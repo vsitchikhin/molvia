@@ -16,17 +16,26 @@
       :body="t('settings.offline.body')"
     />
     <ScreenState
-      v-else-if="online && form.failure && !form.unknown && !form.saveError"
+      v-else-if="!form.draft && online && form.failure && !form.unknown && !form.saveError"
       kind="error"
-      :inline="!!form.draft"
       :title="t('settings.load_error.title')"
       :body="t('settings.load_error.body')"
       @retry="form.refresh"
     />
     <template v-if="form.draft">
-      <p v-if="!online" class="offline">
-        <IconCloud aria-hidden="true" />{{ t('settings.offline.strip') }}
-      </p>
+      <!-- A form shown from what the phone remembers says as of when, and what became of the read
+           (MOL-215, Е-8): the strip, never the quiet card over the fields being edited (MOL-181). -->
+      <StatusStrip
+        v-if="strip"
+        class="status"
+        :kind="strip.kind"
+        :text="strip.text"
+        :attempt="form.failures"
+      >
+        <template #action>
+          <AppButton variant="ghost" @click="form.refresh">{{ t('state.retry') }}</AppButton>
+        </template>
+      </StatusStrip>
       <AppReveal>
         <AppCard
           v-if="form.dirty && !form.unknown && (form.returned || form.conflict || !form.stored)"
@@ -158,31 +167,22 @@
           </p>
         </div>
       </div>
-      <p v-else-if="!online" :id="`${id}-notice`" class="note">
-        {{ t('settings.save_needs_network') }}
-      </p>
       <AppButton
         block
         :inactive="!online || !form.dirty || form.loading || form.unknown"
         :busy="form.saving"
         :busy-label="t('settings.saving')"
-        :aria-describedby="notice || !online ? `${id}-notice` : undefined"
+        :aria-describedby="notice ? `${id}-notice` : undefined"
         @click="form.save"
       >
         <template v-if="form.saveError && online && !form.saving" #icon><IconRefresh /></template>
-        {{
-          form.saveError && online
-            ? t('state.retry')
-            : form.conflict
-              ? t('settings.overwrite')
-              : t('settings.save')
-        }}
+        {{ saveWord }}
       </AppButton>
     </template>
   </AppScreen>
 </template>
 <script lang="ts">
-import { computed, defineComponent, ref, useId, watch } from 'vue'
+import { computed, defineComponent, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { ActorSettings } from '@molvia/model'
 import IconCloud from '~icons/mdi/cloud-off-outline'
@@ -207,8 +207,12 @@ import { countryLabel } from '@/components/placeLabel'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SignOutSheet from '@/components/SignOutSheet.vue'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
+import type { StripKind } from '@/components/StatusStrip.vue'
 import YourDataGroup from '@/components/YourDataGroup.vue'
 import { useSettings } from '@/composables/useSettings'
+import { purchaseDay, timeOfDay } from '@/days'
+import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { useSignOutStore } from '@/stores/signOut'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -238,6 +242,7 @@ export default defineComponent({
     SectionCaption,
     SettingsFields,
     SignOutSheet,
+    StatusStrip,
     YourDataGroup,
   },
   setup() {
@@ -254,6 +259,65 @@ export default defineComponent({
       incomeCurrency: t(`settings.currencies.${value.incomeCurrency}`),
     })
     const settings = useSettings()
+    const { form, online } = settings
+    const actor = useActorStore()
+
+    /**
+     * A read on its way for longer than a moment: only then does the strip say so — a quick one
+     * replaces the form in silence (MOL-201), and the read goes at every opening of the screen.
+     */
+    const late = ref(false)
+    let lateTimer: ReturnType<typeof setTimeout> | undefined
+    watch(
+      () => form.loading && !!form.draft,
+      (waiting) => {
+        clearTimeout(lateTimer)
+        late.value = false
+        if (waiting) {
+          lateTimer = setTimeout(() => {
+            late.value = true
+          }, STRIP_LATE_MS)
+        }
+      },
+      { immediate: true },
+    )
+    onUnmounted(() => {
+      clearTimeout(lateTimer)
+    })
+
+    /**
+     * The form shown and what the server can say of it now (MOL-215, С-11, С-12), as of when the
+     * server last said it to this phone — a shelf of the build before keeps no time, and then the
+     * words say «из памяти». A failure of a save speaks in the strip of the button instead.
+     */
+    const strip = computed<{ kind: StripKind; text: string } | null>(() => {
+      if (!form.draft) return null
+      const at = actor.settingsReadAt
+      const when = at
+        ? { day: purchaseDay(at, i18n.locale.value), time: timeOfDay(at, i18n.locale.value) }
+        : null
+      const said = (key: string): string => (when ? t(key, when) : t(`${key}_untimed`))
+      if (!online.value) return { kind: 'offline', text: said('settings.offline.strip') }
+      if (form.failure && !form.unknown && !form.saveError)
+        return { kind: 'unanswered', text: said('settings.stale_error') }
+      if (late.value) return { kind: 'refreshing', text: said('settings.stale_loading') }
+      return null
+    })
+
+    /**
+     * The button says why it cannot be pressed (Ф-6), on itself and not in a line over it. «Загружаем…»
+     * only where the read keeps the save back: an unchanged form says «изменений нет» while the read of
+     * every opening is on its way, or the word would blink at each one.
+     */
+    const saveWord = computed(() => {
+      if (form.saveError && online.value) return t('state.retry')
+      if (!online.value) return t('settings.save_needs_network')
+      if (form.unknown) return t('settings.save')
+      if (!form.draft) return t('state.loading')
+      if (!form.dirty) return t('settings.save_unchanged')
+      if (form.loading) return t('state.loading')
+      return form.conflict ? t('settings.overwrite') : t('settings.save')
+    })
 
     // «Выйти» (MOL-57): what would be lost is counted while the sheet is open, and the app is
     // asked to send it first — with a connection that is usually everything. Counted is all the
@@ -301,6 +365,8 @@ export default defineComponent({
       unsent,
       askToLeave,
       groupsShown,
+      strip,
+      saveWord,
       feedback: useFeedbackSheetStore(),
     }
   },
@@ -318,7 +384,6 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-.offline,
 .notice {
   display: flex;
   align-items: flex-start;
@@ -337,7 +402,7 @@ export default defineComponent({
   }
 }
 
-.offline,
+.status,
 .draft {
   margin-bottom: var(--space-3);
 }

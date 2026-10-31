@@ -1508,7 +1508,8 @@
     "offline": {
       "title": "No connection",
       "body": "Settings will appear when the connection returns",
-      "strip": "No connection. You can save changes when the internet returns."
+      "strip": "Offline · settings as of {day}, {time}. You can save changes when the internet returns.",
+      "strip_untimed": "Offline · settings saved on this phone. You can save changes when the internet returns."
     },
     "context_missing": "This device has no confirmed settings yet. Connect to load them.",
     "conflict": {
@@ -1532,6 +1533,11 @@
     "changed": "changed",
     "changed_announced": "changed, not saved",
     "save_needs_network": "You can save when the connection returns",
+    "save_unchanged": "Save · no changes",
+    "stale_error": "The server did not answer · settings as of {day}, {time}",
+    "stale_error_untimed": "The server did not answer · settings saved on this phone",
+    "stale_loading": "Refreshing · settings as of {day}, {time}",
+    "stale_loading_untimed": "Refreshing · settings saved on this phone",
     "draft": {
       "title": "You have unsaved changes",
       "volatile": "Changes will remain only while the app is open"

@@ -7,6 +7,8 @@ import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
 import type { ActorView, SettingsUpdate } from '@molvia/model'
 import SectionCaption from '@/components/SectionCaption.vue'
+import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
+import { purchaseDay, timeOfDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -180,7 +182,12 @@ it('offline with memory keeps fields editable and explains when save becomes pos
   me.mockRejectedValue(new TypeError('network'))
   const view = await render()
   await field(view, 'city')?.setValue('Ереван')
-  expect(view.text()).toContain(en.settings.offline.strip)
+  const strips = view.findAllComponents(StatusStrip)
+  expect(strips).toHaveLength(1)
+  expect(strips[0]?.props('kind')).toBe('offline')
+  // Said on the button itself, with no line over it (Ф-6).
+  expect(view.get('.dock > button').text()).toBe(en.settings.save_needs_network)
+  expect(view.find('.dock .note').exists()).toBe(false)
   expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
   expect(view.find('[role="alert"]').exists()).toBe(false)
 })
@@ -313,7 +320,7 @@ it('replaces a previous write error with the offline notice when the connection 
   window.dispatchEvent(new Event('offline'))
   await flushPromises()
   expect(view.find('[role="alert"]').exists()).toBe(false)
-  expect(view.get('.dock > button').text()).toBe(en.settings.save)
+  expect(view.get('.dock > button').text()).toBe(en.settings.save_needs_network)
   expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
 })
 
@@ -405,5 +412,142 @@ describe('«Write to the developer» (MOL-147)', () => {
     await row(view)?.trigger('click')
 
     expect(useFeedbackSheetStore().shown).toBe(true)
+  })
+})
+
+describe('a form shown from memory says as of when, and what became of the read (MOL-215, Е-8)', () => {
+  const READ = new Date('2026-10-31T10:05:00.000Z')
+  const strips = (view: VueWrapper) => view.findAllComponents(StatusStrip)
+  // The day and the time as every strip of the app prints them (`days.ts`, the purchases' too).
+  const asOf = (template: string) =>
+    template.replace('{day}', purchaseDay(READ, 'en')).replace('{time}', timeOfDay(READ, 'en'))
+
+  /** The phone remembers the settings and, unless `readAt` is null, when the server said them. */
+  function remember(readAt: Date | null): void {
+    localStorage.setItem(
+      `molvia.settings.${initial.id}`,
+      JSON.stringify({
+        settings: { country: 'AM', city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' },
+        updatedAt: initial.updatedAt.toISOString(),
+        ...(readAt ? { readAt: readAt.toISOString() } : {}),
+      }),
+    )
+  }
+
+  it('offline: one strip, at the moment the server last said them', async () => {
+    remember(READ)
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    me.mockRejectedValue(new TypeError('network'))
+    const view = await render(false)
+
+    expect(strips(view)).toHaveLength(1)
+    expect(strips(view)[0]?.props('kind')).toBe('offline')
+    expect(strips(view)[0]?.props('text')).toBe(asOf(en.settings.offline.strip))
+  })
+
+  it('offline, a shelf of the build before: from memory, no time', async () => {
+    remember(null)
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    me.mockRejectedValue(new TypeError('network'))
+    const view = await render(false)
+
+    expect(strips(view)[0]?.props('text')).toBe(en.settings.offline.strip_untimed)
+  })
+
+  it('the server did not answer: the strip with «Повторить», never the quiet card over the fields', async () => {
+    remember(READ)
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await render(false)
+
+    expect(view.find('select').exists()).toBe(true)
+    expect(strips(view)).toHaveLength(1)
+    expect(strips(view)[0]?.props('kind')).toBe('unanswered')
+    expect(strips(view)[0]?.props('text')).toBe(asOf(en.settings.stale_error))
+    expect(view.text()).not.toContain(en.settings.load_error.title)
+    const attempt = strips(view)[0]?.props('attempt') as number
+
+    // A retry that failed the same way is an answer too: the strip says its words again (C1).
+    await strips(view)[0]?.get('button').trigger('click')
+    await flushPromises()
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(strips(view)[0]?.props('attempt')).toBe(attempt + 1)
+
+    me.mockResolvedValue(initial)
+    await strips(view)[0]?.get('button').trigger('click')
+    await flushPromises()
+    expect(strips(view)).toHaveLength(0)
+  })
+
+  it('must not fire: a failed save speaks for itself, with no strip of the read beside it', async () => {
+    const view = await render()
+    await field(view, 'city')?.setValue('Ереван')
+    save.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    await view.get('.dock > button').trigger('click')
+    await flushPromises()
+
+    expect(view.find('[role="alert"]').text()).toContain(en.settings.save_error.title)
+    expect(strips(view)).toHaveLength(0)
+  })
+
+  it('a read late past a moment says «обновляем»; a quick one says nothing', async () => {
+    remember(READ)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    try {
+      let answer: (value: ActorView) => void = () => undefined
+      me.mockReturnValue(
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+      )
+      const view = await render(false)
+      vi.advanceTimersByTime(STRIP_LATE_MS - 1)
+      await flushPromises()
+      expect(strips(view)).toHaveLength(0)
+
+      vi.advanceTimersByTime(1)
+      await flushPromises()
+      expect(strips(view)[0]?.props('kind')).toBe('refreshing')
+      expect(strips(view)[0]?.props('text')).toBe(asOf(en.settings.stale_loading))
+      expect(strips(view)[0]?.find('button').exists()).toBe(false)
+
+      answer(initial)
+      await flushPromises()
+      expect(strips(view)).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('«Сохранить» says why it cannot be pressed, on itself (Ф-6)', () => {
+  const button = (view: VueWrapper) => view.get('.dock > button')
+
+  it('no changes', async () => {
+    const view = await render()
+    expect(button(view).text()).toBe(en.settings.save_unchanged)
+    expect(button(view).attributes('aria-disabled')).toBe('true')
+
+    await field(view, 'city')?.setValue('Ереван')
+    expect(button(view).text()).toBe(en.settings.save)
+    expect(button(view).attributes('aria-disabled')).toBeUndefined()
+  })
+
+  it('loading, with no form yet', async () => {
+    me.mockReturnValue(new Promise(() => undefined))
+    const view = await render(false)
+    expect(button(view).text()).toBe(en.state.loading)
+  })
+
+  it('loading, a changed form waiting for the read — and not an unchanged one', async () => {
+    // An unchanged form says «no changes» through the read of every opening: the word would
+    // otherwise blink at each one.
+    me.mockReturnValue(new Promise(() => undefined))
+    const view = await render()
+    expect(button(view).text()).toBe(en.settings.save_unchanged)
+
+    await field(view, 'city')?.setValue('Ереван')
+    expect(button(view).text()).toBe(en.state.loading)
+    expect(button(view).attributes('aria-disabled')).toBe('true')
   })
 })

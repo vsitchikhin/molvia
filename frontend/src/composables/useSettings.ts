@@ -26,6 +26,8 @@ const useSettingsStore = defineStore('settingsForm', () => {
   const loading = ref(false)
   const saving = ref(false)
   const failure = ref(false)
+  /** Failed reads, counted, so a strip whose retry failed the same way says its words again (C1). */
+  const failures = ref(0)
   const stored = ref(true)
   const saved = ref(false)
   const saveError = ref(false)
@@ -182,7 +184,10 @@ const useSettingsStore = defineStore('settingsForm', () => {
       return true
     } catch {
       // A session that ended is heard by the seam in `@/api`, not by every caller (MOL-56).
-      if (mine === generation) failure.value = true
+      if (mine === generation) {
+        failure.value = true
+        failures.value += 1
+      }
       return false
     } finally {
       if (mine === generation) loading.value = false
@@ -246,6 +251,7 @@ const useSettingsStore = defineStore('settingsForm', () => {
     loading,
     saving,
     failure,
+    failures,
     stored,
     saved,
     edit,
