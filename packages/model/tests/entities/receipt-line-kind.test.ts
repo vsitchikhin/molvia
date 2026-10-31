@@ -73,6 +73,9 @@ const WORDS = {
   մարտկոց: 'батарейка',
   սուպեր: 'супер',
   ձեռնոց: 'перчатки',
+  դրաժե: 'драже',
+  շոկոլադե: 'шоколадный',
+  կոնդիցիոներ: 'кондиционер',
 }
 
 const kind = (printed: string) => receiptLineParts(printed).kind
@@ -285,6 +288,45 @@ describe('a brand as its package spells it (MOL-261, В-2 «а»)', () => {
     expect(fit('Печенье Roshen Lovita')).toBe(false)
     // without the lexicon the brand is two letters off its package, and another
     expect(lineFitter(delice, WORDS)('Печенье Kinder Délice')).toBe(false)
+  })
+})
+
+describe('a Latin brand the till prints as it is said, letter by letter (MOL-326)', () => {
+  it('is the line’s brand, its letters in Latin', () => {
+    expect(receiptLineParts('Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ')).toMatchObject({
+      before: ['Լվացքի', 'կոնդիցիոներ'],
+      brand: 'Էյ Բի Սի',
+      after: ['1լ'],
+      kind: 'կոնդիցիոներ',
+    })
+    expect(named('Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ')?.name).toMatch(/^Кондиционер .*ABC 1 л$/u)
+    expect(named('Կոնդիցիոներ «Էյ Բի Սի» 1լ')?.name).toBe('Кондиционер ABC 1 л')
+  })
+
+  it('reads «and» between letters and a plural «-ս» at the end of them', () => {
+    expect(named('Շոկոլադե դրաժե Էմ ընդ Էմս 45գ')).toEqual({
+      name: "Драже шоколадное M&M's 45 г",
+      spelled: false,
+    })
+    expect(named('ԷՄ ԸՆԴ ԷՄՍ 45Գ')).toEqual({ name: "M&M's 45 г", spelled: false })
+    expect(receiptLineParts('Դրաժե Էմ էնդ Էմս').brand).toBe('Էմ էնդ Էմս')
+  })
+
+  it('takes one letter’s name, or «and» with nothing after it, for no brand', () => {
+    expect(receiptLineParts('Վիտամին Դի 30հտ').brand).toBeNull()
+    expect(receiptLineParts('Դրաժե Էմ ընդ').brand).toBeNull()
+    expect(receiptLineParts('Դրաժե Էմս').brand).toBeNull()
+  })
+
+  it('lets an item named by its letters stand on the line, and takes no item of the seed', () => {
+    const fit = (printed: string, item: string, generic = false) =>
+      lineFitter(receiptLineParts(printed), WORDS)(item, { generic })
+    expect(fit('ԷՄ ԸՆԴ ԷՄՍ 45Գ', "M&M's")).toBe(true)
+    expect(fit('Շոկոլադե դրաժե Էմ ընդ Էմս 45գ', "Драже M&M's")).toBe(true)
+    expect(fit('Շոկոլադե դրաժե Էմ ընդ Էմս 45գ', 'Драже Skittles')).toBe(false)
+    expect(fit('Շոկոլադե դրաժե Էմ ընդ Էմս 45գ', 'Драже', true)).toBe(false)
+    expect(fit('Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ', 'Кондиционер ABC')).toBe(true)
+    expect(fit('Լվացքի կոնդիցիոներ Էյ Բի Սի 1լ', 'Кондиционер Lenor')).toBe(false)
   })
 })
 

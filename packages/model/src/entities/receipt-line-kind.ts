@@ -122,14 +122,105 @@ const SIZE_UNITS: Readonly<Record<string, string>> = {
   լ: 'л',
 }
 
+// The Armenian names of the Latin letters, as a till spells a brand it hears letter by letter (MOL-326)
+const LETTER_NAMES: Readonly<Record<string, string>> = {
+  էյ: 'A',
+  բի: 'B',
+  սի: 'C',
+  դի: 'D',
+  ի: 'E',
+  էֆ: 'F',
+  ջի: 'G',
+  էյչ: 'H',
+  այ: 'I',
+  ջեյ: 'J',
+  քեյ: 'K',
+  կեյ: 'K',
+  էլ: 'L',
+  էմ: 'M',
+  էն: 'N',
+  օ: 'O',
+  փի: 'P',
+  պի: 'P',
+  քյու: 'Q',
+  ար: 'R',
+  էս: 'S',
+  թի: 'T',
+  տի: 'T',
+  յու: 'U',
+  վի: 'V',
+  դաբլյու: 'W',
+  էքս: 'X',
+  ուայ: 'Y',
+  զեդ: 'Z',
+  զի: 'Z',
+}
+const LETTERS_AND = new Set(['ընդ', 'էնդ'])
+
+/**
+ * A Latin brand printed as it is said, from the token at `at` (MOL-326): two letters' names at least —
+ * «Էյ Բի Սի» ABC — «and» between two of them, and a plural «-ս» on the last after an «and», «Էմ ընդ Էմս» M&M's.
+ * One letter's name is no brand: «Վիտամին Դի» is a vitamin D.
+ */
+function letterRun(
+  tokens: readonly string[],
+  at: number,
+): { readonly length: number; readonly latin: string } | null {
+  let latin = ''
+  let letters = 0
+  let end = at
+  for (let i = at; i < tokens.length; i += 1) {
+    const token = keyed(tokens[i] ?? '')
+    const letter = LETTER_NAMES[token]
+    if (letter !== undefined) {
+      latin += letter
+      letters += 1
+      end = i + 1
+      continue
+    }
+    const plural = token.endsWith('ս') ? LETTER_NAMES[token.slice(0, -1)] : undefined
+    if (plural !== undefined && letters > 0 && latin.endsWith('&')) {
+      latin += `${plural}'s`
+      letters += 1
+      end = i + 1
+      break
+    }
+    if (!LETTERS_AND.has(token) || letters === 0 || latin.endsWith('&')) break
+    latin += '&'
+  }
+  if (letters < 2) return null
+  return { length: end - at, latin: latin.replace(/&$/u, '') }
+}
+
+/** A brand that is letters' names whole, in Latin: «Էյ Բի Սի» ABC; else none. */
+function lettersOf(text: string): string | null {
+  const tokens = text.split(/\s+/u).filter((token) => token !== '')
+  const run = letterRun(tokens, 0)
+  return run !== null && run.length === tokens.length ? run.latin : null
+}
+
 export function receiptLineParts(printed: string): ReceiptLineParts {
   const open = printed.indexOf('«')
   const close = open < 0 ? -1 : printed.indexOf('»', open + 1)
   const quoted = open < 0 ? null : printed.slice(open + 1, close < 0 ? undefined : close).trim()
   // «…» a till cut, «22/24» a calibre: no letter, no brand — its text stays a word of the line
-  const brand = quoted !== null && /\p{L}/u.test(quoted) ? quoted : null
-  const before = tokensOf(brand === null ? printed.replace(/[«»]/gu, ' ') : printed.slice(0, open))
-  const after = brand === null || close < 0 ? [] : tokensOf(printed.slice(close + 1))
+  const inQuotes = quoted !== null && /\p{L}/u.test(quoted) ? quoted : null
+  const tokens = tokensOf(
+    inQuotes === null ? printed.replace(/[«»]/gu, ' ') : printed.slice(0, open),
+  )
+  // a brand said letter by letter is the line's brand where no «…» is, «Լվացքի կոնդիցիոներ Էյ Բի Սի» (MOL-326)
+  const spokenAt =
+    inQuotes === null ? tokens.findIndex((_, at) => letterRun(tokens, at) !== null) : -1
+  const spoken = spokenAt < 0 ? null : letterRun(tokens, spokenAt)
+  const brand =
+    spoken === null ? inQuotes : tokens.slice(spokenAt, spokenAt + spoken.length).join(' ')
+  const before = spoken === null ? tokens : tokens.slice(0, spokenAt)
+  const after =
+    spoken !== null
+      ? tokens.slice(spokenAt + spoken.length)
+      : brand === null || close < 0
+        ? []
+        : tokensOf(printed.slice(close + 1))
   const head = brand === null ? [...before, ...after] : before.length > 0 ? before : after
   const words = head.filter(
     (token) =>
@@ -316,9 +407,9 @@ const lexiconKey = (text: string): string =>
 // a package's spelling in Latin letters is written bare, as the shelf writes it: «Печенье Roshen Lovita»
 const LATIN_NAME = /^[\p{Script=Latin}\d\s'&.-]+$/u
 
-/** The package's spelling of a brand or a line the lexicon knows, else none. */
+/** The package's spelling of a brand or a line the lexicon knows, or of one said letter by letter, else none. */
 const shelfOf = (text: string, lexicon: NameLexicon): string | null =>
-  lexicon.brands?.[lexiconKey(text)] ?? null
+  lexicon.brands?.[lexiconKey(text)] ?? lettersOf(text)
 
 /**
  * A brand as a name writes it (MOL-261, owner's В-2 «а»): the package's spelling, a Latin one with no quotes —
@@ -797,6 +888,8 @@ const wordsOf = (text: string): string[] =>
   text
     .toLowerCase()
     .replace(/ё/gu, 'е')
+    // «M&M's» is one word, never three letters too short to be any (MOL-326)
+    .replace(/(?<=\p{L})[&'’](?=\p{L})/gu, '')
     .split(/[^\p{L}]+/u)
     .filter((word) => word.length > 2 && !NO_WORD.has(word))
 
