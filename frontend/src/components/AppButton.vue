@@ -237,6 +237,12 @@ export default defineComponent({
   display: flex;
   width: 100%;
   overflow-wrap: anywhere;
+
+  /* With a hyphen where the browser knows the language: «Сфотографи-ровать чек», not
+     «Сфотографирова|ть» (MOL-321) — only a word of twelve letters and more, or WebKit hyphenates any
+     word at a line's end («Сохранить из-менения»). */
+  hyphens: auto;
+  hyphenate-limit-chars: 12 5 5;
 }
 
 /* `aria-disabled` is still `:enabled`: the press and the hover read both, or an inactive button

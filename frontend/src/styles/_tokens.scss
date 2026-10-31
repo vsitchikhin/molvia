@@ -50,7 +50,11 @@
   --text-body: 1.0625rem; /* 17 */
   --text-callout: 0.9375rem; /* 15 — secondary row line */
   --text-footnote: 0.8125rem; /* 13 — unit price, meta */
-  --text-caption: 0.6875rem; /* 11 — tab label, section caption */
+  --text-caption: 0.6875rem; /* 11 — section caption */
+
+  /* The tab label: the caption, grown with the text to 125 % of it and no further (MOL-321, owner's
+     В-3 «а»), as iOS keeps its tab bar's labels — at 150 % on 320 «Настройки» stood past the phone. */
+  --text-tab: min(var(--text-caption), 13.75px); /* 11, at most 13.75 */
 
   /* The amount of a spending as it is typed (MOL-82): the one answer of its sheet, read at arm's
      length — off the scale on purpose, and its currency sign beside it. */

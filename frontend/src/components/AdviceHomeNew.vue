@@ -253,6 +253,14 @@ export default defineComponent({
   font-size: var(--text-title);
   line-height: var(--leading-tight);
   text-wrap: balance;
+
+  /* A word wider than the column breaks, with a hyphen where the browser knows the language
+     (MOL-321): «Сфотографируйте» at 150 % on 320 is 332 px in a column of 260, and took the page 42 px
+     sideways. Only a word of twelve letters and more: WebKit hyphenates any word at a line's end, and
+     «Запишите первые по-купки» came at a text of 100 %. The skeleton's words break as the answer's. */
+  overflow-wrap: break-word;
+  hyphens: auto;
+  hyphenate-limit-chars: 12 5 5;
 }
 
 .intro-body,

@@ -105,7 +105,7 @@ export default defineComponent({
   gap: var(--space-1);
   padding-top: var(--space-2);
   color: var(--text-muted);
-  font-size: var(--text-caption);
+  font-size: var(--text-tab);
   font-weight: var(--weight-medium);
   text-decoration: none;
   transition: color var(--dur-fast) var(--ease-out);
