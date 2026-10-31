@@ -1,35 +1,45 @@
 <template>
-  <div class="login">
-    <div class="head">
+  <div ref="root" class="login">
+    <!-- The first screen names the product and what it is for, not «Вход» (Ф-35, 41 v2 7a); every
+         later step is a step of signing in, and keeps the title. -->
+    <div v-if="phase !== 'offer'" class="head">
       <h1 class="title" tabindex="-1">{{ t('login.title') }}</h1>
     </div>
 
-    <div class="content">
+    <div class="content" :class="{ offer: phase === 'offer' }">
       <!-- Said once, right after «Удалить мои данные» (MOL-94, В-3): the same screen with no word
            left «did it work?» open — and when it did not, or nobody can tell, it says that. -->
       <p v-if="erasure" class="erasure" :class="erasure.tone">
         <IconCheck v-if="erasure.tone === 'done'" aria-hidden="true" />
         <IconAlert v-else aria-hidden="true" />{{ erasure.words }}
       </p>
-      <ScreenSkeleton v-if="phase === 'loading'" :groups="[70, 45]" />
-
-      <ScreenState
-        v-else-if="phase === 'offer'"
-        kind="empty"
-        :icon="IconSend"
-        :title="t('login.offer.title')"
-        :body="t('login.offer.body')"
-      >
-        <p v-if="insecure" class="hint">{{ t('dev.login_insecure') }}</p>
-        <template #action>
-          <AppButton block :busy="starting" :busy-label="t('login.starting')" @click="begin">
+      <!-- A screen, not a state of one: the words are read from the focus on the name, and nothing
+           here goes to the live region. The mark is the home screen's icon; the name beside it says it. -->
+      <template v-if="phase === 'offer'">
+        <img class="mark" src="/favicon.svg" alt="" width="64" height="64" />
+        <h1 class="title brand" tabindex="-1">{{ t('app.name') }}</h1>
+        <p class="promise">{{ t('login.promise') }}</p>
+        <div class="ask">
+          <h2>{{ t('login.offer.title') }}</h2>
+          <p class="why">{{ t('login.offer.body') }}</p>
+          <AppButton
+            size="large"
+            block
+            :busy="starting"
+            :busy-label="t('login.starting')"
+            @click="begin"
+          >
+            <template #icon><IconSend /></template>
             {{ t('login.start') }}
           </AppButton>
           <AppButton v-if="seam" block variant="ghost" @click="devSignIn">
             {{ t('dev.login_seam') }}
           </AppButton>
-        </template>
-      </ScreenState>
+          <p v-if="insecure" class="hint">{{ t('dev.login_insecure') }}</p>
+        </div>
+      </template>
+
+      <ScreenSkeleton v-else-if="phase === 'loading'" :groups="[70, 45]" />
 
       <ScreenState
         v-else-if="phase === 'waiting'"
@@ -139,7 +149,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, onMounted, watch } from 'vue'
+import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCheck from '~icons/mdi/check'
@@ -154,6 +164,7 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useReconnect } from '@/composables/useReconnect'
 import { provideStateStrip } from '@/composables/useStateStrip'
 import { purchaseDay } from '@/days'
+import { focusScreenTitle } from '@/transitions'
 import { usePwaUpdate } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { takeErasureNote } from '@/stores/identity'
@@ -180,6 +191,7 @@ export default defineComponent({
     ConsentStep,
     IconAlert,
     IconCheck,
+    IconSend,
     ScreenSkeleton,
     ScreenState,
     UpdateBand,
@@ -196,6 +208,29 @@ export default defineComponent({
     )
 
     const phase = computed(() => login.phase)
+
+    // The first screen has a heading of its own, «Molvia», and every other step «Вход» (MOL-216): a
+    // change between them takes the heading the focus stood on — `installArrival` puts it there — and
+    // a state's buttons go the same way. Lost so, the focus goes to the heading that came, as a move's
+    // does (adversarial А2); one the person put elsewhere stays where it is.
+    const root = ref<HTMLElement | null>(null)
+    let focusWithin = false
+    watch(
+      phase,
+      () => {
+        focusWithin = root.value?.contains(document.activeElement) ?? false
+      },
+      { flush: 'pre' },
+    )
+    watch(
+      phase,
+      async () => {
+        await nextTick()
+        const focused = document.activeElement
+        if (focusWithin && (focused === null || focused === document.body)) focusScreenTitle()
+      },
+      { flush: 'post' },
+    )
     // The seam is a button rather than something that happens by itself, and only here: Vite
     // folds the literal, so a production bundle carries neither the button nor the call.
     const seam = import.meta.env.DEV
@@ -251,17 +286,21 @@ export default defineComponent({
             : null
     const announce = useAnnouncer()
     let withdraw: (() => void) | undefined
+    const own = `${t('login.title')} · ${t('app.name')}`
     onMounted(() => {
-      document.title = `${t('login.title')} · ${t('app.name')}`
+      document.title = own
       if (erasure) withdraw = announce?.(erasure.words)
     })
+    // Only a title still the door's: a public screen opened from it is named by `installArrival`
+    // before the door goes, and «Purchases» put back over it named a screen nobody saw (adversarial А4).
     onBeforeUnmount(() => {
-      document.title = before
+      if (document.title === own) document.title = before
       withdraw?.()
     })
 
     return {
       t,
+      root,
       phase,
       offered,
       seam,
@@ -317,6 +356,57 @@ export default defineComponent({
   flex-direction: column;
   padding: var(--space-4) calc(var(--space-4) + var(--safe-right))
     calc(var(--space-4) + var(--safe-bottom)) calc(var(--space-4) + var(--safe-left));
+}
+
+// 40 under the status bar (41 v2 7a).
+.offer {
+  padding-top: calc(var(--safe-top) + var(--space-8) + var(--space-2));
+}
+
+// Its 64 is the image's own attributes: a picture, not an icon of the scale.
+.mark {
+  display: block;
+}
+
+// The title of every step, 24 under the mark.
+.brand {
+  margin-top: var(--space-6);
+}
+
+.promise {
+  @include display-type;
+
+  max-width: 30ch;
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-title);
+  line-height: var(--leading-tight);
+  text-wrap: balance;
+}
+
+// The free height is above the ask, so the one action stands where the thumb is.
+.ask {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: auto;
+  padding-top: var(--space-8);
+
+  h2 {
+    margin: 0;
+    font-size: var(--text-headline);
+    font-weight: var(--weight-medium);
+  }
+
+  .why {
+    margin: 0;
+    color: var(--text-muted);
+    font-size: var(--text-callout);
+    line-height: var(--leading-body);
+  }
+
+  .button:first-of-type {
+    margin-top: var(--space-2);
+  }
 }
 
 .erasure {
@@ -375,7 +465,10 @@ export default defineComponent({
   flex-wrap: wrap;
   justify-content: center;
   gap: 0 var(--space-6);
-  margin-bottom: calc(var(--space-2) + var(--safe-bottom));
+
+  // The page's margins: at 320 the two links stood flush with both edges of the phone.
+  margin: 0 calc(var(--space-4) + var(--safe-right)) calc(var(--space-2) + var(--safe-bottom))
+    calc(var(--space-4) + var(--safe-left));
 
   a {
     display: flex;

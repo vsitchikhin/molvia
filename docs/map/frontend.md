@@ -73,7 +73,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/env.d.ts` — Ambient type references for Vite and the PWA plugin's client.
 - `frontend/index.html` — The PWA's HTML shell: viewport with keyboard resizing, per-scheme theme colours, the device's scheme set before the first paint, icons, the app mount, and the floor of the build checked before any module (MOL-231): below it one line in place of the app.
 - `frontend/public/` — Static assets served as is: `favicon.svg` (the icon source), the rasterised app icons and the self-hosted font files.
-- `frontend/src/App.vue` — The app's root: the login screen in place of any non-public route, the live region, and the occasions on which the queues send.
+- `frontend/src/App.vue` — The app's root: the login screen in place of any non-public route — the focus on its heading when it shuts over the app — the live region, and the occasions on which the queues send.
 - `frontend/src/api.ts` — The PWA's one API client, wrapped so that any `error.no_actor` raises the login screen, and the last refusal's code is kept a minute for an error screen's message to the developer (`lastRefusal`, MOL-147).
 - `frontend/src/browserFloor.ts` — `belowFloor()`: the mark `data-outdated` the script in `index.html` puts on the root for a browser below `build.target`, read by the catchers and the start (MOL-231).
 - `frontend/src/browserFloor.test.ts` — Test of the floor's script: its markers stand exactly at `build.target` for every engine, it runs before the app's module, a browser at the floor passes untouched, one without a marker gets the mark and the locales' line, and its language is `pickLocale`'s.
@@ -84,7 +84,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/i18n/plural-ru.ts` — The Russian plural rule for vue-i18n: form by the last two digits, fractions and unknown counts included.
 - `frontend/src/ids.ts` — `newId`: a lower-case uuid for rows the device names, with a fallback outside a secure context.
 - `frontend/src/main.ts` — The PWA's entry: router, i18n, the update worker and the `401` seam installed, the app mounted, the identity started — none of it below the floor of the build (MOL-231).
-- `frontend/src/navigation.ts` — Navigation rules: how a tab tap is written into history (home — «Что брать»), where the back chevron leads, up to the parent, cold-start parent laying, guarded step back and `afterStep`.
+- `frontend/src/navigation.ts` — Navigation rules: how a tab tap is written into history (home — «Что брать»), where the back chevron leads — behind the login a public screen's leads to the door (MOL-216) — up to the parent, cold-start parent laying, guarded step back and `afterStep`.
 - `frontend/src/optimizeDeps.test.ts` — Test: every package a worker imports, through the modules of `src` it loads, stands in `optimizeDeps.include` of `vite.config.ts`, so the dev server never optimizes one in the middle of an end-to-end run (MOL-217).
 - `frontend/src/pwaUpdate.ts` — Service-worker registration and update: quietly while hidden with no sheet, or by «Обновить»; looks every 15 min and on a new server build; `phase` for the app, `build` — the first build the API named to the page (MOL-147).
 - `frontend/src/router.ts` — The router: every route with its title key, tab and parent, redirects of old addresses (`/trip*`, `/advice`), the dev-only kit route, and the scroll behaviour.

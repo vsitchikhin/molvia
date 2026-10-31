@@ -48,7 +48,7 @@ test('keeps the session across a reload, and no script can read it', async ({ pa
   await page.reload()
 
   expect((await sessionCookie(page))?.value).toBe(session?.value)
-  await expect(page.getByRole('heading', { level: 1 })).not.toHaveText('Sign in')
+  await expect(page.getByRole('heading', { level: 1 })).not.toHaveText(/^(Sign in|Molvia)$/)
   expect(identifiers).toEqual([])
 })
 
@@ -80,7 +80,7 @@ test('a session that is gone brings back the same owner, not a new person', asyn
   await page.reload()
 
   // Экран входа, а не пустое приложение и не новый человек (MOL-56): входим снова тем же швом.
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Sign in')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
   await page.getByRole('button', { name: 'Sign in for development' }).click()
 
   await expect.poll(async () => (await sessionCookie(page))?.value).toMatch(/^[A-Za-z0-9_-]{43}$/)

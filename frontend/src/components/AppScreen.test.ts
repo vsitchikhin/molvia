@@ -415,6 +415,23 @@ describe('AppScreen', () => {
       expect(back.get('.hidden').text()).toBe(dictionary.nav.back_label)
     })
 
+    // MOL-216, Е-9: a public screen opened with nobody on the device — behind the door — leads back
+    // to it; «‹ Настройки» promised a screen nobody is let into.
+    it.each([
+      ['en', en],
+      ['ru', ru],
+    ] as const)(
+      'on a public screen behind the door is named after the door in %s',
+      async (locale, dictionary) => {
+        for (const path of ['/privacy', '/terms']) {
+          const { view } = await render(path, { locale })
+          expect(view.get('.back').text().replace(/\s+/g, ' ').trim()).toBe(
+            `${dictionary.nav.back_label} ${dictionary.login.title}`,
+          )
+        }
+      },
+    )
+
     describe('when its label does not fit (MOL-75)', () => {
       /** Sizes happy-dom does not lay out: the column, the labels and where the label starts. */
       const size = { column: 200, full: 0, short: 0 }

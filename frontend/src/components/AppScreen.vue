@@ -97,6 +97,7 @@ import { useBackLabel } from '@/composables/useBackLabel'
 import { useCollapsed, useHeight } from '@/composables/useCollapsed'
 import { provideStateStrip } from '@/composables/useStateStrip'
 import { backTarget, useNavigation } from '@/navigation'
+import { useLoginStore } from '@/stores/login'
 import { usePwaUpdate } from '@/pwaUpdate'
 import { focusScreenTitle } from '@/transitions'
 
@@ -140,7 +141,12 @@ export default defineComponent({
 
     // Named by where it leads (`backTarget`): a screen opened from further up than its parent goes
     // back there, and says so (MOL-77) — the search of a record over «Покупки» says «Покупки».
-    const parentTitleKey = computed(() => backTarget(router, route)?.location.meta.titleKey)
+    // Behind the door a public screen is named after it, «‹ Вход» (MOL-216).
+    const login = useLoginStore()
+    const parentTitleKey = computed(() => {
+      const target = backTarget(router, route, login.closed)
+      return target ? (target.titleKey ?? target.location.meta.titleKey) : undefined
+    })
 
     const column = ref<HTMLElement | null>(null)
     const button = ref<HTMLElement | null>(null)

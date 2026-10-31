@@ -1,9 +1,10 @@
 import { mount } from '@vue/test-utils'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { createRouter, createWebHistory, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
+import { POLICY_VERSION } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
 import {
   afterStep,
@@ -139,6 +140,44 @@ describe('backTarget — the chevron agrees with the system button', () => {
 })
 
 // «Удалить» on an account leads to «Счета», where «Вернуть» stands — not to «Деньги» (review 32).
+// MOL-216, Е-9: «Данные и приватность» and «Условия» open without a session, and their parent is
+// «Настройки», where nobody is let in. Behind the door the chevron is the door's.
+describe('backTarget behind the door — a public screen leads back to the login', () => {
+  const target = (router: Router, door = true) => {
+    const found = backTarget(router, router.currentRoute.value, door)
+    return found && { path: found.location.path, step: found.step, title: found.titleKey }
+  }
+
+  it('steps back onto the address the login stood at, named «Вход»', async () => {
+    const router = await fresh('/money')
+    await router.push('/privacy')
+    expect(target(router)).toEqual({ path: '/money', step: true, title: 'login.title' })
+  })
+
+  it('with nothing of ours underneath, replaces onto home, where the door is drawn', async () => {
+    const router = await fresh('/terms')
+    expect(target(router)).toEqual({ path: '/', step: false, title: 'login.title' })
+  })
+
+  it('a public screen underneath is drawn as itself, and named by its own title', async () => {
+    const router = await fresh('/terms')
+    await router.push('/privacy')
+    expect(target(router)).toEqual({ path: '/terms', step: true, title: undefined })
+  })
+
+  it('with the door open, the parent as ever: «‹ Настройки»', async () => {
+    const router = await fresh('/money')
+    await router.push('/privacy')
+    expect(target(router, false)).toEqual({ path: '/settings', step: false, title: undefined })
+  })
+
+  it('a screen that is not public keeps its parent behind the door too', async () => {
+    const router = await fresh('/purchases')
+    await router.push('/purchases/manual')
+    expect(target(router)).toEqual({ path: '/purchases', step: true, title: undefined })
+  })
+})
+
 describe('upTarget — onto the parent itself', () => {
   const ACCOUNT = '/money/accounts/aaaaaaaa-0000-4000-8000-000000000031'
   const target = (router: Router) => {
@@ -190,6 +229,27 @@ describe('settleColdStart', () => {
       expect(router.options.history.state.back).toBeNull()
     },
   )
+
+  // MOL-216, owner's В-1 «а»: a stranger who opened the privacy page by a link and went back signed in
+  // onto «Настройки». Behind the door home is underneath; with it open, the chain as ever.
+  it.each(['/privacy', '/terms'])('behind the door lays home under %s', async (path) => {
+    const router = await fresh(path)
+    await settleColdStart(router, () => true)
+    expect(router.currentRoute.value.fullPath).toBe(path)
+    expect(router.options.history.state.back).toBe('/')
+  })
+
+  it('with the door open lays «Настройки» under the privacy page', async () => {
+    const router = await fresh('/privacy')
+    await settleColdStart(router, () => false)
+    expect(router.options.history.state.back).toBe('/settings')
+  })
+
+  it('behind the door a screen that is not public still gets its chain', async () => {
+    const router = await fresh('/purchases/manual/add')
+    await settleColdStart(router, () => true)
+    expect(router.options.history.state.back).toBe('/purchases/manual')
+  })
 
   // A reload keeps the history state: the parent is already there and must not be doubled.
   it('lays «Деньги» under a recorded row opened cold from there', async () => {
@@ -390,6 +450,15 @@ describe('the tab bar walks the history as В-2 decided', () => {
   })
 
   it('two taps on the chevron in one go take one step back', async () => {
+    // Somebody on the device, claimed, who accepted this edition: the door is open, and the privacy page's
+    // chevron is «‹ Настройки» (behind the door it is the door's, MOL-216).
+    const owner = 'aaaaaaaa-0000-4000-8000-0000000000aa'
+    localStorage.setItem('molvia.actor', owner)
+    localStorage.setItem('molvia.login', JSON.stringify({ claimed: owner }))
+    localStorage.setItem(`molvia.consent.${owner}`, String(POLICY_VERSION))
+    onTestFinished(() => {
+      localStorage.clear()
+    })
     const router = await fresh('/settings')
     await router.push('/privacy')
     const view = mount(

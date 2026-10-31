@@ -415,7 +415,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   never `updated_at` — MOL-239's clock; past a session's 180 days only the login marks it.
 - **The login is a gate, not a route** (MOL-56): the door has one definition, `login.closed`; the
   device remembers the request and never the secret; whose account this is, is asked before anyone
-  is let in; the queue and the drafts send only once the server has said who we are.
+  is let in; the queue and the drafts send only once the server has said who we are. Behind the
+  door a public screen's chevron is «‹ Вход», and opened cold it has home underneath (MOL-216).
 - **«Выйти» erases this device's drawer after the server's `204`, never on the tap** (MOL-57); a
   lost `204` is settled by the server's next answer; offline there is no way out.
 
