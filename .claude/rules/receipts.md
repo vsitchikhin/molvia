@@ -680,8 +680,9 @@ vector goes, for the API's writer to make again. A second run finds nothing.
 has its rule; the bench and its figures are `.scratch/tasks/research/MOL-326.md`.
 
 - **A word glued to its package is a word** (`tokensOf`, `receiptWords`): «Շաքարավազ1կգ» lost its word whole and was named
-  «1 кг». It is split where two Armenian letters meet a figure — a letter before a figure is a code's, «Ա1». A unit in
-  capitals is a unit: «45Գ».
+  «1 кг». It is split where two Armenian letters meet **a package whole, its figure and its unit** — a figure alone is
+  the model's «շ», «Ֆրեշ» read «Ֆրե2» 16 times of 19 on the bench, «Լավաշ» «Լավա2» (adversarial А4) — and a letter before
+  a figure is a code's, «Ա1». A unit in capitals is a unit: «45Գ».
 - **A Latin brand said letter by letter is the line's brand, in Latin** (`letterRun`): the Armenian names of the Latin
   letters, two at least — «Էյ Բի Սի» ABC — «ընդ» or «էնդ» between them «&», a plural «-ս» on the last after it, «Էմ ընդ
   Էմս» M&M's. It is the line's brand with no «…» as well, so the seed's item stands on no such line and `lineFitter` finds
@@ -697,18 +698,26 @@ has its rule; the bench and its figures are `.scratch/tasks/research/MOL-326.md`
   it misreads otherwise, and of 17 put right 11 were wrong — «Խոզի թայմ ֆիլե», «թարմ» read twice wrong, became a lime. So
   the rule «a dictionary's word is read exactly, never one edit off» (MOL-293) holds, but for one measured swap of the
   font on the model's lines, as its 5↔6 of the figures (MOL-290). `make rename-items` reads a recorded line so too, by its
-  `reader_version`.
+  `reader_version`. **Which receipt is the model's is one flag** (`byModel`): `readByOcr` says false, the server hands
+  it to `bindReceiptLines`, and a test through the server's own queue turns red for either flipped (self-review №4).
 - **The tables grew by the owner's lines**: «լցոնիչ» наполнитель; «կատվի», «շան» кошачий, собачий; the phrases «կատվի
   հող», «ՏՈՖՈՒ ՀՈՂ» — «наполнитель для лотка», the seed's name of it, so `kindKey` is one — and «լվացքի կոնդիցիոներ» «для
-  белья»; Tofu. **A brand of the table that is a word of the dictionary is the word where it is the line's kind**:
-  «Տոֆու 200գ» is tofu, «Լցոնիչ Տոֆու» a litter of Tofu. «կատվի հող» is a phrase, never a name of the seed: the seed's
-  item would stand on a bare-branded litter and lose Tofu (the bench judged it bad).
-- **Where a thing was grown or made makes it no other thing** (owner's В-2 «а»): a country in parentheses —
-  «(հայկական)», «(ռուսական)», every one the bench prints — and «տեղական», «ներմուծված» anywhere are no word of the line,
-  for the name and the binding alike: «Եգիպտացորեն (հայկական)» and «Եգիպտացորեն» are one «Кукуруза», each standing on the
-  other's item. A country printed bare is a kind as often — «Պղպեղ բուլղարական» a bell pepper, «Սուրճ հայկական» the
-  seed's Armenian coffee — and stays. **The price, named:** words exactly as the truth writes them 783 → 776, since the
-  truth writes «(армянская)».
+  белья»; Tofu. **What names an item finds it again** (adversarial А1): `lineFitter` reads a line's words by the
+  genitives and the phrases as well as by the dictionary, and a phrase that holds the kind is a sense of the kind — else
+  «Корм кошачий «Феликс»», made by one receipt, was refused by the next, which master's «Корм кошка» was not. **A brand of
+  the table that is a word of the dictionary is the word where it is the line's kind**: «Տոֆու 200գ» is tofu, «Լցոնիչ
+  Տոֆու» a litter of Tofu; **and printed bare anywhere else it makes the line a branded one**: «Կատվի հող Տոֆու» takes no
+  litter of the seed. «կատվի հող» is a phrase, never a name of the seed, for the same reason. **The price, named**
+  (self-review №6): a tofu that is not the kind is the brand — «Պանիր Տոֆու» names «Сыр Tofu», where the seed's «Тофу»
+  binds it first.
+- **Where a thing was grown or made makes it no other thing** (owner's В-2 «а»): a word of `ORIGINS` — local, imported,
+  and the countries the receipts print of produce, «(հայկական)», «(ռուսական)», «իրանական» — is no word of the line, in
+  parentheses or not (self-review №1): «Եգիպտացորեն (հայկական)», «Եգիպտացորեն հայկական» and «Եգիպտացորեն» are one
+  «Кукуруза», each standing on the other's item. **A list, never an ending** (№2): «(մանկական)» is a child's toothpaste,
+  «Պղպեղ բուլղարական» a bell pepper, «չինական կաղամբ» the seed's Peking cabbage — kinds. **It is set apart, never thrown
+  away** (`ReceiptLineParts.origins`): a seed's name that holds it with the kind keeps it — «Սուրճ (հայկական)» is the
+  seed's «Кофе армянский» — and an item that names it stands on a line that prints it. **The price, named:** words
+  exactly as the truth writes them 783 → 776, since the truth writes «(армянская)».
 - **A brand no table and no rule spells is the model's, for its receipts** (owner's В-1 «б», which takes back MOL-261's
   В-1 «а» for brands alone): the brands in «…» of a receipt the model read that `brandToAsk` finds no spelling for are
   asked of Haiku once for the receipt — text alone, never the photo, a call of its own (`spellBrands`, `brands-v1`): the
@@ -717,12 +726,20 @@ has its rule; the bench and its figures are `.scratch/tasks/research/MOL-326.md`
   within 0.3 of the key of the till's letters in Russian ones — on the 48 pairs of `TILL_BRANDS` 45 pass and no pair of
   two brands of 2 256; 0.34 lets Barilla be Gorilla. A local brand is null by the prompt, and spelt in Russian letters
   in «…» as before. **Each brand is asked once** (`brand_spellings`, a table of no person: a brand is a shelf's): the
-  spelling or none, the first answer standing, under the version that said it. **Its price is the reading's cap's**
+  spelling or none, the first answer standing, under the version that said it. **What was said is read for every
+  receipt, Tesseract's too** (self-review №3): one brand, one name, whoever read the line — the model is asked only of
+  its own receipts, and a receipt Tesseract read sends nothing anywhere. **Its price is the reading's cap's**
   (`model_spend`): the worst reserved before — 8 000 tokens of output, since 2 000 cut two answers of three — its own
   after; over the cap, refused, away or cut, the brand is spelt in letters and asked with the next receipt. On the
   bench's 66 brands, three runs: none invented; «Boyscout» and «Freken Bók» of a first prompt are why it says a Russian
   brand is Cyrillic «even where it sounds English» and «never an accent the brand does not carry». `make rename-items`
-  names a recorded item by the spellings remembered, and asks nothing.
+  names a recorded item by the spellings remembered, and asks nothing — **the table over them, as the queue**: a brand
+  the table spells is never asked (adversarial А3). **The prices, named:** the code holds the sound alone — the script,
+  an accent and whether a brand is local are the prompt's (adversarial А5: «Igit» for «Իգիթ» would pass); the version is
+  written and not read, so a prompt changed asks only what it never asked, and a brand to ask again goes from the table
+  by hand (А6); and a receipt with a brand no table spells is read a call later — the queue waits for the answer, its
+  wait at most `MODEL_TIMEOUT_MS` (self-review №5; the catalogue's names bind no line of a brand in «…», so no line asked
+  was one already bound).
 
 ## The shops' memory (MOL-126)
 
