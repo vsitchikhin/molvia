@@ -387,7 +387,7 @@ for (const size of ['150%', '200%'])
       // While its items come their skeleton stands, a bar of 9rem stood the sheet 112 px sideways at 150 %: the
       // trip's answer is held until the skeleton is measured.
       const trip = /\/api\/trips\/[0-9a-f-]{36}$/
-      let release = () => {}
+      let release: () => void = () => undefined
       const answered = new Promise<void>((resolve) => (release = resolve))
       await page.route(
         trip,
