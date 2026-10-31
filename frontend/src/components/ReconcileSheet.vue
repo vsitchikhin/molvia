@@ -879,6 +879,8 @@ export default defineComponent({
 }
 
 .matched {
+  /* The figure measures itself against the sheet's column, not the window (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   justify-items: center;
   gap: var(--space-2);

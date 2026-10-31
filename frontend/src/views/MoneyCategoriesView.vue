@@ -47,7 +47,7 @@
             <SectionCaption>{{ t('spending.categories.presets') }}</SectionCaption>
             <AppCard as="ul" list>
               <AppReveal group>
-                <li v-for="category in presets" :key="category.id">
+                <li v-for="category in presets" :key="category.id" class="tight">
                   <ListRow
                     as="div"
                     :icon="iconOf(category)"
@@ -78,7 +78,7 @@
             <SectionCaption>{{ t('spending.categories.own_group') }}</SectionCaption>
             <AppCard as="ul" list>
               <AppReveal group>
-                <li v-for="category in own" :key="category.id">
+                <li v-for="category in own" :key="category.id" class="tight">
                   <ListRow
                     :icon="iconOf(category)"
                     :tint="colourOf(category)"
@@ -101,7 +101,7 @@
             <SectionCaption>{{ t('spending.categories.archived') }}</SectionCaption>
             <AppCard as="ul" list>
               <AppReveal group>
-                <li v-for="category in archived" :key="category.id">
+                <li v-for="category in archived" :key="category.id" class="tight">
                   <ListRow
                     as="div"
                     :icon="iconOf(category)"
@@ -324,5 +324,10 @@ export default defineComponent({
    own, which `AppScreen` does not see, and nothing under the thumb may move (review №5, MOL-138). */
 .content > * {
   @include appear(0);
+}
+
+/* A row's tail goes under its words only with large text (`ListRow`, `row-tight`, MOL-321). */
+.tight {
+  container: row-tight / inline-size;
 }
 </style>

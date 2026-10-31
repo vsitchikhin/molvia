@@ -139,7 +139,7 @@
               <SectionCaption>{{ group.title }}</SectionCaption>
               <AppCard as="ul" list>
                 <AppReveal group>
-                  <li v-for="account in group.accounts" :key="account.id">
+                  <li v-for="account in group.accounts" :key="account.id" class="tight">
                     <ListRow
                       as="router-link"
                       :to="{ name: 'money-account', params: { accountId: account.id } }"
@@ -186,7 +186,11 @@
                        connection «Вернуть» is not now, and says why on itself (Ф-6, С-10); nor while
                        another «Вернуть» of the screen is in the air — each answers with the page whole,
                        and the later to land would take the other back (MOL-189). -->
-                  <li v-for="account in removedAccounts" :key="account.id" class="removed-row">
+                  <li
+                    v-for="account in removedAccounts"
+                    :key="account.id"
+                    class="tight removed-row"
+                  >
                     <ListRow
                       as="router-link"
                       class="removed-open"
@@ -812,5 +816,10 @@ export default defineComponent({
    own, which `AppScreen` does not see, and nothing under the thumb may move (review №5, MOL-138). */
 .content > * {
   @include appear(0);
+}
+
+/* A row's tail goes under its words only with large text (`ListRow`, `row-tight`, MOL-321). */
+.tight {
+  container: row-tight / inline-size;
 }
 </style>

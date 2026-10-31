@@ -23,8 +23,6 @@
         <span v-else class="unseen" aria-hidden="true" :data-word="busyLabel" />
       </span>
       <template v-else-if="busy && busyLabel !== undefined">{{ busyLabel }}</template>
-      <!-- A block button's words in a box of their own, so the hyphen can ask the button's width (MOL-321). -->
-      <span v-else-if="block" class="text"><slot /></span>
       <slot v-else />
     </template>
   </button>
@@ -280,8 +278,8 @@ export default defineComponent({
    `useLargeText`): «Сфотографи-ровать чек», not «Сфотографирова|ть». Only a word of twelve letters and more
    where the engine knows the limit — Safari does not, and WebKit hyphenates any word at a line's end
    («Сохранить из-менения») — so never at 100 %. A width would not tell it: a block of a pair is narrow
-   at 100 % too. */
-.text {
+   at 100 % too. Inherited by the words. */
+.block {
   html[data-large-text] & {
     hyphens: auto;
     hyphenate-limit-chars: 12 5 5;

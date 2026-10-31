@@ -7,7 +7,8 @@ const LARGE_REM_PX = 17.6
  * `data-large-text` on the root while the text is large (MOL-321): what CSS cannot ask — the size of a rem
  * in pixels — read off a box one rem wide, again whenever it changes. A width in rem tells the box, not the
  * text: a narrow button is narrow at 100 % too. Only a word broken with a hyphen goes by it today — Safari
- * knows no `hyphenate-limit-chars`, and at 100 % it hyphenated «по-купки» at a line's end.
+ * knows no `hyphenate-limit-chars`, and at 100 % it hyphenated «по-купки» at a line's end. Android's page zoom
+ * keeps a rem 16 CSS px, so there the mark never comes, and nor does the hyphen (MOL-334).
  */
 export function useLargeText(): void {
   let probe: HTMLElement | null = null

@@ -1160,12 +1160,19 @@ export default defineComponent({
   padding: var(--space-4);
 }
 
+/* The category goes under the sum only where the two cannot stand side by side (MOL-321, adversarial Б4):
+   the sum fits its card by `figure-fit`, and beside it the badge took the sheet 18 px sideways at 150 %. */
 .total {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
   margin: 0;
+
+  > .figure {
+    flex: 1 1 min-content;
+  }
 }
 
 .figure {
@@ -1179,6 +1186,8 @@ export default defineComponent({
   display: inline-flex;
   align-items: center;
   gap: var(--space-1);
+  max-width: 100%;
+  min-width: 0;
   min-height: var(--badge-height);
   padding: 0 var(--space-3);
   border-radius: var(--radius-pill);

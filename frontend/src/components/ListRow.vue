@@ -359,7 +359,7 @@ export default defineComponent({
    and 348 in their gutter of 32. The handoff's card of 390 (358) keeps the amount beside. The container
    is the caller's — `OperationRow` sets it — so every row of a card is laid out alike. No row gap: a row
    with no tail is not a line taller. */
-@container row (width < #{$row-narrow}) {
+@mixin tail-under {
   .list-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -389,6 +389,17 @@ export default defineComponent({
     grid-column: 3;
     grid-row: 1 / span 2;
   }
+}
+
+@container row (width < #{$row-narrow}) {
+  @include tail-under;
+}
+
+/* The same, only with large text, in a container named `row-tight` (MOL-321): the rows of «Счета» and
+   «Категории» keep their tail beside the words at 100 % on 320 (16rem), and at 200 % «1 234 567,89 ₽» was
+   cut by 68 px and «Убрать» by 37, the chevron past the phone. 12rem: some 133 % of the text and up. */
+@container row-tight (width < 12rem) {
+  @include tail-under;
 }
 
 .chevron {
