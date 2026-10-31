@@ -276,7 +276,11 @@ counts `failures`, MOL-181's C1; MOL-204's А1). **The connection going makes an
 save speaks for the read after it** — that read alone (`failureOfSave`, Е2 of round 6: the notice silenced a later
 read's refusal too, and the edit then dropped it unsaid) — and the person's own edit, taking «Не удалось сохранить»
 away, takes that read's refusal with it (adversarial Д1 of round 5): the strip came out of the very tap and moved the
-fields under it. Any other read's refusal is the strip's at once, with its answer, beside the notice. **The price,
+fields under it. Only a refused save with that notice marks its read — a 409 says nothing, and there the strip is the
+screen's one word, which an edit took away (Ж2 of round 7). Any other read's refusal is the strip's at once, with its
+answer, beside the notice — **with no «Повторить» of its own while «Сохранить» is the save's** (`retriesSave`, Ж1):
+one «Повторить» a screen (MOL-181, К-5), never two of one name, one reading and one writing. **A failed read reports
+the phone's own defect** (`reportFailure`, MOL-144; review 7 №6). **The price,
 named** (review 6 №5): after that edit the form stands with no strip until the next read — the app or the connection
 back, the screen opened, «Сохранить» — while the server may still be silent. **The moment is said by `answeredAt` with the screen's day**
 (`useLocalDay`, MOL-187's А2): counted once, an app left overnight said «сегодня» of yesterday's answer the
