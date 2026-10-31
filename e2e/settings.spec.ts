@@ -42,16 +42,23 @@ test('settings draft survives tabs and offline; another device produces an expli
   )
   const previous = settingsOf(current)
   await page.context().setOffline(true)
-  const save = page.getByRole('button', { name: 'Сохранить', exact: true })
+  // Why it cannot be pressed is its own name now, with no line over it (Ф-6, MOL-215).
+  const save = page.getByRole('button', {
+    name: 'Сохранить можно, когда появится связь',
+    exact: true,
+  })
   // «Inactive» is `aria-disabled`, never the native attribute: the button has to keep its
   // focus and its hint. `toBeDisabled()` alone accepts both, so it held neither (Е4).
   await expect(save).toHaveAttribute('aria-disabled', 'true')
   expect(await save.evaluate((node: HTMLButtonElement) => node.disabled)).toBe(false)
   await save.focus()
   await expect(save).toBeFocused()
-  const hint = await save.getAttribute('aria-describedby')
-  expect(hint).toBeTruthy()
-  await expect(page.locator(`#${hint ?? ''}`)).toHaveText('Сохранить можно, когда появится связь')
+  // One strip, as of the moment the server last said the settings — this launch's read (MOL-215).
+  const strip = page.locator('.strip')
+  await expect(strip).toHaveCount(1)
+  await expect(strip).toHaveText(
+    /^Без связи · настройки на сегодня в \d{1,2}:\d{2}\. Изменения можно сохранить, когда интернет появится$/,
+  )
   await page.context().setOffline(false)
   await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toBeEnabled()
   // The same choice on both devices: since MOL-65 a choice nobody here touched follows the
@@ -107,6 +114,40 @@ test('settings draft survives tabs and offline; another device produces an expli
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
     true,
   )
+})
+
+// Е-8: a form shown from memory said nothing while the server was silent — a quiet card over the
+// fields, with no time it was true of (MOL-215).
+test('the server silent over a form from memory: the strip as of the last answer, and «Повторить»', async ({
+  page,
+}) => {
+  await signedIn(page)
+  await page.getByRole('link', { name: 'Настройки', exact: true }).click()
+  await expect(page.getByLabel('Город', { exact: true })).toHaveValue('Гюмри')
+  await page.route('**/api/actors/me', (route) =>
+    route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: '{"code":"error.internal"}',
+    }),
+  )
+  await page.reload()
+
+  const strip = page.locator('.strip')
+  await expect(strip).toHaveCount(1)
+  await expect(strip).toContainText(/^Сервер не ответил · настройки на сегодня в \d{1,2}:\d{2}/)
+  // The fields stay, and no card of the error stands over them.
+  await expect(page.getByLabel('Город', { exact: true })).toHaveValue('Гюмри')
+  await expect(
+    page.getByRole('heading', { name: 'Не удалось загрузить настройки', exact: true }),
+  ).toHaveCount(0)
+
+  await page.unroute('**/api/actors/me')
+  await strip.getByRole('button', { name: 'Повторить', exact: true }).click()
+  await expect(strip).toHaveCount(0)
+  await expect(
+    page.getByRole('button', { name: 'Сохранить · изменений нет', exact: true }),
+  ).toHaveAttribute('aria-disabled', 'true')
 })
 
 test('an offline trip keeps the context captured before another device changed settings', async ({
@@ -284,7 +325,7 @@ test('lost save responses remain uncertain until a read confirms the result', as
     page.locator('.dock').getByText('Настройки сохранены', { exact: true }),
   ).toBeVisible()
   await expect(city).toHaveValue('Ереван')
-  const save = page.getByRole('button', { name: 'Сохранить', exact: true })
+  const save = page.getByRole('button', { name: 'Сохранить · изменений нет', exact: true })
   await expect(save).toHaveAttribute('aria-disabled', 'true')
   expect(await save.evaluate((node: HTMLButtonElement) => node.disabled)).toBe(false)
 })
@@ -319,10 +360,9 @@ test('«зарплата — в следующий месяц» saves on the tap
   await expect(day).toHaveValue('25')
   await day.selectOption('28')
   // Saved by the tap, not by the form: nothing waits under «Сохранить».
-  await expect(page.getByRole('button', { name: 'Сохранить', exact: true })).toHaveAttribute(
-    'aria-disabled',
-    'true',
-  )
+  await expect(
+    page.getByRole('button', { name: 'Сохранить · изменений нет', exact: true }),
+  ).toHaveAttribute('aria-disabled', 'true')
   const headers = await asBrowser(page)
   await expect
     .poll(async () =>
