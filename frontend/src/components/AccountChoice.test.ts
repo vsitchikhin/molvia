@@ -2,6 +2,7 @@ import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import type { Pinia } from 'pinia'
+import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { parseMoney } from '@molvia/model'
@@ -18,6 +19,7 @@ import AccountPickerSheet from './AccountPickerSheet.vue'
 import IncomeSheet from './IncomeSheet.vue'
 import ListRow from './ListRow.vue'
 import SpendingSheet from './SpendingSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -195,6 +197,46 @@ describe('the account in the sheet of a spending (handoff 06)', () => {
       accountId: card.id,
       debited: { minor: 214_091n, currency: 'RUB' },
     })
+  })
+
+  // A field refused at a send is heard (MOL-235, adversarial Р2-А1): «Списано» typed and «Сохранить трату»
+  // tapped on an iPhone, which leaves the focus in it (MOL-80) — or Enter — so its own error is said.
+  it('«Списано» refused with the focus in it: nothing is queued, and its error is said', async () => {
+    const pinia = withAccounts([cash, card])
+    const Host = defineComponent({
+      setup() {
+        provideAnnouncer()
+        return () =>
+          h(SpendingSheet, {
+            open: true,
+            target: { kind: 'add' },
+            categories,
+            nameOf: () => 'Cafe',
+            spendCurrency: 'AMD',
+          })
+      },
+    })
+    const view = await mounted(Host, {}, pinia)
+    view.findComponent(AccountPickerSheet).vm.$emit('pick', card.id)
+    await flushPromises()
+    await view.get(`input[type="radio"][value="${CAFE}"]`).setValue(true)
+    await view.get('.well input').setValue('9891')
+    const charged = view.get<HTMLInputElement>('.charged input')
+    await charged.setValue('abc')
+    charged.element.focus()
+    await view
+      .findAll('button')
+      .find((one) => one.text() === en.spending.sheet.save)
+      ?.trigger('click')
+    // The announcer's words land a task and 100 ms later.
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(useSpendingQueueStore(pinia).pending).toHaveLength(0)
+    expect(charged.attributes('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(charged.element)
+    expect(document.querySelector('dialog .region')?.textContent).toContain(
+      en.spending.sheet.bad_amount,
+    )
   })
 
   it('«Без счёта» is said out loud — an explicit null, not a field left out', async () => {

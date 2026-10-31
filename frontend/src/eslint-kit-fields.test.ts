@@ -35,7 +35,7 @@ export default defineComponent({ name: 'FieldProbe' })
     .filter(
       (message) =>
         message.ruleId === 'vue/no-restricted-static-attribute' ||
-        message.ruleId === 'vue/no-restricted-html-elements',
+        message.ruleId === 'vue/no-restricted-syntax',
     )
     .map((message) => message.message)
 }
@@ -62,6 +62,9 @@ describe('the fields of the kit, outside it (MOL-235)', () => {
     expect(await said('<input type="text" inputMode="decimal" />', VIEW)).toEqual([AMOUNT])
     expect(await said('<input type="Search" />', VIEW)).toEqual([SEARCH])
     expect(await said('<input enterKeyHint="search" />', VIEW)).toEqual([SEARCH])
+    // The browser's select all the same, whatever the case of its tag (adversarial Р2-А2).
+    expect(await said('<Select><option>֏</option></Select>', VIEW)).toEqual([SELECT])
+    expect(await said('<SELECT><option>֏</option></SELECT>', VIEW)).toEqual([SELECT])
   }, 120_000)
 
   it('must not fire: what is not a copy passes', async () => {

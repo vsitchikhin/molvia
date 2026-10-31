@@ -875,9 +875,11 @@ export default defineComponent({
         // The first field that is wrong gets the focus (handoff 02), in the order of the form: the sum,
         // «списано», a chip — and only then the fields behind «Дата, заметка, место», whose sheet opens
         // on the wrong one (MOL-199). Opened over an error above it, it would hide the error.
+        // Heard either way, by the field's own error (adversarial А1, Р2-А1): a focus already in
+        // «списано» moves nothing, and the sheet's own form is looked in, never the document's.
         if (!value) void refuse(amountField)
         else if (charge === 'bad' || !chosen)
-          document.querySelector<HTMLInputElement>('.form [aria-invalid="true"]')?.focus()
+          void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
         else openDetails(dayBad.value ? 'day' : typedNote.bad ? 'note' : 'place')
         return
       }
