@@ -263,6 +263,21 @@ describe('IncomeSheet', () => {
     expect(view.get('.current').text()).toContain(en.income.source.salary)
   })
 
+  // The list read again after a conflict takes its strip away with the focus on «Повторить» (MOL-188 №5):
+  // the focus went to the body, under the modal sheet; it goes to the sheet's own title (MOL-317, З1).
+  it('hands the focus on the strip’s «Try again» to the sheet’s title once the list is read again', async () => {
+    amend.mockResolvedValue('conflict')
+    const view = await render(overview(), amended)
+    await save(view, en.income.sheet.save_amend)
+    await view.setProps({ stale: true })
+    const retry = view.get('.strip.unanswered .action button')
+    ;(retry.element as HTMLElement).focus()
+
+    await view.setProps({ stale: false })
+    expect(view.find('.strip.unanswered').exists()).toBe(false)
+    expect(document.activeElement).toBe(view.get('dialog h2').element)
+  })
+
   // MOL-189 review №1: a save after the conflict that did not land — lost on the way, refused under a
   // field — leaves the sheet over the version the list holds, never back on the one it was opened on.
   it('after a conflict every next save goes over the version the list holds, past a failed one', async () => {

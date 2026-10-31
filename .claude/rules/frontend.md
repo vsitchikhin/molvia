@@ -810,9 +810,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   title** (MOL-194, Б1), as a full error does: the retry answered is exactly when it goes. **And so
   when the strip stays and only its button goes** (MOL-214, adversarial А2) — a retry failed offline
   turns `unanswered` to `offline`, which draws none: the focus goes to a button standing in its place,
-  else to the title; one elsewhere stays where it is. Not in a
-  sheet — the page under it is inert and a sheet's title takes no focus; there it falls as before, a
-  price. «From
+  else to the title; one elsewhere stays where it is. **In a sheet «the title» is the sheet's own**
+  (MOL-317, below). «From
   memory» has two forms only: `ScreenState` when there is no answer, the strip when an old one is
   shown. One per screen is held by the screens' tests, not a linter: two strips in a template are
   often `v-if` and `v-else`. `AppNote` stays the note — the «i», 400, no voice. The seventeen copies
@@ -833,6 +832,25 @@ The detail behind the frontend lines of `CLAUDE.md`.
   opening does not bring it back. The region's class is `.region`, not `.announcer`: the end-to-end
   tests find the app's region by that name. `FeedbackSheet` keeps the region of its answer (its own
   rule, feedback.md).
+- **A block of a sheet that goes with the focus gives it to the sheet's own title** (`focusTitleOf`,
+  MOL-317): «Повторить» of a quiet card, a full state's buttons in the footer, a strip's — the screen's
+  `h1` under a modal sheet is inert, `focus()` on it did nothing, and the focus fell to the body, outside
+  the dialog: a screen reader lost its place and the next Tab started the sheet over — the quiet cards of
+  a spending's summary and of a transfer, the scanner's refusals, the strip of a conflict in the sheets of
+  an income and an exchange. The title is the one `aria-labelledby` names (`sheetTitleOf`, the one place
+  that looks for it), never a class; one rule for `ScreenState` and `StatusStrip`, out of a sheet the
+  screen's title as before. **Focusable only while it holds that focus** (owner's В-2 «а»): `tabindex="-1"`
+  is set for the focus and taken off once the focus has left it — kept, a tap on the title over the keys
+  took the focus from the field typed in, and a text above the fields is not a stop of the keyboard.
+  **Not at the `blur` itself** (adversarial А1): the window put away — another app, the notification
+  shade — blurs the focused title and leaves it focused, and a title no longer focusable handed the focus
+  to the body, the very fault; where the focus stands is read a task after the `blur`, and a title still
+  focused keeps its `tabindex` till the next one. No ring, as the screen's title. **A sheet that moves the focus
+  itself takes the title for nobody's**, as the body and the dialog: the scanner's footer follows the
+  camera from there (`barcodes.md`). `e2e/state-strip` holds the three in Chromium and WebKit on the
+  kit's «Состояния в шторке», and a `blur` that moves no focus — the window's, sent by hand, since none
+  is lost headless; Tab to × in Chromium only — WebKit tabs fields alone. `IncomeSheet.test` holds the
+  strip of a conflict.
 - **The skeleton is the answer's shape, drawn in the kit's parts** (MOL-178, Ф-13, Н-5). Its bars were
   `surface-2` on the page's ground — 1.06:1 in the light scheme, next to nothing — with no card, no
   rows and no search field, so the screen jumped as the answer came. **`ScreenSkeleton` is the frame**:
