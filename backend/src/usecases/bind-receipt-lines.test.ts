@@ -428,6 +428,33 @@ describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
   })
 })
 
+describe('a line of the owner’s that went new where its item was there (MOL-331)', () => {
+  const FOUND = '00000000-0000-4000-8000-0000000000f2'
+  async function bindOne(printed: string, name: string, byModel = false) {
+    const { items } = fakeItems({ items: [item(FOUND, name)], near: true, nearIds: [FOUND] })
+    const [bound] = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER },
+      ACTOR,
+      'AM',
+      'ru',
+      [line(printed)],
+      [],
+      { byModel },
+    )
+    return bound
+  }
+
+  it('reads «Պիցցայի լոշիկ» as a shelf does: a pizza base, found and named so', async () => {
+    expect(await bindOne('Պիցցայի լոշիկ «Պանո» 250±10գր', 'Основа для пиццы «Пано»')).toMatchObject(
+      { itemId: FOUND, match: 'search' },
+    )
+    expect(await bindOne('Պիցցայի լոշիկ «Պանո» 250±10գր', 'Хлеб «Пано»')).toMatchObject({
+      itemId: null,
+      translation: 'Основа для пиццы «Пано» 250 г',
+    })
+  })
+})
+
 describe('a catalogue with no names of the tills (MOL-293)', () => {
   it('tells it once a receipt and binds by the gloss all the same', async () => {
     const heard: CatalogueNamesMissing[] = []
