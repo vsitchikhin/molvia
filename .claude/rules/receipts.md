@@ -776,7 +776,8 @@ of Haiku's; the owner's В-9 «б» of MOL-47 took them as one task. Two causes 
 wherever the search put it.
 
 - **A brand a letter short**: a word of the line's brand that no word of the item is by its letters stands on the one
-  word **of the item's own brand** — in «…», or in Latin as a shelf writes one (`brandWordsOf`) — that is the brand's
+  word **of the item's own brand** — in «…», or a brand the lexicon spells in Latin (`brandWordsOf`; never a size of
+  `STANDARDS` or a flavour, «Шоколад MINI», «Чай Lemon», round 3, Р3-А1) — that is the brand's
   with **one letter of the word** more, the key of what is left without it the line's (from three letters, under five,
   where `sameLetters` forgives nothing; `letterLost`), and that the line says nothing else of. So a brand covers one
   word of a brand: copied whole, «Դինա» is «Дина» and never the «дыня» beside it, a brand a letter short of the kind
@@ -797,12 +798,13 @@ wherever the search put it.
 **Measured, wrong 0 everywhere** (`.scratch/tasks/status/MOL-331/results.md`): the binding bench of MOL-293 156 right
 against 151 on master, with meaning; Haiku's own readings of the bench through the product, eight runs of v5, 746
 against 728; the same 321 lines of the truth as copied by the model, as without; the 103 lines of production 30 sure
-and 2 «проверьте» of 32 their item, none new, none another, 71 of 71 new still new — the same after reviews 1 and 2,
+and 2 «проверьте» of 32 their item, none new, none another, 71 of 71 new still new — the same after reviews 1–3,
 whose attacks are red (`.scratch/tasks/selftests/MOL-331-adversarial*`). **The prices, named:** a brand of one kind a letter
 longer than the one copied — a cheese «Сила» copied «Միլա» beside a cheese «Милка» — is taken, «проверьте»: the
 catalogue of the bench holds no such pair (only «Հոմ» and «Хоум», one brand). A weight the till cut off its unit on a
 line of a kind with a fat — a cottage cheese's «… 9» of «9…գր» — is the fat of an item of that brand and words printed
-«9%». And a fat of two and less copied without «%» — kefir 1 %, milk 1,5 % — stays a new item.
+«9%». And a fat of two and less copied without «%» — kefir 1 %, milk 1,5 % — stays a new item, and so does a brand
+copied a letter short whose item writes it bare in Latin no table spells and the model never spelt.
 
 ## The shops' memory (MOL-126)
 
