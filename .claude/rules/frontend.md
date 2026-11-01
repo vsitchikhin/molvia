@@ -538,7 +538,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     `figureChars` (`--figure-width`, set by script) from a table of the face's characters, measured — the figures'
     face (Nunito 800: a figure 0.600, a no-break space 0.279, a comma 0.26, «֏» 0.765) or, for a sum in a row,
     the words' (Onest 600: a figure 0.673, 12 % wider — the figures' table let «Осталось» 4.6 px past its line at
-    150 %, adversarial Г2), a capital as wide as a figure holds, with 3 % room for another engine. A count of characters at 0.56 (the round before) held only where spaces and commas pulled
+    150 %, adversarial Г2), a capital as wide as a figure holds, with 5 % room for another engine — CI's Chromium sets a character on a whole pixel, and 3 % left a bold tile's sum 2.3 px into its tile (round 9). A count of characters at 0.56 (the round before) held only where spaces and commas pulled
     the share down: «֏125,403» in English is 0.578 and stood 6 px past its card, «−999,99 RSD» 0.568 (Б3). The box
     is the nearest `container-type: inline-size`: the card, the column of words, a row, the sheet's column (the
     figure of a check that came out even measured the window before). A sum never breaks, and at 200 % «Потрачено
@@ -559,7 +559,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     («Пришло», «Можно тратить», «Сбережения»), an operation's amount, the day's sum of «Траты» and the figure of
     «Темп месяца» shrink to their box (`figure-fit`) — at 200 % «250 00|0 ₽» broke, «−1 234 567 ֏» stood 43 px
     past its row, «Темп месяца» 23 px past the phone; the tiles of a month stand one under the other below 15rem.
-    Onest 700 is measured and is the words' table: its figures are 600's. Twelve months of a chart narrower than
+    A tile's figure is Onest 700, measured and a table of its own (`strong`): its figures are 600's, its comma, «≈», «₽» wider. Twelve months of a chart narrower than
     14rem are named by every other month's letter over its own column and the empty one — at 200 % a label had
     9 px, a letter alone is 20. **The prices, named:** a name typed in a text field (an account's, a category's)
     scrolls inside it as any field does; the pinned copy of a screen's title in the top bar ends in «…», as iOS's;

@@ -21,7 +21,7 @@
     <div class="tiles" :class="{ one: running }">
       <div class="tile">
         <span class="tile-label">{{ t('spending.income') }}</span>
-        <span class="tile-figure" :style="figureChars(whole(month.income), 'text')">{{
+        <span class="tile-figure" :style="figureChars(whole(month.income), 'strong')">{{
           whole(month.income)
         }}</span>
         <span v-if="month.incomeUncounted.length > 0" class="tile-note">
@@ -44,7 +44,7 @@
           <span
             class="tile-figure"
             :class="{ negative: month.rest.total.minor < 0n }"
-            :style="figureChars(`≈ ${signed(month.rest.total)}`, 'text')"
+            :style="figureChars(`≈ ${signed(month.rest.total)}`, 'strong')"
           >
             ≈ {{ signed(month.rest.total) }}
           </span>
@@ -338,8 +338,8 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-/* A sum never breaks: it shrinks to its tile (MOL-321) — «250 00|0 ₽» at 200 %. Onest 700 is the words' table: its
-   figures are 600's, the rest within the table's room (measured). */
+/* A sum never breaks: it shrinks to its tile (MOL-321) — «250 00|0 ₽» at 200 %. Onest 700 has its own table
+   (`strong`, measured). */
 .tile-figure {
   @include figure-fit(var(--text-headline));
 

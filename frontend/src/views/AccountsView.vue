@@ -79,7 +79,7 @@
                 <span
                   class="tile-figure"
                   :class="{ negative: main.spendable.minor < 0n }"
-                  :style="figureChars(`≈ ${estimate(main.spendable)}`, 'text')"
+                  :style="figureChars(`≈ ${estimate(main.spendable)}`, 'strong')"
                 >
                   ≈ {{ estimate(main.spendable) }}
                 </span>
@@ -97,7 +97,7 @@
                 <span
                   class="tile-figure"
                   :class="{ negative: main.savings.minor < 0n }"
-                  :style="figureChars(`≈ ${estimate(main.savings)}`, 'text')"
+                  :style="figureChars(`≈ ${estimate(main.savings)}`, 'strong')"
                 >
                   ≈ {{ estimate(main.savings) }}
                 </span>
@@ -665,8 +665,8 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
-/* A sum never breaks: it shrinks to its tile (MOL-321) — «≈ 1 433 31|7 ₽» at 200 %. Onest 700 is the words' table:
-   its figures are 600's, the rest within the table's room (measured). */
+/* A sum never breaks: it shrinks to its tile (MOL-321) — «≈ 1 433 31|7 ₽» at 200 %. Onest 700 has its own table
+   (`strong`, measured). */
 .tile-figure {
   @include figure-fit(var(--text-headline));
 
