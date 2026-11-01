@@ -841,6 +841,20 @@ describe('a line the model copied a letter short (MOL-331)', () => {
     expect(copied('Մուրաբա «Միլա»', 'Сыр «Милка»')).toBe(false)
   })
 
+  it('takes a branded line’s last bare number for the item’s fat, only where the line was copied', () => {
+    expect(copied('Պանիր «Պանո» 45', 'Сыр «Пано» 45%')).toBe(true)
+    expect(copied('Պանիր «Պանո» 2.5', 'Сыр «Пано» 2,5%')).toBe(true)
+    expect(fits('Պանիր «Պանո» 45', 'Сыр «Пано» 45%')).toBe(false)
+  })
+
+  it('must not read a number as a fat beside a fat or a package of the line’s own, unbranded, or another', () => {
+    expect(copied('Պանիր «Պանո» 45% 10', 'Сыр «Пано» 10%')).toBe(false)
+    expect(copied('Պանիր «Պանո» 200գր 45', 'Сыр «Пано» 45%')).toBe(false)
+    expect(copied('Պանիր 45', 'Сыр 45%')).toBe(false)
+    expect(copied('Պանիր «Պանո» 45', 'Сыр «Пано» 50%')).toBe(false)
+    expect(copied('Պանիր «Պանո» 45', 'Сыр «Пано» 45 г')).toBe(false)
+  })
+
   it('takes a brand of that kind a letter longer: the price, «проверьте» on the review', () => {
     // «Դաչա» is «Դայչա» less a letter: two brands of one kind would be taken one for the other
     expect(copied('Պանիր «Դաչա»', 'Сыр «Дайча»')).toBe(true)

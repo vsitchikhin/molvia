@@ -1263,7 +1263,10 @@ function nextThing(
 export interface FitOptions {
   /** The item is the seed's own — a kind, never a brand: «Бекон», «Энергетик». */
   readonly generic?: boolean
-  /** The model copied the line: its brand may have lost a letter (MOL-331), and the caller says «проверьте». */
+  /**
+   * The model copied the line: its brand may have lost a letter, its fat its «%» (MOL-331), and the caller says
+   * «проверьте».
+   */
   readonly copied?: boolean
 }
 
@@ -1318,6 +1321,16 @@ export function lineFitter(
     ...figuresOf(parts.percent ?? ''),
     ...figuresOf(parts.size ?? ''),
   ]
+  // a fat the model copied without its sign: a branded line's last word a bare number, with no fat or package of
+  // its own (MOL-331) — «Սերուցք «Մարիաննա» ուլտրապաստերիզացված 10» is the cream of 10 %
+  const last = tokens.at(-1) ?? ''
+  const signless =
+    parts.brand !== null &&
+    parts.percent === null &&
+    parts.size === null &&
+    /^\d+(?:[.,]\d+)?$/u.test(last)
+      ? `${last.replace('.', ',')}%`
+      : null
   const brand = wordsOf(parts.brand ?? '')
   const brandHas = (word: string, copied: boolean): boolean =>
     copied && brand.some((one) => letterLost(one, word))
@@ -1350,7 +1363,12 @@ export function lineFitter(
     if (item.length === 0) return false
     if (branded && options.generic === true) return false
     if (!item.every((word) => lineHas(word, copied))) return false
-    if (!figuresOf(itemName).every((figure) => figures.includes(figure))) return false
+    if (
+      !figuresOf(itemName).every(
+        (figure) => figures.includes(figure) || (copied && figure === signless),
+      )
+    )
+      return false
     const named = brands.find((one) =>
       one.every((word) =>
         item.some(

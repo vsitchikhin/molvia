@@ -470,6 +470,13 @@ describe('a line of the owner’s that went new where its item was there (MOL-33
       await bindOne(pan, 'Основа для пиццы «Пано»', true, 'Основа для пиццы «Пан»'),
     ).toMatchObject({ itemId: OTHER, match: 'search' })
   })
+
+  it('takes the fat the model copied without its «%», «проверьте», and never a Tesseract line so', async () => {
+    const cream = 'Սերուցք «Մարիաննա» ուլտրապաստերիզացված 10'
+    const name = 'Сливки «Марианна» 10%, ультрапастеризованные'
+    expect(await bindOne(cream, name, true)).toMatchObject({ itemId: FOUND, match: 'weak' })
+    expect(await bindOne(cream, name)).toMatchObject({ itemId: null })
+  })
 })
 
 describe('a catalogue with no names of the tills (MOL-293)', () => {
