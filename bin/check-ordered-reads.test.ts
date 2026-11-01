@@ -449,6 +449,48 @@ describe('unorderedReads', () => {
       'a query in a let, carried on',
       `let base = db.select().from(t)\nexpect(await base.where(c)).toEqual([a, b])`,
     ],
+    // round 13, Н3: a Set, a Map, an object keep the order they were filled in, and give it back
+    [
+      'a Set spread back',
+      `expect([...new Set((await db.select().from(t)).map((r) => r.kind))]).toEqual([a, b])`,
+    ],
+    [
+      'a Set by Array.from',
+      `expect(Array.from(new Set((await db.select().from(t)).map((r) => r.kind)))).toEqual([a, b])`,
+    ],
+    [
+      'a Set named, then spread',
+      `const kinds = new Set((await db.select().from(t)).map((r) => r.kind))\nexpect([...kinds]).toEqual([a, b])`,
+    ],
+    [
+      'the values of a Map spread',
+      `expect([...new Map((await db.select().from(t)).map((r) => [r.id, r.kind])).values()]).toEqual([a, b])`,
+    ],
+    [
+      'the keys of an object of rows',
+      `expect(Object.keys(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v])))).toEqual([a, b])`,
+    ],
+    [
+      'a Set stringified',
+      `expect(JSON.stringify([...new Set((await db.select().from(t)).map((r) => r.kind))])).toBe('["a","b"]')`,
+    ],
+    // round 13, Н2: an update or a delete returning rows returns them in no order
+    [
+      'an update of Drizzle returning',
+      `expect(await db.update(t).set(v).returning({ kind: t.kind })).toEqual([a, b])`,
+    ],
+    [
+      'a delete of Drizzle returning',
+      `expect(await db.delete(t).returning({ kind: t.kind })).toEqual([a, b])`,
+    ],
+    [
+      'an update of a tag returning',
+      'expect(await client`update t set n = n + 1 returning kind`).toEqual([a, b])',
+    ],
+    [
+      'a delete executed returning',
+      'expect(await db.execute(sql`delete from t returning kind`)).toEqual([a, b])',
+    ],
   ])('refuses %s', (_, body) => {
     expect(found(body)).toHaveLength(1)
   })
@@ -601,6 +643,15 @@ describe('unorderedReads', () => {
         'const named = async (table, id) => (await db.execute(sql`select count(*)::int as n from ${sql.raw(table)} where item_id = ${id}`))[0]?.n\nexpect([await named(t, a), await named(t, b)]).toEqual([0, 1])',
       ),
     ).toEqual([])
+  })
+
+  // round 13, Н3: a snapshot of a Set against a snapshot — the net reverses both alike, the check holds it
+  it('refuses a snapshot of a Set of rows with no order against another, each side', () => {
+    expect(
+      found(
+        `const before = [...new Set((await db.select().from(t)).map((r) => r.kind))]\nexpect([...new Set((await db.select().from(t)).map((r) => r.kind))]).toEqual(before)`,
+      ),
+    ).toHaveLength(2)
   })
 
   // round 2, №7: a helper whose order is learnt as none late, after a pass read it as chance
@@ -845,6 +896,44 @@ describe('unorderedReads', () => {
     [
       'a helper executing a const template with its order',
       'const run = (q) => db.execute(q)\nconst q = sql`select id from t order by id`\nexpect(await run(q)).toEqual([a, b])',
+    ],
+    // round 13: what a Set, a Map, an object of rows cannot tell
+    [
+      'the size of a Set named',
+      `const kinds = new Set((await db.select().from(t)).map((r) => r.kind))\nexpect(kinds.size).toBe(2)`,
+    ],
+    [
+      'has of a Set',
+      `expect(new Set((await db.select().from(t)).map((r) => r.kind)).has(a)).toBe(true)`,
+    ],
+    [
+      'a Set against a Set',
+      `expect(new Set((await db.select().from(t)).map((r) => r.kind))).toEqual(new Set([a, b]))`,
+    ],
+    [
+      'get of a Map',
+      `expect(new Map((await db.select().from(t)).map((r) => [r.id, r.kind])).get(a)).toBe(b)`,
+    ],
+    [
+      'a value of an object by its key',
+      `expect(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v]))[a]).toBe(1)`,
+    ],
+    [
+      'an object against an object',
+      `expect(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v]))).toEqual({ a: 1, b: 2 })`,
+    ],
+    [
+      'a loop over a Set',
+      `for (const kind of new Set((await db.select().from(t)).map((r) => r.kind))) expect(kind).toBeDefined()`,
+    ],
+    // round 13: an insert returning rows returns them in the order of its values
+    [
+      'an insert of Drizzle returning',
+      `expect(await db.insert(t).values([x, y]).returning({ kind: t.kind })).toEqual([a, b])`,
+    ],
+    [
+      'an update returning one row by its length',
+      `expect(await db.update(t).set(v).where(c).returning()).toHaveLength(1)`,
     ],
   ])('leaves alone %s', (_, body) => {
     expect(found(body)).toEqual([])

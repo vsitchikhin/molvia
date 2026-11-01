@@ -4,13 +4,14 @@
 // `feedback-bot` read its four words so and failed on a pull request that touched only the PWA (CI
 // 41022785698).
 //
-// **The net holds it at run time** (review of MOL-323, round 12): `backend/tests/unordered-rows.ts` turns
-// the rows of every `SELECT` of the integration tests with no `order by` of its own by one, the first last,
-// so a test leaning on the order of rows read with no order fails on its first run, however it uses them —
-// through a `Set`, a callback, a string, anything. **This check says it before the run, for the ordinary
-// form**: its word on how rows with no order are used is a hint the net makes good. What the net cannot see
-// is an order the statement has: an order of chance — a uuid, a moment — and an order of ties. Those this
-// check alone holds, by the schema.
+// **The net holds it at run time** (review of MOL-323, rounds 12, 13): `backend/tests/unordered-rows.ts`
+// reverses the rows of every `SELECT` of the integration tests with no `order by` of its own, and of every
+// `UPDATE`, `DELETE` and `MERGE` returning them — the one order that puts each two rows the other way round
+// — so a test leaning on which of any two such rows comes first fails on its first run, however it reads
+// them. **What the net cannot hold, this check does**: two reads reversed alike match whatever their order
+// was — a snapshot met by a snapshot — and an order the statement has, of chance or of ties, the net never
+// touches. For one read with no order this check's word is a hint the net makes good; for two compared, and
+// for an order the statement has, it is what holds.
 //
 // Found by parsing, as `check-clock-bounds.mjs` is, names resolved by TypeScript's binder, the facts of the
 // tables read from `schema.ts`. **The check is closed at each of the three places it recognises something**
@@ -58,15 +59,16 @@
 // fix is an order, never a use the check does not know. **Every answer of «free» or «not a read» the check
 // gives is one written here**; nothing else is let go.
 //
-// **The price, named, by class, and nothing outside these classes** — of rows with no order none is left,
-// the net holds them; of rows in an order the statement has: an order of ties is taken as an order — a
-// column every row read shares, a parent's identity through a join, a `sort` whose key repeats, an order of
-// SQL text by whatever it names; an order of values the test wrote is taken as the test's — a column that
-// is neither a uuid nor a moment is not judged; a moment before an identity is refused even where the test
-// wrote the moments; of rows in the order of chance, a row picked as the one is taken as the only one, what
-// a loop or a `reduce` collects is not followed, a callback calling a pure method of a name of this file is
-// refused, and a function handed in as a parameter, a field of an object of rows, an import and a helper of
-// another file are not followed. Those go to review.
+// **The price, named, by class, and nothing outside these classes** — of one read with no order none is
+// left, the net holds it; of two reads with no order compared, what a form this check does not follow hides
+// (the net reverses both alike); of rows in an order the statement has: an order of ties is taken as an
+// order — a column every row read shares, a parent's identity through a join, a `sort` whose key repeats,
+// an order of SQL text by whatever it names; an order of values the test wrote is taken as the test's — a
+// column that is neither a uuid nor a moment is not judged; a moment before an identity is refused even
+// where the test wrote the moments; of rows in the order of chance, a row picked as the one is taken as the
+// only one, what a loop or a `reduce` collects is not followed, a callback calling a pure method of a name
+// of this file is refused, and a function handed in as a parameter, a field of an object of rows, an import
+// and a helper of another file are not followed. Those go to review.
 //
 //   node bin/check-ordered-reads.mjs
 
@@ -116,7 +118,15 @@ const CASTS = new Set(['Boolean', 'String', 'Number'])
 /** The methods handed a value, not a callback. */
 const NO_CALLBACK = new Set(['includes', 'slice', 'flat', 'sort', 'toSorted'])
 /** What is handed the rows whole and keeps no order of them. */
-const ORDERLESS_CALLS = new Set(['Set', 'Map', 'inArray', 'notInArray', 'Object.fromEntries'])
+const ORDERLESS_CALLS = new Set(['inArray', 'notInArray'])
+/**
+ * What keeps the rows in the order they were put in, and is followed as they are (review round 13, Н3): a `Set`, a
+ * `Map`, an object of `Object.fromEntries`. Its size, `has`, `get` and a value by its key cannot tell the order; a
+ * `Set`, a `Map` or an object compared with another by `toEqual` neither — vitest compares them with no order; spread,
+ * `Array.from`, `values()`, `Object.keys` and the like give the rows back in that order.
+ */
+const CONTAINERS = { Set: 'set', Map: 'map', 'Object.fromEntries': 'object' }
+const UNPACKS = new Set(['Array.from', 'Object.keys', 'Object.values', 'Object.entries'])
 /** The matchers whose verdict no order of the rows can change. */
 const ORDERLESS_MATCHERS = new Set([
   'toHaveLength',
@@ -336,6 +346,8 @@ const sqlOf = (template) => {
 /** Whether a template reads rows with no order: `select … from` and no `order by` of the statement itself. */
 const unorderedTemplate = (template) => {
   const { all, outside } = sqlOf(template)
+  // an update, a delete or a merge returning rows returns them in no order, and can have none (round 13, Н2)
+  if (/\b(update|delete|merge)\b/i.test(outside) && /\breturning\b/i.test(outside)) return true
   return /\bselect\b/i.test(all) && /\bfrom\b/i.test(all) && !/\border\s+by\b/i.test(outside)
 }
 
@@ -577,6 +589,9 @@ export function unorderedReads(
         ? helpers.get(symbolOf(begun.expression))
         : undefined
     const continued = fromHelper !== undefined && names.some((name) => BUILDS.has(name ?? ''))
+    // an update or a delete of Drizzle returning rows returns them in no order, and can have none (round 13, Н2)
+    if ((names.includes('update') || names.includes('delete')) && names.includes('returning'))
+      return 'none'
     if ((names.some((name) => name?.startsWith('select')) && names.includes('from')) || continued) {
       const given = calls
         .filter((call) => calledAs(call) === 'orderBy')
@@ -788,12 +803,24 @@ export function unorderedReads(
    * returned by a function of the file; `{ why, againstRead }` used in an order — `againstRead` where they
    * are compared with rows read in the order of chance too.
    */
-  const fate = (node, order) => {
+  const fate = (node, order, kept = null) => {
     let n = node
     /** Whether the rows have been made one string: `toContain` of it reads them in place (Ж2). */
     let text = false
+    /** What keeps the rows in their order, if they are in one: `set`, `map` or `object` (Н3). */
+    let container = kept
     for (;;) {
       const p = n.parent
+      if (container) {
+        const end = contained(n, p, container, order)
+        if (end.unpacked) {
+          n = end.unpacked
+          container = null
+          continue
+        }
+        if (end.name) return { name: end.name, container }
+        if (end.free || end.why) return end
+      }
       if (
         ts.isAwaitExpression(p) ||
         ts.isParenthesizedExpression(p) ||
@@ -901,6 +928,17 @@ export function unorderedReads(
         if (callee.getText(sf) === 'JSON.stringify') {
           n = p
           text = true
+          container = null
+          continue
+        }
+        const keeper = CONTAINERS[callee.getText(sf)]
+        if (keeper) {
+          n = p
+          container = keeper
+          continue
+        }
+        if (UNPACKS.has(callee.getText(sf))) {
+          n = p
           continue
         }
         return ORDERLESS_CALLS.has(callee.getText(sf))
@@ -934,6 +972,47 @@ export function unorderedReads(
   }
 
   /** What `expect(rows)` goes on to: a matcher no order can change, or one that compares in order. */
+  /**
+   * Where a `Set`, a `Map` or an object of rows goes: `{ free }`, `{ why }`, `{ name }`, `{ unpacked }` — given back
+   * as rows in its order — or `{}` where the ordinary walk goes on.
+   */
+  const contained = (n, p, container, order) => {
+    if (ts.isPropertyAccessExpression(p) && p.expression === n) {
+      const name = p.name.text
+      const called = ts.isCallExpression(p.parent) && p.parent.expression === p
+      if (container === 'object') return called ? { why: `.${name}()` } : { free: true }
+      if (!called) return name === 'size' ? { free: true } : { why: `.${name}` }
+      if (name === 'has' || (container === 'map' && name === 'get')) return { free: true }
+      if (/^(values|keys|entries)$/.test(name)) return { unpacked: p.parent }
+      return { why: `.${name}()` }
+    }
+    if (ts.isElementAccessExpression(p) && p.expression === n)
+      return container === 'object' ? { free: true } : { why: '[…]' }
+    if (ts.isVariableDeclaration(p) && p.initializer === n && ts.isIdentifier(p.name))
+      return { name: p.name }
+    if ((ts.isCallExpression(p) || ts.isNewExpression(p)) && p.arguments?.includes(n)) {
+      const callee = p.expression.getText(sf)
+      if (UNPACKS.has(callee)) return { unpacked: p }
+      if (/^expect(\.soft)?$/.test(callee)) {
+        const end = matched(p, order)
+        // compared with another by `toEqual`, a Set, a Map, an object tell no order
+        return end.why && /^(toEqual|toStrictEqual|toMatchObject)/.test(end.why)
+          ? { free: true }
+          : end
+      }
+      return {}
+    }
+    // spread back into an array, it is the rows in their order
+    if (
+      ts.isSpreadElement(p) &&
+      ts.isArrayLiteralExpression(p.parent) &&
+      p.parent.elements.length === 1
+    )
+      return { unpacked: p.parent }
+    if (ts.isForOfStatement(p) && p.expression === n) return { free: true }
+    return {}
+  }
+
   const matched = (expectCall, order, text = false) => {
     let m = expectCall.parent
     // a promise refused holds no rows
@@ -1002,7 +1081,7 @@ export function unorderedReads(
     collect(sf)
     for (const { read, order } of reads) {
       const seen = new Set()
-      const follow = (node) => {
+      const follow = (node, kept = null) => {
         // rows handed to a callback of `then`: its first parameter holds them; a callback the parse cannot read
         // is in doubt (review round 10)
         if (
@@ -1021,7 +1100,7 @@ export function unorderedReads(
           )
           return
         }
-        const end = fate(node, order)
+        const end = fate(node, order, kept)
         if (end.helper) {
           const symbol = symbolOf(end.helper)
           helpers.set(symbol, merged(helpers.get(symbol), order))
@@ -1036,7 +1115,7 @@ export function unorderedReads(
           names.set(symbol, merged(names.get(symbol), order))
           if (seen.has(symbol)) return
           seen.add(symbol)
-          for (const use of mentions.get(symbol) ?? []) follow(use)
+          for (const use of mentions.get(symbol) ?? []) follow(use, end.container ?? null)
         }
       }
       follow(read)
