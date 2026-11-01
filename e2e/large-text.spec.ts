@@ -270,6 +270,10 @@ for (const size of ['150%', '200%'])
           await pageSideways(page, page.locator('[class*="skeleton-"]')),
           `${path} loading`,
         ).toBe(0)
+        // The rows' skeleton is the rows' shape: no circle in a narrow row (self-review 10, №3).
+        await expect(page.locator('.skeleton-rows .circle:visible'), `${path} loading`).toHaveCount(
+          0,
+        )
       }
       await page.unroute(held)
       for (const [path, answer] of screens) {
@@ -486,9 +490,28 @@ for (const size of ['150%', '200%'])
       await post(page, '/api/spendings', {
         id: randomUUID(),
         spentOn: day(0),
-        amount: { amount: '1234567', currency: 'AMD' },
+        amount: { amount: '12345678', currency: 'AMD' },
         categoryId: categories[0]?.id,
         accountId: card,
+      })
+      // The 15th of each of the two months before: one of them is a month of an even number (adversarial К3).
+      const back = (months: number): string => {
+        const [year, month] = day(0).split('-').map(Number) as [number, number]
+        return new Date(Date.UTC(year, month - 1 - months, 15)).toISOString().slice(0, 10)
+      }
+      for (const spentOn of [back(1), back(2)])
+        await post(page, '/api/spendings', {
+          id: randomUUID(),
+          spentOn,
+          amount: { amount: '1000', currency: 'AMD' },
+          categoryId: categories[0]?.id,
+        })
+      // A day in two currencies, the dinars with no rate: its sum breaks after «+» (adversarial К1).
+      await post(page, '/api/spendings', {
+        id: randomUUID(),
+        spentOn: day(0),
+        amount: { amount: '50', currency: 'RSD' },
+        categoryId: categories[1]?.id,
       })
       await post(page, '/api/incomes', {
         id: randomUUID(),
@@ -527,6 +550,8 @@ for (const size of ['150%', '200%'])
       await page.goto('/money/spendings')
       await rowsWhole('spendings')
       expect(await pastCard(page, '.day-total', '.day-head')).toBeLessThanOrEqual(0.5)
+      // The month's figure shrinks to the head: «12 345 678 ֏» took «Траты» 27 px sideways at 200 % (adversarial К6).
+      expect(await pastCard(page, '.total .figure', '.total')).toBeLessThanOrEqual(0.5)
       expect(await pageSideways(page, page.locator('.day-head'))).toBe(0)
       await page.goto(`/money/accounts/${card}`)
       await rowsWhole('account')
@@ -552,6 +577,14 @@ for (const size of ['150%', '200%'])
         const next = letters[index + 1]
         if (next && next.left > left) expect(right).toBeLessThanOrEqual(next.left + 0.5)
       }
+      // The chosen month is named whatever its place: October chosen stood unnamed (adversarial К3).
+      const even = [back(1), back(2)].find((date) => Number(date.slice(5, 7)) % 2 === 0)!
+      await page.goto(`/money/charts?mode=year&year=${even.slice(0, 4)}`)
+      await page
+        .locator(`.chart input.radio[value="${String(Number(even.slice(5, 7)) - 1)}"]`)
+        .first()
+        .check({ force: true })
+      await expect(page.locator('.labels .label.chosen .letter').first()).toBeVisible()
       // A select's chosen words wrap over it; a switch's words are never cut.
       await page.goto('/settings')
       await expect(page.locator('.chosen-words').first()).toBeVisible()
@@ -564,6 +597,32 @@ for (const size of ['150%', '200%'])
           .evaluateAll(
             (words) => words.filter((one) => one.scrollWidth > one.clientWidth + 1).length,
           ),
+      ).toBe(0)
+      // A category's dot stays before its name in a narrow row (adversarial К2).
+      await page.goto('/money')
+      await page.getByRole('button', { name: 'Добавить трату' }).click()
+      const spending = page.locator('dialog[open]').last()
+      await expect
+        .poll(() => spending.evaluate((dialog) => dialog.getAnimations({ subtree: true }).length))
+        .toBe(0)
+      await facesIn(page)
+      // A tap within a double tap of the sheet's opening is held (MOL-69) and opens nothing: tapped again till it opens.
+      const more = spending.getByRole('button', { name: /Ещё/ })
+      await expect(async () => {
+        if ((await page.locator('dialog[open]').count()) < 2) await more.click()
+        await expect(page.locator('dialog[open]')).toHaveCount(2, { timeout: 1000 })
+      }).toPass()
+      const dotted = page.locator('dialog[open]').last().locator('.list-row:has(> .dot)')
+      await expect(dotted.first()).toBeVisible()
+      expect(
+        await dotted.evaluateAll(
+          (rows) =>
+            rows.filter(
+              (row) =>
+                row.querySelector(':scope > .dot')!.getBoundingClientRect().left >
+                row.querySelector('.title')!.getBoundingClientRect().left,
+            ).length,
+        ),
       ).toBe(0)
       // An exchange: its sum and currency one under the other, the sum typed whole.
       await page.goto('/money/exchange')

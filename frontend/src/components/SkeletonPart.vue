@@ -343,6 +343,39 @@ export default defineComponent({
   }
 }
 
+/* With large text, as `ListRow` in its list card (`row-tight`, MOL-321): the circle gives way, the words take the row
+   and the amount stands under them — the skeleton is the answer's shape (MOL-178, self-review 10, №3). */
+@container row-tight (width < #{$row-tight}) {
+  .row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    gap: 0 var(--space-3);
+  }
+
+  .circle,
+  .mark {
+    display: none;
+  }
+
+  .words {
+    grid-column: 1 / 3;
+    grid-row: 1;
+  }
+
+  .tail {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-self: end;
+    width: 40%;
+    margin-top: var(--space-1);
+  }
+
+  .chevron {
+    grid-column: 3;
+    grid-row: 1;
+  }
+}
+
 .sum-card {
   display: flex;
   flex-direction: column;

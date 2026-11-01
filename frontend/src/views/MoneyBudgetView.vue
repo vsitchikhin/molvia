@@ -731,7 +731,7 @@ export default defineComponent({
   container: row-tight / inline-size;
 }
 
-@container row-tight (width < 12rem) {
+@container row-tight (width < #{$row-tight}) {
   .tight :deep(.circle) {
     display: none;
   }

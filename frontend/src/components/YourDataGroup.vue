@@ -304,7 +304,7 @@ export default defineComponent({
 }
 
 /* The icon gives its place to the words in a narrow row, as a row's circle does (`ListRow`, MOL-321). */
-@container row-tight (width < 12rem) {
+@container row-tight (width < #{$row-tight}) {
   .entry-icon {
     display: none;
   }

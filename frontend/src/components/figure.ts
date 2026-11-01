@@ -7,6 +7,14 @@ type Widths = Readonly<{ figure: number; other: number; chars: Readonly<Record<s
 type Face = 'display' | 'text' | 'strong'
 
 /**
+ * «≈» and «₽» are in none of our faces' subsets — Onest's, Nunito's or Dram's — so the phone's own fallback draws them,
+ * and its width is not ours to measure: CI's image stood «≈ 1 433 318 ₽» past its tile by the faces' widths (self-review
+ * 10, №1). The widest likely fallback's: DejaVu Sans draws «≈» at 0.838 of its size; «₽» is taken at 0.72.
+ */
+const FALLBACK_APPROX = 0.84
+const FALLBACK_ROUBLE = 0.72
+
+/**
  * How wide a character is, a share of its size, with tabular figures (adversarial В2, Г2 of MOL-321). A count of
  * characters at some 0.55 held only where spaces and commas pulled the share down — «֏125,403» was 0.578 — so a
  * figure is measured by what it is made of. Anything not listed counts as a capital, the widest a figure holds.
@@ -30,9 +38,9 @@ const FACES: Readonly<Record<Face, Widths>> = {
       '+': 0.6,
       '%': 0.96,
       '/': 0.4,
-      '≈': 0.661,
+      '≈': FALLBACK_APPROX,
       '֏': 0.765,
-      '₽': 0.661,
+      '₽': FALLBACK_ROUBLE,
       $: 0.6,
       '€': 0.6,
       '₾': 0.773,
@@ -52,9 +60,9 @@ const FACES: Readonly<Record<Face, Widths>> = {
       '+': 0.673,
       '%': 0.804,
       '/': 0.4,
-      '≈': 0.633,
+      '≈': FALLBACK_APPROX,
       '֏': 0.747,
-      '₽': 0.633,
+      '₽': FALLBACK_ROUBLE,
       $: 0.673,
       '€': 0.709,
       '₾': 0.75,
@@ -76,9 +84,9 @@ const FACES: Readonly<Record<Face, Widths>> = {
       '+': 0.673,
       '%': 0.82,
       '/': 0.41,
-      '≈': 0.647,
+      '≈': FALLBACK_APPROX,
       '֏': 0.765,
-      '₽': 0.647,
+      '₽': FALLBACK_ROUBLE,
       $: 0.673,
       '€': 0.724,
       '₾': 0.761,

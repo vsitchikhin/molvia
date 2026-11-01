@@ -415,6 +415,18 @@ export default defineComponent({
       grid-column: 1 / 3;
     }
 
+    /* A category's dot stays before its name (adversarial К2): with no place of its own the grid put it in the first
+       free cell — at the right, where the chevron and the check stand, or under the name. */
+    .dot {
+      grid-column: 1;
+      grid-row: 1;
+      align-self: center;
+    }
+
+    .dot ~ .words {
+      grid-column: 2;
+    }
+
     /* The title and the line under it whole, never «…»: at 200 % «Бот в Telegram» read «Б…», and the line of an
        exchange hid what came in. */
     .title {
@@ -438,9 +450,8 @@ export default defineComponent({
 
 /* The same, only with large text, in a container named `row-tight` — every list card of the kit is one
    (`AppCard list`) — (MOL-321): the rows keep their tail beside the words at 100 % on 320 (16rem and more),
-   and at 200 % «1 234 567,89 ₽» was cut by 68 px and «Убрать» by 37, the chevron past the phone. 12rem: some
-   133 % of the text and up. */
-@container row-tight (width < 12rem) {
+   and at 200 % «1 234 567,89 ₽» was cut by 68 px and «Убрать» by 37, the chevron past the phone. `$row-tight`. */
+@container row-tight (width < #{$row-tight}) {
   @include tail-under($whole: true);
 }
 

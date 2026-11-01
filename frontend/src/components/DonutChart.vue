@@ -9,7 +9,7 @@
       <!-- Not a live region (review Р-6): the radio chosen already says it. -->
       <p class="center">
         <span class="center-label">{{ centre.label }}</span>
-        <span class="center-figure">{{ centre.figure }}</span>
+        <span class="center-figure" :style="figureChars(centre.figure)">{{ centre.figure }}</span>
         <span v-if="centre.sub" class="center-sub">{{ centre.sub }}</span>
       </p>
     </div>
@@ -54,6 +54,7 @@ import type { Currency, Money, MoneyChartMonthView, SpendingCategoryView } from 
 import AppCard from '@/components/AppCard.vue'
 import DonutRing, { CHOSEN_THICKER } from '@/components/DonutRing.vue'
 import type { RingSector } from '@/components/DonutRing.vue'
+import { figureChars } from '@/components/figure'
 import { categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 
@@ -235,6 +236,7 @@ export default defineComponent({
 
     return {
       t,
+      figureChars,
       id: useId(),
       heading,
       THICKNESS,
@@ -310,10 +312,12 @@ export default defineComponent({
   overflow-wrap: anywhere;
 }
 
+/* Never broken, and never wider than the card (MOL-321): under the ring at 200 % «13 712 150 ֏» took «Графики» past
+   the phone. In the hole it is the card's width it is measured by, so the price of MOL-318 stands there. */
 .center-figure {
   @include display-type;
+  @include figure-fit(var(--text-card-figure));
 
-  font-size: var(--text-card-figure);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

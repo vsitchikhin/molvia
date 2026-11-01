@@ -72,7 +72,7 @@
           v-bind="control()"
           :style="
             size === 'entry'
-              ? entryWidth(1)
+              ? entryWidth('figure')
               : kind === 'decimal'
                 ? figureChars(modelValue || placeholder || '0', 'text')
                 : undefined
@@ -92,7 +92,7 @@
         v-if="$slots.suffix"
         :id="`${id}-suffix`"
         class="suffix"
-        :style="size === 'entry' ? entryWidth(ENTRY_SIGN) : undefined"
+        :style="size === 'entry' ? entryWidth('sign') : undefined"
       >
         <slot name="suffix" />
       </span>
@@ -237,15 +237,18 @@ export default defineComponent({
 
     /**
      * The figure typed and its sign shrink together to the field (MOL-321, adversarial З1, И1): their width in the
-     * figure's size, the sign at its share — for the figure's own `figure-fit` at 1, the sign's at `ENTRY_SIGN`.
-     * At 200 % «125403,50» beside «₽» of its own size was 12.9 px. The sign is read from the tail's text.
+     * figure's size, the sign at its share — `ENTRY_SIGN`, or the figure's own for a code of letters, «RSD», which
+     * at that share was 12 px beside figures of 15 at 200 %. At 200 % «125403,50» beside «₽» of its own size was
+     * 12.9 px. The sign is read from the tail's text.
      */
-    function entryWidth(size: number): StyleValue {
+    function entryWidth(part: 'figure' | 'sign'): StyleValue {
       const sign = (slots.suffix?.() ?? [])
         .map((node) => (typeof node.children === 'string' ? node.children : ''))
         .join('')
+      const share = sign.trim().length > 1 ? 1 : ENTRY_SIGN
       const figure = figureWidth(props.modelValue || (props.placeholder ?? '') || '0')
-      return widthStyle((figure + ENTRY_SIGN * figureWidth(sign)) / size)
+      const width = figure + share * figureWidth(sign)
+      return widthStyle(part === 'figure' ? width : width / share)
     }
 
     function update(event: Event): void {
@@ -306,7 +309,6 @@ export default defineComponent({
       describedBy,
       update,
       entryWidth,
-      ENTRY_SIGN,
       figureChars,
     }
   },

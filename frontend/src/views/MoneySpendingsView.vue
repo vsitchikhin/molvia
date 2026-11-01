@@ -127,7 +127,9 @@
               {{ t('spending.list.count', { n: month.count }, month.count) }}
             </span>
             <span class="sum">
-              <span class="figure">{{ whole(month.spent) }}</span>
+              <span class="figure" :style="figureChars(whole(month.spent))">{{
+                whole(month.spent)
+              }}</span>
               <span v-if="approx" class="approx">{{ approx }}</span>
               <!-- The month's figure says what it leaves out, as on «Деньгах» (MOL-184, В-2). -->
               <span v-if="month.uncounted.length > 0" class="approx">
@@ -466,9 +468,12 @@ export default defineComponent({
       { flush: 'post' },
     )
 
-    /** The day's sum shrinks to the head by its widest line: it breaks only after a «+» (MOL-321). */
+    /**
+     * The day's sum shrinks to the head by its widest line: it breaks only after a «+» (MOL-321), which ends the line
+     * it breaks — measured without it, «12 345 678 ֏ +» stood 11.8 px past the head at 200 % (adversarial К1).
+     */
     function totalWidth(text: string | null): StyleValue {
-      const lines = (text ?? '').split('+')
+      const lines = (text ?? '').split(/(?<=\+)/)
       return figureChars(
         lines.reduce((widest, line) =>
           figureWidth(line, 'text') > figureWidth(widest, 'text') ? line : widest,
@@ -479,6 +484,7 @@ export default defineComponent({
 
     return {
       totalWidth,
+      figureChars,
       transferOpen,
       transferId,
       transferRemoved,
@@ -534,6 +540,8 @@ export default defineComponent({
 /* The sum goes under the count only where the two cannot stand side by side even with the count's
    words broken (MOL-321): at 200 % on 320 «6 600 ֏» stood past the phone. */
 .total {
+  /* The month's figure measures itself against it (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
@@ -556,10 +564,12 @@ export default defineComponent({
   text-align: right;
 }
 
+/* A sum never breaks: the month's shrinks to the head (MOL-321) — at 200 % «12 345 678 ֏» took «Траты» 27 px sideways
+   (adversarial К6). */
 .figure {
   @include display-type;
+  @include figure-fit(var(--text-title));
 
-  font-size: var(--text-title);
   font-variant-numeric: tabular-nums;
 }
 

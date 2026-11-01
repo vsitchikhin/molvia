@@ -298,6 +298,17 @@ export default defineComponent({
   .many .label:nth-child(odd) .letter {
     display: inline;
   }
+
+  /* The chosen month is named whatever its place, its neighbours' letters giving it room (adversarial К3): October
+     chosen, under the bars stood «Я М М И С Н» and nothing of it — the label's ink is the chosen month's second sign. */
+  .many .label.chosen .letter {
+    display: inline;
+  }
+
+  .many .label:has(+ .label.chosen) .letter,
+  .many .label.chosen + .label .letter {
+    display: none;
+  }
 }
 
 .label {
