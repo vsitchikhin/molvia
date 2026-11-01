@@ -4,7 +4,9 @@ export declare function unorderedReads(
   source: string,
   chance?: Set<string>,
   identity?: Set<string>,
+  keys?: string[][],
 ): string[]
 export declare function chanceColumns(source: string): Set<string>
 export declare function identityColumns(source: string): Set<string>
+export declare function uniqueKeys(source: string): string[][]
 export declare const MAY_READ: RegExp

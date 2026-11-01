@@ -16,7 +16,7 @@
 // read of one table: through a join a parent's identity repeats with every child — and a column of chance
 // among them decides the ties of those before it.
 //
-// **The rule is closed** (review of MOL-323, rounds 1–6): a list of the uses that compare by position
+// **The rule is closed** (review of MOL-323, rounds 1–7): a list of the uses that compare by position
 // missed one more each time it was attacked. So it goes the other way round. Rows are followed through
 // `await`, a cast, the methods that keep an order (`map`, `filter`, `flatMap`, `flat`, `slice`),
 // `JSON.stringify`, a spread of them alone, a branch of `?:`, `??` or `||`, an object they are put in, a
@@ -25,15 +25,17 @@
 // their first row (`[0]`, `at(0)`, `const [row] = …`), `find`, `some`, `every`, `includes` — never by a
 // callback handed the index of a row, by a parameter or the rest of its arguments, nor by one that changes
 // anything outside it — a name, a field, a method of a name from outside called (`seen.push`,
-// `next.next()`), a name from outside handed to a call — nor by one the parse cannot read (built by a call,
-// a method, an import; `Boolean`, `String` and `Number` are read) — `reduce`, `sort`, `toSorted`, a `for …
-// of`, a `Set`, a `Map`, `inArray`, `notInArray`, `Object.fromEntries`, `typeof`, discarded; under
-// `expect`: `toHaveLength`, `toContain`, `toContainEqual`, `toBeDefined`, `toBeUndefined`, `toBeTruthy`,
-// `toBeFalsy`, a `not` of any of them and of no other, `toEqual` of one row or none written in place, or of
-// `expect.arrayContaining`. Rows in the order of chance may besides be compared with another read in the
-// same order — by the same columns, a snapshot with a snapshot of the same helper, the read, a name given
-// it, or either through the methods that keep an order — never with anything the test builds. Anything else
-// is refused, and the fix is an order, never a use the check does not know.
+// `next.next()`), a function of this file from outside called (a spy, `record(row)`), a name from outside
+// handed to a call — nor by one the parse cannot read (built by a call, a method, an import; `Boolean`,
+// `String` and `Number` are read) — `reduce`, `sort`, `toSorted`, a `for … of`, a `Set`, a `Map`,
+// `inArray`, `notInArray`, `Object.fromEntries`, `typeof`, discarded; under `expect`: `toHaveLength`,
+// `toContain` and `toContainEqual` of the rows, never of them made one string, `toBeDefined`,
+// `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, a `not` of any of them and of no other, `toEqual` of one row
+// or none written in place, or of `expect.arrayContaining`. Rows in the order of chance may besides be
+// compared with another read in the same order, if it is total — a unique key of the schema among its
+// columns, else its ties lie as the heap does — by the same columns, a snapshot with a snapshot of the same
+// helper, the read, a name given it, or either through the methods that keep an order — never with anything
+// the test builds. Anything else is refused, and the fix is an order, never a use the check does not know.
 //
 // What this is: a guard against the ordinary form, not against one built to slip past it. **The price,
 // named, by class:** an order of ties is taken as an order — a column every row read shares
@@ -43,8 +45,9 @@
 // first, `find`, a key of a `Map` or `Object.fromEntries` — is taken as the only one: where more qualify,
 // the first in the heap answers, or for a key the last; what a `for … of` or a `reduce` collects is not
 // followed — a sum is their ordinary use; a callback that calls a method of a name from outside is refused
-// even where the method is pure (`want.includes(r.x)`) — the parse cannot tell; a field of an object of
-// rows is not followed; a helper of another file is not followed. Those go to review.
+// even where the method is pure (`want.includes(r.x)`) — the parse cannot tell; a function handed in as a
+// parameter is not followed; a field of an object of rows is not followed; a helper of another file is not
+// followed. Those go to review.
 //
 //   node bin/check-ordered-reads.mjs
 
@@ -149,6 +152,70 @@ export function identityColumns(source) {
   return columnsWhere(source, identityColumn)
 }
 
+/**
+ * The unique keys of the schema, each as its columns `table.column`: a primary key or a unique of a column, an
+ * identity, and the keys of a table — `primaryKey({ columns })`, `unique().on(…)`, a `uniqueIndex` with no `where`.
+ * An order that holds one of them is total: two reads of the same rows by it agree (review round 7, Ж3).
+ * @param {string} source
+ * @returns {string[][]}
+ */
+export function uniqueKeys(source) {
+  const sf = ts.createSourceFile(SCHEMA, source, ts.ScriptTarget.Latest, true)
+  const keys = []
+  for (const statement of sf.statements) {
+    if (!ts.isVariableStatement(statement)) continue
+    for (const declaration of statement.declarationList.declarations) {
+      const init = declaration.initializer
+      if (!ts.isIdentifier(declaration.name) || !init || !ts.isCallExpression(init)) continue
+      if (init.expression.getText(sf) !== 'pgTable') continue
+      const table = declaration.name.text
+      const [, columns, extras] = init.arguments
+      if (columns && ts.isObjectLiteralExpression(columns))
+        for (const column of columns.properties) {
+          if (!ts.isPropertyAssignment(column)) continue
+          const unique = callsOf(column.initializer).some((call) =>
+            /^(primaryKey|unique)$/.test(calledAs(call) ?? ''),
+          )
+          if (unique || identityColumn(column.initializer))
+            keys.push([`${table}.${column.name.getText(sf)}`])
+        }
+      if (!extras || !(ts.isArrowFunction(extras) || ts.isFunctionExpression(extras))) continue
+      const param = extras.parameters[0]?.name.getText(sf)
+      const columnOf = (node) =>
+        ts.isPropertyAccessExpression(node) && node.expression.getText(sf) === param
+          ? `${table}.${node.name.text}`
+          : undefined
+      const visit = (node) => {
+        if (ts.isCallExpression(node) && !ts.isPropertyAccessExpression(node.parent)) {
+          const calls = callsOf(node)
+          const names = calls.map(calledAs)
+          const root = names.at(-1)
+          if (root === 'primaryKey') {
+            const [config] = calls.at(-1).arguments
+            const listed =
+              config && ts.isObjectLiteralExpression(config)
+                ? config.properties.find((p) => p.name?.getText(sf) === 'columns')
+                : undefined
+            if (
+              listed &&
+              ts.isPropertyAssignment(listed) &&
+              ts.isArrayLiteralExpression(listed.initializer)
+            )
+              keys.push(listed.initializer.elements.map(columnOf).filter(Boolean))
+          }
+          if ((root === 'unique' || root === 'uniqueIndex') && !names.includes('where')) {
+            const on = calls.find((call) => calledAs(call) === 'on')
+            if (on) keys.push(on.arguments.map(columnOf).filter(Boolean))
+          }
+        }
+        ts.forEachChild(node, visit)
+      }
+      visit(extras.body)
+    }
+  }
+  return keys.filter((key) => key.length > 0)
+}
+
 function columnsWhere(source, is) {
   const sf = ts.createSourceFile(SCHEMA, source, ts.ScriptTarget.Latest, true)
   const found = new Set()
@@ -224,9 +291,16 @@ const literalIndex = (node) => {
  * @param {string} source
  * @param {Set<string>} [chance] the columns of the schema whose order is chance, as `table.column`
  * @param {Set<string>} [identity] the identity columns of the schema, as `table.column`
+ * @param {string[][]} [keys] the unique keys of the schema, each as its columns `table.column`
  * @returns {string[]}
  */
-export function unorderedReads(fileName, source, chance = new Set(), identity = new Set()) {
+export function unorderedReads(
+  fileName,
+  source,
+  chance = new Set(),
+  identity = new Set(),
+  keys = [],
+) {
   const { sf, checker } = bind(fileName, source)
   const symbolOf = (node) => checker.getSymbolAtLocation(node)
   /**
@@ -286,9 +360,11 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
       const unique = joined ? -1 : columns.findIndex((column) => named(column, identity))
       const deciding = unique === -1 ? columns : columns.slice(0, unique + 1)
       // a column of chance decides the ties of those before it: the order is chance
-      return deciding.some((column) => named(column, chance))
-        ? `chance:${deciding.map((column) => column.getText(sf)).join(', ')}`
-        : undefined
+      if (!deciding.some((column) => named(column, chance))) return undefined
+      // total where a unique key of the schema is among its columns: only then is it one order (Ж3)
+      const texts = deciding.map((column) => columnOf(column)?.getText(sf))
+      const total = keys.some((key) => key.every((column) => texts.includes(column)))
+      return `chance:${total ? '!' : ''}${deciding.map((column) => column.getText(sf)).join(', ')}`
     }
     if (method === 'findMany') {
       const [query] = node.arguments
@@ -375,6 +451,15 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
         outside(node.expression.expression)
       )
         changes = true
+      // or a function of this file from outside called, which may change what it likes: a spy, `record(row)` (Ж1);
+      // a parameter of a function around it is handed in, not followed — the price
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        outside(node.expression) &&
+        !ts.isParameter(symbolOf(node.expression)?.valueDeclaration ?? node)
+      )
+        changes = true
       // or a name from outside handed to a call, which may change it: `Object.assign(out, row)`
       if (ts.isCallExpression(node) && node.arguments.some((a) => ts.isIdentifier(a) && outside(a)))
         changes = true
@@ -416,7 +501,14 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
         n = n.expression.expression
       else break
     }
-    return isChance(order) && (ts.isIdentifier(n) ? names.get(symbolOf(n)) : readOf(n)) === order
+    // the same order, and a total one: an order with ties gives the ties as the heap lies (Ж3)
+    const total =
+      isChance(order) &&
+      order
+        .slice(7)
+        .split(' | ')
+        .every((part) => part.startsWith('!'))
+    return total && (ts.isIdentifier(n) ? names.get(symbolOf(n)) : readOf(n)) === order
   }
 
   /**
@@ -426,6 +518,8 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
    */
   const fate = (node, order) => {
     let n = node
+    /** Whether the rows have been made one string: `toContain` of it reads them in place (Ж2). */
+    let text = false
     for (;;) {
       const p = n.parent
       if (
@@ -499,7 +593,7 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
       if (ts.isForOfStatement(p) && p.expression === n) return { free: true }
       if ((ts.isCallExpression(p) || ts.isNewExpression(p)) && p.arguments?.includes(n)) {
         const callee = p.expression
-        if (/^expect(\.soft)?$/.test(callee.getText(sf))) return matched(p, order)
+        if (/^expect(\.soft)?$/.test(callee.getText(sf))) return matched(p, order, text)
         // the value a matcher compares with: the rows on the other side of `toEqual(rows)`
         const subject = ts.isPropertyAccessExpression(callee) ? subjectOf(callee) : undefined
         if (subject && ts.isPropertyAccessExpression(callee)) {
@@ -512,6 +606,7 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
         }
         if (callee.getText(sf) === 'JSON.stringify') {
           n = p
+          text = true
           continue
         }
         return ORDERLESS_CALLS.has(callee.getText(sf))
@@ -545,7 +640,7 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
   }
 
   /** What `expect(rows)` goes on to: a matcher no order can change, or one that compares in order. */
-  const matched = (expectCall, order) => {
+  const matched = (expectCall, order, text = false) => {
     let m = expectCall.parent
     while (ts.isPropertyAccessExpression(m) && /^(resolves|rejects)$/.test(m.name.text))
       m = m.parent
@@ -558,7 +653,7 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
       m = m.parent
       name = m.name.text
     }
-    if (ORDERLESS_MATCHERS.has(name)) return { free: true }
+    if (ORDERLESS_MATCHERS.has(name) && !(text && /^toContain/.test(name))) return { free: true }
     const [expected] = ts.isCallExpression(m.parent) ? m.parent.arguments : []
     if (COMPARES.has(name) && expected) {
       const one =
@@ -639,6 +734,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   const schema = readFileSync(SCHEMA, 'utf8')
   const chance = chanceColumns(schema)
   const identity = identityColumns(schema)
+  const keys = uniqueKeys(schema)
   const files = execFileSync('git', ['ls-files', ...FILES], { encoding: 'utf8' })
     .trim()
     .split('\n')
@@ -646,7 +742,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     if (!MAY_READ.test(source)) return []
-    return unorderedReads(file, source, chance, identity).map((found) => `  ${file}:${found}`)
+    return unorderedReads(file, source, chance, identity, keys).map((found) => `  ${file}:${found}`)
   })
   if (problems.length > 0) {
     console.error(

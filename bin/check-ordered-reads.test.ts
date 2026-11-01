@@ -1,6 +1,12 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { chanceColumns, identityColumns, MAY_READ, unorderedReads } from './check-ordered-reads.mjs'
+import {
+  chanceColumns,
+  identityColumns,
+  MAY_READ,
+  uniqueKeys,
+  unorderedReads,
+} from './check-ordered-reads.mjs'
 
 const FILE = 'a.integration.test.ts'
 const CHANCE = new Set([
@@ -9,14 +15,16 @@ const CHANCE = new Set([
   't.createdAt',
   'events.occurredAt',
   'ownerNotices.createdAt',
+  'verdicts.id',
 ])
 const IDENTITY = new Set(['t.id', 'ownerNotices.id'])
+const KEYS = [['sessions.id'], ['verdicts.id'], ['t.id'], ['ownerNotices.id']]
 
 const lines = (source: string): number[] =>
-  unorderedReads(FILE, source, CHANCE, IDENTITY).map((found) => Number.parseInt(found))
+  unorderedReads(FILE, source, CHANCE, IDENTITY, KEYS).map((found) => Number.parseInt(found))
 
 const inTest = (body: string): string => `it('x', async () => {\n${body}\n})`
-const found = (body: string): string[] => unorderedReads(FILE, inTest(body), CHANCE, IDENTITY)
+const found = (body: string): string[] => unorderedReads(FILE, inTest(body), CHANCE, IDENTITY, KEYS)
 
 describe('unorderedReads', () => {
   // «то же фото дважды» as it failed on CI 41022785698, and the reads of the sweep of MOL-323
@@ -323,6 +331,28 @@ describe('unorderedReads', () => {
       'not.toMatch of the rows stringified',
       `expect(JSON.stringify(await db.select().from(t))).not.toMatch(/a.*b/)`,
     ],
+    // round 7, Ж1: a callback calling a function of this file from outside, which may change what it likes
+    [
+      'every handing rows to a spy',
+      `const spy = vi.fn()\nexpect((await db.select().from(t)).every((r) => spy(r.text))).toBe(true)`,
+    ],
+    [
+      'every handing rows to a function that records',
+      `const seen = []\nconst record = (text) => seen.push(text)\nexpect((await db.select().from(t)).every((r) => record(r.text))).toBe(true)`,
+    ],
+    [
+      'every drawing from a function of the file',
+      `function nextText() {\nreturn want.shift()\n}\nexpect((await db.select().from(t)).every((r) => r.text === nextText())).toBe(true)`,
+    ],
+    // round 7, Ж2: toContain of the rows made one string reads them in place
+    [
+      'toContain of the rows stringified',
+      `expect(JSON.stringify((await db.select().from(t)).map((r) => ({ text: r.text })))).toContain('{"text":"a"},{"text":"b"}')`,
+    ],
+    [
+      'not.toContain of the rows stringified',
+      `expect(JSON.stringify([...(await db.select().from(t))])).not.toContain(secret)`,
+    ],
   ])('refuses %s', (_, body) => {
     expect(found(body)).toHaveLength(1)
   })
@@ -339,6 +369,20 @@ describe('unorderedReads', () => {
         `expect(await db.select().from(sessions).orderBy(sessions.id)).toEqual(await db.select().from(sessions).orderBy(sessions.expiresAt))`,
       ),
     ).toHaveLength(2)
+  })
+
+  // round 7, Ж3: an order of chance with ties is two orders — a snapshot meets a snapshot only by a total one
+  it('refuses a snapshot by a moment with ties, and lets one by a unique key meet itself', () => {
+    expect(
+      found(
+        `const before = await db.select().from(ownerNotices).orderBy(ownerNotices.createdAt)\nconst after = await db.select().from(ownerNotices).orderBy(ownerNotices.createdAt)\nexpect(after).toEqual(before)`,
+      ),
+    ).toHaveLength(2)
+    expect(
+      found(
+        `const before = await db.select().from(sessions).orderBy(sessions.id)\nconst after = await db.select().from(sessions).orderBy(sessions.id)\nexpect(after).toEqual(before)`,
+      ),
+    ).toEqual([])
   })
 
   // round 2, №7: a helper whose order is learnt as none late, after a pass read it as chance
@@ -359,7 +403,7 @@ describe('unorderedReads', () => {
       async function snapshot(id: string) {
         return {
           sessions: await db.select().from(sessions).where(eq(sessions.actorId, id)).orderBy(sessions.id),
-          events: await db.select().from(events).where(eq(events.actorId, id)).orderBy(events.occurredAt),
+          verdicts: await db.select().from(verdicts).where(eq(verdicts.actorId, id)).orderBy(verdicts.id),
         }
       }
       async function loose(id: string) {
@@ -500,8 +544,17 @@ describe('unorderedReads', () => {
       `expect(await db.select().from(t).orderBy(t.id, t.createdAt)).toEqual([a, b])`,
     ],
     [
-      'stringified, not containing',
-      `expect(JSON.stringify([...(await db.select().from(t))])).not.toContain(secret)`,
+      'stringified row by row, not containing',
+      `for (const row of await db.select().from(t)) expect(JSON.stringify(row)).not.toContain(secret)`,
+    ],
+    // round 7, Ж1: a function handed in as a parameter is not followed — the price
+    [
+      'a sum by a function handed in',
+      `const rows = await db.select().from(t)\nconst sum = (pick) => rows.reduce((all, row) => all + pick(row), 0)`,
+    ],
+    [
+      'a schema of another file parsing each row',
+      `expect((await db.select().from(t)).map((r) => schema.parse(r))).toHaveLength(2)`,
     ],
     ['a type of it', `const rows = await db.select().from(t)\ntype Row = (typeof rows)[number]`],
     ['discarded', `await db.select().from(t)`],
@@ -597,6 +650,42 @@ describe('identityColumns', () => {
     expect(identity.has('ownerNotices.id')).toBe(true)
     expect(identity.has('sessions.id')).toBe(false)
     expect([...identity].every((column) => !chanceColumns(schema).has(column))).toBe(true)
+  })
+})
+
+describe('uniqueKeys', () => {
+  it('names the unique keys of the schema: a column’s, a table’s, never a unique index with a where', () => {
+    const schema = `
+      export const sessions = pgTable('sessions', {
+        id: uuid('id').primaryKey(),
+        token: char('token', { length: 64 }).notNull().unique(),
+        actorId: uuid('actor_id').notNull(),
+      })
+      export const picks = pgTable(
+        'picks',
+        { actorId: uuid('actor_id'), key: text('key'), itemId: uuid('item_id') },
+        (table) => [
+          primaryKey({ columns: [table.actorId, table.key, table.itemId] }),
+          unique('picks_key').on(table.key, table.itemId).nullsNotDistinct(),
+          uniqueIndex('picks_live').on(table.itemId).where(sql\`true\`),
+        ],
+      )
+    `
+    expect(uniqueKeys(schema)).toEqual([
+      ['sessions.id'],
+      ['sessions.token'],
+      ['picks.actorId', 'picks.key', 'picks.itemId'],
+      ['picks.key', 'picks.itemId'],
+    ])
+  })
+
+  it('finds the schema’s own: a search pick’s key and a budget plan’s', () => {
+    const keys = uniqueKeys(readFileSync('backend/src/db/schema.ts', 'utf8')).map((key) =>
+      key.join(),
+    )
+    expect(keys).toContain('searchPicks.actorId,searchPicks.queryKey,searchPicks.itemId')
+    expect(keys).toContain('budgetPlans.actorId,budgetPlans.categoryId,budgetPlans.fromMonth')
+    expect(keys).toContain('sessions.id')
   })
 })
 
