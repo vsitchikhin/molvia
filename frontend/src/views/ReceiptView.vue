@@ -43,12 +43,13 @@
 
     <template v-else-if="detail">
       <!-- The kit's strip, so the frame hears the screen say it (MOL-349, adversarial А1): drawn in
-           place, it stood under the notice «Работаем без связи», two clouds. -->
+           place, it stood under the notice «Работаем без связи», two clouds. Its kind is the failure's
+           (MOL-181, adversarial Б2): «Без связи» of a server that answered 500 was untrue. -->
       <StatusStrip
         v-if="stale === 'offline' || stale === 'error'"
         class="memory"
-        kind="offline"
-        :text="t('receipt.review.offline')"
+        :kind="stale === 'offline' ? 'offline' : 'unanswered'"
+        :text="t(stale === 'offline' ? 'receipt.review.offline' : 'receipt.review.unanswered')"
       />
 
       <!-- Recorded elsewhere: the screen of a receipt exists only before it (handoff 05). -->

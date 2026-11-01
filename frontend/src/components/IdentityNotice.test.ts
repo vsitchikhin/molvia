@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, nextTick, ref } from 'vue'
@@ -72,9 +72,18 @@ describe('IdentityNotice', () => {
   it('says the sign-in was not checked where nothing else says it, and asks again on a tap', async () => {
     const { view, store } = render('error')
     expect(view.text()).toContain(en.identity.error.title)
-    const retry = vi.spyOn(store, 'retry').mockResolvedValue(undefined)
+    // Quietly, the card standing with «Trying again…» on its button (self-review №5).
+    let answer: () => void = () => undefined
+    const retry = vi
+      .spyOn(store, 'retry')
+      .mockReturnValue(new Promise<void>((resolve) => (answer = resolve)))
     await view.get('button').trigger('click')
-    expect(retry).toHaveBeenCalled()
+    expect(retry).toHaveBeenCalledWith({ quietly: true })
+    expect(view.get('button').text()).toContain(en.state.retrying)
+    expect(view.find('.notice').exists()).toBe(true)
+    answer()
+    await flushPromises()
+    expect(view.get('button').text()).toContain(en.state.retry)
     expect(render('offline').view.find('button').exists()).toBe(false)
   })
 
@@ -91,10 +100,6 @@ describe('IdentityNotice', () => {
         'a strip of the connection',
         () => h(StatusStrip, { kind: 'offline', text: 'Offline · as of 14:05' }),
       ],
-      [
-        'its skeleton, the answer on its way',
-        () => h(ScreenSkeleton, () => h(SkeletonPart, { kind: 'caption' })),
-      ],
     ])('%s', async (_, content) => {
       // kit-settings-7 (owner's В-2 «б»): under the screen's error the sign-in's card was a third
       // «Повторить»; the same rule holds for both cases.
@@ -105,6 +110,57 @@ describe('IdentityNotice', () => {
         expect(view.find('.notice').exists()).toBe(false)
         view.unmount()
       }
+    })
+
+    // Self-review №4, adversarial Б1: a skeleton is no word. After it comes the screen's «нет связи» or
+    // its answer, and taken for a word it took the failed sign-in's card away at every read — a month
+    // turned, a search typed — the answer bringing it back, the control above moving under the thumb.
+    describe('a skeleton holds the notice as it is', () => {
+      const skeleton = () => h(ScreenSkeleton, () => h(SkeletonPart, { kind: 'caption' }))
+
+      it('the failed sign-in stays through the reads of an answered screen', async () => {
+        useActorStore().state = 'error'
+        const loading = ref(true)
+        const view = framed(() => (loading.value ? skeleton() : h('ul', { class: 'answer' })))
+        const seen: boolean[] = []
+        for (const now of [true, false, true, false]) {
+          loading.value = now
+          await nextTick()
+          await nextTick()
+          seen.push(view.find('.notice').exists())
+        }
+        expect(seen).toEqual([true, true, true, true])
+        expect(view.find('.notice').text()).toContain(en.identity.error.title)
+        view.unmount()
+      })
+
+      it('«без связи» does not come under it: the screen’s own comes after it', async () => {
+        useActorStore().state = 'offline'
+        const loading = ref(true)
+        const view = framed(() =>
+          loading.value ? skeleton() : h(ScreenState, { kind: 'offline', title: 'No connection' }),
+        )
+        await nextTick()
+        expect(view.find('.notice').exists()).toBe(false)
+        loading.value = false
+        await nextTick()
+        await nextTick()
+        expect(view.find('.notice').exists()).toBe(false)
+        view.unmount()
+      })
+
+      it('must not fire: the screen’s error after it still silences the card', async () => {
+        useActorStore().state = 'error'
+        const loading = ref(true)
+        const view = framed(() =>
+          loading.value ? skeleton() : h(ScreenState, { kind: 'error', title: 'Failed' }),
+        )
+        loading.value = false
+        await nextTick()
+        await nextTick()
+        expect(view.find('.notice').exists()).toBe(false)
+        view.unmount()
+      })
     })
 
     it('and speaks again once the screen’s word is gone', async () => {

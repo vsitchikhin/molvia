@@ -52,6 +52,8 @@
           :variant="card ? 'ghost' : updating ? 'secondary' : 'primary'"
           ref="retryButton"
           :class="{ word: card }"
+          :busy="retrying"
+          :busy-label="t('state.retrying')"
           @click="$emit('retry')"
         >
           <template #icon><IconRefresh /></template>
@@ -206,6 +208,8 @@ export default defineComponent({
      * is for the text before, and is not read out (the search's rule, MOL-208 adversarial А3).
      */
     silent: { type: Boolean, default: false },
+    /** «Повторить» at work, the block standing meanwhile: «Повторяем…» in its place (MOL-225, MOL-349). */
+    retrying: { type: Boolean, default: false },
   },
   emits: ['retry'],
   setup(props) {

@@ -7,6 +7,7 @@
       kind="error"
       :title="t('identity.error.title')"
       :body="t('identity.error.body')"
+      :retrying="retrying"
       @retry="retry"
     />
     <AppCard v-else>
@@ -23,7 +24,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue'
+import { defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppCard from '@/components/AppCard.vue'
 import ScreenState from '@/components/ScreenState.vue'
@@ -38,7 +39,7 @@ import { useActorStore } from '@/stores/actor'
  * showing nothing left a person with an app that looked normal and could not save a thing.
  *
  * **Said only where the screen says nothing of its answer** (MOL-349, owner's В-1 «б», В-2 «б»): a
- * screen's own «нет связи», its error, its strip or its skeleton is the one word — drawn over it, the
+ * screen's own «нет связи», its error or its strip is the one word — drawn over it, the
  * notice made two clouds and two texts, stood over the field of «Что брать» (Ф-14), and on
  * «Настройки» with the server down put a third «Повторить» over the screen's error and the salary's
  * (kit-settings-7). Where the screen has its answer and says nothing — `/actors/me` failing alone, the
@@ -68,11 +69,36 @@ export default defineComponent({
     // Its own state is no word of the screen's, or it would silence itself.
     withoutAnswerWord()
 
-    return {
-      t,
-      notice: computed(() => (word?.said.value ? null : noticeFor(actor.state))),
-      retry: () => void actor.retry(),
+    // **Under a skeleton the notice neither comes nor goes** (self-review №4, adversarial Б1): what
+    // follows it, the screen's «нет связи» or its answer, decides. A failed sign-in known as the screen
+    // comes stands from its first frame, as before MOL-349 — after a skeleton comes an answer as a
+    // rule — and «без связи» is held back, since the screen's own comes after it. Settled once the
+    // screen under it has mounted (`flush: 'post'`): before that nobody has said or held anything.
+    const notice = ref<Notice | null>(
+      word ? (actor.state === 'error' ? 'error' : null) : noticeFor(actor.state),
+    )
+    function settle(): void {
+      const wanted = noticeFor(actor.state)
+      if (!wanted || word?.said.value) notice.value = null
+      else if (word?.held.value) notice.value = notice.value ? wanted : null
+      else notice.value = wanted
     }
+    onMounted(settle)
+    watch(() => [actor.state, word?.said.value, word?.held.value], settle, { flush: 'post' })
+
+    // Asked quietly, the card standing with «Повторяем…» on its button (self-review №5): put to
+    // `loading`, it went from under the thumb and the screen under it moved up and back.
+    const retrying = ref(false)
+    async function retry(): Promise<void> {
+      retrying.value = true
+      try {
+        await actor.retry({ quietly: true })
+      } finally {
+        retrying.value = false
+      }
+    }
+
+    return { t, notice, retrying, retry }
   },
 })
 </script>

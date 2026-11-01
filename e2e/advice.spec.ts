@@ -484,6 +484,39 @@ test('the field of the cold offline stands where its well stood', async ({ page,
   expect(await topOf(page, '.search-field .well')).toBe(well)
 })
 
+// MOL-349, self-review №4, adversarial Б1: with `/actors/me` failing alone the card «Could not check the
+// sign-in» stands over the list. A skeleton is no word: the first query's skeleton took the card away
+// and its answer brought it back, the field going up and down under the thumb by the card's height.
+test('a failed sign-in’s card stands through a search, and the field does not move', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const who = await person(page)
+  await ratedPurchase(who, `Тан ${tag}`, 5)
+  await page.route('**/api/actors/me', (route) => route.fulfill({ status: 500, body: '{}' }))
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/advice/search**', async (route) => {
+    await held
+    await route.continue()
+  })
+  await page.goto('/')
+  const card = page.getByRole('heading', { name: 'Could not check the sign-in' })
+  await expect(card).toBeVisible()
+  const field = await topOf(page, '.search-field .well')
+
+  await page.getByRole('searchbox', { name: 'Search the catalogue' }).fill('Тан')
+  await expect(page.locator('.skeleton')).toBeVisible()
+  await expect(card).toBeVisible()
+  expect(await topOf(page, '.search-field .well')).toBe(field)
+  release()
+  await expect(page.locator('.skeleton')).toHaveCount(0)
+  await expect(card).toBeVisible()
+  expect(await topOf(page, '.search-field .well')).toBe(field)
+})
+
 /** Cold offline: the first answer lost with the connection, the cloud on the screen. */
 async function coldOffline(page: Page, context: BrowserContext): Promise<void> {
   let release: () => void = () => undefined
