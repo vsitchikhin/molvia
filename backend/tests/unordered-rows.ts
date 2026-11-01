@@ -1,15 +1,25 @@
+import { createRequire } from 'node:module'
 import postgres from 'postgres'
 
 /**
- * Rows read with no order come back in an order Postgres never promised (MOL-323): every `SELECT` of the
- * integration tests whose statement has no `order by` of its own — not in parentheses, a comment or a string — has
- * its rows turned by one, the first last. A test that leans on the order of such rows fails on its first run
- * however it reads them; rows alike, where the order tells nothing, come back the same. Every client of the
- * process goes through it — the test's, the app's, a transaction's — since it hooks the query of postgres.js,
- * never a client. `bin/check-ordered-reads.mjs` says the same before the run, by parsing; this is what holds.
+ * Rows read with no order come back in an order Postgres never promised (MOL-323): the rows of every `SELECT` of the
+ * integration tests whose statement has no `order by` of its own — not in parentheses, a comment or a string — and of
+ * every `UPDATE`, `DELETE` and `MERGE` that returns them, which never have one, come back reversed. Reversed, not
+ * turned by one (review round 13, Н1): it is the one order that puts each two rows the other way round, so a test
+ * that leans on which of any two comes first — the whole array, `find`, the first row, `[...new Set()]` — fails on
+ * its first run, however it reads them; rows alike, where the order tells nothing, come back the same. `INSERT`'s
+ * rows keep the order of its `VALUES`, as a test may lean on. Every client of the process goes through it — the
+ * test's, the app's, a transaction's — since it hooks the query of postgres.js, never a client.
+ *
+ * What it cannot hold: two reads reversed alike match whatever their order was — a snapshot met by a snapshot —
+ * which no fixed order can tell, two rows having but one other; `bin/check-ordered-reads.mjs` holds that, by
+ * parsing, with an order the statement has (chance, ties), which this never touches.
  */
 
-const TURNED = Symbol.for('molvia.unorderedRowsTurned')
+const REVERSED = Symbol.for('molvia.unorderedRowsReversed')
+
+/** The commands whose rows Postgres gives in no order but the statement's own `order by`. */
+const UNORDERED_COMMANDS = new Set(['SELECT', 'UPDATE', 'DELETE', 'MERGE'])
 
 /** A statement's SQL outside parentheses, strings and comments: where an `order by` of its own stands. */
 function outside(text: string): string {
@@ -40,10 +50,15 @@ export function unordered(text: string): boolean {
   return !/\border\s+by\b/i.test(outside(text))
 }
 
-/** The rows turned by one, in place: a result keeps its fields (`count`, `command`, `columns`). */
-export function turned<T>(rows: T[]): T[] {
-  if (rows.length > 1) rows.push(rows.shift() as T)
-  return rows
+/** The rows reversed, in place: a result keeps its fields (`count`, `command`, `columns`). */
+export function reversed<T>(rows: T[]): T[] {
+  return rows.reverse()
+}
+
+/** Whether a result is rows in no promised order: of a command that gives them so, with no order of its own. */
+export function inNoOrder(result: unknown, text: string): result is unknown[] {
+  const command = Array.isArray(result) ? (result as { command?: string }).command : undefined
+  return command !== undefined && UNORDERED_COMMANDS.has(command) && unordered(text)
 }
 
 interface Pending {
@@ -51,15 +66,15 @@ interface Pending {
   resolve: (result: unknown) => void
 }
 
-// The class of a query of postgres.js, taken from one never run: queries are run when awaited.
-const probe = postgres('postgres://localhost/unused', { max: 1 })
-const query = probe.unsafe('select 1') as unknown as Pending
-const prototype = Object.getPrototypeOf(query) as Record<symbol, unknown>
-await probe.end()
-
-if (!prototype[TURNED]) {
-  prototype[TURNED] = true
-  // A query sets its own `resolve` as it is made; the setter puts the turn in front of it.
+// The class of a query of postgres.js, taken from one never run — queries are run when awaited — of both builds
+// of the package, its ESM and its CommonJS, so that no client of the process escapes by loading the other.
+async function reverseIn(factory: typeof postgres): Promise<void> {
+  const probe = factory('postgres://localhost/unused', { max: 1 })
+  const prototype = Object.getPrototypeOf(probe.unsafe('select 1')) as Record<symbol, unknown>
+  await probe.end()
+  if (prototype[REVERSED]) return
+  prototype[REVERSED] = true
+  // A query sets its own `resolve` as it is made; the setter puts the reversal in front of it.
   Object.defineProperty(prototype, 'resolve', {
     configurable: true,
     set(this: Pending, resolve: (result: unknown) => void) {
@@ -68,11 +83,12 @@ if (!prototype[TURNED]) {
         configurable: true,
         writable: true,
         value: (result: unknown) => {
-          const read =
-            Array.isArray(result) && (result as { command?: string }).command === 'SELECT'
-          resolve(read && unordered(text) ? turned(result) : result)
+          resolve(inNoOrder(result, text) ? reversed(result) : result)
         },
       })
     },
   })
 }
+
+await reverseIn(postgres)
+await reverseIn(createRequire(import.meta.url)('postgres') as typeof postgres)
