@@ -259,16 +259,18 @@ t.id)` with a uuid `id`). So `orderBy(t.id, t.createdAt)` with an identity `id` 
   written read as the test's story.
 - **`bin/check-ordered-reads.mjs` holds it in `npm run lint`** (owner's В-2 «в»), by parsing as the clock
   check does, names by TypeScript's binder, chance, identities and unique keys read from `schema.ts`. **It is
-  closed at each of the three places it recognises something** (review of MOL-323, nine rounds: a list of
-  forms missed one more every round, so each place says what it knows and holds the rest in doubt, and **in
-  doubt there is no order**): **what reads** — a Drizzle chain, its `const` beginning and a helper's included,
-  `execute` of any text (one the parse cannot read is a read with no order), a template, SQL as a string;
-  **what orders** — `orderBy` of columns, directly, by a `const` or spread; anything else is no order of
-  insertion; uuid and `timestamp` are chance, decided up to the first identity in a read of one table, total
-  only with a whole unique key of every table read; **what the rows are used for** — they may end only where
-  their order cannot tell (the list is in its head), a callback of those is in doubt where it takes an index,
-  changes anything outside it or cannot be read, a `not` frees only a matcher free without it, of rows made
-  one string only the length is free, and rows of chance may meet another read in the same total order.
+  closed at each of the three places it recognises something** (review of MOL-323, ten rounds: a list of forms
+  missed one more every round, so each place says what it knows and holds the rest in doubt, and **in doubt
+  there is no order**): **what reads** — a Drizzle chain, its `const` beginning and a helper's included
+  (carried on from any other name it is refused), `findMany` in doubt, `execute`, `unsafe`, `query` and a
+  file's executing helper of any text (one the parse cannot read is a read with no order), a template not a
+  fragment of a query, rows handed to `then`; **what orders** — `orderBy` of columns of tables the schema
+  names (by an import alias or a namespace too), directly, by a `const` or spread; anything else is no order
+  of insertion; uuid and `timestamp` are chance, decided up to the first identity in a read of one table,
+  total only with a whole unique key of every table read; **what the rows are used for** — they may end only
+  where their order cannot tell (the list is in its head), a callback of those is in doubt where it takes an
+  index, changes anything outside it or cannot be read, a `not` frees only a matcher free without it, of rows
+  made one string only the length is free, and rows of chance may meet another read in the same total order.
   Anything else is refused; the fix is an order, never a use the check does not know. **The price, named, by
   class, and nothing outside these classes**: an order of ties is taken as an order (a column every row read
   shares, a parent's identity through a join, a `sort` whose key repeats, an order of SQL text by whatever it
@@ -277,7 +279,8 @@ t.id)` with a uuid `id`). So `orderBy(t.id, t.createdAt)` with an identity `id` 
   one — the first, `find`, a key of a `Map` — is taken as the only one, the ordinary use being a row by its
   key, hundreds of them; what a loop or a `reduce` collects is not followed, a sum being their ordinary use; a
   callback calling a pure method of a name of this file is refused; a function handed in as a parameter, a
-  field of an object of rows, an import and a helper of another file are not followed. Those go to review. **A
+  field of an object of rows, an import and a helper of another file are not followed. Those go to review.
+  **Every answer of «free» or «not a read» the check gives is written in its head, nothing else is let go; a
   form found outside these classes is a defect of the check, fixed at the place it slipped through by the same
   rule of doubt — never a new list.**
 - **How it was proved**: the read of «то же фото дважды» on master with its first word deleted and inserted
