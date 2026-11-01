@@ -500,7 +500,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
     15.9rem at 100 % on 320), the sum and the share under it across the whole row, and its centre goes under the
     ring below 8rem (200 %); the month's name stands over its arrows below 13rem; «Пришло и ушло» stands its three
     figures one under another below 12rem; «На счетах сейчас» stands «1 счёт ›» under its words below 12rem; an
-    icon of `NavRow` gives way below 12rem and the wallet of `AccountRow` below 10rem, where the account's name
+    icon of `NavRow` gives way below 12rem and the wallet of `AccountRow` below 12rem (a sheet's row is 10rem at 150 %: «Ка…» beside «Откуда» at 10rem, adversarial З2), where the account's name
     goes to a line of its own — decorations, where the words had 64 px. **A row's tail goes under its words only
     with large text in a container named `row-tight`** (`ListRow`, below 12rem): the rows of «Счета» and «Категории»
     keep it beside at 100 % on 320, where `row`'s 22rem would turn them, and at 200 % «1 234 567,89 ₽» was cut by 68 px
@@ -525,7 +525,9 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     beside the ring and a wrapping line of its own under it.
   - **A figure shrinks to its box by its width** (`@include figure-fit`, adversarial А1…А6, В2): `min(size,
 100cqi / width)`, the size `--text-figure` for a card's figure or `1em` for one set in the text — a sum in a
-    row's tail, «Осталось» of «Бюджет» (В4), a purchase's sum alone under its name in a record's sheet (Ж1) — and the width the figure's in its own size, set beside it by
+    row's tail, «Осталось» of «Бюджет» (В4), a purchase's sum alone under its name in a record's sheet (Ж1), the amount typed in `AppField size="entry"` against the
+    width beside its sign — a box of its own round the input, since a field cannot ask its own width: at 150 % «12540»
+    showed «2540» while typed (З1) — and the width the figure's in its own size, set beside it by
     `figureChars` (`--figure-width`, set by script) from a table of the face's characters, measured — the figures'
     face (Nunito 800: a figure 0.600, a no-break space 0.279, a comma 0.26, «֏» 0.765) or, for a sum in a row,
     the words' (Onest 600: a figure 0.673, 12 % wider — the figures' table let «Осталось» 4.6 px past its line at
