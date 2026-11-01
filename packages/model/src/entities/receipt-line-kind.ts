@@ -1145,6 +1145,16 @@ function sameLetters(a: string, b: string): boolean {
   return Math.min(x.length, y.length) >= 5 && levenshtein(x, y) <= 1
 }
 
+/**
+ * A brand the model copied a letter short, under five letters where `sameLetters` forgives nothing (MOL-331):
+ * «Պան» for «Պանո», «Ֆին» for «Ֆինո». The line's word is the name's with one letter taken out, from three.
+ */
+function letterLost(printed: string, name: string): boolean {
+  const [short, long] = [toSearchKey(printed), toSearchKey(name)]
+  if (short.length < 3 || long.length !== short.length + 1) return false
+  return [...long].some((_, at) => long.slice(0, at) + long.slice(at + 1) === short)
+}
+
 const HY_UNITS: Readonly<Record<string, string>> = {
   գր: 'г',
   գ: 'г',
@@ -1253,6 +1263,8 @@ function nextThing(
 export interface FitOptions {
   /** The item is the seed's own — a kind, never a brand: «Бекон», «Энергетик». */
   readonly generic?: boolean
+  /** The model copied the line: its brand may have lost a letter (MOL-331), and the caller says «проверьте». */
+  readonly copied?: boolean
 }
 
 /**
@@ -1307,6 +1319,8 @@ export function lineFitter(
     ...figuresOf(parts.size ?? ''),
   ]
   const brand = wordsOf(parts.brand ?? '')
+  const brandHas = (word: string, copied: boolean): boolean =>
+    copied && brand.some((one) => letterLost(one, word))
   const shelfBrand = wordsOf(parts.brand === null ? '' : (shelfOf(parts.brand, lexicon) ?? ''))
   const brands = shelfBrand.length > 0 ? [brand, shelfBrand] : [brand]
   // any of the kind's senses: «հրուշակեղեն» is pastry and confectionery
@@ -1326,16 +1340,24 @@ export function lineFitter(
       (sense) =>
         sense.length > 0 && sense.every((word) => item.some((one) => sameRussian(word, one))),
     )
-  const lineHas = (word: string): boolean =>
-    glossed.some((one) => sameRussian(word, one)) || spelt.some((one) => sameLetters(word, one))
+  const lineHas = (word: string, copied: boolean): boolean =>
+    glossed.some((one) => sameRussian(word, one)) ||
+    spelt.some((one) => sameLetters(word, one)) ||
+    brandHas(word, copied)
   return (itemName, options = {}) => {
     const item = wordsOf(itemName)
+    const copied = options.copied === true
     if (item.length === 0) return false
     if (branded && options.generic === true) return false
-    if (!item.every(lineHas)) return false
+    if (!item.every((word) => lineHas(word, copied))) return false
     if (!figuresOf(itemName).every((figure) => figures.includes(figure))) return false
     const named = brands.find((one) =>
-      one.every((word) => item.some((other) => sameLetters(word, other))),
+      one.every((word) =>
+        item.some(
+          (other) =>
+            sameLetters(word, other) || (copied && one === brand && letterLost(word, other)),
+        ),
+      ),
     )
     if (named === undefined) return false
     if (named.length > 0 && item.every((word) => named.some((one) => sameLetters(word, one))))

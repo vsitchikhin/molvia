@@ -821,6 +821,32 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
   })
 })
 
+describe('a line the model copied a letter short (MOL-331)', () => {
+  const copied = (printed: string, item: string) =>
+    lineFitter(receiptLineParts(printed), WORDS)(item, { copied: true })
+
+  it('takes a brand under five letters with one letter lost, only where the line was copied', () => {
+    expect(copied('Պանիր «Պան» 200գր', 'Сыр «Пано» 200 г')).toBe(true)
+    expect(fits('Պանիր «Պան» 200գր', 'Сыр «Пано» 200 г')).toBe(false)
+    expect(copied('Պանիր «Ֆին»', 'Сыр «Фино»')).toBe(true)
+  })
+
+  it('must not forgive two letters, a letter more, a brand of two letters, nor another kind', () => {
+    expect(copied('Պանիր «Պա» 200գր', 'Сыр «Пано» 200 г')).toBe(false)
+    // three letters, a key of two: «ու» is one letter of the key
+    expect(copied('Պանիր «Մու»', 'Сыр «Мур»')).toBe(false)
+    expect(copied('Պանիր «Պան» 200գր', 'Сыр «Па» 200 г')).toBe(false)
+    expect(copied('Պանիր «Պանո»', 'Сыр «Пан»')).toBe(false)
+    expect(copied('Պանիր «Պան»', 'Сыр «Пинто»')).toBe(false)
+    expect(copied('Մուրաբա «Միլա»', 'Сыр «Милка»')).toBe(false)
+  })
+
+  it('takes a brand of that kind a letter longer: the price, «проверьте» on the review', () => {
+    // «Դաչա» is «Դայչա» less a letter: two brands of one kind would be taken one for the other
+    expect(copied('Պանիր «Դաչա»', 'Сыр «Дайча»')).toBe(true)
+  })
+})
+
 describe('a word the reader misread by the font (MOL-326, В-3 «б»)', () => {
   const KNOWN = new Set([
     'շաքարավազ',

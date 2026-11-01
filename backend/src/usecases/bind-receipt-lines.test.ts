@@ -430,8 +430,12 @@ describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
 
 describe('a line of the owner’s that went new where its item was there (MOL-331)', () => {
   const FOUND = '00000000-0000-4000-8000-0000000000f2'
-  async function bindOne(printed: string, name: string, byModel = false) {
-    const { items } = fakeItems({ items: [item(FOUND, name)], near: true, nearIds: [FOUND] })
+  const OTHER = '00000000-0000-4000-8000-0000000000f3'
+  /** The line against the search's answer: the item `FOUND`, and `OTHER` after it where given. */
+  async function bindOne(printed: string, name: string, byModel = false, other?: string) {
+    const found = [item(FOUND, name), ...(other === undefined ? [] : [item(OTHER, other)])]
+    const ids = found.map((one) => one.id)
+    const { items } = fakeItems({ items: found, near: true, nearIds: ids })
     const [bound] = await bindReceiptLines(
       { items, embedder: NO_EMBEDDER },
       ACTOR,
@@ -452,6 +456,19 @@ describe('a line of the owner’s that went new where its item was there (MOL-33
       itemId: null,
       translation: 'Основа для пиццы «Пано» 250 г',
     })
+  })
+
+  it('takes the brand the model copied a letter short, «проверьте», and never a Tesseract line so', async () => {
+    const pan = 'Պիցցայի լոշիկ «Պան» 260±10գր'
+    expect(await bindOne(pan, 'Основа для пиццы «Пано»', true)).toMatchObject({
+      itemId: FOUND,
+      match: 'weak',
+    })
+    expect(await bindOne(pan, 'Основа для пиццы «Пано»')).toMatchObject({ itemId: null })
+    // a brand as copied stands before one a letter longer, wherever the search put it
+    expect(
+      await bindOne(pan, 'Основа для пиццы «Пано»', true, 'Основа для пиццы «Пан»'),
+    ).toMatchObject({ itemId: OTHER, match: 'search' })
   })
 })
 

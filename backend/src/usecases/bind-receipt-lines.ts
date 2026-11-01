@@ -184,15 +184,22 @@ export async function bindReceiptLines(
       // nor one the printed heading rules out — a brush is no tomato however the gloss read (MOL-255) —
       // which was «проверьте» and is now a new item, as the rest
       const fits = lineFitter(parts, TILL_WORDS_RU, lexicon)
-      const first = answer.items.find(
-        (item) =>
-          fits(item.name, { generic: SEED_NAMES.has(item.name) }) &&
-          !headingRulesOut(line.hs, headings.get(item.id) ?? []),
-      )
+      const fitting = (copied: boolean) =>
+        answer.items.find(
+          (item) =>
+            fits(item.name, { generic: SEED_NAMES.has(item.name), copied }) &&
+            !headingRulesOut(line.hs, headings.get(item.id) ?? []),
+        )
+      // the model's own slips of copying only where nothing stands as printed, and «проверьте» (MOL-331)
+      const exact = fitting(false)
+      const first = exact ?? (byModel ? fitting(true) : undefined)
       if (first !== undefined) {
         // a dish of a class of services is never sure among the catalogue's goods (MOL-226)
         const near =
-          answer.nearIds.includes(first.id) && !isServiceClass(line.hs) && mended === null
+          answer.nearIds.includes(first.id) &&
+          !isServiceClass(line.hs) &&
+          mended === null &&
+          exact !== undefined
         bound.push({ itemId: first.id, match: near ? 'search' : 'weak', translation })
         continue
       }
