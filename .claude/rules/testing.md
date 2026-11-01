@@ -290,7 +290,11 @@ failure` give the same first row, `find` and `[...new Set()]` either way (round 
   call): outside is a name declared outside, an import but vitest's `expect`, `this` and an alias of one; it is
   changed by any write — an assignment taken apart, `++`, `delete`, a loop's target — by a call of it or of its
   method, by being handed to a call or to `new`, by a template of any tag but Drizzle's `sql`, and by a function
-  of the platform not known pure (`fetch`). It reads the helpers beside the tests too. It works by parsing as the clock check does,
+  of the platform not known pure (`fetch`, `console` — an output). **In a file that spies on or stubs the
+  platform none of it is pure** (round 16, Р1): `vi.spyOn(console, 'log')`, `vi.spyOn(Map.prototype, 'set')`,
+  `vi.stubGlobal`, a function of it written over hear every call in its order, so there every call of the platform
+  and every method of a value is in doubt, vitest's `expect` and its matchers alone known; the price, named: a spy
+  set in another file is not seen. It reads the helpers beside the tests too. It works by parsing as the clock check does,
   names by TypeScript's binder, chance, identities and unique keys read from `schema.ts`. **It is closed at
   each of the three places it recognises something** (review of MOL-323, eleven rounds: a list of forms missed
   one more every round, so each place says what it knows and holds the rest in doubt, and **in doubt there is
