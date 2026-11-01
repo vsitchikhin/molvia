@@ -1,7 +1,8 @@
-import { onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import type { Ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 import { ApiError } from '@molvia/client'
 import { useReconnect } from '@/composables/useReconnect'
+import { useStateStrip } from '@/composables/useStateStrip'
 import { useActorStore } from '@/stores/actor'
 import { reportFailure } from '@/failures'
 
@@ -64,6 +65,12 @@ export interface TapSettingState<T> {
    * been lost, it is still to come (round 12: «ответ не пришёл» was said of it too).
    */
   readonly pending: Ref<boolean>
+  /**
+   * An error of the whole screen holds its strip (MOL-349, owner's В-2 «б», kit-settings-7): its
+   * «Повторить» is the screen's one, so the row's own steps aside — its words stay — and the row reads
+   * again by itself once that error lets go.
+   */
+  readonly yields: ComputedRef<boolean>
   retry(): Promise<void>
   choose(next: T): Promise<void>
 }
@@ -287,6 +294,22 @@ export function useTapSetting<T>(
     online.value = navigator.onLine
     if (online.value && (value.value === undefined || failure.value || unsure.value)) void load()
   })
+  const strip = useStateStrip()
+  const yields = computed(() => !!strip && !strip.sheet && strip.held.value)
+  watch(yields, (now, was) => {
+    if (was && !now && failure.value === 'error') void load()
+  })
 
-  return { value, failure, online, saving, saveFailed, unsure, pending, retry: load, choose }
+  return {
+    value,
+    failure,
+    online,
+    saving,
+    saveFailed,
+    unsure,
+    pending,
+    yields,
+    retry: load,
+    choose,
+  }
 }

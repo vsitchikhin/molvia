@@ -123,6 +123,12 @@ test('a receipt from the photo to the purchases: read, reviewed, recorded under 
   await ready.click()
   await expect(page).toHaveURL(/\/purchases\/receipts\/[0-9a-f-]+$/)
   await expect(page.locator('.receipt-line')).toHaveCount(13)
+  // The positions are parted by the list card's hairline, «Add a line» too (MOL-349, С-5): the row's
+  // button reset took it off, and the lines of each position ran into one sheet of text.
+  const rows = await page.locator('.receipt-line, .add-line').all()
+  expect(rows).toHaveLength(14)
+  for (const row of rows.slice(1)) await expect(row).toHaveCSS('border-top-width', '1px')
+  await expect(rows[0]!).toHaveCSS('border-top-width', '0px')
   await saveAll(page)
 
   // The review gives way to the purchases (`router.replace`), and says once what was written.
@@ -376,6 +382,21 @@ test('a line the reader lost, typed on the review, is one purchase more of the r
   await sheet(page).getByRole('button', { name: 'Pick an item' }).click()
   await expect(sheet(page).last()).toContainText('For the line you are adding')
   await risen(page)
+  // The items found are parted by the list card's hairline, as the receipt's lines are (MOL-349, С-5).
+  const word = `Ряженка${randomUUID().slice(0, 6)}`
+  const headers = await asBrowser(page)
+  for (const fat of ['2,5%', '4%']) {
+    const proposed = await page.request.post('/api/catalogue/items', {
+      headers,
+      data: { kind: 'product', name: `${word} ${fat}`, defaultUnit: 'l' },
+    })
+    expect(proposed.status()).toBe(201)
+  }
+  await sheet(page).last().getByRole('searchbox').fill(word)
+  const results = sheet(page).last().locator('.results .result')
+  await expect(results).toHaveCount(2)
+  await expect(results.first()).toHaveCSS('border-top-width', '0px')
+  await expect(results.last()).toHaveCSS('border-top-width', '1px')
   const name = `Сметана ${randomUUID().slice(0, 8)}`
   await sheet(page).last().getByRole('searchbox').fill(name)
   await sheet(page)

@@ -10,7 +10,7 @@
 
     <section v-for="part in PARTS" :key="part" class="part">
       <h2>{{ t(`privacy.${part}.title`) }}</h2>
-      <AppCard v-if="LISTS[part]" class="list">
+      <AppCard v-if="LISTS[part]">
         <dl>
           <div v-for="kind in LISTS[part]" :key="kind" class="kind">
             <dt>{{ t(`privacy.${part}.${kind}.term`) }}</dt>

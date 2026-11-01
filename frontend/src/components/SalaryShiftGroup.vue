@@ -48,7 +48,8 @@
         <span class="said"
           ><IconAlert aria-hidden="true" /><span>{{ t('settings.tap.load_error') }}</span></span
         >
-        <AppButton variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
+        <!-- One «Повторить» a screen: under its error the screen's reads this row again (MOL-349). -->
+        <AppButton v-if="!yields" variant="ghost" @click="retry">{{ t('state.retry') }}</AppButton>
       </div>
     </AppCard>
   </section>

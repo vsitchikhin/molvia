@@ -909,12 +909,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
    * Один заход повтора: сперва спросить о личности, если сервер молчал, и только потом пробовать
    * отправку — без ответа `me()` она всё равно не пойдёт (MOL-56, Б1).
    *
-   * **`await` здесь держит цепочку** (адверсариальный Г1): `start()` синхронно ставит
+   * **`await` здесь держит цепочку** (адверсариальный Г1): громкий `start()` синхронно ставил
    * `loading`, и `flush()` в том же тике видел уже не `error`, а значит не заводил следующего
-   * таймера. Повтор случался ровно один раз, без обещанного удвоения.
+   * таймера. Повтор случался ровно один раз, без обещанного удвоения. С MOL-349 он тихий и
+   * `error` не трогает, но ответ всё равно ждётся: без него `flush()` нечего проверять.
    */
   async function attempt(): Promise<void> {
-    if (actor.state === 'error') await actor.retry()
+    // Quietly (MOL-349, self-review №1): the login screen showing the failure keeps it.
+    if (actor.state === 'error') await actor.retry({ quietly: true })
     await flush()
   }
 

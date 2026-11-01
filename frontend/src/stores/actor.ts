@@ -21,6 +21,15 @@ import {
   rememberIdentity,
 } from '@/stores/identity'
 import { reportFailure } from '@/failures'
+import { doublingRetry } from '@/stores/queueing'
+
+/**
+ * An identity that could not be checked is asked again by time (MOL-349, owner's В-2 «б»), as the
+ * consent is (MOL-95): its notice and its «Повторить» went, since they stood over the screen's error
+ * and its own — three on «Настройки» (kit-settings-7).
+ */
+export const IDENTITY_RETRY_FIRST_MS = 5_000
+export const IDENTITY_RETRY_LAST_MS = 60_000
 
 /**
  * What the identity is doing, so a screen can show the right one of its states.
@@ -105,8 +114,8 @@ export const useActorStore = defineStore('actor', () => {
         }
     }
   })
-  /** True while `start` is in flight, so a retry button cannot queue a second one. */
-  let running = false
+  /** The question `start` has in the air, so a retry button cannot queue a second one — it waits for it. */
+  let running: Promise<void> | null = null
   /**
    * How many questions about the identity are in flight. A refusal earned by one of them is the
    * answer being waited for, not news — `sessionEnded` steps aside while it is non-zero, or a
@@ -160,7 +169,25 @@ export const useActorStore = defineStore('actor', () => {
     reportFailure(error, 'screen')
     state.value = navigator.onLine ? 'error' : 'offline'
     console.error('[molvia] личность не поднялась', error)
+    if (state.value === 'error') again.later()
   }
+
+  /**
+   * **Quietly** (MOL-349): the state stays as it was while the question is in the air, as the
+   * consent's asks again (adversarial Д1 of MOL-95) — put to `loading`, the login screen showing the
+   * failure would blink to its skeleton at every try. Offline the timer waits for `online`, as
+   * `recover` does.
+   */
+  const again = doublingRetry(
+    () => void start({ quietly: true }),
+    IDENTITY_RETRY_FIRST_MS,
+    IDENTITY_RETRY_LAST_MS,
+  )
+  watch(state, (now) => {
+    if (now === 'error' || now === 'loading') return
+    again.cancel()
+    again.reset()
+  })
 
   /**
    * The development seam, and since MOL-56 it is a button rather than something that happens by
@@ -262,11 +289,36 @@ export const useActorStore = defineStore('actor', () => {
     told(false)
   }
 
-  /** Called once after the app mounts, and again by the retry control. */
-  async function start(): Promise<void> {
-    if (running) return
-    running = true
-    state.value = 'loading'
+  /**
+   * Called once after the app mounts and by the retry control, which show the question; **quietly**
+   * by everything the person did not ask for (MOL-349, adversarial А3, self-review №1) — the timer,
+   * `online`, the app looked at again, a queue's own retry — which leave a failure or «offline» on the
+   * screen until the answer, as the consent's questions do (Д1 of MOL-95).
+   */
+  function start(options: { quietly?: boolean } = {}): Promise<void> {
+    // **A second ask waits for the one in the air** (MOL-349, adversarial Г2): returned at once, the
+    // card's «Повторить» pressed while the identity asked again by itself said «не удалось» again
+    // before any answer, and nothing when the real one failed.
+    if (running) {
+      // A tap by hand shows the question it waits for (self-review №11, adversarial Д1): handed a
+      // quiet one, the login's «Повторить» showed nothing, and its failure was not said again.
+      if (!options.quietly && (state.value === 'error' || state.value === 'offline')) {
+        state.value = 'loading'
+        // A question that had already settled before this `loading` — the offline branch is
+        // synchronous — puts nothing back: then it is asked anew (adversarial round 6, the probe).
+        return running.then(() => (state.value === 'loading' ? start(options) : undefined))
+      }
+      return running
+    }
+    running = ask(options).finally(() => {
+      running = null
+    })
+    return running
+  }
+
+  async function ask({ quietly = false }: { quietly?: boolean }): Promise<void> {
+    if (!(quietly && (state.value === 'error' || state.value === 'offline')))
+      state.value = 'loading'
     // «Выйти» in another window that this tab slept through (round 2, Д2): its own shelf still
     // holds the drawer. Let go here as the `storage` listener would have.
     if (erasedWhileAway()) {
@@ -274,31 +326,27 @@ export const useActorStore = defineStore('actor', () => {
       actor.value = null
       id.value = null
     }
-    try {
-      if (!navigator.onLine) {
-        // The identifier already on the device is usable without a network — a PWA precached
-        // for the shelf shows its cached screens as this person — but nothing has been
-        // checked, and saying «ready» would promise an entity nothing has fetched. The state
-        // stays «offline», which is both true and the one the offline text belongs to.
-        //
-        // **With no owner on the device there is nothing to show** (MOL-56, Q5): no drawers, no
-        // cached answers, and a person who has never signed in on this phone cannot start. That
-        // is the login screen's offline state and not a notice over an empty app.
-        const known = currentIdentity()
-        // An owner who pressed «Выйти» and was not confirmed yet is not somebody to open the
-        // app as (adversarial Б2): the drawer waits for the server's word to be erased.
-        if (!isIdentifier(known) || leavingOwner() === known) {
-          state.value = 'signed-out'
-          return
-        }
-        id.value = known
-        state.value = 'offline'
+    if (!navigator.onLine) {
+      // The identifier already on the device is usable without a network — a PWA precached
+      // for the shelf shows its cached screens as this person — but nothing has been
+      // checked, and saying «ready» would promise an entity nothing has fetched. The state
+      // stays «offline», which is both true and the one the offline text belongs to.
+      //
+      // **With no owner on the device there is nothing to show** (MOL-56, Q5): no drawers, no
+      // cached answers, and a person who has never signed in on this phone cannot start. That
+      // is the login screen's offline state and not a notice over an empty app.
+      const known = currentIdentity()
+      // An owner who pressed «Выйти» and was not confirmed yet is not somebody to open the
+      // app as (adversarial Б2): the drawer waits for the server's word to be erased.
+      if (!isIdentifier(known) || leavingOwner() === known) {
+        state.value = 'signed-out'
         return
       }
-      await load()
-    } finally {
-      running = false
+      id.value = known
+      state.value = 'offline'
+      return
     }
+    await load()
   }
 
   // A connection that came back is the commonest recovery there is, and until now it took a
@@ -309,7 +357,7 @@ export const useActorStore = defineStore('actor', () => {
   // `online` while the network returns, and since MOL-19 the offline notice has no button — it
   // would have waited for a restart (Р-8).
   function recover(): void {
-    if (state.value === 'offline' || state.value === 'error') void start()
+    if (state.value === 'offline' || state.value === 'error') void start({ quietly: true })
   }
   window.addEventListener('online', recover)
   document.addEventListener('visibilitychange', () => {
