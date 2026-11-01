@@ -92,7 +92,8 @@ describe('сбой API — в таблицу (MOL-143)', () => {
 
     const everything = await db.execute(sql`
       select f::text as row from ${failures} f
-      union all select n::text from ${ownerNotices} n`)
+      union all select n::text from ${ownerNotices} n
+      order by row`)
     expect(everything.length).toBeGreaterThan(0)
     expect(JSON.stringify([...everything])).not.toMatch(/Сыр|Ширакаци|Аня/)
     const [row] = await recorded()
