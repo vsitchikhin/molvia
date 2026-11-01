@@ -407,7 +407,8 @@ the round trip through Telegram, and ask whose account this turned out to be.
   consent's rhythm — and **every question nobody asked for is quiet** (adversarial А3, self-review
   №1): the timer, `online`, the app looked at again and a queue's own retry leave `error` or `offline`
   on the screen until the answer, or the login screen showing the failure would blink to its skeleton
-  at every try (adversarial Д1 of MOL-95). Only «Повторить» by hand shows the question.
+  at every try (adversarial Д1 of MOL-95). Only the login's «Повторить» by hand shows the question; the
+  card's asks quietly and says «Повторяем…» (self-review №5).
 - **The development seam is a button, and only in a development build.** It signed the app in by
   itself until now, which made the screen this epic exists for invisible in every working copy
   and unreachable to the end-to-end suite; `signedIn()` in `e2e/session.ts` now presses it, in

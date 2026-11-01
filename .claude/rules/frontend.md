@@ -876,10 +876,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
   often `v-if` and `v-else`. `AppNote` stays the note — the «i», 400, no voice. The seventeen copies
   move onto it in their screens' tasks, with their words.
   **The notice of an identity not checked is no second word** (MOL-349, owner's В-1 «б»): the frame
-  hears what its screen says of the answer (`useAnswerWord`) — the skeleton, a `ScreenState` of
-  `offline` or `error`, a `StatusStrip` — and `IdentityNotice` speaks only where nothing does; a sheet
-  provides no word of its own, since it is mounted shut with its screen. The skeleton is in the list on
-  purpose: the notice put in between it and the screen's «нет связи» would push the field down and back.
+  hears what its screen says of the answer (`useAnswerWord`) — a `ScreenState` of `offline` or `error`,
+  a `StatusStrip` — and `IdentityNotice` speaks only where nothing does; a sheet provides no word of its
+  own, since it is mounted shut with its screen. **A skeleton is no word, it holds the notice as it is**
+  (self-review №4, adversarial Б1): after it comes the screen's «нет связи» or its answer, so the notice
+  neither comes nor goes under it — taken for a word, it took a failed sign-in's card away at every read
+  and the answer brought it back, the month's arrow and the field of «Что брать» moving under the thumb.
+  A failed sign-in known as the screen comes stands from its first frame; «без связи» waits for what
+  the skeleton gives way to. **The card asks again quietly, «Повторяем…» on its button** (`retrying`
+  of `ScreenState`, self-review №5): put to `loading`, it went from under the thumb.
   **The word is a component of the kit inside the frame's slot**: a screen is the frame's parent, so
   `sayAnswerWord` in the screen's own `setup` hears nothing, and a strip drawn in place — the receipt's
   «Без связи · чек из памяти» was a bare `<p>` with a cloud — stood under the notice, two clouds
