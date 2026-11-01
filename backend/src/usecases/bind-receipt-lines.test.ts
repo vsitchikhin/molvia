@@ -428,6 +428,75 @@ describe('a word the model misread by the font (MOL-326, В-3 «б»)', () => {
   })
 })
 
+describe('a line of the owner’s that went new where its item was there (MOL-331)', () => {
+  const FOUND = '00000000-0000-4000-8000-0000000000f2'
+  const OTHER = '00000000-0000-4000-8000-0000000000f3'
+  /** The line against the search's answer: the item `FOUND`, and `OTHER` after it where given. */
+  async function bindOne(printed: string, name: string, byModel = false, other?: string) {
+    const found = [item(FOUND, name), ...(other === undefined ? [] : [item(OTHER, other)])]
+    const ids = found.map((one) => one.id)
+    const { items } = fakeItems({ items: found, near: true, nearIds: ids })
+    const [bound] = await bindReceiptLines(
+      { items, embedder: NO_EMBEDDER },
+      ACTOR,
+      'AM',
+      'ru',
+      [line(printed)],
+      [],
+      { byModel },
+    )
+    return bound
+  }
+
+  it('reads «Պիցցայի լոշիկ» as a shelf does: a pizza base, found and named so', async () => {
+    expect(await bindOne('Պիցցայի լոշիկ «Պանո» 250±10գր', 'Основа для пиццы «Пано»')).toMatchObject(
+      { itemId: FOUND, match: 'search' },
+    )
+    expect(await bindOne('Պիցցայի լոշիկ «Պանո» 250±10գր', 'Хлеб «Пано»')).toMatchObject({
+      itemId: null,
+      translation: 'Основа для пиццы «Пано» 250 г',
+    })
+  })
+
+  it('takes the brand the model copied a letter short, «проверьте», and never a Tesseract line so', async () => {
+    const pan = 'Պիցցայի լոշիկ «Պան» 260±10գր'
+    expect(await bindOne(pan, 'Основа для пиццы «Пано»', true)).toMatchObject({
+      itemId: FOUND,
+      match: 'weak',
+    })
+    expect(await bindOne(pan, 'Основа для пиццы «Пано»')).toMatchObject({ itemId: null })
+    // a brand as copied stands before one a letter longer, wherever the search put it
+    expect(
+      await bindOne(pan, 'Основа для пиццы «Пано»', true, 'Основа для пиццы «Пан»'),
+    ).toMatchObject({ itemId: OTHER, match: 'search' })
+  })
+
+  it('takes the fat the model copied without its «%», «проверьте», and never a Tesseract line so', async () => {
+    const cream = 'Սերուցք «Մարիաննա» ուլտրապաստերիզացված 10'
+    const name = 'Сливки «Марианна» 10%, ультрапастеризованные'
+    expect(await bindOne(cream, name, true)).toMatchObject({ itemId: FOUND, match: 'weak' })
+    expect(await bindOne(cream, name)).toMatchObject({ itemId: null })
+  })
+
+  it('must not take a copied line for another thing: a flavour beside a brand, litres or grams for a fat (review)', async () => {
+    for (const [printed, name] of [
+      // adversarial А1: the brand copied whole names no melon
+      ['Յոգուրտ «Դինա» 2% 130գր', 'Йогурт «Дина» дыня 2% 130 г'],
+      // round 2, Р2-А1: a yoghurt of the brand «Коко» is no coconut yoghurt of no brand
+      ['Յոգուրտ «Կոկո» 2% 130գր', 'Йогурт кокос 2% 130 г'],
+      // round 3, Р3-А1: a size in Latin is no brand of the item
+      ['Շոկոլադ «Մին» 90գր', 'Шоколад MINI 90 г'],
+      // adversarial А3: a litre of kefir cut off its unit
+      ['Կեֆիր «Մարիաննա» 1', 'Кефир «Марианна» 1%'],
+      // self-review №1: a chocolate's grams cut, as the plan promised
+      ['Շոկոլադ «Գրանդ Քենդի» 90', 'Шоколад «Гранд Кенди» 90%'],
+    ] as const)
+      expect(await bindOne(printed, name, true), `${printed} → ${name}`).toMatchObject({
+        itemId: null,
+      })
+  })
+})
+
 describe('a catalogue with no names of the tills (MOL-293)', () => {
   it('tells it once a receipt and binds by the gloss all the same', async () => {
     const heard: CatalogueNamesMissing[] = []
