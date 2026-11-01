@@ -40,7 +40,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 ## frontend · composables
 
 - `frontend/src/composables/useAnnouncer.ts` — Composable: the app's polite live regions — the app's, provided in `App.vue`, and each sheet's (`provideSheetAnnouncer`), the top open sheet's taking whatever is said while it is up; blocks say and take back words, and words of what stands (`held`) in a closed sheet are said at its opening (MOL-181).
-- `frontend/src/composables/useAnswerWord.ts` — Composable: whether the screen says itself what became of its answer — its skeleton, a state of no connection or an error, a strip — provided by `AppScreen`, none in a sheet; `IdentityNotice` speaks only where it says nothing (MOL-349).
+- `frontend/src/composables/useAnswerWord.ts` — Composable: whether the screen says itself what became of its answer — a state of no connection or an error, a strip — said; a skeleton holds the notice as it is; provided by `AppScreen`, none in a sheet; `IdentityNotice` speaks only where nothing is said (MOL-349).
 - `frontend/src/composables/useBackLabel.ts` — Composable: which back label fits the row (parent's title, «Back», or the chevron alone), measured by a resize observer.
 - `frontend/src/composables/useCollapsed.ts` — Composable: whether the large title has scrolled past the pinned row (sentinel observer), and an element's live height.
 - `frontend/src/composables/useColorScheme.ts` — Composable: the scheme of this device (`molvia.scheme`) — kept, drawn on the root and in the status bar's theme colours, followed from other windows; the script in `index.html` reads it before the first paint (MOL-111).

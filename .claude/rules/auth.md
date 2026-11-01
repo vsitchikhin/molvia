@@ -418,7 +418,8 @@ the round trip through Telegram, and ask whose account this turned out to be.
   identity asks again by itself waits for that question** (`start` hands back the one in the air,
   adversarial Г2), so «Повторяем…» stands and the failure is said when it came; **a tap by hand on the
   login shows the question it waits for** — `loading`, the skeleton, the failure drawn and said again
-  (self-review №11, adversarial Д1).
+  (self-review №11, adversarial Д1) — and asks anew when that question had settled before it, never
+  leaving `loading` behind (adversarial round 6).
 - **The development seam is a button, and only in a development build.** It signed the app in by
   itself until now, which made the screen this epic exists for invisible in every working copy
   and unreachable to the end-to-end suite; `signedIn()` in `e2e/session.ts` now presses it, in
