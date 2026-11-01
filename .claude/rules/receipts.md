@@ -523,6 +523,9 @@ the kind's choice counts no unit, «Ազնվամորու Մուրաբա կգ» i
 **An item the printed heading rules out is no item now**, where MOL-255 made it «проверьте»: the new item beside
 it is «проверьте» too, and a wrong item offered is worse than a name to check (Tesseract's «(3824) ՏՈՖՈՒ ՀՈՂ», a
 cat's litter, found «Тофу»). **The shop's memory is above all of it**: the person's own word, unchanged.
+**A heading is the till's, never the tariff's** (MOL-331): the seed's headings were written blind (MOL-114), and a
+heading a till was seen printing on paper for the kind is the kind's — «Ереван Сити» sells carrots under 0806, Dog City
+toilet paper under 3818 (`catalogue-seed-nodes.ts`). Below, «What the model copies short».
 
 **Anything else is a new item, named in full and «проверьте»** (`match: weak` with no item, В-1 «а», on the wire too —
 the review sends `new` only for a line whose item is gone since, adversarial А6): `newLineName` — the kind first, as a
@@ -748,6 +751,60 @@ has its rule; the bench and its figures are `.scratch/tasks/research/MOL-326.md`
   by hand (А6); and a receipt with a brand no table spells is read a call later — the queue waits for the answer, its
   wait at most `MODEL_TIMEOUT_MS` (self-review №5; the catalogue's names bind no line of a brand in «…», so no line asked
   was one already bound).
+
+## What the model copies short (MOL-331)
+
+**Three lines of the owner's went new where their item was there** (MOL-47's 103 lines of production, 31.10.2026), all
+of Haiku's; the owner's В-9 «б» of MOL-47 took them as one task. Two causes were not what the task said
+(`.scratch/tasks/requirements/MOL-331.md`, the benches `.scratch/tasks/status/MOL-331/results.md`):
+
+- **«Գազար կգ» under 0805 was no heading the model made up**: the paper of b8a76f31 — am-44 of the bench — prints
+  «0806/031338» under the carrot; the bench's truth wrote 0706 by sense. The model copies headings right: on eight runs of
+  v5, of 1 086 lines with a heading on both sides 971 are the truth's, 70 a 5↔6 of the font `headingRulesOut` forgives, 40
+  «Դաս. 56.10» of KFC, and one is another kind — this carrot, five runs of five. So a heading is trusted as Tesseract's
+  is, and **the seed takes the heading the till prints** (above): the carrot 0806, and four more the bench's truth showed
+  ruling their own item out — greens 0704, toilet paper 3818, cotton buds 4421, each seen on paper or copied six times of
+  six; a trout steak under 0303 stays no beef «Стейк».
+- **«Պիցցայի լոշիկ «Պան»» had two causes**: the owner's «Основа для пиццы «Пано»» was refused with the brand whole too —
+  no word of the line says «основа» — so `TILL_PHRASES_RU` reads «պիցցայի լոշիկ» as a shelf does, «основа для пиццы»;
+  and the model copied «Պանո» a letter short.
+- **«Սերուցք «Մարիաննա» … 10»**: the line's «10» against the item's «10%».
+
+**Where nothing stands as printed, a line the model read is tried once more with its slips of copying**
+(`lineFitter`'s `copied`, `bindReceiptLines`), and an item found so is «проверьте», as a word put right by the font is
+(MOL-326): Tesseract's lines stay as read, it slips otherwise. A brand as copied stands before one a letter longer
+wherever the search put it.
+
+- **A brand a letter short**: a word of the line's brand that no word of the item is by its letters stands on the one
+  word **of the item's own brand** — in «…», or a brand the lexicon spells in Latin, whole (`brandWordsOf`; never a
+  size of `STANDARDS` or a flavour, «Шоколад MINI», «Чай Lemon», round 3, Р3-А1, nor «Cola» of «Coca-Cola» alone, round 4) — that is the brand's
+  with **one letter of the word** more, the key of what is left without it the line's (from three letters, under five,
+  where `sameLetters` forgives nothing; `letterLost`), and that the line says nothing else of. So a brand covers one
+  word of a brand: copied whole, «Դինա» is «Дина» and never the «дыня» beside it, a brand a letter short of the kind
+  the line says names no brand («Սուրճ «Կոֆ»» no «Кофе»), two words a letter longer are a doubt (review 1, А1, №3),
+  and an item of no brand of its own takes none — «Թեյ «Կիվ»» is no «Чай киви» (round 2, Р2-А1). A letter of the key is
+  not one of the word — «ш» is `sh`, «я» `ia`, a double folds, a sign is none — so «Սամ» is no «Шам», «Սալ» no «Шаль»
+  nor «Шалл», and «Պան» no «Панно» (А2, Р2-А2). Haiku does it: in the rule's span, on the runs of v5, a brand a letter short led to its own
+  eight times («Ֆին», «Ամառ», «Միլա», «Միկա») and to another six — «Միլա» copied for the glue «Սիլա» is «Милка» less a
+  letter — every one of another kind, which the kind refuses. From five letters `sameLetters` took them already
+  («Թամար», «Բարիլա», «Կիդեր»): that, and «Դաչա» a letter short of «Դայչա», is MOL-293's, as on master.
+- **A fat without «%»**: a branded line of a kind whose «%» is a fat (`TILL_FAT_KINDS_RU`, a table of the backend —
+  milk, cream, sour cream, cottage cheese, kefir, butter, cheese and their like), its last word a bare number above two,
+  with no fat and no package of its own, is the fat of an item that prints it with «%». **Of a kind with none it is no
+  fat**: a chocolate's «… 90» is its grams the till cut, as the plan promised (self-review №1); **nor two and less**, the
+  litres of a package cut off their unit as often — «Կեֆիր … 1» is a litre (А3). The bench never saw Haiku drop a «%»
+  (0 of 96); the line of 30.10 is the one case, its photo gone with its record.
+
+**Measured, wrong 0 everywhere** (`.scratch/tasks/status/MOL-331/results.md`): the binding bench of MOL-293 156 right
+against 151 on master, with meaning; Haiku's own readings of the bench through the product, eight runs of v5, 746
+against 728; the same 321 lines of the truth as copied by the model, as without; the 103 lines of production 30 sure
+and 2 «проверьте» of 32 their item, none new, none another, 71 of 71 new still new — the same after reviews 1–4,
+whose attacks are red (`.scratch/tasks/selftests/MOL-331-adversarial*`). **The prices, named:** a brand of one kind a letter
+longer than the one copied — a cheese «Сила» copied «Միլա» beside a cheese «Милка» — is taken, «проверьте»: the
+catalogue of the bench holds no such pair (only «Հոմ» and «Хоум», one brand). A weight the till cut off its unit on a
+line of a kind with a fat — a cottage cheese's «… 9» of «9…գր» — is the fat of an item of that brand and words printed
+«9%». And a fat of two and less copied without «%» — kefir 1 %, milk 1,5 % — stays a new item, and so does a brand
+copied a letter short whose item writes it bare in Latin no table spells and the model never spelt.
 
 ## The shops' memory (MOL-126)
 

@@ -77,6 +77,24 @@ describe('a line by the seed’s own till name (MOL-293, adversarial А1)', () =
   })
 })
 
+describe('a heading a till prints for the kind, seen on paper (MOL-331)', () => {
+  it.each([
+    ['Գազար կգ', '0806', 'Морковь'],
+    // the till's 5 and 6 are one glyph, and the model copied 0805 off the same paper
+    ['Գազար կգ', '0805', 'Морковь'],
+    ['Համեմ հտ', '0704', 'Кинза'],
+    ['Մաղադանոս հտ', '0704', 'Петрушка'],
+    ['Թուղթ զուգարանի Neva 12հ 3շ', '3818', 'Бумага туалетная'],
+    ['Փայտիկ ականջի 250հ 193', '4421', 'Палочки ватные'],
+  ])('binds «%s» printed under %s to «%s»', async (printed, hs, own) => {
+    expect(await bind(printed, hs)).toMatchObject({ name: own, match: 'search' })
+  })
+
+  it('still rules out an item of another thing: a trout steak is no beef «Стейк»', async () => {
+    expect((await bind('Ծիածանափայլ իշխանի սթեյք սառեցված կգ', '0303')).name).not.toBe('Стейк')
+  })
+})
+
 describe('a line by the search, an item of another thing never (MOL-293, adversarial А3–А5, А7)', () => {
   it('takes no biscuit for a liver printed with no heading', async () => {
     const liver = await bind('Լյարդ')

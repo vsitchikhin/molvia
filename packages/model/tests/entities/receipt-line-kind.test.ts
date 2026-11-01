@@ -71,6 +71,7 @@ const WORDS = {
   նռան: 'гранат',
   միջին: 'средний',
   պանիր: 'сыр',
+  շոկոլադ: 'шоколад',
   չեդդեր: 'чеддер',
   պաղպաղակ: 'мороженое',
   մարտկոց: 'батарейка',
@@ -818,6 +819,89 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
   it('takes nothing for a name of no word', () => {
     expect(fits(yoghurt, '')).toBe(false)
     expect(fits(yoghurt, 'для')).toBe(false)
+  })
+})
+
+describe('a line the model copied a letter short (MOL-331)', () => {
+  const LEXICON = { fats: new Set(['сыр']), brands: { միլկա: 'Milka', 'կոկա կոլա': 'Coca-Cola' } }
+  const copied = (printed: string, item: string) =>
+    lineFitter(receiptLineParts(printed), WORDS, LEXICON)(item, { copied: true })
+
+  it('takes a brand under five letters with one letter lost, only where the line was copied', () => {
+    expect(copied('Պանիր «Պան» 200գր', 'Сыр «Пано» 200 г')).toBe(true)
+    expect(fits('Պանիր «Պան» 200գր', 'Сыр «Пано» 200 г')).toBe(false)
+    expect(copied('Պանիր «Ֆին»', 'Сыр «Фино»')).toBe(true)
+  })
+
+  it('must not forgive two letters, a letter more, a brand of two letters, nor another kind', () => {
+    expect(copied('Պանիր «Պա» 200գր', 'Сыр «Пано» 200 г')).toBe(false)
+    // three letters, a key of two: «ու» is one letter of the key
+    expect(copied('Պանիր «Մու»', 'Сыр «Мур»')).toBe(false)
+    expect(copied('Պանիր «Պան» 200գր', 'Сыр «Па» 200 г')).toBe(false)
+    expect(copied('Պանիր «Պանո»', 'Сыр «Пан»')).toBe(false)
+    expect(copied('Պանիր «Պան»', 'Сыр «Пинто»')).toBe(false)
+    expect(copied('Մուրաբա «Միլա»', 'Сыр «Милка»')).toBe(false)
+  })
+
+  it('must not take a letter of the key for a letter of the word: one misread, two through a double (adversarial А2)', () => {
+    expect(copied('Պանիր «Սամ» 200գր', 'Сыр «Шам» 200 г')).toBe(false)
+    expect(copied('Պանիր «Հալ»', 'Сыр «Чал»')).toBe(false)
+    expect(copied('Պանիր «Ուլա»', 'Сыр «Юла»')).toBe(false)
+    expect(copied('Պանիր «Պան»', 'Сыр «Панно»')).toBe(false)
+    // a sign or a double the key leaves out pays for no digraph (round 2, Р2-А2)
+    expect(copied('Պանիր «Սալ»', 'Сыр «Шаль»')).toBe(false)
+    expect(copied('Պանիր «Սալ»', 'Сыр «Шалл»')).toBe(false)
+  })
+
+  it('stands the brand on one word of the item, never on a word beside it or on its kind (adversarial А1)', () => {
+    // copied whole, «Դինա» is «Дина», and the melon is a flavour the line has not
+    expect(copied('Պանիր «Դինա»', 'Сыр «Дина» дыня')).toBe(false)
+    expect(copied('Պանիր «Դինա»', 'Сыр «Дина»')).toBe(true)
+    // a brand copied whole covers no word a letter longer beside it: «Кив» is no «киви»
+    expect(copied('Պանիր «Կիվ»', 'Сыр «Кив» киви')).toBe(false)
+    // two words a letter longer are a doubt, and neither is the brand
+    expect(copied('Պանիր «Պան»', 'Сыр «Пано» Пани')).toBe(false)
+    // a brand a letter short of the kind the line says already names no brand
+    expect(copied('Սուրճ «Կոֆ»', 'Кофе')).toBe(false)
+    // an item of no brand of its own: its word a letter longer is a flavour, never the brand (round 2, Р2-А1)
+    expect(copied('Պանիր «Կիվ»', 'Сыр киви')).toBe(false)
+    // a brand the lexicon spells in Latin is the item's own; any other Latin word is not (round 3, Р3-А1)
+    expect(copied('Պանիր «Միլա»', 'Сыр Milka')).toBe(true)
+    expect(copied('Պանիր «Մին»', 'Сыр MINI')).toBe(false)
+    expect(copied('Պանիր «Լեմն»', 'Сыр Lemon')).toBe(false)
+    // a word of a brand of the lexicon standing alone is no brand: «Cola» of «Coca-Cola» (round 4)
+    expect(copied('Պանիր «Կոլ»', 'Сыр Cola')).toBe(false)
+    expect(copied('Պանիր «Պան» ելակ', 'Сыр «Пано» ежевика')).toBe(false)
+  })
+
+  it('takes a brand of that kind a letter longer: the price, «проверьте» on the review', () => {
+    // the model copied the glue «Սիլա» as «Միլա» on the bench: of a kind of the line, «Милка» would be taken
+    expect(copied('Պանիր «Միլա» 90գր', 'Сыр «Милка» 90 г')).toBe(true)
+    expect(fits('Պանիր «Միլա» 90գր', 'Сыр «Милка» 90 г')).toBe(false)
+  })
+
+  it('takes a branded line’s last bare number for the fat of a kind that has one, only where the line was copied', () => {
+    expect(copied('Պանիր «Պանո» 45', 'Сыр «Пано» 45%')).toBe(true)
+    expect(copied('Պանիր «Պանո» 2.5', 'Сыр «Пано» 2,5%')).toBe(true)
+    expect(fits('Պանիր «Պանո» 45', 'Сыр «Пано» 45%')).toBe(false)
+  })
+
+  it('must not read a number as a fat beside a fat or a package of the line’s own, unbranded, or another', () => {
+    expect(copied('Պանիր «Պանո» 45% 10', 'Сыр «Пано» 10%')).toBe(false)
+    expect(copied('Պանիր «Պանո» 200գր 45', 'Сыр «Пано» 45%')).toBe(false)
+    expect(copied('Պանիր 45', 'Сыр 45%')).toBe(false)
+    expect(copied('Պանիր «Պանո» 45', 'Сыр «Пано» 50%')).toBe(false)
+    expect(copied('Պանիր «Պանո» 45', 'Сыр «Пано» 45 г')).toBe(false)
+  })
+
+  it('must not read a fat off a kind with none, nor off litres a package may be (adversarial А3)', () => {
+    // a chocolate's «90» is its grams cut: the plan's own test
+    expect(copied('Շոկոլադ «Գրանդ Քենդի» 90', 'Шоколад «Гранд Кенди» 90%')).toBe(false)
+    expect(copied('Պանիր «Պանո» 1', 'Сыр «Пано» 1%')).toBe(false)
+    expect(copied('Պանիր «Պանո» 2', 'Сыр «Пано» 2%')).toBe(false)
+    expect(
+      lineFitter(receiptLineParts('Պանիր «Պանո» 45'), WORDS)('Сыр «Пано» 45%', { copied: true }),
+    ).toBe(false)
   })
 })
 
