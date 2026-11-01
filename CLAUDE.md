@@ -707,7 +707,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   kind — or all of it that brand; two things side by side, both; a heading's item it rules out is none. Else a new
   item named in full, «проверьте» on the wire too — a word spelt in letters taken away by one press (`spelled`). A
   dictionary's word is read exactly, never one edit off — but for one measured swap of the font's letters, on the model's
-  lines only, «проверьте» (`glyphsMended`, MOL-326).
+  lines only, «проверьте» (`glyphsMended`, MOL-326). Where nothing stands as printed, the model's two slips of copying
+  — a brand under five letters a letter short, a branded line's last bare number a fat without «%» — let an item stand,
+  «проверьте» (`copied`, MOL-331). **A heading a till was seen printing for a kind is the seed's** (MOL-331).
 - **A new item's name is a shelf's** (MOL-261): the brand as its package spells it — a Latin one bare, else in «…»,
   a line may name an item by either (`TILL_BRANDS`, В-2 «а») — the kind the seed's, in its number, so `kindKey` is one;
   adjectives agreed, a genitive by its own form's adjective, a till's phrase whole — each a table of the backend, never
