@@ -87,26 +87,34 @@ test('a session that is gone brings back the same owner, not a new person', asyn
   expect(await knownOwner(page)).toBe(owner)
 })
 
-// The identity's error is polite, so the region is its only way to a screen reader. «Try again»
-// failing the same way must be heard again, not swallowed as «no change» (MOL-19, C1).
-//
-// Сервер, который не ответил, — это не «сессии нет»: сессия может быть жива за порталом кафе,
-// поэтому приложение показывается с плашкой, а не дверью (MOL-56).
-test('the same answer after «Try again» is said again', async ({ page }) => {
-  // Плашка — про телефон, который уже знает своего владельца: на пустом устройстве показывать
-  // нечего, и там это дверь, а не приложение с плашкой (MOL-56, адверсариальный А5).
+// MOL-349, adversarial А2: `/actors/me` failing alone, the screen shows its answer and says nothing,
+// and the writes wait — the sign-in's card is the one word of it, and goes by itself, with no tap,
+// once the identity is answered. Сервер, который не ответил, — это не «сессии нет»: приложение
+// показывается, а не дверь (MOL-56).
+test('an identity the server did not check is said over an answered screen, and goes by itself', async ({
+  page,
+}) => {
+  // Плашка — про телефон, который уже знает своего владельца: на пустом устройстве это дверь.
   await open(page)
   const said = await recordLiveRegion(page)
-  await page.route('**/api/actors/me**', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await page.route('**/api/actors/me', (route) => route.fulfill({ status: 500, body: '{}' }))
   await page.reload()
-  const notice = 'Could not check the sign-in'
-  await expect(page.getByRole('heading', { name: notice })).toBeVisible()
+  const title = 'Could not check the sign-in'
+  const notice = page.getByRole('heading', { name: title })
+  await expect(notice).toBeVisible()
   await expect
-    .poll(async () => (await said()).filter((text) => text.includes(notice)))
+    .poll(async () => (await said()).filter((text) => text.includes(title)))
     .toHaveLength(1)
 
-  await page.getByRole('button', { name: 'Try again' }).click()
+  // «Try again» failing the same way is still an answer, said again (MOL-19, C1), though asked quietly
+  // the card stands all the while (MOL-349, adversarial В2).
+  await page.locator('.notice').getByRole('button', { name: 'Try again' }).click()
   await expect
-    .poll(async () => (await said()).filter((text) => text.includes(notice)))
+    .poll(async () => (await said()).filter((text) => text.includes(title)))
     .toHaveLength(2)
+  await expect(notice).toBeVisible()
+
+  // Asked again by time — the identity's own 5 s and on, the queues' 15 s — never by a tap.
+  await page.unroute('**/api/actors/me')
+  await expect(notice).toHaveCount(0, { timeout: 30_000 })
 })

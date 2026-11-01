@@ -575,12 +575,36 @@ describe('AppScreen', () => {
       defineComponent(() => () => h(AppScreen, { title: 'Trip' })),
       { global: { plugins: [router, pinia, createAppI18n('en')] } },
     )
-    useActorStore(pinia).state = 'error'
+    useActorStore(pinia).state = 'offline'
     await nextTick()
     const order = [...view.element.querySelectorAll('.head, .notice, .content')].map((node) =>
       ['head', 'notice', 'content'].find((name) => node.classList.contains(name)),
     )
     expect(order).toEqual(['head', 'notice', 'content'])
+  })
+
+  // MOL-349, owner's В-1 «б»: the screen's own «нет связи», put in the frame's slot, is the one word
+  // about the connection — the frame hears it from what the screen renders there.
+  it('keeps the identity notice silent while the screen says itself it has no connection', async () => {
+    const pinia = createPinia()
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/')
+    const speaking = ref(true)
+    const view = mount(
+      defineComponent(
+        () => () =>
+          h(AppScreen, { title: 'Trip' }, () =>
+            speaking.value ? h(ScreenState, { kind: 'offline', title: 'No connection' }) : null,
+          ),
+      ),
+      { global: { plugins: [router, pinia, createAppI18n('en')] } },
+    )
+    useActorStore(pinia).state = 'offline'
+    await nextTick()
+    expect(view.find('.notice').exists()).toBe(false)
+    speaking.value = false
+    await nextTick()
+    expect(view.find('.notice').exists()).toBe(true)
   })
 })
 

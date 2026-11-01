@@ -52,6 +52,8 @@
           :variant="card ? 'ghost' : updating ? 'secondary' : 'primary'"
           ref="retryButton"
           :class="{ word: card }"
+          :busy="retrying"
+          :busy-label="t('state.retrying')"
           @click="$emit('retry')"
         >
           <template #icon><IconRefresh /></template>
@@ -93,6 +95,7 @@ import { lastRefusal } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { sayAnswerWord } from '@/composables/useAnswerWord'
 import { useStateStrip } from '@/composables/useStateStrip'
 import { useUpdateAnnouncement } from '@/composables/useUpdateAnnouncement'
 import { usePwaUpdate } from '@/pwaUpdate'
@@ -205,6 +208,13 @@ export default defineComponent({
      * is for the text before, and is not read out (the search's rule, MOL-208 adversarial А3).
      */
     silent: { type: Boolean, default: false },
+    /** «Повторить» at work, the block standing meanwhile: «Повторяем…» in its place (MOL-225, MOL-349). */
+    retrying: { type: Boolean, default: false },
+    /**
+     * Which failed answer the block stands for, where a retry leaves it standing: a new one says the same
+     * words again (C1, as `StatusStrip`'s) — the sign-in's card, asked again quietly (MOL-349, adversarial В2).
+     */
+    attempt: { type: Number, default: 0 },
   },
   emits: ['retry'],
   setup(props) {
@@ -218,6 +228,8 @@ export default defineComponent({
     const actions = ref<HTMLElement | null>(null)
     const retryButton = ref<ComponentPublicInstance | null>(null)
     const announce = useAnnouncer()
+    // No connection or an error: what became of the answer, said by the screen itself (MOL-349).
+    sayAnswerWord(() => props.kind === 'offline' || props.kind === 'error')
 
     // The strip is asked for while the block is an error of the whole screen, and let go as it
     // stops being one; the first to ask holds it, and the next takes it once that one lets go.
@@ -363,7 +375,7 @@ export default defineComponent({
       withdraw = announce([props.title, props.body].filter(Boolean).join('. '), { held: true })
     }
     onMounted(speak)
-    watch(() => [props.title, props.body, props.silent], speak)
+    watch(() => [props.title, props.body, props.silent, props.attempt], speak)
 
     onBeforeUnmount(() => {
       withdraw?.()

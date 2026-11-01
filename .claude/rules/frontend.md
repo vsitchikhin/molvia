@@ -364,7 +364,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   drawn in the row** at `--icon-md`, so `molvia/icon-size` sees it in one file and no screen draws a
   22 beside a 24. **A row's button look is taken off in `:where()`**: the hairline `AppCard list`
   draws between rows is a `border-top`, and an equal selector reset it by load order (`AdviceHomeNew`
-  had met it). **Inactive** is the kit's not now (MOL-174): `aria-disabled`, focusable, the click
+  had met it) — **so is a row a screen builds of its own** (MOL-349, С-5): the receipt's lines
+  (`ReceiptLineRow`) and «Выбрать товар»'s results ran into one sheet of text, and only the whole
+  sweep of the list cards (`.scratch/tasks/selftests/MOL-349`) found the second. **A card of
+  paragraphs is no card of rows**: `list` takes the card's padding away for rows that bring their own,
+  and on «Данные и приватность» the text stood on the edge, its first letter cut by the radius. **Inactive** is the kit's not now (MOL-174): `aria-disabled`, focusable, the click
   cancelled and stopped — a link is followed nowhere, and has no `href`, or a middle click or a long
   press would open it in a tab (review Р-1); `e2e/kit-inactive` holds a tap (the cancelled click),
   Enter and a middle click (no address) in Chromium and WebKit. **Selected** is the fill, the ring and a ✓ in place of the chevron, the weight
@@ -992,6 +996,24 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   shown. One per screen is held by the screens' tests, not a linter: two strips in a template are
   often `v-if` and `v-else`. `AppNote` stays the note — the «i», 400, no voice. The seventeen copies
   move onto it in their screens' tasks, with their words.
+  **The notice of an identity not checked is no second word** (MOL-349, owner's В-1 «б»): the frame
+  hears what its screen says of the answer (`useAnswerWord`) — a `ScreenState` of `offline` or `error`,
+  a `StatusStrip` — and `IdentityNotice` speaks only where nothing does; a sheet provides no word of its
+  own, since it is mounted shut with its screen. **A skeleton is no word, it holds the notice as it is**
+  (self-review №4, adversarial Б1): after it comes the screen's «нет связи» or its answer, so the notice
+  neither comes nor goes under it — taken for a word, it took a failed sign-in's card away at every read
+  and the answer brought it back, the month's arrow and the field of «Что брать» moving under the thumb.
+  **Not even a failure that comes under it** (self-review №10, adversarial Г1 against В1): with the
+  server down `me()` fails first, and let in at once the card came over the skeleton and went with the
+  screen's own error a moment later — at every launch and every screen opened meanwhile. **The price,
+  named:** with `/actors/me` failing alone, rarer than a server down, the card comes with a screen's
+  first answer, which stands one card lower than its skeleton. **The card asks again quietly, «Повторяем…» on its button**
+  (`retrying` of `ScreenState`, self-review №5): put to `loading`, it went from under the thumb; **and a
+  tap that failed the same way is said again** (`attempt` of `ScreenState`, C1 of MOL-19, adversarial В2).
+  **The word is a component of the kit inside the frame's slot**: a screen is the frame's parent, so
+  `sayAnswerWord` in the screen's own `setup` hears nothing, and a strip drawn in place — the receipt's
+  «Без связи · чек из памяти» was a bare `<p>` with a cloud — stood under the notice, two clouds
+  (adversarial А1); it is a `StatusStrip` now.
 - **A sheet has a live region of its own, and while it is up everything is said there** (MOL-181,
   owner's В-2 «а»). The app's region is outside the modal `<dialog>`, inert while it is open, and
   nothing said there is read (feedback С-10). `BottomSheet` gives its region to the app's announcer

@@ -128,13 +128,18 @@ export default defineComponent({
   opacity: var(--opacity-stale);
 }
 
+/* Taken off in `:where()`, as `ListRow`'s: an equal selector took the list card's hairline between the
+   results off (MOL-349, С-5). */
+:where(.result) {
+  border: 0;
+}
+
 .result {
   display: grid;
   gap: var(--space-1);
   width: 100%;
   min-height: var(--touch-target-lg);
   padding: var(--space-3) var(--space-4);
-  border: 0;
   color: var(--text);
   background: var(--surface);
   text-align: left;
