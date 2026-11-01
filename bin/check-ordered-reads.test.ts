@@ -1,15 +1,22 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { chanceColumns, MAY_READ, unorderedReads } from './check-ordered-reads.mjs'
+import { chanceColumns, identityColumns, MAY_READ, unorderedReads } from './check-ordered-reads.mjs'
 
 const FILE = 'a.integration.test.ts'
-const CHANCE = new Set(['sessions.id', 't.createdAt', 'events.occurredAt'])
+const CHANCE = new Set([
+  'sessions.id',
+  'sessions.expiresAt',
+  't.createdAt',
+  'events.occurredAt',
+  'ownerNotices.createdAt',
+])
+const IDENTITY = new Set(['t.id', 'ownerNotices.id'])
 
 const lines = (source: string): number[] =>
-  unorderedReads(FILE, source, CHANCE).map((found) => Number.parseInt(found))
+  unorderedReads(FILE, source, CHANCE, IDENTITY).map((found) => Number.parseInt(found))
 
 const inTest = (body: string): string => `it('x', async () => {\n${body}\n})`
-const found = (body: string): string[] => unorderedReads(FILE, inTest(body), CHANCE)
+const found = (body: string): string[] => unorderedReads(FILE, inTest(body), CHANCE, IDENTITY)
 
 describe('unorderedReads', () => {
   // «то же фото дважды» as it failed on CI 41022785698, and the reads of the sweep of MOL-323
@@ -37,15 +44,15 @@ describe('unorderedReads', () => {
     ['taken apart past a hole', `const [, b] = await db.select().from(t)`],
     [
       'through filter',
-      `const rows = await db.select().from(t)\nexpect(rows.filter(Boolean)).toEqual([a, b])`,
+      `const rows = await db.select().from(t)\nexpect(rows.filter((r) => r.ok)).toEqual([a, b])`,
     ],
     [
       'through slice and map',
-      `expect((await db.select().from(t)).slice(1).map(f)).toEqual([a, b])`,
+      `expect((await db.select().from(t)).slice(1).map((r) => r.x)).toEqual([a, b])`,
     ],
     [
       'named twice',
-      `const rows = await db.select().from(t)\nconst texts = rows.map(f)\nexpect(texts).toEqual([a, b])`,
+      `const rows = await db.select().from(t)\nconst texts = rows.map((r) => r.x)\nexpect(texts).toEqual([a, b])`,
     ],
     [
       'given by assignment',
@@ -56,7 +63,7 @@ describe('unorderedReads', () => {
       'taken from Promise.all',
       `const [words, n] = await Promise.all([db.select().from(t), count()])\nexpect(words).toEqual([a, b])`,
     ],
-    ['joined', `expect((await db.select().from(t)).map(f).join()).toBe('a,b')`],
+    ['joined', `expect((await db.select().from(t)).map((r) => r.x).join()).toBe('a,b')`],
     [
       'forEach',
       `const rows = await db.select().from(t)\nrows.forEach((row, i) => expect(row).toBe(all[i]))`,
@@ -123,7 +130,7 @@ describe('unorderedReads', () => {
     ],
     [
       'map by its index',
-      `expect((await db.select().from(t)).map((r, i) => r.x === want[i]).every(Boolean)).toBe(true)`,
+      `expect((await db.select().from(t)).map((r, i) => r.x === want[i]).every((ok) => ok)).toBe(true)`,
     ],
     [
       'reduce by its index',
@@ -133,7 +140,7 @@ describe('unorderedReads', () => {
     // round 2, Б2: rows in the order of chance are as closed as rows with none
     [
       'chance joined',
-      `const rows = await db.select().from(sessions).orderBy(sessions.id)\nexpect(rows.map(f).join(' / ')).toBe('a / b')`,
+      `const rows = await db.select().from(sessions).orderBy(sessions.id)\nexpect(rows.map((r) => r.x).join(' / ')).toBe('a / b')`,
     ],
     [
       'chance by forEach',
@@ -153,11 +160,11 @@ describe('unorderedReads', () => {
     ],
     [
       'chance against Array(n)',
-      `expect((await db.select().from(sessions).orderBy(sessions.id)).map(f)).toEqual(Array(2).fill(a))`,
+      `expect((await db.select().from(sessions).orderBy(sessions.id)).map((r) => r.x)).toEqual(Array(2).fill(a))`,
     ],
     [
       'chance against a string in place',
-      `expect((await db.select().from(sessions).orderBy(sessions.id)).map(f).join()).toEqual('a,b')`,
+      `expect((await db.select().from(sessions).orderBy(sessions.id)).map((r) => r.x).join()).toEqual('a,b')`,
     ],
     // round 2, Б3: chance is the schema's, never a name
     [
@@ -186,19 +193,19 @@ describe('unorderedReads', () => {
     // round 3, В2: «another read» is a read of chance, never what the test builds
     [
       'chance against a constant',
-      `const devices = ['a', 'b']\nexpect((await db.select().from(sessions).orderBy(sessions.id)).map(f)).toEqual(devices)`,
+      `const devices = ['a', 'b']\nexpect((await db.select().from(sessions).orderBy(sessions.id)).map((r) => r.x)).toEqual(devices)`,
     ],
     [
       'chance against ids pushed as written',
-      `const ids = []\nids.push(await signIn(a))\nexpect((await db.select().from(sessions).orderBy(sessions.id)).map(f)).toEqual(ids)`,
+      `const ids = []\nids.push(await signIn(a))\nexpect((await db.select().from(sessions).orderBy(sessions.id)).map((r) => r.x)).toEqual(ids)`,
     ],
     [
       'chance against a literal mapped',
-      `expect((await db.select().from(sessions).orderBy(sessions.id)).map(f)).toEqual([anna, boris].map(g))`,
+      `expect((await db.select().from(sessions).orderBy(sessions.id)).map((r) => r.x)).toEqual([anna, boris].map((one) => one.id))`,
     ],
     [
       'chance on the other side of a constant',
-      `const devices = ['a', 'b']\nconst rows = await db.select().from(sessions).orderBy(sessions.id)\nexpect(devices).toEqual(rows.map(f))`,
+      `const devices = ['a', 'b']\nconst rows = await db.select().from(sessions).orderBy(sessions.id)\nexpect(devices).toEqual(rows.map((r) => r.x))`,
     ],
     [
       'chance against a read in another order',
@@ -222,8 +229,40 @@ describe('unorderedReads', () => {
       'some by a function with the index',
       `function lastIsB(row, i) {\nreturn i === 1 && row.b\n}\nexpect((await db.select().from(t)).some(lastIsB)).toBe(true)`,
     ],
+    // round 4, Г3: what decides is the moment before the identity — order by the identity alone
+    [
+      'a moment before an identity, desc',
+      `expect(await db.select().from(t).orderBy(desc(t.createdAt), desc(t.id))).toEqual([a, b])`,
+    ],
+    // round 4, Г4: a callback the parse cannot read is in doubt
+    [
+      'every by a callback a helper builds',
+      `const matchesIn = (texts) => (row, i) => row.text === texts[i]\nexpect((await db.select().from(t)).every(matchesIn(['a', 'b']))).toBe(true)`,
+    ],
+    [
+      'every by a method of an object',
+      `const check = { inOrder: (row, i) => row.x === i }\nexpect((await db.select().from(t)).every(check.inOrder)).toBe(true)`,
+    ],
+    [
+      'map by an imported function',
+      `expect((await db.select().from(t)).map(toId)).toEqual([a, b])`,
+    ],
   ])('refuses %s', (_, body) => {
     expect(found(body)).toHaveLength(1)
+  })
+
+  // round 4, Г1: another read of chance in another order is no snapshot of the same — each side refused
+  it('refuses rows of chance against another order of chance, by name and in place', () => {
+    expect(
+      found(
+        `const byId = await db.select().from(sessions).orderBy(sessions.id)\nconst byExpiry = await db.select().from(sessions).orderBy(sessions.expiresAt)\nexpect(byId).toEqual(byExpiry)`,
+      ),
+    ).toHaveLength(2)
+    expect(
+      found(
+        `expect(await db.select().from(sessions).orderBy(sessions.id)).toEqual(await db.select().from(sessions).orderBy(sessions.expiresAt))`,
+      ),
+    ).toHaveLength(2)
   })
 
   // round 2, №7: a helper whose order is learnt as none late, after a pass read it as chance
@@ -244,6 +283,7 @@ describe('unorderedReads', () => {
       async function snapshot(id: string) {
         return {
           sessions: await db.select().from(sessions).where(eq(sessions.actorId, id)).orderBy(sessions.id),
+          events: await db.select().from(events).where(eq(events.actorId, id)).orderBy(events.occurredAt),
         }
       }
       async function loose(id: string) {
@@ -256,7 +296,7 @@ describe('unorderedReads', () => {
         expect(await snapshot(me)).toEqual({ sessions: [a, b] })
       })
     `
-    expect(lines(source)).toEqual([13, 14])
+    expect(lines(source)).toEqual([14, 15])
   })
 
   it('finds a function of the file that returns such a read — in place, named first, and through another', () => {
@@ -333,10 +373,10 @@ describe('unorderedReads', () => {
       'findMany with orderBy',
       `expect(await db.query.t.findMany({ orderBy: t.id })).toEqual([a, b])`,
     ],
-    ['sort', `expect((await db.select().from(t)).map(f).sort()).toEqual([a, b])`],
+    ['sort', `expect((await db.select().from(t)).map((r) => r.x).sort()).toEqual([a, b])`],
     [
       'toSorted through a name',
-      `const rows = await db.select().from(t)\nexpect(rows.map(f).toSorted()).toEqual([a, b])`,
+      `const rows = await db.select().from(t)\nexpect(rows.map((r) => r.x).toSorted()).toEqual([a, b])`,
     ],
     ['a length', `expect(await db.select().from(t)).toHaveLength(2)`],
     [
@@ -348,14 +388,14 @@ describe('unorderedReads', () => {
     ['the first row taken apart', `const [row] = await db.select().from(t)`],
     ['the first row by index', `const rows = await db.select().from(t)\nexpect(rows[0]).toBe(a)`],
     ['the first row through a branch', `const [row] = x ? [] : await db.select().from(t)`],
-    ['find', `expect((await db.select().from(t)).find(f)).toEqual([a, b])`],
-    ['some', `expect((await db.select().from(t)).some(f)).toBe(true)`],
+    ['find', `expect((await db.select().from(t)).find((r) => r.id === a)).toEqual([a, b])`],
+    ['some', `expect((await db.select().from(t)).some((r) => r.ok)).toBe(true)`],
     ['a sum', `expect((await db.select().from(t)).reduce((all, r) => all + r.n, 0)).toBe(3)`],
     ['a loop', `for (const row of await db.select().from(t)) expect(row.n).toBe(1)`],
-    ['a Set', `expect(new Set((await db.select().from(t)).map(f)).size).toBe(1)`],
+    ['a Set', `expect(new Set((await db.select().from(t)).map((r) => r.x)).size).toBe(1)`],
     [
       'notInArray',
-      `const ids = (await db.select().from(t)).map(f)\nwhere(notInArray(t.id, ids.length > 0 ? ids : [x]))`,
+      `const ids = (await db.select().from(t)).map((r) => r.x)\nwhere(notInArray(t.id, ids.length > 0 ? ids : [x]))`,
     ],
     [
       'arrayContaining',
@@ -373,6 +413,28 @@ describe('unorderedReads', () => {
     [
       'a template that selects nothing',
       'expect(await db.execute(sql`delete from t`)).toEqual([a, b])',
+    ],
+    // round 4, Г1, Г2: a snapshot in the same order, by name, in place or through map
+    [
+      'chance against the same order of chance',
+      `const before = await db.select().from(sessions).orderBy(sessions.id)\nconst after = await db.select().from(sessions).orderBy(sessions.id)\nexpect(after).toEqual(before)`,
+    ],
+    [
+      'chance mapped against the same mapped',
+      `const before = await db.select().from(sessions).orderBy(sessions.id)\nconst after = await db.select().from(sessions).orderBy(sessions.id)\nexpect(after.map((r) => r.seenAt)).toEqual(before.map((r) => r.seenAt))`,
+    ],
+    [
+      'chance against the same mapped',
+      `const before = await db.select().from(sessions).orderBy(sessions.id)\nexpect((await db.select().from(sessions).orderBy(sessions.id)).map((r) => r.x)).toEqual(before.map((r) => r.x))`,
+    ],
+    // round 4, №11: what follows an identity decides nothing
+    [
+      'an identity before a moment',
+      `expect(await db.select().from(ownerNotices).orderBy(ownerNotices.id, ownerNotices.createdAt)).toEqual([a, b])`,
+    ],
+    [
+      'an identity before a uuid',
+      `expect(await db.select().from(t).orderBy(t.id, sessions.id)).toEqual([a, b])`,
     ],
   ])('leaves alone %s', (_, body) => {
     expect(found(body)).toEqual([])
@@ -428,6 +490,17 @@ describe('chanceColumns', () => {
     expect(chance.has('ownerNotices.createdAt')).toBe(true)
     expect(chance.has('feedback.id')).toBe(false)
     expect(chance.has('receiptLines.position')).toBe(false)
+  })
+})
+
+describe('identityColumns', () => {
+  it('names the identities of the schema: a message’s id, never a session’s uuid', () => {
+    const schema = readFileSync('backend/src/db/schema.ts', 'utf8')
+    const identity = identityColumns(schema)
+    expect(identity.has('feedback.id')).toBe(true)
+    expect(identity.has('ownerNotices.id')).toBe(true)
+    expect(identity.has('sessions.id')).toBe(false)
+    expect([...identity].every((column) => !chanceColumns(schema).has(column))).toBe(true)
   })
 })
 

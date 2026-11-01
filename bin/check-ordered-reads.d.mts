@@ -3,6 +3,8 @@ export declare function unorderedReads(
   fileName: string,
   source: string,
   chance?: Set<string>,
+  identity?: Set<string>,
 ): string[]
 export declare function chanceColumns(source: string): Set<string>
+export declare function identityColumns(source: string): Set<string>
 export declare const MAY_READ: RegExp
