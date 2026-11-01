@@ -2,7 +2,7 @@
   <AppCard as="section" list class="losses" :aria-labelledby="headingId">
     <div class="head">
       <SectionCaption :id="headingId" inset>{{ t('exchange.vs_market.title') }}</SectionCaption>
-      <p class="total" :class="toneOf(losses.total)">
+      <p class="total" :class="toneOf(losses.total)" :style="figureChars(amountOf(losses.total))">
         {{ amountOf(losses.total) }}
       </p>
       <p v-if="toneOf(losses.total)" class="word" :class="toneOf(losses.total)">
@@ -55,6 +55,7 @@ import { signedAmount } from '@/components/accounts'
 import { signedPercent } from '@/components/charts'
 import { roundsToNought } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
+import { figureChars } from '@/components/figure'
 
 /**
  * «Обмены против рынка» (MOL-74, owner's decision В-1; on «Обмен денег» and against the market since
@@ -94,6 +95,7 @@ export default defineComponent({
       signedAmount(money, locale.value, { plus: true, estimate: !roundsToNought(money) })
     const widthOf = (level: number) => `${String((Math.abs(level) * 100) / CHART_LEVEL)}%`
     return {
+      figureChars,
       t,
       locale,
       headingId: useId(),
@@ -110,6 +112,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .head {
+  /* The figure measures itself against the card's head (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-1);
   padding: var(--space-4) var(--space-4) var(--space-1);
@@ -117,9 +121,9 @@ export default defineComponent({
 
 .total {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
 }
 

@@ -3,7 +3,11 @@
     <RouterLink class="open" :to="{ name: 'money-accounts' }" :aria-label="label">
       <span class="words">
         <span class="caption">{{ caption }}</span>
-        <span class="figure" :class="{ negative: totals.total.minor < 0n }">
+        <span
+          class="figure"
+          :class="{ negative: totals.total.minor < 0n }"
+          :style="figureChars(`≈ ${signed(totals.total)}`)"
+        >
           ≈ {{ signed(totals.total) }}
         </span>
         <span class="spendable" :class="{ negative: totals.spendable.minor < 0n }">
@@ -27,6 +31,7 @@ import IconChevron from '~icons/mdi/chevron-right'
 import type { Money, MoneyAccountsResponse } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import { signedAmount } from '@/components/accounts'
+import { figureChars } from '@/components/figure'
 
 type IncomeTotals = NonNullable<MoneyAccountsResponse['incomeTotals']>
 
@@ -77,13 +82,15 @@ export default defineComponent({
         ? t('spending.summary.accounts_then', { when: props.asOf })
         : t('spending.summary.accounts_now'),
     )
-    return { t, signed, label, caption }
+    return { figureChars, t, signed, label, caption }
   },
 })
 </script>
 
 <style scoped lang="scss">
 .now {
+  /* It measures itself for the line below (MOL-321). */
+  container-type: inline-size;
   padding: 0;
 }
 
@@ -103,6 +110,8 @@ export default defineComponent({
 }
 
 .words {
+  /* The figure measures itself against the words' column (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -118,8 +127,8 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-tight);
   overflow-wrap: anywhere;
@@ -154,5 +163,24 @@ export default defineComponent({
   flex: none;
   font-size: var(--icon);
   color: var(--text-muted);
+}
+
+/* Narrower than this the words take the whole line and «1 счёт ›» stands under them, at the right
+   (MOL-321): at 200 % on 320 the count and the chevron left the words 18 px, and «≈ 0 ₽» stood on four
+   lines. In rem, as the text grows: 16rem at 100 % on 320 keeps them side by side. */
+$count-beside: 12rem;
+
+@container (width < #{$count-beside}) {
+  .open {
+    flex-wrap: wrap;
+  }
+
+  .words {
+    flex-basis: 100%;
+  }
+
+  .count {
+    margin-left: auto;
+  }
 }
 </style>

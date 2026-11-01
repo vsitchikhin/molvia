@@ -80,7 +80,9 @@
         >
           <template v-if="spentMonth">
             <p class="month">{{ monthLabel(spentMonth.month) }}</p>
-            <p class="figure">{{ whole(spentMonth.spent) }}</p>
+            <p class="figure" :style="figureChars(whole(spentMonth.spent))">
+              {{ whole(spentMonth.spent) }}
+            </p>
             <p class="detail held">{{ spentDetail }}</p>
           </template>
         </BarChart>
@@ -199,7 +201,9 @@
                (Е-11, handoff 157 v2 `year-category`). -->
           <template v-if="categoryPoint">
             <p class="month">{{ monthLabel(categoryPoint.month) }}</p>
-            <p class="figure small">{{ whole(categoryPoint.amount) }}</p>
+            <p class="figure small" :style="figureChars(whole(categoryPoint.amount))">
+              {{ whole(categoryPoint.amount) }}
+            </p>
             <p class="detail held">{{ categoryDetail }}</p>
           </template>
         </BarChart>
@@ -239,6 +243,7 @@ import {
 import { categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
+import { figureChars } from '@/components/figure'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyChartYear } from '@/composables/useMoneyCharts'
 import { calendarDay } from '@/days'
@@ -666,6 +671,7 @@ export default defineComponent({
     })
 
     return {
+      figureChars,
       t,
       locale,
       id: useId(),
@@ -721,6 +727,8 @@ export default defineComponent({
 /* Not `.card`: a scoped class of this component reaches the root of a child's too, and the root of
    `MonthSwitcher` is an `AppCard` — its pill was laid out as a grid of a chart's card. */
 .chart-card {
+  /* It measures itself for «Пришло и ушло» below (MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-1);
   padding: var(--space-4);
@@ -728,6 +736,7 @@ export default defineComponent({
 
 .head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
@@ -775,14 +784,14 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   display: block;
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
 
   &.small {
-    font-size: var(--text-title);
+    @include figure-fit(var(--text-title));
   }
 }
 
@@ -901,5 +910,16 @@ export default defineComponent({
   @include appear(0);
 
   margin-top: var(--space-4);
+}
+
+/* Narrower than this the three figures of «Пришло и ушло» stand one under another (MOL-321): at 200 % on
+   320 a third of the card was 83 px for «≈ −1 375 ₽» of 164, and the year went 52 px sideways. In rem:
+   the card's 13.9rem at 100 % on 320 keeps the three side by side. */
+$columns-beside: 12rem;
+
+@container (width < #{$columns-beside}) {
+  .columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 </style>

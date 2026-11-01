@@ -359,7 +359,7 @@ export default defineComponent({
    and 348 in their gutter of 32. The handoff's card of 390 (358) keeps the amount beside. The container
    is the caller's — `OperationRow` sets it — so every row of a card is laid out alike. No row gap: a row
    with no tail is not a line taller. */
-@container row (width < #{$row-narrow}) {
+@mixin tail-under($whole: false) {
   .list-row {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
@@ -389,6 +389,70 @@ export default defineComponent({
     grid-column: 3;
     grid-row: 1 / span 2;
   }
+
+  /* The whole row under the words, the circle and the chevron at the top: in the column of the words alone a
+     sum at 200 % stood past the card's left edge — «100 000 ₽» read «00 000 ₽» (adversarial В5). The title
+     breaks rather than end in «…», «Коп…» at 200 %. */
+  @if $whole {
+    .chevron,
+    .check {
+      grid-row: 1;
+    }
+
+    .tail {
+      grid-column: 1 / -1;
+    }
+
+    /* The circle gives its place to the words, as the icon of `NavRow` and the wallet of `AccountRow` do: beside
+       it and the chevron the words had some 40 px at 200 %, and «Обмен», «Продукты», «Карта» stood a letter or
+       two a line. What the row is, its title says; the circle repeats it. */
+    .circle,
+    .list-row > .icon {
+      display: none;
+    }
+
+    .words {
+      grid-column: 1 / 3;
+    }
+
+    /* A category's dot stays before its name (adversarial К2): with no place of its own the grid put it in the first
+       free cell — at the right, where the chevron and the check stand, or under the name. */
+    .dot {
+      grid-column: 1;
+      grid-row: 1;
+      align-self: center;
+    }
+
+    .dot ~ .words {
+      grid-column: 2;
+    }
+
+    /* The title and the line under it whole, never «…»: at 200 % «Бот в Telegram» read «Б…», and the line of an
+       exchange hid what came in. */
+    .title {
+      overflow: visible;
+      overflow-wrap: anywhere;
+      white-space: normal;
+    }
+
+    .meta {
+      display: block;
+      overflow: visible;
+      -webkit-line-clamp: none;
+      line-clamp: none;
+    }
+  }
+}
+
+@container row (width < #{$row-narrow}) {
+  @include tail-under;
+}
+
+/* The same, only with large text, in a container named `row-tight` — every list card of the kit is one
+   (`AppCard list`) — (MOL-321): the rows keep their tail beside the words at 100 % on 320 (16rem and more),
+   and at 200 % «1 234 567,89 ₽» was cut by 68 px and «Убрать» by 37, the chevron past the phone. `$row-tight`. */
+@container row-tight (width < #{$row-tight}) {
+  @include tail-under($whole: true);
 }
 
 .chevron {

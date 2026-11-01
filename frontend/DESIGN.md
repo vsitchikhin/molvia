@@ -382,7 +382,7 @@ over a neutral, highly legible text face with real Cyrillic.
 - **Body** (Onest 400, 17, 1.45): everything read.
 - **Callout** (Onest 400, 15): a row's second line.
 - **Label / Footnote** (Onest 600 / 400, 13): field labels, meta, unit prices.
-- **Caption** (Onest 700, 11, caps, +0.06em): group captions and a card's own title (`SectionCaption`), nowhere else; tab labels 11/600 without caps.
+- **Caption** (Onest 700, 11, caps, +0.06em): group captions and a card's own title (`SectionCaption`), nowhere else; tab labels 11/600 without caps, growing with the text to 125 % and no further (`--text-tab`, MOL-321).
 
 ### Named Rules
 

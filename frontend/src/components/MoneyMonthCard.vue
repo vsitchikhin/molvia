@@ -4,7 +4,7 @@
       <SectionCaption as="span" inset>{{ t('spending.spent') }}</SectionCaption>
       <span v-if="change" class="change">{{ change }}</span>
     </p>
-    <p class="figure">{{ whole(month.spent) }}</p>
+    <p class="figure" :style="figureChars(whole(month.spent))">{{ whole(month.spent) }}</p>
     <!-- Only in another currency, never «≈ 0 ₽» beside «0 ֏» (`spentApprox`, MOL-184). -->
     <p v-if="approx" class="approx">≈ {{ whole(approx) }}</p>
     <p v-for="line in foreign" :key="line" class="footnote">{{ line }}</p>
@@ -21,7 +21,9 @@
     <div class="tiles" :class="{ one: running }">
       <div class="tile">
         <span class="tile-label">{{ t('spending.income') }}</span>
-        <span class="tile-figure">{{ whole(month.income) }}</span>
+        <span class="tile-figure" :style="figureChars(whole(month.income), 'strong')">{{
+          whole(month.income)
+        }}</span>
         <span v-if="month.incomeUncounted.length > 0" class="tile-note">
           {{ t('spending.income_uncounted', { amounts: list(month.incomeUncounted) }) }}
         </span>
@@ -39,7 +41,11 @@
       <div v-if="!running" class="tile rest">
         <span class="tile-label">{{ restLabel }}</span>
         <template v-if="month.rest">
-          <span class="tile-figure" :class="{ negative: month.rest.total.minor < 0n }">
+          <span
+            class="tile-figure"
+            :class="{ negative: month.rest.total.minor < 0n }"
+            :style="figureChars(`≈ ${signed(month.rest.total)}`, 'strong')"
+          >
             ≈ {{ signed(month.rest.total) }}
           </span>
           <span v-for="line in restNotes.total" :key="line" class="tile-note">
@@ -88,6 +94,7 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import { signedAmount } from '@/components/accounts'
 import { signedPercent } from '@/components/charts'
 import { bankWords, rateWords, spentApprox } from '@/components/spending'
+import { figureChars } from '@/components/figure'
 import { calendarDay } from '@/days'
 
 /**
@@ -212,6 +219,7 @@ export default defineComponent({
     })
 
     return {
+      figureChars,
       t,
       running,
       approx,
@@ -232,15 +240,20 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .spent {
+  /* The figure measures itself against the card (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-1);
   padding: var(--space-4);
 }
 
 /* As tall as the caption's line, the comparison centred in it: the part's caption line, and the
-   figure under it where the part's stands (MOL-178). */
+   figure under it where the part's stands (MOL-178). «Потрачено» and the comparison side by side while their least
+   widths fit, else the comparison under it (MOL-321): at 200 % the caption stood «ПОТ|РАЧ|ЕНО» beside «Месяц
+   только начался». */
 .spent-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
@@ -248,6 +261,7 @@ export default defineComponent({
 }
 
 .change {
+  flex: 1 1 min-content;
   color: var(--text-muted);
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
@@ -257,9 +271,9 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-tight);
 }
@@ -297,7 +311,17 @@ export default defineComponent({
   }
 }
 
+/* One under the other with large text (MOL-321): side by side at 200 % a tile was some 85 px. The card is 16rem
+   at 100 % on 320 and keeps them beside. */
+@container (width < 15rem) {
+  .tiles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .tile {
+  /* Its figure measures itself against it (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   align-content: start;
   gap: var(--space-1);
@@ -314,11 +338,14 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+/* A sum never breaks: it shrinks to its tile (MOL-321) — «250 00|0 ₽» at 200 %. Onest 700 has its own table
+   (`strong`, measured). */
 .tile-figure {
-  font-size: var(--text-headline);
+  @include figure-fit(var(--text-headline));
+
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 
   &.negative {
     color: var(--bad-ink);
