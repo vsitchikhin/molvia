@@ -4,10 +4,11 @@ paths:
   - '**/vitest*.config.ts'
   - 'bin/test-time-reporter*'
   - 'bin/check-clock-bounds*'
+  - 'bin/check-ordered-reads*'
   - 'packages/model/tests/support/clock*'
 ---
 
-# Tests: their own timeout, and a bound on the clock
+# Tests: their own timeout, a bound on the clock, the order of a read
 
 The detail behind the timeout line of `CLAUDE.md` › Testing (MOL-243). The area owns no tests of its
 own — every test belongs to the area it tests — and its tools in `bin/` are mapped with the root's
@@ -218,6 +219,36 @@ of the measure and with every test merged. So CI checks every run instead (owner
   parse of receipts (MOL-265), `normalisations` in `support/text.ts`: «found once», «refused before the
   normalisation». Twice the work, or a hundred times a third of a millisecond, is under any bound a clock
   keeps on CI. A count is no rule of the domain and no state anyone reads but a test.
+
+## A read a test compares by position names its order (MOL-323)
+
+**Postgres promises no order without `ORDER BY`**, and an integration test that reads rows and compares them
+to an array written in order depends on where the rows lie. `clearAll` empties the tables by `DELETE`, not
+`TRUNCATE`, so the space of the rows before is free, and a row inserted later may come back first. «То же
+фото дважды» in `feedback-bot` read its four words with no order and failed so on a pull request that
+touched only the PWA (CI 41022785698): `['', 1], ['Вот', 1], ['Вот', 0], ['', 1]`.
+
+- **The order is the table's own column**: `receipt_lines.position`, an identity `id` — the order of
+  insertion of one writer — or the key where the table has no other (`official_rates`). Never `created_at`
+  alone: a default of `now()` is one for every row of a transaction.
+- **Every read compared by position, rows alike included** (owner's В-3 «б»): `['56.10', '56.10']` cannot
+  flake today, and the rule with no exception is the one a guard can hold; a test that later makes the rows
+  differ does not become a flake.
+- **Not `TRUNCATE` instead** (Р-2): it would hide the flake, not close it — the order is still not promised.
+  Nor an assertion made indifferent to the order: the rows in the order they were written read as the
+  test's story.
+- **`bin/check-ordered-reads.mjs` refuses the ordinary form** in `npm run lint` (owner's В-2 «в»), found by
+  parsing as the clock check is, names by TypeScript's binder: a chain of Drizzle with `select…` and `from`
+  and no `orderBy`, `findMany` with none, a template with `select` and no `order by`, a function of the file
+  returning one — through `await`, a cast and `map`, `filter`, `flatMap`, `flat`, `slice`; `sort` gives an
+  order — compared to an array of two or more written there, by an index past 0 or below it, or taken apart
+  into two. The first row alone is the read of one row. **The price, named:** an array expected that is not
+  written in place, a helper of another file, `order by` in a subquery only and a read handed to a function
+  are not seen, and go to review.
+- **How it was proved**: the read of «то же фото дважды» on master with its first word deleted and inserted
+  again under the same id — the row then lies last in the heap and the index alike — gives CI's diff
+  exactly, and with `orderBy` it is green. `update … set x = x` proves nothing: a HOT update leaves the row
+  where the index sees it (`.scratch/tasks/selftests/MOL-323-attack.md`).
 
 ## A page's timers go with its window (MOL-286)
 
