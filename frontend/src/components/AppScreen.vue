@@ -41,7 +41,12 @@
     </header>
 
     <div class="head">
-      <h1 class="title" tabindex="-1">{{ title }}</h1>
+      <h1 class="title" tabindex="-1">
+        <template v-for="(part, index) in titleParts" :key="index"
+          ><span v-if="part.lang" :lang="part.lang">{{ part.text }}</span
+          ><template v-else>{{ part.text }}</template></template
+        >
+      </h1>
       <div v-if="$slots.subtitle" class="subtitle">
         <slot name="subtitle" />
       </div>
@@ -129,8 +134,22 @@ export default defineComponent({
   props: {
     title: { type: String, required: true },
   },
-  setup(_props, { slots }) {
+  setup(props, { slots }) {
     const { t } = useI18n()
+    /**
+     * The title's words of Latin and of Cyrillic, each said in its language, so a word broken with large text is broken
+     * where its own language breaks it (adversarial М2 of MOL-321): the Russian dictionary has no Latin, and «Бот в
+     * Telegram» stood «Telegra|m» at 200 %. The words read out are the same.
+     */
+    const titleParts = computed(() =>
+      props.title
+        .split(/([A-Za-z]+|[\u0400-\u04FF]+)/)
+        .filter((text) => text !== '')
+        .map((text) => ({
+          text,
+          lang: /^[A-Za-z]+$/.test(text) ? 'en' : /^[\u0400-\u04FF]+$/.test(text) ? 'ru' : null,
+        })),
+    )
     const route = useRoute()
     const router = useRouter()
 
@@ -292,6 +311,7 @@ export default defineComponent({
 
     return {
       t,
+      titleParts,
       bar,
       dock,
       content,
@@ -502,7 +522,8 @@ export default defineComponent({
 
   /* With large text a word wider than the line breaks where print breaks it, with a hyphen, from six letters — the
      newcomer's heading's rule (MOL-321, owner's В-2 «а»): at 150 % «Устройства» broke as «Устройст|ва», at 200 %
-     «Катего|рии», «Бюдж|ет» (adversarial Л5). Never at 100 %, where no title breaks. */
+     «Катего|рии», «Бюдж|ет» (adversarial Л5). Never at 100 %, where no title breaks. Safari knows no limit, and WebKit
+     hyphenates any word at a line's end — the price of the block button's hyphen, accepted there (self-review 13). */
   html[data-large-text] & {
     hyphens: auto;
     hyphenate-limit-chars: 6 3 3;
