@@ -572,7 +572,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     9 px, a letter alone is 20 — and the chosen month by its own letter wherever it stands, its neighbours' giving it
     room (adversarial К3). **The prices, named:** a name typed in a text field (an account's, a category's)
     scrolls inside it as any field does; the pinned copy of a screen's title in the top bar ends in «…», as iOS's;
-    at 200 % a word wider than its line still breaks inside — no hyphen under twelve letters; at 100 % on 320 a
+    at 200 % a word wider than its line still breaks inside — no hyphen under twelve letters — but in a screen's title, which with large text hyphenates from six (`AppScreen`, adversarial Л5: «Устройст|ва» at 150 %); at 100 % on 320 a
     month's label «июл» is 4 px wider than its column, as on master.
   - **A skeleton is the answer's shape at large text too** (MOL-178): the ring of `ChartsSkeleton` is
     `min(13.25rem, 100%)` as the ring that comes, its band 12 of the hundred of that width — the square of 13.25rem
