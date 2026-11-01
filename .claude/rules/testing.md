@@ -232,11 +232,13 @@ that moves from an index to a scan as the statistics change moves the order with
 - **The order of insertion is an identity `id` or a position** (`receipt_lines.position`), or a key the test
   writes in its own order (`official_rates`). **A uuid is an order of values, not of insertion**: 17 tables
   of the schema have one, and `randomUUID()` puts two rows written one after the other either way round
-  (review of MOL-323, round 1: of 24 pairs, 14 came back reversed). **Nor is a moment written by default**,
-  whatever its name: `now()` is one for every row of a transaction, `clock_timestamp()` one for rows a
-  microsecond apart (round 2). Ordered by either, rows may be compared with another read of them — a snapshot
-  with a snapshot (`erasure`) — never with what the test writes in place, `Array(n)` included: six reader
-  versions alike are compared as a set (`receipt-model`).
+  (review of MOL-323, round 1: of 24 pairs, 14 came back reversed). **Nor is a moment**, whatever
+  its name and whoever writes it: `now()` is one for every row of a transaction, and a repository writes one
+  `at` for a whole batch (`failures-repository`: of a batch reordered, `orderBy(ownerNotices.createdAt)` gave
+  it back reversed — round 3). **A column of either anywhere in an order makes it chance**: it decides the
+  ties of those before it (`orderBy(t.kind, t.id)`). Rows in it may be compared with another read in that
+  order — a snapshot with a snapshot (`erasure`) — never with anything the test builds, a constant or ids
+  pushed as written included: six reader versions alike are compared as a set (`receipt-model`).
 - **Rows with no order of insertion at all are compared with none**: two logins at once
   (`login-transaction`) write neither first, so their sessions are compared as a set — `new Set`, `toSorted`
   — not by a uuid that only looks like an order.
@@ -254,9 +256,10 @@ that moves from an index to a scan as the statistics change moves the order with
   a `Set`, `toHaveLength`, `toContain`, `not`, `toEqual` of one row or of `expect.arrayContaining` — and
   anything else is refused; the fix is an order, never a use the check does not know. **Rows in the order of
   chance go by the same closed rule** (round 2: refused only in three forms, they passed in six more), and may
-  besides be compared with another read; chance is read from `schema.ts` — a uuid, a moment written by default
-  — never from a name; an object they are put in is followed, so a snapshot of them meets a snapshot. A callback
-  handed the index of a row (`every((r, i) => …)`) tells the order, and a spread in an array expected is not
+  besides be compared with another read of chance, the read itself or a name given it (round 3: anything not
+  a literal passed for «another read»); chance is read from `schema.ts` — a uuid or a `timestamp`, never a
+  name; an object they are put in is followed, so a snapshot of them meets a snapshot. A callback
+  handed the index of a row (`every((r, i) => …)`), written in place or named, tells the order, and a spread in an array expected is not
   one row. The lists are in its head. **The price, named, by class** (round 2): **an order of ties is taken
   as an order** — a column every row read shares (`.orderBy(t.threadId)` under `eq(t.threadId, …)`), a `sort`
   whose key repeats, an `order by` of SQL text by whatever it names (a uuid there is not told); **a row picked
