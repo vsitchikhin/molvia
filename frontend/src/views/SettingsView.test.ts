@@ -20,12 +20,13 @@ import SettingsView from './SettingsView.vue'
 const me = vi.fn<() => Promise<ActorView>>()
 const save = vi.fn<(input: SettingsUpdate) => Promise<ActorView>>()
 const salaryShift = vi.fn<() => Promise<{ day: number | null }>>()
+const analyticsSetting = vi.fn<() => Promise<{ off: boolean }>>()
 vi.mock('@/api', () => ({
   api: {
     me: () => me(),
     saveSettings: (input: SettingsUpdate) => save(input),
     salaryShift: () => salaryShift(),
-    analyticsSetting: () => Promise.resolve({ off: false }),
+    analyticsSetting: () => analyticsSetting(),
   },
 }))
 const initial = actorCodec.parse({
@@ -58,6 +59,8 @@ beforeEach(() => {
   save.mockReset()
   salaryShift.mockReset()
   salaryShift.mockResolvedValue({ day: null })
+  analyticsSetting.mockReset()
+  analyticsSetting.mockResolvedValue({ off: false })
   localStorage.clear()
   sessionStorage.clear()
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
@@ -170,6 +173,43 @@ it('a failed initial read shows retry, not a creation form', async () => {
   expect(view.text()).toContain(en.settings.load_error.title)
   expect(view.find('select').exists()).toBe(false)
 })
+// MOL-349, owner's В-2 «б» (kit-settings-7): the server down, the screen had three «Повторить» — the
+// identity's notice, the screen's error in the strip and the salary's own row. One stays, the
+// screen's, and it reads the salary again once the screen has its answer.
+it('one «Повторить» under the screen’s error, and the salary is read again after it', async () => {
+  me.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+  salaryShift.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+  analyticsSetting.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+  const view = await render(false)
+  expect(view.text()).toContain(en.settings.load_error.title)
+  // The salary's and «Учитывать меня в статистике»'s words stay, with no button of their own.
+  expect(view.findAll('.failed')).toHaveLength(2)
+  const retries = () => view.findAll('button').filter((one) => one.text().trim() === en.state.retry)
+  expect(retries()).toHaveLength(1)
+
+  me.mockResolvedValue(initial)
+  salaryShift.mockResolvedValue({ day: 25 })
+  analyticsSetting.mockResolvedValue({ off: false })
+  const salaryAsked = salaryShift.mock.calls.length
+  const analyticsAsked = analyticsSetting.mock.calls.length
+  await retries().at(0)?.trigger('click')
+  await flushPromises()
+  expect(view.text()).not.toContain(en.settings.load_error.title)
+  // Each read once more: the salary and «Учитывать меня в статистике».
+  expect(salaryShift).toHaveBeenCalledTimes(salaryAsked + 1)
+  expect(analyticsSetting).toHaveBeenCalledTimes(analyticsAsked + 1)
+  expect(view.text()).not.toContain(en.settings.tap.load_error)
+})
+
+it('must not fire: with the form shown, the salary’s failure keeps its own «Повторить»', async () => {
+  salaryShift.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+  const view = await render()
+  expect(view.text()).toContain(en.settings.tap.load_error)
+  expect(view.findAll('button').filter((one) => one.text().trim() === en.state.retry)).toHaveLength(
+    1,
+  )
+})
+
 it('offline without memory offers no retry and no default values', async () => {
   vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
   me.mockRejectedValue(new TypeError('network'))
