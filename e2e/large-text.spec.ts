@@ -585,6 +585,10 @@ for (const size of ['150%', '200%'])
         .first()
         .check({ force: true })
       await expect(page.locator('.labels .label.chosen .letter').first()).toBeVisible()
+      // A screen's title breaks a word with a hyphen with large text: «Устройст|ва» at 150 % (adversarial Л5). CI's
+      // Chromium may have no dictionary, so the style is read, as the block button's is.
+      await page.goto('/settings/devices')
+      await expect(page.getByRole('heading', { level: 1 })).toHaveCSS('hyphens', 'auto')
       // A select's chosen words wrap over it; a switch's words are never cut.
       await page.goto('/settings')
       await expect(page.locator('.chosen-words').first()).toBeVisible()
