@@ -232,9 +232,11 @@ that moves from an index to a scan as the statistics change moves the order with
 - **The order of insertion is an identity `id` or a position** (`receipt_lines.position`), or a key the test
   writes in its own order (`official_rates`). **A uuid is an order of values, not of insertion**: 17 tables
   of the schema have one, and `randomUUID()` puts two rows written one after the other either way round
-  (review of MOL-323, round 1: of 24 pairs, 14 came back reversed). **`created_at` alone is none either**: a
-  default of `now()` is one for every row of a transaction. Ordered by either, rows may be compared with
-  another read of them — a snapshot with a snapshot (`erasure`) — never with rows written in place.
+  (review of MOL-323, round 1: of 24 pairs, 14 came back reversed). **Nor is a moment written by default**,
+  whatever its name: `now()` is one for every row of a transaction, `clock_timestamp()` one for rows a
+  microsecond apart (round 2). Ordered by either, rows may be compared with another read of them — a snapshot
+  with a snapshot (`erasure`) — never with what the test writes in place, `Array(n)` included: six reader
+  versions alike are compared as a set (`receipt-model`).
 - **Rows with no order of insertion at all are compared with none**: two logins at once
   (`login-transaction`) write neither first, so their sessions are compared as a set — `new Set`, `toSorted`
   — not by a uuid that only looks like an order.
@@ -250,12 +252,18 @@ that moves from an index to a scan as the statistics change moves the order with
   `.resolves`, a spread, `Promise.all`, a helper naming its read. So rows read with no order may end only
   where their order cannot tell — their length, their first row, `find`, `some`, `reduce`, `sort`, a loop,
   a `Set`, `toHaveLength`, `toContain`, `not`, `toEqual` of one row or of `expect.arrayContaining` — and
-  anything else is refused; the fix is an order, never a use the check does not know. Rows ordered only by a
-  uuid of the schema (read from `schema.ts`) or `createdAt` are refused where the test writes the order of
-  insertion: an array of two or more in place, an index past 0, taken apart into two. The lists are in its
-  head. **The price, named:** a helper of another file is not followed; what a loop or a `reduce` collects
-  is not — a sum is their ordinary use; and an order by a column every row read shares
-  (`.orderBy(t.threadId)` under `eq(t.threadId, …)`) passes. Those go to review.
+  anything else is refused; the fix is an order, never a use the check does not know. **Rows in the order of
+  chance go by the same closed rule** (round 2: refused only in three forms, they passed in six more), and may
+  besides be compared with another read; chance is read from `schema.ts` — a uuid, a moment written by default
+  — never from a name; an object they are put in is followed, so a snapshot of them meets a snapshot. A callback
+  handed the index of a row (`every((r, i) => …)`) tells the order, and a spread in an array expected is not
+  one row. The lists are in its head. **The price, named, by class** (round 2): **an order of ties is taken
+  as an order** — a column every row read shares (`.orderBy(t.threadId)` under `eq(t.threadId, …)`), a `sort`
+  whose key repeats, an `order by` of SQL text by whatever it names (a uuid there is not told); **a row picked
+  as the one is taken as the only one** — the first, `find`, a key of a `Map` or `Object.fromEntries`: where
+  more qualify, the first in the heap answers, or for a key the last; the ordinary use is a row by its key,
+  hundreds of them, and the check cannot count what a `where` matches; what a loop or a `reduce` collects is
+  not followed — a sum is their ordinary use; a helper of another file is not followed. Those go to review.
 - **How it was proved**: the read of «то же фото дважды» on master with its first word deleted and inserted
   again under the same id — the row then lies last in the heap and the index alike — gives CI's diff
   exactly, and with `orderBy` it is green. `update … set x = x` proves nothing: a HOT update leaves the row
