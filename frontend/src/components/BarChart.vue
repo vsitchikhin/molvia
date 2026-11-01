@@ -56,7 +56,10 @@
         class="label"
         :class="{ chosen: index === modelValue }"
       >
-        {{ bar.label }}
+        <span class="word">{{ bar.label }}</span
+        ><span v-if="bars.length > FEW" class="letter">{{
+          bar.label.charAt(0).toLocaleUpperCase()
+        }}</span>
       </span>
     </div>
   </fieldset>
@@ -265,12 +268,35 @@ export default defineComponent({
 }
 
 .labels {
+  /* It measures itself for the months' letters below (MOL-321). */
+  container-type: inline-size;
   display: flex;
   gap: var(--space-2);
   margin-top: var(--space-1);
 
   .many & {
     gap: var(--space-1);
+  }
+}
+
+.letter {
+  display: none;
+}
+
+/* Twelve months narrower than this are named by their letter, every other month's, over its own column and the
+   empty one beside — as a phone's year chart names them (MOL-321): at 200 % a label had 9 px, «янв» showed half its
+   «я», and even a letter alone is 20 px. The row is 16rem at 100 % on 320 and keeps the words. */
+@container (width < 14rem) {
+  .many .label {
+    overflow: visible;
+  }
+
+  .many .word {
+    display: none;
+  }
+
+  .many .label:nth-child(odd) .letter {
+    display: inline;
   }
 }
 

@@ -179,10 +179,14 @@ $icon-beside: 12rem;
     flex: 1 1 calc(100% - var(--icon) - var(--space-2));
   }
 
+  /* On its own line the name is whole, never «…»: «Карта Америабанка» read «Карта Амери…» at 200 %. */
   .value {
     flex-basis: 100%;
     order: 1;
+    overflow: visible;
+    overflow-wrap: anywhere;
     text-align: left;
+    white-space: normal;
   }
 }
 </style>

@@ -169,6 +169,14 @@ export default defineComponent({
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+
+  /* With large text whole (MOL-321): at 200 % «Перевод между счетами» read «Перево|д…». */
+  html[data-large-text] & {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: none;
+    line-clamp: none;
+  }
 }
 
 /* Never cut: on its own line it breaks between its words, never inside a figure, whose groups the

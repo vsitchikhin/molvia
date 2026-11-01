@@ -76,26 +76,36 @@
             <div class="tiles">
               <div class="tile">
                 <span class="tile-label">{{ t('accounts.screen.spendable') }}</span>
-                <span class="tile-figure" :class="{ negative: main.spendable.minor < 0n }">
+                <span
+                  class="tile-figure"
+                  :class="{ negative: main.spendable.minor < 0n }"
+                  :style="figureChars(`≈ ${estimate(main.spendable)}`, 'text')"
+                >
                   ≈ {{ estimate(main.spendable) }}
                 </span>
                 <span
                   v-if="second"
                   class="tile-second"
                   :class="{ negative: second.spendable.minor < 0n }"
+                  :style="figureChars(`≈ ${estimate(second.spendable)}`, 'text')"
                 >
                   ≈ {{ estimate(second.spendable) }}
                 </span>
               </div>
               <div class="tile">
                 <span class="tile-label">{{ t('accounts.savings') }}</span>
-                <span class="tile-figure" :class="{ negative: main.savings.minor < 0n }">
+                <span
+                  class="tile-figure"
+                  :class="{ negative: main.savings.minor < 0n }"
+                  :style="figureChars(`≈ ${estimate(main.savings)}`, 'text')"
+                >
                   ≈ {{ estimate(main.savings) }}
                 </span>
                 <span
                   v-if="second"
                   class="tile-second"
                   :class="{ negative: second.savings.minor < 0n }"
+                  :style="figureChars(`≈ ${estimate(second.savings)}`, 'text')"
                 >
                   ≈ {{ estimate(second.savings) }}
                 </span>
@@ -640,6 +650,8 @@ export default defineComponent({
 }
 
 .tile {
+  /* Its figures measure themselves against it (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   align-content: center;
   min-height: 4rem;
@@ -653,18 +665,22 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+/* A sum never breaks: it shrinks to its tile (MOL-321) — «≈ 1 433 31|7 ₽» at 200 %. Onest 700 is the words' table:
+   its figures are 600's, the rest within the table's room (measured). */
 .tile-figure {
-  font-size: var(--text-headline);
+  @include figure-fit(var(--text-headline));
+
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .tile-second {
+  @include figure-fit(var(--text-footnote));
+
   color: var(--text-muted);
-  font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .footnote {
@@ -705,6 +721,13 @@ export default defineComponent({
   flex: 1 1 0;
   min-width: 0;
   overflow-wrap: break-word;
+}
+
+/* The icon gives its place to the words in a narrow row, as a row's circle does (`ListRow`, MOL-321). */
+@container row-tight (width < 12rem) {
+  .unassigned-icon {
+    display: none;
+  }
 }
 
 .unassigned-chevron {

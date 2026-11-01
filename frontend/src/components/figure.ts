@@ -68,9 +68,19 @@ const ROOM = 1.03
  * width in the face the figure is set in.
  */
 export function figureChars(text: string, face: 'display' | 'text' = 'display'): StyleValue {
+  return widthStyle(figureWidth(text, face))
+}
+
+/** The same width as a number, a share of the figure's size, for a figure that stands with something else. */
+export function figureWidth(text: string, face: 'display' | 'text' = 'display'): number {
   const { figure, other, chars } = FACES[face]
   let width = 0
   for (const { segment } of letters.segment(text.trim()))
     width += /^\d$/.test(segment) ? figure : (chars[segment] ?? other)
+  return width
+}
+
+/** `--figure-width` of a width counted, with its room. */
+export function widthStyle(width: number): StyleValue {
   return { '--figure-width': String(Math.round(width * ROOM * 1000) / 1000) }
 }

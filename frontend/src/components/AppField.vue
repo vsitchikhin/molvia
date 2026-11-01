@@ -7,6 +7,7 @@
         'app-field-invalid': failed,
         'app-field-readonly': readonly,
         'app-field-entry': size === 'entry',
+        'app-field-decimal': kind === 'decimal',
       },
     ]"
     :style="attrs.style"
@@ -49,18 +50,33 @@
           {{ option.label }}
         </option>
       </select>
+      <!-- The chosen option as words that wrap, drawn only with large text over the select (MOL-321). -->
+      <span
+        v-if="kind === 'select'"
+        class="chosen-words"
+        :class="{ placeholder: !modelValue }"
+        aria-hidden="true"
+        >{{ options.find((option) => option.value === modelValue)?.label ?? placeholder }}</span
+      >
       <IconChevronDown v-if="kind === 'select'" class="chevron" aria-hidden="true" />
       <span v-if="shows" class="shown" aria-hidden="true">
         <IconCalendar class="shown-icon" />{{ display }}
       </span>
-      <!-- The box the amount typed measures itself against (MOL-321); no box of its own but in `entry`. -->
+      <!-- The box a figure typed shrinks to beside what else the well holds (MOL-321); no box of its own but for an
+           amount of the body's size. -->
       <span v-if="kind !== 'multiline' && kind !== 'select'" class="control-box">
         <input
           :id="id"
           class="control"
           :class="{ veiled: shows }"
           v-bind="control()"
-          :style="size === 'entry' ? figureChars(modelValue || placeholder || '0') : undefined"
+          :style="
+            size === 'entry'
+              ? entryWidth(1)
+              : kind === 'decimal'
+                ? figureChars(modelValue || placeholder || '0', 'text')
+                : undefined
+          "
           :type="kind === 'date' ? 'date' : 'text'"
           :inputmode="kind === 'decimal' ? 'decimal' : kind === 'digits' ? 'numeric' : undefined"
           :value="modelValue"
@@ -72,7 +88,12 @@
           @input="update"
         />
       </span>
-      <span v-if="$slots.suffix" :id="`${id}-suffix`" class="suffix">
+      <span
+        v-if="$slots.suffix"
+        :id="`${id}-suffix`"
+        class="suffix"
+        :style="size === 'entry' ? entryWidth(ENTRY_SIGN) : undefined"
+      >
         <slot name="suffix" />
       </span>
     </div>
@@ -92,15 +113,18 @@
 
 <script lang="ts">
 import { computed, defineComponent, onUnmounted, ref, useAttrs, useId, useSlots, watch } from 'vue'
-import type { PropType } from 'vue'
+import type { PropType, StyleValue } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconChevronDown from '~icons/mdi/chevron-down'
 import type { ErrorCode } from '@molvia/model'
 import AppReveal from '@/components/AppReveal.vue'
-import { figureChars } from '@/components/figure'
+import { figureChars, figureWidth, widthStyle } from '@/components/figure'
 import { LINGER_MS } from '@/composables/useAnnouncer'
+
+/** The sign of `entry` beside its figure, a share of the figure's size: 32 to 40 (MOL-235). */
+const ENTRY_SIGN = 0.8
 
 /** How many characters left are said aloud, beside the moment the count comes and the end. */
 const SPOKEN_MARKS = [20, 100]
@@ -211,6 +235,19 @@ export default defineComponent({
       return parts.length > 0 ? parts.join(' ') : undefined
     }
 
+    /**
+     * The figure typed and its sign shrink together to the field (MOL-321, adversarial З1, И1): their width in the
+     * figure's size, the sign at its share — for the figure's own `figure-fit` at 1, the sign's at `ENTRY_SIGN`.
+     * At 200 % «125403,50» beside «₽» of its own size was 12.9 px. The sign is read from the tail's text.
+     */
+    function entryWidth(size: number): StyleValue {
+      const sign = (slots.suffix?.() ?? [])
+        .map((node) => (typeof node.children === 'string' ? node.children : ''))
+        .join('')
+      const figure = figureWidth(props.modelValue || (props.placeholder ?? '') || '0')
+      return widthStyle((figure + ENTRY_SIGN * figureWidth(sign)) / size)
+    }
+
     function update(event: Event): void {
       emit(
         'update:modelValue',
@@ -268,6 +305,8 @@ export default defineComponent({
       control,
       describedBy,
       update,
+      entryWidth,
+      ENTRY_SIGN,
       figureChars,
     }
   },
@@ -281,8 +320,11 @@ export default defineComponent({
   min-width: 0;
 }
 
+/* What stands beside the label goes under it where the two do not fit (MOL-321): «· необязательно» stood past the
+   sheet of a spending's day and note at 200 %. */
 .label {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-2);
@@ -326,9 +368,25 @@ export default defineComponent({
   }
 }
 
-/* Not a box of the well's row: the control stands in it as before (`entry` below gives it one). */
+/* Not a box of the well's row: the control stands in it as before — an amount of the body's size gives it one. */
 .control-box {
   display: contents;
+}
+
+.app-field-decimal:not(.app-field-entry) {
+  .control-box {
+    container-type: inline-size;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
+  }
+
+  /* An amount shrinks to what the well leaves it (MOL-321): at 200 % «125403,50» was 192 px in 165 beside the
+     currency of a plan or an account, and showed «125403,». */
+  .control {
+    @include figure-fit(var(--text-body));
+  }
 }
 
 /* No width of its own (MOL-318), as `NavRow`'s label: a select is as wide as its longest option — a long
@@ -362,6 +420,32 @@ export default defineComponent({
 
 .placeholder {
   color: var(--text-muted);
+}
+
+/* With large text the chosen option is words that wrap, the select over them unseen and still the one tapped,
+   focused and read out (MOL-321): its own line held «Армянский драм · AMD» in 92 px at 200 % and showed «Армя», a
+   country «Арм», a currency of «Валюта» nothing at all beside an amount. As the date's drawn words (`.shown`). */
+.chosen-words {
+  display: none;
+}
+
+html[data-large-text] {
+  .chosen-words {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    padding: var(--space-2) var(--space-6) var(--space-2) 0;
+    font-size: var(--text-body);
+    overflow-wrap: anywhere;
+    pointer-events: none;
+  }
+
+  .select {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    opacity: 0;
+  }
 }
 
 .chevron {
@@ -432,37 +516,33 @@ textarea.control {
   box-shadow: inset 0 0 0 var(--hairline) var(--bad);
 }
 
+/* What of the field the figure and its sign do not get: the well's padding and edges, the gap between them. */
+$entry-edges: calc(2 * var(--space-4) + 2 * var(--hairline) + var(--space-2));
+
 /* The amount being typed (MOL-235): the well, the figure and the sign of the spending's sheet as it was. */
 .app-field-entry {
+  container-type: inline-size;
+
   .well {
     min-height: 4.5rem;
     padding: 0 var(--space-4);
     border-radius: var(--radius-lg);
   }
 
-  /* The width left beside the sign, for the figure to shrink to (MOL-321). */
-  .control-box {
-    container-type: inline-size;
-    display: flex;
-    flex: 1;
-    align-items: center;
-    min-width: 0;
-  }
-
   /* The figure's own line, as the copies had it: inherited, the body's leading made the input 58, not 54. It
-     shrinks to its box by its length (MOL-321, adversarial З1): at 150 % «12540» was 180 px in a field of 125
-     and showed «2540» as it was typed, «12» and half a «5» once left — the one figure the sheet is for. */
+     shrinks with its sign to the well by their length (MOL-321, adversarial З1, И1): at 150 % «12540» was 180 px
+     in a field of 125 and showed «2540» as it was typed, «12» and half a «5» once left — the one figure the sheet
+     is for. Measured from the field, less the well's edges and the gap between them (`entryWidth`). */
   .control {
     @include display-type;
-    @include figure-fit(var(--text-entry));
+    @include figure-fit(var(--text-entry), $less: $entry-edges);
 
     line-height: normal;
   }
 
   .suffix {
     @include display-type;
-
-    font-size: var(--text-entry-sign);
+    @include figure-fit(var(--text-entry-sign), $less: $entry-edges);
   }
 }
 

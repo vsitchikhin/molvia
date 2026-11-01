@@ -586,6 +586,9 @@ export default defineComponent({
 }
 
 .form {
+  /* It measures itself for the pairs below (MOL-321). */
+  container-type: inline-size;
+
   /* A column, not a grid: a block of it grows and goes by `AppReveal`, which takes a flex
      column's gap back with the block — a grid's stays and jumped (MOL-151, adversarial Б2). */
   display: flex;
@@ -597,6 +600,17 @@ export default defineComponent({
   display: grid;
   grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
   gap: var(--space-3);
+}
+
+/* Narrower than this the sum and its currency stand one under the other (MOL-321, adversarial И2, И3): side by side
+   at 200 % the sum had 89 px — «125403» read «1254» — and the currency under its chevron none, «₽ RUB» unseen. In
+   rem, as every turn of large text: the form is 18rem at 100 % on 320 and keeps the pair. */
+$pair-beside: 15rem;
+
+@container (width < #{$pair-beside}) {
+  .pair {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .hint {

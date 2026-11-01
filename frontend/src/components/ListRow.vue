@@ -394,8 +394,6 @@ export default defineComponent({
      sum at 200 % stood past the card's left edge — «100 000 ₽» read «00 000 ₽» (adversarial В5). The title
      breaks rather than end in «…», «Коп…» at 200 %. */
   @if $whole {
-    .circle,
-    .list-row > .icon,
     .chevron,
     .check {
       grid-row: 1;
@@ -405,9 +403,31 @@ export default defineComponent({
       grid-column: 1 / -1;
     }
 
+    /* The circle gives its place to the words, as the icon of `NavRow` and the wallet of `AccountRow` do: beside
+       it and the chevron the words had some 40 px at 200 %, and «Обмен», «Продукты», «Карта» stood a letter or
+       two a line. What the row is, its title says; the circle repeats it. */
+    .circle,
+    .list-row > .icon {
+      display: none;
+    }
+
+    .words {
+      grid-column: 1 / 3;
+    }
+
+    /* The title and the line under it whole, never «…»: at 200 % «Бот в Telegram» read «Б…», and the line of an
+       exchange hid what came in. */
     .title {
+      overflow: visible;
       overflow-wrap: anywhere;
       white-space: normal;
+    }
+
+    .meta {
+      display: block;
+      overflow: visible;
+      -webkit-line-clamp: none;
+      line-clamp: none;
     }
   }
 }
@@ -416,9 +436,10 @@ export default defineComponent({
   @include tail-under;
 }
 
-/* The same, only with large text, in a container named `row-tight` (MOL-321): the rows of «Счета» and
-   «Категории» keep their tail beside the words at 100 % on 320 (16rem), and at 200 % «1 234 567,89 ₽» was
-   cut by 68 px and «Убрать» by 37, the chevron past the phone. 12rem: some 133 % of the text and up. */
+/* The same, only with large text, in a container named `row-tight` — every list card of the kit is one
+   (`AppCard list`) — (MOL-321): the rows keep their tail beside the words at 100 % on 320 (16rem and more),
+   and at 200 % «1 234 567,89 ₽» was cut by 68 px and «Убрать» by 37, the chevron past the phone. 12rem: some
+   133 % of the text and up. */
 @container row-tight (width < 12rem) {
   @include tail-under($whole: true);
 }

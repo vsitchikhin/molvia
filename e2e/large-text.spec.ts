@@ -459,6 +459,129 @@ for (const size of ['150%', '200%'])
       expect(await typed(sheet), 'transfer').toBeLessThanOrEqual(0)
     })
 
+    // A life's sums and names, every row, tile and field of «Деньги» and «Настройки» (self-review of round 9): at
+    // 200 % a row's circle left its words some 40 px — «О|б|м|е|н», «Карта Амер|иабан|ка» — a tile broke its sum
+    // («250 00|0 ₽»), «Темп месяца» stood 23 px past the phone, a select showed «Армя», and in an exchange the sum
+    // and its currency side by side showed «1254» and no currency (adversarial И2, И3).
+    test('a life’s sums and names stand whole in rows, tiles and fields', async ({ page }) => {
+      test.setTimeout(90_000)
+      await signedIn(page)
+      const card = randomUUID()
+      const savings = randomUUID()
+      for (const [id, name, currency, amount, kept] of [
+        [card, 'Карта Америабанка', 'AMD', '1250000', false],
+        [savings, 'Копилка', 'RUB', '1234567.89', true],
+      ] as const)
+        await post(page, '/api/money/accounts', {
+          id,
+          name,
+          currency,
+          savings: kept,
+          start: { amount, currency },
+          startOn: day(3),
+        })
+      const { categories } = (await (
+        await page.request.get('/api/spending-categories', { headers: await asBrowser(page) })
+      ).json()) as { categories: { id: string }[] }
+      await post(page, '/api/spendings', {
+        id: randomUUID(),
+        spentOn: day(0),
+        amount: { amount: '1234567', currency: 'AMD' },
+        categoryId: categories[0]?.id,
+        accountId: card,
+      })
+      await post(page, '/api/incomes', {
+        id: randomUUID(),
+        amount: { amount: '250000', currency: 'RUB' },
+        receivedOn: day(0),
+        source: 'salary',
+        accountId: savings,
+      })
+      await post(page, '/api/exchanges', {
+        id: randomUUID(),
+        given: { amount: '50000', currency: 'RUB' },
+        received: { amount: '240000', currency: 'AMD' },
+        exchangedOn: day(0),
+        givenAccountId: savings,
+        receivedAccountId: card,
+      })
+      // A row's words take its width: no circle, the title whole.
+      const rowsWhole = async (where: string): Promise<void> => {
+        await expect(page.locator('.list-row').first()).toBeVisible()
+        await facesIn(page)
+        await expect(page.locator('.list-row .circle:visible'), where).toHaveCount(0)
+        expect(
+          await page
+            .locator('.list-row .title')
+            .evaluateAll(
+              (titles) =>
+                titles.filter((title) => title.scrollWidth > title.clientWidth + 1).length,
+            ),
+          where,
+        ).toBe(0)
+      }
+      await page.goto('/money')
+      await expect(page.locator('.tile-figure').first()).toBeVisible()
+      await facesIn(page)
+      expect(await pastCard(page, '.tile-figure', '.tile')).toBeLessThanOrEqual(0.5)
+      await page.goto('/money/spendings')
+      await rowsWhole('spendings')
+      expect(await pastCard(page, '.day-total', '.day-head')).toBeLessThanOrEqual(0.5)
+      expect(await pageSideways(page, page.locator('.day-head'))).toBe(0)
+      await page.goto(`/money/accounts/${card}`)
+      await rowsWhole('account')
+      expect(await pastCard(page, '.list-row .tail', '.list-row')).toBeLessThanOrEqual(0.5)
+      await page.goto('/money/accounts')
+      await rowsWhole('accounts')
+      expect(await pastCard(page, '.tile-figure, .tile-second', '.tile')).toBeLessThanOrEqual(0.5)
+      await page.goto('/money/charts')
+      expect(await pageSideways(page, page.locator('.pace'))).toBe(0)
+      await page.goto('/money/charts?mode=year')
+      await expect(page.locator('.labels .letter').first()).toBeVisible()
+      await expect(page.locator('.labels .word:visible')).toHaveCount(0)
+      await facesIn(page)
+      // Every other month's letter, none over its neighbour: a letter alone is 20 px over a column of 9 at 200 %.
+      const letters = await page
+        .locator('.labels .letter:visible')
+        .evaluateAll((all) =>
+          all
+            .map((one) => one.getBoundingClientRect())
+            .map((box) => ({ left: box.left, right: box.right })),
+        )
+      for (const [index, { left, right }] of letters.entries()) {
+        const next = letters[index + 1]
+        if (next && next.left > left) expect(right).toBeLessThanOrEqual(next.left + 0.5)
+      }
+      // A select's chosen words wrap over it; a switch's words are never cut.
+      await page.goto('/settings')
+      await expect(page.locator('.chosen-words').first()).toBeVisible()
+      await facesIn(page)
+      for (const select of await page.locator('.app-field select').all())
+        await expect(select).toHaveCSS('opacity', '0')
+      expect(
+        await page
+          .locator('.list-row .title, .entry-text')
+          .evaluateAll(
+            (words) => words.filter((one) => one.scrollWidth > one.clientWidth + 1).length,
+          ),
+      ).toBe(0)
+      // An exchange: its sum and currency one under the other, the sum typed whole.
+      await page.goto('/money/exchange')
+      await page.getByRole('button', { name: 'Записать обмен' }).click()
+      const sheet = page.locator('dialog[open]').last()
+      const pair = sheet.locator('.pair').first()
+      await expect(pair).toBeVisible()
+      const [amount, currency] = await pair.locator('.app-field').all()
+      expect((await currency!.boundingBox())!.y).toBeGreaterThan((await amount!.boundingBox())!.y)
+      const typed = amount!.locator('input')
+      await typed.fill('125403,50')
+      await typed.blur()
+      await facesIn(page)
+      expect(
+        await typed.evaluate((input) => input.scrollWidth - input.clientWidth),
+      ).toBeLessThanOrEqual(0)
+    })
+
     // In English a whole sum of drams is «֏125,403», wider for its count than Russian's «125 403 ֏» — a count at
     // 0.56 of the size let it 6 px past its card (adversarial В2, В3).
     test.describe('in English', () => {

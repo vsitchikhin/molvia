@@ -143,7 +143,12 @@
               <section v-for="day in journal" :key="day.day" class="day">
                 <h2 class="day-head">
                   <span class="day-words">{{ dayTitle(day.day) }}</span>
-                  <span v-if="day.total" class="day-total">{{ dayTotalText(day, locale) }}</span>
+                  <span
+                    v-if="day.total"
+                    class="day-total"
+                    :style="totalWidth(dayTotalText(day, locale))"
+                    >{{ dayTotalText(day, locale) }}</span
+                  >
                 </h2>
                 <AppCard as="ul" list>
                   <AppReveal group>
@@ -245,6 +250,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, nextTick, onUnmounted, ref, watch } from 'vue'
+import type { StyleValue } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconPlus from '~icons/mdi/plus'
 import IconWallet from '~icons/mdi/wallet-outline'
@@ -267,6 +273,7 @@ import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import type { Removed } from '@/components/spending'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
+import { figureChars, figureWidth } from '@/components/figure'
 import { dayTotalText, journalRowProps, spentApprox } from '@/components/spending'
 import type { JournalRow, OperationRowProps } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
@@ -459,7 +466,19 @@ export default defineComponent({
       { flush: 'post' },
     )
 
+    /** The day's sum shrinks to the head by its widest line: it breaks only after a «+» (MOL-321). */
+    function totalWidth(text: string | null): StyleValue {
+      const lines = (text ?? '').split('+')
+      return figureChars(
+        lines.reduce((widest, line) =>
+          figureWidth(line, 'text') > figureWidth(widest, 'text') ? line : widest,
+        ),
+        'text',
+      )
+    }
+
     return {
+      totalWidth,
       transferOpen,
       transferId,
       transferRemoved,
@@ -563,6 +582,8 @@ export default defineComponent({
 
 /* The day's sum stands over the rows' sums (157 v2 02 п. 4, MOL-176 В-1). */
 .day-head {
+  /* The day's sum measures itself against it (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -592,6 +613,9 @@ export default defineComponent({
    narrower than its widest figure: a figure wider than 60 % — «≈ 50 000 000 ֏» in a large system font —
    takes the room from the day's words rather than standing past the column (round 3). */
 .day-total {
+  /* And shrinks where even its widest line is wider than the head: «≈ 1 366 472 ֏» stood 2 px past it at 200 %. */
+  @include figure-fit(1em);
+
   flex: none;
   min-width: min-content;
   max-width: 60%;
