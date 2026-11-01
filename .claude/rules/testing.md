@@ -257,45 +257,51 @@ t.id)` with a uuid `id`). So `orderBy(t.id, t.createdAt)` with an identity `id` 
 - **Not `TRUNCATE` instead** (Р-2): it would hide the flake, not close it — the order is still not promised.
   Nor an assertion made indifferent to the order where the test means one: the rows in the order they were
   written read as the test's story.
-- **The net holds it at run time** (round 12): `backend/tests/unordered-rows.ts`, the first setup file of the
-  integration tests, turns the rows of every `SELECT` with no `order by` of its own by one, the first last —
-  on the prototype of postgres.js's query, so every client of the process: the test's, the app's, a
-  transaction's, a migration's. A test leaning on the order of rows read with no order fails on its first run
-  however it reads them, and rows alike, where the order tells nothing, come back the same. With it the whole
-  suite, 2 838 tests, is green: nothing of the branch leans on an order Postgres never promised. **Why it and
-  not the check alone**: eleven rounds of review each found another way to use rows that a parse of the test's
-  text did not see — a name of a name, a `Set` spread back, a callback, a string — and the list never closed;
-  the run sees every way at once. Its own test, `unordered-rows.integration.test.ts`, reads with no order on
-  purpose and is the one file the check leaves out.
-- **`bin/check-ordered-reads.mjs` says it in `npm run lint`, before the run** (owner's В-2 «в»): for rows with
-  no order it is a hint the net makes good; for an order the statement has — chance and ties, which the net
-  cannot see — it is what holds. It works by parsing as the clock check does, names by TypeScript's binder,
-  chance, identities and unique keys read from `schema.ts`. **It is closed at each of the three places it
-  recognises something** (review of MOL-323, eleven rounds: a list of forms missed one more every round, so
-  each place says what it knows and holds the rest in doubt, and **in doubt there is no order**): **what
-  reads** — a Drizzle chain, its `const` beginning and a helper's included (carried on from any other name it
-  is refused), `findMany` in doubt, `execute`, `unsafe`, `query` and a file's executing helper of any text
-  (one the parse cannot read is a read with no order), a template by its tag — Drizzle's `sql`, by its import,
-  a fragment wherever it stands, any other a query wherever it stands — rows handed to `then`, every file
-  read; **what orders** — `orderBy` of columns of tables the schema names (by an import alias or a namespace
-  too), directly, by a `const` or spread; anything else is no order of insertion; uuid and `timestamp` are
-  chance, decided up to the first identity in a read of one table, total only with a whole unique key of every
-  table read; **what the rows are used for** — they may end only where their order cannot tell (the list is in
-  its head), a callback of those is in doubt where it takes an index, changes anything outside it or cannot be
-  read, a `not` frees only a matcher free without it, of rows made one string only the length is free, and
-  rows of chance may meet another read in the same total order. Anything else is refused; the fix is an order,
-  never a use the check does not know. **The price, named, by class, and nothing outside these classes** — of
-  rows with no order none is left, the net holds them; of rows in an order the statement has: an order of ties
-  is taken as an order (a column every row read shares, a parent's identity through a join, a `sort` whose key
-  repeats, an order of SQL text by whatever it names); an order of values the test wrote is the test's (a
-  column neither a uuid nor a moment is not judged); a moment before an identity is refused even where the
-  test wrote the moments; a row picked as the one — the first, `find`, a key of a `Map` — is taken as the only
-  one, the ordinary use being a row by its key, hundreds of them; what a loop or a `reduce` collects is not
-  followed, a sum being their ordinary use; a callback calling a pure method of a name of this file is
-  refused; a function handed in as a parameter, a field of an object of rows, an import and a helper of
-  another file are not followed. Those go to review. **Every answer of «free» or «not a read» the check gives
-  is written in its head, nothing else is let go; a form found outside these classes is a defect of the check,
-  fixed at the place it slipped through by the same rule of doubt — never a new list.**
+- **The net holds it at run time** (rounds 12, 13): `backend/tests/unordered-rows.ts`, the first setup file of
+  the integration tests, **reverses** the rows of every `SELECT` with no `order by` of its own, and of every
+  `UPDATE`, `DELETE` and `MERGE` returning them — on the prototype of postgres.js's query, of its ESM and its
+  CommonJS build, so every client of the process: the test's, the app's, a transaction's, a migration's.
+  Reversed, not turned by one: the turn moved the first row only and left rows 2…n as the heap gave them, so
+  `find`, the first row and `[...new Set()]` of «то же фото дважды» passed it (round 13, Н1); reversal is the
+  one order that puts each two rows the other way round. `INSERT`'s rows keep the order of its `VALUES`, as a
+  test may lean on. A test leaning on which of any two such rows comes first fails on its first run however it
+  reads them; rows alike come back the same. With it the whole suite, 2 866 tests, is green. **What it cannot
+  hold**: two reads reversed alike match whatever their order was — a snapshot met by a snapshot; two rows
+  have but one other order, so no fixed one can tell — and an order the statement has, of chance or of ties,
+  it never touches; both are the check's. Its own test, `unordered-rows.integration.test.ts`, reads with no
+  order on purpose and is the one file the check leaves out.
+- **`bin/check-ordered-reads.mjs` says it in `npm run lint`, before the run** (owner's В-2 «в»): for one read
+  with no order it is a hint the net makes good; for two reads with no order compared, and for an order the
+  statement has — chance and ties, which the net cannot see — it is what holds; a `Set`, a `Map` and an object
+  of `Object.fromEntries` keep the order they were filled in and are followed through, and an `update` or a
+  `delete` returning rows is a read with no order (round 13). It works by parsing as the clock check does,
+  names by TypeScript's binder, chance, identities and unique keys read from `schema.ts`. **It is closed at
+  each of the three places it recognises something** (review of MOL-323, eleven rounds: a list of forms missed
+  one more every round, so each place says what it knows and holds the rest in doubt, and **in doubt there is
+  no order**): **what reads** — a Drizzle chain, its `const` beginning and a helper's included (carried on
+  from any other name it is refused), `findMany` in doubt, `execute`, `unsafe`, `query` and a file's executing
+  helper of any text (one the parse cannot read is a read with no order), a template by its tag — Drizzle's
+  `sql`, by its import, a fragment wherever it stands, any other a query wherever it stands — rows handed to
+  `then`, every file read; **what orders** — `orderBy` of columns of tables the schema names (by an import
+  alias or a namespace too), directly, by a `const` or spread; anything else is no order of insertion; uuid
+  and `timestamp` are chance, decided up to the first identity in a read of one table, total only with a whole
+  unique key of every table read; **what the rows are used for** — they may end only where their order cannot
+  tell (the list is in its head), a callback of those is in doubt where it takes an index, changes anything
+  outside it or cannot be read, a `not` frees only a matcher free without it, of rows made one string only the
+  length is free, and rows of chance may meet another read in the same total order. Anything else is refused;
+  the fix is an order, never a use the check does not know. **The price, named, by class, and nothing outside
+  these classes** — of one read with no order none is left, the net holds it; of two reads with no order
+  compared, what a form the check does not follow hides; of rows in an order the statement has: an order of
+  ties is taken as an order (a column every row read shares, a parent's identity through a join, a `sort`
+  whose key repeats, an order of SQL text by whatever it names); an order of values the test wrote is the
+  test's (a column neither a uuid nor a moment is not judged); a moment before an identity is refused even
+  where the test wrote the moments; a row picked as the one — the first, `find`, a key of a `Map` — is taken
+  as the only one, the ordinary use being a row by its key, hundreds of them; what a loop or a `reduce`
+  collects is not followed, a sum being their ordinary use; a callback calling a pure method of a name of this
+  file is refused; a function handed in as a parameter, a field of an object of rows, an import and a helper
+  of another file are not followed. Those go to review. **Every answer of «free» or «not a read» the check
+  gives is written in its head, nothing else is let go; a form found outside these classes is a defect of the
+  check, fixed at the place it slipped through by the same rule of doubt — never a new list.**
 - **How it was proved**: the read of «то же фото дважды» on master with its first word deleted and inserted
   again under the same id — the row then lies last in the heap and the index alike — gives CI's diff
   exactly, and with `orderBy` it is green. `update … set x = x` proves nothing: a HOT update leaves the row
