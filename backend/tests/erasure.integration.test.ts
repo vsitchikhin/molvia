@@ -68,31 +68,71 @@ async function rowsMentioning(needle: string, digits = false): Promise<string[]>
 
 async function snapshot(actorId: string) {
   return {
-    actor: await db.select().from(actors).where(eq(actors.id, actorId)),
-    verdicts: await db.select().from(verdicts).where(eq(verdicts.actorId, actorId)),
-    picks: await db.select().from(searchPicks).where(eq(searchPicks.actorId, actorId)),
-    events: await db.select().from(events).where(eq(events.actorId, actorId)),
+    actor: await db.select().from(actors).where(eq(actors.id, actorId)).orderBy(actors.id),
+    verdicts: await db
+      .select()
+      .from(verdicts)
+      .where(eq(verdicts.actorId, actorId))
+      .orderBy(verdicts.id),
+    picks: await db
+      .select()
+      .from(searchPicks)
+      .where(eq(searchPicks.actorId, actorId))
+      .orderBy(searchPicks.queryKey, searchPicks.itemId),
+    events: await db.select().from(events).where(eq(events.actorId, actorId)).orderBy(events.id),
     expenses: await db.execute(sql`
-      select e.* from expenses e join trips t on t.id = e.trip_id where t.actor_id = ${actorId}`),
-    sessions: await db.execute(sql`select * from sessions where actor_id = ${actorId}`),
-    exchanges: await db.select().from(exchanges).where(eq(exchanges.actorId, actorId)),
-    incomes: await db.select().from(incomes).where(eq(incomes.actorId, actorId)),
-    spendings: await db.select().from(spendings).where(eq(spendings.actorId, actorId)),
+      select e.* from expenses e join trips t on t.id = e.trip_id where t.actor_id = ${actorId}
+      order by e.id`),
+    sessions: await db.execute(sql`select * from sessions where actor_id = ${actorId} order by id`),
+    exchanges: await db
+      .select()
+      .from(exchanges)
+      .where(eq(exchanges.actorId, actorId))
+      .orderBy(exchanges.id),
+    incomes: await db
+      .select()
+      .from(incomes)
+      .where(eq(incomes.actorId, actorId))
+      .orderBy(incomes.id),
+    spendings: await db
+      .select()
+      .from(spendings)
+      .where(eq(spendings.actorId, actorId))
+      .orderBy(spendings.id),
     categories: await db
       .select()
       .from(spendingCategories)
-      .where(eq(spendingCategories.actorId, actorId)),
-    monthRates: await db.select().from(moneyMonthRates).where(eq(moneyMonthRates.actorId, actorId)),
-    plans: await db.select().from(budgetPlans).where(eq(budgetPlans.actorId, actorId)),
-    feedback: await db.select().from(feedback).where(eq(feedback.actorId, actorId)),
+      .where(eq(spendingCategories.actorId, actorId))
+      .orderBy(spendingCategories.id),
+    monthRates: await db
+      .select()
+      .from(moneyMonthRates)
+      .where(eq(moneyMonthRates.actorId, actorId))
+      .orderBy(moneyMonthRates.month, moneyMonthRates.base, moneyMonthRates.quote),
+    plans: await db
+      .select()
+      .from(budgetPlans)
+      .where(eq(budgetPlans.actorId, actorId))
+      .orderBy(budgetPlans.categoryId, budgetPlans.fromMonth),
+    feedback: await db
+      .select()
+      .from(feedback)
+      .where(eq(feedback.actorId, actorId))
+      .orderBy(feedback.id),
     replies: await db.execute(sql`
       select r.* from feedback_replies r join feedback f on f.id = r.feedback_id
-      where f.actor_id = ${actorId}`),
-    accounts: await db.select().from(moneyAccounts).where(eq(moneyAccounts.actorId, actorId)),
+      where f.actor_id = ${actorId}
+      order by r.id`),
+    accounts: await db
+      .select()
+      .from(moneyAccounts)
+      .where(eq(moneyAccounts.actorId, actorId))
+      .orderBy(moneyAccounts.id),
     checks: await db
       .select()
       .from(moneyAccountChecks)
-      .where(eq(moneyAccountChecks.actorId, actorId)),
+      .where(eq(moneyAccountChecks.actorId, actorId))
+      .orderBy(moneyAccountChecks.id),
   }
 }
 

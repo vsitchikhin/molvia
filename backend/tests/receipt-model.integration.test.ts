@@ -356,7 +356,10 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     expect(reports.filter((r) => r.kind === 'read').map((r) => r.unparsed)).toEqual(
       Array(6).fill(null),
     )
-    const rows = await db.select({ version: receipts.readerVersion }).from(receipts)
+    const rows = await db
+      .select({ version: receipts.readerVersion })
+      .from(receipts)
+      .orderBy(receipts.id)
     expect(rows.map((row) => row.version)).toEqual(Array(6).fill('tesseract 5.5.0 · test'))
     expect(await month()).toBeNull()
   }, 30_000)

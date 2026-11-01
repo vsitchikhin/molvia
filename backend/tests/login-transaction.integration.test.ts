@@ -125,10 +125,14 @@ describe('atomic login', () => {
     ])
     expect(results.map((result) => result.status)).toEqual(['authenticated', 'authenticated'])
     expect(await first.db.select().from(actors)).toHaveLength(1)
-    const written = await first.db.select().from(sessions).orderBy(sessions.id)
+    // two logins at once: neither is written first, so the rows are compared with no order (MOL-323)
+    const written = await first.db.select().from(sessions)
     expect(written).toHaveLength(2)
-    expect(written[0]?.actorId).toBe(written[1]?.actorId)
-    expect(written.map((row) => row.deviceName)).toEqual(['iPhone · Safari', 'iPhone · Safari'])
+    expect(new Set(written.map((row) => row.actorId)).size).toBe(1)
+    expect(written.map((row) => row.deviceName).toSorted()).toEqual([
+      'iPhone · Safari',
+      'iPhone · Safari',
+    ])
   })
 
   it('a session failure rolls back consumption and a newly created owner', async () => {
