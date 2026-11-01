@@ -16,8 +16,10 @@
           <span v-for="row in top" :key="row.key" class="sector">
             <span class="dot" :style="{ background: row.colour }"></span>
             <span class="sector-name">{{ row.name }}</span>
-            <span class="sector-share">{{ row.share }}</span>
-            <span class="sector-amount">{{ row.amount }}</span>
+            <span class="figures">
+              <span class="sector-share">{{ row.share }}</span>
+              <span class="sector-amount">{{ row.amount }}</span>
+            </span>
           </span>
         </span>
         <span v-else-if="waiting === 'read'" class="why">{{
@@ -188,6 +190,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .open {
+  /* The card measures itself for the ring below (MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
@@ -202,6 +206,7 @@ export default defineComponent({
 
 .heading {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
@@ -227,13 +232,14 @@ export default defineComponent({
   gap: var(--space-4);
 }
 
-/* The ring and, in its middle, «0 ֏» of a month with nothing spent. */
+/* The ring and, in its middle, «0 ֏» of a month with nothing spent. Never wider than the card: under
+   the names at 200 % the ring of 6.75rem was 216 px in a card of 190 (MOL-321). */
 .ring-box {
   display: grid;
   flex: none;
   place-items: center;
-  width: 6.75rem;
-  height: 6.75rem;
+  width: min(6.75rem, 100%);
+  aspect-ratio: 1;
 }
 
 .ring,
@@ -274,6 +280,11 @@ export default defineComponent({
   border-radius: var(--radius-pill);
 }
 
+/* Of the sector's grid beside the ring; the second line of its own under it (below). */
+.figures {
+  display: contents;
+}
+
 /* The whole name, on as many lines as it takes (Е-19): cut, «Аренда и комм…» read as another. */
 .sector-name {
   font-size: var(--text-callout);
@@ -311,5 +322,45 @@ export default defineComponent({
   color: var(--text);
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
+}
+
+/* Narrower than this the ring stands over its names (MOL-321, plan Р-2): with Android's text at 150 % on
+   a phone of 320 the ring of 6.75rem left the names some 70 px and the page went 43 px sideways. In rem,
+   as everything beside the ring grows with the text, so the text's size turns it as the width does, in
+   any language. A phone of 320 at 100 % is under it too — 13.9rem: there the names had 41 px beside the
+   ring and broke inside every word («Прод|укты», «рест|оран|ы»); from 15rem they keep some 5rem. Under the
+   ring a name has its line and the sum and the share the next, or «Продукты» broke at 150 % as well. */
+$ring-beside: 15rem;
+
+@container (width < #{$ring-beside}) {
+  .figure {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ring-box {
+    align-self: center;
+  }
+
+  .sector {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+
+  /* The sum and the share side by side while they fit, the share under the sum when not — a sum of any
+     length, at 200 % too, where two columns ran into each other. */
+  .figures {
+    display: flex;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    column-gap: var(--space-2);
+  }
+
+  .sector-amount {
+    order: -1;
+  }
+
+  .sector-share {
+    margin-inline-start: auto;
+  }
 }
 </style>

@@ -127,7 +127,9 @@
               {{ t('spending.list.count', { n: month.count }, month.count) }}
             </span>
             <span class="sum">
-              <span class="figure">{{ whole(month.spent) }}</span>
+              <span class="figure" :style="figureChars(whole(month.spent))">{{
+                whole(month.spent)
+              }}</span>
               <span v-if="approx" class="approx">{{ approx }}</span>
               <!-- The month's figure says what it leaves out, as on «Деньгах» (MOL-184, В-2). -->
               <span v-if="month.uncounted.length > 0" class="approx">
@@ -142,8 +144,13 @@
             <AppReveal :key="month.month" group>
               <section v-for="day in journal" :key="day.day" class="day">
                 <h2 class="day-head">
-                  <span>{{ dayTitle(day.day) }}</span>
-                  <span v-if="day.total" class="day-total">{{ dayTotalText(day, locale) }}</span>
+                  <span class="day-words">{{ dayTitle(day.day) }}</span>
+                  <span
+                    v-if="day.total"
+                    class="day-total"
+                    :style="totalWidth(dayTotalText(day, locale))"
+                    >{{ dayTotalText(day, locale) }}</span
+                  >
                 </h2>
                 <AppCard as="ul" list>
                   <AppReveal group>
@@ -245,6 +252,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, nextTick, onUnmounted, ref, watch } from 'vue'
+import type { StyleValue } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconPlus from '~icons/mdi/plus'
 import IconWallet from '~icons/mdi/wallet-outline'
@@ -267,6 +275,7 @@ import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import type { Removed } from '@/components/spending'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
+import { figureChars, figureWidth } from '@/components/figure'
 import { dayTotalText, journalRowProps, spentApprox } from '@/components/spending'
 import type { JournalRow, OperationRowProps } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
@@ -459,7 +468,23 @@ export default defineComponent({
       { flush: 'post' },
     )
 
+    /**
+     * The day's sum shrinks to the head by its widest line: it breaks only after a «+» (MOL-321), which ends the line
+     * it breaks — measured without it, «12 345 678 ֏ +» stood 11.8 px past the head at 200 % (adversarial К1).
+     */
+    function totalWidth(text: string | null): StyleValue {
+      const lines = (text ?? '').split(/(?<=\+)/)
+      return figureChars(
+        lines.reduce((widest, line) =>
+          figureWidth(line, 'text') > figureWidth(widest, 'text') ? line : widest,
+        ),
+        'text',
+      )
+    }
+
     return {
+      totalWidth,
+      figureChars,
       transferOpen,
       transferId,
       transferRemoved,
@@ -512,8 +537,13 @@ export default defineComponent({
   margin-block: var(--space-4);
 }
 
+/* The sum goes under the count only where the two cannot stand side by side even with the count's
+   words broken (MOL-321): at 200 % on 320 «6 600 ֏» stood past the phone. */
 .total {
+  /* The month's figure measures itself against it (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   justify-content: space-between;
   gap: var(--space-3);
@@ -521,6 +551,7 @@ export default defineComponent({
 }
 
 .count {
+  flex: 1 1 min-content;
   padding-top: var(--space-2);
   color: var(--text-muted);
   font-size: var(--text-callout);
@@ -533,10 +564,12 @@ export default defineComponent({
   text-align: right;
 }
 
+/* A sum never breaks: the month's shrinks to the head (MOL-321) — at 200 % «12 345 678 ֏» took «Траты» 27 px sideways
+   (adversarial К6). */
 .figure {
   @include display-type;
+  @include figure-fit(var(--text-title));
 
-  font-size: var(--text-title);
   font-variant-numeric: tabular-nums;
 }
 
@@ -559,7 +592,10 @@ export default defineComponent({
 
 /* The day's sum stands over the rows' sums (157 v2 02 п. 4, MOL-176 В-1). */
 .day-head {
+  /* The day's sum measures itself against it (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: var(--space-3);
   margin: 0;
@@ -573,6 +609,13 @@ export default defineComponent({
   justify-self: start;
 }
 
+/* Where even the words broken leave no room for the day's sum — its least width beside the day's
+   longest word, at 200 % on 320 the page 47 px sideways — it goes under them, at the right (MOL-321):
+   a line wraps only where the least widths do not fit, so at 100 % the words still give way first. */
+.day-words {
+  flex: 1 1 min-content;
+}
+
 /* The day's words give way on a narrow phone, never a figure of its sum: broken, «≈» stood over
    «125 403 ֏» and the figure left the column (review Р3-1). A sum of several currencies breaks only after
    its «+» (`dayTotalText` binds the rest), right-aligned in at most 60 % of the head: unbroken, drams and
@@ -580,9 +623,13 @@ export default defineComponent({
    narrower than its widest figure: a figure wider than 60 % — «≈ 50 000 000 ֏» in a large system font —
    takes the room from the day's words rather than standing past the column (round 3). */
 .day-total {
+  /* And shrinks where even its widest line is wider than the head: «≈ 1 366 472 ֏» stood 2 px past it at 200 %. */
+  @include figure-fit(1em);
+
   flex: none;
   min-width: min-content;
   max-width: 60%;
+  margin-left: auto;
   font-weight: var(--weight-regular);
   font-variant-numeric: tabular-nums;
   text-align: right;

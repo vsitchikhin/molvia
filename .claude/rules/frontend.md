@@ -443,7 +443,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the price MOL-269 names for showing the memory at once; before, the value was cut and the row never grew. **Two
   lines are the label's at a text of 100 %** (adversarial Б1): at 125 % «Перевод между счетами» takes three on 320 and
   ends in «…» after the second, and at 150 % a word wider than the column breaks inside itself («Устройств|а», by the
-  rule of names) — on master it was cut on one line; large text is MOL-321. **A sheet's column is the sheet's width, never its
+  rule of names) — on master it was cut on one line; how large text holds is the rule «Large text stands within the phone» below (MOL-321). **A sheet's column is the sheet's width, never its
   content's** (`.panel`, `minmax(0, 1fr)`, MOL-318, owner's В-1 «б»): an `auto` column took the least
   width of whatever stood in it — the label above, then a row of chips with a long name of one's own —
   and the whole sheet went sideways; what cannot shrink now stands past its own edge alone, the × in
@@ -472,11 +472,131 @@ The detail behind the frontend lines of `CLAUDE.md`.
   of fifteen characters still stands past a row of 320; the figure in the middle of a ring stands past it for
   a sum of eleven, over the ring and not the page; a name in an `AppButton` narrower than its row is not broken,
   since its cell of two words (MOL-225) would break with it — the buttons with a name in them are all `block`,
-  which breaks it («Продолжить «…»», «Взять «…»», «Записать «…» без кода», adversarial Б1, Б2). What MOL-318 proved is a name at a text of 100 %: at 150 % on 320 the segments of `SegmentedControl` («Настройки»
-  120 px, the exchange's sheet 121) and the ring of «Деньги» (43 px) still stand past the phone, on master too and with
-  short names; probes found «Графики» at 150 % (47 px, 169 at 200 %), and only at 200 % «Траты» (50), «Бюджет» (40), an
-  account's screen (21) and «Обмен» (5), their causes not yet named — all MOL-321, where the segment's whole word (MOL-189) meets this rule. And WebKit says «ResizeObserver loop completed» as a sheet with the
-  chips opens — on master too, a window error with no frame of ours, which the phone's reports leave out. **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
+  which breaks it («Продолжить «…»», «Взять «…»», «Записать «…» без кода», adversarial Б1, Б2). What MOL-318 proved is a name at a text of 100 %; large text is the rule after this one (MOL-321). And WebKit says «ResizeObserver loop completed» as a sheet with the
+  chips opens — on master too, a window error with no frame of ours, which the phone's reports leave out.
+- **Large text stands within the phone on «Деньги», «Настройки» and a newcomer's «Что брать»: Android's 150 % and
+  200 % on 320** (MOL-321, owner's В-1…В-4). The project measures it as its specs make it — the root's font-size,
+  which every size of the app is in — and `e2e/large-text.spec.ts` holds those screens and the sheets of «Деньги» at
+  both, with the sums a month in drams and savings in roubles have («Потрачено 125 403 ֏», «1 234 567,89 ₽» — a month
+  of four digits passed by, adversarial А1, А4). Before it «Настройки» and the exchange's sheet went 120 px sideways
+  at 150 %, the rings of «Деньги» and «Графики» 43 and 47, a newcomer's «Что брать» 42, and at 200 % the month's
+  switcher, the day's sum, the figures of «Деньги», «Пришло и ушло» and the sheets of an account, a plan and a
+  category besides. **The rest of the app is MOL-334**: the scale of «Оценки», «Продолжить» of «Покупки», the totals
+  of a receipt and a record. Six ways:
+  - **A row of segments its words do not fit stands them one under another** (`SegmentedControl`, В-1 «а»):
+    the word stays whole — MOL-189 holds, and now a test holds it (`kit-rows`: every word of «Как меняли» on one
+    line, in both engines and languages; m7, which broke the word, went green on 66 tests before). The row is
+    measured on itself, its class off for the moment: as it mounts, before the first paint, then on a
+    segment's resize in the next frame — a size changed inside the observer's callback is «ResizeObserver loop
+    completed», which the class would cause. Each segment a whole 44 there. **The row has no least width of its
+    own** (`contain: inline-size`): in the form of a new account, a grid column of `auto`, it handed its words up
+    as the column's width, always «fitted», and the sheet went 82 px sideways at 200 %. **A hard hyphen is a
+    word's end**: «Non-|cash» breaks where print breaks it, at 100 % on 320 in English.
+  - **What stands beside something turns by `@container` in `rem`**: everything beside it grows with the text,
+    so a threshold in `rem` turns at the text's size, not the phone's width or the language. The ring of «Куда
+    ушли» stands over its names below 15rem — **and so on a phone of 320 at 100 % too** (13.9rem), where the names
+    had 41 px beside the ring and broke inside every word («Прод|укты», «рест|оран|ы»): the one look of 100 %
+    the task changes, named. The legend of «Графики» puts its name on a line of its own below 15rem (its card is
+    15.9rem at 100 % on 320), the sum and the share under it across the whole row, and its centre goes under the
+    ring below 8rem (200 %); the month's name stands over its arrows below 13rem; «Пришло и ушло» stands its three
+    figures one under another below 12rem; «На счетах сейчас» stands «1 счёт ›» under its words below 12rem; an
+    icon of `NavRow` gives way below 12rem and the wallet of `AccountRow` below 12rem (a sheet's row is 10rem at 150 %: «Ка…» beside «Откуда» at 10rem, adversarial З2), where the account's name
+    goes to a line of its own — decorations, where the words had 64 px. **A row's tail goes under its words only
+    with large text in a container named `row-tight`** (`ListRow`, below 12rem): the rows of «Счета» and «Категории»
+    keep it beside at 100 % on 320, where `row`'s 22rem would turn them, and at 200 % «1 234 567,89 ₽» was cut by 68 px
+    and «Убрать» by 37 (adversarial Б1, Б2). There the tail takes the row's whole width, the circle and the chevron
+    at the top, and the title breaks: in the column of the words alone a sum stood past the card's left edge —
+    «100 000 ₽» read «00 000 ₽», worse than cut at the right (В5) — and the sum shrinks to the row (`figure-fit`).
+    `row` keeps the words' column, as `OperationRow` drew it. The rows of «Бюджет» take it too, and **there the
+    category's circle gives way** below 12rem: with it and the chevron the words had some 30 px at 200 %,
+    «Продукты» a letter a line, and «Осталось», shrunk to that, was 4.9 px (adversarial Г1) — a width is closed by
+    the layout, never by a size nobody reads; the category stays said by its name and its bar. The words take the circle's column
+    with its gap, a removed category's empty tail stays in the chevron's (self-review 5), and the plan under the
+    name stands whole (`whole`): two lines held «125 403 ֏ из» and hid the plan at 200 % (adversarial Д2). **Since round 9 that is every
+    row of the kit** (self-review of round 9): every list card is `row-tight` (`AppCard list`), and below `$row-tight` (15rem: some 120 % on 320 and up — at 130 % a
+    sum of a million in the words' column stood over the circle, self-review 10) a
+    row's circle gives way, its words take the circle's column, the title and the line under it are whole — no
+    «…» — and the tail stands under them across the row. At 200 % the rows of «Траты», an account's operations,
+    «Счета» and «Настройки» left their words some 40 px — «О|б|м|е|н», «Карта Амер|иабан|ка» — and «Бот в
+    Telegram» read «Б…»; a removed category's circle on «Категории» gives way as well. A row's switch («Зарплата —
+    в следующий месяц», «Учитывать меня в статистике», the bot's) goes under its words where the words' 6rem do not
+    fit beside it, and the icon of «Ваши данные» and of «не попали» gives way in the same narrow card. A category's dot
+    stays before its name, placed (adversarial К2: with no cell of its own the grid put it at the right); the rows'
+    skeleton (`SkeletonPart`) turns with them (self-review 10, №3). `NavRow`'s
+    label is whole with large text. **A box cannot ask its own
+    width**: the rules under a query stand on its children, and what the box itself does — `flex-wrap` — is set
+    outside it.
+  - **A line wraps only where its least widths do not fit**: `flex-wrap` with the words at `flex-basis:
+min-content` — the day's head and the total of «Траты», a line of an exchange's card, «Против обычного»,
+    «Покупки ›» of a spending's sheet, the difference of a check, a record's sum and its category in the sheet
+    opened from «Траты» (adversarial Б4). A flex line breaks by its items' bases, so at
+    100 % the words still give way first, as before, and the figure goes under them only when even the words
+    broken leave it no room. The sum and the share of a ring's name are one `figures` span, `display: contents`
+    beside the ring and a wrapping line of its own under it.
+  - **A figure shrinks to its box by its width** (`@include figure-fit`, adversarial А1…А6, В2): `min(size,
+100cqi / width)`, the size `--text-figure` for a card's figure or `1em` for one set in the text — a sum in a
+    row's tail, «Осталось» of «Бюджет» (В4), a purchase's sum alone under its name in a record's sheet (Ж1), the amount typed in `AppField size="entry"` against the
+    width beside its sign — a box of its own round the input, since a field cannot ask its own width: at 150 % «12540»
+    showed «2540» while typed (З1) — and the width the figure's in its own size, set beside it by
+    `figureChars` (`--figure-width`, set by script) from a table of the face's characters, measured — the figures'
+    face (Nunito 800: a figure 0.600, a no-break space 0.279, a comma 0.26, «֏» 0.765) or, for a sum in a row,
+    the words' (Onest 600: a figure 0.673, 12 % wider — the figures' table let «Осталось» 4.6 px past its line at
+    150 %, adversarial Г2), a capital as wide as a figure holds, with 5 % room for another engine — CI's Chromium sets a character on a whole pixel, and 3 % left a bold tile's sum 2.3 px into its tile (round 9). A count of characters at 0.56 (the round before) held only where spaces and commas pulled
+    the share down: «֏125,403» in English is 0.578 and stood 6 px past its card, «−999,99 RSD» 0.568 (Б3). The box
+    is the nearest `container-type: inline-size`: the card, the column of words, a row, the sheet's column (the
+    figure of a check that came out even measured the window before). A sum never breaks, and at 200 % «Потрачено
+    125 403 ֏» was 276 px in a card of 190; a width alone (`18cqi`, the first try) did not know the length. A
+    figure of fourteen keeps its size at 100 % on 320. Twelve figures of «Деньги»; the totals of a receipt and a
+    record are MOL-334.
+  - **The tab label stops growing at 125 %**: `--text-tab`, `min(var(--text-caption), 13.75px)`, as iOS keeps its
+    tab bar (В-3 «а»); a token, named one by one in Stylelint's list of sizes. The tab bar is fixed and in no width
+    of the page, so `large-text` reads every label within its column.
+  - **What is typed and chosen stays seen** (adversarial З1, И1–И3, self-review of round 9): the amount of
+    `AppField size="entry"` and its sign shrink together to the field, by «figure + 0.8 × sign» (`entryWidth`,
+    32 to 40) — beside a sign of its own size «125403,50» was 12.9 px at 200 %; an amount of the body's size
+    (`kind="decimal"`) shrinks to its own box (`.control-box`, `display: contents` in every other field) beside the
+    currency of a plan or an account; the sum and its currency of an exchange and an income stand one under the
+    other below 15rem — side by side at 200 % the sum read «1254» and the currency had 0 px; and with large text a
+    select's chosen option is drawn as words that wrap (`.chosen-words`), the select over them unseen and still
+    the one tapped, focused and read out — «Армянский драм · AMD» had 92 px and showed «Армя». A tile's figure
+    («Пришло», «Можно тратить», «Сбережения»), an operation's amount, the day's sum of «Траты» and the figure of
+    «Темп месяца» shrink to their box (`figure-fit`) — at 200 % «250 00|0 ₽» broke, «−1 234 567 ֏» stood 43 px
+    past its row, «Темп месяца» 23 px past the phone; the tiles of a month stand one under the other below 15rem.
+    A tile's figure is Onest 700, measured and a table of its own (`strong`): its figures are 600's, its comma wider. **«≈» and «₽» are in
+    none of our faces' subsets** — the phone's fallback draws them — so every table takes them at the widest likely
+    fallback's (DejaVu: «≈» 0.838; «₽» 0.72): CI's image stood «≈ 1 433 318 ₽» 2.3 px into its tile (self-review 10,
+    №1). The month's total of «Траты» and the figure in the middle of a ring shrink too (adversarial К6, К7); the
+    day's sum is measured by its widest line with its «+» (К1). A code of letters beside an entry («RSD») shrinks as
+    its figures do, not to the sign's share — 12 px beside 15 at 200 %. Twelve months of a chart narrower than
+    14rem are named by every other month's letter over its own column and the empty one — at 200 % a label had
+    9 px, a letter alone is 20 — and the chosen month by its own letter wherever it stands, its neighbours' giving it
+    room (adversarial К3). **The prices, named:** a name typed in a text field (an account's, a category's)
+    scrolls inside it as any field does; the pinned copy of a screen's title in the top bar ends in «…», as iOS's;
+    at 200 % a word wider than its line still breaks inside — no hyphen under twelve letters — but in a screen's title, which with large text hyphenates from six (`AppScreen`, adversarial Л5: «Устройст|ва» at 150 %); Safari knows no limit and hyphenates any word at a line's end, as at the block button. **A word of another script in a Russian title** — «Telegram» of «Бот в Telegram», a bank «Raiffeisen», «Ամերիաբանկ» — has no dictionary of the document's language and still breaks without a hyphen at large text, as on master (adversarial М2, Н3): saying each word in its own `lang` was tried and taken back — it split a letter from its combining mark («Poš̌tanska», at 100 % on every screen) and a word's voice in two (Н1, Н2), and a hyphen in «Tele-gram» was never shown; at 100 % on 320 a
+    month's label «июл» is 4 px wider than its column, as on master.
+  - **A skeleton is the answer's shape at large text too** (MOL-178): the ring of `ChartsSkeleton` is
+    `min(13.25rem, 100%)` as the ring that comes, its band 12 of the hundred of that width — the square of 13.25rem
+    took «Графики» 47 px sideways at 150 % and 169 at 200 % while the answer was on its way (adversarial Е1); the
+    trip's card in a record's sheet is a column of `minmax(0, 1fr)` (MOL-318's rule) — `auto` took its bars of 9 and
+    11rem and stood the sheet 112 px sideways — and an item's name keeps 6rem, its sum going under it where the two do
+    not fit, the name's bar likewise. `large-text` holds every screen of «Деньги» with its answer held, before the
+    device remembers one, and the record's sheet with the trip's answer held: a check that measured the skeleton
+    only when it caught it passed it by (self-review 6, №1).
+  - **A word wider than its column breaks with a hyphen only while the text is large** (В-2 «а»: «Сфотогра-фируйте»,
+    «Сфотографи-ровать чек»): `html[data-large-text]`, set by `useLargeText` from a box one rem wide while a rem is
+    over 17.6 px — a width in `rem` tells the box, not the text, and a block of a pair is narrow at 100 % too. At
+    100 % no engine hyphenates: Safari knows no `hyphenate-limit-chars` in any version, and WebKit hyphenates any
+    word at a line's end («Запишите первые по-купки», self-review №2); where the limit is known, only a word of
+    twelve letters and more; a block button takes it on itself, its words inherit it.
+    **The prices, named:** at 200 % a word of eight letters and more in a `NavRow` still breaks («Категории» — 171 px
+    of 136, MOL-334); CI's Chromium may have no dictionary, so e2e reads the style and the eye the hyphen; at 200 %
+    the docked strip and the tab bar take half a window of 720 — the list ends over them and scrolls, but a tap aimed
+    by a script scrolled under them («Написать разработчику»); and **Android's page zoom is not this model**
+    (self-review №3): it narrows the window in CSS pixels — 213 at 150 % — a phone narrower than the 320 the project
+    holds, where `--text-tab`, in px, limits nothing, and `data-large-text`, which reads a rem in CSS px, is never
+    set — no hyphen there, a word broken as before В-2 (round 2, №3); which one the owner's Chrome takes is asked in
+    MOL-334.
+- **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
   its tint, in the strip's shape and never a live region; a tag a pill of 13/600, plain, warn or bad
   — rows had drawn them at 11/700, 11/600 and 13/600. Screens move onto them in their own tasks.
@@ -657,7 +777,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   read as «Системная» it put every other window in a scheme nobody chose (adversarial Б′) — the
   window keeps its own, as its reload does. The control is `SegmentedControl` with `fit` — each
   segment the width of its word (two words of a label break between them where the row is short,
-  never a word: «Как меняли» stood past the field at 320, MOL-189, Е-11), the semibold reserved under it so a tap moves nothing; the word
+  never a word: «Как меняли» stood past the field at 320, MOL-189, Е-11; a row its words do not fit stands
+  one under another, MOL-321), the semibold reserved under it so a tap moves nothing; the word
   lies over its segment's hit area, so a tap on it lands on the label, **inside the track's own
   stacking context** (`isolation`) — lifted without it, it rose over the pinned header too, drawn
   through it and taking its taps (adversarial Д); even thirds on a 320 px phone left «Системная» (91

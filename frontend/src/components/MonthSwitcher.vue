@@ -87,7 +87,10 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .switcher {
+  /* It measures itself for the name below (MOL-321). */
+  container-type: inline-size;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   padding: 0 var(--space-1);
@@ -102,5 +105,18 @@ export default defineComponent({
   font-weight: var(--weight-medium);
   text-align: center;
   white-space: nowrap;
+}
+
+/* Narrower than this the name stands on a line of its own over the arrows (MOL-321): an arrow is 44 of
+   the thumb at any text, and at 200 % on 320 the two left «Октябрь 2026» 80 px and took «Деньги»,
+   «Траты» and «Графики» 40 px sideways. In rem: 15.5rem at 100 % on 320 keeps the row. */
+$name-beside: 13rem;
+
+@container (width < #{$name-beside}) {
+  .month {
+    flex-basis: 100%;
+    order: -1;
+    white-space: normal;
+  }
 }
 </style>

@@ -63,7 +63,11 @@
                too (В-1 «б»). Every figure is the server's. -->
           <AppCard v-if="main" class="total">
             <SectionCaption as="p" inset>{{ t('accounts.total') }}</SectionCaption>
-            <p class="figure" :class="{ negative: main.total.minor < 0n }">
+            <p
+              class="figure"
+              :class="{ negative: main.total.minor < 0n }"
+              :style="figureChars(`≈ ${estimate(main.total)}`)"
+            >
               ≈ {{ estimate(main.total) }}
             </p>
             <p v-if="second" class="figure-second" :class="{ negative: second.total.minor < 0n }">
@@ -72,26 +76,36 @@
             <div class="tiles">
               <div class="tile">
                 <span class="tile-label">{{ t('accounts.screen.spendable') }}</span>
-                <span class="tile-figure" :class="{ negative: main.spendable.minor < 0n }">
+                <span
+                  class="tile-figure"
+                  :class="{ negative: main.spendable.minor < 0n }"
+                  :style="figureChars(`≈ ${estimate(main.spendable)}`, 'strong')"
+                >
                   ≈ {{ estimate(main.spendable) }}
                 </span>
                 <span
                   v-if="second"
                   class="tile-second"
                   :class="{ negative: second.spendable.minor < 0n }"
+                  :style="figureChars(`≈ ${estimate(second.spendable)}`, 'text')"
                 >
                   ≈ {{ estimate(second.spendable) }}
                 </span>
               </div>
               <div class="tile">
                 <span class="tile-label">{{ t('accounts.savings') }}</span>
-                <span class="tile-figure" :class="{ negative: main.savings.minor < 0n }">
+                <span
+                  class="tile-figure"
+                  :class="{ negative: main.savings.minor < 0n }"
+                  :style="figureChars(`≈ ${estimate(main.savings)}`, 'strong')"
+                >
                   ≈ {{ estimate(main.savings) }}
                 </span>
                 <span
                   v-if="second"
                   class="tile-second"
                   :class="{ negative: second.savings.minor < 0n }"
+                  :style="figureChars(`≈ ${estimate(second.savings)}`, 'text')"
                 >
                   ≈ {{ estimate(second.savings) }}
                 </span>
@@ -135,7 +149,7 @@
               <SectionCaption>{{ group.title }}</SectionCaption>
               <AppCard as="ul" list>
                 <AppReveal group>
-                  <li v-for="account in group.accounts" :key="account.id">
+                  <li v-for="account in group.accounts" :key="account.id" class="tight">
                     <ListRow
                       as="router-link"
                       :to="{ name: 'money-account', params: { accountId: account.id } }"
@@ -145,7 +159,11 @@
                     >
                       <template #tail>
                         <span class="money">
-                          <span :class="{ negative: account.balance.minor < 0n }">
+                          <span
+                            class="balance-figure"
+                            :class="{ negative: account.balance.minor < 0n }"
+                            :style="figureChars(signed(account.balance), 'text')"
+                          >
                             {{ signed(account.balance) }}
                           </span>
                           <span v-if="account.inSpend" class="approx">
@@ -182,7 +200,11 @@
                        connection «Вернуть» is not now, and says why on itself (Ф-6, С-10); nor while
                        another «Вернуть» of the screen is in the air — each answers with the page whole,
                        and the later to land would take the other back (MOL-189). -->
-                  <li v-for="account in removedAccounts" :key="account.id" class="removed-row">
+                  <li
+                    v-for="account in removedAccounts"
+                    :key="account.id"
+                    class="tight removed-row"
+                  >
                     <ListRow
                       as="router-link"
                       class="removed-open"
@@ -299,6 +321,7 @@ import {
   signedAmount,
 } from '@/components/accounts'
 import { bankWords, rateWords } from '@/components/spending'
+import { figureChars } from '@/components/figure'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useOnline } from '@/composables/useOnline'
 import { useReconnect } from '@/composables/useReconnect'
@@ -533,6 +556,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       IconTransfer,
       transferable,
       transferOpen,
@@ -590,9 +614,9 @@ export default defineComponent({
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-tight);
 }
@@ -626,6 +650,8 @@ export default defineComponent({
 }
 
 .tile {
+  /* Its figures measure themselves against it (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   align-content: center;
   min-height: 4rem;
@@ -639,18 +665,22 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+/* A sum never breaks: it shrinks to its tile (MOL-321) — «≈ 1 433 31|7 ₽» at 200 %. Onest 700 has its own table
+   (`strong`, measured). */
 .tile-figure {
-  font-size: var(--text-headline);
+  @include figure-fit(var(--text-headline));
+
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .tile-second {
+  @include figure-fit(var(--text-footnote));
+
   color: var(--text-muted);
-  font-size: var(--text-footnote);
   font-variant-numeric: tabular-nums;
-  overflow-wrap: anywhere;
+  white-space: nowrap;
 }
 
 .footnote {
@@ -679,14 +709,25 @@ export default defineComponent({
   }
 }
 
-.unassigned-text {
-  flex: 1;
-}
-
 .unassigned-icon {
   @include icon;
 
   font-size: var(--icon-md);
+}
+
+/* The words take what is left and break, the chevron keeps its place (MOL-321): at 200 % «операция» held whole
+   took the chevron 19 px past the phone (adversarial Д1). */
+.unassigned-text {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* The icon gives its place to the words in a narrow row, as a row's circle does (`ListRow`, MOL-321). */
+@container row-tight (width < #{$row-tight}) {
+  .unassigned-icon {
+    display: none;
+  }
 }
 
 .unassigned-chevron {
@@ -704,6 +745,16 @@ export default defineComponent({
   display: grid;
   justify-items: end;
   white-space: nowrap;
+}
+
+/* A sum never breaks: under the words at 200 % it shrinks to the row (`figure-fit` of the text's size,
+   MOL-321), measured against the row itself. */
+.tight > .list-row {
+  container-type: inline-size;
+}
+
+.balance-figure {
+  @include figure-fit(1em);
 }
 
 .approx {
@@ -806,5 +857,10 @@ export default defineComponent({
    own, which `AppScreen` does not see, and nothing under the thumb may move (review №5, MOL-138). */
 .content > * {
   @include appear(0);
+}
+
+/* A row's tail goes under its words only with large text (`ListRow`, `row-tight`, MOL-321). */
+.tight {
+  container: row-tight / inline-size;
 }
 </style>

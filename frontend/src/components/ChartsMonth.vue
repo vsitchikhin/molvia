@@ -78,7 +78,7 @@
         >
           <template v-if="reading">
             <p class="month">{{ reading.label }}</p>
-            <p class="figure">{{ reading.figure }}</p>
+            <p class="figure" :style="figureChars(reading.figure)">{{ reading.figure }}</p>
             <!-- Two lines held: at 320 a large usual and its percent take a second, and the line and the
                  slider under it went down under the thumb moving them (adversarial Б1 of MOL-186,
                  MOL-151). A month has a sub on every day or on none, so a month without one holds
@@ -106,6 +106,7 @@ import DonutChart from '@/components/DonutChart.vue'
 import PaceLine from '@/components/PaceLine.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import { countedWhen } from '@/components/accounts'
+import { figureChars } from '@/components/figure'
 import { longMonth, monthGenitive, signedPercent } from '@/components/charts'
 import SectionCaption from '@/components/SectionCaption.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
@@ -289,6 +290,7 @@ export default defineComponent({
 
     return {
       t,
+      figureChars,
       id: useId(),
       IconDonut,
       phase,
@@ -317,13 +319,18 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .card {
+  /* The day's figure measures itself against the card (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-1);
   padding: var(--space-4);
 }
 
+/* The caption and the legend side by side while they fit, the legend under it when not, and its two keys one
+   under the other (MOL-321): at 200 % «Темп месяца — Ноябрь» stood «Ноябрь» past the card, 23 px past the phone. */
 .head {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-2);
@@ -331,6 +338,7 @@ export default defineComponent({
 
 .legend {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
   margin: 0;
@@ -369,11 +377,12 @@ export default defineComponent({
   margin-top: var(--space-2);
 }
 
+/* A sum never breaks: it shrinks to the card (MOL-321). */
 .figure {
   @include display-type;
+  @include figure-fit(var(--text-title));
 
   margin: 0;
-  font-size: var(--text-title);
   font-variant-numeric: tabular-nums;
 }
 
