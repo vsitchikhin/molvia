@@ -283,7 +283,10 @@ strip and the docked button never offer two of one name, one reading and one wri
 alone, never by the read on its way, or the strip's button came and went with every read the screen made itself and
 the strip grew and shrank under the finger (З1 of round 8). **The price, named** (З2): the groups keep the «Повторить» of
 their own section's error — the salary's day, «Учитывать меня в статистике» (MOL-180's quiet card) — so with the server
-down the screen has three of one name, each under the words of its own section, as on master. **And the strip's height
+down **and the form from memory** the screen has three of one name, each under the words of its own section, as on
+master. **With no form, under the screen's full error, the groups give theirs up** (MOL-349, owner's В-2 «б»,
+kit-settings-7, handoff 6b): a row saved on the tap keeps its words and no button while an error holds the screen's
+strip (`yields` of `useTapSetting`), and reads itself again once the error lets go. **And the strip's height
 moves with the refusal** (review 9 №7, adversarial И1): under a refused save the strip of a later read stands with no
 button, 36 high; the edit that takes the notice away gives it «Повторить», and it grows to 44 — or a line, the button
 taking the words' width at 390 — moving the fields under it by that much. A `select` is closed by then, so nothing is

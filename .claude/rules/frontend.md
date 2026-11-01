@@ -364,7 +364,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   drawn in the row** at `--icon-md`, so `molvia/icon-size` sees it in one file and no screen draws a
   22 beside a 24. **A row's button look is taken off in `:where()`**: the hairline `AppCard list`
   draws between rows is a `border-top`, and an equal selector reset it by load order (`AdviceHomeNew`
-  had met it). **Inactive** is the kit's not now (MOL-174): `aria-disabled`, focusable, the click
+  had met it) — **so is a row a screen builds of its own** (MOL-349, С-5): the receipt's lines
+  (`ReceiptLineRow`) and «Выбрать товар»'s results ran into one sheet of text, and only the whole
+  sweep of the list cards (`.scratch/tasks/selftests/MOL-349`) found the second. **A card of
+  paragraphs is no card of rows**: `list` takes the card's padding away for rows that bring their own,
+  and on «Данные и приватность» the text stood on the edge, its first letter cut by the radius. **Inactive** is the kit's not now (MOL-174): `aria-disabled`, focusable, the click
   cancelled and stopped — a link is followed nowhere, and has no `href`, or a middle click or a long
   press would open it in a tab (review Р-1); `e2e/kit-inactive` holds a tap (the cancelled click),
   Enter and a middle click (no address) in Chromium and WebKit. **Selected** is the fill, the ring and a ✓ in place of the chevron, the weight
@@ -871,6 +875,11 @@ The detail behind the frontend lines of `CLAUDE.md`.
   shown. One per screen is held by the screens' tests, not a linter: two strips in a template are
   often `v-if` and `v-else`. `AppNote` stays the note — the «i», 400, no voice. The seventeen copies
   move onto it in their screens' tasks, with their words.
+  **The notice of an identity not checked is no second word** (MOL-349, owner's В-1 «б»): the frame
+  hears what its screen says of the answer (`useAnswerWord`) — the skeleton, a `ScreenState` of
+  `offline` or `error`, a `StatusStrip` — and `IdentityNotice` speaks only where nothing does; a sheet
+  provides no word of its own, since it is mounted shut with its screen. The skeleton is in the list on
+  purpose: the notice put in between it and the screen's «нет связи» would push the field down and back.
 - **A sheet has a live region of its own, and while it is up everything is said there** (MOL-181,
   owner's В-2 «а»). The app's region is outside the modal `<dialog>`, inert while it is open, and
   nothing said there is read (feedback С-10). `BottomSheet` gives its region to the app's announcer

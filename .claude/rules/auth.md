@@ -392,6 +392,20 @@ the round trip through Telegram, and ask whose account this turned out to be.
 - **Offline with nobody on the device is the screen's own offline state**, not a notice over an
   empty app: there are no drawers to open and no cached answers to show. Offline **with** an
   owner opens the app, because a PWA at a shelf with no signal is the main scenario there is.
+  **Its notice, «Работаем без связи», speaks only where the screen says nothing of its answer**
+  (`IdentityNotice`, `useAnswerWord`, MOL-349, owner's В-1 «б»): every screen with a server says its
+  own «нет связи» under what chooses the answer, and the notice over it made two clouds and stood over
+  the field of «Что брать» (Ф-14); the privacy page and the terms keep it. What holds the queues is
+  `flush()`, never the notice.
+- **An identity the server did not check has no notice and asks again by itself** (MOL-349, owner's
+  В-2 «б», kit-settings-7): «Не удалось проверить вход» with a «Повторить» of its own stood over the
+  screen's error and its «Повторить». `stores/actor` asks again by time — `IDENTITY_RETRY_FIRST_MS`
+  5 s doubling to a minute, the consent's rhythm — besides `online` and the app looked at again, and
+  **quietly**: the state stays `error` while the question is in the air, or the login screen showing
+  the failure would blink to its skeleton at every try (adversarial Д1 of MOL-95). A queue with
+  something to send asks it first, as before; «Повторить» of the login still shows the question.
+  **The price, named:** a page that says nothing of its answer — the privacy page, the terms — says
+  nothing of the failure either, while the identity asks again behind it.
 - **The development seam is a button, and only in a development build.** It signed the app in by
   itself until now, which made the screen this epic exists for invisible in every working copy
   and unreachable to the end-to-end suite; `signedIn()` in `e2e/session.ts` now presses it, in
