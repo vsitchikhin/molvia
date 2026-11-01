@@ -513,13 +513,16 @@ The detail behind the frontend lines of `CLAUDE.md`.
     the layout, never by a size nobody reads; the category stays said by its name and its bar. The words take the circle's column
     with its gap, a removed category's empty tail stays in the chevron's (self-review 5), and the plan under the
     name stands whole (`whole`): two lines held «125 403 ֏ из» and hid the plan at 200 % (adversarial Д2). **Since round 9 that is every
-    row of the kit** (self-review of round 9): every list card is `row-tight` (`AppCard list`), and below 12rem a
+    row of the kit** (self-review of round 9): every list card is `row-tight` (`AppCard list`), and below `$row-tight` (15rem: some 120 % on 320 and up — at 130 % a
+    sum of a million in the words' column stood over the circle, self-review 10) a
     row's circle gives way, its words take the circle's column, the title and the line under it are whole — no
     «…» — and the tail stands under them across the row. At 200 % the rows of «Траты», an account's operations,
     «Счета» and «Настройки» left their words some 40 px — «О|б|м|е|н», «Карта Амер|иабан|ка» — and «Бот в
     Telegram» read «Б…»; a removed category's circle on «Категории» gives way as well. A row's switch («Зарплата —
     в следующий месяц», «Учитывать меня в статистике», the bot's) goes under its words where the words' 6rem do not
-    fit beside it, and the icon of «Ваши данные» and of «не попали» gives way in the same narrow card. `NavRow`'s
+    fit beside it, and the icon of «Ваши данные» and of «не попали» gives way in the same narrow card. A category's dot
+    stays before its name, placed (adversarial К2: with no cell of its own the grid put it at the right); the rows'
+    skeleton (`SkeletonPart`) turns with them (self-review 10, №3). `NavRow`'s
     label is whole with large text. **A box cannot ask its own
     width**: the rules under a query stand on its children, and what the box itself does — `flex-wrap` — is set
     outside it.
@@ -559,9 +562,15 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     («Пришло», «Можно тратить», «Сбережения»), an operation's amount, the day's sum of «Траты» and the figure of
     «Темп месяца» shrink to their box (`figure-fit`) — at 200 % «250 00|0 ₽» broke, «−1 234 567 ֏» stood 43 px
     past its row, «Темп месяца» 23 px past the phone; the tiles of a month stand one under the other below 15rem.
-    A tile's figure is Onest 700, measured and a table of its own (`strong`): its figures are 600's, its comma, «≈», «₽» wider. Twelve months of a chart narrower than
+    A tile's figure is Onest 700, measured and a table of its own (`strong`): its figures are 600's, its comma wider. **«≈» and «₽» are in
+    none of our faces' subsets** — the phone's fallback draws them — so every table takes them at the widest likely
+    fallback's (DejaVu: «≈» 0.838; «₽» 0.72): CI's image stood «≈ 1 433 318 ₽» 2.3 px into its tile (self-review 10,
+    №1). The month's total of «Траты» and the figure in the middle of a ring shrink too (adversarial К6, К7); the
+    day's sum is measured by its widest line with its «+» (К1). A code of letters beside an entry («RSD») shrinks as
+    its figures do, not to the sign's share — 12 px beside 15 at 200 %. Twelve months of a chart narrower than
     14rem are named by every other month's letter over its own column and the empty one — at 200 % a label had
-    9 px, a letter alone is 20. **The prices, named:** a name typed in a text field (an account's, a category's)
+    9 px, a letter alone is 20 — and the chosen month by its own letter wherever it stands, its neighbours' giving it
+    room (adversarial К3). **The prices, named:** a name typed in a text field (an account's, a category's)
     scrolls inside it as any field does; the pinned copy of a screen's title in the top bar ends in «…», as iOS's;
     at 200 % a word wider than its line still breaks inside — no hyphen under twelve letters; at 100 % on 320 a
     month's label «июл» is 4 px wider than its column, as on master.
