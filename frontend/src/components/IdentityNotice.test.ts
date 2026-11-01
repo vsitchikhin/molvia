@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h, nextTick, ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -67,14 +67,15 @@ describe('IdentityNotice', () => {
     expect(render('offline').view.text()).toContain(en.identity.offline.title)
   })
 
-  // MOL-349, owner's В-2 «б» (kit-settings-7): the quiet card «Не удалось проверить вход» brought a
-  // «Повторить» of its own over the screen's error and its «Повторить». The identity asks again by
-  // itself (`actor.test`), and the screen's error is the one word.
-  it('draws nothing for an identity that could not be checked', () => {
-    const { view } = render('error')
-    expect(view.text()).toBe('')
-    expect(view.find('button').exists()).toBe(false)
-    expect(en.identity).not.toHaveProperty('error')
+  // MOL-349, adversarial А2: `/actors/me` failing alone, the screen shows its answer and says nothing,
+  // and the writes wait — the notice is the only word of it, with its own «Повторить».
+  it('says the sign-in was not checked where nothing else says it, and asks again on a tap', async () => {
+    const { view, store } = render('error')
+    expect(view.text()).toContain(en.identity.error.title)
+    const retry = vi.spyOn(store, 'retry').mockResolvedValue(undefined)
+    await view.get('button').trigger('click')
+    expect(retry).toHaveBeenCalled()
+    expect(render('offline').view.find('button').exists()).toBe(false)
   })
 
   // MOL-349, owner's В-1 «б» (С-2): over the screen's own «нет связи» the notice made two clouds, and
@@ -95,11 +96,15 @@ describe('IdentityNotice', () => {
         () => h(ScreenSkeleton, () => h(SkeletonPart, { kind: 'caption' })),
       ],
     ])('%s', async (_, content) => {
-      useActorStore().state = 'offline'
-      const view = framed(content)
-      await nextTick()
-      expect(view.find('.notice').exists()).toBe(false)
-      view.unmount()
+      // kit-settings-7 (owner's В-2 «б»): under the screen's error the sign-in's card was a third
+      // «Повторить»; the same rule holds for both cases.
+      for (const state of ['offline', 'error'] as const) {
+        useActorStore().state = state
+        const view = framed(content)
+        await nextTick()
+        expect(view.find('.notice').exists()).toBe(false)
+        view.unmount()
+      }
     })
 
     it('and speaks again once the screen’s word is gone', async () => {
@@ -147,7 +152,13 @@ describe('IdentityNotice', () => {
   // and an interruption on every move cut off the heading the move had just focused. The owner
   // made every notice polite (MOL-19, Р-9).
   it('never interrupts: it is drawn again on every screen the person moves to', () => {
-    expect(render('offline').view.find('[role="alert"]').exists()).toBe(false)
+    for (const state of ['error', 'offline'] as const) {
+      expect(render(state).view.find('[role="alert"]').exists()).toBe(false)
+    }
+  })
+
+  it('draws an error red, as on any screen', () => {
+    expect(render('error').view.get('.state').classes()).toContain('bad')
   })
 
   // Yellow rather than the green of an offline trip — without an identity nothing can be saved —

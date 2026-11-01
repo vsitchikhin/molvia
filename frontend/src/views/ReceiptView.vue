@@ -42,10 +42,14 @@
     />
 
     <template v-else-if="detail">
-      <p v-if="stale === 'offline' || stale === 'error'" class="strip">
-        <IconCloudOff class="strip-icon" aria-hidden="true" />
-        {{ t('receipt.review.offline') }}
-      </p>
+      <!-- The kit's strip, so the frame hears the screen say it (MOL-349, adversarial А1): drawn in
+           place, it stood under the notice «Работаем без связи», two clouds. -->
+      <StatusStrip
+        v-if="stale === 'offline' || stale === 'error'"
+        class="memory"
+        kind="offline"
+        :text="t('receipt.review.offline')"
+      />
 
       <!-- Recorded elsewhere: the screen of a receipt exists only before it (handoff 05). -->
       <template v-if="status === 'recorded'">
@@ -379,7 +383,6 @@ import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import IconCamera from '~icons/mdi/camera-outline'
 import IconChevronRight from '~icons/mdi/chevron-right'
-import IconCloudOff from '~icons/mdi/cloud-off-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconImageOff from '~icons/mdi/image-off-outline'
 import IconMessage from '~icons/mdi/message-text-outline'
@@ -422,6 +425,7 @@ import ReceiptTotal from '@/components/ReceiptTotal.vue'
 import ReceiptTotalSheet from '@/components/ReceiptTotalSheet.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { api } from '@/api'
 import { useOnline } from '@/composables/useOnline'
@@ -468,7 +472,6 @@ export default defineComponent({
     ChargedField,
     IconCamera,
     IconChevronRight,
-    IconCloudOff,
     IconDelete,
     IconImageOff,
     IconMessage,
@@ -484,6 +487,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    StatusStrip,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -1130,19 +1134,10 @@ export default defineComponent({
   font-size: var(--icon);
 }
 
-.strip {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
+.memory {
   margin: 0 0 var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
-  color: var(--text-muted);
-  background: var(--surface-2);
-  font-size: var(--text-footnote);
 }
 
-.strip-icon,
 .note-icon {
   @include icon;
 

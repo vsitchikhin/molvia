@@ -1302,6 +1302,10 @@
     "unknown": "We do not know whether the data was deleted: the answer to the last tap was lost, and the sign-in is gone."
   },
   "identity": {
+    "error": {
+      "title": "Could not check the sign-in",
+      "body": "The app is open, but nothing is sent until the server answers."
+    },
     "offline": {
       "title": "Working without a connection",
       "body": "Purchases are kept on the phone and sent once the internet is back."

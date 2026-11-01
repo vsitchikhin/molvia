@@ -1,11 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { watch } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, POLICY_VERSION } from '@molvia/model'
 import type { ActorView, Consent, LoginPoll, LoginStarted } from '@molvia/model'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { useConsentStore } from '@/stores/consent'
 import { useLoginStore } from '@/stores/login'
+import { useReceiptQueueStore } from '@/stores/receiptQueue'
+import { useSpendingQueueStore } from '@/stores/spendingQueue'
+import { useTripQueueStore } from '@/stores/tripQueue'
 
 const startLogin = vi.fn<(options?: { readonly again?: boolean }) => Promise<LoginStarted>>()
 const pollLogin = vi.fn<(id: string) => Promise<LoginPoll>>()
@@ -1065,5 +1069,77 @@ describe('условия и приватность — шаг после «че�
     expect(login.phase).toBe('welcome')
     login.confirm()
     expect(login.phase).toBe('consent')
+  })
+})
+
+// MOL-349, adversarial А3 and self-review №1: a question about the identity nobody asked for — the
+// timer, `online`, the app looked at again, a queue's retry — is quiet, as the consent's are (Д1 of
+// MOL-95). Put to `loading`, the login screen showing «Не удалось проверить вход» turned to its
+// skeleton for the whole question, «Повторить» went from under the thumb and the error was said anew.
+describe('the login screen showing a failure of the identity', () => {
+  async function onTheError() {
+    online(true)
+    me.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'boom', true))
+    const actor = useActorStore()
+    const login = useLoginStore()
+    await actor.start()
+    expect(login.closed).toBe(true)
+    expect(login.phase).toBe('error')
+    const phases: string[] = []
+    watch(
+      () => login.phase,
+      (phase) => phases.push(phase),
+      { flush: 'sync' },
+    )
+    return { actor, login, phases }
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('keeps it while the identity asks again by time', async () => {
+    vi.useFakeTimers()
+    const { login, phases } = await onTheError()
+    me.mockReturnValueOnce(new Promise(() => undefined))
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(login.phase).toBe('error')
+    expect(phases).toEqual([])
+  })
+
+  it('keeps it when the app is looked at again', async () => {
+    const { login, phases } = await onTheError()
+    me.mockReturnValue(new Promise(() => undefined))
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    document.dispatchEvent(new Event('visibilitychange'))
+    await Promise.resolve()
+    expect(login.phase).toBe('error')
+    expect(phases).toEqual([])
+  })
+
+  it('keeps it on `online`, and the failure again says nothing new', async () => {
+    const { login, phases } = await onTheError()
+    window.dispatchEvent(new Event('online'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(login.phase).toBe('error')
+    expect(phases).toEqual([])
+  })
+
+  it('keeps it while the three queues ask again, for minutes', async () => {
+    vi.useFakeTimers()
+    const { login, phases } = await onTheError()
+    const queues = [useTripQueueStore(), useSpendingQueueStore(), useReceiptQueueStore()]
+    for (const queue of queues) await queue.flush()
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
+    expect(me.mock.calls.length).toBeGreaterThan(5)
+    expect(login.phase).toBe('error')
+    expect(phases).toEqual([])
+  })
+
+  it('must not fire: «Повторить» by hand still shows the question', async () => {
+    const { actor, login } = await onTheError()
+    me.mockReturnValue(new Promise(() => undefined))
+    void actor.retry()
+    expect(login.phase).toBe('loading')
   })
 })

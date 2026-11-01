@@ -55,7 +55,11 @@ export function useAnswerWord(): AnswerWord | null {
   return inject(answerWordKey, null)
 }
 
-/** Says the screen's word while `active` holds, and takes it back with the component. */
+/**
+ * Says the screen's word while `active` holds, and takes it back with the component. Called by a
+ * component inside the frame's slot: a screen is the frame's parent, and from its own `setup` it hears
+ * nothing (adversarial А1).
+ */
 export function sayAnswerWord(active: () => boolean): void {
   const word = useAnswerWord()
   if (!word) return

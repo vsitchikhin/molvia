@@ -86,30 +86,22 @@ test('a session that is gone brings back the same owner, not a new person', asyn
   expect(await knownOwner(page)).toBe(owner)
 })
 
-// MOL-349, owner's В-2 «б»: an identity the server did not check has no notice and no «Try again» of
-// its own — they stood over the screen's error and its «Try again» (kit-settings-7) — and asks again
-// by itself. Сервер, который не ответил, — это не «сессии нет»: приложение показывается, а не дверь
-// (MOL-56).
-test('an identity the server did not check says nothing of its own, and asks again by itself', async ({
+// MOL-349, adversarial А2: `/actors/me` failing alone, the screen shows its answer and says nothing,
+// and the writes wait — the sign-in's card is the one word of it, and goes by itself, with no tap,
+// once the identity is answered. Сервер, который не ответил, — это не «сессии нет»: приложение
+// показывается, а не дверь (MOL-56).
+test('an identity the server did not check is said over an answered screen, and goes by itself', async ({
   page,
 }) => {
-  // Плашка была про телефон, который уже знает своего владельца: на пустом устройстве это дверь.
+  // Плашка — про телефон, который уже знает своего владельца: на пустом устройстве это дверь.
   await open(page)
-  let refused = 0
-  await page.route('**/api/actors/me', (route) => {
-    refused += 1
-    return route.fulfill({ status: 500, body: '{}' })
-  })
+  await page.route('**/api/actors/me', (route) => route.fulfill({ status: 500, body: '{}' }))
   await page.reload()
-  await expect.poll(() => refused).toBeGreaterThan(0)
-  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
-  await expect(page.locator('.notice-slot')).toBeEmpty()
+  const notice = page.getByRole('heading', { name: 'Could not check the sign-in' })
+  await expect(notice).toBeVisible()
+  await expect(page.locator('.notice').getByRole('button', { name: 'Try again' })).toBeVisible()
 
-  // The first try again comes five seconds after the failure, with no tap.
+  // Asked again by time — the identity's own 5 s and on, the queues' 15 s — never by a tap.
   await page.unroute('**/api/actors/me')
-  const answered = await page.waitForResponse(
-    (response) => new URL(response.url()).pathname === '/api/actors/me',
-    { timeout: 15_000 },
-  )
-  expect(answered.status()).toBe(200)
+  await expect(notice).toHaveCount(0, { timeout: 30_000 })
 })

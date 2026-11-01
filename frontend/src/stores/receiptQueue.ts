@@ -379,7 +379,8 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
   const retry = doublingRetry(() => void attempt())
 
   async function attempt(): Promise<void> {
-    if (actor.state === 'error') await actor.retry()
+    // Quietly (MOL-349, self-review №1): the login screen showing the failure keeps it.
+    if (actor.state === 'error') await actor.retry({ quietly: true })
     await flush()
   }
 

@@ -1,6 +1,15 @@
 <template>
-  <aside v-if="shown" class="notice">
-    <AppCard>
+  <aside v-if="notice" class="notice">
+    <!-- An error is the quiet card itself (MOL-180, К-13); offline sits in one. -->
+    <ScreenState
+      v-if="notice === 'error'"
+      inline
+      kind="error"
+      :title="t('identity.error.title')"
+      :body="t('identity.error.body')"
+      @retry="retry"
+    />
+    <AppCard v-else>
       <!-- Yellow, not the green of an offline trip: without an identity nothing can be saved. -->
       <ScreenState
         inline
@@ -24,18 +33,17 @@ import { useActorStore } from '@/stores/actor'
 /**
  * What happened to the identity, when it is something a person has to be told.
  *
- * Opened with no connection, the app shows the owner on the device with nothing checked, and every
- * request goes out without an owner. **Said only where the screen says nothing of its answer**
- * (MOL-349, owner's В-1 «б»): a screen's own «нет связи», its strip or its skeleton is the one word
- * about the connection — drawn over it, the notice made two clouds and two texts, and on «Что брать»
- * stood over the field that chooses the answer (Ф-14). The privacy page and the terms say nothing of
- * the kind, and there it stays. What holds the queues meanwhile is their `flush()`, never this notice
- * (MOL-56).
+ * Two cases, and they are the reason this is not a courtesy: while the identity is not up,
+ * every request the app makes goes out without an owner, and the queues send nothing (MOL-56) —
+ * showing nothing left a person with an app that looked normal and could not save a thing.
  *
- * **An identity that could not be checked says nothing here** (MOL-349, owner's В-2 «б»): its quiet
- * card with a «Повторить» of its own stood over the screen's error and its «Повторить» — three on
- * «Настройки» (kit-settings-7). The identity asks again by itself (`stores/actor`), and the screen's
- * error is the one word.
+ * **Said only where the screen says nothing of its answer** (MOL-349, owner's В-1 «б», В-2 «б»): a
+ * screen's own «нет связи», its error, its strip or its skeleton is the one word — drawn over it, the
+ * notice made two clouds and two texts, stood over the field of «Что брать» (Ф-14), and on
+ * «Настройки» with the server down put a third «Повторить» over the screen's error and the salary's
+ * (kit-settings-7). Where the screen has its answer and says nothing — `/actors/me` failing alone, the
+ * privacy page, «Что взяли?» — the notice is the only word that the writes wait (adversarial А2).
+ * The identity asks again by itself either way (`stores/actor`).
  *
  * **`lost` went with MOL-53.** A session is not the data: losing one means signing in again, and
  * whatever happens then is MOL-56's to draw, together with the screen that can act on it.
@@ -43,6 +51,13 @@ import { useActorStore } from '@/stores/actor'
  * Drawn by the shared screen state (MOL-19) as a notice of its own height: its cases are that
  * block's cases, not a second implementation of them.
  */
+const NOTICES = ['error', 'offline'] as const
+type Notice = (typeof NOTICES)[number]
+
+function noticeFor(state: string): Notice | null {
+  return (NOTICES as readonly string[]).includes(state) ? (state as Notice) : null
+}
+
 export default defineComponent({
   name: 'IdentityNotice',
   components: { AppCard, ScreenState },
@@ -55,7 +70,8 @@ export default defineComponent({
 
     return {
       t,
-      shown: computed(() => actor.state === 'offline' && !(word?.said.value ?? false)),
+      notice: computed(() => (word?.said.value ? null : noticeFor(actor.state))),
+      retry: () => void actor.retry(),
     }
   },
 })

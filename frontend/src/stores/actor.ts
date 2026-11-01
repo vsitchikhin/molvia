@@ -173,9 +173,10 @@ export const useActorStore = defineStore('actor', () => {
   }
 
   /**
-   * **Quietly** (MOL-349): the state stays `error` while the question is in the air, as the consent's
-   * asks again (adversarial Д1 of MOL-95) — put to `loading`, the login screen showing the failure
-   * would blink to its skeleton at every try. Offline the timer waits for `online`, as `recover` does.
+   * **Quietly** (MOL-349): the state stays as it was while the question is in the air, as the
+   * consent's asks again (adversarial Д1 of MOL-95) — put to `loading`, the login screen showing the
+   * failure would blink to its skeleton at every try. Offline the timer waits for `online`, as
+   * `recover` does.
    */
   const again = doublingRetry(
     () => void start({ quietly: true }),
@@ -288,11 +289,17 @@ export const useActorStore = defineStore('actor', () => {
     told(false)
   }
 
-  /** Called once after the app mounts, again by the retry control, and by time after an error. */
+  /**
+   * Called once after the app mounts and by the retry control, which show the question; **quietly**
+   * by everything the person did not ask for (MOL-349, adversarial А3, self-review №1) — the timer,
+   * `online`, the app looked at again, a queue's own retry — which leave a failure or «offline» on the
+   * screen until the answer, as the consent's questions do (Д1 of MOL-95).
+   */
   async function start({ quietly = false }: { quietly?: boolean } = {}): Promise<void> {
     if (running) return
     running = true
-    if (!(quietly && state.value === 'error')) state.value = 'loading'
+    if (!(quietly && (state.value === 'error' || state.value === 'offline')))
+      state.value = 'loading'
     // «Выйти» in another window that this tab slept through (round 2, Д2): its own shelf still
     // holds the drawer. Let go here as the `storage` listener would have.
     if (erasedWhileAway()) {
@@ -335,7 +342,7 @@ export const useActorStore = defineStore('actor', () => {
   // `online` while the network returns, and since MOL-19 the offline notice has no button — it
   // would have waited for a restart (Р-8).
   function recover(): void {
-    if (state.value === 'offline' || state.value === 'error') void start()
+    if (state.value === 'offline' || state.value === 'error') void start({ quietly: true })
   }
   window.addEventListener('online', recover)
   document.addEventListener('visibilitychange', () => {
