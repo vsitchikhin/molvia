@@ -589,12 +589,6 @@ for (const size of ['150%', '200%'])
       // Chromium may have no dictionary, so the style is read, as the block button's is.
       await page.goto('/settings/devices')
       await expect(page.getByRole('heading', { level: 1 })).toHaveCSS('hyphens', 'auto')
-      // A Latin word of a Russian title is broken by its own language: «Telegra|m» at 200 % (adversarial М2).
-      await page.goto('/settings/bot')
-      await expect(page.getByRole('heading', { level: 1 })).toHaveText('Бот в Telegram')
-      await expect(page.getByRole('heading', { level: 1 }).locator('[lang="en"]')).toHaveText(
-        'Telegram',
-      )
       // A select's chosen words wrap over it; a switch's words are never cut.
       await page.goto('/settings')
       await expect(page.locator('.chosen-words').first()).toBeVisible()

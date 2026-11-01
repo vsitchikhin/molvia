@@ -41,12 +41,7 @@
     </header>
 
     <div class="head">
-      <h1 class="title" tabindex="-1">
-        <template v-for="(part, index) in titleParts" :key="index"
-          ><span v-if="part.lang" :lang="part.lang">{{ part.text }}</span
-          ><template v-else>{{ part.text }}</template></template
-        >
-      </h1>
+      <h1 class="title" tabindex="-1">{{ title }}</h1>
       <div v-if="$slots.subtitle" class="subtitle">
         <slot name="subtitle" />
       </div>
@@ -134,22 +129,8 @@ export default defineComponent({
   props: {
     title: { type: String, required: true },
   },
-  setup(props, { slots }) {
+  setup(_props, { slots }) {
     const { t } = useI18n()
-    /**
-     * The title's words of Latin and of Cyrillic, each said in its language, so a word broken with large text is broken
-     * where its own language breaks it (adversarial М2 of MOL-321): the Russian dictionary has no Latin, and «Бот в
-     * Telegram» stood «Telegra|m» at 200 %. The words read out are the same.
-     */
-    const titleParts = computed(() =>
-      props.title
-        .split(/([A-Za-z]+|[\u0400-\u04FF]+)/)
-        .filter((text) => text !== '')
-        .map((text) => ({
-          text,
-          lang: /^[A-Za-z]+$/.test(text) ? 'en' : /^[\u0400-\u04FF]+$/.test(text) ? 'ru' : null,
-        })),
-    )
     const route = useRoute()
     const router = useRouter()
 
@@ -311,7 +292,6 @@ export default defineComponent({
 
     return {
       t,
-      titleParts,
       bar,
       dock,
       content,
