@@ -362,6 +362,56 @@ describe('unorderedReads', () => {
       'indexOf of the rows stringified',
       `expect(JSON.stringify(await db.select().from(t)).indexOf('b') > JSON.stringify(x).indexOf('a')).toBe(true)`,
     ],
+    // round 9, И1: columns of an order given by a name, spread from an array, a constant of asc
+    [
+      'an order by a name of a moment',
+      `const by = ownerNotices.createdAt\nexpect(await db.select().from(ownerNotices).orderBy(by)).toEqual([a, b])`,
+    ],
+    [
+      'an order spread from an array',
+      `const order = [ownerNotices.createdAt] as const\nexpect(await db.select().from(ownerNotices).orderBy(...order)).toEqual([a, b])`,
+    ],
+    [
+      'an order by a constant of asc',
+      `const OLDEST = asc(ownerNotices.createdAt)\nexpect(await db.select().from(ownerNotices).orderBy(OLDEST)).toEqual([a, b])`,
+    ],
+    // round 9, И2: what the parse cannot read is no order
+    [
+      'an order by a fragment of sql',
+      'expect(await db.select().from(t).orderBy(sql`${t.id} desc`)).toEqual([a, b])',
+    ],
+    [
+      'an order by a call',
+      `expect(await db.select().from(t).orderBy(byNewest(t))).toEqual([a, b])`,
+    ],
+    [
+      'an order by a let',
+      `let by = t.id\nexpect(await db.select().from(t).orderBy(by)).toEqual([a, b])`,
+    ],
+    // round 9: a query begun in a const, or its sql
+    [
+      'a query begun in a const, carried on',
+      `const base = db.select().from(t)\nexpect(await base.where(c)).toEqual([a, b])`,
+    ],
+    [
+      'sql in a const handed to execute',
+      'const q = sql`select id from t`\nexpect(await db.execute(q)).toEqual([a, b])',
+    ],
+    // after round 9: every place the parse recognises a read, closed — what it cannot read is a read with no order
+    ['execute of a text built by a call', `expect(await db.execute(queryOf(t))).toEqual([a, b])`],
+    [
+      'execute of sql.raw with no order',
+      'expect(await db.execute(sql.raw(`select id from t`))).toEqual([a, b])',
+    ],
+    [
+      'a template handed to a helper that executes it',
+      'const read = (q) => db.execute(q)\nexpect(await read(sql`select id from t`)).toEqual([a, b])',
+    ],
+    [
+      'a query carried on from a helper',
+      `const rows = () => db.select().from(t)\nexpect(await rows().where(c)).toEqual([a, b])`,
+    ],
+    ['unsafe SQL as a string', `expect(await sql.unsafe('select id from t')).toEqual([a, b])`],
   ])('refuses %s', (_, body) => {
     expect(found(body)).toHaveLength(1)
   })
@@ -608,6 +658,40 @@ describe('unorderedReads', () => {
       'an identity before a uuid',
       `expect(await db.select().from(t).orderBy(t.id, sessions.id)).toEqual([a, b])`,
     ],
+    // round 9: the same orders the parse can read
+    [
+      'an order by a name of an identity',
+      `const by = t.id\nexpect(await db.select().from(t).orderBy(by)).toEqual([a, b])`,
+    ],
+    [
+      'an order spread from an array of an identity',
+      `const order = [desc(t.id)] as const\nexpect(await db.select().from(t).orderBy(...order)).toEqual([a, b])`,
+    ],
+    [
+      'a query begun in a const and ordered after',
+      `const base = db.select().from(t)\nexpect(await base.where(c).orderBy(t.id)).toEqual([a, b])`,
+    ],
+    [
+      'sql in a const with its order',
+      'const q = sql`select id from t order by id`\nexpect(await db.execute(q)).toEqual([a, b])',
+    ],
+    [
+      'execute of sql.raw that updates',
+      "await expect(db.execute(sql.raw(`update t set x = 1 where id = '${id}'`))).rejects.toThrow()",
+    ],
+    [
+      'a template handed to a helper, with its order',
+      'const read = (q) => db.execute(q)\nexpect(await read(sql`select id from t order by id`)).toEqual([a, b])',
+    ],
+    [
+      'a query carried on from a helper, ordered',
+      `const rows = () => db.select().from(t)\nexpect(await rows().where(c).orderBy(t.id)).toEqual([a, b])`,
+    ],
+    [
+      'unsafe SQL with its order',
+      `expect(await sql.unsafe('select id from t order by id')).toEqual([a, b])`,
+    ],
+    ['a refused promise', `await expect(db.select().from(t)).rejects.toThrow()`],
   ])('leaves alone %s', (_, body) => {
     expect(found(body)).toEqual([])
   })

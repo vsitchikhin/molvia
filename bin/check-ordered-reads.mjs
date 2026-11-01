@@ -1,55 +1,55 @@
 // Refuses a read of Postgres with no ORDER BY whose rows an integration test uses in an order (MOL-323):
 // without one Postgres promises no order, and `clearAll` empties the tables by `DELETE`, so a row inserted
-// later may come back first. «То же фото дважды» in `feedback-bot` read its four words so and failed on a
-// pull request that touched only the PWA (CI 41022785698).
+// later may come back first, and a plan that changes moves the rows with it. «То же фото дважды» in
+// `feedback-bot` read its four words so and failed on a pull request that touched only the PWA (CI
+// 41022785698).
 //
-// Found by parsing, as `check-clock-bounds.mjs` is, names resolved by TypeScript's binder.
+// Found by parsing, as `check-clock-bounds.mjs` is, names resolved by TypeScript's binder, the facts of the
+// tables read from `schema.ts`. **The check is closed at each of the three places it recognises something**
+// (review of MOL-323, nine rounds: a list of forms missed one more each round, so every place says what it
+// knows and holds the rest in doubt — and **in doubt there is no order**).
 //
-// **A read with no order**: a chain of Drizzle with `select…` and `from` and no `orderBy` that names a
-// column (`orderBy()` renders no ORDER BY); `findMany` with no `orderBy`; a template with `select` and
-// `from` and no `order by` of the statement itself — not in parentheses, a comment or a string — handed to
-// `execute` or tagged on its own (postgres.js); a function of the file that returns one, named first or
-// not. **A read in the order of chance** is one whose order is decided by a column of chance, read from the
-// schema: a uuid (`randomUUID()`) or a moment, whoever writes it — `now()` is one for every row of a
-// transaction, a repository writes one for a whole batch, and a test writes what it likes. An order is
-// decided by its columns up to the first identity of the schema — what follows one decides nothing, in a
-// read of one table: through a join a parent's identity repeats with every child — and a column of chance
-// among them decides the ties of those before it.
+// **1. What reads.** A chain of Drizzle with `select…` and `from`, its beginning followed through a `const`
+// and through a function of the file that returns one; `findMany`; `execute` of a template, of `sql.raw` of
+// one, of a `const` of either — and of a text the parse cannot read, which is a read with no order; a
+// template tagged on its own or handed to a helper (postgres.js); SQL as a string to `unsafe` or `query`. A
+// template has an order when `order by` stands in the statement itself — not in parentheses, a comment or a
+// string — and a `select` with no `from` is one row.
 //
-// **The rule is closed** (review of MOL-323, rounds 1–8): a list of the uses that compare by position
-// missed one more each time it was attacked. So it goes the other way round. Rows are followed through
-// `await`, a cast, the methods that keep an order (`map`, `filter`, `flatMap`, `flat`, `slice`),
-// `JSON.stringify`, a spread of them alone, a branch of `?:`, `??` or `||`, an object they are put in, a
-// name they are given — declared, assigned or taken from an array (`Promise.all`) — and a function of the
-// file that returns them. Rows with no order may end only where their order cannot tell: their length,
-// their first row (`[0]`, `at(0)`, `const [row] = …`), `find`, `some`, `every`, `includes` — never by a
-// callback handed the index of a row, by a parameter or the rest of its arguments, nor by one that changes
-// anything outside it — a name, a field, a method of a name from outside called (`seen.push`,
-// `next.next()`), a function of this file from outside called (a spy, `record(row)`), a name from outside
-// handed to a call — nor by one the parse cannot read (built by a call, a method, an import; `Boolean`,
-// `String` and `Number` are read) — `reduce`, `sort`, `toSorted`, a `for … of`, a `Set`, a `Map`,
-// `inArray`, `notInArray`, `Object.fromEntries`, `typeof`, discarded; under `expect`: `toHaveLength`,
-// `toContain` and `toContainEqual` of the rows — of them made one string nothing but its length —
-// `toBeDefined`, `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, a `not` of any of them and of no other,
-// `toEqual` of one row or none written in place, or of `expect.arrayContaining`. Rows in the order of
-// chance may besides be compared with another read in the same order, if it is total — a unique key of
-// every table it reads among its columns, every part of the key a column and none of them NULL unless its
-// NULLs are one, else its ties lie as the heap does — by the same columns, a snapshot with a snapshot of
-// the same helper, the read, a name given it, or either through the methods that keep an order — never with
-// anything the test builds. Anything else is refused, and the fix is an order, never a use the check does
-// not know.
+// **2. What orders.** The arguments of `orderBy`, each a column, `asc` or `desc` of one, a `const` of these
+// or an array of them spread; any other argument — a fragment of `sql`, a call, an expression — is in
+// doubt, and the read has no order of insertion. Of the columns, the schema says which are chance — a uuid
+// and any `timestamp`: an order of values, not of insertion, `now()` one for a whole transaction — and
+// which are identities. An order is decided by its columns up to the first identity, in a read of one table
+// (through a join a parent's identity repeats with every child); a column of chance among them makes the
+// order chance; it is total only where a unique key of every table read stands among them — every part of
+// the key a column, none of them NULL unless its NULLs are one.
 //
-// What this is: a guard against the ordinary form, not against one built to slip past it. **The price,
-// named, by class:** an order of ties is taken as an order — a column every row read shares
-// (`.orderBy(t.threadId)` under `eq(t.threadId, …)`), a parent's identity through a join, which its
-// children share, a `sort` whose key repeats, an `order by` of SQL text by whatever it names; a moment
-// before an identity is refused even where the test wrote the moments itself — the parse cannot tell who
-// did, and the identity alone is the order; a row picked as the one — the first, `find`, a key of a `Map`
-// or `Object.fromEntries` — is taken as the only one: where more qualify, the first in the heap answers, or
-// for a key the last; what a `for … of` or a `reduce` collects is not followed — a sum is their ordinary
-// use; a callback that calls a method of a name from outside is refused even where the method is pure
-// (`want.includes(r.x)`) — the parse cannot tell; a function handed in as a parameter is not followed; a
-// field of an object of rows is not followed; a helper of another file is not followed. Those go to review.
+// **3. What the rows are used for.** They are followed through `await`, a cast, `map`, `filter`, `flatMap`,
+// `flat`, `slice`, `JSON.stringify`, a spread of them alone, a branch of `?:`, `??`, `||`, an object, a
+// name — declared, assigned, taken from `Promise.all` — a function of the file that returns them, and a
+// query carried on (`base.where(c)`), which is a read of its own. They may end only where their order
+// cannot tell: their length, their first row, `find`, `some`, `every`, `includes`, `reduce`, `sort`,
+// `toSorted`, a `for … of`, a `Set`, a `Map`, `inArray`, `notInArray`, `Object.fromEntries`, `typeof`,
+// discarded, a promise refused; under `expect`: `toHaveLength`, `toContain` and `toContainEqual` of the
+// rows, `toBeDefined`, `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, a `not` of these and of no other,
+// `toEqual` of one row or none written in place or of `expect.arrayContaining`. A callback of these is in
+// doubt where it takes the index of a row (a parameter, the rest of its arguments), changes anything
+// outside it (a name, a field, a method of a name from outside, a function of this file called, a name
+// handed to a call), or is one the parse cannot read; the platform's `Boolean`, `String`, `Number` are
+// read. Of the rows made one string nothing is free but its length. Rows in the order of chance may besides
+// meet another read in the same total order — a snapshot with a snapshot. Anything else is refused, and the
+// fix is an order, never a use the check does not know.
+//
+// **The price, named, by class, and nothing outside these classes:** an order of ties is taken as an order
+// — a column every row read shares, a parent's identity through a join, a `sort` whose key repeats, an
+// order of SQL text by whatever it names; an order of values the test wrote is taken as the test's — a
+// column that is neither a uuid nor a moment is not judged; a moment before an identity is refused even
+// where the test wrote the moments; a row picked as the one — the first, `find`, a key of a `Map` or
+// `Object.fromEntries` — is taken as the only one; what a `for … of` or a `reduce` collects is not
+// followed, a sum being their ordinary use; a callback calling a pure method of a name of this file is
+// refused; a function handed in as a parameter, a field of an object of rows, an import and a helper of
+// another file are not followed. Those go to review.
 //
 //   node bin/check-ordered-reads.mjs
 
@@ -68,6 +68,29 @@ export const MAY_READ = /\bselect|findMany/i
 
 /** The methods an array of rows keeps its order through. */
 const KEEPS = new Set(['map', 'filter', 'flatMap', 'flat', 'slice'])
+/** The methods that carry a query of Drizzle on: what they give is a query, read where it ends. */
+const BUILDS = new Set([
+  'where',
+  'orderBy',
+  'limit',
+  'offset',
+  'groupBy',
+  'having',
+  'innerJoin',
+  'leftJoin',
+  'rightJoin',
+  'fullJoin',
+  'crossJoin',
+  'innerJoinLateral',
+  'leftJoinLateral',
+  'crossJoinLateral',
+  'for',
+  '$dynamic',
+  'union',
+  'unionAll',
+  'intersect',
+  'except',
+])
 /** The methods whose answer no order of the rows can change, or that give them one. */
 const ORDERLESS = new Set(['find', 'some', 'every', 'includes', 'reduce', 'sort', 'toSorted'])
 /** Where a callback is handed the index of a row: the second parameter, `reduce`'s third; a comparator never. */
@@ -250,9 +273,10 @@ function columnsWhere(source, is) {
  * the order they come — `'--'` is a string — and what stands outside every parenthesis apart.
  */
 const sqlOf = (template) => {
-  const text = ts.isNoSubstitutionTemplateLiteral(template)
-    ? template.text
-    : [template.head.text, ...template.templateSpans.map((span) => span.literal.text)].join(' ? ')
+  const text =
+    ts.isNoSubstitutionTemplateLiteral(template) || ts.isStringLiteral(template)
+      ? template.text
+      : [template.head.text, ...template.templateSpans.map((span) => span.literal.text)].join(' ? ')
   let all = ''
   let outside = ''
   let depth = 0
@@ -331,14 +355,61 @@ export function unorderedReads(
   const isChance = (order) => order?.startsWith('chance:') ?? false
 
   /** The column an argument of `orderBy` names, `asc` and `desc` taken off. */
-  const columnOf = (argument) =>
-    ts.isCallExpression(argument) && /^(asc|desc)$/.test(argument.expression.getText(sf))
-      ? argument.arguments[0]
-      : argument
-  const named = (argument, columns) => {
-    const a = columnOf(argument)
-    return Boolean(a) && ts.isPropertyAccessExpression(a) && columns.has(a.getText(sf))
+  /** What a `const` name stands for, followed to the end: the node itself where it is none. */
+  const constant = (node, depth = 0) => {
+    if (!node || !ts.isIdentifier(node) || depth > 8) return node
+    const declaration = symbolOf(node)?.valueDeclaration
+    const isConst =
+      declaration &&
+      ts.isVariableDeclaration(declaration) &&
+      declaration.initializer &&
+      ts.isVariableDeclarationList(declaration.parent) &&
+      (declaration.parent.flags & ts.NodeFlags.Const) !== 0
+    return isConst ? constant(declaration.initializer, depth + 1) : node
   }
+
+  /**
+   * The calls of a query, its `const` beginnings included: `const base = db.select().from(t)` and then
+   * `base.where(c)` is one query, `select`, `from` and `where` (review round 9, after И1).
+   */
+  const queryOf = (node, depth = 0) => {
+    const calls = callsOf(node)
+    let root = node
+    while (ts.isCallExpression(root) || ts.isPropertyAccessExpression(root)) root = root.expression
+    const begun = depth < 8 && ts.isIdentifier(root) ? constant(root) : undefined
+    return begun && begun !== root && ts.isCallExpression(begun)
+      ? [...calls, ...queryOf(begun, depth + 1)]
+      : calls
+  }
+
+  /**
+   * The columns an argument of `orderBy` orders by, each with its direction, or none where the parse cannot tell:
+   * a column, `asc` or `desc` of one, a `const` name of any of these, an array of them, spread. Anything else — a
+   * fragment of `sql`, a call, an expression — is in doubt, and an order in doubt is no order (review round 9).
+   */
+  const orderColumns = (argument, depth = 0) => {
+    let a = argument
+    while (ts.isParenthesizedExpression(a) || ts.isAsExpression(a) || ts.isSatisfiesExpression(a))
+      a = a.expression
+    if (depth > 8 || !a) return undefined
+    if (ts.isSpreadElement(a)) return orderColumns(a.expression, depth + 1)
+    if (ts.isArrayLiteralExpression(a)) {
+      const all = a.elements.map((element) => orderColumns(element, depth + 1))
+      return all.every(Boolean) ? all.flat() : undefined
+    }
+    if (ts.isCallExpression(a) && /^(asc|desc)$/.test(a.expression.getText(sf))) {
+      const inner = orderColumns(a.arguments[0], depth + 1)
+      const direction = a.expression.getText(sf)
+      return inner?.map((column) => ({ ...column, key: `${direction} ${column.node.getText(sf)}` }))
+    }
+    if (ts.isPropertyAccessExpression(a)) return [{ node: a, key: a.getText(sf) }]
+    if (ts.isIdentifier(a)) {
+      const value = constant(a)
+      return value !== a ? orderColumns(value, depth + 1) : undefined
+    }
+    return undefined
+  }
+  const named = (column, columns) => columns.has(column.node.getText(sf))
 
   /**
    * What order a node reads in, if it reads: `none`, `chance:<columns>`, or undefined — ordered, or no read.
@@ -346,8 +417,12 @@ export function unorderedReads(
    */
   const readOf = (node) => {
     if (ts.isTaggedTemplateExpression(node)) {
-      // handed to `execute`, the call is the read
-      const handed = ts.isCallExpression(node.parent) && node.parent.arguments.includes(node)
+      // handed to `execute`, the call is the read; handed to anything else — a helper that executes it — it is
+      const handed =
+        ts.isCallExpression(node.parent) &&
+        node.parent.arguments.includes(node) &&
+        ts.isPropertyAccessExpression(node.parent.expression) &&
+        node.parent.expression.name.text === 'execute'
       return !handed && unorderedTemplate(node.template) ? 'none' : undefined
     }
     if (!ts.isCallExpression(node)) return undefined
@@ -357,19 +432,32 @@ export function unorderedReads(
     if (ts.isPropertyAccessExpression(node.parent) && node.parent.expression === node)
       return undefined
     const method = node.expression.name.text
-    const calls = callsOf(node).filter((call) => ts.isPropertyAccessExpression(call.expression))
+    const query = queryOf(node)
+    const calls = query.filter((call) => ts.isPropertyAccessExpression(call.expression))
     const names = calls.map(calledAs)
-    if (names.some((name) => name?.startsWith('select')) && names.includes('from')) {
-      const columns = calls
+    // a query carried on from a function of the file that returns one: `rows().where(c)` (after round 9)
+    const begun = query.at(-1)
+    const fromHelper =
+      begun && ts.isIdentifier(begun.expression)
+        ? helpers.get(symbolOf(begun.expression))
+        : undefined
+    const continued = fromHelper !== undefined && names.some((name) => BUILDS.has(name ?? ''))
+    if ((names.some((name) => name?.startsWith('select')) && names.includes('from')) || continued) {
+      const given = calls
         .filter((call) => calledAs(call) === 'orderBy')
         .flatMap((call) => [...call.arguments])
-      if (columns.length === 0) return 'none'
+      if (given.length === 0) return fromHelper ?? 'none'
+      const read = given.map((argument) => orderColumns(argument))
+      // an order the parse cannot read is no order of insertion, nor one a snapshot may meet (round 9, И1, И2)
+      if (read.some((columns) => !columns))
+        return `chance:?${given.map((argument) => argument.getText(sf)).join(', ')}`
+      const columns = read.flat()
       // an identity is unique in its own table only: through a join a parent's repeats with every child, and the
       // columns after it decide the children's order (review round 5, Д1)
       const joined = names.some((name) => /join/i.test(name ?? ''))
       const unique = joined ? -1 : columns.findIndex((column) => named(column, identity))
       const deciding = unique === -1 ? columns : columns.slice(0, unique + 1)
-      const texts = deciding.map((column) => columnOf(column)?.getText(sf))
+      const texts = deciding.map((column) => column.node.getText(sf))
       // the tables a read takes its rows from: a key of one is unique only among its own rows (review round 8, З2)
       const tables = calls
         .filter((call) => calledAs(call) === 'from' || /join/i.test(calledAs(call) ?? ''))
@@ -378,10 +466,12 @@ export function unorderedReads(
       // a column of chance decides the ties of those before it: the order is chance
       if (!deciding.some((column) => named(column, chance))) return undefined
       // total where a unique key of every table read is among its columns: only then is it one order (Ж3, З2)
-      const total = tables.every((table) =>
-        keys.some((key) => key.every(of(table)) && key.every((column) => texts.includes(column))),
-      )
-      return `chance:${total ? '!' : ''}${deciding.map((column) => column.getText(sf)).join(', ')}`
+      const total =
+        tables.length > 0 &&
+        tables.every((table) =>
+          keys.some((key) => key.every(of(table)) && key.every((column) => texts.includes(column))),
+        )
+      return `chance:${total ? '!' : ''}${deciding.map((column) => column.key).join(', ')}`
     }
     if (method === 'findMany') {
       const [query] = node.arguments
@@ -392,10 +482,30 @@ export function unorderedReads(
       return ordered ? undefined : 'none'
     }
     if (method === 'execute') {
-      const [query] = node.arguments
-      const unordered =
-        query && ts.isTaggedTemplateExpression(query) && unorderedTemplate(query.template)
-      return unordered ? 'none' : undefined
+      let text = constant(node.arguments[0])
+      // `sql.raw(…)`: its text is the string it is handed
+      if (text && ts.isCallExpression(text) && text.expression.getText(sf) === 'sql.raw')
+        text = constant(text.arguments[0])
+      if (text && ts.isTaggedTemplateExpression(text)) text = text.template
+      // a parameter is judged where its text is written: a template handed to a helper is a read of its own
+      const declaration =
+        text && ts.isIdentifier(text) ? symbolOf(text)?.valueDeclaration : undefined
+      if (declaration && ts.isParameter(declaration)) return undefined
+      // a text in doubt — built by a call, not one the parse can read — is a read with no order
+      const readable =
+        text &&
+        (ts.isNoSubstitutionTemplateLiteral(text) ||
+          ts.isTemplateExpression(text) ||
+          ts.isStringLiteral(text))
+      if (!readable) return 'none'
+      return unorderedTemplate(text) ? 'none' : undefined
+    }
+    // SQL as a string: postgres.js's `unsafe`, a pool's `query`
+    if (method === 'unsafe' || method === 'query') {
+      const text = constant(node.arguments[0])
+      const written = text && (ts.isStringLiteral(text) || ts.isNoSubstitutionTemplateLiteral(text))
+      if (!written) return undefined
+      return unorderedTemplate(text) ? 'none' : undefined
     }
     return undefined
   }
@@ -574,6 +684,8 @@ export function unorderedReads(
         const doubt =
           ORDERLESS.has(name) || KEEPS.has(name) ? callbackDoubt(p.parent, name) : undefined
         if (doubt) return { why: `.${name}() ${doubt}` }
+        // a query carried on is a read of its own, judged where it ends (`base.where(c)`)
+        if (BUILDS.has(name)) return { free: true }
         if (ORDERLESS.has(name)) return { free: true }
         if (KEEPS.has(name)) {
           n = p.parent
@@ -624,6 +736,9 @@ export function unorderedReads(
             return { why: `${name}(…)`, againstRead: sameChance(subject, order) }
           return { why: `${name}(…)` }
         }
+        // a template handed to `execute` is that read's text, judged as the call
+        if (ts.isPropertyAccessExpression(callee) && callee.name.text === 'execute')
+          return { free: true }
         if (callee.getText(sf) === 'JSON.stringify') {
           n = p
           text = true
@@ -662,6 +777,8 @@ export function unorderedReads(
   /** What `expect(rows)` goes on to: a matcher no order can change, or one that compares in order. */
   const matched = (expectCall, order, text = false) => {
     let m = expectCall.parent
+    // a promise refused holds no rows
+    if (ts.isPropertyAccessExpression(m) && m.name.text === 'rejects') return { free: true }
     while (ts.isPropertyAccessExpression(m) && /^(resolves|rejects)$/.test(m.name.text))
       m = m.parent
     if (!ts.isPropertyAccessExpression(m)) return { why: 'expect' }
