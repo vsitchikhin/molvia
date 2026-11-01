@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   chanceColumns,
+  filesToRead,
   identityColumns,
   schemaTables,
   uniqueKeys,
@@ -580,7 +581,7 @@ describe('unorderedReads', () => {
   const drizzle = (body: string): string[] =>
     unorderedReads(
       FILE,
-      `import { sql } from 'drizzle-orm'\n${inTest(body)}`,
+      `import { sql } from 'drizzle-orm'\nimport { onlyRow } from './rows'\n${inTest(body)}`,
       CHANCE,
       IDENTITY,
       KEYS,
@@ -640,7 +641,7 @@ describe('unorderedReads', () => {
     ).toHaveLength(1)
     expect(
       drizzle(
-        'const named = async (table, id) => (await db.execute(sql`select count(*)::int as n from ${sql.raw(table)} where item_id = ${id}`))[0]?.n\nexpect([await named(t, a), await named(t, b)]).toEqual([0, 1])',
+        'const named = async (table, id) => onlyRow(await db.execute(sql`select count(*)::int as n from ${sql.raw(table)} where item_id = ${id}`))?.n\nexpect([await named(t, a), await named(t, b)]).toEqual([0, 1])',
       ),
     ).toEqual([])
   })
@@ -741,14 +742,6 @@ describe('unorderedReads', () => {
       'every by a named callback of the row alone',
       `const positive = (r) => r.n > 0\nexpect((await db.select().from(t)).every(positive)).toBe(true)`,
     ],
-    [
-      'sort by a comparator',
-      `expect((await db.select().from(t)).toSorted((a, b) => a.id - b.id)).toEqual([a, b])`,
-    ],
-    [
-      'find by a key',
-      `const rows = await db.select().from(t)\nexpect(rows.find((r) => r.id === a)?.n).toBe(1)`,
-    ],
     ['a Map by its key', `const byId = new Map((await db.select().from(t)).map((r) => [r.id, r]))`],
     [
       'order by in the template',
@@ -758,11 +751,6 @@ describe('unorderedReads', () => {
       'a select with no from — one row',
       'expect(await db.execute(sql`select ${n}::int as n`)).toEqual([a, b])',
     ],
-    ['sort', `expect((await db.select().from(t)).map((r) => r.x).sort()).toEqual([a, b])`],
-    [
-      'toSorted through a name',
-      `const rows = await db.select().from(t)\nexpect(rows.map((r) => r.x).toSorted()).toEqual([a, b])`,
-    ],
     ['a length', `expect(await db.select().from(t)).toHaveLength(2)`],
     [
       'a length through a name',
@@ -770,12 +758,7 @@ describe('unorderedReads', () => {
     ],
     ['no rows', `expect(await db.select().from(t)).toEqual([])`],
     ['one row', `expect(await db.select().from(t)).toEqual([a])`],
-    ['the first row taken apart', `const [row] = await db.select().from(t)`],
-    ['the first row by index', `const rows = await db.select().from(t)\nexpect(rows[0]).toBe(a)`],
-    ['the first row through a branch', `const [row] = x ? [] : await db.select().from(t)`],
-    ['find', `expect((await db.select().from(t)).find((r) => r.id === a)).toEqual([a, b])`],
     ['some', `expect((await db.select().from(t)).some((r) => r.ok)).toBe(true)`],
-    ['a sum', `expect((await db.select().from(t)).reduce((all, r) => all + r.n, 0)).toBe(3)`],
     ['a loop', `for (const row of await db.select().from(t)) expect(row.n).toBe(1)`],
     ['a Set', `expect(new Set((await db.select().from(t)).map((r) => r.x)).size).toBe(1)`],
     [
@@ -811,11 +794,6 @@ describe('unorderedReads', () => {
     [
       'stringified row by row, not containing',
       `for (const row of await db.select().from(t)) expect(JSON.stringify(row)).not.toContain(secret)`,
-    ],
-    // round 7, Ж1: a function handed in as a parameter is not followed — the price
-    [
-      'a sum by a function handed in',
-      `const rows = await db.select().from(t)\nconst sum = (pick) => rows.reduce((all, row) => all + pick(row), 0)`,
     ],
     [
       'a schema of another file parsing each row',
@@ -911,14 +889,6 @@ describe('unorderedReads', () => {
       `expect(new Set((await db.select().from(t)).map((r) => r.kind))).toEqual(new Set([a, b]))`,
     ],
     [
-      'get of a Map',
-      `expect(new Map((await db.select().from(t)).map((r) => [r.id, r.kind])).get(a)).toBe(b)`,
-    ],
-    [
-      'a value of an object by its key',
-      `expect(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v]))[a]).toBe(1)`,
-    ],
-    [
       'an object against an object',
       `expect(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v]))).toEqual({ a: 1, b: 2 })`,
     ],
@@ -937,6 +907,241 @@ describe('unorderedReads', () => {
     ],
   ])('leaves alone %s', (_, body) => {
     expect(found(body)).toEqual([])
+  })
+
+  // review round 14, О1: values the same reversed — `failure, silence, failure` — give the net's reversal the same first
+  // row, the same `find`, the same sort of what a comparator ties, the same last value of a key; so each of these is a
+  // use in an order, and the rows go through `onlyRow`, `sorted` or `sum`, which hold at run time what makes them free
+  it.each([
+    ['the first row taken apart', `const [row] = await db.select().from(t)`],
+    ['the first row by index', `const rows = await db.select().from(t)\nexpect(rows[0]).toBe(a)`],
+    [
+      'the first row by at(0)',
+      `const rows = await db.select().from(t)\nexpect(rows.at(0)).toBe(a)`,
+    ],
+    ['the first row through a branch', `const [row] = x ? [] : await db.select().from(t)`],
+    [
+      'the first row of a read by its key',
+      `const [row] = await db.select().from(t).where(eq(t.id, a))`,
+    ],
+    [
+      'the first row of rows in the order of chance',
+      `const [row] = await db.select().from(sessions).orderBy(sessions.id)`,
+    ],
+    [
+      'the first row of a template',
+      'const [row] = await db.execute(sql`select kind from owner_notices`)',
+    ],
+    [
+      'the first row of filtered rows',
+      `const [row] = (await db.select().from(t)).filter((r) => r.ok)`,
+    ],
+    ['find', `expect((await db.select().from(t)).find((r) => r.id === a)).toEqual([a, b])`],
+    [
+      'find by a key',
+      `const rows = await db.select().from(t)\nexpect(rows.find((r) => r.id === a)?.n).toBe(1)`,
+    ],
+    ['findLast', `expect((await db.select().from(t)).findLast((r) => r.ok)).toBe(a)`],
+    ['findIndex', `expect((await db.select().from(t)).findIndex((r) => r.ok)).toBe(0)`],
+    ['indexOf', `expect((await db.select().from(t)).map((r) => r.x).indexOf(a)).toBe(0)`],
+    ['sort', `expect((await db.select().from(t)).map((r) => r.x).sort()).toEqual([a, b])`],
+    [
+      'sort by a comparator',
+      `expect((await db.select().from(t)).toSorted((a, b) => a.id - b.id)).toEqual([a, b])`,
+    ],
+    [
+      'toSorted through a name',
+      `const rows = await db.select().from(t)\nexpect(rows.map((r) => r.x).toSorted()).toEqual([a, b])`,
+    ],
+    ['a sum', `expect((await db.select().from(t)).reduce((all, r) => all + r.n, 0)).toBe(3)`],
+    [
+      'reduceRight',
+      `expect((await db.select().from(t)).reduceRight((all, r) => all + r.s, '')).toBe(a)`,
+    ],
+    // round 7, Ж1: a function handed in as a parameter is not followed
+    [
+      'a sum by a function handed in',
+      `const rows = await db.select().from(t)\nconst sum = (pick) => rows.reduce((all, row) => all + pick(row), 0)`,
+    ],
+    [
+      'get of a Map',
+      `expect(new Map((await db.select().from(t)).map((r) => [r.id, r.kind])).get(a)).toBe(b)`,
+    ],
+    [
+      'a value of an object by its key',
+      `expect(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v]))[a]).toBe(1)`,
+    ],
+    [
+      'a field of an object by its key',
+      `expect(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v])).a).toBe(1)`,
+    ],
+    [
+      'a part by slice',
+      `expect((await db.select().from(t)).slice(1).some((r) => r.ok)).toBe(true)`,
+    ],
+    [
+      'a part by slice into a length',
+      `expect((await db.select().from(t)).slice(0, 1)).toHaveLength(1)`,
+    ],
+    [
+      'a loop that collects',
+      `const kinds = []\nfor (const row of await db.select().from(t)) kinds.push(row.kind)`,
+    ],
+    [
+      'a loop that keeps the last',
+      `let last\nfor (const row of await db.select().from(t)) last = row`,
+    ],
+    [
+      'a loop left at a row by break',
+      `for (const row of await db.select().from(t)) { if (row.ok) break }`,
+    ],
+    [
+      'a loop left at a row by return',
+      `for (const row of await db.select().from(t)) { if (row.ok) return row }`,
+    ],
+    [
+      'a loop left by a labelled continue',
+      `outer: for (const x of xs) for (const row of await db.select().from(t)) { if (row.ok) continue outer }`,
+    ],
+    [
+      'some by a function handed in',
+      `const f = async (pick) => expect((await db.select().from(t)).some((r) => pick(r))).toBe(true)`,
+    ],
+    [
+      'a loop that writes',
+      `const { db } = connectDrizzle()\nfor (const row of await db.select().from(t)) await db.insert(u).values(row)`,
+    ],
+    [
+      'a loop over a Set that collects',
+      `const kinds = []\nfor (const kind of new Set((await db.select().from(t)).map((r) => r.kind))) kinds.push(kind)`,
+    ],
+  ])('refuses %s (round 14)', (_, body) => {
+    expect(found(body)).not.toEqual([])
+  })
+
+  /** A test of integration with `onlyRow`, `sorted` and `sum` imported as the tests import them. */
+  const byRows = (body: string, from = './rows'): string[] =>
+    unorderedReads(
+      FILE,
+      `import { eq } from 'drizzle-orm'\nimport { onlyRow, sorted, sum } from '${from}'\n${inTest(body)}`,
+      CHANCE,
+      IDENTITY,
+      KEYS,
+    )
+
+  it.each([
+    ['the one row', `const row = onlyRow(await db.select().from(t))`],
+    [
+      'the one row through a name',
+      `const rows = await db.select().from(t)\nexpect(onlyRow(rows)?.n).toBe(1)`,
+    ],
+    ['the one row of a template', 'const row = onlyRow(await db.execute(sql`select kind from t`))'],
+    [
+      'the one row of filtered rows, for find',
+      `const row = onlyRow((await db.select().from(t)).filter((r) => r.ok))`,
+    ],
+    [
+      'the one row of rows in the order of chance',
+      `const row = onlyRow(await db.select().from(sessions).orderBy(sessions.id))`,
+    ],
+    [
+      'the one row of a Set',
+      `const kind = onlyRow(new Set((await db.select().from(t)).map((r) => r.kind)))`,
+    ],
+    [
+      'values sorted',
+      `expect(sorted((await db.select().from(t)).map((r) => r.x))).toEqual([a, b])`,
+    ],
+    [
+      'a Set sorted',
+      `expect(sorted(new Set((await db.select().from(t)).map((r) => r.x)))).toEqual([a, b])`,
+    ],
+    ['a sum', `expect(sum((await db.select().from(t)).map((r) => r.n))).toBe(3)`],
+    [
+      'a loop over values sorted',
+      `const kinds = []\nfor (const kind of sorted((await db.select().from(t)).map((r) => r.kind))) kinds.push(kind)`,
+    ],
+    [
+      'a loop of assertions alone',
+      `for (const row of await db.select().from(t)) expect(row.n).toBe(1)`,
+    ],
+    [
+      'a loop with a continue of its own',
+      `for (const row of await db.select().from(t)) { if (!row.ok) continue\nexpect(row.n).toBe(1) }`,
+    ],
+    [
+      'a loop with a function of its own that returns',
+      `for (const row of await db.select().from(t)) expect([1].map((n) => { return n })).toEqual([1])`,
+    ],
+    ['a slice whole', `expect((await db.select().from(t)).slice().some((r) => r.ok)).toBe(true)`],
+    [
+      'has of a Map',
+      `expect(new Map((await db.select().from(t)).map((r) => [r.id, r.kind])).has(a)).toBe(true)`,
+    ],
+  ])('leaves alone %s (round 14)', (_, body) => {
+    expect(byRows(body)).toEqual([])
+  })
+
+  it.each([
+    // by the import that names them, from `./rows` alone: anything else is a function of no known answer
+    ['onlyRow of another module', `const row = onlyRow(await db.select().from(t))`, './other'],
+    [
+      'sorted of another module',
+      `expect(sorted((await db.select().from(t)).map((r) => r.x))).toEqual([a, b])`,
+      '@/rows',
+    ],
+  ])('refuses %s (round 14)', (_, body, from) => {
+    expect(byRows(body, from)).toHaveLength(1)
+  })
+
+  // review round 14: a function of another module is one of no known answer — it may write the rows in their order
+  it('refuses a loop and a callback that call a function or a method of an import, but not expect', () => {
+    const imported = (body: string): string[] =>
+      unorderedReads(
+        FILE,
+        `import { expect } from 'vitest'\nimport { insertRow, schema } from './fixtures'\n${inTest(body)}`,
+        CHANCE,
+        IDENTITY,
+        KEYS,
+      )
+    expect(
+      imported(`for (const row of await db.select().from(t)) await insertRow(row)`),
+    ).toHaveLength(1)
+    expect(
+      imported(`expect((await db.select().from(t)).some((r) => insertRow(r))).toBe(true)`),
+    ).toHaveLength(1)
+    expect(
+      imported(`expect((await db.select().from(t)).map((r) => schema.parse(r))).toHaveLength(2)`),
+    ).toHaveLength(1)
+    expect(imported(`for (const row of await db.select().from(t)) expect(row.n).toBe(1)`)).toEqual(
+      [],
+    )
+    expect(
+      imported(`for (const row of await db.select().from(t)) expect.soft(row.n).toBe(1)`),
+    ).toEqual([])
+  })
+
+  it('refuses onlyRow and sorted of the file itself, and one of the module under another use', () => {
+    const local = (body: string): string[] =>
+      unorderedReads(
+        FILE,
+        `const onlyRow = (rows) => rows[0]\nconst sorted = (v) => v\n${inTest(body)}`,
+        CHANCE,
+        IDENTITY,
+        KEYS,
+      )
+    expect(local(`const row = onlyRow(await db.select().from(t))`)).toHaveLength(1)
+    expect(
+      local(`expect(sorted((await db.select().from(t)).map((r) => r.x))).toEqual([a, b])`),
+    ).toHaveLength(1)
+    // what onlyRow takes is free; a part of the rows taken before it by place is not
+    expect(byRows(`const row = onlyRow((await db.select().from(t)).slice(0, 1))`)).toHaveLength(1)
+    // sorted gives values back: what then is done with the rows themselves is judged as ever
+    expect(
+      byRows(
+        `const rows = await db.select().from(t)\nsorted(rows.map((r) => r.x))\nexpect(rows).toEqual([a, b])`,
+      ),
+    ).toHaveLength(1)
   })
 
   // names by TypeScript's binder: another test's `rows` holds an ordered read
@@ -1054,5 +1259,17 @@ describe('schemaTables', () => {
     expect(tables.has('ownerNotices')).toBe(true)
     expect(tables.has('sessions')).toBe(true)
     expect(tables.has('receiptLines')).toBe(true)
+  })
+})
+
+// review round 14: a helper beside the tests reads as a test does — `fixtures.ts`' first row was found only there
+describe('filesToRead', () => {
+  it('reads the integration tests and the helpers beside them, the net’s own test aside', () => {
+    const files = filesToRead()
+    expect(files).toContain('backend/tests/feedback-bot.integration.test.ts')
+    expect(files).toContain('backend/tests/fixtures.ts')
+    expect(files).toContain('backend/tests/setup-db.ts')
+    expect(files).not.toContain('backend/tests/unordered-rows.integration.test.ts')
+    expect(new Set(files).size).toBe(files.length)
   })
 })

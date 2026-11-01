@@ -11,3 +11,4 @@ export declare function chanceColumns(source: string): Set<string>
 export declare function identityColumns(source: string): Set<string>
 export declare function uniqueKeys(source: string): string[][]
 export declare function schemaTables(source: string): Set<string>
+export declare function filesToRead(): string[]

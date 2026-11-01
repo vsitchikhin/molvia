@@ -4,14 +4,14 @@
 // `feedback-bot` read its four words so and failed on a pull request that touched only the PWA (CI
 // 41022785698).
 //
-// **The net holds it at run time** (review of MOL-323, rounds 12, 13): `backend/tests/unordered-rows.ts`
-// reverses the rows of every `SELECT` of the integration tests with no `order by` of its own, and of every
-// `UPDATE`, `DELETE` and `MERGE` returning them — the one order that puts each two rows the other way round
-// — so a test leaning on which of any two such rows comes first fails on its first run, however it reads
-// them. **What the net cannot hold, this check does**: two reads reversed alike match whatever their order
-// was — a snapshot met by a snapshot — and an order the statement has, of chance or of ties, the net never
-// touches. For one read with no order this check's word is a hint the net makes good; for two compared, and
-// for an order the statement has, it is what holds.
+// **The net is the run's half** (review of MOL-323, rounds 12, 13): `backend/tests/unordered-rows.ts` reverses
+// the rows of every `SELECT` of the integration tests with no `order by` of its own, and of every `UPDATE`,
+// `DELETE` and `MERGE` returning them, so a test leaning on which of two such rows comes first fails on its
+// first run — where the values it reads differ reversed. **Values the same reversed it cannot tell** (round 14,
+// О1): kinds `failure, silence, failure` give the same first row, `find` and `[...new Set()]` either way, and
+// no fixed order can tell every such use — two columns may ask for two orders at once; nor two reads reversed
+// alike, nor an order the statement has, of chance or of ties, which it never touches. **So this check holds
+// every use of rows with no order by itself**, and the net is what a form the check follows wrong runs into.
 //
 // Found by parsing, as `check-clock-bounds.mjs` is, names resolved by TypeScript's binder, the facts of the
 // tables read from `schema.ts`. **The check is closed at each of the three places it recognises something**
@@ -46,29 +46,34 @@
 // `flat`, `slice`, `JSON.stringify`, a spread of them alone, a branch of `?:`, `??`, `||`, an object, a
 // name — declared, assigned, taken from `Promise.all` — a function of the file that returns them, and a
 // query carried on (`base.where(c)`), which is a read of its own. They may end only where their order
-// cannot tell: their length, their first row, `find`, `some`, `every`, `includes`, `reduce`, `sort`,
-// `toSorted`, a `for … of`, a `Set`, a `Map`, `inArray`, `notInArray`, `Object.fromEntries`, `typeof`,
-// discarded, a promise refused; under `expect`: `toHaveLength`, `toContain` and `toContainEqual` of the
-// rows, `toBeDefined`, `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, a `not` of these and of no other,
-// `toEqual` of one row or none written in place or of `expect.arrayContaining`. A callback of these is in
-// doubt where it takes the index of a row (a parameter, the rest of its arguments), changes anything
-// outside it (a name, a field, a method of a name from outside, a function of this file called, a name
-// handed to a call), or is one the parse cannot read; the platform's `Boolean`, `String`, `Number` are
-// read. Of the rows made one string nothing is free but its length. Rows in the order of chance may besides
-// meet another read in the same total order — a snapshot with a snapshot. Anything else is refused, and the
-// fix is an order, never a use the check does not know. **Every answer of «free» or «not a read» the check
-// gives is one written here**; nothing else is let go.
+// cannot tell: their length, `some`, `every`, `includes`, a `for … of` whose body changes nothing outside it
+// and leaves at no row (`break`, `return`, `yield`, a labelled `continue`), a `Set` — its size, `has`, itself
+// against another, a `Map`'s `has` and size — `inArray`, `notInArray`, `typeof`, discarded, a promise refused;
+// `onlyRow`, `sorted` and `sum` of `backend/tests/rows.ts`, by their import, which hold at run time what makes
+// them free — the one row or none, else an error; values that are not objects, sorted; whole numbers, summed;
+// under `expect`: `toHaveLength`, `toContain` and `toContainEqual` of the rows, `toBeDefined`,
+// `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, a `not` of these and of no other, `toEqual` of one row or none
+// written in place or of `expect.arrayContaining`. **Not the first row, `find`, `reduce`, `sort`, `toSorted`,
+// a part by `slice`, a value of a `Map` or an object by its key** (round 14, О1): each is the order the rows
+// came in — of several, the first; of a comparator's ties, the one before; of a key repeated, the last. A
+// callback of these is in doubt where it takes the index of a row (a parameter, the rest of its arguments),
+// changes anything outside it (a name, a field, a method of a name from outside, a function of this file or of
+// an import called — vitest's `expect` alone is known to keep nothing — a name handed to a call), or is one
+// the parse cannot read; the platform's `Boolean`, `String`, `Number` are read. Of the rows made one string
+// nothing is free but its length. Rows in the order of chance may besides meet another read in the same total
+// order — a snapshot with a snapshot. Anything else is refused, and the fix is an order, or the rows through
+// `onlyRow`, `sorted`, `sum` — never a use the check does not know. **Every answer of «free» or «not a read»
+// the check gives is one written here**; nothing else is let go.
 //
-// **The price, named, by class, and nothing outside these classes** — of one read with no order none is
-// left, the net holds it; of two reads with no order compared, what a form this check does not follow hides
-// (the net reverses both alike); of rows in an order the statement has: an order of ties is taken as an
-// order — a column every row read shares, a parent's identity through a join, a `sort` whose key repeats,
-// an order of SQL text by whatever it names; an order of values the test wrote is taken as the test's — a
-// column that is neither a uuid nor a moment is not judged; a moment before an identity is refused even
-// where the test wrote the moments; of rows in the order of chance, a row picked as the one is taken as the
-// only one, what a loop or a `reduce` collects is not followed, a callback calling a pure method of a name
-// of this file is refused, and a function handed in as a parameter, a field of an object of rows, an import
-// and a helper of another file are not followed. Those go to review.
+// **The price, named, by class, and nothing outside these classes** — of rows with no order, what a form this
+// check does not follow hides: rows a helper of another file returns — the net reverses them, and values the
+// same reversed it cannot tell — and a read of the API's own code, which no test file holds; of rows in
+// an order the statement has: an order of ties is taken as an order — a column every row read shares, a
+// parent's identity through a join, an order of SQL text by whatever it names; an order of values the test
+// wrote is taken as the test's — a column that is neither a uuid nor a moment is not judged; a moment before an
+// identity is refused even where the test wrote the moments; a callback calling a pure method of a name of
+// this file or of an import is refused. Those go to review. The files read are the integration tests and the
+// helpers beside them in `backend/tests/` (round 14), the net's own test aside.
 //
 //   node bin/check-ordered-reads.mjs
 
@@ -77,14 +82,14 @@ import { readFileSync } from 'node:fs'
 import process from 'node:process'
 import ts from 'typescript'
 
-/** The files that read Postgres: the integration tests of the API. */
-const FILES = ['backend/*.integration.test.ts']
+/** The files that read Postgres: the integration tests of the API and the helpers beside them (review round 14). */
+const FILES = ['backend/*.integration.test.ts', 'backend/tests/*.ts']
 /** The test of the net that turns rows read with no order: it reads so on purpose. */
 const THE_NET = 'backend/tests/unordered-rows.integration.test.ts'
 /** Where a column is a uuid, a moment or an identity. */
 const SCHEMA = 'backend/src/db/schema.ts'
 
-/** The methods an array of rows keeps its order through. */
+/** The methods an array of rows keeps its order through, every row's part kept: `slice` only whole, with nothing. */
 const KEEPS = new Set(['map', 'filter', 'flatMap', 'flat', 'slice'])
 /** The methods that carry a query of Drizzle on: what they give is a query, read where it ends. */
 const BUILDS = new Set([
@@ -109,14 +114,15 @@ const BUILDS = new Set([
   'intersect',
   'except',
 ])
-/** The methods whose answer no order of the rows can change, or that give them one. */
-const ORDERLESS = new Set(['find', 'some', 'every', 'includes', 'reduce', 'sort', 'toSorted'])
-/** Where a callback is handed the index of a row: the second parameter, `reduce`'s third; a comparator never. */
-const INDEX_AT = { reduce: 2, sort: Infinity, toSorted: Infinity }
+/**
+ * The methods whose answer no order of the rows can change. Not `find`, `reduce`, `sort`, `toSorted`: the first
+ * match, a sum of strings, two rows a comparator ties — each the order the rows came in (review round 14, О1).
+ */
+const ORDERLESS = new Set(['some', 'every', 'includes'])
 /** The platform's casts: a callback of the first argument alone. */
 const CASTS = new Set(['Boolean', 'String', 'Number'])
 /** The methods handed a value, not a callback. */
-const NO_CALLBACK = new Set(['includes', 'slice', 'flat', 'sort', 'toSorted'])
+const NO_CALLBACK = new Set(['includes', 'slice', 'flat'])
 /** What is handed the rows whole and keeps no order of them. */
 const ORDERLESS_CALLS = new Set(['inArray', 'notInArray'])
 /**
@@ -436,6 +442,13 @@ export function unorderedReads(
     return found
   }
 
+  /** The module an import of a name is from: `vitest` for `import { expect } from 'vitest'`. */
+  const importedFrom = (declaration) => {
+    let d = declaration
+    while (d && !ts.isImportDeclaration(d)) d = d.parent
+    return d && ts.isStringLiteral(d.moduleSpecifier) ? d.moduleSpecifier.text : undefined
+  }
+
   /** Whether a tag is Drizzle's `sql`, by the import that names it: a fragment, never a query of its own. */
   const drizzleSql = (tag) => {
     if (!ts.isIdentifier(tag)) return false
@@ -707,14 +720,14 @@ export function unorderedReads(
     if (ts.isIdentifier(argument) && CASTS.has(argument.text)) return undefined
     const callback = functionOf(argument)
     if (!callback) return 'by a callback the check cannot read'
-    if (callback.parameters.length > (INDEX_AT[method] ?? 1)) return 'by index'
+    if (callback.parameters.length > 1) return 'by index'
     // an index without a parameter for it: the rest of the arguments, or a count kept outside (Д3)
     if (callback.parameters.some((parameter) => parameter.dotDotDotToken)) return 'by index'
     return countsOutside(callback) ? 'by what it changes outside' : undefined
   }
 
-  /** Whether a function changes a name declared outside it: `texts[i++]`, `n += 1`. */
-  const countsOutside = (callback) => {
+  /** Whether a function — or a loop, its body — changes a name declared outside it: `texts[i++]`, `n += 1`. */
+  const countsOutside = (callback, body = callback.body) => {
     let changes = false
     const outside = (target) => {
       let root = target
@@ -725,7 +738,16 @@ export function unorderedReads(
         ts.isNonNullExpression(root)
       )
         root = root.expression
-      const declaration = ts.isIdentifier(root) ? symbolOf(root)?.valueDeclaration : undefined
+      if (!ts.isIdentifier(root)) return false
+      // an import is a function of no known answer — it may write what it is handed, in the order it was handed it
+      // (review round 14) — but vitest's `expect`, which keeps nothing
+      const [first] = symbolOf(root)?.declarations ?? []
+      if (
+        first &&
+        (ts.isImportSpecifier(first) || ts.isImportClause(first) || ts.isNamespaceImport(first))
+      )
+        return !(root.text === 'expect' && importedFrom(first) === 'vitest')
+      const declaration = symbolOf(root)?.valueDeclaration
       return Boolean(
         declaration && !(declaration.pos >= callback.pos && declaration.end <= callback.end),
       )
@@ -738,14 +760,9 @@ export function unorderedReads(
         outside(node.expression.expression)
       )
         changes = true
-      // or a function of this file from outside called, which may change what it likes: a spy, `record(row)` (Ж1);
-      // a parameter of a function around it is handed in, not followed — the price
-      if (
-        ts.isCallExpression(node) &&
-        ts.isIdentifier(node.expression) &&
-        outside(node.expression) &&
-        !ts.isParameter(symbolOf(node.expression)?.valueDeclaration ?? node)
-      )
+      // or a function from outside called, which may change what it likes: a spy, `record(row)` (Ж1), one handed
+      // in as a parameter of a function around it, an import (round 14)
+      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && outside(node.expression))
         changes = true
       // or a name from outside handed to a call, which may change it: `Object.assign(out, row)`
       if (ts.isCallExpression(node) && node.arguments.some((a) => ts.isIdentifier(a) && outside(a)))
@@ -765,8 +782,42 @@ export function unorderedReads(
         changes = true
       ts.forEachChild(node, visit)
     }
-    visit(callback.body)
+    visit(body)
     return changes
+  }
+
+  /**
+   * Why a `for … of` of rows may tell their order: its body changes what is outside it, as a callback's may, or leaves
+   * the loop at a row — `break`, `return`, `yield` — which is `find` (review round 14, О1).
+   */
+  const loopDoubt = (loop) => {
+    let leaves = false
+    const visit = (node) => {
+      if (ts.isFunctionLike(node)) return
+      if (ts.isBreakStatement(node) || ts.isReturnStatement(node) || ts.isYieldExpression(node))
+        leaves = true
+      if (ts.isContinueStatement(node) && node.label) leaves = true
+      ts.forEachChild(node, visit)
+    }
+    visit(loop.statement)
+    if (leaves) return 'a for … of left at a row'
+    return countsOutside(loop, loop.statement)
+      ? 'a for … of that changes what is outside it'
+      : undefined
+  }
+
+  /**
+   * Whether a call is of `onlyRow`, `sorted` or `sum` of `backend/tests/rows.ts`, by the import that names it: the
+   * one row or none, else an error; values that are not objects, sorted; whole numbers, summed — what no order of the
+   * rows can change, held at run time (review round 14, О1).
+   */
+  const byRows = (callee) => {
+    if (!ts.isIdentifier(callee)) return false
+    const declaration = symbolOf(callee)?.declarations?.[0]
+    if (!declaration || !ts.isImportSpecifier(declaration)) return false
+    const from = declaration.parent.parent.parent.moduleSpecifier
+    const name = (declaration.propertyName ?? declaration.name).text
+    return ts.isStringLiteral(from) && from.text === './rows' && /^(onlyRow|sorted|sum)$/.test(name)
   }
 
   /** The names given a read, by their symbol, with its order. */
@@ -871,20 +922,24 @@ export function unorderedReads(
             : { why: `.${name}() of a query the check cannot follow` }
         }
         if (ORDERLESS.has(name)) return { free: true }
+        // a part of the rows by place is the order's: `slice` keeps them only whole (review round 14, О1)
+        if (name === 'slice' && p.parent.arguments.length > 0) return { why: '.slice(…)' }
         if (KEEPS.has(name)) {
           n = p.parent
           continue
         }
-        if (name === 'at' && literalIndex(p.parent.arguments[0]) === 0) return { free: true }
+        // the first row of several is the order's (review round 14, О1): `onlyRow` takes the one
+        if (name === 'at' && literalIndex(p.parent.arguments[0]) === 0)
+          return { why: 'the first row' }
         return { why: `.${name}()` }
       }
       if (ts.isElementAccessExpression(p) && p.expression === n)
-        return literalIndex(p.argumentExpression) === 0 ? { free: true } : { why: '[…]' }
+        return { why: literalIndex(p.argumentExpression) === 0 ? 'the first row' : '[…]' }
       if (ts.isVariableDeclaration(p) && p.initializer === n) {
         if (ts.isIdentifier(p.name)) return { name: p.name }
         const [only, ...rest] = ts.isArrayBindingPattern(p.name) ? p.name.elements : []
         const first = only && ts.isBindingElement(only) && !only.dotDotDotToken
-        return first && rest.length === 0 ? { free: true } : { why: 'taken apart' }
+        return { why: first && rest.length === 0 ? 'the first row' : 'taken apart' }
       }
       if (
         ts.isBinaryExpression(p) &&
@@ -906,10 +961,14 @@ export function unorderedReads(
         return named ? { helper: named } : { why: 'returned' }
       }
       if (ts.isExpressionStatement(p) || ts.isTypeQueryNode(p)) return { free: true }
-      if (ts.isForOfStatement(p) && p.expression === n) return { free: true }
+      if (ts.isForOfStatement(p) && p.expression === n) {
+        const doubt = loopDoubt(p)
+        return doubt ? { why: doubt } : { free: true }
+      }
       if ((ts.isCallExpression(p) || ts.isNewExpression(p)) && p.arguments?.includes(n)) {
         const callee = p.expression
         if (/^expect(\.soft)?$/.test(callee.getText(sf))) return matched(p, order, text)
+        if (ts.isCallExpression(p) && byRows(callee)) return { free: true }
         // the value a matcher compares with: the rows on the other side of `toEqual(rows)`
         const subject = ts.isPropertyAccessExpression(callee) ? subjectOf(callee) : undefined
         if (subject && ts.isPropertyAccessExpression(callee)) {
@@ -980,14 +1039,16 @@ export function unorderedReads(
     if (ts.isPropertyAccessExpression(p) && p.expression === n) {
       const name = p.name.text
       const called = ts.isCallExpression(p.parent) && p.parent.expression === p
-      if (container === 'object') return called ? { why: `.${name}()` } : { free: true }
+      // a value by its key is the last row of that key put in: the order's where a key repeats (round 14)
+      if (container === 'object') return { why: called ? `.${name}()` : 'a value by its key' }
       if (!called) return name === 'size' ? { free: true } : { why: `.${name}` }
-      if (name === 'has' || (container === 'map' && name === 'get')) return { free: true }
+      if (name === 'has') return { free: true }
+      if (name === 'get') return { why: 'a value by its key' }
       if (/^(values|keys|entries)$/.test(name)) return { unpacked: p.parent }
       return { why: `.${name}()` }
     }
     if (ts.isElementAccessExpression(p) && p.expression === n)
-      return container === 'object' ? { free: true } : { why: '[…]' }
+      return { why: container === 'object' ? 'a value by its key' : '[…]' }
     if (ts.isVariableDeclaration(p) && p.initializer === n && ts.isIdentifier(p.name))
       return { name: p.name }
     if ((ts.isCallExpression(p) || ts.isNewExpression(p)) && p.arguments?.includes(n)) {
@@ -1009,7 +1070,10 @@ export function unorderedReads(
       p.parent.elements.length === 1
     )
       return { unpacked: p.parent }
-    if (ts.isForOfStatement(p) && p.expression === n) return { free: true }
+    if (ts.isForOfStatement(p) && p.expression === n) {
+      const doubt = loopDoubt(p)
+      return doubt ? { why: doubt } : { free: true }
+    }
     return {}
   }
 
@@ -1124,16 +1188,25 @@ export function unorderedReads(
   return [...new Set(found)].sort((a, b) => Number.parseInt(a) - Number.parseInt(b))
 }
 
+/**
+ * The files the check reads, as git knows them: every integration test and every helper beside them, the net's own
+ * test aside.
+ * @returns {string[]}
+ */
+export function filesToRead() {
+  return execFileSync('git', ['ls-files', ...FILES], { encoding: 'utf8' })
+    .trim()
+    .split('\n')
+    .filter((file, at, all) => file && file !== THE_NET && all.indexOf(file) === at)
+}
+
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
   const schema = readFileSync(SCHEMA, 'utf8')
   const chance = chanceColumns(schema)
   const identity = identityColumns(schema)
   const known = schemaTables(schema)
   const keys = uniqueKeys(schema)
-  const files = execFileSync('git', ['ls-files', ...FILES], { encoding: 'utf8' })
-    .trim()
-    .split('\n')
-    .filter((file) => file && file !== THE_NET)
+  const files = filesToRead()
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     return unorderedReads(file, source, chance, identity, keys, known).map(
