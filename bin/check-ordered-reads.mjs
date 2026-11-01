@@ -5,35 +5,38 @@
 //
 // Found by parsing, as `check-clock-bounds.mjs` is, names resolved by TypeScript's binder.
 //
-// **A read with no order**: a chain of Drizzle with `select…` and `from` and no `orderBy` that names a column
-// (`orderBy()` renders no ORDER BY); `findMany` with no `orderBy`; a template with `select` and `from` and no
-// `order by` of the statement itself — not in parentheses, a comment or a string — handed to `execute` or
-// tagged on its own (postgres.js); a function of the file that returns one, named first or not. **A read in
-// the order of chance** is one ordered only by columns of chance, read from the schema: a uuid
-// (`randomUUID()`) and a moment written by default (`now()` is one for every row of a transaction,
-// `clock_timestamp()` one for rows a microsecond apart). Their order is of values, not of insertion.
+// **A read with no order**: a chain of Drizzle with `select…` and `from` and no `orderBy` that names a
+// column (`orderBy()` renders no ORDER BY); `findMany` with no `orderBy`; a template with `select` and
+// `from` and no `order by` of the statement itself — not in parentheses, a comment or a string — handed to
+// `execute` or tagged on its own (postgres.js); a function of the file that returns one, named first or
+// not. **A read in the order of chance** is one whose order has a column of chance in it, read from the
+// schema: a uuid (`randomUUID()`) or a moment, whoever writes it — `now()` is one for every row of a
+// transaction, a repository writes one for a whole batch. Their order is of values, not of insertion, and a
+// column of chance decides the ties of those before it.
 //
-// **The rule is closed** (review of MOL-323, rounds 1 and 2): a list of the uses that compare by position
+// **The rule is closed** (review of MOL-323, rounds 1–3): a list of the uses that compare by position
 // missed one more each time it was attacked. So it goes the other way round. Rows are followed through
 // `await`, a cast, the methods that keep an order (`map`, `filter`, `flatMap`, `flat`, `slice`),
-// `JSON.stringify`, a spread of them alone, a branch of `?:`, `??` or `||`, an object they are put in, a name
-// they are given — declared, assigned or taken from an array (`Promise.all`) — and a function of the file that
-// returns them. Rows with no order may end only where their order cannot tell: their length, their first row
-// (`[0]`, `at(0)`, `const [row] = …`), `find`, `some`, `every`, `includes` — never by an index their callback is
-// handed — `reduce`, `sort`, `toSorted`, a `for … of`, a `Set`, a `Map`, `inArray`, `notInArray`,
-// `Object.fromEntries`, `typeof`, discarded; under
-// `expect`: `toHaveLength`, `toContain`, `toContainEqual`, `toBeDefined`, `toBeUndefined`, `toBeTruthy`,
-// `toBeFalsy`, any `not`, `toEqual` of one row or none written in place, or of `expect.arrayContaining`. Rows in
-// the order of chance may besides be compared with another read of them — a snapshot with a snapshot — but
-// never with what the test writes in place (a literal, `Array(n)`). Anything else is refused, and the fix is an
-// order, never a use the check does not know.
+// `JSON.stringify`, a spread of them alone, a branch of `?:`, `??` or `||`, an object they are put in, a
+// name they are given — declared, assigned or taken from an array (`Promise.all`) — and a function of the
+// file that returns them. Rows with no order may end only where their order cannot tell: their length,
+// their first row (`[0]`, `at(0)`, `const [row] = …`), `find`, `some`, `every`, `includes` — never by an
+// index their callback, written in place or named, is handed — `reduce`, `sort`, `toSorted`, a `for … of`,
+// a `Set`, a `Map`, `inArray`, `notInArray`, `Object.fromEntries`, `typeof`, discarded; under `expect`:
+// `toHaveLength`, `toContain`, `toContainEqual`, `toBeDefined`, `toBeUndefined`, `toBeTruthy`, `toBeFalsy`,
+// any `not`, `toEqual` of one row or none written in place, or of `expect.arrayContaining`. Rows in the
+// order of chance may besides be compared with another read in the order of chance — a snapshot with a
+// snapshot, by the read itself or a name given it — never with anything the test builds. Anything else is
+// refused, and the fix is an order, never a use the check does not know.
 //
 // What this is: a guard against the ordinary form, not against one built to slip past it. **The price,
 // named, by class:** an order of ties is taken as an order — a column every row read shares
-// (`.orderBy(t.threadId)` under `eq(t.threadId, …)`), a `sort` whose key repeats, an `order by` of SQL text by
-// whatever it names; a row picked as the one — the first, `find`, a key of a `Map` or `Object.fromEntries` — is
-// taken as the only one: where more qualify, the first in the heap answers, or for a key the last; what a `for … of` or a `reduce` collects is not followed — a sum is their ordinary use;
-// a helper of another file is not followed. Those go to review.
+// (`.orderBy(t.threadId)` under `eq(t.threadId, …)`), a `sort` whose key repeats, an `order by` of SQL text
+// by whatever it names; a row picked as the one — the first, `find`, a key of a `Map` or
+// `Object.fromEntries` — is taken as the only one: where more qualify, the first in the heap answers, or
+// for a key the last; what a `for … of` or a `reduce` collects is not followed — a sum is their ordinary
+// use; a field of an object of rows is not followed; a helper of another file is not followed. Those go to
+// review.
 //
 //   node bin/check-ordered-reads.mjs
 
@@ -44,7 +47,7 @@ import ts from 'typescript'
 
 /** The files that read Postgres: the integration tests of the API. */
 const FILES = ['backend/*.integration.test.ts']
-/** Where a column is a uuid or a moment written by default: its order is chance. */
+/** Where a column is a uuid or a moment: its order is chance. */
 const SCHEMA = 'backend/src/db/schema.ts'
 
 /** A file that names none of these reads nothing: the binder is spared it. */
@@ -70,9 +73,6 @@ const ORDERLESS_MATCHERS = new Set([
 ])
 /** The matchers that compare one value with another, an array element by element. */
 const COMPARES = new Set(['toEqual', 'toStrictEqual', 'toMatchObject', 'toBe'])
-/** A default of the database that writes the moment. */
-const MOMENT =
-  /\b(now|clock_timestamp|statement_timestamp|transaction_timestamp)\s*\(|current_timestamp/i
 
 /** One file as a program of its own, with nothing to resolve: enough for the binder to name its symbols. */
 function bind(fileName, source) {
@@ -107,13 +107,9 @@ const calledAs = (call) =>
       ? call.expression.text
       : undefined
 
-/** Whether a column of the schema is chance: a uuid, or a moment written by default. */
-const chanceColumn = (initializer, sf) =>
-  callsOf(initializer).some((call) => {
-    const name = calledAs(call)
-    if (name === 'uuid' || name === 'defaultNow') return true
-    return name === 'default' && call.arguments.some((a) => MOMENT.test(a.getText(sf)))
-  })
+/** Whether a column of the schema is chance: a uuid, or a moment, whoever writes it. */
+const chanceColumn = (initializer) =>
+  callsOf(initializer).some((call) => /^(uuid|timestamp)$/.test(calledAs(call) ?? ''))
 
 /**
  * The columns of the schema whose order is chance, as `table.column` by the names the tests import.
@@ -132,7 +128,7 @@ export function chanceColumns(source) {
       const columns = init.arguments[1]
       if (!columns || !ts.isObjectLiteralExpression(columns)) continue
       for (const column of columns.properties)
-        if (ts.isPropertyAssignment(column) && chanceColumn(column.initializer, sf))
+        if (ts.isPropertyAssignment(column) && chanceColumn(column.initializer))
           found.add(`${declaration.name.text}.${column.name.getText(sf)}`)
     }
   }
@@ -189,23 +185,6 @@ const literalIndex = (node) => {
   return undefined
 }
 
-/** Whether a value is written by the test in place: a literal, or an array it builds (`Array(6).fill(x)`). */
-const writtenInPlace = (node, sf) => {
-  let n = node
-  while (ts.isParenthesizedExpression(n) || ts.isAsExpression(n)) n = n.expression
-  if (
-    ts.isArrayLiteralExpression(n) ||
-    ts.isObjectLiteralExpression(n) ||
-    ts.isStringLiteral(n) ||
-    ts.isNoSubstitutionTemplateLiteral(n) ||
-    ts.isTemplateExpression(n) ||
-    ts.isNumericLiteral(n)
-  )
-    return true
-  const [root] = callsOf(n).reverse()
-  return Boolean(root && /^(new )?Array\b/.test(root.getText(sf)))
-}
-
 /**
  * Every read with no order that one file uses in an order, as `line: text — why`.
  * @param {string} fileName
@@ -247,7 +226,8 @@ export function unorderedReads(fileName, source, chance = new Set()) {
         .filter((call) => calledAs(call) === 'orderBy')
         .flatMap((call) => [...call.arguments])
       if (columns.length === 0) return 'none'
-      return columns.every(byChance) ? 'chance' : undefined
+      // a column of chance decides the ties of those before it: the order is chance
+      return columns.some(byChance) ? 'chance' : undefined
     }
     if (method === 'findMany') {
       const [query] = node.arguments
@@ -281,21 +261,37 @@ export function unorderedReads(fileName, source, chance = new Set()) {
     return false
   }
 
+  /** The function a callback is, written in place or named: `(row, i) => …`, `inOrder`. */
+  const functionOf = (node) => {
+    if (!node) return undefined
+    if (ts.isArrowFunction(node) || ts.isFunctionExpression(node)) return node
+    const declaration = ts.isIdentifier(node) ? symbolOf(node)?.valueDeclaration : undefined
+    if (declaration && ts.isFunctionDeclaration(declaration)) return declaration
+    const init =
+      declaration && ts.isVariableDeclaration(declaration) ? declaration.initializer : undefined
+    return init && (ts.isArrowFunction(init) || ts.isFunctionExpression(init)) ? init : undefined
+  }
+
   /** Whether the callback a method of rows is handed takes the index of a row. */
   const byIndex = (call, method) => {
-    const [callback] = call.arguments
-    const at = INDEX_AT[method] ?? 1
-    return Boolean(
-      callback &&
-      (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback)) &&
-      callback.parameters.length > at,
-    )
+    const callback = functionOf(call.arguments[0])
+    return Boolean(callback && callback.parameters.length > (INDEX_AT[method] ?? 1))
+  }
+
+  /** The names given a read, by their symbol, with its order. */
+  const names = new Map()
+  /** Whether a value is rows in the order of chance too: a read of them, or a name given one. */
+  const chanceSide = (node) => {
+    let n = node
+    while (ts.isAwaitExpression(n) || ts.isParenthesizedExpression(n) || ts.isAsExpression(n))
+      n = n.expression
+    return (ts.isIdentifier(n) ? names.get(symbolOf(n)) : readOf(n)) === 'chance'
   }
 
   /**
    * Where rows go: `{ free }` where their order cannot tell; `{ name }` given to a name; `{ helper }`
    * returned by a function of the file; `{ why, againstRead }` used in an order — `againstRead` where they
-   * are compared with a value the test did not write in place.
+   * are compared with rows read in the order of chance too.
    */
   const fate = (node) => {
     let n = node
@@ -377,8 +373,7 @@ export function unorderedReads(fileName, source, chance = new Set()) {
         if (subject && ts.isPropertyAccessExpression(callee)) {
           const name = callee.name.text
           if (negated(callee)) return { free: true }
-          if (COMPARES.has(name))
-            return { why: `${name}(…)`, againstRead: !writtenInPlace(subject, sf) }
+          if (COMPARES.has(name)) return { why: `${name}(…)`, againstRead: chanceSide(subject) }
           return { why: `${name}(…)` }
         }
         if (callee.getText(sf) === 'JSON.stringify') {
@@ -435,7 +430,7 @@ export function unorderedReads(fileName, source, chance = new Set()) {
       const what = ts.isArrayLiteralExpression(expected)
         ? `[${String(expected.elements.length)}]`
         : '…'
-      return { why: `${name}(${what})`, againstRead: !writtenInPlace(expected, sf) }
+      return { why: `${name}(${what})`, againstRead: chanceSide(expected) }
     }
     return { why: name }
   }
@@ -461,8 +456,9 @@ export function unorderedReads(fileName, source, chance = new Set()) {
   const lines = source.split('\n')
   let found = []
   // a helper may return a call of another helper, and learn its order late: read until nothing changes
-  for (let before; before !== [...helpers.values()].join();) {
-    before = [...helpers.values()].join()
+  const state = () => [...helpers.values(), '|', ...names.values()].join()
+  for (let before; before !== state();) {
+    before = state()
     found = []
     const reads = []
     const collect = (node) => {
@@ -486,6 +482,7 @@ export function unorderedReads(fileName, source, chance = new Set()) {
           )
         } else if (end.name) {
           const symbol = symbolOf(end.name)
+          if (names.get(symbol) !== 'none') names.set(symbol, order)
           if (seen.has(symbol)) return
           seen.add(symbol)
           for (const use of mentions.get(symbol) ?? []) follow(use)
@@ -510,7 +507,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   })
   if (problems.length > 0) {
     console.error(
-      `ordered reads: ${String(problems.length)} rows with no ORDER BY used in an order — order by an identity id or a position, never a uuid or a moment written by default alone (.claude/rules/testing.md, MOL-323)`,
+      `ordered reads: ${String(problems.length)} rows with no ORDER BY used in an order — order by an identity id or a position, never by a uuid or a moment (.claude/rules/testing.md, MOL-323)`,
     )
     for (const problem of problems) console.error(problem)
     process.exitCode = 1

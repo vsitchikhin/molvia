@@ -178,6 +178,50 @@ describe('unorderedReads', () => {
       'none on the other side of toEqual',
       `const rows = await db.select().from(t)\nexpect(before).toEqual(rows)`,
     ],
+    // round 3, В1: a moment is chance whoever writes it
+    [
+      'a moment with an identity after it, against rows in place',
+      `expect(await db.select().from(t).orderBy(t.createdAt, t.id)).toEqual([a, b])`,
+    ],
+    // round 3, В2: «another read» is a read of chance, never what the test builds
+    [
+      'chance against a constant',
+      `const devices = ['a', 'b']\nexpect((await db.select().from(sessions).orderBy(sessions.id)).map(f)).toEqual(devices)`,
+    ],
+    [
+      'chance against ids pushed as written',
+      `const ids = []\nids.push(await signIn(a))\nexpect((await db.select().from(sessions).orderBy(sessions.id)).map(f)).toEqual(ids)`,
+    ],
+    [
+      'chance against a literal mapped',
+      `expect((await db.select().from(sessions).orderBy(sessions.id)).map(f)).toEqual([anna, boris].map(g))`,
+    ],
+    [
+      'chance on the other side of a constant',
+      `const devices = ['a', 'b']\nconst rows = await db.select().from(sessions).orderBy(sessions.id)\nexpect(devices).toEqual(rows.map(f))`,
+    ],
+    [
+      'chance against a read in another order',
+      `const rows = await db.select().from(sessions).orderBy(sessions.id)\nexpect(rows).toEqual(await db.select().from(sessions).orderBy(sessions.position))`,
+    ],
+    // round 3, В3: a column of chance decides the ties of those before it
+    [
+      'a kind broken by a uuid',
+      `expect(await db.select().from(sessions).orderBy(sessions.kind, sessions.id)).toEqual([a, b])`,
+    ],
+    [
+      'a kind broken by a uuid, asc and desc',
+      `expect(await db.select().from(sessions).orderBy(asc(sessions.kind), desc(sessions.id))).toEqual([a, b])`,
+    ],
+    // round 3, В4: a callback by the index, named
+    [
+      'every by a named callback with the index',
+      `const inOrder = (row, i) => row.text === want[i]\nexpect((await db.select().from(t)).every(inOrder)).toBe(true)`,
+    ],
+    [
+      'some by a function with the index',
+      `function lastIsB(row, i) {\nreturn i === 1 && row.b\n}\nexpect((await db.select().from(t)).some(lastIsB)).toBe(true)`,
+    ],
   ])('refuses %s', (_, body) => {
     expect(found(body)).toHaveLength(1)
   })
@@ -249,16 +293,12 @@ describe('unorderedReads', () => {
       `expect(await db.select().from(t).orderBy(t.id).where(c)).toEqual([a, b])`,
     ],
     [
-      'createdAt with a second column',
-      `expect(await db.select().from(t).orderBy(t.createdAt, t.id)).toEqual([a, b])`,
+      'a position broken by an identity',
+      `expect(await db.select().from(t).orderBy(t.position, t.id)).toEqual([a, b])`,
     ],
     [
-      'a uuid against another read',
-      `expect(await db.select().from(sessions).orderBy(sessions.id)).toEqual(before)`,
-    ],
-    [
-      'a moment of clock_timestamp with a second column',
-      `expect(await db.select().from(t).orderBy(t.createdAt, t.id)).toEqual([a, b])`,
+      'a uuid against another read of chance',
+      `const before = await db.select().from(sessions).orderBy(sessions.id)\nexpect(await db.select().from(sessions).orderBy(sessions.id)).toEqual(before)`,
     ],
     [
       "a '--' in a string, then an order",
@@ -267,6 +307,10 @@ describe('unorderedReads', () => {
     [
       'every by the row alone',
       `expect((await db.select().from(t)).every((r) => r.n > 0)).toBe(true)`,
+    ],
+    [
+      'every by a named callback of the row alone',
+      `const positive = (r) => r.n > 0\nexpect((await db.select().from(t)).every(positive)).toBe(true)`,
     ],
     [
       'sort by a comparator',
@@ -351,7 +395,7 @@ describe('unorderedReads', () => {
 })
 
 describe('chanceColumns', () => {
-  it('names the columns of chance by the names the tests import: a uuid, a moment written by default', () => {
+  it('names the columns of chance by the names the tests import: a uuid, a moment whoever writes it', () => {
     const schema = `
       export const sessions = pgTable('sessions', {
         id: uuid('id').primaryKey(),
@@ -371,6 +415,7 @@ describe('chanceColumns', () => {
       'sessions.actorId',
       'sessions.seenAt',
       'sessions.createdAt',
+      'sessions.expiresAt',
     ])
   })
 
@@ -379,6 +424,8 @@ describe('chanceColumns', () => {
     expect(chance.has('sessions.id')).toBe(true)
     expect(chance.has('events.occurredAt')).toBe(true)
     expect(chance.has('feedback.createdAt')).toBe(true)
+    // round 3, В1: a moment the repository writes, one for a whole batch (`failures-repository`)
+    expect(chance.has('ownerNotices.createdAt')).toBe(true)
     expect(chance.has('feedback.id')).toBe(false)
     expect(chance.has('receiptLines.position')).toBe(false)
   })
