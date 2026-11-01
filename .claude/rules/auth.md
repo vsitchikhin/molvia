@@ -416,7 +416,9 @@ the round trip through Telegram, and ask whose account this turned out to be.
   `/actors/me` failing alone the card comes with a screen's first answer** (self-review №10): a skeleton
   holds it back, since with the server down the screen's own error comes after it. **A tap while the
   identity asks again by itself waits for that question** (`start` hands back the one in the air,
-  adversarial Г2), so «Повторяем…» stands and the failure is said when it came.
+  adversarial Г2), so «Повторяем…» stands and the failure is said when it came; **a tap by hand on the
+  login shows the question it waits for** — `loading`, the skeleton, the failure drawn and said again
+  (self-review №11, adversarial Д1).
 - **The development seam is a button, and only in a development build.** It signed the app in by
   itself until now, which made the screen this epic exists for invisible in every working copy
   and unreachable to the end-to-end suite; `signedIn()` in `e2e/session.ts` now presses it, in
