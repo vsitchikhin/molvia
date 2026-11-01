@@ -1899,6 +1899,7 @@ describe('«Записать»', () => {
       .select({ hs: receiptLines.hs })
       .from(receiptLines)
       .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
     expect(lines.map((line) => line.hs)).toEqual(['56.10', '56.10'])
   })
 

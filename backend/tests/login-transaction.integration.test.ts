@@ -125,7 +125,7 @@ describe('atomic login', () => {
     ])
     expect(results.map((result) => result.status)).toEqual(['authenticated', 'authenticated'])
     expect(await first.db.select().from(actors)).toHaveLength(1)
-    const written = await first.db.select().from(sessions)
+    const written = await first.db.select().from(sessions).orderBy(sessions.id)
     expect(written).toHaveLength(2)
     expect(written[0]?.actorId).toBe(written[1]?.actorId)
     expect(written.map((row) => row.deviceName)).toEqual(['iPhone · Safari', 'iPhone · Safari'])

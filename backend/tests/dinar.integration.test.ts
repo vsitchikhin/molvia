@@ -348,7 +348,10 @@ describe('база держит динар тем же правилом, что 
 
   it('строка НБ Сербии хранит базу RSD; строка с чужой базой — отказ', async () => {
     await rates.upsert(serbian(daysAgo(1)))
-    const stored = await db.select().from(officialRates)
+    const stored = await db
+      .select()
+      .from(officialRates)
+      .orderBy(officialRates.provider, officialRates.currency, officialRates.rateDate)
     expect(stored.map((one) => [one.provider, one.base])).toEqual([
       ['nbs', 'RSD'],
       ['nbs', 'RSD'],

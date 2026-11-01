@@ -283,7 +283,11 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
       // «Վճարված է Առձեռն» — in hand (MOL-312)
       paidBy: 'cash',
     })
-    const lines = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
+    const lines = await db
+      .select()
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
     expect(lines.map((line) => [line.printed, line.sumMinor])).toEqual([
       ['Կաթ «Օրինակ» 3.2% 1լ', 74_000n],
       ['Հաց «Օրինակ»', 28_710n],
@@ -318,7 +322,11 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
       Promise.resolve({ kind: 'read', answer: spelt, costMicroUsd: 2_180, tokens: TOKENS }),
     )
     const reports = await readAll(benchReader(), model)
-    const lines = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
+    const lines = await db
+      .select()
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
     expect(lines.map((line) => [line.printed, line.sumMinor, line.discountMinor])).toEqual([
       ['Կաթ «Օրինակ» 3.2% 1լ', 74_000n, null],
       ['Հաց «Օրինակ»', 28_710n, 290n],
@@ -453,7 +461,10 @@ describe('the month’s cap (Т-4, В-2 «а»)', () => {
     expect(model.asked).toBe(1)
     expect((await receiptOf(id))?.readerVersion).toBe('tesseract 5.5.0 · test')
     expect(reports).toContainEqual({ kind: 'model_passed', reason: 'cap' })
-    const told = await db.select({ payload: ownerNotices.payload }).from(ownerNotices)
+    const told = await db
+      .select({ payload: ownerNotices.payload })
+      .from(ownerNotices)
+      .orderBy(ownerNotices.id)
     expect(told.map((row) => (row.payload as { step: number }).step)).toEqual([90, 100])
   }, 30_000)
 
@@ -1210,9 +1221,9 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     },
   }
   const notices = async () =>
-    (await db.select({ payload: ownerNotices.payload }).from(ownerNotices)).map(
-      (row) => row.payload,
-    )
+    (
+      await db.select({ payload: ownerNotices.payload }).from(ownerNotices).orderBy(ownerNotices.id)
+    ).map((row) => row.payload)
 
   it('counts why, keeps the photo and the answer for the review, and tells the developer — no name, no sum', async () => {
     const me = await person(LATER)

@@ -749,6 +749,7 @@ describe('то же слово после «ответьте ещё раз» —
       .select({ text: feedback.text })
       .from(feedback)
       .where(eq(feedback.threadId, thread))
+      .orderBy(feedback.id)
     expect(words.map((row) => row.text)).toEqual(['Всё ещё не грузится', 'А теперь грузится'])
     expect(
       await db.select().from(ownerNotices).where(eq(ownerNotices.kind, 'feedback_continued')),
@@ -795,7 +796,10 @@ describe('ответ знает свою нить (адверсариально�
 
     await answer(app, thread, 9040, 'Второй ответ')
 
-    const rows = await db.select({ thread: feedbackReplies.threadId }).from(feedbackReplies)
+    const rows = await db
+      .select({ thread: feedbackReplies.threadId })
+      .from(feedbackReplies)
+      .orderBy(feedbackReplies.id)
     expect(rows.map((row) => row.thread)).toEqual([thread, thread])
   })
 })
@@ -1048,7 +1052,11 @@ describe('снимки — владельцу после уведомления 
     await word({ text: 'Вот', picture: photo })
     await word({ text: 'Вот' })
 
-    const words = await db.select().from(feedback).where(eq(feedback.threadId, thread))
+    const words = await db
+      .select()
+      .from(feedback)
+      .where(eq(feedback.threadId, thread))
+      .orderBy(feedback.id)
     expect(words.map((row) => [row.text, row.pictures])).toEqual([
       ['', 1],
       ['', 1],
