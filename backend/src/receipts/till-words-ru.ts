@@ -2098,3 +2098,23 @@ export const TILL_PHRASES_RU: Readonly<Record<string, string>> = {
   // MOL-331, the owner's «Основа для пиццы «Пано»» of 08.10.2026: word by word «Лепёшка для пиццы»
   'պիցցայի լոշիկ': 'основа для пиццы',
 }
+
+/**
+ * The kinds whose «%» is a fat, by a word of their gloss (MOL-331): only on a line of one does a bare number the
+ * model copied read as a fat — a chocolate's «… 90» is its grams the till cut, a cocoa's its cocoa. A kind is added
+ * here, never in code.
+ */
+export const TILL_FAT_KINDS_RU: ReadonlySet<string> = new Set([
+  'молоко',
+  'сливки',
+  'сметана',
+  'творог',
+  'кефир',
+  'мацун',
+  'тан',
+  'ряженка',
+  'йогурт',
+  'сливочное',
+  'сыр',
+  'сырок',
+])

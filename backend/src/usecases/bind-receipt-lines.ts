@@ -24,7 +24,12 @@ import type { Embedder } from '@/embeddings/embedder'
 import type { BrandAsked } from '@/receipts/model-reader'
 import { CATALOGUE_SEED } from '@/catalogue-seed'
 import { TILL_BRANDS } from '@/receipts/till-brands'
-import { TILL_GENITIVES_RU, TILL_PHRASES_RU, TILL_WORDS_RU } from '@/receipts/till-words-ru'
+import {
+  TILL_FAT_KINDS_RU,
+  TILL_GENITIVES_RU,
+  TILL_PHRASES_RU,
+  TILL_WORDS_RU,
+} from '@/receipts/till-words-ru'
 import { findByBarcode } from '@/usecases/find-by-barcode'
 import { queryMeaning } from '@/usecases/query-meaning'
 
@@ -68,7 +73,7 @@ const SEED_NAMES = new Set(CATALOGUE_SEED.map(([name]) => name))
 /**
  * What a new item's name is written with beyond the till's words (MOL-261): the brands as their packages spell
  * them, the seed's items in the till's language — the country's nodes — for the kind it is of, the genitives
- * as adjectives and the till's phrases.
+ * as adjectives and the till's phrases; and the kinds whose «%» is a fat, for a line the model copied (MOL-331).
  */
 export function namingLexicon(nodes: readonly CatalogueNode[]): NameLexicon {
   return {
@@ -76,6 +81,7 @@ export function namingLexicon(nodes: readonly CatalogueNode[]): NameLexicon {
     seed: nodes,
     genitives: TILL_GENITIVES_RU,
     phrases: TILL_PHRASES_RU,
+    fats: TILL_FAT_KINDS_RU,
   }
 }
 

@@ -477,6 +477,20 @@ describe('a line of the owner’s that went new where its item was there (MOL-33
     expect(await bindOne(cream, name, true)).toMatchObject({ itemId: FOUND, match: 'weak' })
     expect(await bindOne(cream, name)).toMatchObject({ itemId: null })
   })
+
+  it('must not take a copied line for another thing: a flavour beside a brand, litres or grams for a fat (review)', async () => {
+    for (const [printed, name] of [
+      // adversarial А1: the brand copied whole names no melon
+      ['Յոգուրտ «Դինա» 2% 130գր', 'Йогурт «Дина» дыня 2% 130 г'],
+      // adversarial А3: a litre of kefir cut off its unit
+      ['Կեֆիր «Մարիաննա» 1', 'Кефир «Марианна» 1%'],
+      // self-review №1: a chocolate's grams cut, as the plan promised
+      ['Շոկոլադ «Գրանդ Քենդի» 90', 'Шоколад «Гранд Кенди» 90%'],
+    ] as const)
+      expect(await bindOne(printed, name, true), `${printed} → ${name}`).toMatchObject({
+        itemId: null,
+      })
+  })
 })
 
 describe('a catalogue with no names of the tills (MOL-293)', () => {

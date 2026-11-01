@@ -484,6 +484,11 @@ export interface NameLexicon {
    * «ֆրանսիական հրուշակեղեն» «пирожное французское», «շոկոլադե սալիկ» «шоколад». It names the kind it holds.
    */
   readonly phrases?: Readonly<Record<string, string>>
+  /**
+   * The kinds whose «%» is a fat, by a word of the kind's gloss: «сливки», «сыр» (MOL-331). A bare number the model
+   * copied is a fat only on a line of such a kind — a chocolate's «… 90» is its grams cut.
+   */
+  readonly fats?: ReadonlySet<string>
 }
 
 /** An item of the seed: its name and its names in the till's language. */
@@ -1145,13 +1150,22 @@ function sameLetters(a: string, b: string): boolean {
   return Math.min(x.length, y.length) >= 5 && levenshtein(x, y) <= 1
 }
 
+/** A number a package of litres may be: a dairy pack is two at most. */
+const LITRES_MAX = 2
+
+/** A word's letters, «ու» one: a letter of the key is not a letter of the word — «ш» is `sh` (adversarial А2). */
+const letterCount = (word: string): number =>
+  word.replace(/ու/gu, 'ւ').match(/\p{L}/gu)?.length ?? 0
+
 /**
  * A brand the model copied a letter short, under five letters where `sameLetters` forgives nothing (MOL-331):
- * «Պան» for «Պանո», «Ֆին» for «Ֆինո». The line's word is the name's with one letter taken out, from three.
+ * «Պան» for «Պանո», «Ֆին» for «Ֆինո». The line's word is the name's with one letter taken out, from three — a letter
+ * of the word, so neither a letter misread, «Սամ» for «Шам», nor two, «Պան» for «Панно» (adversarial А2).
  */
 function letterLost(printed: string, name: string): boolean {
   const [short, long] = [toSearchKey(printed), toSearchKey(name)]
   if (short.length < 3 || long.length !== short.length + 1) return false
+  if (letterCount(name) !== letterCount(printed) + 1) return false
   // a key is Latin and «ц», one code unit a letter
   for (let at = 0; at < long.length; at++)
     if (long.slice(0, at) + long.slice(at + 1) === short) return true
@@ -1324,19 +1338,7 @@ export function lineFitter(
     ...figuresOf(parts.percent ?? ''),
     ...figuresOf(parts.size ?? ''),
   ]
-  // a fat the model copied without its sign: a branded line's last word a bare number, with no fat or package of
-  // its own (MOL-331) — «Սերուցք «Մարիաննա» ուլտրապաստերիզացված 10» is the cream of 10 %
-  const last = tokens.at(-1) ?? ''
-  const signless =
-    parts.brand !== null &&
-    parts.percent === null &&
-    parts.size === null &&
-    /^\d+(?:[.,]\d+)?$/u.test(last)
-      ? `${last.replace('.', ',')}%`
-      : null
   const brand = wordsOf(parts.brand ?? '')
-  const brandHas = (word: string, copied: boolean): boolean =>
-    copied && brand.some((one) => letterLost(one, word))
   const shelfBrand = wordsOf(parts.brand === null ? '' : (shelfOf(parts.brand, lexicon) ?? ''))
   const brands = shelfBrand.length > 0 ? [brand, shelfBrand] : [brand]
   // any of the kind's senses: «հրուշակեղեն» is pastry and confectionery
@@ -1345,6 +1347,19 @@ export function lineFitter(
     ...(parts.kind === null ? [] : sensesOf(parts.kind, dictionary).map(wordsOf)),
     ...phrases.filter((phrase) => phrase.kind).map((phrase) => phrase.words),
   ]
+  // a fat the model copied without its sign (MOL-331): a branded line of a kind whose «%» is a fat, its last word a
+  // bare number, with no fat or package of its own — «Սերուցք «Մարիաննա» ուլտրապաստերիզացված 10» is the cream of 10 %;
+  // two and less may be the litres of a package cut off their unit, «Կեֆիր … 1» (adversarial А3)
+  const last = tokens.at(-1) ?? ''
+  const signless =
+    kinds.some((sense) => sense.some((word) => lexicon.fats?.has(word) === true)) &&
+    parts.brand !== null &&
+    parts.percent === null &&
+    parts.size === null &&
+    /^\d+(?:[.,]\d+)?$/u.test(last) &&
+    Number(last.replace(',', '.')) > LITRES_MAX
+      ? `${last.replace('.', ',')}%`
+      : null
   const next = nextThing(parts, dictionary)
   const nexts = next === null ? [] : sensesOf(next, dictionary).map(wordsOf)
   // a thing the dictionary has not is said by its letters: «Смузи» for «սմուզի»
@@ -1356,16 +1371,26 @@ export function lineFitter(
       (sense) =>
         sense.length > 0 && sense.every((word) => item.some((one) => sameRussian(word, one))),
     )
-  const lineHas = (word: string, copied: boolean): boolean =>
-    glossed.some((one) => sameRussian(word, one)) ||
-    spelt.some((one) => sameLetters(word, one)) ||
-    brandHas(word, copied)
+  const lineHas = (word: string): boolean =>
+    glossed.some((one) => sameRussian(word, one)) || spelt.some((one) => sameLetters(word, one))
+  // a word of the brand with no word of the item by its letters stands on the one word a letter longer that the line
+  // says nothing else of, and on that word alone (adversarial А1): «Դինա» names «Дина» and never the «дыня» beside
+  // it, «Սուրճ «Կոֆ»» no «Кофе»
+  const lostLetters = (item: readonly string[]): Set<string> =>
+    new Set(
+      brand.flatMap((one) => {
+        if (item.some((other) => sameLetters(one, other))) return []
+        const longer = item.filter((other) => !lineHas(other) && letterLost(one, other))
+        return longer.length === 1 ? longer : []
+      }),
+    )
   return (itemName, options = {}) => {
     const item = wordsOf(itemName)
     const copied = options.copied === true
+    const lost = copied ? lostLetters(item) : new Set<string>()
     if (item.length === 0) return false
     if (branded && options.generic === true) return false
-    if (!item.every((word) => lineHas(word, copied))) return false
+    if (!item.every((word) => lineHas(word) || lost.has(word))) return false
     if (
       !figuresOf(itemName).every(
         (figure) => figures.includes(figure) || (copied && figure === signless),
@@ -1376,7 +1401,8 @@ export function lineFitter(
       one.every((word) =>
         item.some(
           (other) =>
-            sameLetters(word, other) || (copied && one === brand && letterLost(word, other)),
+            sameLetters(word, other) ||
+            (one === brand && lost.has(other) && letterLost(word, other)),
         ),
       ),
     )
