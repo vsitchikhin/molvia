@@ -1319,6 +1319,65 @@ describe('unorderedReads', () => {
     expect(watching(spy, body)).toEqual([])
   })
 
+  // review round 17, С1: a matcher of `expect` keeps nothing only where it is known to — a snapshot keeps a count
+  it.each([
+    [
+      'a snapshot in a loop',
+      'for (const row of await db.select().from(t)) expect(row.kind).toMatchSnapshot()',
+    ],
+    [
+      'an inline snapshot in a loop',
+      'for (const row of await db.select().from(t)) expect(row.kind).toMatchInlineSnapshot()',
+    ],
+    [
+      'a file snapshot in a loop',
+      "for (const row of await db.select().from(t)) await expect(row.kind).toMatchFileSnapshot('a.txt')",
+    ],
+    [
+      'a snapshot of a thrown error in a loop',
+      'for (const row of await db.select().from(t)) expect(() => f(row)).toThrowErrorMatchingSnapshot()',
+    ],
+    [
+      'a snapshot by a computed name',
+      "for (const row of await db.select().from(t)) expect(row.kind)['toMatchSnapshot']()",
+    ],
+    [
+      'a soft snapshot',
+      'for (const row of await db.select().from(t)) expect.soft(row.kind).toMatchSnapshot()',
+    ],
+    [
+      'a matcher of extend',
+      'for (const row of await db.select().from(t)) expect(row).toBeRecorded()',
+    ],
+    [
+      'extend in a loop',
+      'for (const row of await db.select().from(t)) expect.extend({ [row.kind]: () => ({}) })',
+    ],
+    [
+      'a snapshot in a callback',
+      'expect((await db.select().from(t)).every((r) => expect(r.kind).toMatchSnapshot())).toBeDefined()',
+    ],
+  ])('refuses %s (round 17)', (_, body) => {
+    expect(found(body)).not.toEqual([])
+  })
+
+  it.each([
+    [
+      'matchers that forget',
+      'for (const row of await db.select().from(t)) { expect(row.n).toBeGreaterThan(0)\nexpect(row.kind).not.toMatch(/x/)\nexpect(row).toHaveProperty("kind") }',
+    ],
+    [
+      'asymmetric helpers',
+      'for (const row of await db.select().from(t)) expect(row).toEqual(expect.objectContaining({ kind: expect.any(String) }))',
+    ],
+    [
+      'a computed name known',
+      "for (const row of await db.select().from(t)) expect(row.n)['toBe'](1)",
+    ],
+  ])('leaves alone %s (round 17)', (_, body) => {
+    expect(found(body)).toEqual([])
+  })
+
   it('refuses onlyRow and sorted of the file itself, and one of the module under another use', () => {
     const local = (body: string): string[] =>
       unorderedReads(

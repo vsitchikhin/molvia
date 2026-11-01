@@ -61,7 +61,8 @@
 // an import but vitest's `expect`, `this`, and an alias of one; written by an assignment, its targets taken apart,
 // `++`, `delete`, a loop's target; called, its method called, handed to a call or to `new`; a query by a template
 // of any tag but Drizzle's `sql`; the platform's functions but its pure ones (`fetch`, `process.stdout.write`,
-// `console`), and every one of them in a file that spies on or stubs the platform (round 16, Р1) — or is one the
+// `console`), and every one of them in a file that spies on or stubs the platform (round 16, Р1); of vitest's
+// `expect`, only the names known to keep nothing — not a snapshot, which keeps a count (round 17, С1) — or is one the
 // parse cannot read; the platform's `Boolean`, `String`, `Number` are read. Of the rows made one string
 // nothing is free but its length. Rows in the order of chance may besides meet another read in the same total
 // order — a snapshot with a snapshot. Anything else is refused, and the fix is an order, or the rows through
@@ -194,6 +195,54 @@ const ORDERLESS_MATCHERS = new Set([
 ])
 /** The matchers that compare one value with another, an array element by element. */
 const COMPARES = new Set(['toEqual', 'toStrictEqual', 'toMatchObject', 'toBe'])
+/**
+ * The names of vitest's `expect` chain known to keep nothing between calls (review round 17, С1): its modifiers, its
+ * matchers that compare and forget, its asymmetric helpers. Not a snapshot — `toMatchSnapshot`,
+ * `toMatchInlineSnapshot`, `toMatchFileSnapshot`, `toThrowErrorMatchingSnapshot` keep a count, the n-th call met with
+ * the n-th written — nor `extend` and what it adds, nor anything else: a name not here is in doubt.
+ */
+const KEEPS_NOTHING = new Set([
+  'soft',
+  'not',
+  'resolves',
+  'rejects',
+  'toBe',
+  'toEqual',
+  'toStrictEqual',
+  'toMatchObject',
+  'toContain',
+  'toContainEqual',
+  'toHaveLength',
+  'toHaveProperty',
+  'toBeDefined',
+  'toBeUndefined',
+  'toBeNull',
+  'toBeTruthy',
+  'toBeFalsy',
+  'toBeNaN',
+  'toBeTypeOf',
+  'toBeInstanceOf',
+  'toBeGreaterThan',
+  'toBeGreaterThanOrEqual',
+  'toBeLessThan',
+  'toBeLessThanOrEqual',
+  'toBeCloseTo',
+  'toMatch',
+  'toThrow',
+  'toThrowError',
+  'toSatisfy',
+  'toBeOneOf',
+  'toHaveBeenCalled',
+  'toHaveBeenCalledTimes',
+  'toHaveBeenCalledWith',
+  'any',
+  'anything',
+  'objectContaining',
+  'arrayContaining',
+  'stringContaining',
+  'stringMatching',
+  'closeTo',
+])
 
 /** One file as a program of its own, with nothing to resolve: enough for the binder to name its symbols. */
 function bind(fileName, source) {
@@ -817,17 +866,30 @@ export function unorderedReads(
     visit(sf)
     return found
   })()
-  /** Whether a call's callee is vitest's `expect`, or a matcher of its chain: what keeps nothing, watched or not. */
+  /**
+   * What a callee of vitest's `expect` chain is: `pure` where `expect` and every name of its chain is one known to
+   * keep nothing (`KEEPS_NOTHING`), `doubt` where one is not — a snapshot keeps a count, the n-th call is met with the
+   * n-th written (review round 17, С1), and a matcher of `expect.extend` may keep anything — or none, not of the chain.
+   */
   const expectChain = (node) => {
     let n = node
+    let known = true
     for (;;) {
-      if (ts.isPropertyAccessExpression(n) || ts.isElementAccessExpression(n)) n = n.expression
-      else if (ts.isCallExpression(n)) n = n.expression
+      if (ts.isPropertyAccessExpression(n)) {
+        if (!KEEPS_NOTHING.has(n.name.text)) known = false
+        n = n.expression
+      } else if (ts.isElementAccessExpression(n)) {
+        const name = n.argumentExpression
+        if (!(ts.isStringLiteralLike(name) && KEEPS_NOTHING.has(name.text))) known = false
+        n = n.expression
+      } else if (ts.isCallExpression(n)) n = n.expression
       else break
     }
-    if (!ts.isIdentifier(n) || n.text !== 'expect') return false
+    if (!ts.isIdentifier(n) || n.text !== 'expect') return undefined
     const [first] = symbolOf(n)?.declarations ?? []
-    return Boolean(first && ts.isImportSpecifier(first) && importedFrom(first) === 'vitest')
+    if (!(first && ts.isImportSpecifier(first) && importedFrom(first) === 'vitest'))
+      return undefined
+    return known ? 'pure' : 'doubt'
   }
 
   /**
@@ -945,7 +1007,8 @@ export function unorderedReads(
     /** Whether calling or making what a callee names may change what is outside. */
     const callsOut = (callee) => {
       // vitest's `expect` and its matchers keep nothing, the platform watched or not
-      if (expectChain(callee)) return false
+      const chain = expectChain(callee)
+      if (chain) return chain === 'doubt'
       if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) {
         const root = rootOf(callee)
         if (root.kind === ts.SyntaxKind.ThisKeyword) return true
