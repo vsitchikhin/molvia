@@ -57,9 +57,11 @@
 // a part by `slice`, a value of a `Map` or an object by its key** (round 14, О1): each is the order the rows
 // came in — of several, the first; of a comparator's ties, the one before; of a key repeated, the last. A
 // callback of these is in doubt where it takes the index of a row (a parameter, the rest of its arguments),
-// changes anything outside it (a name, a field, a method of a name from outside, a function of this file or of
-// an import called — vitest's `expect` alone is known to keep nothing — a name handed to a call), or is one
-// the parse cannot read; the platform's `Boolean`, `String`, `Number` are read. Of the rows made one string
+// may change anything outside it — closed, in doubt it does (round 15, П1): outside is a name declared outside,
+// an import but vitest's `expect`, `this`, and an alias of one; written by an assignment, its targets taken apart,
+// `++`, `delete`, a loop's target; called, its method called, handed to a call or to `new`; a query by a template
+// of any tag but Drizzle's `sql`; the platform's functions but its pure ones (`fetch`, `process.stdout.write`) — or
+// is one the parse cannot read; the platform's `Boolean`, `String`, `Number` are read. Of the rows made one string
 // nothing is free but its length. Rows in the order of chance may besides meet another read in the same total
 // order — a snapshot with a snapshot. Anything else is refused, and the fix is an order, or the rows through
 // `onlyRow`, `sorted`, `sum` — never a use the check does not know. **Every answer of «free» or «not a read»
@@ -119,6 +121,50 @@ const BUILDS = new Set([
  * match, a sum of strings, two rows a comparator ties — each the order the rows came in (review round 14, О1).
  */
 const ORDERLESS = new Set(['some', 'every', 'includes'])
+/**
+ * What the platform holds that changes nothing outside a callback (review round 15): the functions, and the roots
+ * whose methods only read or make — `Object`'s too, but `assign` and `defineProperty` write their first argument,
+ * which is judged as any argument is. Anything else of the platform called — `fetch`, `process.stdout.write`,
+ * `setTimeout` — is in doubt.
+ */
+const PURE_FUNCTIONS = new Set([
+  'String',
+  'Number',
+  'Boolean',
+  'BigInt',
+  'parseInt',
+  'parseFloat',
+  'isNaN',
+  'isFinite',
+  'encodeURIComponent',
+  'decodeURIComponent',
+  'structuredClone',
+  'Set',
+  'Map',
+  'Date',
+  'Error',
+  'TypeError',
+  'RangeError',
+  'RegExp',
+  'URL',
+  'URLSearchParams',
+  'Array',
+  'Object',
+  'Uint8Array',
+])
+const PURE_GLOBALS = new Set([
+  'JSON',
+  'Math',
+  'Object',
+  'Array',
+  'Number',
+  'String',
+  'BigInt',
+  'Date',
+  'Intl',
+  'Buffer',
+  'console',
+])
 /** The platform's casts: a callback of the first argument alone. */
 const CASTS = new Set(['Boolean', 'String', 'Number'])
 /** The methods handed a value, not a callback. */
@@ -726,58 +772,166 @@ export function unorderedReads(
     return countsOutside(callback) ? 'by what it changes outside' : undefined
   }
 
-  /** Whether a function — or a loop, its body — changes a name declared outside it: `texts[i++]`, `n += 1`. */
+  /**
+   * Whether a function — or a loop, its body — may change anything outside it (review round 15, П1: closed, in doubt
+   * it does). Outside is a name declared outside it, an import but vitest's `expect`, `this`, and a name of the body
+   * given anything that mentions one of those (`const o = outer`, an alias). It changes what is outside by writing
+   * it — an assignment, its targets taken apart, `++`, `delete`, the target of a `for … of` — by calling it or a
+   * method of it, by handing it to a call or to `new`, by a template of any tag but Drizzle's `sql`, which only
+   * builds a fragment: a query of postgres.js writes as a call does; and by calling or making with `new` what the
+   * platform holds but its pure functions and constructors (`fetch`, `process.stdout.write`).
+   */
   const countsOutside = (callback, body = callback.body) => {
-    let changes = false
-    const outside = (target) => {
-      let root = target
+    const within = (declaration) =>
+      declaration.pos >= callback.pos && declaration.end <= callback.end
+    const rootOf = (node) => {
+      let n = node
       while (
-        ts.isPropertyAccessExpression(root) ||
-        ts.isElementAccessExpression(root) ||
-        ts.isParenthesizedExpression(root) ||
-        ts.isNonNullExpression(root)
+        ts.isPropertyAccessExpression(n) ||
+        ts.isElementAccessExpression(n) ||
+        ts.isParenthesizedExpression(n) ||
+        ts.isNonNullExpression(n) ||
+        ts.isAsExpression(n) ||
+        ts.isSatisfiesExpression(n) ||
+        ts.isSpreadElement(n)
       )
-        root = root.expression
-      if (!ts.isIdentifier(root)) return false
-      // an import is a function of no known answer — it may write what it is handed, in the order it was handed it
-      // (review round 14) — but vitest's `expect`, which keeps nothing
-      const [first] = symbolOf(root)?.declarations ?? []
-      if (
-        first &&
-        (ts.isImportSpecifier(first) || ts.isImportClause(first) || ts.isNamespaceImport(first))
-      )
-        return !(root.text === 'expect' && importedFrom(first) === 'vitest')
-      const declaration = symbolOf(root)?.valueDeclaration
-      return Boolean(
-        declaration && !(declaration.pos >= callback.pos && declaration.end <= callback.end),
-      )
+        n = n.expression
+      return n
     }
+    /** The names of the body given what mentions something outside: what they hold may be the outside itself. */
+    const aliases = new Set()
+    /** `outside` of a name: the platform's (`undefined`), outside (`true`) or the body's (`false`). */
+    const whose = (identifier) => {
+      const symbol = symbolOf(identifier)
+      const [first] = symbol?.declarations ?? []
+      if (!first) return undefined
+      if (ts.isImportSpecifier(first) || ts.isImportClause(first) || ts.isNamespaceImport(first))
+        return !(identifier.text === 'expect' && importedFrom(first) === 'vitest')
+      if (aliases.has(symbol)) return true
+      return !within(symbol.valueDeclaration ?? first)
+    }
+    /** Whether a value is of what is outside: its root a name from outside, or `this`. */
+    const outside = (node) => {
+      const root = rootOf(node)
+      if (root.kind === ts.SyntaxKind.ThisKeyword) return true
+      return ts.isIdentifier(root) && whose(root) === true
+    }
+    /** Whether a target written is outside: a name of the platform is outside too (`globalThis.x = row`). */
+    const written = (node) => {
+      const root = rootOf(node)
+      if (root.kind === ts.SyntaxKind.ThisKeyword) return true
+      return ts.isIdentifier(root) && whose(root) !== false
+    }
+    /** The targets of an assignment, taken apart: `[a, b] = …`, `({ x: o.k, ...rest } = …)`. */
+    const targets = (left) => {
+      if (ts.isArrayLiteralExpression(left))
+        return left.elements.flatMap((element) =>
+          ts.isOmittedExpression(element) ? [] : targets(element),
+        )
+      if (ts.isObjectLiteralExpression(left))
+        return left.properties.flatMap((property) =>
+          ts.isPropertyAssignment(property)
+            ? targets(property.initializer)
+            : ts.isShorthandPropertyAssignment(property)
+              ? [property.name]
+              : ts.isSpreadAssignment(property)
+                ? targets(property.expression)
+                : [property],
+        )
+      if (ts.isSpreadElement(left)) return targets(left.expression)
+      if (ts.isBinaryExpression(left) && left.operatorToken.kind === ts.SyntaxKind.EqualsToken)
+        return targets(left.left)
+      return [left]
+    }
+    /** Whether a node mentions anything outside, nested functions included. */
+    const mentions = (node) => {
+      let found = false
+      const visit = (n) => {
+        if ((ts.isIdentifier(n) || n.kind === ts.SyntaxKind.ThisKeyword) && outside(n)) found = true
+        if (!found) ts.forEachChild(n, visit)
+      }
+      visit(node)
+      return found
+    }
+    /** The names a declaration binds, taken apart. */
+    const bound = (name) =>
+      ts.isIdentifier(name)
+        ? [name]
+        : name.elements.flatMap((element) =>
+            ts.isOmittedExpression(element) ? [] : bound(element.name),
+          )
+    // aliases learnt until nothing changes: `const a = outer; const b = a`
+    for (let grew = true; grew;) {
+      grew = false
+      const learn = (n) => {
+        const given =
+          ts.isVariableDeclaration(n) && n.initializer
+            ? [n.name, n.initializer]
+            : ts.isBinaryExpression(n) &&
+                n.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+                ts.isIdentifier(n.left)
+              ? [n.left, n.right]
+              : undefined
+        if (given && mentions(given[1]))
+          for (const name of bound(given[0])) {
+            const symbol = symbolOf(name)
+            if (symbol && !aliases.has(symbol) && whose(name) === false) {
+              aliases.add(symbol)
+              grew = true
+            }
+          }
+        ts.forEachChild(n, learn)
+      }
+      learn(body)
+    }
+    /** Whether calling or making what a callee names may change what is outside. */
+    const callsOut = (callee) => {
+      if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) {
+        const root = rootOf(callee)
+        if (root.kind === ts.SyntaxKind.ThisKeyword) return true
+        // a method of a value the body made — a call's answer, a literal — is the body's
+        if (!ts.isIdentifier(root)) return false
+        const of = whose(root)
+        if (of === undefined)
+          return (
+            !PURE_GLOBALS.has(root.text) ||
+            (root.text === 'Object' && !ts.isPropertyAccessExpression(callee))
+          )
+        return of
+      }
+      if (ts.isIdentifier(callee)) {
+        const of = whose(callee)
+        return of === undefined ? !PURE_FUNCTIONS.has(callee.text) : of
+      }
+      // a callee the parse cannot name is in doubt
+      return !(ts.isFunctionExpression(callee) || ts.isArrowFunction(callee))
+    }
+    let changes = false
     const visit = (node) => {
-      // a call of a method of a name from outside: `seen.push(row)`, `next.next()` (review round 6, Е1)
-      if (
-        ts.isCallExpression(node) &&
-        ts.isPropertyAccessExpression(node.expression) &&
-        outside(node.expression.expression)
-      )
-        changes = true
-      // or a function from outside called, which may change what it likes: a spy, `record(row)` (Ж1), one handed
-      // in as a parameter of a function around it, an import (round 14)
-      if (ts.isCallExpression(node) && ts.isIdentifier(node.expression) && outside(node.expression))
-        changes = true
-      // or a name from outside handed to a call, which may change it: `Object.assign(out, row)`
-      if (ts.isCallExpression(node) && node.arguments.some((a) => ts.isIdentifier(a) && outside(a)))
+      if (ts.isCallExpression(node) || ts.isNewExpression(node)) {
+        if (callsOut(node.expression)) changes = true
+        if ((node.arguments ?? []).some(outside)) changes = true
+      }
+      if (ts.isTaggedTemplateExpression(node) && !drizzleSql(node.tag) && callsOut(node.tag))
         changes = true
       if (
         (ts.isPostfixUnaryExpression(node) || ts.isPrefixUnaryExpression(node)) &&
         [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator) &&
-        outside(node.operand)
+        written(node.operand)
       )
         changes = true
+      if (ts.isDeleteExpression(node) && written(node.expression)) changes = true
       if (
         ts.isBinaryExpression(node) &&
         node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
         node.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
-        outside(node.left)
+        targets(node.left).some(written)
+      )
+        changes = true
+      if (
+        (ts.isForOfStatement(node) || ts.isForInStatement(node)) &&
+        !ts.isVariableDeclarationList(node.initializer) &&
+        targets(node.initializer).some(written)
       )
         changes = true
       ts.forEachChild(node, visit)

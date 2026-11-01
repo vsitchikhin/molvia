@@ -25,7 +25,9 @@ const lines = (source: string): number[] =>
   unorderedReads(FILE, source, CHANCE, IDENTITY, KEYS).map((found) => Number.parseInt(found))
 
 const inTest = (body: string): string => `it('x', async () => {\n${body}\n})`
-const found = (body: string): string[] => unorderedReads(FILE, inTest(body), CHANCE, IDENTITY, KEYS)
+// vitest's `expect` by its import, as every test file has it: a function of the platform not known pure is in doubt
+const found = (body: string): string[] =>
+  unorderedReads(FILE, `import { expect } from 'vitest'\n${inTest(body)}`, CHANCE, IDENTITY, KEYS)
 
 describe('unorderedReads', () => {
   // «то же фото дважды» as it failed on CI 41022785698, and the reads of the sweep of MOL-323
@@ -713,7 +715,7 @@ describe('unorderedReads', () => {
     const [first] = found(
       `const rows = await db\n  .select()\n  .from(t)\nexpect(rows).toEqual([a, b])`,
     )
-    expect(first).toBe('2: const rows = await db — toEqual([2]) at 5')
+    expect(first).toBe('3: const rows = await db — toEqual([2]) at 6')
   })
 
   it.each([
@@ -794,10 +796,6 @@ describe('unorderedReads', () => {
     [
       'stringified row by row, not containing',
       `for (const row of await db.select().from(t)) expect(JSON.stringify(row)).not.toContain(secret)`,
-    ],
-    [
-      'a schema of another file parsing each row',
-      `expect((await db.select().from(t)).map((r) => schema.parse(r))).toHaveLength(2)`,
     ],
     ['a type of it', `const rows = await db.select().from(t)\ntype Row = (typeof rows)[number]`],
     ['discarded', `await db.select().from(t)`],
@@ -1023,7 +1021,7 @@ describe('unorderedReads', () => {
   const byRows = (body: string, from = './rows'): string[] =>
     unorderedReads(
       FILE,
-      `import { eq } from 'drizzle-orm'\nimport { onlyRow, sorted, sum } from '${from}'\n${inTest(body)}`,
+      `import { eq } from 'drizzle-orm'\nimport { expect } from 'vitest'\nimport { onlyRow, sorted, sum } from '${from}'\n${inTest(body)}`,
       CHANCE,
       IDENTITY,
       KEYS,
@@ -1118,6 +1116,125 @@ describe('unorderedReads', () => {
     )
     expect(
       imported(`for (const row of await db.select().from(t)) expect.soft(row.n).toBe(1)`),
+    ).toEqual([])
+  })
+
+  // review round 15, П1: what writes outside a loop or a callback, whatever its form — in doubt it does
+  it.each([
+    [
+      'a query of postgres.js by its tag',
+      'const client = connect()\nfor (const row of await db.select().from(t)) await client`insert into u (kind) values (${row.kind})`',
+    ],
+    [
+      'a query by a tag of an import',
+      'for (const row of await db.select().from(t)) await pg`insert into u (kind) values (${row.kind})`',
+    ],
+    [
+      'new of a class of the file',
+      'class Log { constructor(k) { Log.all.push(k) } }\nfor (const row of await db.select().from(t)) new Log(row.kind)',
+    ],
+    [
+      'new of a class of an import',
+      'for (const row of await db.select().from(t)) new Recorder(row)',
+    ],
+    [
+      'delete of a field outside',
+      'const left = { a: 1 }\nfor (const row of await db.select().from(t)) delete left[row.kind]',
+    ],
+    [
+      'an assignment taken apart into a field outside',
+      'const last = {}\nfor (const row of await db.select().from(t)) ({ kind: last.kind } = row)',
+    ],
+    [
+      'an assignment taken apart into a name outside',
+      'let kind\nfor (const row of await db.select().from(t)) [kind] = [row.kind]',
+    ],
+    [
+      'a loop whose target is outside',
+      'let kind\nfor (const row of await db.select().from(t)) for (kind of [row.kind]);',
+    ],
+    [
+      'an alias of a name outside',
+      'const kinds = []\nfor (const row of await db.select().from(t)) { const into = kinds\ninto.push(row.kind) }',
+    ],
+    [
+      'an alias through a branch',
+      'const kinds = []\nfor (const row of await db.select().from(t)) { const into = row.ok ? kinds : []\ninto.push(row.kind) }',
+    ],
+    [
+      'an alias of an alias',
+      'const kinds = []\nfor (const row of await db.select().from(t)) { const a = kinds\nconst b = a\nb.push(row.kind) }',
+    ],
+    [
+      'a field of this',
+      'const o = {\n  async fill() {\n    for (const row of await db.select().from(t)) this.last = row\n  },\n}',
+    ],
+    [
+      'this handed to a call',
+      'const o = {\n  async fill() {\n    for (const row of await db.select().from(t)) Object.assign(this, row)\n  },\n}',
+    ],
+    [
+      'a field of the platform',
+      'for (const row of await db.select().from(t)) globalThis.last = row',
+    ],
+    [
+      'a function of the platform',
+      'for (const row of await db.select().from(t)) await fetch(row.url)',
+    ],
+    [
+      'a method of the platform',
+      'for (const row of await db.select().from(t)) process.stdout.write(row.kind)',
+    ],
+    [
+      'a field outside handed to a call',
+      'const store = { all: [] }\nfor (const row of await db.select().from(t)) Object.assign(store.all, [row])',
+    ],
+    [
+      'a name outside spread into a call',
+      'const kinds = []\nfor (const row of await db.select().from(t)) kinds.splice(0, 0, ...[row.kind])',
+    ],
+    [
+      'a query by a tag in a callback',
+      'const client = connect()\nexpect((await db.select().from(t)).every((r) => client`insert into u values (${r.kind})`)).toBe(true)',
+    ],
+  ])('refuses %s (round 15)', (_, body) => {
+    expect(found(body)).not.toEqual([])
+  })
+
+  it.each([
+    [
+      'a Set of its own',
+      'for (const row of await db.select().from(t)) expect(new Set([row.kind]).size).toBe(1)',
+    ],
+    [
+      'a list of its own',
+      'for (const row of await db.select().from(t)) { const own = []\nown.push(row.kind)\nexpect(own).toHaveLength(1) }',
+    ],
+    [
+      'the platform’s pure methods',
+      'for (const row of await db.select().from(t)) expect(Math.max(row.n, JSON.stringify(row).length)).toBeGreaterThan(0)',
+    ],
+    [
+      'a fragment of Drizzle’s sql',
+      'for (const row of await db.select().from(t)) expect(sql`${row.kind}`).toBeDefined()',
+    ],
+    [
+      'a tag of the platform’s String.raw',
+      'for (const row of await db.select().from(t)) expect(String.raw`${row.kind}`).toBe(row.kind)',
+    ],
+    [
+      'a function of its own',
+      'for (const row of await db.select().from(t)) { const twice = (n) => n * 2\nexpect(twice(row.n)).toBe(2) }',
+    ],
+  ])('leaves alone %s (round 15)', (_, body) => {
+    expect(
+      unorderedReads(
+        FILE,
+        `import { sql } from 'drizzle-orm'\nimport { expect } from 'vitest'\n${inTest(body)}`,
+        CHANCE,
+        IDENTITY,
+        KEYS,
+      ),
     ).toEqual([])
   })
 
