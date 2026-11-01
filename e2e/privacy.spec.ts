@@ -14,6 +14,23 @@ test('«Данные и приватность» opens by its address without a 
   await expect(page.getByText(/«Удалить мои данные», или отправьте \/delete боту/)).toBeVisible()
 })
 
+// MOL-349, С-1: the lists are paragraphs in a plain card. Drawn as a card of rows they had no padding,
+// and the radius cut the first letter of «Номер аккаунта Telegram» — a page read before signing in.
+test("its lists stand inside the card's padding, never on its edge", async ({ page }) => {
+  await page.goto('/privacy')
+  const cards = page.locator('.card:has(dl)')
+  await expect(cards).toHaveCount(2)
+  for (const card of await cards.all()) {
+    await expect(card).toHaveCSS('padding-left', '16px')
+    const [edge, term] = await Promise.all([
+      card.boundingBox(),
+      card.locator('dt').first().boundingBox(),
+    ])
+    expect(term!.x - edge!.x).toBeGreaterThanOrEqual(16)
+    expect(term!.y - edge!.y).toBeGreaterThanOrEqual(16)
+  }
+})
+
 test('and from the login screen, which is where a person without a session meets it', async ({
   page,
 }) => {
