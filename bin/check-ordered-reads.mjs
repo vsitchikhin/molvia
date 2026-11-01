@@ -6,16 +6,19 @@
 //
 // Found by parsing, as `check-clock-bounds.mjs` is, names resolved by TypeScript's binder, the facts of the
 // tables read from `schema.ts`. **The check is closed at each of the three places it recognises something**
-// (review of MOL-323, ten rounds: a list of forms missed one more each round, so every place says what it
-// knows and holds the rest in doubt — and **in doubt there is no order**).
+// (review of MOL-323, eleven rounds: a list of forms missed one more each round, so every place says what
+// it knows and holds the rest in doubt — and **in doubt there is no order**).
 //
 // **1. What reads.** A chain of Drizzle with `select…` and `from`, its beginning followed through a `const`
 // and through a function of the file that returns one — carried on from any other name, it is refused;
 // `findMany`, whose order the parse does not read, so in doubt; `execute` of a template, of `sql.raw` of
 // one, of a `const` of either, and of a text the parse cannot read, which is a read with no order; a
-// function of the file that executes what it is handed, read by that text's order, or none; `unsafe` and
-// `query` of SQL as a string, the same; a template awaited, named or returned (postgres.js). A template
-// handed to a call, put in another or in an object is a fragment of a query, never a read of its own. A
+// function of the file that executes the whole text it is handed — as it is, through `sql.raw`, or a
+// template of `${sql.raw(text)}` alone — read by that text's order, or none; `unsafe` and `query` of SQL as
+// a string, the same. **A template is what its tag is**: Drizzle's `sql`, by its import, is a fragment of a
+// query wherever it stands, read by `execute` or a helper that executes it; any other tag — postgres.js's
+// client, or one the parse cannot place — is a query, a read wherever it stands, handed to `expect` or a
+// function included. Every file of integration tests is read, none spared by a guess at its text. A
 // template has an order when `order by` stands in the statement itself — not in parentheses, a comment or a
 // string — and a `select` with no `from` is one row. Rows handed to a callback of `then` are its first
 // parameter's.
@@ -68,9 +71,6 @@ import ts from 'typescript'
 const FILES = ['backend/*.integration.test.ts']
 /** Where a column is a uuid, a moment or an identity. */
 const SCHEMA = 'backend/src/db/schema.ts'
-
-/** A file that names none of these reads nothing: the binder is spared it. */
-export const MAY_READ = /\bselect|findMany/i
 
 /** The methods an array of rows keeps its order through. */
 const KEEPS = new Set(['map', 'filter', 'flatMap', 'flat', 'slice'])
@@ -383,19 +383,45 @@ export function unorderedReads(
     const f = functionOf(callee)
     if (!f) return false
     const parameters = new Set(f.parameters.map((parameter) => parameter.name.getText(sf)))
+    // a parameter that is the whole text an `execute`, `unsafe` or `query` is handed: as it is, through `sql.raw`,
+    // or as a template of `${sql.raw(text)}` alone (review round 11, Л2) — never a value or a name bound in one
+    const raw = (n) =>
+      ts.isCallExpression(n) &&
+      n.expression.getText(sf) === 'sql.raw' &&
+      ts.isIdentifier(n.arguments[0]) &&
+      parameters.has(n.arguments[0].text)
+    const mentions = (n) =>
+      (ts.isIdentifier(n) && parameters.has(n.text)) ||
+      raw(n) ||
+      (ts.isTaggedTemplateExpression(n) &&
+        ts.isTemplateExpression(n.template) &&
+        n.template.head.text.trim() === '' &&
+        n.template.templateSpans.length === 1 &&
+        n.template.templateSpans[0].literal.text.trim() === '' &&
+        raw(n.template.templateSpans[0].expression))
     let found = false
     const visit = (n) => {
       if (
         ts.isCallExpression(n) &&
         ts.isPropertyAccessExpression(n.expression) &&
         /^(execute|unsafe|query)$/.test(n.expression.name.text) &&
-        n.arguments.some((a) => ts.isIdentifier(a) && parameters.has(a.text))
+        n.arguments.some(mentions)
       )
         found = true
       ts.forEachChild(n, visit)
     }
     visit(f.body)
     return found
+  }
+
+  /** Whether a tag is Drizzle's `sql`, by the import that names it: a fragment, never a query of its own. */
+  const drizzleSql = (tag) => {
+    if (!ts.isIdentifier(tag)) return false
+    const declaration = symbolOf(tag)?.declarations?.[0]
+    const imported = declaration && ts.isImportSpecifier(declaration)
+    if (!imported) return false
+    const from = declaration.parent.parent.parent.moduleSpecifier
+    return ts.isStringLiteral(from) && /^drizzle-orm/.test(from.text)
   }
 
   /** What a `const` name stands for, followed to the end: the node itself where it is none. */
@@ -492,15 +518,20 @@ export function unorderedReads(
    */
   const readOf = (node) => {
     if (ts.isTaggedTemplateExpression(node)) {
-      // a template handed to a call, placed in another or in an object is a fragment of a query, never a read of
-      // its own: `execute`'s text, a helper's that executes it — that call is the read — or Drizzle's
-      // (`where`, `exists`, `select({ n: … })`), judged with the query it is part of (review round 10, №18)
+      // what a template is, is its tag's: Drizzle's `sql` is a fragment of a query wherever it stands — read by
+      // `execute` or a helper that executes it, judged with the query it is part of (`where`, `exists`,
+      // `select({ n: … })`); any other tag — postgres.js's client, or one the parse cannot place — is a query,
+      // a read wherever it stands, handed to `expect` or a function included (review round 11, Л1, №19)
+      if (drizzleSql(node.tag)) return undefined
+      // handed to `execute`, the call is the read
       const p = node.parent
-      const fragment =
-        ((ts.isCallExpression(p) || ts.isNewExpression(p)) && p.arguments?.includes(node)) ||
-        ts.isTemplateSpan(p) ||
-        ts.isPropertyAssignment(p)
-      return !fragment && unorderedTemplate(node.template) ? 'none' : undefined
+      if (
+        ts.isCallExpression(p) &&
+        ts.isPropertyAccessExpression(p.expression) &&
+        p.expression.name.text === 'execute'
+      )
+        return undefined
+      return unorderedTemplate(node.template) ? 'none' : undefined
     }
     if (!ts.isCallExpression(node)) return undefined
     if (ts.isIdentifier(node.expression)) {
@@ -511,8 +542,15 @@ export function unorderedReads(
       // whatever it is handed: a template by its order, anything the parse cannot read with none (round 10)
       const texts = node.arguments.map((argument) => constant(argument))
       const template = texts.find((text) => text && ts.isTaggedTemplateExpression(text))
-      if (!template) return 'none'
-      return unorderedTemplate(template.template) ? 'none' : undefined
+      if (template) return unorderedTemplate(template.template) ? 'none' : undefined
+      const written = texts.find(
+        (text) =>
+          text &&
+          (ts.isStringLiteral(text) ||
+            ts.isNoSubstitutionTemplateLiteral(text) ||
+            ts.isTemplateExpression(text)),
+      )
+      return written && !unorderedTemplate(written) ? undefined : 'none'
     }
     if (!ts.isPropertyAccessExpression(node.expression)) return undefined
     // the outermost call of its chain only: `.where(…)`, not the `.from(…)` inside it
@@ -1009,7 +1047,6 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
     .filter(Boolean)
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
-    if (!MAY_READ.test(source)) return []
     return unorderedReads(file, source, chance, identity, keys, known).map(
       (found) => `  ${file}:${found}`,
     )

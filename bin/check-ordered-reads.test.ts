@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest'
 import {
   chanceColumns,
   identityColumns,
-  MAY_READ,
   schemaTables,
   uniqueKeys,
   unorderedReads,
@@ -535,6 +534,75 @@ describe('unorderedReads', () => {
     ).toEqual([])
   })
 
+  // round 10, №18 and round 11: Drizzle's `sql`, by its import, is a fragment of the query it stands in
+  const drizzle = (body: string): string[] =>
+    unorderedReads(
+      FILE,
+      `import { sql } from 'drizzle-orm'\n${inTest(body)}`,
+      CHANCE,
+      IDENTITY,
+      KEYS,
+    )
+  it.each([
+    [
+      'a subquery in where',
+      'expect(await db.select().from(t).where(sql`${t.id} in (select id from u)`)).toHaveLength(2)',
+    ],
+    [
+      'exists of a template',
+      'expect(await db.select().from(t).where(exists(sql`select 1 from u where u.t = ${t.id}`))).toHaveLength(2)',
+    ],
+    [
+      'a scalar subquery in select',
+      'expect(await db.select({ n: sql`(select count(*) from u)` }).from(t)).toHaveLength(2)',
+    ],
+    [
+      'a template inside another',
+      'expect(await db.execute(sql`select * from t where x in (${sql`select y from u`}) order by id`)).toEqual([a, b])',
+    ],
+  ])('leaves alone Drizzle’s fragment: %s', (_, body) => {
+    expect(drizzle(body)).toEqual([])
+  })
+
+  // round 11, Л1, №19: any other tag is a query, a read wherever it stands
+  it.each([
+    [
+      'handed to expect',
+      'await expect(client`select kind from owner_notices`).resolves.toEqual([a, b])',
+    ],
+    [
+      'handed to a function that awaits it',
+      'const settled = (q) => q\nexpect(await settled(client`select kind from owner_notices`)).toEqual([a, b])',
+    ],
+    [
+      'handed to Promise.resolve',
+      'expect(await Promise.resolve(client`select kind from owner_notices`)).toEqual([a, b])',
+    ],
+  ])('refuses a query of another tag %s', (_, body) => {
+    expect(drizzle(body)).not.toEqual([])
+  })
+
+  it('lets a query of another tag refused as a promise go', () => {
+    expect(drizzle('await expect(client`update actors set x = 1`).rejects.toThrow()')).toEqual([])
+    expect(
+      drizzle('await expect(client`select kind from owner_notices`).rejects.toThrow()'),
+    ).toEqual([])
+  })
+
+  // round 11, Л2: a helper that executes its parameter through sql.raw, and one that only binds a name with it
+  it('reads a helper executing its text through sql.raw, and not one binding a name of a table so', () => {
+    expect(
+      drizzle(
+        "const run = (text) => db.execute(sql.raw(text))\nexpect(await run('select kind from owner_notices')).toEqual([a, b])",
+      ),
+    ).toHaveLength(1)
+    expect(
+      drizzle(
+        'const named = async (table, id) => (await db.execute(sql`select count(*)::int as n from ${sql.raw(table)} where item_id = ${id}`))[0]?.n\nexpect([await named(t, a), await named(t, b)]).toEqual([0, 1])',
+      ),
+    ).toEqual([])
+  })
+
   // round 2, №7: a helper whose order is learnt as none late, after a pass read it as chance
   it('reads again a helper whose order changes from chance to none', () => {
     const source = `
@@ -767,22 +835,6 @@ describe('unorderedReads', () => {
     ['a refused promise', `await expect(db.select().from(t)).rejects.toThrow()`],
     // round 10, №18: a template inside a query is a fragment, judged with the query it is part of
     [
-      'a subquery in where',
-      'expect(await db.select().from(t).where(sql`${t.id} in (select id from u)`)).toHaveLength(2)',
-    ],
-    [
-      'exists of a template',
-      'expect(await db.select().from(t).where(exists(sql`select 1 from u where u.t = ${t.id}`))).toHaveLength(2)',
-    ],
-    [
-      'a scalar subquery in select',
-      'expect(await db.select({ n: sql`(select count(*) from u)` }).from(t)).toHaveLength(2)',
-    ],
-    [
-      'a template inside another',
-      'expect(await db.execute(sql`select * from t where x in (${sql`select y from u`}) order by id`)).toEqual([a, b])',
-    ],
-    [
       'a helper executing a template, its length',
       'const run = (q) => db.execute(q)\nexpect(await run(sql`select id from t`)).toHaveLength(2)',
     ],
@@ -913,15 +965,5 @@ describe('schemaTables', () => {
     expect(tables.has('ownerNotices')).toBe(true)
     expect(tables.has('sessions')).toBe(true)
     expect(tables.has('receiptLines')).toBe(true)
-  })
-})
-
-describe('MAY_READ', () => {
-  it('spares the binder a file that reads nothing', () => {
-    expect(MAY_READ.test('await db.insert(t).values(v)')).toBe(false)
-    expect(MAY_READ.test('await db.select().from(t)')).toBe(true)
-    expect(MAY_READ.test('await db.selectDistinct().from(t)')).toBe(true)
-    expect(MAY_READ.test('await db.query.t.findMany()')).toBe(true)
-    expect(MAY_READ.test('sql`SELECT 1`')).toBe(true)
   })
 })
