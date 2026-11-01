@@ -482,6 +482,8 @@ describe('a line of the owner’s that went new where its item was there (MOL-33
     for (const [printed, name] of [
       // adversarial А1: the brand copied whole names no melon
       ['Յոգուրտ «Դինա» 2% 130գր', 'Йогурт «Дина» дыня 2% 130 г'],
+      // round 2, Р2-А1: a yoghurt of the brand «Коко» is no coconut yoghurt of no brand
+      ['Յոգուրտ «Կոկո» 2% 130գր', 'Йогурт кокос 2% 130 г'],
       // adversarial А3: a litre of kefir cut off its unit
       ['Կեֆիր «Մարիաննա» 1', 'Кефир «Марианна» 1%'],
       // self-review №1: a chocolate's grams cut, as the plan promised

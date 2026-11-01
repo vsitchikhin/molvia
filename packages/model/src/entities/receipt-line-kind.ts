@@ -1153,22 +1153,34 @@ function sameLetters(a: string, b: string): boolean {
 /** A number a package of litres may be: a dairy pack is two at most. */
 const LITRES_MAX = 2
 
+/**
+ * The words of an item's own brand: in «…», or in Latin, as a shelf's name writes a brand (MOL-261) — «Сыр «Пано»»,
+ * «Печенье Milka»; never a flavour or a kind, «Чай киви».
+ */
+function brandWordsOf(itemName: string): Set<string> {
+  const quoted = [...itemName.matchAll(/«([^»]*)»/gu)].flatMap((found) => wordsOf(found[1] ?? ''))
+  return new Set([...quoted, ...wordsOf(itemName).filter((word) => /[a-z]/u.test(word))])
+}
+
 /** A word's letters, «ու» one: a letter of the key is not a letter of the word — «ш» is `sh` (adversarial А2). */
 const letterCount = (word: string): number =>
   word.replace(/ու/gu, 'ւ').match(/\p{L}/gu)?.length ?? 0
 
 /**
  * A brand the model copied a letter short, under five letters where `sameLetters` forgives nothing (MOL-331):
- * «Պան» for «Պանո», «Ֆին» for «Ֆինո». The line's word is the name's with one letter taken out, from three — a letter
- * of the word, so neither a letter misread, «Սամ» for «Шам», nor two, «Պան» for «Панно» (adversarial А2).
+ * «Պան» for «Պանո», «Ֆին» for «Ֆինո». The line's word is the name's with one letter of the word taken out, from three:
+ * the key of what is left is the line's, so a letter of a digraph is no letter lost — «Սամ» is no «Шам», nor «Սալ» a
+ * «Шаль» or a «Шалл» — and the name has one letter more, a double counted twice: «Պան» is no «Панно» (adversarial А2,
+ * round 2, Р2-А2).
  */
 function letterLost(printed: string, name: string): boolean {
-  const [short, long] = [toSearchKey(printed), toSearchKey(name)]
-  if (short.length < 3 || long.length !== short.length + 1) return false
-  if (letterCount(name) !== letterCount(printed) + 1) return false
-  // a key is Latin and «ц», one code unit a letter
-  for (let at = 0; at < long.length; at++)
-    if (long.slice(0, at) + long.slice(at + 1) === short) return true
+  const short = toSearchKey(printed)
+  if (short.length < 3 || letterCount(name) !== letterCount(printed) + 1) return false
+  let before = ''
+  for (const letter of name) {
+    if (toSearchKey(before + name.slice(before.length + letter.length)) === short) return true
+    before += letter
+  }
   return false
 }
 
@@ -1374,20 +1386,22 @@ export function lineFitter(
   const lineHas = (word: string): boolean =>
     glossed.some((one) => sameRussian(word, one)) || spelt.some((one) => sameLetters(word, one))
   // a word of the brand with no word of the item by its letters stands on the one word a letter longer that the line
-  // says nothing else of, and on that word alone (adversarial А1): «Դինա» names «Дина» and never the «дыня» beside
-  // it, «Սուրճ «Կոֆ»» no «Кофе»
-  const lostLetters = (item: readonly string[]): Set<string> =>
+  // says nothing else of, a word of the item's own brand, and on that word alone (adversarial А1): «Դինա» names «Дина»
+  // and never the «дыня» beside it, «Սուրճ «Կոֆ»» no «Кофе», «Թեյ «Կիվ»» no «Чай киви» (round 2, Р2-А1)
+  const lostLetters = (item: readonly string[], own: ReadonlySet<string>): Set<string> =>
     new Set(
       brand.flatMap((one) => {
         if (item.some((other) => sameLetters(one, other))) return []
-        const longer = item.filter((other) => !lineHas(other) && letterLost(one, other))
+        const longer = item.filter(
+          (other) => own.has(other) && !lineHas(other) && letterLost(one, other),
+        )
         return longer.length === 1 ? longer : []
       }),
     )
   return (itemName, options = {}) => {
     const item = wordsOf(itemName)
     const copied = options.copied === true
-    const lost = copied ? lostLetters(item) : new Set<string>()
+    const lost = copied ? lostLetters(item, brandWordsOf(itemName)) : new Set<string>()
     if (item.length === 0) return false
     if (branded && options.generic === true) return false
     if (!item.every((word) => lineHas(word) || lost.has(word))) return false

@@ -848,6 +848,9 @@ describe('a line the model copied a letter short (MOL-331)', () => {
     expect(copied('Պանիր «Հալ»', 'Сыр «Чал»')).toBe(false)
     expect(copied('Պանիր «Ուլա»', 'Сыр «Юла»')).toBe(false)
     expect(copied('Պանիր «Պան»', 'Сыр «Панно»')).toBe(false)
+    // a sign or a double the key leaves out pays for no digraph (round 2, Р2-А2)
+    expect(copied('Պանիր «Սալ»', 'Сыр «Шаль»')).toBe(false)
+    expect(copied('Պանիր «Սալ»', 'Сыр «Шалл»')).toBe(false)
   })
 
   it('stands the brand on one word of the item, never on a word beside it or on its kind (adversarial А1)', () => {
@@ -860,6 +863,10 @@ describe('a line the model copied a letter short (MOL-331)', () => {
     expect(copied('Պանիր «Պան»', 'Сыр «Пано» Пани')).toBe(false)
     // a brand a letter short of the kind the line says already names no brand
     expect(copied('Սուրճ «Կոֆ»', 'Кофе')).toBe(false)
+    // an item of no brand of its own: its word a letter longer is a flavour, never the brand (round 2, Р2-А1)
+    expect(copied('Պանիր «Կիվ»', 'Сыр киви')).toBe(false)
+    // a brand a shelf writes in Latin is the item's own
+    expect(copied('Պանիր «Միլա»', 'Сыр Milka')).toBe(true)
     expect(copied('Պանիր «Պան» ելակ', 'Сыр «Пано» ежевика')).toBe(false)
   })
 
