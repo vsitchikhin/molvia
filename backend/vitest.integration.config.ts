@@ -19,7 +19,8 @@ export default defineConfig({
     // A database per worker, copied from the migrated one (MOL-164), so the files run in
     // parallel: in one shared database they deleted each other's rows in `beforeEach` and failed
     // in a way that looks like a schema bug, which is why they once ran in turn — 85 s of CI.
-    // Rows read with no ORDER BY come back turned by one (MOL-323): a test leaning on their order fails at once.
+    // Rows read with no ORDER BY come back reversed (MOL-323): a test leaning on their order fails at once where the
+    // values it reads differ reversed; the rest is `bin/check-ordered-reads.mjs`'s.
     setupFiles: ['./tests/unordered-rows.ts', './tests/setup-worker.ts'],
   },
 })

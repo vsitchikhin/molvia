@@ -6,14 +6,15 @@ import postgres from 'postgres'
  * integration tests whose statement has no `order by` of its own — not in parentheses, a comment or a string — and of
  * every `UPDATE`, `DELETE` and `MERGE` that returns them, which never have one, come back reversed. Reversed, not
  * turned by one (review round 13, Н1): it is the one order that puts each two rows the other way round, so a test
- * that leans on which of any two comes first — the whole array, `find`, the first row, `[...new Set()]` — fails on
- * its first run, however it reads them; rows alike, where the order tells nothing, come back the same. `INSERT`'s
- * rows keep the order of its `VALUES`, as a test may lean on. Every client of the process goes through it — the
- * test's, the app's, a transaction's — since it hooks the query of postgres.js, never a client.
+ * that leans on which of two comes first fails on its first run where the values it reads differ reversed; rows
+ * alike, where the order tells nothing, come back the same. `INSERT`'s rows keep the order of its `VALUES`, as a
+ * test may lean on. Every client of the process goes through it — the test's, the app's, a transaction's — since
+ * it hooks the query of postgres.js, never a client.
  *
- * What it cannot hold: two reads reversed alike match whatever their order was — a snapshot met by a snapshot —
- * which no fixed order can tell, two rows having but one other; `bin/check-ordered-reads.mjs` holds that, by
- * parsing, with an order the statement has (chance, ties), which this never touches.
+ * What it cannot hold, and `bin/check-ordered-reads.mjs` does, by parsing: values the same reversed — kinds
+ * `failure, silence, failure` give the same first row, `find` and `[...new Set()]` either way (review round 14,
+ * О1), and no fixed order tells every use, two columns asking for two orders at once; two reads reversed alike,
+ * a snapshot met by a snapshot; an order the statement has (chance, ties), which this never touches.
  */
 
 const REVERSED = Symbol.for('molvia.unorderedRowsReversed')
