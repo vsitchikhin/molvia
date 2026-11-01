@@ -247,6 +247,39 @@ describe('unorderedReads', () => {
       'map by an imported function',
       `expect((await db.select().from(t)).map(toId)).toEqual([a, b])`,
     ],
+    // round 5, Д1: through a join a parent's identity repeats, and the moment after it decides
+    [
+      'a parent identity then a child moment, by a join',
+      `expect(await db.select().from(feedback).innerJoin(ownerNotices, on).orderBy(t.id, ownerNotices.createdAt)).toEqual([a, b])`,
+    ],
+    [
+      'the same, joined the other way, asc',
+      `expect(await db.select().from(ownerNotices).leftJoin(t, on).orderBy(asc(t.id), asc(ownerNotices.createdAt))).toEqual([a, b])`,
+    ],
+    // round 5, Д2: not turns a comparison over, never into one the order cannot tell
+    ['not.toEqual', `expect(await db.select().from(t)).not.toEqual([a, b])`],
+    ['soft not.toStrictEqual', `expect.soft(await db.select().from(t)).not.toStrictEqual([a, b])`],
+    [
+      'not.toEqual on the other side',
+      `const rows = await db.select().from(t)\nexpect([a, b]).not.toEqual(rows)`,
+    ],
+    // round 5, Д3: an index without a parameter for it
+    [
+      'every by a count kept outside',
+      `let i = 0\nexpect((await db.select().from(t)).every((r) => r.text === texts[i++])).toBe(true)`,
+    ],
+    [
+      'find by a count kept outside',
+      `let n = 0\nexpect((await db.select().from(t)).find(() => n++ === 1)).toEqual(a)`,
+    ],
+    [
+      'every by the rest of its arguments',
+      `expect((await db.select().from(t)).every((...args) => args[0].text === want[args[1]])).toBe(true)`,
+    ],
+    [
+      'map(parseInt) — it takes the index',
+      `expect((await db.select().from(t)).map((r) => r.n).map(parseInt)).toEqual([1, 2])`,
+    ],
   ])('refuses %s', (_, body) => {
     expect(found(body)).toHaveLength(1)
   })
@@ -402,7 +435,27 @@ describe('unorderedReads', () => {
       `expect(await db.select().from(t)).toEqual(expect.arrayContaining([a, b]))`,
     ],
     ['toContainEqual', `expect(await db.select().from(t)).toContainEqual(a)`],
-    ['not', `expect(await db.select().from(t)).not.toEqual([a, b])`],
+    ['not containing', `expect(await db.select().from(t)).not.toContainEqual(a)`],
+    ['not of a length', `expect(await db.select().from(t)).not.toHaveLength(0)`],
+    // round 5, №14: the platform's casts take their first argument alone
+    [
+      'filter(Boolean) before a length',
+      `expect((await db.select().from(t)).filter(Boolean)).toHaveLength(2)`,
+    ],
+    [
+      'map(String) into a Set',
+      `expect(new Set((await db.select().from(t)).map(String)).size).toBe(2)`,
+    ],
+    // round 5, Д3: a name of the callback's own is no count kept outside
+    [
+      'every with a count of its own',
+      `expect((await db.select().from(t)).every((r) => {\nlet n = 0\nn += r.k\nreturn n > 0\n})).toBe(true)`,
+    ],
+    // round 5, Д1: an identity of the read's own table, no join
+    [
+      'an identity before a moment, no join',
+      `expect(await db.select().from(t).orderBy(t.id, t.createdAt)).toEqual([a, b])`,
+    ],
     [
       'stringified, not containing',
       `expect(JSON.stringify([...(await db.select().from(t))])).not.toContain(secret)`,

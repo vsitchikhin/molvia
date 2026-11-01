@@ -12,24 +12,27 @@
 // not. **A read in the order of chance** is one whose order is decided by a column of chance, read from the
 // schema: a uuid (`randomUUID()`) or a moment, whoever writes it — `now()` is one for every row of a
 // transaction, a repository writes one for a whole batch, and a test writes what it likes. An order is
-// decided by its columns up to the first identity of the schema — what follows one decides nothing — and a
-// column of chance among them decides the ties of those before it.
+// decided by its columns up to the first identity of the schema — what follows one decides nothing, in a
+// read of one table: through a join a parent's identity repeats with every child — and a column of chance
+// among them decides the ties of those before it.
 //
-// **The rule is closed** (review of MOL-323, rounds 1–4): a list of the uses that compare by position
+// **The rule is closed** (review of MOL-323, rounds 1–5): a list of the uses that compare by position
 // missed one more each time it was attacked. So it goes the other way round. Rows are followed through
 // `await`, a cast, the methods that keep an order (`map`, `filter`, `flatMap`, `flat`, `slice`),
 // `JSON.stringify`, a spread of them alone, a branch of `?:`, `??` or `||`, an object they are put in, a
 // name they are given — declared, assigned or taken from an array (`Promise.all`) — and a function of the
 // file that returns them. Rows with no order may end only where their order cannot tell: their length,
 // their first row (`[0]`, `at(0)`, `const [row] = …`), `find`, `some`, `every`, `includes` — never by a
-// callback handed the index of a row, nor by one the parse cannot read (built by a call, a method, an
-// import) — `reduce`, `sort`, `toSorted`, a `for … of`, a `Set`, a `Map`, `inArray`, `notInArray`,
-// `Object.fromEntries`, `typeof`, discarded; under `expect`: `toHaveLength`, `toContain`, `toContainEqual`,
-// `toBeDefined`, `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, any `not`, `toEqual` of one row or none
-// written in place, or of `expect.arrayContaining`. Rows in the order of chance may besides be compared
-// with another read in the same order — by the same columns, a snapshot with a snapshot of the same helper,
-// the read, a name given it, or either through the methods that keep an order — never with anything the
-// test builds. Anything else is refused, and the fix is an order, never a use the check does not know.
+// callback handed the index of a row, by a parameter, the rest of its arguments or a count it keeps
+// outside, nor by one the parse cannot read (built by a call, a method, an import; `Boolean`, `String` and
+// `Number` are read) — `reduce`, `sort`, `toSorted`, a `for … of`, a `Set`, a `Map`, `inArray`,
+// `notInArray`, `Object.fromEntries`, `typeof`, discarded; under `expect`: `toHaveLength`, `toContain`,
+// `toContainEqual`, `toBeDefined`, `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, a `not` of any of them,
+// `toEqual` of one row or none written in place, or of `expect.arrayContaining`. Rows in the order of
+// chance may besides be compared with another read in the same order — by the same columns, a snapshot with
+// a snapshot of the same helper, the read, a name given it, or either through the methods that keep an
+// order — never with anything the test builds. Anything else is refused, and the fix is an order, never a
+// use the check does not know.
 //
 // What this is: a guard against the ordinary form, not against one built to slip past it. **The price,
 // named, by class:** an order of ties is taken as an order — a column every row read shares
@@ -62,6 +65,8 @@ const KEEPS = new Set(['map', 'filter', 'flatMap', 'flat', 'slice'])
 const ORDERLESS = new Set(['find', 'some', 'every', 'includes', 'reduce', 'sort', 'toSorted'])
 /** Where a callback is handed the index of a row: the second parameter, `reduce`'s third; a comparator never. */
 const INDEX_AT = { reduce: 2, sort: Infinity, toSorted: Infinity }
+/** The platform's casts: a callback of the first argument alone. */
+const CASTS = new Set(['Boolean', 'String', 'Number'])
 /** The methods handed a value, not a callback. */
 const NO_CALLBACK = new Set(['includes', 'slice', 'flat', 'sort', 'toSorted'])
 /** What is handed the rows whole and keeps no order of them. */
@@ -273,7 +278,10 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
         .filter((call) => calledAs(call) === 'orderBy')
         .flatMap((call) => [...call.arguments])
       if (columns.length === 0) return 'none'
-      const unique = columns.findIndex((column) => named(column, identity))
+      // an identity is unique in its own table only: through a join a parent's repeats with every child, and the
+      // columns after it decide the children's order (review round 5, Д1)
+      const joined = names.some((name) => /join$/i.test(name ?? ''))
+      const unique = joined ? -1 : columns.findIndex((column) => named(column, identity))
       const deciding = unique === -1 ? columns : columns.slice(0, unique + 1)
       // a column of chance decides the ties of those before it: the order is chance
       return deciding.some((column) => named(column, chance))
@@ -330,9 +338,43 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
   const callbackDoubt = (call, method) => {
     const [argument] = call.arguments
     if (!argument || NO_CALLBACK.has(method)) return undefined
+    // the platform's casts take their first argument and nothing else (review round 5, №14)
+    if (ts.isIdentifier(argument) && CASTS.has(argument.text)) return undefined
     const callback = functionOf(argument)
     if (!callback) return 'by a callback the check cannot read'
-    return callback.parameters.length > (INDEX_AT[method] ?? 1) ? 'by index' : undefined
+    if (callback.parameters.length > (INDEX_AT[method] ?? 1)) return 'by index'
+    // an index without a parameter for it: the rest of the arguments, or a count kept outside (Д3)
+    if (callback.parameters.some((parameter) => parameter.dotDotDotToken)) return 'by index'
+    return countsOutside(callback) ? 'by a count kept outside it' : undefined
+  }
+
+  /** Whether a function changes a name declared outside it: `texts[i++]`, `n += 1`. */
+  const countsOutside = (callback) => {
+    let changes = false
+    const outside = (target) => {
+      const declaration = ts.isIdentifier(target) ? symbolOf(target)?.valueDeclaration : undefined
+      return Boolean(
+        declaration && !(declaration.pos >= callback.pos && declaration.end <= callback.end),
+      )
+    }
+    const visit = (node) => {
+      if (
+        (ts.isPostfixUnaryExpression(node) || ts.isPrefixUnaryExpression(node)) &&
+        [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator) &&
+        outside(node.operand)
+      )
+        changes = true
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        node.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
+        outside(node.left)
+      )
+        changes = true
+      ts.forEachChild(node, visit)
+    }
+    visit(callback.body)
+    return changes
   }
 
   /** The names given a read, by their symbol, with its order. */
@@ -442,7 +484,8 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
         const subject = ts.isPropertyAccessExpression(callee) ? subjectOf(callee) : undefined
         if (subject && ts.isPropertyAccessExpression(callee)) {
           const name = callee.name.text
-          if (negated(callee)) return { free: true }
+          // `not` turns a comparison over, never into one the order cannot tell (review round 5, Д2)
+          if (negated(callee) && !COMPARES.has(name)) return { free: true }
           if (COMPARES.has(name))
             return { why: `${name}(…)`, againstRead: sameChance(subject, order) }
           return { why: `${name}(…)` }
@@ -487,8 +530,15 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
     while (ts.isPropertyAccessExpression(m) && /^(resolves|rejects)$/.test(m.name.text))
       m = m.parent
     if (!ts.isPropertyAccessExpression(m)) return { why: 'expect' }
-    const name = m.name.text
-    if (name === 'not' || ORDERLESS_MATCHERS.has(name)) return { free: true }
+    let name = m.name.text
+    // `not` turns a comparison over, never into one the order cannot tell (review round 5, Д2)
+    if (name === 'not') {
+      if (!ts.isPropertyAccessExpression(m.parent) || !COMPARES.has(m.parent.name.text))
+        return { free: true }
+      m = m.parent
+      name = m.name.text
+    }
+    if (ORDERLESS_MATCHERS.has(name)) return { free: true }
     const [expected] = ts.isCallExpression(m.parent) ? m.parent.arguments : []
     if (COMPARES.has(name) && expected) {
       const one =
