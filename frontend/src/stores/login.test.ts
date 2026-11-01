@@ -1136,6 +1136,24 @@ describe('the login screen showing a failure of the identity', () => {
     expect(phases).toEqual([])
   })
 
+  // Self-review №11, adversarial Д1: «Повторить» pressed while the identity asks again by itself was
+  // handed that quiet question — no skeleton, and its failure not said again.
+  it('«Повторить» by hand while a quiet question is in the air shows it, and the failure comes again', async () => {
+    const { actor, login, phases } = await onTheError()
+    let fail: (error: Error) => void = () => undefined
+    me.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)))
+    const quiet = actor.start({ quietly: true })
+    expect(login.phase).toBe('error')
+    const calls = me.mock.calls.length
+    const tap = login.retry()
+    expect(me.mock.calls.length).toBe(calls)
+    expect(login.phase).toBe('loading')
+    fail(new ApiError(ERROR.INTERNAL, 'boom', true))
+    await Promise.all([quiet, tap])
+    expect(login.phase).toBe('error')
+    expect(phases).toEqual(['loading', 'error'])
+  })
+
   it('must not fire: «Повторить» by hand still shows the question', async () => {
     const { actor, login } = await onTheError()
     me.mockReturnValue(new Promise(() => undefined))

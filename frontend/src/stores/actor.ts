@@ -299,7 +299,14 @@ export const useActorStore = defineStore('actor', () => {
     // **A second ask waits for the one in the air** (MOL-349, adversarial Г2): returned at once, the
     // card's «Повторить» pressed while the identity asked again by itself said «не удалось» again
     // before any answer, and nothing when the real one failed.
-    running ??= ask(options).finally(() => {
+    if (running) {
+      // A tap by hand shows the question it waits for (self-review №11, adversarial Д1): handed a
+      // quiet one, the login's «Повторить» showed nothing, and its failure was not said again.
+      if (!options.quietly && (state.value === 'error' || state.value === 'offline'))
+        state.value = 'loading'
+      return running
+    }
+    running = ask(options).finally(() => {
       running = null
     })
     return running
