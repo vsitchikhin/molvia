@@ -1154,12 +1154,13 @@ function sameLetters(a: string, b: string): boolean {
 const LITRES_MAX = 2
 
 /**
- * The words of an item's own brand: in «…», or in Latin, as a shelf's name writes a brand (MOL-261) — «Сыр «Пано»»,
- * «Печенье Milka»; never a flavour or a kind, «Чай киви».
+ * The words of an item's own brand: in «…», or a brand the lexicon spells in Latin, as a shelf's name writes one
+ * (MOL-261) — «Сыр «Пано»», «Печенье Milka»; never a flavour or a kind, «Чай киви», nor any other Latin word — a size
+ * of `STANDARDS`, «Шоколад MINI», a flavour, «Чай Lemon» (round 3, Р3-А1).
  */
-function brandWordsOf(itemName: string): Set<string> {
+function brandWordsOf(itemName: string, shelved: ReadonlySet<string>): Set<string> {
   const quoted = [...itemName.matchAll(/«([^»]*)»/gu)].flatMap((found) => wordsOf(found[1] ?? ''))
-  return new Set([...quoted, ...wordsOf(itemName).filter((word) => /[a-z]/u.test(word))])
+  return new Set([...quoted, ...wordsOf(itemName).filter((word) => shelved.has(word))])
 }
 
 /** A word's letters, «ու» one: a letter of the key is not a letter of the word — «ш» is `sh` (adversarial А2). */
@@ -1388,6 +1389,12 @@ export function lineFitter(
   // a word of the brand with no word of the item by its letters stands on the one word a letter longer that the line
   // says nothing else of, a word of the item's own brand, and on that word alone (adversarial А1): «Դինա» names «Дина»
   // and never the «дыня» beside it, «Սուրճ «Կոֆ»» no «Кофе», «Թեյ «Կիվ»» no «Чай киви» (round 2, Р2-А1)
+  // the brands the lexicon spells in Latin, as an item's name may print them bare
+  const shelved = new Set(
+    Object.values(lexicon.brands ?? {})
+      .flatMap(wordsOf)
+      .filter((word) => /[a-z]/u.test(word)),
+  )
   const lostLetters = (item: readonly string[], own: ReadonlySet<string>): Set<string> =>
     new Set(
       brand.flatMap((one) => {
@@ -1401,7 +1408,7 @@ export function lineFitter(
   return (itemName, options = {}) => {
     const item = wordsOf(itemName)
     const copied = options.copied === true
-    const lost = copied ? lostLetters(item, brandWordsOf(itemName)) : new Set<string>()
+    const lost = copied ? lostLetters(item, brandWordsOf(itemName, shelved)) : new Set<string>()
     if (item.length === 0) return false
     if (branded && options.generic === true) return false
     if (!item.every((word) => lineHas(word) || lost.has(word))) return false

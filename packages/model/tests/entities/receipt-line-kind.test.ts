@@ -823,9 +823,9 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
 })
 
 describe('a line the model copied a letter short (MOL-331)', () => {
-  const FATS = { fats: new Set(['сыр']) }
+  const LEXICON = { fats: new Set(['сыр']), brands: { միլկա: 'Milka' } }
   const copied = (printed: string, item: string) =>
-    lineFitter(receiptLineParts(printed), WORDS, FATS)(item, { copied: true })
+    lineFitter(receiptLineParts(printed), WORDS, LEXICON)(item, { copied: true })
 
   it('takes a brand under five letters with one letter lost, only where the line was copied', () => {
     expect(copied('Պանիր «Պան» 200գր', 'Сыр «Пано» 200 г')).toBe(true)
@@ -865,8 +865,10 @@ describe('a line the model copied a letter short (MOL-331)', () => {
     expect(copied('Սուրճ «Կոֆ»', 'Кофе')).toBe(false)
     // an item of no brand of its own: its word a letter longer is a flavour, never the brand (round 2, Р2-А1)
     expect(copied('Պանիր «Կիվ»', 'Сыр киви')).toBe(false)
-    // a brand a shelf writes in Latin is the item's own
+    // a brand the lexicon spells in Latin is the item's own; any other Latin word is not (round 3, Р3-А1)
     expect(copied('Պանիր «Միլա»', 'Сыр Milka')).toBe(true)
+    expect(copied('Պանիր «Մին»', 'Сыр MINI')).toBe(false)
+    expect(copied('Պանիր «Լեմն»', 'Сыр Lemon')).toBe(false)
     expect(copied('Պանիր «Պան» ելակ', 'Сыр «Пано» ежевика')).toBe(false)
   })
 
