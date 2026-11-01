@@ -1003,11 +1003,11 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   (self-review №4, adversarial Б1): after it comes the screen's «нет связи» or its answer, so the notice
   neither comes nor goes under it — taken for a word, it took a failed sign-in's card away at every read
   and the answer brought it back, the month's arrow and the field of «Что брать» moving under the thumb.
-  A failed sign-in known as the screen comes stands from its first frame, **and one that comes under a
-  skeleton comes at once** (adversarial В1): at a launch `me()` fails while the first screen loads, and
-  held back the card came over the answer, the field lower than its well — over the skeleton it moves
-  only the skeleton; a card a word of the screen took away does not come back under one; «без связи»
-  waits for what the skeleton gives way to. **The card asks again quietly, «Повторяем…» on its button**
+  **Not even a failure that comes under it** (self-review №10, adversarial Г1 against В1): with the
+  server down `me()` fails first, and let in at once the card came over the skeleton and went with the
+  screen's own error a moment later — at every launch and every screen opened meanwhile. **The price,
+  named:** with `/actors/me` failing alone, rarer than a server down, the card comes with a screen's
+  first answer, which stands one card lower than its skeleton. **The card asks again quietly, «Повторяем…» on its button**
   (`retrying` of `ScreenState`, self-review №5): put to `loading`, it went from under the thumb; **and a
   tap that failed the same way is said again** (`attempt` of `ScreenState`, C1 of MOL-19, adversarial В2).
   **The word is a component of the kit inside the frame's slot**: a screen is the frame's parent, so

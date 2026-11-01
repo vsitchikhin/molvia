@@ -412,7 +412,11 @@ the round trip through Telegram, and ask whose account this turned out to be.
   section's own error — a search failed under the field — is a word of the screen as a full one is, and
   takes the card away over an answered screen while it stands; counted as no word, the four screens
   whose error is a section's («Деньги», «Траты», «Покупки», «Что брать») would stand two «Повторить»
-  with the server down, which kit-settings-7 was about. It takes two failures at once.
+  with the server down, which kit-settings-7 was about. It takes two failures at once. **And with
+  `/actors/me` failing alone the card comes with a screen's first answer** (self-review №10): a skeleton
+  holds it back, since with the server down the screen's own error comes after it. **A tap while the
+  identity asks again by itself waits for that question** (`start` hands back the one in the air,
+  adversarial Г2), so «Повторяем…» stands and the failure is said when it came.
 - **The development seam is a button, and only in a development build.** It signed the app in by
   itself until now, which made the screen this epic exists for invisible in every working copy
   and unreachable to the end-to-end suite; `signedIn()` in `e2e/session.ts` now presses it, in
