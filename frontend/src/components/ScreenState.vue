@@ -93,6 +93,7 @@ import { lastRefusal } from '@/api'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { sayAnswerWord } from '@/composables/useAnswerWord'
 import { useStateStrip } from '@/composables/useStateStrip'
 import { useUpdateAnnouncement } from '@/composables/useUpdateAnnouncement'
 import { usePwaUpdate } from '@/pwaUpdate'
@@ -218,6 +219,8 @@ export default defineComponent({
     const actions = ref<HTMLElement | null>(null)
     const retryButton = ref<ComponentPublicInstance | null>(null)
     const announce = useAnnouncer()
+    // No connection or an error: what became of the answer, said by the screen itself (MOL-349).
+    sayAnswerWord(() => props.kind === 'offline' || props.kind === 'error')
 
     // The strip is asked for while the block is an error of the whole screen, and let go as it
     // stops being one; the first to ask holds it, and the next takes it once that one lets go.

@@ -2,7 +2,6 @@ import { expect, test } from '@playwright/test'
 import { SESSION_COOKIE } from '@molvia/model'
 import type { Page } from '@playwright/test'
 import { open } from './session'
-import { recordLiveRegion } from './live-region'
 
 /**
  * How a request proves who it is, through a real browser (MOL-53). None of this can be shown
@@ -87,26 +86,30 @@ test('a session that is gone brings back the same owner, not a new person', asyn
   expect(await knownOwner(page)).toBe(owner)
 })
 
-// The identity's error is polite, so the region is its only way to a screen reader. «Try again»
-// failing the same way must be heard again, not swallowed as «no change» (MOL-19, C1).
-//
-// Сервер, который не ответил, — это не «сессии нет»: сессия может быть жива за порталом кафе,
-// поэтому приложение показывается с плашкой, а не дверью (MOL-56).
-test('the same answer after «Try again» is said again', async ({ page }) => {
-  // Плашка — про телефон, который уже знает своего владельца: на пустом устройстве показывать
-  // нечего, и там это дверь, а не приложение с плашкой (MOL-56, адверсариальный А5).
+// MOL-349, owner's В-2 «б»: an identity the server did not check has no notice and no «Try again» of
+// its own — they stood over the screen's error and its «Try again» (kit-settings-7) — and asks again
+// by itself. Сервер, который не ответил, — это не «сессии нет»: приложение показывается, а не дверь
+// (MOL-56).
+test('an identity the server did not check says nothing of its own, and asks again by itself', async ({
+  page,
+}) => {
+  // Плашка была про телефон, который уже знает своего владельца: на пустом устройстве это дверь.
   await open(page)
-  const said = await recordLiveRegion(page)
-  await page.route('**/api/actors/me**', (route) => route.fulfill({ status: 500, body: '{}' }))
+  let refused = 0
+  await page.route('**/api/actors/me', (route) => {
+    refused += 1
+    return route.fulfill({ status: 500, body: '{}' })
+  })
   await page.reload()
-  const notice = 'Could not check the sign-in'
-  await expect(page.getByRole('heading', { name: notice })).toBeVisible()
-  await expect
-    .poll(async () => (await said()).filter((text) => text.includes(notice)))
-    .toHaveLength(1)
+  await expect.poll(() => refused).toBeGreaterThan(0)
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('What to buy')
+  await expect(page.locator('.notice-slot')).toBeEmpty()
 
-  await page.getByRole('button', { name: 'Try again' }).click()
-  await expect
-    .poll(async () => (await said()).filter((text) => text.includes(notice)))
-    .toHaveLength(2)
+  // The first try again comes five seconds after the failure, with no tap.
+  await page.unroute('**/api/actors/me')
+  const answered = await page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/actors/me',
+    { timeout: 15_000 },
+  )
+  expect(answered.status()).toBe(200)
 })

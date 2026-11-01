@@ -1,15 +1,6 @@
 <template>
-  <aside v-if="notice" class="notice">
-    <!-- An error is the quiet card itself (MOL-180, К-13); offline sits in one. -->
-    <ScreenState
-      v-if="notice === 'error'"
-      inline
-      kind="error"
-      :title="t('identity.error.title')"
-      :body="t('identity.error.body')"
-      @retry="retry"
-    />
-    <AppCard v-else>
+  <aside v-if="shown" class="notice">
+    <AppCard>
       <!-- Yellow, not the green of an offline trip: without an identity nothing can be saved. -->
       <ScreenState
         inline
@@ -27,43 +18,44 @@ import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppCard from '@/components/AppCard.vue'
 import ScreenState from '@/components/ScreenState.vue'
+import { useAnswerWord, withoutAnswerWord } from '@/composables/useAnswerWord'
 import { useActorStore } from '@/stores/actor'
 
 /**
  * What happened to the identity, when it is something a person has to be told.
  *
- * Two cases, and they are the reason this is not a courtesy: while the identity is not up,
- * every request the app makes goes out without an owner. Showing nothing left a person with an
- * app that looked normal and could not save a thing.
+ * Opened with no connection, the app shows the owner on the device with nothing checked, and every
+ * request goes out without an owner. **Said only where the screen says nothing of its answer**
+ * (MOL-349, owner's В-1 «б»): a screen's own «нет связи», its strip or its skeleton is the one word
+ * about the connection — drawn over it, the notice made two clouds and two texts, and on «Что брать»
+ * stood over the field that chooses the answer (Ф-14). The privacy page and the terms say nothing of
+ * the kind, and there it stays. What holds the queues meanwhile is their `flush()`, never this notice
+ * (MOL-56).
  *
- * **`lost` went with MOL-53.** It said «the trips and ratings of this device are out of reach
- * and we have started a new record; the old key is kept» — a sentence about a world where the
- * device held the key. A session is not the data: losing one means signing in again, and
+ * **An identity that could not be checked says nothing here** (MOL-349, owner's В-2 «б»): its quiet
+ * card with a «Повторить» of its own stood over the screen's error and its «Повторить» — three on
+ * «Настройки» (kit-settings-7). The identity asks again by itself (`stores/actor`), and the screen's
+ * error is the one word.
+ *
+ * **`lost` went with MOL-53.** A session is not the data: losing one means signing in again, and
  * whatever happens then is MOL-56's to draw, together with the screen that can act on it.
  *
  * Drawn by the shared screen state (MOL-19) as a notice of its own height: its cases are that
  * block's cases, not a second implementation of them.
  */
-const NOTICES = ['error', 'offline'] as const
-type Notice = (typeof NOTICES)[number]
-
-function noticeFor(state: string): Notice | null {
-  return (NOTICES as readonly string[]).includes(state) ? (state as Notice) : null
-}
-
 export default defineComponent({
   name: 'IdentityNotice',
   components: { AppCard, ScreenState },
   setup() {
     const { t } = useI18n()
     const actor = useActorStore()
-
-    const notice = computed(() => noticeFor(actor.state))
+    const word = useAnswerWord()
+    // Its own state is no word of the screen's, or it would silence itself.
+    withoutAnswerWord()
 
     return {
       t,
-      notice,
-      retry: () => void actor.retry(),
+      shown: computed(() => actor.state === 'offline' && !(word?.said.value ?? false)),
     }
   },
 })

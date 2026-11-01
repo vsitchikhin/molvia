@@ -95,6 +95,7 @@ import IdentityNotice from '@/components/IdentityNotice.vue'
 import UpdateBand from '@/components/UpdateBand.vue'
 import { useBackLabel } from '@/composables/useBackLabel'
 import { useCollapsed, useHeight } from '@/composables/useCollapsed'
+import { provideAnswerWord } from '@/composables/useAnswerWord'
 import { provideStateStrip } from '@/composables/useStateStrip'
 import { backTarget, useNavigation } from '@/navigation'
 import { useLoginStore } from '@/stores/login'
@@ -260,6 +261,8 @@ export default defineComponent({
     )
     const stateTarget = ref<HTMLElement | null>(null)
     const strip = provideStateStrip(stateTarget)
+    // What the screen says of its answer silences the notice of an identity not checked (MOL-349).
+    provideAnswerWord()
     // An error taking the strip unmounts the screen's own action, and a focus on it fell to the body
     // («Где вы?» closed over a failed «Что брать» hands it back to «Записать покупки», review №6): it
     // goes to the error's first button, where that action stood (`nextAction`). Where the action went

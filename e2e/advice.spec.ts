@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { BrowserContext, Page } from '@playwright/test'
 import { liveRegion, recordLiveRegion } from './live-region'
-import { asBrowser, signedIn } from './session'
+import { asBrowser, launchOffline, signedIn } from './session'
 
 interface Person {
   readonly id: string
@@ -417,6 +417,22 @@ test('a connection lost mid-request is offline, not an error', async ({ page, co
     page.locator('.dock').getByRole('button', { name: 'Photograph a receipt' }),
   ).toBeVisible()
   expect(searches).toEqual([])
+})
+
+// MOL-349, С-2 (Ф-14): opened with no connection and the sign-in not checked, the screen's own state
+// is the one word about it — the notice «Working without a connection» stood over the search field.
+test('a launch with no connection says it once, under the field, and nothing over it', async ({
+  page,
+}) => {
+  await person(page)
+  await launchOffline(page)
+  await expect(
+    page.getByRole('heading', { name: 'The list will show up once you are online' }),
+  ).toBeVisible()
+  await expect(page.getByRole('searchbox', { name: 'Search the catalogue' })).toBeVisible()
+  await expect(page.locator('.notice-slot')).toBeEmpty()
+  await expect(page.getByRole('heading', { name: 'Working without a connection' })).toHaveCount(0)
+  await expect(page.locator('.state')).toHaveCount(1)
 })
 
 // The field stands in one place whatever came (owner's В-2 «а» on review № 1 of MOL-201): the line

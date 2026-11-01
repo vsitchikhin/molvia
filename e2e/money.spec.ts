@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { fakeKeyboard } from './keyboard'
 import { facesIn, standAt, topOf } from './scroll'
-import { asBrowser, signedIn } from './session'
+import { asBrowser, launchOffline, signedIn } from './session'
 import { chooseCategory } from './category'
 import { fillDetails, openDetails } from './spending-details'
 
@@ -1503,4 +1503,28 @@ test('the sum being typed stands in sight over the keys of a turned phone (MOL-1
   await keyboard(260, 260)
   await expect(sheet).not.toHaveClass(/pinned/)
   await expect.poll(async () => inSight(page, sum)).toEqual({ field: 54, seen: 54, focused: true })
+})
+
+// MOL-349, С-2 and С-4: opened with no connection and the sign-in not checked, «Деньги» and «Траты» say
+// it once, in their own words — no notice over them about purchases — and «Траты» with no category
+// known promise no spending they have no strip for.
+test('a launch with no connection: «Деньги» and «Траты» say it once, and promise nothing they lack', async ({
+  page,
+}) => {
+  await signedIn(page, '/settings')
+  await launchOffline(page, '/money/spendings')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Траты')
+  await expect(
+    page.getByText('Траты появятся, когда интернет вернётся', { exact: true }),
+  ).toBeVisible()
+  await expect(page.getByText('Новую трату можно записать и сейчас')).toHaveCount(0)
+  await expect(page.locator('.dock')).toHaveCount(0)
+  await expect(page.locator('.notice-slot')).toBeEmpty()
+  await expect(page.locator('.state')).toHaveCount(1)
+
+  // The script and the route stay with the page: «Деньги» opened the same way.
+  await page.goto('/money')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Деньги')
+  await expect(page.locator('.state')).toHaveCount(1)
+  await expect(page.locator('.notice-slot')).toBeEmpty()
 })

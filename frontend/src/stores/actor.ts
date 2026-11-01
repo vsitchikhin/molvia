@@ -21,6 +21,15 @@ import {
   rememberIdentity,
 } from '@/stores/identity'
 import { reportFailure } from '@/failures'
+import { doublingRetry } from '@/stores/queueing'
+
+/**
+ * An identity that could not be checked is asked again by time (MOL-349, owner's В-2 «б»), as the
+ * consent is (MOL-95): its notice and its «Повторить» went, since they stood over the screen's error
+ * and its own — three on «Настройки» (kit-settings-7).
+ */
+export const IDENTITY_RETRY_FIRST_MS = 5_000
+export const IDENTITY_RETRY_LAST_MS = 60_000
 
 /**
  * What the identity is doing, so a screen can show the right one of its states.
@@ -160,7 +169,24 @@ export const useActorStore = defineStore('actor', () => {
     reportFailure(error, 'screen')
     state.value = navigator.onLine ? 'error' : 'offline'
     console.error('[molvia] личность не поднялась', error)
+    if (state.value === 'error') again.later()
   }
+
+  /**
+   * **Quietly** (MOL-349): the state stays `error` while the question is in the air, as the consent's
+   * asks again (adversarial Д1 of MOL-95) — put to `loading`, the login screen showing the failure
+   * would blink to its skeleton at every try. Offline the timer waits for `online`, as `recover` does.
+   */
+  const again = doublingRetry(
+    () => void start({ quietly: true }),
+    IDENTITY_RETRY_FIRST_MS,
+    IDENTITY_RETRY_LAST_MS,
+  )
+  watch(state, (now) => {
+    if (now === 'error' || now === 'loading') return
+    again.cancel()
+    again.reset()
+  })
 
   /**
    * The development seam, and since MOL-56 it is a button rather than something that happens by
@@ -262,11 +288,11 @@ export const useActorStore = defineStore('actor', () => {
     told(false)
   }
 
-  /** Called once after the app mounts, and again by the retry control. */
-  async function start(): Promise<void> {
+  /** Called once after the app mounts, again by the retry control, and by time after an error. */
+  async function start({ quietly = false }: { quietly?: boolean } = {}): Promise<void> {
     if (running) return
     running = true
-    state.value = 'loading'
+    if (!(quietly && state.value === 'error')) state.value = 'loading'
     // «Выйти» in another window that this tab slept through (round 2, Д2): its own shelf still
     // holds the drawer. Let go here as the `storage` listener would have.
     if (erasedWhileAway()) {

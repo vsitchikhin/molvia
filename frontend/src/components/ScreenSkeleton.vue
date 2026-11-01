@@ -14,6 +14,7 @@ import { defineComponent, onBeforeUnmount, onMounted, ref, warn, type PropType }
 import { useI18n } from 'vue-i18n'
 import SkeletonPart, { isWidths } from '@/components/SkeletonPart.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { sayAnswerWord } from '@/composables/useAnswerWord'
 
 /**
  * Loading drawn as the content that is coming, not as a spinner: the screen must not jump
@@ -51,6 +52,8 @@ export default defineComponent({
     // Said in the app's live region when there is one, and taken back when loading is over —
     // «Loading…» left in the region would be read under the answer (MOL-19, П-2, C3).
     const announce = useAnnouncer()
+    // The answer is on its way: the screen's own word about it comes next (MOL-349).
+    sayAnswerWord(() => true)
     let withdraw: (() => void) | undefined
     onMounted(() => {
       withdraw = announce?.(t('state.loading'), { held: true })

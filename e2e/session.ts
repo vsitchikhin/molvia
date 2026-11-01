@@ -199,3 +199,17 @@ export async function goOffline(page: Page): Promise<() => Promise<void>> {
     await page.context().setOffline(false)
   }
 }
+
+/**
+ * Запуск без сети с владельцем на устройстве (MOL-349): установленное приложение открыли у полки,
+ * вход не подтвердить, личность — `offline`. Оболочку на dev-сервере без service worker отдаёт сеть,
+ * поэтому «без сети» здесь — `navigator.onLine` ложь с первой строки страницы и оборванный API, приём
+ * съёмки MOL-302. Владелец уже должен быть на устройстве: сначала `open()` со связью.
+ */
+export async function launchOffline(page: Page, path = '/'): Promise<void> {
+  await page.addInitScript(() => {
+    Object.defineProperty(Navigator.prototype, 'onLine', { configurable: true, get: () => false })
+  })
+  await page.route('**/api/**', (route) => route.abort('internetdisconnected'))
+  await page.goto(path)
+}
