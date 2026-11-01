@@ -1152,7 +1152,10 @@ function sameLetters(a: string, b: string): boolean {
 function letterLost(printed: string, name: string): boolean {
   const [short, long] = [toSearchKey(printed), toSearchKey(name)]
   if (short.length < 3 || long.length !== short.length + 1) return false
-  return [...long].some((_, at) => long.slice(0, at) + long.slice(at + 1) === short)
+  // a key is Latin and «ц», one code unit a letter
+  for (let at = 0; at < long.length; at++)
+    if (long.slice(0, at) + long.slice(at + 1) === short) return true
+  return false
 }
 
 const HY_UNITS: Readonly<Record<string, string>> = {
