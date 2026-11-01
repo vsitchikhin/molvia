@@ -4,10 +4,18 @@
 // `feedback-bot` read its four words so and failed on a pull request that touched only the PWA (CI
 // 41022785698).
 //
+// **The net holds it at run time** (review of MOL-323, round 12): `backend/tests/unordered-rows.ts` turns
+// the rows of every `SELECT` of the integration tests with no `order by` of its own by one, the first last,
+// so a test leaning on the order of rows read with no order fails on its first run, however it uses them —
+// through a `Set`, a callback, a string, anything. **This check says it before the run, for the ordinary
+// form**: its word on how rows with no order are used is a hint the net makes good. What the net cannot see
+// is an order the statement has: an order of chance — a uuid, a moment — and an order of ties. Those this
+// check alone holds, by the schema.
+//
 // Found by parsing, as `check-clock-bounds.mjs` is, names resolved by TypeScript's binder, the facts of the
 // tables read from `schema.ts`. **The check is closed at each of the three places it recognises something**
-// (review of MOL-323, eleven rounds: a list of forms missed one more each round, so every place says what
-// it knows and holds the rest in doubt — and **in doubt there is no order**).
+// (review of MOL-323, eleven rounds before the net: a list of forms missed one more each round, so every
+// place says what it knows and holds the rest in doubt — and **in doubt there is no order**).
 //
 // **1. What reads.** A chain of Drizzle with `select…` and `from`, its beginning followed through a `const`
 // and through a function of the file that returns one — carried on from any other name, it is refused;
@@ -50,14 +58,14 @@
 // fix is an order, never a use the check does not know. **Every answer of «free» or «not a read» the check
 // gives is one written here**; nothing else is let go.
 //
-// **The price, named, by class, and nothing outside these classes:** an order of ties is taken as an order
-// — a column every row read shares, a parent's identity through a join, a `sort` whose key repeats, an
-// order of SQL text by whatever it names; an order of values the test wrote is taken as the test's — a
-// column that is neither a uuid nor a moment is not judged; a moment before an identity is refused even
-// where the test wrote the moments; a row picked as the one — the first, `find`, a key of a `Map` or
-// `Object.fromEntries` — is taken as the only one; what a `for … of` or a `reduce` collects is not
-// followed, a sum being their ordinary use; a callback calling a pure method of a name of this file is
-// refused; a function handed in as a parameter, a field of an object of rows, an import and a helper of
+// **The price, named, by class, and nothing outside these classes** — of rows with no order none is left,
+// the net holds them; of rows in an order the statement has: an order of ties is taken as an order — a
+// column every row read shares, a parent's identity through a join, a `sort` whose key repeats, an order of
+// SQL text by whatever it names; an order of values the test wrote is taken as the test's — a column that
+// is neither a uuid nor a moment is not judged; a moment before an identity is refused even where the test
+// wrote the moments; of rows in the order of chance, a row picked as the one is taken as the only one, what
+// a loop or a `reduce` collects is not followed, a callback calling a pure method of a name of this file is
+// refused, and a function handed in as a parameter, a field of an object of rows, an import and a helper of
 // another file are not followed. Those go to review.
 //
 //   node bin/check-ordered-reads.mjs
@@ -69,6 +77,8 @@ import ts from 'typescript'
 
 /** The files that read Postgres: the integration tests of the API. */
 const FILES = ['backend/*.integration.test.ts']
+/** The test of the net that turns rows read with no order: it reads so on purpose. */
+const THE_NET = 'backend/tests/unordered-rows.integration.test.ts'
 /** Where a column is a uuid, a moment or an identity. */
 const SCHEMA = 'backend/src/db/schema.ts'
 
@@ -1044,7 +1054,7 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   const files = execFileSync('git', ['ls-files', ...FILES], { encoding: 'utf8' })
     .trim()
     .split('\n')
-    .filter(Boolean)
+    .filter((file) => file && file !== THE_NET)
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     return unorderedReads(file, source, chance, identity, keys, known).map(
