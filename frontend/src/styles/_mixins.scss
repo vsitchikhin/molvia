@@ -2,6 +2,17 @@
 // never has to remember to import it. Tokens stay CSS custom properties: they must be
 // swappable at runtime for the dark scheme, which a Sass variable cannot do.
 
+/// A figure that is its card's answer: its size — `--text-figure`, or `1em` for a figure set in the text's size
+/// — smaller only where it would stand past the box it is measured in, the nearest `container-type:
+/// inline-size` (MOL-321). A sum never breaks, and at 200 % on 320 «Потрачено 125 403 ֏» was 276 px in a card
+/// of 190. The component says how wide the figure is in its own size (`figureChars`, a share of it a
+/// character, measured), since CSS cannot measure text.
+/// `$less` is what of the box the figure does not get — a field's edges around a figure typed.
+@mixin figure-fit($size: var(--text-figure), $less: 0px) {
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- the one place a figure's size is worked out (MOL-321) */
+  font-size: min(#{$size}, calc((100cqi - #{$less}) / var(--figure-width, 1)));
+}
+
 /// Anything a thumb has to hit at a shelf, in bad light.
 @mixin touch-target {
   display: inline-flex;
@@ -35,6 +46,11 @@
 /// (`ListRow` in the container `row`) and its skeleton (`SkeletonPart` of rows) read the one number, so
 /// the bars cannot part from the answer. A container query takes no custom property, hence Sass.
 $row-narrow: 22rem;
+
+/// With large text, a row of the kit's list cards (`row-tight`) narrower than this lays its words over its whole width:
+/// the circle gives way, the tail stands under them (MOL-321). 15rem: some 120 % of the text on 320 and up — at 130 %
+/// a sum of a million in the words' column stood over the circle (self-review 10, №4); 18rem at 100 % keeps the row.
+$row-tight: 15rem;
 
 /// A bar of a skeleton (Ф-13, MOL-178): `border-strong` at `--skeleton-rest`, which on a card's `surface`
 /// is `border`'s 1.42:1 in the light scheme and 1.47:1 in the dark, on the page's ground 1.31 and 1.53 —

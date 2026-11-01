@@ -67,6 +67,8 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .nav-row {
+  /* It measures itself for the icon below (MOL-321). */
+  container-type: inline-size;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -167,6 +169,14 @@ export default defineComponent({
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
   line-clamp: 2;
+
+  /* With large text whole (MOL-321): at 200 % «Перевод между счетами» read «Перево|д…». */
+  html[data-large-text] & {
+    display: block;
+    overflow: visible;
+    -webkit-line-clamp: none;
+    line-clamp: none;
+  }
 }
 
 /* Never cut: on its own line it breaks between its words, never inside a figure, whose groups the
@@ -186,5 +196,17 @@ export default defineComponent({
 
   font-size: var(--icon);
   color: var(--text-muted);
+}
+
+/* Narrower than this the icon gives its place to the words (MOL-321), as `AccountRow`'s wallet: at 200 % on
+   320 the icon, the chevron and the gaps left the label 64 px, and «Тра|ты», «Бю|дж|ет» broke inside. In rem:
+   16rem at 100 % on 320, some 133 % of the text and up. The price: at 200 % a word of eight letters and more
+   («Категории») still breaks. */
+$icon-beside: 12rem;
+
+@container (width < #{$icon-beside}) {
+  .icon {
+    display: none;
+  }
 }
 </style>

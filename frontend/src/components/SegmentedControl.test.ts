@@ -194,4 +194,127 @@ describe('SegmentedControl', () => {
     render('kg', [...UNITS, { value: 'g', label: 'g' }, { value: 'ml', label: 'ml' }])
     expect(warn).toHaveBeenCalledOnce()
   })
+
+  // MOL-321, owner's В-1 «а»: a row its words do not fit stands its segments one under another. happy-dom
+  // lays nothing out, so the row's widths are given: wider than itself unless stacked.
+  describe('a row its words do not fit (MOL-321)', () => {
+    let rowWidth = 100
+    let resized: (() => void) | null = null
+    const box = 100
+
+    function laidOut(): void {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+        configurable: true,
+        get(this: HTMLElement) {
+          return this.classList.contains('track') ? box : 0
+        },
+      })
+      Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+        configurable: true,
+        get(this: HTMLElement) {
+          if (!this.classList.contains('track')) return 0
+          return this.classList.contains('stacked') ? box : rowWidth
+        },
+      })
+      vi.stubGlobal(
+        'ResizeObserver',
+        class {
+          constructor(callback: () => void) {
+            resized = callback
+          }
+          observe(): void {
+            // The test calls `resized` itself, as the browser would on a new size.
+          }
+          disconnect(): void {
+            resized = null
+          }
+        },
+      )
+      vi.stubGlobal('requestAnimationFrame', (step: () => void) => {
+        step()
+        return 1
+      })
+    }
+
+    afterEach(() => {
+      Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth')
+      Reflect.deleteProperty(HTMLElement.prototype, 'scrollWidth')
+      vi.unstubAllGlobals()
+      resized = null
+    })
+
+    // Measured as it mounts; the class comes in the render after it, a microtask, before any paint.
+    it('stands one under another when the row is wider than its place, from the first paint', async () => {
+      laidOut()
+      rowWidth = 220
+      const view = render()
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).toContain('stacked')
+    })
+
+    it('must not fire: a row that fits stays a row, at exactly its width too', async () => {
+      laidOut()
+      rowWidth = box
+      const view = render()
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).not.toContain('stacked')
+    })
+
+    it('goes back to a row once the words fit again, measured as a row', async () => {
+      laidOut()
+      rowWidth = 220
+      const view = render()
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).toContain('stacked')
+      // Still too wide: measured stacked, as it stands, it would read as fitting and flip back.
+      resized?.()
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).toContain('stacked')
+      rowWidth = box - 1
+      resized?.()
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).not.toContain('stacked')
+      rowWidth = box + 1
+      resized?.()
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).toContain('stacked')
+    })
+
+    // A row, its sheet shut: a box of no width holds any word, so read, it would stand one under another.
+    it('must not fire: a row not laid out — a shut sheet — keeps its last measure', async () => {
+      laidOut()
+      rowWidth = box
+      const view = render()
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).not.toContain('stacked')
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+        configurable: true,
+        get: () => 0,
+      })
+      resized?.()
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).not.toContain('stacked')
+    })
+
+    it('measures again when its words change', async () => {
+      laidOut()
+      rowWidth = box
+      const view = render()
+      rowWidth = 220
+      await view.setProps({ options: [...UNITS.slice(0, 2), { value: 'piece', label: 'Штуки' }] })
+      await view.vm.$nextTick()
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).toContain('stacked')
+    })
+
+    it('keeps the radios one group and the chosen fill when stacked', async () => {
+      laidOut()
+      rowWidth = 220
+      const view = render('l')
+      await view.vm.$nextTick()
+      expect(view.get('.track').classes()).toContain('stacked')
+      expect(view.findAll('input[type="radio"]')).toHaveLength(3)
+      expect(view.findAll('.on').map((segment) => segment.text())).toEqual(['l'])
+    })
+  })
 })

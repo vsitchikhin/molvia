@@ -296,9 +296,17 @@ export default defineComponent({
 }
 
 /* The eight colours four and four on every phone: by the width they broke five and three at 320,
-   six and two at 390, seven and one at 430 (review №1). */
+   six and two at 390, seven and one at 430 (review №1). No wider than the sheet (MOL-321): four of 44
+   grew with the text to 282 px at 150 % on 320, and the sheet went 10 px sideways — a colour is as wide
+   as its column, at most 44, never under 44 physical px. */
 .colours {
-  grid-template-columns: repeat(4, var(--touch-target));
+  grid-template-columns: repeat(4, minmax(0, var(--touch-target)));
+
+  .option {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+  }
 }
 
 .option {

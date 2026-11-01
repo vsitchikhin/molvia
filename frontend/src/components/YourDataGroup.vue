@@ -274,6 +274,7 @@ export default defineComponent({
   display: grid;
   flex: 1;
   min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .entry-label {
@@ -287,10 +288,25 @@ export default defineComponent({
 
 // The row itself does nothing: its words and its switch do.
 .setting {
+  flex-wrap: wrap;
   cursor: default;
+
+  /* The switch goes under the words only where the two do not fit (MOL-321): beside it at 200 % «статистике» stood
+     past the card, cut, the switch over it. 6rem keeps the row at 100 % on 320 as it was. */
+  .entry-text {
+    flex: 1 1 0;
+    min-width: min(6rem, 100%);
+  }
 
   label {
     cursor: pointer;
+  }
+}
+
+/* The icon gives its place to the words in a narrow row, as a row's circle does (`ListRow`, MOL-321). */
+@container row-tight (width < #{$row-tight}) {
+  .entry-icon {
+    display: none;
   }
 }
 
@@ -304,6 +320,7 @@ export default defineComponent({
   display: flex;
   flex: none;
   justify-content: flex-end;
+  margin-inline-start: auto;
   min-width: var(--switch-width);
 }
 

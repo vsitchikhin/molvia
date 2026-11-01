@@ -66,7 +66,9 @@
           <SectionCaption as="p" inset>
             {{ overall.over ? t('budget.total.over') : t('budget.total.left') }}
           </SectionCaption>
-          <p class="figure" :class="{ over: overall.over }">{{ overall.figure }}</p>
+          <p class="figure" :class="{ over: overall.over }" :style="figureChars(overall.figure)">
+            {{ overall.figure }}
+          </p>
           <p v-if="budget.total.leftIncome" class="approx">
             ≈ {{ amount(budget.total.leftIncome) }}
           </p>
@@ -97,20 +99,26 @@
              И): no button and no chevron, its place kept so the figures and the bars stay in one
              column. -->
         <AppCard v-if="rows.length > 0" as="ul" list>
-          <li v-for="row in rows" :key="row.categoryId">
+          <li v-for="row in rows" :key="row.categoryId" class="tight">
             <ListRow
               :as="row.archived ? 'div' : 'button'"
               :icon="row.icon"
               :tint="row.tint"
               :next="!row.archived"
               wrap
+              whole
               :data-category="row.categoryId"
               @click="row.archived || edit(row.categoryId, row.plan)"
             >
               <template #title>
                 <span class="head">
                   <span>{{ row.name }}</span>
-                  <span class="amount" :class="{ over: row.over }">{{ row.left }}</span>
+                  <span
+                    class="amount"
+                    :class="{ over: row.over }"
+                    :style="figureChars(row.left, 'text')"
+                    >{{ row.left }}</span
+                  >
                 </span>
               </template>
               <template #meta>
@@ -135,7 +143,7 @@
         <div v-if="unplanned.length > 0">
           <SectionCaption>{{ t('budget.unplanned') }}</SectionCaption>
           <AppCard as="ul" list>
-            <li v-for="row in unplanned" :key="row.categoryId">
+            <li v-for="row in unplanned" :key="row.categoryId" class="tight">
               <ListRow
                 :as="row.archived ? 'div' : 'button'"
                 :icon="row.icon"
@@ -143,13 +151,16 @@
                 :meta="row.meta"
                 :next="!row.archived"
                 wrap
+                whole
                 :data-category="row.categoryId"
                 @click="row.archived || edit(row.categoryId, null)"
               >
                 <template #title>
                   <span class="head">
                     <span>{{ row.name }}</span>
-                    <span class="amount">{{ row.spent }}</span>
+                    <span class="amount" :style="figureChars(row.spent, 'text')">{{
+                      row.spent
+                    }}</span>
                   </span>
                 </template>
                 <template v-if="row.archived" #tail><span class="no-chevron"></span></template>
@@ -160,19 +171,22 @@
 
         <!-- The target has no category's colour: its circle is quiet, its bar `--graphic` — data
              without a colour of its own — and the mark of the target the ink of the text. -->
-        <AppCard as="section" list :aria-labelledby="`${id}-savings`">
+        <AppCard as="section" list class="tight" :aria-labelledby="`${id}-savings`">
           <ListRow
             :icon="IconPiggyBank"
             tint="muted"
             :meta="savings.goal"
             next
             wrap
+            whole
             @click="editSavings"
           >
             <template #title>
               <span class="head">
                 <span :id="`${id}-savings`">{{ t('budget.savings.title') }}</span>
-                <span class="amount">{{ savings.actual }}</span>
+                <span class="amount" :style="figureChars(savings.actual, 'text')">{{
+                  savings.actual
+                }}</span>
               </span>
             </template>
             <template #below>
@@ -238,6 +252,7 @@ import { budgetAmount, spendingLook } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
+import { figureChars } from '@/components/figure'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyBudget } from '@/composables/useMoneyBudget'
@@ -509,6 +524,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       t,
       id,
       IconPiggyBank,
@@ -566,15 +582,17 @@ export default defineComponent({
 }
 
 .total {
+  /* The figure measures itself against the card (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-1);
 }
 
 .figure {
   @include display-type;
+  @include figure-fit;
 
   margin: 0;
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   line-height: var(--leading-tight);
 
@@ -612,19 +630,23 @@ export default defineComponent({
   background: var(--surface-2);
 }
 
+/* The sum goes under its word only where the two cannot stand side by side (MOL-321): at 200 % «370 000 ֏»
+   stood past the plate. */
 .plate-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
 
   dt {
+    flex: 1 1 min-content;
     color: var(--text-muted);
     font-size: var(--text-footnote);
   }
 
   dd {
-    margin: 0;
+    margin: 0 0 0 auto;
     font-size: var(--text-callout);
     font-weight: var(--weight-medium);
     font-variant-numeric: tabular-nums;
@@ -636,9 +658,16 @@ export default defineComponent({
    whole name no longer fits beside it (MOL-200). */
 .head {
   @include name-beside-figure;
+
+  /* The figure measures itself against the title's line (`figure-fit`, MOL-321). */
+  container-type: inline-size;
 }
 
+/* A sum never breaks: under the name at 200 % «124 597 ֏» stood 31 px past the phone (adversarial В4); it
+   shrinks to the line instead, the text's size otherwise. */
 .amount {
+  @include figure-fit(1em);
+
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -693,5 +722,30 @@ export default defineComponent({
 /* The answer comes in where the skeleton stood, faded only (MOL-138, MOL-151). */
 .content > :not(:first-child) {
   @include appear(0);
+}
+
+/* With large text a row's words take the place of its circle (`ListRow`, `row-tight`, MOL-321): at 200 % the
+   circle and the chevron left the words some 30 px, «Продукты» stood a letter a line, and «Осталось», shrunk to
+   that, was 4.9 px (adversarial Г1). The category stays said by its name and its bar's colour. */
+.tight {
+  container: row-tight / inline-size;
+}
+
+@container row-tight (width < #{$row-tight}) {
+  .tight :deep(.circle) {
+    display: none;
+  }
+
+  /* The words take the circle's column with its gap, and a removed category's empty tail stays where the
+     chevron stands, so its figures and its bar end with the live rows' (self-review 5, №1). */
+  .tight :deep(.words) {
+    grid-column: 1 / 3;
+  }
+
+  .tight :deep(.tail) {
+    grid-column: 3;
+    grid-row: 1;
+    margin-top: 0;
+  }
 }
 </style>
