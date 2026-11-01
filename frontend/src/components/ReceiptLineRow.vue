@@ -146,13 +146,18 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The button's look is taken off in `:where()`, as `ListRow`'s: the hairline `AppCard list` draws
+   between rows is a `border-top`, and an equal selector loaded later took it off (MOL-349, С-5). */
+:where(.receipt-line) {
+  border: 0;
+}
+
 .receipt-line {
   display: flex;
   gap: var(--space-3);
   align-items: flex-start;
   width: 100%;
   padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
-  border: 0;
   color: var(--text);
   background: var(--surface);
   text-align: left;
