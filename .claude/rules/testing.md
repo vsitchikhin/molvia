@@ -241,10 +241,11 @@ that moves from an index to a scan as the statistics change moves the order with
   column of chance among them makes it chance**: it decides the ties of those before it (`orderBy(t.kind,
 t.id)` with a uuid `id`). So `orderBy(t.id, t.createdAt)` with an identity `id` is an order, and
   `orderBy(t.createdAt, t.id)` is not: the moment decides, even where the test wrote the moments — order by
-  the identity alone. Rows in the order of chance may be compared with another read in the same order — by the
-  same columns, a snapshot with a snapshot of the same helper (`erasure`) — never with anything the test
-  builds, a constant or ids pushed as written included: six reader versions alike are compared as a set
-  (`receipt-model`).
+  the identity alone. Rows in the order of chance may be compared with another read in the same order, **if it
+  is total** — a unique key of the schema among its columns (round 7: a batch of one moment, rewritten between
+  two reads, came back the other way) — a snapshot with a snapshot of the same helper (`erasure`, its picks
+  and plans ordered by their whole key) — never with anything the test builds, a constant or ids pushed as
+  written included: six reader versions alike are compared as a set (`receipt-model`).
 - **Rows with no order of insertion at all are compared with none**: two logins at once
   (`login-transaction`) write neither first, so their sessions are compared as a set — `new Set`, `toSorted`
   — not by a uuid that only looks like an order.
@@ -256,27 +257,28 @@ t.id)` with a uuid `id`). So `orderBy(t.id, t.createdAt)` with an identity `id` 
   written read as the test's story.
 - **`bin/check-ordered-reads.mjs` holds it in `npm run lint`** (owner's В-2 «в»), by parsing as the clock
   check does, names by TypeScript's binder, chance and identity read from `schema.ts`. **Its rule is closed**
-  (review of MOL-323, rounds 1–6): a list of the uses that compare by position missed another each time it was
+  (review of MOL-323, rounds 1–7): a list of the uses that compare by position missed another each time it was
   attacked — a name of a name, `.join`, `.resolves`, a spread, `Promise.all`, a helper naming its read, a
   callback by the index. So rows read with no order may end only where their order cannot tell — their length,
   their first row, `find`, `some`, `reduce`, `sort`, a loop, a `Set`, `toHaveLength`, `toContain`, `not`,
   `toEqual` of one row or of `expect.arrayContaining` — and anything else is refused; a callback handed the
   index of a row — a parameter, the rest of its arguments — or one that changes anything outside it (a name, a
-  field, `seen.push`, `next.next()`, a name handed to a call), or one the parse cannot read is refused too
-  (`Boolean`, `String`, `Number` are read); a `not` frees only a matcher free without it (rounds 5, 6); the
-  fix is an order, never a use the check does not know. Rows in the order of chance go by the same closed
-  rule, and may besides meet another read in the same order, the read itself, a name given it, or either
-  through `map` and the rest that keep an order. The lists are in its head. **The price, named, by class:**
-  **an order of ties is taken as an order** — a column every row read shares (`.orderBy(t.threadId)` under
-  `eq(t.threadId, …)`), a `sort` whose key repeats, an `order by` of SQL text by whatever it names (a uuid
-  there is not told); **a moment before an identity is refused** where the test wrote the moments itself — the
-  parse cannot tell who did; **a row picked as the one is taken as the only one** — the first, `find`, a key
-  of a `Map` or `Object.fromEntries`: where more qualify, the first in the heap answers, or for a key the
-  last; the ordinary use is a row by its key, hundreds of them, and the check cannot count what a `where`
-  matches; what a loop or a `reduce` collects is not followed — a sum is their ordinary use; a callback
-  calling a pure method of a name from outside (`want.includes(r.x)`) is refused all the same — the parse
-  cannot tell pure from not; a field of an object of rows and a helper of another file are not followed. Those
-  go to review.
+  field, `seen.push`, `next.next()`, a spy or a function of the file called, a name handed to a call), or one
+  the parse cannot read is refused too (`Boolean`, `String`, `Number` are read); a `not` frees only a matcher
+  free without it, and `toContain` is free of the rows, never of them made one string — a secret is looked for
+  row by row (rounds 5–7); the fix is an order, never a use the check does not know. Rows in the order of
+  chance go by the same closed rule, and may besides meet another read in the same order, the read itself, a
+  name given it, or either through `map` and the rest that keep an order. The lists are in its head. **The
+  price, named, by class:** **an order of ties is taken as an order** — a column every row read shares
+  (`.orderBy(t.threadId)` under `eq(t.threadId, …)`), a `sort` whose key repeats, an `order by` of SQL text by
+  whatever it names (a uuid there is not told); **a moment before an identity is refused** where the test
+  wrote the moments itself — the parse cannot tell who did; **a row picked as the one is taken as the only
+  one** — the first, `find`, a key of a `Map` or `Object.fromEntries`: where more qualify, the first in the
+  heap answers, or for a key the last; the ordinary use is a row by its key, hundreds of them, and the check
+  cannot count what a `where` matches; what a loop or a `reduce` collects is not followed — a sum is their
+  ordinary use; a callback calling a pure method of a name from outside (`want.includes(r.x)`) is refused all
+  the same — the parse cannot tell pure from not; a function handed in as a parameter, a field of an object of
+  rows and a helper of another file are not followed. Those go to review.
 - **How it was proved**: the read of «то же фото дважды» on master with its first word deleted and inserted
   again under the same id — the row then lies last in the heap and the index alike — gives CI's diff
   exactly, and with `orderBy` it is green. `update … set x = x` proves nothing: a HOT update leaves the row
