@@ -109,4 +109,6 @@ support types, the shared integration tests, the migrations.
 - `backend/tests/repositories.integration.test.ts` — Integration test: the core repositories — actors, catalogue, places, trips with purchases, verdicts — write and read back.
 - `backend/tests/schema.integration.test.ts` — Integration test: the constraints the schema itself refuses — uniqueness, paired columns, references, gate log, picks, sessions.
 - `backend/tests/setup-db.ts` — Vitest global setup: creates and migrates the copy's test database — the workers' template — drops the last run's copies and builds the API bundle once.
+- `backend/tests/unordered-rows.ts` — Vitest setup file, first of the integration tests (MOL-323): every `SELECT` with no `order by` of its own comes back with its rows turned by one, on the prototype of postgres.js's query, so a test leaning on an order Postgres never promised fails at once.
+- `backend/tests/unordered-rows.integration.test.ts` — Test of the net: Drizzle, `execute`, postgres.js by tag and string, a transaction turned; an order of its own and a write returning left; what is unordered by the statement's text.
 - `backend/tests/setup-worker.ts` — Vitest setup file: gives each integration worker its own copy of the test database, made from it as a template.
