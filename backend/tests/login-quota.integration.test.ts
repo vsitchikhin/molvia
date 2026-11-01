@@ -33,7 +33,8 @@ describe('login quota and lifetime', () => {
     const row = await requests.byIdAndSecret(view.id, secret)
     expect(row).not.toBeNull()
     expect(row!.expiresAt.getTime() - row!.createdAt.getTime()).toBe(300_000)
-    expect(JSON.stringify(await first.db.select().from(loginRequests))).not.toContain(secret)
+    for (const request of await first.db.select().from(loginRequests))
+      expect(JSON.stringify(request)).not.toContain(secret)
   }, 10_000)
 
   it('serialises the Nth and N+1th start and remembers the quota across repository instances', async () => {

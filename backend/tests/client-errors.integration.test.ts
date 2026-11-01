@@ -224,8 +224,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
 
   it('адрес, по которому считается предел, не пишется ни в лог, ни в таблицу', async () => {
     await send({ reports: [REPORT] }, '198.51.100.77')
-    const rows = await recorded()
-    expect(JSON.stringify(rows)).not.toContain('198.51.100.77')
+    for (const row of await recorded()) expect(JSON.stringify(row)).not.toContain('198.51.100.77')
     expect(lines.join('\n')).not.toContain('198.51.100.77')
   })
 })

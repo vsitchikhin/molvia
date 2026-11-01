@@ -78,7 +78,7 @@ async function snapshot(actorId: string) {
       .select()
       .from(searchPicks)
       .where(eq(searchPicks.actorId, actorId))
-      .orderBy(searchPicks.queryKey, searchPicks.itemId),
+      .orderBy(searchPicks.actorId, searchPicks.queryKey, searchPicks.itemId),
     events: await db.select().from(events).where(eq(events.actorId, actorId)).orderBy(events.id),
     expenses: await db.execute(sql`
       select e.* from expenses e join trips t on t.id = e.trip_id where t.actor_id = ${actorId}
@@ -113,7 +113,7 @@ async function snapshot(actorId: string) {
       .select()
       .from(budgetPlans)
       .where(eq(budgetPlans.actorId, actorId))
-      .orderBy(budgetPlans.categoryId, budgetPlans.fromMonth),
+      .orderBy(budgetPlans.actorId, budgetPlans.categoryId, budgetPlans.fromMonth),
     feedback: await db
       .select()
       .from(feedback)

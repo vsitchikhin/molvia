@@ -106,7 +106,8 @@ describe('Telegram login over HTTP', () => {
         expect(response.body).not.toContain(forbidden)
       }
     }
-    expect(JSON.stringify(await db.select().from(sessions))).not.toContain(token)
+    for (const session of await db.select().from(sessions))
+      expect(JSON.stringify(session)).not.toContain(token)
     expect(await db.select().from(events)).toHaveLength(0)
     const repeat = await poll(request)
     expect(repeat.statusCode).toBe(404)
