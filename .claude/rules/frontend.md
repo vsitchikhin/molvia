@@ -512,8 +512,15 @@ The detail behind the frontend lines of `CLAUDE.md`.
     «Продукты» a letter a line, and «Осталось», shrunk to that, was 4.9 px (adversarial Г1) — a width is closed by
     the layout, never by a size nobody reads; the category stays said by its name and its bar. The words take the circle's column
     with its gap, a removed category's empty tail stays in the chevron's (self-review 5), and the plan under the
-    name stands whole (`whole`): two lines held «125 403 ֏ из» and hid the plan at 200 % (adversarial Д2). On «Категории» the
-    circle is the category's own icon and stays. **A box cannot ask its own
+    name stands whole (`whole`): two lines held «125 403 ֏ из» and hid the plan at 200 % (adversarial Д2). **Since round 9 that is every
+    row of the kit** (self-review of round 9): every list card is `row-tight` (`AppCard list`), and below 12rem a
+    row's circle gives way, its words take the circle's column, the title and the line under it are whole — no
+    «…» — and the tail stands under them across the row. At 200 % the rows of «Траты», an account's operations,
+    «Счета» and «Настройки» left their words some 40 px — «О|б|м|е|н», «Карта Амер|иабан|ка» — and «Бот в
+    Telegram» read «Б…»; a removed category's circle on «Категории» gives way as well. A row's switch («Зарплата —
+    в следующий месяц», «Учитывать меня в статистике», the bot's) goes under its words where the words' 6rem do not
+    fit beside it, and the icon of «Ваши данные» and of «не попали» gives way in the same narrow card. `NavRow`'s
+    label is whole with large text. **A box cannot ask its own
     width**: the rules under a query stand on its children, and what the box itself does — `flex-wrap` — is set
     outside it.
   - **A line wraps only where its least widths do not fit**: `flex-wrap` with the words at `flex-basis:
@@ -541,6 +548,23 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   - **The tab label stops growing at 125 %**: `--text-tab`, `min(var(--text-caption), 13.75px)`, as iOS keeps its
     tab bar (В-3 «а»); a token, named one by one in Stylelint's list of sizes. The tab bar is fixed and in no width
     of the page, so `large-text` reads every label within its column.
+  - **What is typed and chosen stays seen** (adversarial З1, И1–И3, self-review of round 9): the amount of
+    `AppField size="entry"` and its sign shrink together to the field, by «figure + 0.8 × sign» (`entryWidth`,
+    32 to 40) — beside a sign of its own size «125403,50» was 12.9 px at 200 %; an amount of the body's size
+    (`kind="decimal"`) shrinks to its own box (`.control-box`, `display: contents` in every other field) beside the
+    currency of a plan or an account; the sum and its currency of an exchange and an income stand one under the
+    other below 15rem — side by side at 200 % the sum read «1254» and the currency had 0 px; and with large text a
+    select's chosen option is drawn as words that wrap (`.chosen-words`), the select over them unseen and still
+    the one tapped, focused and read out — «Армянский драм · AMD» had 92 px and showed «Армя». A tile's figure
+    («Пришло», «Можно тратить», «Сбережения»), an operation's amount, the day's sum of «Траты» and the figure of
+    «Темп месяца» shrink to their box (`figure-fit`) — at 200 % «250 00|0 ₽» broke, «−1 234 567 ֏» stood 43 px
+    past its row, «Темп месяца» 23 px past the phone; the tiles of a month stand one under the other below 15rem.
+    Onest 700 is measured and is the words' table: its figures are 600's. Twelve months of a chart narrower than
+    14rem are named by every other month's letter over its own column and the empty one — at 200 % a label had
+    9 px, a letter alone is 20. **The prices, named:** a name typed in a text field (an account's, a category's)
+    scrolls inside it as any field does; the pinned copy of a screen's title in the top bar ends in «…», as iOS's;
+    at 200 % a word wider than its line still breaks inside — no hyphen under twelve letters; at 100 % on 320 a
+    month's label «июл» is 4 px wider than its column, as on master.
   - **A skeleton is the answer's shape at large text too** (MOL-178): the ring of `ChartsSkeleton` is
     `min(13.25rem, 100%)` as the ring that comes, its band 12 of the hundred of that width — the square of 13.25rem
     took «Графики» 47 px sideways at 150 % and 169 at 200 % while the answer was on its way (adversarial Е1); the
