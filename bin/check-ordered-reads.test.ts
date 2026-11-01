@@ -1,15 +1,15 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { MAY_READ, unorderedReads, uuidColumns } from './check-ordered-reads.mjs'
+import { chanceColumns, MAY_READ, unorderedReads } from './check-ordered-reads.mjs'
 
 const FILE = 'a.integration.test.ts'
-const UUIDS = new Set(['sessions.id'])
+const CHANCE = new Set(['sessions.id', 't.createdAt', 'events.occurredAt'])
 
 const lines = (source: string): number[] =>
-  unorderedReads(FILE, source, UUIDS).map((found) => Number.parseInt(found))
+  unorderedReads(FILE, source, CHANCE).map((found) => Number.parseInt(found))
 
 const inTest = (body: string): string => `it('x', async () => {\n${body}\n})`
-const found = (body: string): string[] => unorderedReads(FILE, inTest(body), UUIDS)
+const found = (body: string): string[] => unorderedReads(FILE, inTest(body), CHANCE)
 
 describe('unorderedReads', () => {
   // «то же фото дважды» as it failed on CI 41022785698, and the reads of the sweep of MOL-323
@@ -112,8 +112,107 @@ describe('unorderedReads', () => {
       'orderBy of a uuid by an index',
       `const rows = await db.select().from(sessions).orderBy(sessions.id)\nexpect(rows[1]).toBe(a)`,
     ],
+    // round 2, Б1: a use known orderless made to tell the order
+    [
+      'every by its index',
+      `const rows = await db.select().from(t)\nexpect(rows.every((r, i) => r.x === want[i])).toBe(true)`,
+    ],
+    [
+      'some by its index',
+      `expect((await db.select().from(t)).some((r, i) => i === 3 && r.x)).toBe(true)`,
+    ],
+    [
+      'map by its index',
+      `expect((await db.select().from(t)).map((r, i) => r.x === want[i]).every(Boolean)).toBe(true)`,
+    ],
+    [
+      'reduce by its index',
+      `expect((await db.select().from(t)).reduce((all, r, i) => all + i * r.n, 0)).toBe(5)`,
+    ],
+    ['a spread against rows in place', `expect(await db.select().from(t)).toEqual([...want])`],
+    // round 2, Б2: rows in the order of chance are as closed as rows with none
+    [
+      'chance joined',
+      `const rows = await db.select().from(sessions).orderBy(sessions.id)\nexpect(rows.map(f).join(' / ')).toBe('a / b')`,
+    ],
+    [
+      'chance by forEach',
+      `const rows = await db.select().from(sessions).orderBy(sessions.id)\nrows.forEach((r, i) => expect(r).toBe(all[i]))`,
+    ],
+    [
+      'chance by the last index',
+      `const rows = await db.select().from(sessions).orderBy(sessions.id)\nexpect(rows[rows.length - 1]).toBe(a)`,
+    ],
+    [
+      'chance reversed',
+      `expect((await db.select().from(sessions).orderBy(sessions.id)).reverse()).toEqual(x)`,
+    ],
+    [
+      'chance in an inline snapshot',
+      `expect(await db.select().from(sessions).orderBy(sessions.id)).toMatchInlineSnapshot()`,
+    ],
+    [
+      'chance against Array(n)',
+      `expect((await db.select().from(sessions).orderBy(sessions.id)).map(f)).toEqual(Array(2).fill(a))`,
+    ],
+    [
+      'chance against a string in place',
+      `expect((await db.select().from(sessions).orderBy(sessions.id)).map(f).join()).toEqual('a,b')`,
+    ],
+    // round 2, Б3: chance is the schema's, never a name
+    [
+      'a moment of another name against rows in place',
+      `expect(await db.select().from(events).orderBy(events.occurredAt)).toEqual([a, b])`,
+    ],
+    // round 2, Б4: the text of a template read once, from the start
+    [
+      "a '--' in a string, no order",
+      "expect(await db.execute(sql`select id from t where x <> '--'`)).toEqual([a, b])",
+    ],
+    [
+      'a statement wholly in parentheses',
+      'expect(await db.execute(sql`(select id from t) union all (select id from u)`)).toEqual([a, b])',
+    ],
+    ['none against another read', `expect(await db.select().from(t)).toEqual(before)`],
+    [
+      'none on the other side of toEqual',
+      `const rows = await db.select().from(t)\nexpect(before).toEqual(rows)`,
+    ],
   ])('refuses %s', (_, body) => {
     expect(found(body)).toHaveLength(1)
+  })
+
+  // round 2, №7: a helper whose order is learnt as none late, after a pass read it as chance
+  it('reads again a helper whose order changes from chance to none', () => {
+    const source = `
+      const x = async () => db.select().from(t)
+      const h = async (k: boolean) => (k ? db.select().from(t).orderBy(t.createdAt) : x())
+      it('x', async () => {
+        expect(await h(false)).toEqual(want)
+      })
+    `
+    expect(lines(source)).toEqual([5])
+  })
+
+  // a snapshot with a snapshot: the order of chance is one order of the same rows, an object of them followed
+  it('lets a snapshot of rows in the order of chance meet another, and no snapshot of rows with none', () => {
+    const source = `
+      async function snapshot(id: string) {
+        return {
+          sessions: await db.select().from(sessions).where(eq(sessions.actorId, id)).orderBy(sessions.id),
+        }
+      }
+      async function loose(id: string) {
+        return { sessions: await db.select().from(sessions).where(eq(sessions.actorId, id)) }
+      }
+      it('x', async () => {
+        const before = await snapshot(me)
+        expect(await snapshot(me)).toEqual(before)
+        expect(await loose(me)).toEqual(await loose(me))
+        expect(await snapshot(me)).toEqual({ sessions: [a, b] })
+      })
+    `
+    expect(lines(source)).toEqual([13, 14])
   })
 
   it('finds a function of the file that returns such a read — in place, named first, and through another', () => {
@@ -157,6 +256,27 @@ describe('unorderedReads', () => {
       'a uuid against another read',
       `expect(await db.select().from(sessions).orderBy(sessions.id)).toEqual(before)`,
     ],
+    [
+      'a moment of clock_timestamp with a second column',
+      `expect(await db.select().from(t).orderBy(t.createdAt, t.id)).toEqual([a, b])`,
+    ],
+    [
+      "a '--' in a string, then an order",
+      "expect(await db.execute(sql`select id from t where x <> '--' order by id`)).toEqual([a, b])",
+    ],
+    [
+      'every by the row alone',
+      `expect((await db.select().from(t)).every((r) => r.n > 0)).toBe(true)`,
+    ],
+    [
+      'sort by a comparator',
+      `expect((await db.select().from(t)).toSorted((a, b) => a.id - b.id)).toEqual([a, b])`,
+    ],
+    [
+      'find by a key',
+      `const rows = await db.select().from(t)\nexpect(rows.find((r) => r.id === a)?.n).toBe(1)`,
+    ],
+    ['a Map by its key', `const byId = new Map((await db.select().from(t)).map((r) => [r.id, r]))`],
     [
       'order by in the template',
       'expect(await db.execute(sql`select id from t where x in (select y from u) order by id`)).toEqual([a, b])',
@@ -230,25 +350,37 @@ describe('unorderedReads', () => {
   })
 })
 
-describe('uuidColumns', () => {
-  it('names the uuid columns of a table by the names the tests import', () => {
+describe('chanceColumns', () => {
+  it('names the columns of chance by the names the tests import: a uuid, a moment written by default', () => {
     const schema = `
       export const sessions = pgTable('sessions', {
         id: uuid('id').primaryKey(),
         actorId: uuid('actor_id').notNull().references(() => actors.id),
         name: varchar('device_name', { length: 64 }),
+        seenAt: timestamp('seen_at').notNull().defaultNow(),
+        createdAt: timestamp('created_at').notNull().default(sql\`clock_timestamp()\`),
+        day: date('day').notNull().default(sql\`current_date\`),
+        expiresAt: timestamp('expires_at').notNull(),
       })
       export const feedback = pgTable('feedback', {
         id: bigint('id', { mode: 'number' }).generatedAlwaysAsIdentity().primaryKey(),
       })
     `
-    expect([...uuidColumns(schema)]).toEqual(['sessions.id', 'sessions.actorId'])
+    expect([...chanceColumns(schema)]).toEqual([
+      'sessions.id',
+      'sessions.actorId',
+      'sessions.seenAt',
+      'sessions.createdAt',
+    ])
   })
 
-  it('finds the schema’s own: a session’s id is a uuid, a message’s an identity', () => {
-    const uuids = uuidColumns(readFileSync('backend/src/db/schema.ts', 'utf8'))
-    expect(uuids.has('sessions.id')).toBe(true)
-    expect(uuids.has('feedback.id')).toBe(false)
+  it('finds the schema’s own: a session’s id and a message’s moment are chance, a message’s id is not', () => {
+    const chance = chanceColumns(readFileSync('backend/src/db/schema.ts', 'utf8'))
+    expect(chance.has('sessions.id')).toBe(true)
+    expect(chance.has('events.occurredAt')).toBe(true)
+    expect(chance.has('feedback.createdAt')).toBe(true)
+    expect(chance.has('feedback.id')).toBe(false)
+    expect(chance.has('receiptLines.position')).toBe(false)
   })
 })
 

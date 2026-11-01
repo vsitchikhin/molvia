@@ -9,27 +9,31 @@
 // (`orderBy()` renders no ORDER BY); `findMany` with no `orderBy`; a template with `select` and `from` and no
 // `order by` of the statement itself — not in parentheses, a comment or a string — handed to `execute` or
 // tagged on its own (postgres.js); a function of the file that returns one, named first or not. **A read in
-// the order of chance** is one ordered only by a uuid of the schema or by `createdAt`: an order of values,
-// not of insertion — two writes of one transaction share `now()`, and a uuid is `randomUUID()`.
+// the order of chance** is one ordered only by columns of chance, read from the schema: a uuid
+// (`randomUUID()`) and a moment written by default (`now()` is one for every row of a transaction,
+// `clock_timestamp()` one for rows a microsecond apart). Their order is of values, not of insertion.
 //
-// **The rule is closed** (review of MOL-323, round 1): a list of the uses that compare by position missed one
-// more each time it was attacked — a name of a name, `.join`, `.resolves`, a spread, `Promise.all`. So it goes
-// the other way round. Rows with no order are followed through `await`, a cast, the methods that keep an
-// order (`map`, `filter`, `flatMap`, `flat`, `slice`), `JSON.stringify`, a spread of them alone, a branch of
-// `?:`, `??` or `||`, a name they are given — declared, assigned or taken from an array (`Promise.all`) — and a
-// function of the file that returns them. They may end only where their order cannot tell: their length, their
-// first row (`[0]`, `at(0)`, `const [row] = …` — the read of one row), `find`, `some`, `every`, `includes`,
-// `reduce`, `sort`, `toSorted`, a `for … of`, a `Set`, a `Map`, `inArray`, `notInArray`, `Object.fromEntries`,
-// `typeof`, discarded; under `expect`: `toHaveLength`, `toContain`, `toContainEqual`, `toBeDefined`,
-// `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, any `not`, `toEqual` of one row or none or of
-// `expect.arrayContaining`. Anything else is refused, and the fix is an order, never a use the check does
-// not know. Rows in the order of chance are refused only where the test writes an order of insertion: an
-// array of two or more written in place, an index past 0, taken apart into two.
+// **The rule is closed** (review of MOL-323, rounds 1 and 2): a list of the uses that compare by position
+// missed one more each time it was attacked. So it goes the other way round. Rows are followed through
+// `await`, a cast, the methods that keep an order (`map`, `filter`, `flatMap`, `flat`, `slice`),
+// `JSON.stringify`, a spread of them alone, a branch of `?:`, `??` or `||`, an object they are put in, a name
+// they are given — declared, assigned or taken from an array (`Promise.all`) — and a function of the file that
+// returns them. Rows with no order may end only where their order cannot tell: their length, their first row
+// (`[0]`, `at(0)`, `const [row] = …`), `find`, `some`, `every`, `includes` — never by an index their callback is
+// handed — `reduce`, `sort`, `toSorted`, a `for … of`, a `Set`, a `Map`, `inArray`, `notInArray`,
+// `Object.fromEntries`, `typeof`, discarded; under
+// `expect`: `toHaveLength`, `toContain`, `toContainEqual`, `toBeDefined`, `toBeUndefined`, `toBeTruthy`,
+// `toBeFalsy`, any `not`, `toEqual` of one row or none written in place, or of `expect.arrayContaining`. Rows in
+// the order of chance may besides be compared with another read of them — a snapshot with a snapshot — but
+// never with what the test writes in place (a literal, `Array(n)`). Anything else is refused, and the fix is an
+// order, never a use the check does not know.
 //
 // What this is: a guard against the ordinary form, not against one built to slip past it. **The price,
-// named:** a helper of another file is not followed; what a `for … of` or a `reduce` collects is not — its sum
-// is the ordinary use; a column whose order is no order but is neither a uuid nor `createdAt` — one every row
-// read shares (`.orderBy(t.threadId)` under `eq(t.threadId, …)`) — passes. Those go to review.
+// named, by class:** an order of ties is taken as an order — a column every row read shares
+// (`.orderBy(t.threadId)` under `eq(t.threadId, …)`), a `sort` whose key repeats, an `order by` of SQL text by
+// whatever it names; a row picked as the one — the first, `find`, a key of a `Map` or `Object.fromEntries` — is
+// taken as the only one: where more qualify, the first in the heap answers, or for a key the last; what a `for … of` or a `reduce` collects is not followed — a sum is their ordinary use;
+// a helper of another file is not followed. Those go to review.
 //
 //   node bin/check-ordered-reads.mjs
 
@@ -40,7 +44,7 @@ import ts from 'typescript'
 
 /** The files that read Postgres: the integration tests of the API. */
 const FILES = ['backend/*.integration.test.ts']
-/** Where a column is a uuid: its order is chance (`randomUUID()`). */
+/** Where a column is a uuid or a moment written by default: its order is chance. */
 const SCHEMA = 'backend/src/db/schema.ts'
 
 /** A file that names none of these reads nothing: the binder is spared it. */
@@ -50,6 +54,8 @@ export const MAY_READ = /\bselect|findMany/i
 const KEEPS = new Set(['map', 'filter', 'flatMap', 'flat', 'slice'])
 /** The methods whose answer no order of the rows can change, or that give them one. */
 const ORDERLESS = new Set(['find', 'some', 'every', 'includes', 'reduce', 'sort', 'toSorted'])
+/** Where a callback is handed the index of a row: the second parameter, `reduce`'s third; a comparator never. */
+const INDEX_AT = { reduce: 2, sort: Infinity, toSorted: Infinity }
 /** What is handed the rows whole and keeps no order of them. */
 const ORDERLESS_CALLS = new Set(['Set', 'Map', 'inArray', 'notInArray', 'Object.fromEntries'])
 /** The matchers whose verdict no order of the rows can change. */
@@ -62,10 +68,11 @@ const ORDERLESS_MATCHERS = new Set([
   'toBeTruthy',
   'toBeFalsy',
 ])
-/** The matchers that compare an array element by element. */
-const COMPARES = new Set(['toEqual', 'toStrictEqual', 'toMatchObject'])
-/** A column whose order is chance whatever the table. */
-const CHANCE = new Set(['createdAt'])
+/** The matchers that compare one value with another, an array element by element. */
+const COMPARES = new Set(['toEqual', 'toStrictEqual', 'toMatchObject', 'toBe'])
+/** A default of the database that writes the moment. */
+const MOMENT =
+  /\b(now|clock_timestamp|statement_timestamp|transaction_timestamp)\s*\(|current_timestamp/i
 
 /** One file as a program of its own, with nothing to resolve: enough for the binder to name its symbols. */
 function bind(fileName, source) {
@@ -79,20 +86,41 @@ function bind(fileName, source) {
   return { sf, checker }
 }
 
-/** The innermost call a chain starts with: `uuid` of `uuid('id').primaryKey()`. */
-const rootCall = (node) => {
+/** The calls of a chain, outermost first: `db.select().from(t).where(c)`, `uuid('id').primaryKey()`. */
+const callsOf = (node) => {
+  const calls = []
   let n = node
-  while (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression))
-    n = n.expression.expression
-  return ts.isCallExpression(n) && ts.isIdentifier(n.expression) ? n.expression.text : undefined
+  for (;;) {
+    if (ts.isCallExpression(n)) {
+      calls.push(n)
+      n = n.expression
+    } else if (ts.isPropertyAccessExpression(n)) n = n.expression
+    else return calls
+  }
 }
 
+/** The name a call of a chain is made by: `primaryKey`, or `uuid` for the root. */
+const calledAs = (call) =>
+  ts.isPropertyAccessExpression(call.expression)
+    ? call.expression.name.text
+    : ts.isIdentifier(call.expression)
+      ? call.expression.text
+      : undefined
+
+/** Whether a column of the schema is chance: a uuid, or a moment written by default. */
+const chanceColumn = (initializer, sf) =>
+  callsOf(initializer).some((call) => {
+    const name = calledAs(call)
+    if (name === 'uuid' || name === 'defaultNow') return true
+    return name === 'default' && call.arguments.some((a) => MOMENT.test(a.getText(sf)))
+  })
+
 /**
- * The columns of the schema that are uuids, as `table.column` by the names the tests import.
+ * The columns of the schema whose order is chance, as `table.column` by the names the tests import.
  * @param {string} source
  * @returns {Set<string>}
  */
-export function uuidColumns(source) {
+export function chanceColumns(source) {
   const sf = ts.createSourceFile(SCHEMA, source, ts.ScriptTarget.Latest, true)
   const found = new Set()
   for (const statement of sf.statements) {
@@ -104,54 +132,49 @@ export function uuidColumns(source) {
       const columns = init.arguments[1]
       if (!columns || !ts.isObjectLiteralExpression(columns)) continue
       for (const column of columns.properties)
-        if (ts.isPropertyAssignment(column) && rootCall(column.initializer) === 'uuid')
+        if (ts.isPropertyAssignment(column) && chanceColumn(column.initializer, sf))
           found.add(`${declaration.name.text}.${column.name.getText(sf)}`)
     }
   }
   return found
 }
 
-/** A template's SQL outside parentheses: what `${…}` holds put aside, comments and strings taken out. */
-const statementOf = (template) => {
-  const parts = ts.isNoSubstitutionTemplateLiteral(template)
-    ? [template.text]
-    : [template.head.text, ...template.templateSpans.map((span) => span.literal.text)]
-  const text = parts
-    .join(' ? ')
-    .replace(/--[^\n]*/g, ' ')
-    .replace(/\/\*[\s\S]*?\*\//g, ' ')
-    .replace(/'(?:[^']|'')*'/g, "''")
+/**
+ * A template's SQL, read once from the start: what `${…}` holds put aside, strings and comments taken out in
+ * the order they come — `'--'` is a string — and what stands outside every parenthesis apart.
+ */
+const sqlOf = (template) => {
+  const text = ts.isNoSubstitutionTemplateLiteral(template)
+    ? template.text
+    : [template.head.text, ...template.templateSpans.map((span) => span.literal.text)].join(' ? ')
+  let all = ''
   let outside = ''
   let depth = 0
-  for (const char of text) {
-    if (char === '(') depth++
-    if (depth === 0) outside += char
-    if (char === ')') depth--
+  for (let i = 0; i < text.length; i++) {
+    const rest = text.slice(i)
+    let skip = 0
+    if (text[i] === "'") skip = /^'(?:[^']|'')*'?/.exec(rest)?.[0].length ?? 1
+    else if (rest.startsWith('--')) skip = /^--[^\n]*/.exec(rest)?.[0].length ?? 2
+    else if (rest.startsWith('/*'))
+      skip = rest.includes('*/') ? rest.indexOf('*/') + 2 : rest.length
+    if (skip > 0) {
+      all += ' '
+      if (depth === 0) outside += ' '
+      i += skip - 1
+      continue
+    }
+    if (text[i] === '(') depth++
+    all += text[i]
+    if (depth === 0) outside += text[i]
+    if (text[i] === ')') depth--
   }
-  return outside
+  return { all, outside }
 }
 
-/** Whether a template reads rows with no order: `select … from` and no `order by` of its own. */
+/** Whether a template reads rows with no order: `select … from` and no `order by` of the statement itself. */
 const unorderedTemplate = (template) => {
-  const statement = statementOf(template)
-  return (
-    /\bselect\b/i.test(statement) &&
-    /\bfrom\b/i.test(statement) &&
-    !/\border\s+by\b/i.test(statement)
-  )
-}
-
-/** The calls of a chain, outermost first: `db.select().from(t).where(c)`. */
-const callsOf = (node) => {
-  const calls = []
-  let n = node
-  for (;;) {
-    if (ts.isCallExpression(n)) {
-      if (ts.isPropertyAccessExpression(n.expression)) calls.push(n)
-      n = n.expression
-    } else if (ts.isPropertyAccessExpression(n)) n = n.expression
-    else return calls
-  }
+  const { all, outside } = sqlOf(template)
+  return /\bselect\b/i.test(all) && /\bfrom\b/i.test(all) && !/\border\s+by\b/i.test(outside)
 }
 
 const literalIndex = (node) => {
@@ -166,14 +189,31 @@ const literalIndex = (node) => {
   return undefined
 }
 
+/** Whether a value is written by the test in place: a literal, or an array it builds (`Array(6).fill(x)`). */
+const writtenInPlace = (node, sf) => {
+  let n = node
+  while (ts.isParenthesizedExpression(n) || ts.isAsExpression(n)) n = n.expression
+  if (
+    ts.isArrayLiteralExpression(n) ||
+    ts.isObjectLiteralExpression(n) ||
+    ts.isStringLiteral(n) ||
+    ts.isNoSubstitutionTemplateLiteral(n) ||
+    ts.isTemplateExpression(n) ||
+    ts.isNumericLiteral(n)
+  )
+    return true
+  const [root] = callsOf(n).reverse()
+  return Boolean(root && /^(new )?Array\b/.test(root.getText(sf)))
+}
+
 /**
  * Every read with no order that one file uses in an order, as `line: text — why`.
  * @param {string} fileName
  * @param {string} source
- * @param {Set<string>} [uuids] the uuid columns of the schema, as `table.column`
+ * @param {Set<string>} [chance] the columns of the schema whose order is chance, as `table.column`
  * @returns {string[]}
  */
-export function unorderedReads(fileName, source, uuids = new Set()) {
+export function unorderedReads(fileName, source, chance = new Set()) {
   const { sf, checker } = bind(fileName, source)
   const symbolOf = (node) => checker.getSymbolAtLocation(node)
   /** The functions of the file that return a read, by their symbol, with its order: `none` or `chance`. */
@@ -183,11 +223,7 @@ export function unorderedReads(fileName, source, uuids = new Set()) {
   const byChance = (argument) => {
     let a = argument
     if (ts.isCallExpression(a) && /^(asc|desc)$/.test(a.expression.getText(sf))) a = a.arguments[0]
-    return (
-      Boolean(a) &&
-      ts.isPropertyAccessExpression(a) &&
-      (uuids.has(a.getText(sf)) || CHANCE.has(a.name.text))
-    )
+    return Boolean(a) && ts.isPropertyAccessExpression(a) && chance.has(a.getText(sf))
   }
 
   /** What order a node reads in, if it reads: `none`, `chance`, or undefined — ordered, or no read. */
@@ -204,11 +240,11 @@ export function unorderedReads(fileName, source, uuids = new Set()) {
     if (ts.isPropertyAccessExpression(node.parent) && node.parent.expression === node)
       return undefined
     const method = node.expression.name.text
-    const calls = callsOf(node)
-    const names = calls.map((call) => call.expression.name.text)
-    if (names.some((name) => name.startsWith('select')) && names.includes('from')) {
+    const calls = callsOf(node).filter((call) => ts.isPropertyAccessExpression(call.expression))
+    const names = calls.map(calledAs)
+    if (names.some((name) => name?.startsWith('select')) && names.includes('from')) {
       const columns = calls
-        .filter((call) => call.expression.name.text === 'orderBy')
+        .filter((call) => calledAs(call) === 'orderBy')
         .flatMap((call) => [...call.arguments])
       if (columns.length === 0) return 'none'
       return columns.every(byChance) ? 'chance' : undefined
@@ -230,10 +266,36 @@ export function unorderedReads(fileName, source, uuids = new Set()) {
     return undefined
   }
 
+  /** The value `expect` was handed, from a matcher of it: `expect(a).not.toEqual` → `a`. */
+  const subjectOf = (matcher) => {
+    let e = matcher.expression
+    while (ts.isPropertyAccessExpression(e) && /^(not|resolves|rejects)$/.test(e.name.text))
+      e = e.expression
+    return ts.isCallExpression(e) && /^expect(\.soft)?$/.test(e.expression.getText(sf))
+      ? e.arguments[0]
+      : undefined
+  }
+  const negated = (matcher) => {
+    for (let e = matcher.expression; ts.isPropertyAccessExpression(e); e = e.expression)
+      if (e.name.text === 'not') return true
+    return false
+  }
+
+  /** Whether the callback a method of rows is handed takes the index of a row. */
+  const byIndex = (call, method) => {
+    const [callback] = call.arguments
+    const at = INDEX_AT[method] ?? 1
+    return Boolean(
+      callback &&
+      (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback)) &&
+      callback.parameters.length > at,
+    )
+  }
+
   /**
    * Where rows go: `{ free }` where their order cannot tell; `{ name }` given to a name; `{ helper }`
-   * returned by a function of the file; `{ why, stated }` used in an order — `stated` where the test writes
-   * the order of insertion itself.
+   * returned by a function of the file; `{ why, againstRead }` used in an order — `againstRead` where they
+   * are compared with a value the test did not write in place.
    */
   const fate = (node) => {
     let n = node
@@ -250,40 +312,41 @@ export function unorderedReads(fileName, source, uuids = new Set()) {
           [ts.SyntaxKind.QuestionQuestionToken, ts.SyntaxKind.BarBarToken].includes(
             p.operatorToken.kind,
           )) ||
-        (ts.isSpreadElement(p) &&
-          ts.isArrayLiteralExpression(p.parent) &&
-          p.parent.elements.length === 1)
+        ((ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p)) &&
+          ts.isObjectLiteralExpression(p.parent))
       ) {
-        n = ts.isSpreadElement(p) ? p.parent : p
+        n = ts.isPropertyAssignment(p) || ts.isShorthandPropertyAssignment(p) ? p.parent : p
+        continue
+      }
+      if (
+        ts.isSpreadElement(p) &&
+        ts.isArrayLiteralExpression(p.parent) &&
+        p.parent.elements.length === 1
+      ) {
+        n = p.parent
         continue
       }
       if (ts.isPropertyAccessExpression(p) && p.expression === n) {
         const name = p.name.text
         if (!ts.isCallExpression(p.parent) || p.parent.expression !== p)
           return name === 'length' ? { free: true } : { why: `.${name}` }
+        if ((ORDERLESS.has(name) || KEEPS.has(name)) && byIndex(p.parent, name))
+          return { why: `.${name}() by index` }
         if (ORDERLESS.has(name)) return { free: true }
         if (KEEPS.has(name)) {
           n = p.parent
           continue
         }
-        if (name === 'at') {
-          const index = literalIndex(p.parent.arguments[0])
-          if (index === 0) return { free: true }
-          return { why: `.at(…)`, stated: index !== undefined }
-        }
+        if (name === 'at' && literalIndex(p.parent.arguments[0]) === 0) return { free: true }
         return { why: `.${name}()` }
       }
-      if (ts.isElementAccessExpression(p) && p.expression === n) {
-        const index = literalIndex(p.argumentExpression)
-        return index === 0 ? { free: true } : { why: '[…]', stated: index !== undefined }
-      }
+      if (ts.isElementAccessExpression(p) && p.expression === n)
+        return literalIndex(p.argumentExpression) === 0 ? { free: true } : { why: '[…]' }
       if (ts.isVariableDeclaration(p) && p.initializer === n) {
         if (ts.isIdentifier(p.name)) return { name: p.name }
         const [only, ...rest] = ts.isArrayBindingPattern(p.name) ? p.name.elements : []
         const first = only && ts.isBindingElement(only) && !only.dotDotDotToken
-        return first && rest.length === 0
-          ? { free: true }
-          : { why: 'taken apart', stated: ts.isArrayBindingPattern(p.name) }
+        return first && rest.length === 0 ? { free: true } : { why: 'taken apart' }
       }
       if (
         ts.isBinaryExpression(p) &&
@@ -307,13 +370,24 @@ export function unorderedReads(fileName, source, uuids = new Set()) {
       if (ts.isExpressionStatement(p) || ts.isTypeQueryNode(p)) return { free: true }
       if (ts.isForOfStatement(p) && p.expression === n) return { free: true }
       if ((ts.isCallExpression(p) || ts.isNewExpression(p)) && p.arguments?.includes(n)) {
-        const callee = p.expression.getText(sf)
-        if (/^expect(\.soft)?$/.test(callee)) return matched(p)
-        if (callee === 'JSON.stringify') {
+        const callee = p.expression
+        if (/^expect(\.soft)?$/.test(callee.getText(sf))) return matched(p)
+        // the value a matcher compares with: the rows on the other side of `toEqual(rows)`
+        const subject = ts.isPropertyAccessExpression(callee) ? subjectOf(callee) : undefined
+        if (subject && ts.isPropertyAccessExpression(callee)) {
+          const name = callee.name.text
+          if (negated(callee)) return { free: true }
+          if (COMPARES.has(name))
+            return { why: `${name}(…)`, againstRead: !writtenInPlace(subject, sf) }
+          return { why: `${name}(…)` }
+        }
+        if (callee.getText(sf) === 'JSON.stringify') {
           n = p
           continue
         }
-        return ORDERLESS_CALLS.has(callee) ? { free: true } : { why: `handed to ${callee}` }
+        return ORDERLESS_CALLS.has(callee.getText(sf))
+          ? { free: true }
+          : { why: `handed to ${callee.getText(sf)}` }
       }
       return { why: ts.SyntaxKind[p.kind] }
     }
@@ -351,12 +425,17 @@ export function unorderedReads(fileName, source, uuids = new Set()) {
     if (name === 'not' || ORDERLESS_MATCHERS.has(name)) return { free: true }
     const [expected] = ts.isCallExpression(m.parent) ? m.parent.arguments : []
     if (COMPARES.has(name) && expected) {
-      if (ts.isArrayLiteralExpression(expected))
-        return expected.elements.length <= 1
-          ? { free: true }
-          : { why: `${name}([${String(expected.elements.length)}])`, stated: true }
+      const one =
+        ts.isArrayLiteralExpression(expected) &&
+        expected.elements.length <= 1 &&
+        !expected.elements.some(ts.isSpreadElement)
+      if (one) return { free: true }
       if (ts.isCallExpression(expected) && /arrayContaining$/.test(expected.expression.getText(sf)))
         return { free: true }
+      const what = ts.isArrayLiteralExpression(expected)
+        ? `[${String(expected.elements.length)}]`
+        : '…'
+      return { why: `${name}(${what})`, againstRead: !writtenInPlace(expected, sf) }
     }
     return { why: name }
   }
@@ -381,9 +460,9 @@ export function unorderedReads(fileName, source, uuids = new Set()) {
   const line = (node) => sf.getLineAndCharacterOfPosition(node.getStart()).line + 1
   const lines = source.split('\n')
   let found = []
-  // a helper may return a call of another helper: found until nothing new is
-  for (let known = -1; known !== helpers.size;) {
-    known = helpers.size
+  // a helper may return a call of another helper, and learn its order late: read until nothing changes
+  for (let before; before !== [...helpers.values()].join();) {
+    before = [...helpers.values()].join()
     found = []
     const reads = []
     const collect = (node) => {
@@ -399,11 +478,11 @@ export function unorderedReads(fileName, source, uuids = new Set()) {
         if (end.helper) {
           const symbol = symbolOf(end.helper)
           if (helpers.get(symbol) !== 'none') helpers.set(symbol, order)
-        } else if (end.why && (order === 'none' || end.stated)) {
+        } else if (end.why && !(order === 'chance' && end.againstRead)) {
           const at = node === read ? '' : ` at ${String(line(node))}`
-          const chance = order === 'chance' ? ' (ordered by chance)' : ''
+          const by = order === 'chance' ? ' (ordered by chance)' : ''
           found.push(
-            `${String(line(read))}: ${(lines[line(read) - 1] ?? '').trim()} — ${end.why}${at}${chance}`,
+            `${String(line(read))}: ${(lines[line(read) - 1] ?? '').trim()} — ${end.why}${at}${by}`,
           )
         } else if (end.name) {
           const symbol = symbolOf(end.name)
@@ -419,7 +498,7 @@ export function unorderedReads(fileName, source, uuids = new Set()) {
 }
 
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
-  const uuids = uuidColumns(readFileSync(SCHEMA, 'utf8'))
+  const chance = chanceColumns(readFileSync(SCHEMA, 'utf8'))
   const files = execFileSync('git', ['ls-files', ...FILES], { encoding: 'utf8' })
     .trim()
     .split('\n')
@@ -427,11 +506,11 @@ if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop()
   const problems = files.flatMap((file) => {
     const source = readFileSync(file, 'utf8')
     if (!MAY_READ.test(source)) return []
-    return unorderedReads(file, source, uuids).map((found) => `  ${file}:${found}`)
+    return unorderedReads(file, source, chance).map((found) => `  ${file}:${found}`)
   })
   if (problems.length > 0) {
     console.error(
-      `ordered reads: ${String(problems.length)} rows with no ORDER BY used in an order — order by an identity id or a position, never a uuid or createdAt alone (.claude/rules/testing.md, MOL-323)`,
+      `ordered reads: ${String(problems.length)} rows with no ORDER BY used in an order — order by an identity id or a position, never a uuid or a moment written by default alone (.claude/rules/testing.md, MOL-323)`,
     )
     for (const problem of problems) console.error(problem)
     process.exitCode = 1
