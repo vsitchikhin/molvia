@@ -220,35 +220,47 @@ of the measure and with every test merged. So CI checks every run instead (owner
   normalisation». Twice the work, or a hundred times a third of a millisecond, is under any bound a clock
   keeps on CI. A count is no rule of the domain and no state anyone reads but a test.
 
-## A read a test compares by position names its order (MOL-323)
+## Rows a test uses in an order are read in an order (MOL-323)
 
 **Postgres promises no order without `ORDER BY`**, and an integration test that reads rows and compares them
 to an array written in order depends on where the rows lie. `clearAll` empties the tables by `DELETE`, not
-`TRUNCATE`, so the space of the rows before is free, and a row inserted later may come back first. «То же
-фото дважды» in `feedback-bot` read its four words with no order and failed so on a pull request that
-touched only the PWA (CI 41022785698): `['', 1], ['Вот', 1], ['Вот', 0], ['', 1]`.
+`TRUNCATE`, so the space of the rows before is free, and a row inserted later may come back first; a plan
+that moves from an index to a scan as the statistics change moves the order with it. «То же фото дважды» in
+`feedback-bot` read its four words with no order and failed so on a pull request that touched only the PWA
+(CI 41022785698): `['', 1], ['Вот', 1], ['Вот', 0], ['', 1]`.
 
-- **The order is the table's own column**: `receipt_lines.position`, an identity `id` — the order of
-  insertion of one writer — or the key where the table has no other (`official_rates`). Never `created_at`
-  alone: a default of `now()` is one for every row of a transaction.
-- **Every read compared by position, rows alike included** (owner's В-3 «б»): `['56.10', '56.10']` cannot
-  flake today, and the rule with no exception is the one a guard can hold; a test that later makes the rows
+- **The order of insertion is an identity `id` or a position** (`receipt_lines.position`), or a key the test
+  writes in its own order (`official_rates`). **A uuid is an order of values, not of insertion**: 17 tables
+  of the schema have one, and `randomUUID()` puts two rows written one after the other either way round
+  (review of MOL-323, round 1: of 24 pairs, 14 came back reversed). **`created_at` alone is none either**: a
+  default of `now()` is one for every row of a transaction. Ordered by either, rows may be compared with
+  another read of them — a snapshot with a snapshot (`erasure`) — never with rows written in place.
+- **Rows with no order of insertion at all are compared with none**: two logins at once
+  (`login-transaction`) write neither first, so their sessions are compared as a set — `new Set`, `toSorted`
+  — not by a uuid that only looks like an order.
+- **Every read used in an order, rows alike included** (owner's В-3 «б»): `['56.10', '56.10']` cannot flake
+  today, and the rule with no exception is the one a guard can hold; a test that later makes the rows
   differ does not become a flake.
 - **Not `TRUNCATE` instead** (Р-2): it would hide the flake, not close it — the order is still not promised.
-  Nor an assertion made indifferent to the order: the rows in the order they were written read as the
-  test's story.
-- **`bin/check-ordered-reads.mjs` refuses the ordinary form** in `npm run lint` (owner's В-2 «в»), found by
-  parsing as the clock check is, names by TypeScript's binder: a chain of Drizzle with `select…` and `from`
-  and no `orderBy`, `findMany` with none, a template with `select` and no `order by`, a function of the file
-  returning one — through `await`, a cast and `map`, `filter`, `flatMap`, `flat`, `slice`; `sort` gives an
-  order — compared to an array of two or more written there, by an index past 0 or below it, or taken apart
-  into two. The first row alone is the read of one row. **The price, named:** an array expected that is not
-  written in place, a helper of another file, `order by` in a subquery only and a read handed to a function
-  are not seen, and go to review.
+  Nor an assertion made indifferent to the order where the test means one: the rows in the order they were
+  written read as the test's story.
+- **`bin/check-ordered-reads.mjs` holds it in `npm run lint`** (owner's В-2 «в»), by parsing as the clock
+  check does, names by TypeScript's binder. **Its rule is closed** (review of MOL-323, round 1): a list of
+  the uses that compare by position missed another each time it was attacked — a name of a name, `.join`,
+  `.resolves`, a spread, `Promise.all`, a helper naming its read. So rows read with no order may end only
+  where their order cannot tell — their length, their first row, `find`, `some`, `reduce`, `sort`, a loop,
+  a `Set`, `toHaveLength`, `toContain`, `not`, `toEqual` of one row or of `expect.arrayContaining` — and
+  anything else is refused; the fix is an order, never a use the check does not know. Rows ordered only by a
+  uuid of the schema (read from `schema.ts`) or `createdAt` are refused where the test writes the order of
+  insertion: an array of two or more in place, an index past 0, taken apart into two. The lists are in its
+  head. **The price, named:** a helper of another file is not followed; what a loop or a `reduce` collects
+  is not — a sum is their ordinary use; and an order by a column every row read shares
+  (`.orderBy(t.threadId)` under `eq(t.threadId, …)`) passes. Those go to review.
 - **How it was proved**: the read of «то же фото дважды» on master with its first word deleted and inserted
   again under the same id — the row then lies last in the heap and the index alike — gives CI's diff
   exactly, and with `orderBy` it is green. `update … set x = x` proves nothing: a HOT update leaves the row
-  where the index sees it (`.scratch/tasks/selftests/MOL-323-attack.md`).
+  where the index sees it (`.scratch/tasks/selftests/MOL-323-attack.md`). The guard on master's tests finds
+  every read the task ordered, and none on the branch.
 
 ## A page's timers go with its window (MOL-286)
 
