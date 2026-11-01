@@ -64,6 +64,7 @@ import { provideSheetAnnouncer } from '@/composables/useAnnouncer'
 import { useHeight } from '@/composables/useCollapsed'
 import { typedIn, useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
+import { withoutAnswerWord } from '@/composables/useAnswerWord'
 import { provideStateStrip, WithoutStateStrip } from '@/composables/useStateStrip'
 import { pageAnchor, sheetOpener, useSheetHistory } from '@/composables/useSheetHistory'
 
@@ -153,6 +154,8 @@ export default defineComponent({
     // The footer is the strip of a state in the sheet (MOL-211): its buttons stand pinned under the
     // thumb. A strip of the sheet's own, so the strip of the screen under it stays the screen's.
     const strip = provideStateStrip(footer, { sheet: true })
+    // Mounted shut with its screen: a state in it is no word of the screen's (MOL-349).
+    withoutAnswerWord()
     const footerBox = useHeight(footer)
     // Without its bottom padding, which the stylesheet adds to the edge itself: the keys coming up take
     // the home indicator's 34 off it in the same style change that moves the footer down. Measured

@@ -1,9 +1,19 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
+import { defineComponent, h, nextTick, ref, watch } from 'vue'
+import { createMemoryHistory, createRouter } from 'vue-router'
+import IconWallet from '~icons/mdi/wallet-outline'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
+import BottomSheet from '@/components/BottomSheet.vue'
 import IdentityNotice from '@/components/IdentityNotice.vue'
+import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
+import ScreenState from '@/components/ScreenState.vue'
+import SkeletonPart from '@/components/SkeletonPart.vue'
+import StatusStrip from '@/components/StatusStrip.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
+import { provideAnswerWord } from '@/composables/useAnswerWord'
 import { useActorStore } from '@/stores/actor'
 import type { IdentityState } from '@/stores/actor'
 
@@ -18,8 +28,33 @@ function render(state: IdentityState) {
   return { view, store }
 }
 
+/**
+ * A frame as `AppScreen` is one: it provides the screen's word, draws the notice first and the
+ * screen's content after it — what the content says is the case under test.
+ */
+function framed(content: () => ReturnType<typeof h> | null) {
+  const Frame = defineComponent({
+    setup() {
+      provideAnswerWord()
+      return () => h('div', [h(IdentityNotice), content()])
+    },
+  })
+  // A sheet needs the router: its entry in the history is the router's own (MOL-80).
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/', component: Frame }],
+  })
+  return mount(Frame, {
+    global: { plugins: [pinia, router, createAppI18n('en')] },
+    attachTo: document.body,
+  })
+}
+
+let pinia = createPinia()
+
 beforeEach(() => {
-  setActivePinia(createPinia())
+  pinia = createPinia()
+  setActivePinia(pinia)
   localStorage.clear()
 })
 
@@ -29,24 +64,229 @@ describe('IdentityNotice', () => {
     expect(render('loading').view.text()).toBe('')
   })
 
-  it('does not stay silent when the identity could not be loaded at all', () => {
-    // While it is not up, every request the app makes goes out without an owner — an app
-    // that looked normal and could not save a thing was the worst of the options.
-    expect(render('error').view.text()).toContain(en.identity.error.title)
+  it('says the app works with no connection where nothing else says it', () => {
     expect(render('offline').view.text()).toContain(en.identity.offline.title)
   })
 
-  // Offline had a «Try again» of its own until MOL-19: under the screen's own offline it made
-  // two buttons of one name doing different things, and the store comes back on `online` by
-  // itself, as the text says. The owner took it away (MOL-19, Р-1).
-  it('offers a retry only for an error, where the next attempt is the way out', async () => {
+  // MOL-349, adversarial А2: `/actors/me` failing alone, the screen shows its answer and says nothing,
+  // and the writes wait — the notice is the only word of it, with its own «Повторить».
+  it('says the sign-in was not checked where nothing else says it, and asks again on a tap', async () => {
     const { view, store } = render('error')
-    const retry = vi.spyOn(store, 'retry').mockResolvedValue(undefined)
-
+    expect(view.text()).toContain(en.identity.error.title)
+    // Quietly, the card standing with «Trying again…» on its button (self-review №5).
+    let answer: () => void = () => undefined
+    const retry = vi
+      .spyOn(store, 'retry')
+      .mockReturnValue(new Promise<void>((resolve) => (answer = resolve)))
     await view.get('button').trigger('click')
-
-    expect(retry).toHaveBeenCalled()
+    expect(retry).toHaveBeenCalledWith({ quietly: true })
+    expect(view.get('button').text()).toContain(en.state.retrying)
+    expect(view.find('.notice').exists()).toBe(true)
+    answer()
+    await flushPromises()
+    expect(view.get('button').text()).toContain(en.state.retry)
     expect(render('offline').view.find('button').exists()).toBe(false)
+  })
+
+  // Adversarial В2, C1 of MOL-19: asked again quietly, the card stands, and a tap that failed the same
+  // way would change none of its words — the answer to the tap is said again all the same.
+  it('says the same failure again after its «Повторить», standing all the while', async () => {
+    const actor = useActorStore()
+    actor.state = 'error'
+    vi.spyOn(actor, 'retry').mockResolvedValue(undefined)
+    const said: string[] = []
+    const Frame = defineComponent({
+      setup() {
+        const announcements = provideAnnouncer()
+        watch(announcements, (now, before) => {
+          for (const added of now.filter((a) => !before.some((b) => b.id === a.id)))
+            said.push(added.text)
+        })
+        provideAnswerWord()
+        return () => h('div', [h(IdentityNotice), h('ul', { class: 'answer' })])
+      },
+    })
+    const view = mount(Frame, {
+      global: { plugins: [pinia, createAppI18n('en')] },
+      attachTo: document.body,
+    })
+    const heard = () => said.filter((text) => text.includes(en.identity.error.title)).length
+    await vi.waitFor(() => {
+      expect(heard()).toBe(1)
+    })
+    await view.get('.notice button').trigger('click')
+    await flushPromises()
+    await vi.waitFor(() => {
+      expect(heard()).toBe(2)
+    })
+    expect(view.find('.notice').exists()).toBe(true)
+    view.unmount()
+  })
+
+  // MOL-349, owner's В-1 «б» (С-2): over the screen's own «нет связи» the notice made two clouds, and
+  // on «Что брать» stood over the field that chooses the answer.
+  describe('says nothing where the screen says itself what became of its answer', () => {
+    it.each([
+      ['its offline state', () => h(ScreenState, { kind: 'offline', title: 'No connection' })],
+      [
+        'an error, a section’s too',
+        () => h(ScreenState, { kind: 'error', inline: true, title: 'Failed' }),
+      ],
+      [
+        'a strip of the connection',
+        () => h(StatusStrip, { kind: 'offline', text: 'Offline · as of 14:05' }),
+      ],
+    ])('%s', async (_, content) => {
+      // kit-settings-7 (owner's В-2 «б»): under the screen's error the sign-in's card was a third
+      // «Повторить»; the same rule holds for both cases.
+      for (const state of ['offline', 'error'] as const) {
+        useActorStore().state = state
+        const view = framed(content)
+        await nextTick()
+        expect(view.find('.notice').exists()).toBe(false)
+        view.unmount()
+      }
+    })
+
+    // Self-review №4, adversarial Б1: a skeleton is no word. After it comes the screen's «нет связи» or
+    // its answer, and taken for a word it took the failed sign-in's card away at every read — a month
+    // turned, a search typed — the answer bringing it back, the control above moving under the thumb.
+    describe('a skeleton holds the notice as it is', () => {
+      const skeleton = () => h(ScreenSkeleton, () => h(SkeletonPart, { kind: 'caption' }))
+
+      it('the failed sign-in stays through the reads of an answered screen', async () => {
+        useActorStore().state = 'error'
+        const loading = ref(true)
+        const view = framed(() => (loading.value ? skeleton() : h('ul', { class: 'answer' })))
+        const seen: boolean[] = []
+        for (const now of [true, false, true, false]) {
+          loading.value = now
+          await nextTick()
+          await nextTick()
+          seen.push(view.find('.notice').exists())
+        }
+        // The first read's skeleton holds it back; past the first answer no read moves it.
+        expect(seen).toEqual([false, true, true, true])
+        expect(view.find('.notice').text()).toContain(en.identity.error.title)
+        view.unmount()
+      })
+
+      // Self-review №10, adversarial Г1: with the server down `me()` fails first, under the skeleton.
+      // Let in at once, the card came over the skeleton and went with the screen's own error a moment
+      // later. The price is the rarer case, `/actors/me` failing alone: the card comes with the answer.
+      it('a failure that comes under it waits: no card with the screen’s error, one with its answer', async () => {
+        for (const after of ['error', 'answer'] as const) {
+          useActorStore().state = 'loading'
+          const loading = ref(true)
+          const view = framed(() =>
+            loading.value
+              ? skeleton()
+              : after === 'error'
+                ? h(ScreenState, { kind: 'error', inline: true, title: 'Failed' })
+                : h('ul', { class: 'answer' }),
+          )
+          await nextTick()
+          const seen = [view.find('.notice').exists()]
+          useActorStore().state = 'error'
+          await nextTick()
+          await nextTick()
+          seen.push(view.find('.notice').exists())
+          loading.value = false
+          await nextTick()
+          await nextTick()
+          seen.push(view.find('.notice').exists())
+          expect(seen).toEqual(after === 'error' ? [false, false, false] : [false, false, true])
+          view.unmount()
+        }
+      })
+
+      it('must not fire: a card the screen’s word took away does not come back under one', async () => {
+        useActorStore().state = 'error'
+        const loading = ref(false)
+        const view = framed(() =>
+          loading.value
+            ? skeleton()
+            : h(ScreenState, { kind: 'error', inline: true, title: 'Failed' }),
+        )
+        const seen: boolean[] = []
+        for (const now of [false, true, false]) {
+          loading.value = now
+          await nextTick()
+          await nextTick()
+          seen.push(view.find('.notice').exists())
+        }
+        expect(seen).toEqual([false, false, false])
+        view.unmount()
+      })
+
+      it('«без связи» does not come under it: the screen’s own comes after it', async () => {
+        useActorStore().state = 'offline'
+        const loading = ref(true)
+        const view = framed(() =>
+          loading.value ? skeleton() : h(ScreenState, { kind: 'offline', title: 'No connection' }),
+        )
+        await nextTick()
+        expect(view.find('.notice').exists()).toBe(false)
+        loading.value = false
+        await nextTick()
+        await nextTick()
+        expect(view.find('.notice').exists()).toBe(false)
+        view.unmount()
+      })
+
+      it('must not fire: the screen’s error after it still silences the card', async () => {
+        useActorStore().state = 'error'
+        const loading = ref(true)
+        const view = framed(() =>
+          loading.value ? skeleton() : h(ScreenState, { kind: 'error', title: 'Failed' }),
+        )
+        loading.value = false
+        await nextTick()
+        await nextTick()
+        expect(view.find('.notice').exists()).toBe(false)
+        view.unmount()
+      })
+    })
+
+    it('and speaks again once the screen’s word is gone', async () => {
+      useActorStore().state = 'offline'
+      const speaking = ref(true)
+      const view = framed(() =>
+        speaking.value ? h(ScreenState, { kind: 'offline', title: 'No connection' }) : null,
+      )
+      await nextTick()
+      expect(view.find('.notice').exists()).toBe(false)
+      speaking.value = false
+      await nextTick()
+      expect(view.find('.notice').exists()).toBe(true)
+      view.unmount()
+    })
+
+    it('must not fire: an empty state, or attention, is no word about the connection', async () => {
+      useActorStore().state = 'offline'
+      const view = framed(() =>
+        h('div', [
+          h(ScreenState, { kind: 'attention', title: 'Mind this' }),
+          h(ScreenState, { kind: 'empty', icon: IconWallet, title: 'Nothing yet' }),
+        ]),
+      )
+      await nextTick()
+      expect(view.find('.notice').text()).toContain(en.identity.offline.title)
+      view.unmount()
+    })
+
+    // A sheet is mounted shut with its screen: its «Нет связи» is no word of the screen's.
+    it('must not fire: a state inside a sheet does not speak for the screen', async () => {
+      useActorStore().state = 'offline'
+      const view = framed(() =>
+        h(BottomSheet, { open: false, title: 'Where are you?' }, () =>
+          h(ScreenState, { kind: 'offline', title: 'No connection' }),
+        ),
+      )
+      await nextTick()
+      expect(view.find('.notice').exists()).toBe(true)
+      view.unmount()
+    })
   })
 
   // Until MOL-19 a lost identity interrupted. But the notice is drawn again over every screen,
@@ -58,34 +298,30 @@ describe('IdentityNotice', () => {
     }
   })
 
-  // Drawn by the shared screen state: an error is red like on any screen, offline is yellow
-  // rather than the green of an offline trip — without an identity nothing can be saved. The
-  // error is announced politely: the notice is drawn again on every screen the person moves
-  // to, and an alert would cut off the heading each move focuses (MOL-19, A3).
-  it.each([
-    ['error', 'bad', 'status'],
-    ['offline', 'warn', 'status'],
-  ] as const)('draws %s in %s and announces it as %s', (state, tone, role) => {
-    const { view } = render(state)
-    expect(view.get('.state').classes()).toContain(tone)
-    expect(view.get('[role]').attributes('role')).toBe(role)
+  it('draws an error red, as on any screen', () => {
+    expect(render('error').view.get('.state').classes()).toContain('bad')
   })
 
-  it('is never drawn red for a dropped connection', () => {
-    expect(render('offline').view.get('.state').classes()).not.toContain('bad')
+  // Yellow rather than the green of an offline trip — without an identity nothing can be saved —
+  // and never red for a dropped connection.
+  it('draws offline in warn, never red, with no button', () => {
+    const { view } = render('offline')
+    expect(view.get('.state').classes()).toContain('warn')
+    expect(view.get('.state').classes()).not.toContain('bad')
+    expect(view.find('button').exists()).toBe(false)
   })
 
   it('stays a landmark, so it can be reached among the page regions', () => {
-    expect(render('error').view.element.tagName).toBe('ASIDE')
+    expect(render('offline').view.element.tagName).toBe('ASIDE')
   })
 
   it('takes every word from i18n, not from the markup', () => {
     // Not a single string lives in a template: the plan is other languages without a
     // rebrand, and hardcoded text is the cheapest mistake today, the dearest one later.
-    const { view } = render('error')
+    const { view } = render('offline')
 
     expect(view.text()).not.toContain('identity.')
-    expect(view.html()).not.toContain('Не удалось')
+    expect(view.html()).not.toContain('Работаем')
   })
 
   // MOL-53 сняло состояние `lost` вместе с миром, который оно описывало: ключ держало

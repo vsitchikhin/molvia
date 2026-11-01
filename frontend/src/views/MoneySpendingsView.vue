@@ -108,7 +108,7 @@
           kind="offline"
           tone="warn"
           :title="t('spending.offline.title')"
-          :body="t('spending.offline.body')"
+          :body="t(canWrite ? 'spending.offline.body' : 'spending.offline.body_read')"
         />
 
         <!-- No button inside: «Добавить трату» is the strip under the thumb (handoff 02, 2d). -->

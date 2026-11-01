@@ -17,6 +17,7 @@
   "state": {
     "loading": "Loading…",
     "retry": "Try again",
+    "retrying": "Trying again…",
     "report": "Report a problem"
   },
   "trip": {
@@ -2395,6 +2396,7 @@
       "cancel_record_failed": "The server did not answer — try cancelling again",
       "refused": "Not saved: {reason}. Fix it and save again",
       "offline": "Offline · receipt from this phone. Line edits are kept here",
+      "unanswered": "The server did not answer · receipt from this phone. Line edits are kept here",
       "error": {
         "title": "The server didn’t answer",
         "body": "The receipt is safe. Any line edits are kept on this phone"

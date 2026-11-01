@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { signedIn } from './session'
+import { launchOffline, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -12,6 +12,23 @@ test('«Данные и приватность» opens by its address without a 
   await expect(page.getByRole('heading', { name: 'Удалить всё' })).toBeVisible()
   // Both doors (MOL-94): the row in the settings and the bot's command.
   await expect(page.getByText(/«Удалить мои данные», или отправьте \/delete боту/)).toBeVisible()
+})
+
+// MOL-349, С-1: the lists are paragraphs in a plain card. Drawn as a card of rows they had no padding,
+// and the radius cut the first letter of «Номер аккаунта Telegram» — a page read before signing in.
+test("its lists stand inside the card's padding, never on its edge", async ({ page }) => {
+  await page.goto('/privacy')
+  const cards = page.locator('.card:has(dl)')
+  await expect(cards).toHaveCount(2)
+  for (const card of await cards.all()) {
+    await expect(card).toHaveCSS('padding-left', '16px')
+    const [edge, term] = await Promise.all([
+      card.boundingBox(),
+      card.locator('dt').first().boundingBox(),
+    ])
+    expect(term!.x - edge!.x).toBeGreaterThanOrEqual(16)
+    expect(term!.y - edge!.y).toBeGreaterThanOrEqual(16)
+  }
 })
 
 test('and from the login screen, which is where a person without a session meets it', async ({
@@ -78,4 +95,14 @@ test('and from the settings, with the chevron back to them', async ({ page }) =>
 
   await page.getByRole('button', { name: 'Назад Настройки' }).click()
   await expect(page).toHaveURL(/\/settings$/)
+})
+
+// MOL-349, owner's В-1 «б»: a page that says nothing of its answer keeps the notice of a sign-in not
+// checked — here it is the one word that the app works with no connection.
+test('opened with no connection, it says the app works offline, once', async ({ page }) => {
+  await signedIn(page, '/settings')
+  await launchOffline(page, '/privacy')
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Данные и приватность')
+  await expect(page.getByRole('heading', { name: 'Работаем без связи' })).toBeVisible()
+  await expect(page.locator('.state')).toHaveCount(1)
 })

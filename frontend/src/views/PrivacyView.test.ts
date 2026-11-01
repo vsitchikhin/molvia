@@ -181,7 +181,7 @@ it('says the consent is kept — the edition and when — and nothing of the age
   expect(view.text()).toContain(ru.privacy.stored.consent.text)
   expect(ru.privacy.stored.consent.text).toMatch(/Возраст и дату рождения мы не храним/)
   // The subtitle is the revision written in code, not a sentence of the dictionary.
-  expect(view.text()).toContain('Редакция 5 от 29 октября 2026')
+  expect(view.text()).toContain('Редакция 5 от 1 ноября 2026')
 })
 
 describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for (MOL-236)', () => {
@@ -417,4 +417,17 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
       view.html().indexOf('class="summary"'),
     )
   })
+})
+
+// The lists are paragraphs, not rows of the kit: a card of rows (`list`) has no padding of its own,
+// and the text stood on the card's edge, its first letter cut by the radius (MOL-349, С-1). The
+// padding itself is the cascade's, held by `privacy.spec`.
+it('draws its lists in plain cards, never in a card of rows', async () => {
+  const view = await render()
+  const cards = view.findAll('.card')
+  expect(cards.length).toBeGreaterThan(0)
+  for (const card of cards) {
+    expect(card.find('dl').exists()).toBe(true)
+    expect(card.classes()).not.toContain('list')
+  }
 })

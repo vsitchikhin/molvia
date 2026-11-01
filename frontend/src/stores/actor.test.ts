@@ -226,6 +226,125 @@ describe('the first launch', () => {
   })
 })
 
+// MOL-349, owner's В-2 «б» (kit-settings-7): the notice «Не удалось проверить вход» and its «Повторить»
+// went — three «Повторить» on «Настройки» — so the identity asks again by itself, by the consent's
+// rhythm, and quietly: the login screen showing the failure must not blink to its skeleton.
+describe('an identity that could not be checked', () => {
+  it('asks again by time, 5 s doubling to a minute, and stops with an answer', async () => {
+    vi.useFakeTimers()
+    const { store } = await freshStore()
+    const { IDENTITY_RETRY_FIRST_MS, IDENTITY_RETRY_LAST_MS } = await import('@/stores/actor')
+    expect([IDENTITY_RETRY_FIRST_MS, IDENTITY_RETRY_LAST_MS]).toEqual([5_000, 60_000])
+    me.mockRejectedValue(new Error('fetch failed'))
+
+    await store.start()
+    expect(store.state).toBe('error')
+    expect(me).toHaveBeenCalledTimes(1)
+
+    await vi.advanceTimersByTimeAsync(4_999)
+    expect(me).toHaveBeenCalledTimes(1)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(me).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(9_999)
+    expect(me).toHaveBeenCalledTimes(2)
+    await vi.advanceTimersByTimeAsync(1)
+    expect(me).toHaveBeenCalledTimes(3)
+    // 20 s, 40 s, then a minute at most.
+    await vi.advanceTimersByTimeAsync(20_000 + 40_000)
+    expect(me).toHaveBeenCalledTimes(5)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(me).toHaveBeenCalledTimes(6)
+
+    me.mockResolvedValue(FIRST)
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(store.state).toBe('ready')
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(me).toHaveBeenCalledTimes(7)
+  })
+
+  it('stays «error» while it asks again by itself, never «loading»', async () => {
+    vi.useFakeTimers()
+    const { store } = await freshStore()
+    me.mockRejectedValueOnce(new Error('fetch failed'))
+    await store.start()
+    expect(store.state).toBe('error')
+
+    const seen: string[] = []
+    let answer: (view: ActorView) => void = () => undefined
+    me.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const stop = store.$subscribe(() => seen.push(store.state))
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(store.state).toBe('error')
+    answer(FIRST)
+    await vi.advanceTimersByTimeAsync(0)
+    stop()
+    expect(store.state).toBe('ready')
+    expect(seen).not.toContain('loading')
+  })
+
+  // Adversarial Г2: the card's «Повторить» pressed while the identity asks again by itself sent
+  // nothing, came back at once and said «не удалось» again before any answer — and nothing when the
+  // real one failed. A second ask waits for the one in the air.
+  it('a second ask waits for the question in the air, and asks nothing more', async () => {
+    const { store } = await freshStore()
+    me.mockRejectedValueOnce(new Error('fetch failed'))
+    await store.start()
+    let fail: (error: Error) => void = () => undefined
+    me.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)))
+    const first = store.start({ quietly: true })
+    let tapDone = false
+    const tap = store.retry({ quietly: true }).then(() => {
+      tapDone = true
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(tapDone).toBe(false)
+    expect(me).toHaveBeenCalledTimes(2)
+    fail(new Error('fetch failed'))
+    await Promise.all([first, tap])
+    expect(tapDone).toBe(true)
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(store.state).toBe('error')
+  })
+
+  // Adversarial round 6, the probe: a loud ask in the very task of a quiet one that settled offline —
+  // the offline branch is synchronous — set `loading` after it, and nothing put it back.
+  it('a loud ask after a quiet one that already settled is asked anew, never left at «loading»', async () => {
+    localStorage.setItem(KEY, FIRST.id)
+    const { store } = await freshStore()
+    online(false)
+    await store.start()
+    expect(store.state).toBe('offline')
+    const quiet = store.start({ quietly: true })
+    const loud = store.start()
+    await Promise.all([quiet, loud])
+    expect(store.state).toBe('offline')
+  })
+
+  it('must not fire: «Повторить» by hand still shows the question', async () => {
+    const { store } = await freshStore()
+    me.mockRejectedValueOnce(new Error('fetch failed'))
+    await store.start()
+    me.mockReturnValueOnce(new Promise(() => undefined))
+    void store.retry()
+    expect(store.state).toBe('loading')
+  })
+
+  it('must not fire: a failure with no connection waits for «online», not for a clock', async () => {
+    vi.useFakeTimers()
+    const { store } = await freshStore()
+    // The connection drops while the question is in the air: offline is read after the failure.
+    me.mockImplementation(() => {
+      online(false)
+      return Promise.reject(new Error('fetch failed'))
+    })
+    await store.start()
+    expect(store.state).toBe('offline')
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(me).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('a device whose storage refuses writes', () => {
   it('still knows which drawer is its own for the rest of the session', async () => {
     // The identifier is held in memory as well as written down, so a phone in private mode

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { BrowserContext, Page } from '@playwright/test'
 import { liveRegion, recordLiveRegion } from './live-region'
-import { asBrowser, signedIn } from './session'
+import { asBrowser, launchOffline, signedIn } from './session'
 
 interface Person {
   readonly id: string
@@ -419,6 +419,22 @@ test('a connection lost mid-request is offline, not an error', async ({ page, co
   expect(searches).toEqual([])
 })
 
+// MOL-349, С-2 (Ф-14): opened with no connection and the sign-in not checked, the screen's own state
+// is the one word about it — the notice «Working without a connection» stood over the search field.
+test('a launch with no connection says it once, under the field, and nothing over it', async ({
+  page,
+}) => {
+  await person(page)
+  await launchOffline(page)
+  await expect(
+    page.getByRole('heading', { name: 'The list will show up once you are online' }),
+  ).toBeVisible()
+  await expect(page.getByRole('searchbox', { name: 'Search the catalogue' })).toBeVisible()
+  await expect(page.locator('.notice-slot')).toBeEmpty()
+  await expect(page.getByRole('heading', { name: 'Working without a connection' })).toHaveCount(0)
+  await expect(page.locator('.state')).toHaveCount(1)
+})
+
 // The field stands in one place whatever came (owner's В-2 «а» on review № 1 of MOL-201): the line
 // under the title is held while the answer is on its way and when there is none, so the well, the
 // field in the cold offline and the field over the list stand at one height.
@@ -466,6 +482,69 @@ test('the field of the cold offline stands where its well stood', async ({ page,
     page.getByRole('heading', { name: 'The list will show up once you are online' }),
   ).toBeVisible()
   expect(await topOf(page, '.search-field .well')).toBe(well)
+})
+
+// MOL-349, self-review №4, adversarial Б1: with `/actors/me` failing alone the card «Could not check the
+// sign-in» stands over the list. A skeleton is no word: the first query's skeleton took the card away
+// and its answer brought it back, the field going up and down under the thumb by the card's height.
+test('a failed sign-in’s card stands through a search, and the field does not move', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const who = await person(page)
+  await ratedPurchase(who, `Тан ${tag}`, 5)
+  await page.route('**/api/actors/me', (route) => route.fulfill({ status: 500, body: '{}' }))
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/advice/search**', async (route) => {
+    await held
+    await route.continue()
+  })
+  await page.goto('/')
+  const card = page.getByRole('heading', { name: 'Could not check the sign-in' })
+  await expect(card).toBeVisible()
+  const field = await topOf(page, '.search-field .well')
+
+  await page.getByRole('searchbox', { name: 'Search the catalogue' }).fill('Тан')
+  await expect(page.locator('.skeleton')).toBeVisible()
+  await expect(card).toBeVisible()
+  expect(await topOf(page, '.search-field .well')).toBe(field)
+  release()
+  await expect(page.locator('.skeleton')).toHaveCount(0)
+  await expect(card).toBeVisible()
+  expect(await topOf(page, '.search-field .well')).toBe(field)
+})
+
+// MOL-349, self-review №10, adversarial Г1: at a launch with the server down `me()` fails first, under
+// the first screen's skeleton. Let in at once, the card came over the skeleton and went with the
+// screen's own error a moment later; a skeleton holds it back — not one frame of it.
+test('a launch with the server down: the sign-in’s card never shows, the screen says it', async ({
+  page,
+}) => {
+  await person(page)
+  await page.addInitScript(() => {
+    const seen = { notice: false }
+    Object.assign(window, { molviaNoticeSeen: seen })
+    new MutationObserver(() => {
+      if (document.querySelector('.notice')) seen.notice = true
+    }).observe(document, { childList: true, subtree: true })
+  })
+  await page.route('**/api/actors/me', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await page.route('**/api/advice', async (route) => {
+    // The screen's read answers after `me()`, as with a server down the two come in turn.
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    await route.fulfill({ status: 500, body: '{}' })
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'The server did not answer' })).toBeVisible()
+  expect(
+    await page.evaluate(
+      () =>
+        (window as unknown as { molviaNoticeSeen: { notice: boolean } }).molviaNoticeSeen.notice,
+    ),
+  ).toBe(false)
 })
 
 /** Cold offline: the first answer lost with the connection, the cloud on the screen. */

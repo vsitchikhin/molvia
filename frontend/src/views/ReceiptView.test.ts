@@ -1023,6 +1023,35 @@ describe('ReceiptView (MOL-127)', () => {
     expect(view.findAll('.receipt-line')).toHaveLength(2)
   })
 
+  // MOL-349, adversarial А1: the strip drawn in place was no word the frame heard, and a launch with no
+  // connection stood the notice «Работаем без связи» over it — two clouds, two texts (С-2).
+  // Adversarial Б2: the server answering 500 with the connection up is no «Без связи» — the strip of the
+  // kit says it in its own kind, and it is the screen's word, so the sign-in's card stays away.
+  it('a server that did not answer is said so over the receipt from memory, never «offline»', async () => {
+    await render()
+    while (mounted.length) mounted.pop()?.unmount()
+    receipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'boom', true))
+    const { view } = await render()
+    await flushPromises()
+    const strip = view.get('.strip')
+    expect(strip.classes()).toContain('unanswered')
+    expect(strip.text()).toContain(ru.receipt.review.unanswered)
+    expect(strip.text()).not.toContain(ru.receipt.review.offline)
+  })
+
+  it('offline at a launch, the strip from memory is the one word: no notice of the sign-in over it', async () => {
+    await render()
+    while (mounted.length) mounted.pop()?.unmount()
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    receipt.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Load failed', false))
+    const { view } = await render()
+    useActorStore().state = 'offline'
+    await flushPromises()
+    expect(view.find('.strip').text()).toContain(ru.receipt.review.offline)
+    expect(view.find('.notice').exists()).toBe(false)
+    expect(view.text()).not.toContain(ru.identity.offline.title)
+  })
+
   it('a receipt the server has no more is said so, with the way back (handoff question 5)', async () => {
     receipt.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'gone'))
     const { view } = await render()

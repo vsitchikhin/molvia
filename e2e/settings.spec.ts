@@ -479,3 +479,24 @@ test('the bot’s messages turn off on the tap, each its own, and stay off after
   await page.goBack()
   await expect(page).toHaveURL(/\/settings$/)
 })
+
+// MOL-349, owner's В-2 «б» (kit-settings-7, handoff 6b): the server down, «Настройки» had three
+// «Повторить» — the sign-in's notice, the screen's error and the salary's row. One stays, in the strip.
+test('the server down: one «Повторить», the screen’s, in the strip', async ({ page }) => {
+  await signedIn(page, '/')
+  // Nothing of the settings kept on the phone: the form from memory has a strip of its own (MOL-215).
+  await page.evaluate(() => {
+    for (const shelf of [localStorage, sessionStorage])
+      for (const key of Object.keys(shelf))
+        if (key.startsWith('molvia.settings')) shelf.removeItem(key)
+  })
+  await page.route('**/api/actors/me**', (route) => route.fulfill({ status: 500, body: '{}' }))
+  await page.goto('/settings')
+  await expect(page.getByRole('heading', { name: 'Не удалось загрузить настройки' })).toBeVisible()
+  const retry = page.getByRole('button', { name: 'Повторить', exact: true })
+  await expect(retry).toHaveCount(1)
+  await expect(
+    page.locator('.dock').getByRole('button', { name: 'Повторить', exact: true }),
+  ).toBeVisible()
+  await expect(page.locator('.notice-slot')).toBeEmpty()
+})

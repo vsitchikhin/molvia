@@ -24,6 +24,7 @@ import IconUnanswered from '~icons/mdi/alert-circle-outline'
 import IconOffline from '~icons/mdi/cloud-off-outline'
 import IconRefreshing from '~icons/mdi/sync'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { sayAnswerWord } from '@/composables/useAnswerWord'
 import { focusTitleOf } from '@/transitions'
 
 /**
@@ -68,6 +69,8 @@ export default defineComponent({
   setup(props) {
     const announce = useAnnouncer()
     const glyph = computed(() => GLYPHS[props.kind])
+    // The connection said by the screen itself (MOL-349).
+    sayAnswerWord(() => true)
 
     // Outside the app — a component mounted on its own — the strip speaks for itself.
     const role = computed(() => (announce ? undefined : 'status'))
