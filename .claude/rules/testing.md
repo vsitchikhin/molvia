@@ -293,7 +293,9 @@ failure` give the same first row, `find` and `[...new Set()]` either way (round 
   of the platform not known pure (`fetch`, `console` — an output). **In a file that spies on or stubs the
   platform none of it is pure** (round 16, Р1): `vi.spyOn(console, 'log')`, `vi.spyOn(Map.prototype, 'set')`,
   `vi.stubGlobal`, a function of it written over hear every call in its order, so there every call of the platform
-  and every method of a value is in doubt, vitest's `expect` and its matchers alone known; the price, named: a spy
+  and every method of a value is in doubt, vitest's `expect` and its matchers alone known — **those known to keep
+  nothing, by a closed list** (round 17, С1): a snapshot keeps a count, the n-th `toMatchSnapshot` met with the n-th
+  written, so in a loop it holds the rows' order; a snapshot, `expect.extend` and a matcher it adds are in doubt; the price, named: a spy
   set in another file is not seen. It reads the helpers beside the tests too. It works by parsing as the clock check does,
   names by TypeScript's binder, chance, identities and unique keys read from `schema.ts`. **It is closed at
   each of the three places it recognises something** (review of MOL-323, eleven rounds: a list of forms missed
