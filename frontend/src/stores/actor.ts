@@ -302,8 +302,12 @@ export const useActorStore = defineStore('actor', () => {
     if (running) {
       // A tap by hand shows the question it waits for (self-review №11, adversarial Д1): handed a
       // quiet one, the login's «Повторить» showed nothing, and its failure was not said again.
-      if (!options.quietly && (state.value === 'error' || state.value === 'offline'))
+      if (!options.quietly && (state.value === 'error' || state.value === 'offline')) {
         state.value = 'loading'
+        // A question that had already settled before this `loading` — the offline branch is
+        // synchronous — puts nothing back: then it is asked anew (adversarial round 6, the probe).
+        return running.then(() => (state.value === 'loading' ? start(options) : undefined))
+      }
       return running
     }
     running = ask(options).finally(() => {

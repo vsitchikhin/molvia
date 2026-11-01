@@ -307,6 +307,20 @@ describe('an identity that could not be checked', () => {
     expect(store.state).toBe('error')
   })
 
+  // Adversarial round 6, the probe: a loud ask in the very task of a quiet one that settled offline —
+  // the offline branch is synchronous — set `loading` after it, and nothing put it back.
+  it('a loud ask after a quiet one that already settled is asked anew, never left at «loading»', async () => {
+    localStorage.setItem(KEY, FIRST.id)
+    const { store } = await freshStore()
+    online(false)
+    await store.start()
+    expect(store.state).toBe('offline')
+    const quiet = store.start({ quietly: true })
+    const loud = store.start()
+    await Promise.all([quiet, loud])
+    expect(store.state).toBe('offline')
+  })
+
   it('must not fire: «Повторить» by hand still shows the question', async () => {
     const { store } = await freshStore()
     me.mockRejectedValueOnce(new Error('fetch failed'))
