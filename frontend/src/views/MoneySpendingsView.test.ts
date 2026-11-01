@@ -785,6 +785,29 @@ describe('MoneySpendingsView: the kit’s states, the rhythm and the day’s sum
     expect(view.find('.strip button').exists()).toBe(false)
   })
 
+  // MOL-349, С-4: the rule of the summary (Е-7, MOL-183) — «можно записать и сейчас» only where
+  // «Добавить трату» stands, and with no category known on this phone it does not.
+  it('offline with nothing kept promises no spending it cannot take', async () => {
+    online(false)
+    moneyMonth.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.offline.body_read)
+    expect(view.text()).not.toContain(en.spending.offline.body)
+    expect(
+      view.findAll('button').some((one) => one.text().trim() === en.spending.summary.add),
+    ).toBe(false)
+  })
+
+  it('offline on a month never read, another month kept: its categories take a spending, and it says so', async () => {
+    moneyMonth.mockResolvedValueOnce(month({ month: '2026-08' }))
+    ;(await render('/money/spendings?month=2026-08')).unmount()
+    online(false)
+    moneyMonth.mockRejectedValue(new TypeError('network'))
+    const view = await render()
+    expect(view.text()).toContain(en.spending.offline.body)
+    expect(button(view, en.spending.summary.add).exists()).toBe(true)
+  })
+
   it('loads as the answer stands: the total, a day’s caption and three rows of the journal', async () => {
     moneyMonth.mockReturnValue(new Promise(() => undefined))
     const view = await render()
