@@ -266,8 +266,11 @@ export default defineComponent({
   background: var(--text);
 }
 
+/* The words go under the icon only where they cannot stand beside it (MOL-321): at 200 % «Сравнение»
+   alone was wider than what the icon left, and «Графики» went 40 px sideways. */
 .few {
   display: flex;
+  flex-wrap: wrap;
   gap: var(--space-3);
   align-items: flex-start;
   padding: var(--space-3);
@@ -284,8 +287,11 @@ export default defineComponent({
 
 .few-text {
   display: grid;
+  flex: 1 1 min-content;
   gap: var(--space-1);
+  min-width: 0;
   margin: 0;
+  overflow-wrap: break-word;
 }
 
 .few-title {

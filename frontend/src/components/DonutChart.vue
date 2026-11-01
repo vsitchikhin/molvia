@@ -9,7 +9,7 @@
       <!-- Not a live region (review Р-6): the radio chosen already says it. -->
       <p class="center">
         <span class="center-label">{{ centre.label }}</span>
-        <span class="center-figure">{{ centre.figure }}</span>
+        <span class="center-figure" :style="figureChars(centre.figure)">{{ centre.figure }}</span>
         <span v-if="centre.sub" class="center-sub">{{ centre.sub }}</span>
       </p>
     </div>
@@ -32,8 +32,10 @@
         />
         <span class="dot" :style="{ background: row.colour }"></span>
         <span class="name">{{ row.name }}</span>
-        <span class="amount">{{ row.amount }}</span>
-        <span class="share">{{ row.share }}</span>
+        <span class="figures">
+          <span class="amount">{{ row.amount }}</span>
+          <span class="share">{{ row.share }}</span>
+        </span>
       </label>
     </fieldset>
     <p v-if="uncounted" class="note">{{ uncounted }}</p>
@@ -52,6 +54,7 @@ import type { Currency, Money, MoneyChartMonthView, SpendingCategoryView } from 
 import AppCard from '@/components/AppCard.vue'
 import DonutRing, { CHOSEN_THICKER } from '@/components/DonutRing.vue'
 import type { RingSector } from '@/components/DonutRing.vue'
+import { figureChars } from '@/components/figure'
 import { categoryColour } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 
@@ -233,6 +236,7 @@ export default defineComponent({
 
     return {
       t,
+      figureChars,
       id: useId(),
       heading,
       THICKNESS,
@@ -252,16 +256,20 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .card {
+  /* The card measures itself for the legend below (MOL-321). */
+  container-type: inline-size;
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
 }
 
+/* Never wider than the card (MOL-321): a square of 13.25rem was 318 px with Android's text at 150 % and
+   took «Графики» 47 px past a phone of 320. */
 .figure {
   display: grid;
   place-items: center;
-  width: 13.25rem;
-  height: 13.25rem;
+  width: min(13.25rem, 100%);
+  aspect-ratio: 1;
   margin: 0 auto;
 }
 
@@ -281,7 +289,10 @@ export default defineComponent({
 .center {
   display: flex;
   grid-area: 1 / 1;
-  max-width: 8.5rem;
+
+  /* In the hole, whatever the ring's size: 8.5rem of a ring of 13.25rem is its 64 %, and the hole is
+     76 % of it (`THICKNESS`). */
+  max-width: min(8.5rem, 64%);
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -301,10 +312,12 @@ export default defineComponent({
   overflow-wrap: anywhere;
 }
 
+/* Never broken, and never wider than the card (MOL-321): under the ring at 200 % «13 712 150 ֏» took «Графики» past
+   the phone. In the hole it is the card's width it is measured by, so the price of MOL-318 stands there. */
 .center-figure {
   @include display-type;
+  @include figure-fit(var(--text-card-figure));
 
-  font-size: var(--text-card-figure);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -364,6 +377,11 @@ export default defineComponent({
   }
 }
 
+/* Of the row's grid; the second line of its own when the card is narrow (below). */
+.figures {
+  display: contents;
+}
+
 .name,
 .amount {
   font-size: var(--text-callout);
@@ -398,5 +416,59 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
   overflow-wrap: anywhere;
+}
+
+/* Narrower than this a row of the legend stands its name on a line of its own, the sum and the share
+   under it (MOL-321): with the ring in the card at 150 % the name had no width left and was gone, and
+   beside the share alone «Продукты» still broke in its middle. In rem, as `CategoryDonutCard`: the
+   card's 15.9rem at 100 % on 320 keeps the row as it was. */
+$row-beside: 15rem;
+
+@container (width < #{$row-beside}) {
+  .row {
+    grid-template-columns: auto minmax(0, 1fr);
+    padding-block: var(--space-2);
+  }
+
+  .name {
+    overflow: visible;
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  /* As «Куда ушли» of «Деньги»: the sum and the share side by side while they fit, the share under the
+     sum when not — at 200 % two columns ran into each other — and under the dot too: alone in its column
+     the sum «125 403 ֏» was 160 px in 125 at 200 % (adversarial А3), and a sum never breaks. */
+  .figures {
+    display: flex;
+    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    column-gap: var(--space-2);
+  }
+
+  .share {
+    margin-inline-start: auto;
+  }
+}
+
+/* Narrower still, the hole cannot hold the month, the sum and what is missing — at 200 % they stood over
+   the ring — and they go under it (MOL-321). At 150 % the card is 9.25rem and they stay in the hole. */
+$centre-inside: 8rem;
+
+@container (width < #{$centre-inside}) {
+  .figure {
+    grid-template-rows: auto auto;
+    gap: var(--space-2);
+    aspect-ratio: auto;
+  }
+
+  .ring-box {
+    aspect-ratio: 1;
+  }
+
+  .center {
+    grid-area: 2 / 1;
+    max-width: none;
+  }
 }
 </style>

@@ -59,6 +59,8 @@ export default defineComponent({
 }
 
 .list {
+  /* Its rows turn by its width with large text (`ListRow`, MOL-321). */
+  container: row-tight / inline-size;
   padding: 0;
   overflow: hidden;
   list-style: none;

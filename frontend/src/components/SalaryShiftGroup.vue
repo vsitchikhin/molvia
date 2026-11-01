@@ -120,6 +120,7 @@ export default defineComponent({
 
 .row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
@@ -127,8 +128,11 @@ export default defineComponent({
   cursor: pointer;
 }
 
+/* The switch goes under the words only where the two do not fit (MOL-321): beside it at 200 % the words had some
+   40 px, «Зар|пла|та». 6rem keeps the row at 100 % on 320 as it was. */
 .label {
-  min-width: 0;
+  flex: 1 1 0;
+  min-width: min(6rem, 100%);
   overflow-wrap: anywhere;
 }
 
@@ -137,6 +141,7 @@ export default defineComponent({
   display: flex;
   flex: none;
   justify-content: flex-end;
+  margin-inline-start: auto;
   min-width: var(--switch-width);
 }
 

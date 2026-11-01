@@ -13,7 +13,7 @@
       </template>
       <template v-if="amount !== null" #tail>
         <span class="sums">
-          <span class="amount">{{ amount }}</span>
+          <span class="amount" :style="figureChars(amount, 'text')">{{ amount }}</span>
           <span v-if="sub" class="sub">{{ sub }}</span>
         </span>
       </template>
@@ -28,6 +28,7 @@ import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconUpload from '~icons/mdi/cloud-upload-outline'
 import AppTag from '@/components/AppTag.vue'
 import ListRow from '@/components/ListRow.vue'
+import { figureChars } from '@/components/figure'
 import type { OperationRowProps } from '@/components/spending'
 
 /**
@@ -54,7 +55,7 @@ export default defineComponent({
   },
   emits: { open: () => true },
   setup() {
-    return { IconAlert: markRaw(IconAlert), IconUpload: markRaw(IconUpload) }
+    return { IconAlert: markRaw(IconAlert), IconUpload: markRaw(IconUpload), figureChars }
   },
 })
 </script>
@@ -81,7 +82,11 @@ li .tag {
   justify-items: end;
 }
 
+/* Never broken, and shrunk to the row less its padding where even the whole row is narrower (MOL-321): at 200 %
+   «−1 234 567 ֏» stood 43 px past the row of an account's screen. */
 .amount {
+  @include figure-fit(1em, $less: calc(2 * var(--space-4)));
+
   white-space: nowrap;
 }
 
