@@ -65,7 +65,9 @@
           <span class="item-name">
             {{ item.name }} <span class="quantity">{{ item.quantity }}</span>
           </span>
-          <span class="item-amount">{{ item.amount }}</span>
+          <span class="item-amount" :style="figureChars(item.amount, 'text')">{{
+            item.amount
+          }}</span>
         </li>
       </ul>
       <p class="info">
@@ -1215,6 +1217,8 @@ export default defineComponent({
 }
 
 .item {
+  /* The sum measures itself against its row (`figure-fit`, MOL-321). */
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
@@ -1287,7 +1291,11 @@ export default defineComponent({
   font-size: var(--text-footnote);
 }
 
+/* Under the name a sum stands alone in its row and shrinks to it: «1 234 567 ֏» was 212 px in a row of 144 at
+   200 % and stood past the card (adversarial Ж1). A sum never breaks. */
 .item-amount {
+  @include figure-fit(1em);
+
   flex: none;
   margin-inline-start: auto;
   font-variant-numeric: tabular-nums;

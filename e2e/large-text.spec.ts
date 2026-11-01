@@ -379,8 +379,8 @@ for (const size of ['150%', '200%'])
         await sheetSideways(page, page.getByRole('button', { name: 'Задать план категории' })),
       ).toBe(0)
       // A record opened from «Траты»: its sum and its category, the category under the sum where the two do
-      // not fit (adversarial Б4).
-      await aRecord(page, '12540')
+      // not fit (adversarial Б4); an item of seven figures, its sum alone under the name (adversarial Ж1).
+      await aRecord(page, '1234567')
       await page.goto('/money/spendings')
       const record = page.getByRole('button', { name: /Ереван Сити/ }).first()
       await expect(record).toBeVisible()
@@ -414,6 +414,7 @@ for (const size of ['150%', '200%'])
       expect(await pastCard(page, 'dialog[open] .summary .badge', '.summary')).toBeLessThanOrEqual(
         0.5,
       )
+      expect(await pastCard(page, 'dialog[open] .item-amount', '.item')).toBeLessThanOrEqual(0.5)
       await page.keyboard.press('Escape')
       await expect(page.locator('dialog[open]')).toHaveCount(0)
       // A new category's colours, four and four (adversarial А10).
