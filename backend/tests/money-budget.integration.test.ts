@@ -17,6 +17,7 @@ import { budgetPlans, expenses, moneyMonthRates } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
+import { sorted } from './rows'
 
 // The 5 tests here past half a second on CI carry a timeout of their own (MOL-266), ten times their
 // worst there, rounded up to 5 s, so the time reporter names one only on a run slower than any yet
@@ -203,7 +204,7 @@ describe('«Бюджет» (MOL-117)', () => {
       plannedWhole: true,
     })
     const frozen = await db.select().from(moneyMonthRates).where(eq(moneyMonthRates.actorId, me.id))
-    expect(frozen.map((row) => row.month).sort()).toEqual([m2, m1])
+    expect(sorted(frozen.map((row) => row.month))).toEqual([m2, m1])
   })
 
   it('процент — от зарплаты, перенесённой в следующий месяц, а месяц без дохода ждёт его (Р-3)', async () => {

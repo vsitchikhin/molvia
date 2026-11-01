@@ -9,6 +9,7 @@ import { exchangeRevisions, marketRates } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 823 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -63,7 +64,7 @@ describe('курсы рынка в базе (MOL-137)', () => {
     await market.upsert([figure('bankCash', '4.12', '2026-09-29')])
     const stored = await db.select().from(marketRates)
     expect(stored).toHaveLength(1)
-    expect(stored[0]?.scaled).toBe(4_120_000n)
+    expect(onlyRow(stored)?.scaled).toBe(4_120_000n)
   })
 
   it('отдаёт по каналу, валюте и стороне последний день окна — не позже дня и не раньше начала', async () => {

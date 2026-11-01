@@ -7,6 +7,7 @@ import { actors, loginRequests, sessions } from '@/db/schema'
 import { completeLogin } from '@/usecases/complete-login'
 import { connectDrizzle } from './db'
 import { anHourFromNow, clearAll, telegramId } from './fixtures'
+import { sorted } from './rows'
 
 // The test here past half a second on CI carries a timeout of 10 s: it took 502 ms there at worst
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -129,7 +130,7 @@ describe('atomic login', () => {
     const written = await first.db.select().from(sessions)
     expect(written).toHaveLength(2)
     expect(new Set(written.map((row) => row.actorId)).size).toBe(1)
-    expect(written.map((row) => row.deviceName).toSorted()).toEqual([
+    expect(sorted(written.map((row) => row.deviceName))).toEqual([
       'iPhone · Safari',
       'iPhone · Safari',
     ])

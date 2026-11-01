@@ -7,6 +7,7 @@ import { actors, receiptLines, receipts } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertPlace, insertTrip, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // «Чек разобран» (MOL-129): the bot says a receipt was read only to someone the phone did not hand
 // it to read — the list of «Покупки» or the review — within 30 s.
@@ -91,10 +92,12 @@ async function receipt(
 }
 
 async function heardOf(id: string) {
-  const [row] = await db
-    .select({ heard: receipts.heard, heardAt: receipts.heardAt })
-    .from(receipts)
-    .where(eq(receipts.id, id))
+  const row = onlyRow(
+    await db
+      .select({ heard: receipts.heard, heardAt: receipts.heardAt })
+      .from(receipts)
+      .where(eq(receipts.id, id)),
+  )
   return row
 }
 
@@ -193,10 +196,12 @@ async function claimed() {
 }
 
 async function telegramOf(actorId: string): Promise<number> {
-  const [row] = await db
-    .select({ telegramUserId: actors.telegramUserId })
-    .from(actors)
-    .where(eq(actors.id, actorId))
+  const row = onlyRow(
+    await db
+      .select({ telegramUserId: actors.telegramUserId })
+      .from(actors)
+      .where(eq(actors.id, actorId)),
+  )
   return row?.telegramUserId ?? 0
 }
 
@@ -358,10 +363,12 @@ describe('«Сообщать, что чек разобран» (В-2)', () => {
   it('must not touch the rating reminders, nor they it', async () => {
     const me = await owner()
     await choose(me, { on: false })
-    const [row] = await db
-      .select({ remindersOff: actors.remindersOff })
-      .from(actors)
-      .where(eq(actors.id, me.id))
+    const row = onlyRow(
+      await db
+        .select({ remindersOff: actors.remindersOff })
+        .from(actors)
+        .where(eq(actors.id, me.id)),
+    )
     expect(row?.remindersOff).toBeNull()
   })
 
@@ -417,10 +424,9 @@ describe('a block of the bot, whatever the reminders say (review №1, А2)', ()
   it('a second «blocked» moves no moment, and the settings never lift it', async () => {
     const me = await owner()
     await botSays(me, 'blocked')
-    const [first] = await db
-      .select({ at: actors.botBlockedAt })
-      .from(actors)
-      .where(eq(actors.id, me.id))
+    const first = onlyRow(
+      await db.select({ at: actors.botBlockedAt }).from(actors).where(eq(actors.id, me.id)),
+    )
     await botSays(me, 'blocked')
     await app.inject({
       method: 'PUT',
@@ -428,10 +434,9 @@ describe('a block of the bot, whatever the reminders say (review №1, А2)', ()
       headers: { cookie: me.cookie },
       payload: { on: true },
     })
-    const [again] = await db
-      .select({ at: actors.botBlockedAt })
-      .from(actors)
-      .where(eq(actors.id, me.id))
+    const again = onlyRow(
+      await db.select({ at: actors.botBlockedAt }).from(actors).where(eq(actors.id, me.id)),
+    )
     expect(first?.at).toBeInstanceOf(Date)
     expect(again?.at).toEqual(first?.at)
   })

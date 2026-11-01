@@ -13,6 +13,7 @@ import { actors, events } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 663 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -143,7 +144,7 @@ describe('the first visit', () => {
     expect(body).not.toHaveProperty('telegramUserId')
     expect(actorIn(body)).not.toHaveProperty('telegramUserId')
 
-    const [row] = await madeHere()
+    const row = onlyRow(await madeHere())
     expect(row?.telegramUserId).toBeGreaterThan(0)
   })
 
@@ -222,10 +223,10 @@ describe('a request that proves who it is', () => {
     // The hook reads, it never writes: `updated_at` moving here would mean every request
     // silently touched the row the trigger is meant to guard.
     const actor = actorIn((await firstVisit()).body)
-    const [before] = await db.select().from(actors).where(eq(actors.id, actor.id))
+    const before = onlyRow(await db.select().from(actors).where(eq(actors.id, actor.id)))
 
     await asActor(actor.id)
-    const [after] = await db.select().from(actors).where(eq(actors.id, actor.id))
+    const after = onlyRow(await db.select().from(actors).where(eq(actors.id, actor.id)))
 
     expect(after?.updatedAt).toEqual(before?.updatedAt)
   })

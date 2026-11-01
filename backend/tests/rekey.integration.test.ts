@@ -4,6 +4,7 @@ import { rekeyItems } from '@/db/rekey'
 import { items } from '@/db/schema'
 import { connectDrizzle } from './db'
 import { clearAll, insertItem } from './fixtures'
+import {} from './rows'
 
 // The test here past half a second on CI carries a timeout of 10 s: it took 543 ms there at worst
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -20,11 +21,15 @@ afterAll(async () => {
   await close()
 })
 
-// Sorted here: the database's collation would put «Č» and the scripts in an order of its own.
+// Sorted here: the database's collation would put «Č» and the scripts in an order of its own. Read by the key and
+// the name first, so that the rows a key ties come in one order (MOL-323).
 const keys = async () =>
-  (await db.select({ name: items.name, key: items.searchKey }).from(items)).sort((a, b) =>
-    a.key.localeCompare(b.key, 'en'),
-  )
+  (
+    await db
+      .select({ name: items.name, key: items.searchKey })
+      .from(items)
+      .orderBy(items.searchKey, items.name)
+  ).sort((a, b) => a.key.localeCompare(b.key, 'en'))
 
 // The keys the tables before MOL-109 gave: a háček stripped, Georgian and ђ left as they were.
 describe('пересчёт ключей при старте (MOL-109, В-2)', () => {

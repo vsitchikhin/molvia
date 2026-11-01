@@ -13,6 +13,7 @@ import { buildServer } from '@/server'
 import { withActor } from '@/routes/actor'
 import { connectDrizzle } from './db'
 import { signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 
@@ -196,7 +197,7 @@ describe('the seam hands out a session, not an identifier', () => {
         .split(';')[0]
         ?.slice(SESSION_COOKIE.length + 1) ?? ''
 
-    const [row] = await db.select().from(sessions)
+    const row = onlyRow(await db.select().from(sessions))
     expect(token).toHaveLength(43)
     expect(JSON.stringify(row)).not.toContain(token)
     expect(created.body).not.toContain(token)

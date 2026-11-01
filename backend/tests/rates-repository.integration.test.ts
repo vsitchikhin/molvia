@@ -6,6 +6,7 @@ import { createRateRepository } from '@/db/rates-repository'
 import { officialRates, trips } from '@/db/schema'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertPlace } from './fixtures'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 const rates = createRateRepository(db)
@@ -51,7 +52,7 @@ describe('кеш официальных курсов', () => {
     const stored = await db.select().from(officialRates)
 
     expect(stored).toHaveLength(1)
-    expect(stored[0]?.scaled).toBe(4_320_000n)
+    expect(onlyRow(stored)?.scaled).toBe(4_320_000n)
   })
 
   it('отдаёт последний день не позже заданного — ровно этот день берётся, следующий нет', async () => {

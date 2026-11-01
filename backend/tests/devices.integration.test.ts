@@ -14,6 +14,7 @@ import { createSessionRepository } from '@/db/sessions-repository'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aStrangersCookie, anHourFromNow, clearAll, insertActor } from './fixtures'
+import { sorted } from './rows'
 
 // The test here past half a second on CI carries a timeout of 10 s: it took 513 ms there at worst
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -76,7 +77,7 @@ async function expire(id: string): Promise<void> {
 }
 
 async function rows(): Promise<string[]> {
-  return (await db.select({ id: sessions.id }).from(sessions)).map((row) => row.id).sort()
+  return sorted((await db.select({ id: sessions.id }).from(sessions)).map((row) => row.id))
 }
 
 function inject(method: 'GET' | 'POST' | 'DELETE', url: string, cookie?: string, extra = {}) {

@@ -10,6 +10,7 @@ import { BROADCAST_START, actors, broadcasts } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, telegramId } from './fixtures'
+import { onlyRow } from './rows'
 
 // The message to people about a leak (MOL-237): queued by `make notify`, handed to the bot in
 // batches after a cursor, the cursor moved only by the bot's word — better twice than never.
@@ -49,9 +50,11 @@ async function waitingForRow(n: number, settled: () => boolean = () => false): P
   const watch = connect()
   try {
     for (let attempt = 0; attempt < 200 && !settled(); attempt += 1) {
-      const [waiting] = await watch<{ n: number }[]>`
+      const waiting = onlyRow(
+        await watch<{ n: number }[]>`
         select count(*)::int as n from pg_stat_activity
-        where wait_event_type = 'Lock' and query ilike '%broadcasts%'`
+        where wait_event_type = 'Lock' and query ilike '%broadcasts%'`,
+      )
       if ((waiting?.n ?? 0) >= n) return
       await new Promise((resolve) => setTimeout(resolve, 25))
     }
@@ -62,7 +65,7 @@ async function waitingForRow(n: number, settled: () => boolean = () => false): P
 }
 
 async function row() {
-  const [stored] = await db.select().from(broadcasts)
+  const stored = onlyRow(await db.select().from(broadcasts))
   if (!stored) throw new Error('no broadcast')
   return stored
 }

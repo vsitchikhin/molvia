@@ -16,6 +16,7 @@ import { SEARCH_LIMIT } from '@/usecases/search-catalogue'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 888 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -49,7 +50,7 @@ afterAll(async () => {
 })
 
 async function idOf(name: string): Promise<string> {
-  const [row] = await db.select({ id: items.id }).from(items).where(eq(items.name, name))
+  const row = onlyRow(await db.select({ id: items.id }).from(items).where(eq(items.name, name)))
   if (!row) throw new Error(`${name} is not in the seed`)
   return row.id
 }

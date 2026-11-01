@@ -1,6 +1,7 @@
 import { afterAll, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
 import { connectDrizzle } from './db'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 afterAll(close)
@@ -45,10 +46,12 @@ it('has no collation built by another version of ICU', async () => {
 })
 
 it('has its own collation of the libc it runs on, where a version was recorded', async () => {
-  const [row] = await db.execute<{ recorded: string | null; actual: string | null }>(
-    sql`select datcollversion as recorded,
+  const row = onlyRow(
+    await db.execute<{ recorded: string | null; actual: string | null }>(
+      sql`select datcollversion as recorded,
                pg_database_collation_actual_version(oid) as actual
         from pg_database where datname = current_database()`,
+    ),
   )
   // A volume moved off alpine records none (`deploy/README.md`): nothing to compare there.
   expect(row?.recorded ?? row?.actual).toBe(row?.actual)

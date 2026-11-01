@@ -9,6 +9,7 @@ import { insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
 import { MIGRATIONS } from '@/db/migrate'
 import * as schema from '@/db/schema'
 import { expenses } from '@/db/schema'
+import { onlyRow } from './rows'
 
 /**
  * 0073 on a database of people from before it (MOL-238): the last visit is the latest the server knows
@@ -98,8 +99,10 @@ async function messageFromApp(
 }
 
 async function seenOf(id: string): Promise<{ seen: string; updated: string }> {
-  const [row] = await sql<{ seen: string; updated: string }[]>`
-    select last_seen_at as seen, updated_at as updated from actors where id = ${id}`
+  const row = onlyRow(
+    await sql<{ seen: string; updated: string }[]>`
+    select last_seen_at as seen, updated_at as updated from actors where id = ${id}`,
+  )
   if (row === undefined) throw new Error('the owner is gone')
   return { seen: new Date(row.seen).toISOString(), updated: new Date(row.updated).toISOString() }
 }
@@ -239,8 +242,10 @@ describe('0073: the last visit of everyone already there', () => {
     await sql`
       insert into actors (id, telegram_user_id, country, city, spend_currency, income_currency)
       values (${fresh}, ${telegramId()}, 'AM', 'Гюмри', 'AMD', 'RUB')`
-    const [made] = await sql<{ same: boolean }[]>`
-      select last_seen_at = created_at as same from actors where id = ${fresh}`
+    const made = onlyRow(
+      await sql<{ same: boolean }[]>`
+      select last_seen_at = created_at as same from actors where id = ${fresh}`,
+    )
     expect(made).toEqual({ same: true })
     await expect(sql`update actors set last_seen_at = null where id = ${fresh}`).rejects.toThrow(
       /not-null|null value/,

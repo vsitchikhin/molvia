@@ -38,6 +38,7 @@ import {
   insertPlace,
   telegramId,
 } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 796 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -53,7 +54,8 @@ beforeEach(() => clearAll(db))
 async function rowsMentioning(needle: string, digits = false): Promise<string[]> {
   const tables = await db.execute<{ table_name: string }>(sql`
     select table_name from information_schema.tables
-    where table_schema = 'public' and table_type = 'BASE TABLE'`)
+    where table_schema = 'public' and table_type = 'BASE TABLE'
+    order by table_name`)
   const found: string[] = []
   for (const { table_name } of tables) {
     // A Telegram id is a number: match it whole, not inside some other number.
@@ -212,7 +214,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
 
     await erasure.erase(tg, { dryRun: false })
 
-    const [item] = await db.select().from(items).where(eq(items.id, ownItem))
+    const item = onlyRow(await db.select().from(items).where(eq(items.id, ownItem)))
     expect(item?.createdBy).toBeNull()
     expect(item?.name).toBe('Рынок-сыр')
   }, 10_000)
@@ -227,7 +229,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
 
     const codes = await db.select().from(itemBarcodes).where(eq(itemBarcodes.itemId, itemId))
     expect(codes).toHaveLength(1)
-    expect(codes[0]?.addedBy).toBeNull()
+    expect(onlyRow(codes)?.addedBy).toBeNull()
   })
 
   it('места остаются все — и то, где бывал только он (решение Q4)', async () => {
@@ -339,7 +341,9 @@ describe('подтверждение входа и стирание одного
     const tg = telegramId()
     // Started in the browser, not confirmed yet: the row has no Telegram id for erasure to lock.
     const requestId = await insertLoginRequest(db)
-    const [request] = await db.select().from(loginRequests).where(eq(loginRequests.id, requestId))
+    const request = onlyRow(
+      await db.select().from(loginRequests).where(eq(loginRequests.id, requestId)),
+    )
     const holder = connectDrizzle()
     try {
       let confirming: Promise<unknown> | undefined
@@ -495,7 +499,7 @@ describe('стирание оставляет одно число — сколь
       await expect(erasure.erase(tg, { dryRun: false })).resolves.toMatchObject({ counted: true })
     }
 
-    expect((await weeks()).sort()).toEqual([
+    expect(sorted(await weeks())).toEqual([
       ['2026-10-05', 2],
       ['2026-10-12', 1],
     ])
@@ -516,7 +520,7 @@ describe('стирание оставляет одно число — сколь
     await erasure.erase(mondayInYerevan, { dryRun: false })
     await erasure.erase(sundayInYerevan, { dryRun: false })
 
-    expect((await weeks()).sort()).toEqual([
+    expect(sorted(await weeks())).toEqual([
       ['2026-10-05', 1],
       ['2026-10-12', 1],
     ])

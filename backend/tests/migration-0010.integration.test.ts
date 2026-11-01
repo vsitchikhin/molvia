@@ -5,6 +5,7 @@ import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
 import { MIGRATIONS } from '@/db/migrate'
+import { onlyRow } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -117,9 +118,9 @@ describe('0010: places that the new identity makes one', () => {
       { id: keptPlaceId, name: `Кафе ${CUP}` },
     ])
 
-    const [trip] = await sql<
-      { place_id: string }[]
-    >`select place_id from trips where id = ${tripId}`
+    const trip = onlyRow(
+      await sql<{ place_id: string }[]>`select place_id from trips where id = ${tripId}`,
+    )
     expect(trip?.place_id).toBe(keptPlaceId)
 
     const verdicts = await sql<{ place_id: string; score: number }[]>`

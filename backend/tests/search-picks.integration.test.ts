@@ -5,6 +5,7 @@ import { createSearchPickRepository } from '@/db/search-picks-repository'
 import { searchPicks } from '@/db/schema'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem } from './fixtures'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 const picks = createSearchPickRepository(db)
@@ -37,13 +38,15 @@ describe('запоминание пары «запрос → позиция»', 
     const itemId = await insertItem(db)
 
     await picks.remember(actorId, 'молоко', itemId)
-    const [first] = await rows()
+    const first = onlyRow(await rows())
     await picks.remember(actorId, 'молоко', itemId)
     const after = await rows()
 
     expect(after).toHaveLength(1)
-    expect(after[0]?.picks).toBe(2)
-    expect(after[0]?.lastPickedAt.getTime()).toBeGreaterThan(first?.lastPickedAt.getTime() ?? 0)
+    expect(onlyRow(after)?.picks).toBe(2)
+    expect(onlyRow(after)?.lastPickedAt.getTime()).toBeGreaterThan(
+      first?.lastPickedAt.getTime() ?? 0,
+    )
   })
 
   it('тот же запрос в другой письменности — та же строка, не вторая', async () => {
@@ -99,7 +102,7 @@ describe('запоминание пары «запрос → позиция»', 
 
     await picks.remember(actorId, words.join(' '), itemId)
 
-    expect((await rows())[0]?.queryKey).toBe(words.slice(0, 12).join(' '))
+    expect(onlyRow(await rows())?.queryKey).toBe(words.slice(0, 12).join(' '))
   })
 
   it('несуществующая позиция — отказ внешнего ключа, как у остальных репозиториев', async () => {

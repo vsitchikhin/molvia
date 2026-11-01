@@ -8,6 +8,7 @@ import { actors, places } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 let app: FastifyInstance
@@ -56,8 +57,8 @@ describe('settings and offline trip context', () => {
     expect(settingsOf(actorCodec.parse(response.json()))).toEqual(changed)
     expect((await save(cookie, initial, changed)).statusCode).toBe(200)
     const rows = await db.select().from(actors)
-    expect(rows.find((row) => row.id === other)).toMatchObject(initial)
-    expect(rows.find((row) => row.id === owner)).toMatchObject({
+    expect(onlyRow(rows.filter((row) => row.id === other))).toMatchObject(initial)
+    expect(onlyRow(rows.filter((row) => row.id === owner))).toMatchObject({
       sharedUntil: new Date('2030-01-01'),
     })
     const extra = await app.inject({
@@ -91,7 +92,7 @@ describe('settings and offline trip context', () => {
   })
 
   const sinceOf = async (owner: string) =>
-    (await db.select().from(actors).where(eq(actors.id, owner)))[0]?.incomeCurrencySince ?? null
+    onlyRow(await db.select().from(actors).where(eq(actors.id, owner)))?.incomeCurrencySince ?? null
 
   it('remembers when the currency of conversion changed, and nothing else moves it (MOL-42, В-2)', async () => {
     const owner = await insertActor(db)

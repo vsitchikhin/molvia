@@ -7,6 +7,7 @@ import { loginRequests } from '@/db/schema'
 import { startLogin } from '@/usecases/start-login'
 import { connectDrizzle } from './db'
 import { clearAll } from './fixtures'
+import { sorted } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -33,8 +34,9 @@ describe('login quota and lifetime', () => {
     const row = await requests.byIdAndSecret(view.id, secret)
     expect(row).not.toBeNull()
     expect(row!.expiresAt.getTime() - row!.createdAt.getTime()).toBe(300_000)
-    for (const request of await first.db.select().from(loginRequests))
-      expect(JSON.stringify(request)).not.toContain(secret)
+    const stored = await first.db.select().from(loginRequests)
+    for (const text of sorted(stored.map((request) => JSON.stringify(request))))
+      expect(text).not.toContain(secret)
   }, 10_000)
 
   it('serialises the Nth and N+1th start and remembers the quota across repository instances', async () => {

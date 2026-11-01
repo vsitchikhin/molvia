@@ -26,6 +26,7 @@ import { DEV_ACCOUNT_COOKIE } from '@/cookie'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aStrangersCookie, anHourFromNow, clearAll, insertActor, telegramId } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 641 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -196,17 +197,17 @@ describe('скользящий срок через сервер', () => {
     // Ответ, который выставляет cookie, не кешируется — на любой ручке (Р-6).
     expect(mine.headers['cache-control']).toBe('no-store')
 
-    const [row] = await db.select().from(sessions).where(eq(sessions.id, id))
+    const row = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
     expect(row?.lastSeenAt.getTime()).toBeGreaterThan(Date.now() - HOUR)
   }, 10_000)
 
   it('на границе суток минус секунда не пишет ничего', async () => {
     const { id, cookie } = await signedIn(SESSION_TOUCH_AFTER_HOURS - 1)
-    const [before] = await db.select().from(sessions).where(eq(sessions.id, id))
+    const before = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
 
     const mine = await whoAmI(cookie)
 
-    const [after] = await db.select().from(sessions).where(eq(sessions.id, id))
+    const after = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
     expect(mine.headers['set-cookie']).toBeUndefined()
     expect(after?.lastSeenAt).toEqual(before?.lastSeenAt)
     expect(after?.expiresAt).toEqual(before?.expiresAt)
@@ -221,7 +222,7 @@ describe('скользящий срок через сервер', () => {
     expect(first.headers['set-cookie']).toBeDefined()
     // Второй уже не «засиделся»: строка только что сдвинулась, и `UPDATE` не отправляется.
     expect(second.headers['set-cookie']).toBeUndefined()
-    const [row] = await db.select().from(sessions).where(eq(sessions.id, id))
+    const row = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
     expect(row?.lastSeenAt.getTime()).toBeGreaterThan(Date.now() - HOUR)
   })
 

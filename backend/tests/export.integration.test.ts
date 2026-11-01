@@ -48,6 +48,7 @@ import {
   telegramId,
 } from './fixtures'
 import { aLife } from './life'
+import { onlyRow, sorted } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -459,7 +460,8 @@ describe('состав экспорта — один источник правд
       where kcu.constraint_schema = 'public'
         -- A key that lets go of the row (\`items.created_by\`) does not take it along: the item is
         -- the catalogue's, and neither are the tables under it the person's.
-        and rc.delete_rule <> 'SET NULL'`)
+        and rc.delete_rule <> 'SET NULL'
+      order by child, parent`)
     const reaching = new Set(['actors'])
     for (let grown = true; grown;) {
       grown = false
@@ -484,10 +486,9 @@ describe('состав экспорта — один источник правд
     // Red here is a person's new data: it also adds its row to the record of processing
     // (Confluence 12091393, MOL-97) in the same PR — no test holds it, only this line and `CLAUDE.md`.
     for (const [table, { exported, omitted = {} }] of Object.entries(EXPORT_COLUMNS)) {
-      const actual = rows
-        .filter((row) => row.table_name === table)
-        .map((row) => row.column_name)
-        .sort()
+      const actual = sorted(
+        rows.filter((row) => row.table_name === table).map((row) => row.column_name),
+      )
       const declared = [...exported, ...Object.keys(omitted)]
       expect({ table, columns: actual }).toEqual({ table, columns: [...declared].sort() })
       expect(new Set(declared).size).toBe(declared.length)
@@ -620,7 +621,7 @@ describe('экспорт всего своего (MOL-93)', () => {
     expect(content.expenses).toHaveLength(erased.expenses)
     expect(content.verdicts).toHaveLength(erased.verdicts)
     expect(text).not.toContain('Отзыв Бориса')
-    for (const { id } of borisTrips) expect(text).not.toContain(id)
+    for (const id of sorted(borisTrips.map((trip) => trip.id))) expect(text).not.toContain(id)
     expect(content.catalogue.places.map((place) => place.id)).toEqual([shared.placeId])
   }, 20_000)
 
@@ -660,7 +661,7 @@ describe('экспорт всего своего (MOL-93)', () => {
   it('ни одного секрета: ни хеша токена, ни кода и секрета запроса входа', async () => {
     const { tg, actorId } = await someone()
     await aLife(db, actorId, tg, { itemId: await insertItem(db), placeId: await insertPlace(db) })
-    const [session] = await db.select().from(sessions).where(eq(sessions.actorId, actorId))
+    const session = onlyRow(await db.select().from(sessions).where(eq(sessions.actorId, actorId)))
     const requests = await db
       .select()
       .from(loginRequests)
@@ -670,10 +671,8 @@ describe('экспорт всего своего (MOL-93)', () => {
 
     expect(session).toBeDefined()
     expect(text).not.toContain(session?.tokenHash)
-    for (const request of requests) {
-      expect(text).not.toContain(request.code)
-      expect(text).not.toContain(request.secretHash)
-    }
+    for (const secret of sorted(requests.flatMap((request) => [request.code, request.secretHash])))
+      expect(text).not.toContain(secret)
     expect(content.loginRequests).toHaveLength(2)
     expect(content.sessions).toEqual([expect.objectContaining({ id: session?.id, current: true })])
   })

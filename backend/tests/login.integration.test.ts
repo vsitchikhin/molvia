@@ -18,6 +18,7 @@ import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { actors, events, loginDays, loginRequests, sessions } from '@/db/schema'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertPlace, insertTrip, telegramId } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 const { db, close } = connectDrizzle()
 const botSecret = randomBytes(32).toString('base64url')
@@ -106,8 +107,9 @@ describe('Telegram login over HTTP', () => {
         expect(response.body).not.toContain(forbidden)
       }
     }
-    for (const session of await db.select().from(sessions))
-      expect(JSON.stringify(session)).not.toContain(token)
+    const sessionRows = await db.select().from(sessions)
+    for (const text of sorted(sessionRows.map((session) => JSON.stringify(session))))
+      expect(text).not.toContain(token)
     expect(await db.select().from(events)).toHaveLength(0)
     const repeat = await poll(request)
     expect(repeat.statusCode).toBe(404)
@@ -144,7 +146,7 @@ describe('Telegram login over HTTP', () => {
     })
     const placeId = await insertPlace(db)
     const tripId = await insertTrip(db, { actorId, placeId })
-    const [original] = await db.select().from(actors).where(eq(actors.id, actorId))
+    const original = onlyRow(await db.select().from(actors).where(eq(actors.id, actorId)))
     const request = await start()
     await confirm(request.code, telegramUserId)
     const response = await poll(request)
@@ -166,7 +168,7 @@ describe('Telegram login over HTTP', () => {
     expect(trip.statusCode).toBe(200)
     expect(trip.json<{ trip: { id: string } }>().trip.id).toBe(tripId)
     // Nothing of the account moves, `updated_at` included — but the login is a visit (MOL-238)
-    const [after] = await db.select().from(actors)
+    const after = onlyRow(await db.select().from(actors))
     if (original === undefined || after === undefined) throw new Error('the owner is gone')
     expect({ ...after, lastSeenAt: original.lastSeenAt }).toEqual(original)
     expect(after.lastSeenAt.getTime()).toBeGreaterThan(original.lastSeenAt.getTime())
@@ -326,7 +328,7 @@ describe('Telegram login over HTTP', () => {
         201,
       )
     }
-    const [day] = await db.select().from(loginDays)
+    const day = onlyRow(await db.select().from(loginDays))
     expect(day).toMatchObject({ started: 2, again: 1 })
   })
 

@@ -17,6 +17,7 @@ import type { OffAnswer } from '@/open-food-facts/product'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 630 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -111,7 +112,7 @@ describe('кеш ответов Open Food Facts', () => {
   it('находка, ставшая промахом, теряет имена и объём', async () => {
     await cache.put(NUTELLA, found)
     await cache.put(NUTELLA, { found: false })
-    const [row] = await db.select().from(openFoodFacts)
+    const row = onlyRow(await db.select().from(openFoodFacts))
     expect(row).toMatchObject({ found: false, nameRu: null, nameEn: null, quantityMilli: null })
   })
 
@@ -306,7 +307,7 @@ describe('«Предложить товар» после подсказки (В-
       headers: { cookie: await signIn(db, actor) },
       payload: { kind: 'product', name: 'Нутелла', defaultUnit: 'kg', barcodes },
     })
-    const [row] = await db.select().from(items)
+    const row = onlyRow(await db.select().from(items))
     return { status: response.statusCode, origin: row?.origin }
   }
 

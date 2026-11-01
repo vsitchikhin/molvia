@@ -50,6 +50,7 @@ import {
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
+import { onlyRow, sorted, sum } from './rows'
 
 // Which reader reads a receipt (MOL-272): the model for whoever it is granted to and accepted edition 3,
 // under the month's cap, Tesseract otherwise and whenever the model is not the one to (В-1 «а»).
@@ -260,7 +261,7 @@ async function readAll(
 }
 
 const receiptOf = async (id: string) =>
-  (await db.select().from(receipts).where(eq(receipts.id, id)))[0]
+  onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
 const month = () => spend.month(spendMonthOf(new Date()))
 
 describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
@@ -589,10 +590,9 @@ describe('the model away (Р-9)', () => {
   it('leaves it to Tesseract once it waited past the wait, not a millisecond before', async () => {
     const me = await person(LATER)
     const id = await queued(me)
-    const [row] = await db
-      .select({ queuedAt: receipts.queuedAt })
-      .from(receipts)
-      .where(eq(receipts.id, id))
+    const row = onlyRow(
+      await db.select({ queuedAt: receipts.queuedAt }).from(receipts).where(eq(receipts.id, id)),
+    )
     const queuedAt = row?.queuedAt?.getTime() ?? 0
     const model = fakeModel(() => Promise.reject(new ModelUnavailable('unreachable', 0)))
     await readAll(benchReader(), model, {
@@ -775,12 +775,12 @@ describe('the shop’s memory in the digits (MOL-291)', () => {
       { kind: 'sku', key: BUTTER, itemId, price: { minor: BigInt(drams * 100), currency: 'AMD' } },
     ])
   const butterOf = async (id: string) =>
-    (
+    onlyRow(
       await db
         .select()
         .from(receiptLines)
-        .where(sql`${receiptLines.receiptId} = ${id} and ${receiptLines.position} = 2`)
-    )[0]
+        .where(sql`${receiptLines.receiptId} = ${id} and ${receiptLines.position} = 2`),
+    )
 
   it('puts a line right by the person’s own shelf price, and leaves it empty with none', async () => {
     const item = await insertItem(db, { name: 'Масло сливочное', searchKey: 'maslo slivochnoe' })
@@ -862,7 +862,7 @@ describe('the shop’s memory in the digits (MOL-291)', () => {
     const reviewed = async (totals: ModelReceipt['totals']) => {
       const id = await queued(me)
       await readAll(benchReader(), model(answer({ lines: [gone], totals })))
-      const [stored] = await db.select().from(receipts).where(eq(receipts.id, id))
+      const stored = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
       const response = await app.inject({
         method: 'GET',
         url: `/receipts/${id}`,
@@ -910,7 +910,7 @@ describe('the shop’s memory in the digits (MOL-291)', () => {
       { label: 'Վճարված է Առձեռն', amount: '1210' },
     ]
     await readAll(benchReader(), model(answer({ lines, totals })))
-    const [stored] = await db.select().from(receipts).where(eq(receipts.id, id))
+    const stored = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
     expect(stored?.balanced).toBe(true)
     const response = await app.inject({
       method: 'GET',
@@ -1112,10 +1112,10 @@ describe('the measure of 0.2r by its reader (MOL-272, В-6 «а»)', () => {
   const sums = async (table: typeof receiptDays | typeof modelReceiptDays) => {
     const rows = await db.select().from(table)
     return {
-      read: rows.reduce((all, row) => all + row.read, 0),
-      recorded: rows.reduce((all, row) => all + row.recorded, 0),
-      lines: rows.reduce((all, row) => all + row.lines, 0),
-      edited: rows.reduce((all, row) => all + row.linesEdited, 0),
+      read: sum(rows.map((row) => row.read)),
+      recorded: sum(rows.map((row) => row.recorded)),
+      lines: sum(rows.map((row) => row.lines)),
+      edited: sum(rows.map((row) => row.linesEdited)),
     }
   }
 
@@ -1164,7 +1164,7 @@ describe('the measure of 0.2r by its reader (MOL-272, В-6 «а»)', () => {
         Promise.resolve({ kind: 'read', answer: nothing, costMicroUsd: 1_000, tokens: TOKENS }),
       ),
     )
-    const [row] = await db.select().from(modelReceiptDays)
+    const row = onlyRow(await db.select().from(modelReceiptDays))
     expect(row?.reshoot).toBe(1)
     expect(await db.select().from(receiptDays)).toEqual([])
   }, 30_000)
@@ -1209,9 +1209,11 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     })),
   })
   const reasons = async () =>
-    (await db.select().from(receiptReasonDays))
-      .map((row) => `${row.reader} ${row.country} ${row.scope} ${row.reason} ${String(row.n)}`)
-      .sort()
+    sorted(
+      (await db.select().from(receiptReasonDays)).map(
+        (row) => `${row.reader} ${row.country} ${row.scope} ${row.reason} ${String(row.n)}`,
+      ),
+    )
   // The real claim, told the review may not keep what it hands out (MOL-319): unreachable since the model reads
   // only edition 5, past the review's 4, and held for the day the review's edition outgrows the model's.
   const unreviewable: ReadReceiptsDeps['receipts'] = {
@@ -1237,7 +1239,9 @@ describe('a receipt read not whole: its reasons, its review and the developer to
       'model AM read receipts 1',
       'model AM receipt line_not_as_printed 1',
     ])
-    const [kept] = await db.select().from(receiptMisses).where(eq(receiptMisses.receiptId, id))
+    const kept = onlyRow(
+      await db.select().from(receiptMisses).where(eq(receiptMisses.receiptId, id)),
+    )
     expect(kept).toMatchObject({
       readerVersion: 'claude-haiku-5-5@v5',
       reasons: { receipt: 'line_not_as_printed', lines: [null, null, 'unsettled'] },
@@ -1527,7 +1531,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
     )
     const [notice] = await notices()
     expect(notice).toMatchObject({ reason: 'line_not_as_printed', partly: true })
-    const [kept] = await db.select().from(receiptMisses).where(eq(receiptMisses.receipt, id))
+    const kept = onlyRow(await db.select().from(receiptMisses).where(eq(receiptMisses.receipt, id)))
     expect(kept?.reasons).toMatchObject({ receipt: 'line_not_as_printed', partly: true })
   }, 30_000)
 
@@ -1553,7 +1557,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
       await readAll(benchReader(), fakeModel(notWhole))
       await removed(me, id, true)
       expect(await receiptOf(id)).toBeUndefined()
-      const [kept] = await db.select().from(receiptMisses)
+      const kept = onlyRow(await db.select().from(receiptMisses))
       expect(kept).toMatchObject({ receipt: id, receiptId: null })
       expect(kept?.retakenAt).not.toBeNull()
       expect(await db.select().from(receiptMissParts)).toHaveLength(1)
@@ -1585,7 +1589,7 @@ describe('a receipt read not whole: its reasons, its review and the developer to
         headers: { cookie: me.cookie },
       })
       expect(back.statusCode).toBe(200)
-      const [kept] = await db.select().from(receiptMisses)
+      const kept = onlyRow(await db.select().from(receiptMisses))
       expect(kept).toMatchObject({ receiptId: id, retakenAt: null })
     }, 30_000)
   })

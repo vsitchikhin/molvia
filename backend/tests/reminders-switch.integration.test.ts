@@ -26,6 +26,7 @@ import {
   signIn,
   telegramId,
 } from './fixtures'
+import { onlyRow, sum } from './rows'
 
 // The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 572 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -100,27 +101,26 @@ async function bought(who: Person, name: string, at: Date): Promise<void> {
 }
 
 async function ladderOf(who: Person) {
-  const [row] = await db.select().from(ratingReminders).where(eq(ratingReminders.actorId, who.id))
+  const row = onlyRow(
+    await db.select().from(ratingReminders).where(eq(ratingReminders.actorId, who.id)),
+  )
   return row ? { step: row.step, remindedOn: row.remindedOn } : null
 }
 
 async function offOf(who: Person) {
-  const [row] = await db
-    .select({ off: actors.remindersOff })
-    .from(actors)
-    .where(eq(actors.id, who.id))
+  const row = onlyRow(
+    await db.select({ off: actors.remindersOff }).from(actors).where(eq(actors.id, who.id)),
+  )
   return row?.off
 }
 
 /** The off counters of every day, summed: the days are the server's real today. */
 async function turnedOff() {
   const rows = await db.select().from(reminderDays)
-  const sum = (pick: (row: (typeof rows)[number]) => number) =>
-    rows.reduce((total, row) => total + pick(row), 0)
   return {
-    button: sum((row) => row.offButton),
-    settings: sum((row) => row.offSettings),
-    blocked: sum((row) => row.offBlocked),
+    button: sum(rows.map((row) => row.offButton)),
+    settings: sum(rows.map((row) => row.offSettings)),
+    blocked: sum(rows.map((row) => row.offBlocked)),
   }
 }
 
@@ -231,7 +231,9 @@ describe('выключено — значит выключено', () => {
 
     expect(asked(await evening('2026-07-14'))).toEqual({ [boris.tg]: ['Кефир'] })
     expect(await ladderOf(anna)).toBeNull()
-    const [day] = await db.select().from(reminderDays).where(eq(reminderDays.day, '2026-07-14'))
+    const day = onlyRow(
+      await db.select().from(reminderDays).where(eq(reminderDays.day, '2026-07-14')),
+    )
     expect(day?.firstSteps).toBe(1)
   })
 
@@ -298,7 +300,9 @@ describe('включение начинает лестницу заново (Р-
 
       expect(asked(await evening('2026-07-14', reminders, '19:07'))).toEqual({})
       expect(await ladderOf(anna)).toEqual({ step: 1, remindedOn: '2026-07-14' })
-      const [day] = await db.select().from(reminderDays).where(eq(reminderDays.day, '2026-07-14'))
+      const day = onlyRow(
+        await db.select().from(reminderDays).where(eq(reminderDays.day, '2026-07-14')),
+      )
       expect(day).toMatchObject({ firstSteps: 1, items: 1 })
     },
     10_000,
@@ -475,7 +479,7 @@ describe('счётчики выключений (В-4)', () => {
   it('строки без id: у счётчика нет ни одного идентификатора', async () => {
     const anna = await person()
     await bot(anna, 'blocked')
-    const [row] = await db.select().from(reminderDays)
+    const row = onlyRow(await db.select().from(reminderDays))
     expect(JSON.stringify(row)).not.toContain(anna.id)
     expect(JSON.stringify(row)).not.toContain(String(anna.tg))
   })

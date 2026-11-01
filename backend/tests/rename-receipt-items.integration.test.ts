@@ -11,6 +11,7 @@ import { renameReceiptItems } from '@/rename-receipt-items'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // Each test records a receipt through the API and renames twice: 1–2 s on a Mac under the lock, given 30 s.
 
@@ -172,10 +173,12 @@ describe('rename-receipt-items (MOL-261, В-3 «а»)', () => {
 
   it('renames the items that record made under the proposal, their key with them, and nothing twice', async () => {
     await prepared()
-    const [salt] = await db
-      .select({ id: items.id })
-      .from(items)
-      .where(eq(items.name, 'Соль мелкий «Фаворит» 1 кг'))
+    const salt = onlyRow(
+      await db
+        .select({ id: items.id })
+        .from(items)
+        .where(eq(items.name, 'Соль мелкий «Фаворит» 1 кг')),
+    )
     if (salt === undefined) throw new Error('no salt')
     await db
       .insert(itemEmbeddings)
@@ -190,10 +193,9 @@ describe('rename-receipt-items (MOL-261, В-3 «а»)', () => {
       'Соль мелкая «Фаворит» 1 кг',
       'Фанта',
     ])
-    const [renamed] = await db
-      .select({ key: items.searchKey })
-      .from(items)
-      .where(eq(items.id, salt.id))
+    const renamed = onlyRow(
+      await db.select({ key: items.searchKey }).from(items).where(eq(items.id, salt.id)),
+    )
     expect(renamed?.key).toBe(toSearchKey('Соль мелкая «Фаворит» 1 кг'))
     // its vector of the old name goes, for the API's writer to make again
     expect(

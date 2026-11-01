@@ -16,6 +16,7 @@ import { createVerdictRepository } from '@/db/verdicts-repository'
 import { buildServer } from '@/server'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 889 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -95,10 +96,12 @@ async function rows(itemId: string) {
 
 /** In microseconds, as stored: a `Date` folds two instants inside one millisecond into one. */
 async function stamps(itemId: string) {
-  const [row] = await db.execute<{ rated: string; updated: string }>(sql`
+  const row = onlyRow(
+    await db.execute<{ rated: string; updated: string }>(sql`
     select rated_at::text as rated, updated_at::text as updated
     from verdicts where item_id = ${itemId}::uuid
-  `)
+  `),
+  )
   return row
 }
 
@@ -169,7 +172,7 @@ describe('PUT — поставить оценку', () => {
     })
 
     expect(card(reply).review).toBe('Пахнет крахмалом.\nМясом — нет')
-    expect((await rows(itemId))[0]?.review).toBe('Пахнет крахмалом.\nМясом — нет')
+    expect(onlyRow(await rows(itemId))?.review).toBe('Пахнет крахмалом.\nМясом — нет')
   })
 
   it('9: отзыв на границе — 500 символов принят, 501 нет', async () => {
@@ -310,7 +313,7 @@ describe('PATCH — изменить оценку', () => {
     expect(reply.status).toBe(200)
     expect(reply.headers['cache-control']).toBe('no-store')
     expect(card(reply)).toMatchObject({ score: 2, review: null })
-    expect((await rows(itemId))[0]?.review).toBeNull()
+    expect(onlyRow(await rows(itemId))?.review).toBeNull()
   })
 
   it('5: смена одной оценки текст не трогает', async () => {
@@ -371,7 +374,7 @@ describe('DELETE — снять оценку', () => {
 
     expect(reply.status).toBe(204)
     expect(reply.raw).toBe('')
-    const [row] = await rows(itemId)
+    const row = onlyRow(await rows(itemId))
     expect(row?.deletedAt).toBeInstanceOf(Date)
     expect(row?.review).toBeNull()
     expect(row?.score).toBe(2)
@@ -386,7 +389,7 @@ describe('DELETE — снять оценку', () => {
     await rate(owner, itemId, { score: 5 })
 
     expect((await withdraw(stranger, itemId)).status).toBe(404)
-    expect((await rows(itemId))[0]?.deletedAt).toBeNull()
+    expect(onlyRow(await rows(itemId))?.deletedAt).toBeNull()
 
     expect((await withdraw(owner, itemId)).status).toBe(204)
     expect((await withdraw(owner, itemId)).status).toBe(404)
@@ -407,7 +410,7 @@ describe('DELETE — снять оценку', () => {
     expect(card(reply)).toMatchObject({ score: 4, review: null })
     const all = await rows(itemId)
     expect(all).toHaveLength(1)
-    expect(all[0]?.deletedAt).toBeNull()
+    expect(onlyRow(all)?.deletedAt).toBeNull()
     expect((await stamps(itemId))?.rated).toBe(before?.rated)
   })
 
@@ -424,10 +427,12 @@ describe('DELETE — снять оценку', () => {
       // and a test that committed anyway would pass on the old code too (С-19).
       let waited = false
       for (let tries = 0; tries < 500 && !waited; tries += 1) {
-        const [waiting] = await watcher<{ n: number }[]>`
+        const waiting = onlyRow(
+          await watcher<{ n: number }[]>`
           select count(*)::int as n from pg_stat_activity
           where wait_event_type = 'Lock' and datname = current_database()
-        `
+        `,
+        )
         waited = (waiting?.n ?? 0) > 0
         if (!waited) await new Promise((resolve) => setTimeout(resolve, 10))
       }
@@ -507,7 +512,7 @@ describe('что не должно сработать', () => {
       await amend(actor, itemId, { score: 4 }),
     ]
 
-    const [row] = await rows(itemId)
+    const row = onlyRow(await rows(itemId))
     for (const reply of replies) {
       expect(reply.raw).not.toContain(actor)
       expect(reply.raw).not.toContain(row?.id ?? 'no row')

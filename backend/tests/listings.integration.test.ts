@@ -10,6 +10,7 @@ import { createPlaceRepository } from '@/db/places-repository'
 import { createTripRepository } from '@/db/trips-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { verdicts as verdictsTable } from '@/db/schema'
+import { onlyRow } from './rows'
 
 // The test here past half a second on CI carries a timeout of 10 s: it took 506 ms there at worst
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -309,7 +310,7 @@ describe('оценки', () => {
 
     expect((await verdicts.listFor(actorId, 10)).map((verdict) => verdict.itemId)).toEqual([cheese])
     expect(await verdicts.forItem(actorId, milk, null)).toBeNull()
-    const [row] = await db.select().from(verdictsTable).where(eq(verdictsTable.itemId, milk))
+    const row = onlyRow(await db.select().from(verdictsTable).where(eq(verdictsTable.itemId, milk)))
     expect(row?.deletedAt).toBeInstanceOf(Date)
     expect(row?.score).toBe(5)
   })

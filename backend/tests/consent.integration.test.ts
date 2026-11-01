@@ -7,6 +7,7 @@ import { actors } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 let app: FastifyInstance
@@ -43,10 +44,12 @@ async function accept(cookie: string, payload: unknown) {
 }
 
 async function row(id: string) {
-  const [found] = await db
-    .select({ version: actors.consentVersion, at: actors.consentedAt })
-    .from(actors)
-    .where(eq(actors.id, id))
+  const found = onlyRow(
+    await db
+      .select({ version: actors.consentVersion, at: actors.consentedAt })
+      .from(actors)
+      .where(eq(actors.id, id)),
+  )
   return found
 }
 
@@ -106,18 +109,22 @@ describe('согласие с условиями и политикой (MOL-95)'
       payload: { on: false },
     })
     expect(off.statusCode).toBe(200)
-    const [before] = await db
-      .select({ offAt: actors.analyticsOffAt, onAt: actors.analyticsOnAt })
-      .from(actors)
-      .where(eq(actors.id, id))
+    const before = onlyRow(
+      await db
+        .select({ offAt: actors.analyticsOffAt, onAt: actors.analyticsOnAt })
+        .from(actors)
+        .where(eq(actors.id, id)),
+    )
     expect(before?.offAt).not.toBeNull()
 
     expect((await accept(cookie, { version: 2 })).json()).toEqual({ version: 2 })
 
-    const [after] = await db
-      .select({ offAt: actors.analyticsOffAt, onAt: actors.analyticsOnAt })
-      .from(actors)
-      .where(eq(actors.id, id))
+    const after = onlyRow(
+      await db
+        .select({ offAt: actors.analyticsOffAt, onAt: actors.analyticsOnAt })
+        .from(actors)
+        .where(eq(actors.id, id)),
+    )
     expect(after).toEqual(before)
     const setting = await app.inject({
       method: 'GET',

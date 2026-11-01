@@ -16,6 +16,7 @@ import { DEV_ACCOUNT_COOKIE } from '@/cookie'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { anHourFromNow, clearAll, insertActor, insertItem } from './fixtures'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 const actorRepository = createActorRepository(db)
@@ -55,14 +56,16 @@ async function sessionOf(actorId: string, expiresAt = anHourFromNow()): Promise<
 }
 
 async function rowOf(actorId: string) {
-  const [row] = await db
-    .select({
-      lastSeenAt: actors.lastSeenAt,
-      updatedAt: actors.updatedAt,
-      createdAt: actors.createdAt,
-    })
-    .from(actors)
-    .where(eq(actors.id, actorId))
+  const row = onlyRow(
+    await db
+      .select({
+        lastSeenAt: actors.lastSeenAt,
+        updatedAt: actors.updatedAt,
+        createdAt: actors.createdAt,
+      })
+      .from(actors)
+      .where(eq(actors.id, actorId)),
+  )
   if (row === undefined) throw new Error('the owner is gone')
   return row
 }
@@ -167,10 +170,12 @@ describe('первый запрос дня', () => {
 describe('вход', () => {
   it('отмечает визит давнему владельцу, хоть бы он был час назад', async () => {
     const actorId = await insertActor(db, { lastSeenAt: new Date(Date.now() - HOUR) })
-    const [row] = await db
-      .select({ telegramUserId: actors.telegramUserId })
-      .from(actors)
-      .where(eq(actors.id, actorId))
+    const row = onlyRow(
+      await db
+        .select({ telegramUserId: actors.telegramUserId })
+        .from(actors)
+        .where(eq(actors.id, actorId)),
+    )
     if (row === undefined) throw new Error('the owner is gone')
 
     await signIn(actorRepository, sessionRepository, row.telegramUserId)
@@ -189,10 +194,12 @@ describe('вход', () => {
 
   it('шов разработки — тот же вход', async () => {
     const actorId = await insertActor(db, { lastSeenAt: LONG_AGO })
-    const [row] = await db
-      .select({ telegramUserId: actors.telegramUserId })
-      .from(actors)
-      .where(eq(actors.id, actorId))
+    const row = onlyRow(
+      await db
+        .select({ telegramUserId: actors.telegramUserId })
+        .from(actors)
+        .where(eq(actors.id, actorId)),
+    )
     if (row === undefined) throw new Error('the owner is gone')
 
     const response = await app.inject({
@@ -209,10 +216,12 @@ describe('вход', () => {
 describe('бот', () => {
   it('оценка кнопкой напоминания визитом не считается (В-1 «а»)', async () => {
     const actorId = await insertActor(db, { lastSeenAt: LONG_AGO })
-    const [row] = await db
-      .select({ telegramUserId: actors.telegramUserId })
-      .from(actors)
-      .where(eq(actors.id, actorId))
+    const row = onlyRow(
+      await db
+        .select({ telegramUserId: actors.telegramUserId })
+        .from(actors)
+        .where(eq(actors.id, actorId)),
+    )
     if (row === undefined) throw new Error('the owner is gone')
     const milk = await insertItem(db)
 

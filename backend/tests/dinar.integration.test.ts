@@ -20,6 +20,7 @@ import { buildServer } from '@/server'
 import { officialRatesRefresh } from '@/usecases/refresh-official-rates'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertPlace, signIn, tripContext } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 3 tests here past half a second on CI carry a timeout of 10 s: the slowest took 824 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -288,9 +289,12 @@ describe('архив НБ Грузии дописывает динар на на
       nbg.filter((one) => one.rateDate === date && one.currency === currency)
     // Последний месяц уже есть: динар лёг, рубль остался прежним — 4,35, а не 9,99 ответа.
     expect(on(daysAgo(10), 'RSD')).toHaveLength(1)
-    expect(on(daysAgo(10), 'RSD')[0]).toMatchObject({ base: 'AMD', scaled: parseRate('3.47') })
+    expect(onlyRow(on(daysAgo(10), 'RSD'))).toMatchObject({
+      base: 'AMD',
+      scaled: parseRate('3.47'),
+    })
     expect(on(daysAgo(10), 'RUB')).toHaveLength(1)
-    expect(on(daysAgo(10), 'RUB')[0]?.scaled).toBe(parseRate('4.35'))
+    expect(onlyRow(on(daysAgo(10), 'RUB'))?.scaled).toBe(parseRate('4.35'))
     // Поход в динарах при доходе в драмах теперь берёт этот динар у НБ Грузии.
     const trip = await start(await belgrade('AMD'))
     expect(trip.rateProvider).toBe('nbg')
@@ -358,10 +362,12 @@ describe('база держит динар тем же правилом, что 
       ['nbs', 'RSD'],
     ])
     await rates.insertMissing([row('RSD', '3.6', daysAgo(2), 'nbg')])
-    const [georgia] = await db
-      .select()
-      .from(officialRates)
-      .where(sql`provider = 'nbg'`)
+    const georgia = onlyRow(
+      await db
+        .select()
+        .from(officialRates)
+        .where(sql`provider = 'nbg'`),
+    )
     expect(georgia?.base).toBe('AMD')
     // Без базы колонка — драм: для НБС это ложь, и база её не примет.
     await expect(

@@ -18,6 +18,7 @@ import {
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aScreenshot, clearAll, insertActor, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -80,10 +81,9 @@ async function send(app: FastifyInstance, cookie: string, body: Record<string, u
 }
 
 async function telegramOf(actorId: string) {
-  const [row] = await db
-    .select({ telegram: actors.telegramUserId })
-    .from(actors)
-    .where(eq(actors.id, actorId))
+  const row = onlyRow(
+    await db.select({ telegram: actors.telegramUserId }).from(actors).where(eq(actors.id, actorId)),
+  )
   if (row === undefined) throw new Error('no actor')
   return row.telegram
 }
@@ -100,9 +100,9 @@ describe('сообщение из приложения — уведомлени�
     const { number } = sent.json<{ number: number }>()
     const queued = await db.select().from(ownerNotices)
     expect(queued).toHaveLength(1)
-    expect(queued[0]?.kind).toBe('feedback')
-    expect(queued[0]?.feedbackId).toBe(number)
-    expect(queued[0]?.payload).toEqual({
+    expect(onlyRow(queued)?.kind).toBe('feedback')
+    expect(onlyRow(queued)?.feedbackId).toBe(number)
+    expect(onlyRow(queued)?.payload).toEqual({
       kind: 'feedback',
       number,
       thread: number,
@@ -118,7 +118,7 @@ describe('сообщение из приложения — уведомлени�
       at: expect.any(String) as string,
     })
     // Nothing of the person: the copy stays in the owner's chat for good (В-3 of MOL-150).
-    const words = JSON.stringify(queued[0]?.payload)
+    const words = JSON.stringify(onlyRow(queued)?.payload)
     expect(words).not.toContain(anna)
     expect(words).not.toContain(String(await telegramOf(anna)))
   }, 10_000)
@@ -173,11 +173,10 @@ describe('сообщение из приложения — уведомлени�
 
     const left = await db.select({ payload: ownerNotices.payload }).from(ownerNotices)
     expect(left).toHaveLength(1)
-    const [borises] = await db
-      .select({ id: feedback.id })
-      .from(feedback)
-      .where(eq(feedback.actorId, boris))
-    expect(left[0]?.payload).toMatchObject({ thread: borises?.id })
+    const borises = onlyRow(
+      await db.select({ id: feedback.id }).from(feedback).where(eq(feedback.actorId, boris)),
+    )
+    expect(onlyRow(left)?.payload).toMatchObject({ thread: borises?.id })
   })
 
   it('годовой срок нити уносит и её уведомление', async () => {
@@ -289,7 +288,7 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
       locale: 'en',
       day: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/) as string,
     })
-    const [row] = await db.select().from(feedbackReplies)
+    const row = onlyRow(await db.select().from(feedbackReplies))
     expect(row).toMatchObject({ feedbackId: number, actorId: anna, text: 'Починили, обновите' })
     expect(row?.delivered).toBeNull()
   })
@@ -369,10 +368,9 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
       thread: null,
       text: 'Спасибо',
     })
-    const [continued] = await db
-      .select({ id: feedback.id })
-      .from(feedback)
-      .where(eq(feedback.threadId, thread))
+    const continued = onlyRow(
+      await db.select({ id: feedback.id }).from(feedback).where(eq(feedback.threadId, thread)),
+    )
 
     const reply = await fromBot(app, {
       telegramUserId: OWNER,
@@ -422,7 +420,8 @@ describe('ответ владельца (MOL-148, Р-2, Р-3, Р-11)', () => {
         message: feedbackReplies.telegramMessageId,
       })
       .from(feedbackReplies)
-    expect(rows.sort((a, b) => a.id - b.id)).toEqual([
+      .orderBy(feedbackReplies.id)
+    expect(rows).toEqual([
       { id: sentReply, delivered: 'sent', message: 9031 },
       { id: blockedReply, delivered: 'blocked', message: null },
     ])
@@ -444,7 +443,7 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
     })
 
     expect(word.json()).toEqual({ outcome: 'continued' })
-    const [continued] = await db.select().from(feedback).where(eq(feedback.threadId, thread))
+    const continued = onlyRow(await db.select().from(feedback).where(eq(feedback.threadId, thread)))
     expect(continued).toMatchObject({
       actorId,
       kind: 'bug',
@@ -484,17 +483,18 @@ describe('продолжение нити (MOL-148, В-1 MOL-150, В-2)', () => 
       thread: null,
       text: 'Всё равно не грузится',
     })
-    const [continued] = await db
-      .select({ id: feedback.id })
-      .from(feedback)
-      .where(eq(feedback.threadId, thread))
+    const continued = onlyRow(
+      await db.select({ id: feedback.id }).from(feedback).where(eq(feedback.threadId, thread)),
+    )
 
     const second = await answer(app, thread, 9040, 'Теперь точно')
 
-    const [row] = await db
-      .select({ feedbackId: feedbackReplies.feedbackId })
-      .from(feedbackReplies)
-      .where(eq(feedbackReplies.id, second))
+    const row = onlyRow(
+      await db
+        .select({ feedbackId: feedbackReplies.feedbackId })
+        .from(feedbackReplies)
+        .where(eq(feedbackReplies.id, second)),
+    )
     expect(row?.feedbackId).toBe(continued?.id)
   })
 
@@ -682,7 +682,7 @@ describe('уведомление о сообщении выдаётся, пок�
       last += pause + 1
     }
     expect(await notices.claim(20, at(last + 100_000))).toEqual([])
-    const [row] = await db.select({ tries: ownerNotices.tries }).from(ownerNotices)
+    const row = onlyRow(await db.select({ tries: ownerNotices.tries }).from(ownerNotices))
     expect(row?.tries).toBe(8)
   })
 
@@ -719,10 +719,9 @@ describe('уведомление о сообщении выдаётся, пок�
       thread: null,
       text: 'Спасибо',
     })
-    const [continued] = await db
-      .select({ id: feedback.id })
-      .from(feedback)
-      .where(eq(feedback.threadId, thread))
+    const continued = onlyRow(
+      await db.select({ id: feedback.id }).from(feedback).where(eq(feedback.threadId, thread)),
+    )
     const now = Date.now()
 
     expect(await notices.claim(20, new Date(now))).toMatchObject([
@@ -770,7 +769,7 @@ describe('Telegram не принял ответ — failed (адверсариа
     const { reply: replyId } = reply.json<{ reply: number }>()
 
     expect((await delivered(app, { reply: replyId, outcome: 'failed' })).statusCode).toBe(204)
-    const [row] = await db.select().from(feedbackReplies)
+    const row = onlyRow(await db.select().from(feedbackReplies))
     expect(row).toMatchObject({ delivered: 'failed', telegramMessageId: null })
 
     await db
@@ -957,10 +956,9 @@ describe('снимки — владельцу после уведомления 
     expect((await sentBy(app, [number])).statusCode).toBe(204)
 
     expect((await picture(app, number, 1)).statusCode).toBe(404)
-    const [gone] = await db
-      .select()
-      .from(feedbackPictures)
-      .where(eq(feedbackPictures.feedbackId, number))
+    const gone = onlyRow(
+      await db.select().from(feedbackPictures).where(eq(feedbackPictures.feedbackId, number)),
+    )
     expect(gone?.sentAt).toBeInstanceOf(Date)
     const files = await db
       .select()
@@ -1001,16 +999,20 @@ describe('снимки — владельцу после уведомления 
     })
 
     expect(word.json()).toEqual({ outcome: 'continued' })
-    const [continued] = await db.select().from(feedback).where(eq(feedback.threadId, thread))
+    const continued = onlyRow(await db.select().from(feedback).where(eq(feedback.threadId, thread)))
     expect(continued).toMatchObject({ text: '', pictures: 1 })
-    const [kept] = await db
-      .select()
-      .from(feedbackPictures)
-      .where(eq(feedbackPictures.feedbackId, continued?.id ?? 0))
-    const [file] = await db
-      .select()
-      .from(feedbackPictureFiles)
-      .where(eq(feedbackPictureFiles.feedbackId, continued?.id ?? 0))
+    const kept = onlyRow(
+      await db
+        .select()
+        .from(feedbackPictures)
+        .where(eq(feedbackPictures.feedbackId, continued?.id ?? 0)),
+    )
+    const file = onlyRow(
+      await db
+        .select()
+        .from(feedbackPictureFiles)
+        .where(eq(feedbackPictureFiles.feedbackId, continued?.id ?? 0)),
+    )
     expect(file).toMatchObject({ image: null, telegramFileId: photo.fileId })
     expect(kept).toMatchObject({
       source: 'telegram',
@@ -1214,10 +1216,9 @@ describe('раунд 2 MOL-167', () => {
     })
 
     expect(said.statusCode).toBe(204)
-    const [line] = await db
-      .select()
-      .from(feedbackPictures)
-      .where(eq(feedbackPictures.feedbackId, number))
+    const line = onlyRow(
+      await db.select().from(feedbackPictures).where(eq(feedbackPictures.feedbackId, number)),
+    )
     expect(line?.sentAt).toBeInstanceOf(Date)
   })
 })
