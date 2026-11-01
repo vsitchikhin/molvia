@@ -74,7 +74,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 
 ## frontend · components
 
-- `frontend/src/components/IdentityNotice.vue` — Notice over a screen opened with no connection and the identity not checked — only where the screen says nothing of its answer itself (`useAnswerWord`, MOL-349); an identity the server did not check has none and asks again by itself.
+- `frontend/src/components/IdentityNotice.vue` — Notice over a screen when the identity could not be checked (error or offline) — only where the screen says nothing of its answer itself (`useAnswerWord`, MOL-349); the identity asks again by itself, quietly.
 - `frontend/src/components/SessionEndSheet.vue` — Sheet «Завершить вход на …?» from «Устройства»: names the device and ends its session; a failure is said in the sheet.
 - `frontend/src/components/SignOutSheet.vue` — Sheet «Выйти из Molvia на этом устройстве?»: what goes, what stays, the count of unsent writes; inactive offline.
 

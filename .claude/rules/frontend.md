@@ -880,6 +880,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   `offline` or `error`, a `StatusStrip` — and `IdentityNotice` speaks only where nothing does; a sheet
   provides no word of its own, since it is mounted shut with its screen. The skeleton is in the list on
   purpose: the notice put in between it and the screen's «нет связи» would push the field down and back.
+  **The word is a component of the kit inside the frame's slot**: a screen is the frame's parent, so
+  `sayAnswerWord` in the screen's own `setup` hears nothing, and a strip drawn in place — the receipt's
+  «Без связи · чек из памяти» was a bare `<p>` with a cloud — stood under the notice, two clouds
+  (adversarial А1); it is a `StatusStrip` now.
 - **A sheet has a live region of its own, and while it is up everything is said there** (MOL-181,
   owner's В-2 «а»). The app's region is outside the modal `<dialog>`, inert while it is open, and
   nothing said there is read (feedback С-10). `BottomSheet` gives its region to the app's announcer
