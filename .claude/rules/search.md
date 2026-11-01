@@ -436,9 +436,10 @@ a coconut drink, its mean within one edit and a word two off (see «Where a name
 stands», MOL-332). No point is better on both halves, so by MOL-14's rule nothing moves: a gloss is
 short and clean («молоко», «кинза шт»), and what decides is around the search — the names, the kind
 and brand of MOL-293, the heading. The three lines lost are those rules', each with its item in the
-search's answer, all of Haiku's — a carrot under a heading of grapes, which the till itself prints, a
-brand a letter short, «10» without its «%» — and MOL-331 brought all three back (`receipts.md`). **The meaning earns its place**: without it 23 of the 32, and
-four more under «проверьте» — «газированный напиток кола кола» finds «Coca-Cola» by meaning alone.
+search's answer, all of Haiku's — a carrot under a heading of grapes, which the till itself
+prints, a brand a letter short, «10» without its «%» — and MOL-331 brought all three back
+(`receipts.md`). **The meaning earns its place**: without it 23 of the 32, and four more under
+«проверьте» — «газированный напиток кола кола» finds «Coca-Cola» by meaning alone.
 The search typed at a shelf is not measured by it: one person's receipts, two shops mostly, and
 today's dictionary and names over yesterday's lines.
 

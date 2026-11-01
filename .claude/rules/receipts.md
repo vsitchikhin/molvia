@@ -775,23 +775,32 @@ of Haiku's; the owner's В-9 «б» of MOL-47 took them as one task. Two causes 
 (MOL-326): Tesseract's lines stay as read, it slips otherwise. A brand as copied stands before one a letter longer
 wherever the search put it.
 
-- **A brand a letter short**: a word of the line's brand whose key, from three letters and under five — where
-  `sameLetters` forgives nothing — is an item's word with one letter taken out (`letterLost`). Haiku does it: of 1 518
-  brands in «…» on the runs of v5 it copied 1 068 right, and a brand a letter short led to its own 47 times («Թամար»,
-  «Լատին», «Ֆին», «Բարիլա», «Կիդեր»); from five letters `sameLetters` took them already.
-- **A fat without «%»**: a branded line's last word a bare number, with no fat and no package of its own, is the fat of
-  an item that prints it with «%». The bench never saw Haiku drop a «%» (0 of 96); the line of 30.10 is the one case,
-  its photo gone with its record.
+- **A brand a letter short**: a word of the line's brand that no word of the item is by its letters stands on the one
+  word of the item whose key, from three letters and under five — where `sameLetters` forgives nothing — is the brand's
+  with one letter taken out, **a letter of the word** («ու» one), and that the line says nothing else of (`letterLost`).
+  So a brand covers one word: copied whole, «Դինա» is «Дина» and never the «дыня» beside it, a brand a letter short of
+  the kind the line says names no brand («Սուրճ «Կոֆ»» no «Кофе»), and two words a letter longer are a doubt (review 1,
+  А1, №3). A letter of the key is not one of the word — «ш» is `sh`, «я» `ia`, a double folds — so «Սամ» is no «Шам»
+  and «Պան» no «Панно» (А2). Haiku does it: in the rule's span, on the runs of v5, a brand a letter short led to its own
+  eight times («Ֆին», «Ամառ», «Միլա», «Միկա») and to another six — «Միլա» copied for the glue «Սիլա» is «Милка» less a
+  letter — every one of another kind, which the kind refuses. From five letters `sameLetters` took them already
+  («Թամար», «Բարիլա», «Կիդեր»): that, and «Դաչա» a letter short of «Դայչա», is MOL-293's, as on master.
+- **A fat without «%»**: a branded line of a kind whose «%» is a fat (`TILL_FAT_KINDS_RU`, a table of the backend —
+  milk, cream, sour cream, cottage cheese, kefir, butter, cheese and their like), its last word a bare number above two,
+  with no fat and no package of its own, is the fat of an item that prints it with «%». **Of a kind with none it is no
+  fat**: a chocolate's «… 90» is its grams the till cut, as the plan promised (self-review №1); **nor two and less**, the
+  litres of a package cut off their unit as often — «Կեֆիր … 1» is a litre (А3). The bench never saw Haiku drop a «%»
+  (0 of 96); the line of 30.10 is the one case, its photo gone with its record.
 
 **Measured, wrong 0 everywhere** (`.scratch/tasks/status/MOL-331/results.md`): the binding bench of MOL-293 156 right
 against 151 on master, with meaning; Haiku's own readings of the bench through the product, eight runs of v5, 746
 against 728; the same 321 lines of the truth as copied by the model, as without; the 103 lines of production 30 sure
-and 2 «проверьте» of 32 their item, none new, none another, 71 of 71 new still new. **The prices, named:** two brands of
-one kind a letter apart — «Դաչա», a salad, is «Դայչա», a sauerkraut, a letter short — would be taken one for the
-other, «проверьте»; the catalogue of the bench holds no such pair (only «Հոմ» and «Хоум», one brand), and of the
-brands the model copied a letter short twelve led to another brand, every one of another kind, which the kind refuses.
-And a weight the till cut off its unit — «… 85» of «85գր», «… 225» — is the fat of an item of that brand and words
-printed «85%»: the bench's tills cut the name so on seven lines, and no such item stands beside them.
+and 2 «проверьте» of 32 their item, none new, none another, 71 of 71 new still new — the same after review 1, whose
+attacks are red (`.scratch/tasks/selftests/MOL-331-adversarial*`). **The prices, named:** a brand of one kind a letter
+longer than the one copied — a cheese «Сила» copied «Միլա» beside a cheese «Милка» — is taken, «проверьте»: the
+catalogue of the bench holds no such pair (only «Հոմ» and «Хоум», one brand). A weight the till cut off its unit on a
+line of a kind with a fat — a cottage cheese's «… 9» of «9…գր» — is the fat of an item of that brand and words printed
+«9%». And a fat of two and less copied without «%» — kefir 1 %, milk 1,5 % — stays a new item.
 
 ## The shops' memory (MOL-126)
 
