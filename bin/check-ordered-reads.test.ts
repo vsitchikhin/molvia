@@ -4,6 +4,7 @@ import {
   chanceColumns,
   identityColumns,
   MAY_READ,
+  schemaTables,
   uniqueKeys,
   unorderedReads,
 } from './check-ordered-reads.mjs'
@@ -412,6 +413,43 @@ describe('unorderedReads', () => {
       `const rows = () => db.select().from(t)\nexpect(await rows().where(c)).toEqual([a, b])`,
     ],
     ['unsafe SQL as a string', `expect(await sql.unsafe('select id from t')).toEqual([a, b])`],
+    // round 10: what the parse cannot read is no order — the relational API's order, SQL as a text not written
+    [
+      'findMany with an orderBy',
+      `expect(await db.query.t.findMany({ orderBy: (t, { asc }) => [asc(t.id)] })).toEqual([a, b])`,
+    ],
+    [
+      'unsafe of a template',
+      'expect(await client.unsafe(`select kind from owner_notices where kind <> ${kind}`)).toEqual([a, b])',
+    ],
+    [
+      'unsafe of a let',
+      `let text = 'select kind from owner_notices'\nexpect(await client.unsafe(text)).toEqual([a, b])`,
+    ],
+    [
+      'a query of a pool by a template',
+      'expect((await pool.query(`select kind from ${table}`)).rows).toEqual([a, b])',
+    ],
+    // round 10: rows handed to a callback of then
+    [
+      'then, its rows compared in the callback',
+      `await db.select().from(t).then((rows) => expect(rows).toEqual([a, b]))`,
+    ],
+    ['then of a callback the parse cannot read', `await db.select().from(t).then(check)`],
+    // round 10, the audit of every place the check says «free»: a helper that executes what it is handed by a name
+    // or a call, and a query carried on from a name the parse cannot follow
+    [
+      'a helper executing a const template',
+      'const run = (q) => db.execute(q)\nconst q = sql`select id from t`\nexpect(await run(q)).toEqual([a, b])',
+    ],
+    [
+      'a helper executing a text built by a call',
+      `const run = (q) => db.execute(q)\nexpect(await run(build(t))).toEqual([a, b])`,
+    ],
+    [
+      'a query in a let, carried on',
+      `let base = db.select().from(t)\nexpect(await base.where(c)).toEqual([a, b])`,
+    ],
   ])('refuses %s', (_, body) => {
     expect(found(body)).toHaveLength(1)
   })
@@ -454,6 +492,45 @@ describe('unorderedReads', () => {
     expect(
       found(
         `const read = () => db.select().from(t).innerJoin(sessions, on).orderBy(t.id, sessions.id)\nconst before = await read()\nexpect(await read()).toEqual(before)`,
+      ),
+    ).toEqual([])
+  })
+
+  // round 10, К1: a table by the name this file gives it, and one the schema cannot name
+  it('reads a table through its import alias and namespace, and holds one the schema does not name in doubt', () => {
+    const known = new Set(['ownerNotices', 'sessions'])
+    const at = (body: string): string[] => unorderedReads(FILE, body, CHANCE, IDENTITY, KEYS, known)
+    expect(
+      at(
+        `import { ownerNotices as noticesTable } from '@/db/schema'\nit('x', async () => {\nexpect(await db.select().from(noticesTable).orderBy(noticesTable.createdAt)).toEqual([a, b])\n})`,
+      ),
+    ).toHaveLength(1)
+    expect(
+      at(
+        `import * as schema from '@/db/schema'\nit('x', async () => {\nexpect(await db.select().from(schema.ownerNotices).orderBy(schema.ownerNotices.createdAt)).toEqual([a, b])\n})`,
+      ),
+    ).toHaveLength(1)
+    expect(
+      at(
+        `import { sessions as sessionsTable } from '@/db/schema'\nit('x', async () => {\nexpect(await db.select().from(sessionsTable).orderBy(sessionsTable.id)).toEqual([a, b])\n})`,
+      ),
+    ).toHaveLength(1)
+    // a column of a table the schema does not name is in doubt: no order
+    expect(
+      at(
+        `it('x', async () => {\nexpect(await db.select().from(sub).orderBy(sub.position)).toEqual([a, b])\n})`,
+      ),
+    ).toHaveLength(1)
+    // an identity through the namespace is an order
+    expect(
+      at(
+        `import * as schema from '@/db/schema'\nit('x', async () => {\nexpect(await db.select().from(schema.ownerNotices).orderBy(schema.ownerNotices.id)).toEqual([a, b])\n})`,
+      ),
+    ).toEqual([])
+    // an identity by its alias is still an order
+    expect(
+      at(
+        `import { ownerNotices as noticesTable } from '@/db/schema'\nit('x', async () => {\nexpect(await db.select().from(noticesTable).orderBy(noticesTable.id)).toEqual([a, b])\n})`,
       ),
     ).toEqual([])
   })
@@ -561,10 +638,6 @@ describe('unorderedReads', () => {
     [
       'a select with no from — one row',
       'expect(await db.execute(sql`select ${n}::int as n`)).toEqual([a, b])',
-    ],
-    [
-      'findMany with orderBy',
-      `expect(await db.query.t.findMany({ orderBy: t.id })).toEqual([a, b])`,
     ],
     ['sort', `expect((await db.select().from(t)).map((r) => r.x).sort()).toEqual([a, b])`],
     [
@@ -692,6 +765,35 @@ describe('unorderedReads', () => {
       `expect(await sql.unsafe('select id from t order by id')).toEqual([a, b])`,
     ],
     ['a refused promise', `await expect(db.select().from(t)).rejects.toThrow()`],
+    // round 10, №18: a template inside a query is a fragment, judged with the query it is part of
+    [
+      'a subquery in where',
+      'expect(await db.select().from(t).where(sql`${t.id} in (select id from u)`)).toHaveLength(2)',
+    ],
+    [
+      'exists of a template',
+      'expect(await db.select().from(t).where(exists(sql`select 1 from u where u.t = ${t.id}`))).toHaveLength(2)',
+    ],
+    [
+      'a scalar subquery in select',
+      'expect(await db.select({ n: sql`(select count(*) from u)` }).from(t)).toHaveLength(2)',
+    ],
+    [
+      'a template inside another',
+      'expect(await db.execute(sql`select * from t where x in (${sql`select y from u`}) order by id`)).toEqual([a, b])',
+    ],
+    [
+      'a helper executing a template, its length',
+      'const run = (q) => db.execute(q)\nexpect(await run(sql`select id from t`)).toHaveLength(2)',
+    ],
+    [
+      'then, its rows counted in the callback',
+      `await db.select().from(t).then((rows) => expect(rows).toHaveLength(2))`,
+    ],
+    [
+      'a helper executing a const template with its order',
+      'const run = (q) => db.execute(q)\nconst q = sql`select id from t order by id`\nexpect(await run(q)).toEqual([a, b])',
+    ],
   ])('leaves alone %s', (_, body) => {
     expect(found(body)).toEqual([])
   })
@@ -802,6 +904,15 @@ describe('uniqueKeys', () => {
     expect(keys).not.toContain(
       'storeMemory.tin,storeMemory.kind,storeMemory.key,storeMemory.actorId',
     )
+  })
+})
+
+describe('schemaTables', () => {
+  it('names every table of the schema', () => {
+    const tables = schemaTables(readFileSync('backend/src/db/schema.ts', 'utf8'))
+    expect(tables.has('ownerNotices')).toBe(true)
+    expect(tables.has('sessions')).toBe(true)
+    expect(tables.has('receiptLines')).toBe(true)
   })
 })
 
