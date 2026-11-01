@@ -166,8 +166,9 @@ export default defineComponent({
 /* Narrower than this the wallet gives its place to the words, and the account's name goes to a line of its
    own under the label (MOL-321): the wallet only decorates, and at 200 % «Account» of one word, the wallet
    and the chevron stood 23 px past the spending's sheet; beside «Получил на» the name had some 20 px and
-   was «…» — the row's very answer. In rem: from some 160 % of the text on 320, never at 100 %. */
-$icon-beside: 10rem;
+   was «…» — the row's very answer, and at 150 % «Карта» was «Ка…» beside «Откуда» (adversarial З2): a row of a sheet is
+   10rem there. In rem: from some 130 % of the text on 320, never at 100 %, where a row is 15rem and more. */
+$icon-beside: 12rem;
 
 @container (width < #{$icon-beside}) {
   .icon {

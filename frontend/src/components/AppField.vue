@@ -53,22 +53,25 @@
       <span v-if="shows" class="shown" aria-hidden="true">
         <IconCalendar class="shown-icon" />{{ display }}
       </span>
-      <input
-        v-if="kind !== 'multiline' && kind !== 'select'"
-        :id="id"
-        class="control"
-        :class="{ veiled: shows }"
-        v-bind="control()"
-        :type="kind === 'date' ? 'date' : 'text'"
-        :inputmode="kind === 'decimal' ? 'decimal' : kind === 'digits' ? 'numeric' : undefined"
-        :value="modelValue"
-        :readonly="readonly"
-        :placeholder="placeholder"
-        :aria-invalid="failed ? 'true' : undefined"
-        :aria-errormessage="failed ? `${id}-error` : undefined"
-        :aria-describedby="describedBy()"
-        @input="update"
-      />
+      <!-- The box the amount typed measures itself against (MOL-321); no box of its own but in `entry`. -->
+      <span v-if="kind !== 'multiline' && kind !== 'select'" class="control-box">
+        <input
+          :id="id"
+          class="control"
+          :class="{ veiled: shows }"
+          v-bind="control()"
+          :style="size === 'entry' ? figureChars(modelValue || placeholder || '0') : undefined"
+          :type="kind === 'date' ? 'date' : 'text'"
+          :inputmode="kind === 'decimal' ? 'decimal' : kind === 'digits' ? 'numeric' : undefined"
+          :value="modelValue"
+          :readonly="readonly"
+          :placeholder="placeholder"
+          :aria-invalid="failed ? 'true' : undefined"
+          :aria-errormessage="failed ? `${id}-error` : undefined"
+          :aria-describedby="describedBy()"
+          @input="update"
+        />
+      </span>
       <span v-if="$slots.suffix" :id="`${id}-suffix`" class="suffix">
         <slot name="suffix" />
       </span>
@@ -96,6 +99,7 @@ import IconCalendar from '~icons/mdi/calendar-blank-outline'
 import IconChevronDown from '~icons/mdi/chevron-down'
 import type { ErrorCode } from '@molvia/model'
 import AppReveal from '@/components/AppReveal.vue'
+import { figureChars } from '@/components/figure'
 import { LINGER_MS } from '@/composables/useAnnouncer'
 
 /** How many characters left are said aloud, beside the moment the count comes and the end. */
@@ -253,7 +257,19 @@ export default defineComponent({
       clearTimeout(lingering)
     })
 
-    return { t, attrs, id, failed, shows, counter, said, control, describedBy, update }
+    return {
+      t,
+      attrs,
+      id,
+      failed,
+      shows,
+      counter,
+      said,
+      control,
+      describedBy,
+      update,
+      figureChars,
+    }
   },
 })
 </script>
@@ -308,6 +324,11 @@ export default defineComponent({
   &:focus-within {
     @include field-focus;
   }
+}
+
+/* Not a box of the well's row: the control stands in it as before (`entry` below gives it one). */
+.control-box {
+  display: contents;
 }
 
 /* No width of its own (MOL-318), as `NavRow`'s label: a select is as wide as its longest option — a long
@@ -419,11 +440,22 @@ textarea.control {
     border-radius: var(--radius-lg);
   }
 
-  /* The figure's own line, as the copies had it: inherited, the body's leading made the input 58, not 54. */
+  /* The width left beside the sign, for the figure to shrink to (MOL-321). */
+  .control-box {
+    container-type: inline-size;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    min-width: 0;
+  }
+
+  /* The figure's own line, as the copies had it: inherited, the body's leading made the input 58, not 54. It
+     shrinks to its box by its length (MOL-321, adversarial З1): at 150 % «12540» was 180 px in a field of 125
+     and showed «2540» as it was typed, «12» and half a «5» once left — the one figure the sheet is for. */
   .control {
     @include display-type;
+    @include figure-fit(var(--text-entry));
 
-    font-size: var(--text-entry);
     line-height: normal;
   }
 

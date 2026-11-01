@@ -424,6 +424,41 @@ for (const size of ['150%', '200%'])
       ).toBe(0)
     })
 
+    // The amount typed stands whole in its field, shrunk to it: at 150 % «12540» showed «2540» while typed and «12»
+    // once left, at 200 % two figures and a half (adversarial З1); and «Откуда» says which account — «Ка…» at 150 %
+    // beside the wallet and the label (adversarial З2).
+    test('what is typed in a sheet of «Деньги» stands whole', async ({ page }) => {
+      test.setTimeout(60_000)
+      await signedIn(page)
+      const { card } = await aMonth(page)
+      await post(page, '/api/money/accounts', {
+        id: randomUUID(),
+        name: 'Наличные',
+        currency: 'AMD',
+        savings: false,
+        start: { amount: '50000', currency: 'AMD' },
+        startOn: day(3),
+      })
+      const typed = async (sheet: Locator): Promise<number> => {
+        const field = sheet.locator('.app-field-entry input')
+        await field.fill('125403')
+        await field.blur()
+        await facesIn(page)
+        return field.evaluate((input) => input.scrollWidth - input.clientWidth)
+      }
+      await page.goto('/money')
+      await page.getByRole('button', { name: 'Добавить трату' }).click()
+      expect(await typed(page.locator('dialog[open]').last()), 'spending').toBeLessThanOrEqual(0)
+      await page.goto(`/money/accounts/${card}`)
+      await page.getByRole('button', { name: 'Перевести', exact: true }).click()
+      const sheet = page.locator('dialog[open]').last()
+      await expect(sheet.locator('.row .value').first()).toHaveText('Карта')
+      await facesIn(page)
+      for (const value of await sheet.locator('.row .value').all())
+        expect(await value.evaluate((name) => name.scrollWidth - name.clientWidth)).toBe(0)
+      expect(await typed(sheet), 'transfer').toBeLessThanOrEqual(0)
+    })
+
     // In English a whole sum of drams is «֏125,403», wider for its count than Russian's «125 403 ֏» — a count at
     // 0.56 of the size let it 6 px past its card (adversarial В2, В3).
     test.describe('in English', () => {
