@@ -353,6 +353,15 @@ describe('unorderedReads', () => {
       'not.toContain of the rows stringified',
       `expect(JSON.stringify([...(await db.select().from(t))])).not.toContain(secret)`,
     ],
+    // round 8, З3: a method of the rows made one string reads them in place
+    [
+      'includes of the rows stringified',
+      `expect(JSON.stringify(await db.select().from(t)).includes('{"text":"a"},{"text":"b"}')).toBe(true)`,
+    ],
+    [
+      'indexOf of the rows stringified',
+      `expect(JSON.stringify(await db.select().from(t)).indexOf('b') > JSON.stringify(x).indexOf('a')).toBe(true)`,
+    ],
   ])('refuses %s', (_, body) => {
     expect(found(body)).toHaveLength(1)
   })
@@ -381,6 +390,20 @@ describe('unorderedReads', () => {
     expect(
       found(
         `const before = await db.select().from(sessions).orderBy(sessions.id)\nconst after = await db.select().from(sessions).orderBy(sessions.id)\nexpect(after).toEqual(before)`,
+      ),
+    ).toEqual([])
+  })
+
+  // round 8, З2: a key of one table read through a join is no key — every table's is needed
+  it('refuses a snapshot through a join by one table’s key, and lets one by every table’s meet itself', () => {
+    expect(
+      found(
+        `const read = () => db.select().from(t).innerJoin(ownerNotices, on).orderBy(ownerNotices.createdAt, t.id)\nconst before = await read()\nexpect(await read()).toEqual(before)`,
+      ),
+    ).not.toEqual([])
+    expect(
+      found(
+        `const read = () => db.select().from(t).innerJoin(sessions, on).orderBy(t.id, sessions.id)\nconst before = await read()\nexpect(await read()).toEqual(before)`,
       ),
     ).toEqual([])
   })
@@ -668,6 +691,9 @@ describe('uniqueKeys', () => {
           primaryKey({ columns: [table.actorId, table.key, table.itemId] }),
           unique('picks_key').on(table.key, table.itemId).nullsNotDistinct(),
           uniqueIndex('picks_live').on(table.itemId).where(sql\`true\`),
+          // round 8, №17: an expression in a key, and NULLs that are distinct, make no key
+          uniqueIndex('picks_identity').on(table.key, identityOf(table.itemId)),
+          unique('picks_open').on(table.key, table.itemId),
         ],
       )
     `
@@ -686,6 +712,12 @@ describe('uniqueKeys', () => {
     expect(keys).toContain('searchPicks.actorId,searchPicks.queryKey,searchPicks.itemId')
     expect(keys).toContain('budgetPlans.actorId,budgetPlans.categoryId,budgetPlans.fromMonth')
     expect(keys).toContain('sessions.id')
+    // round 8: an expression shortened no key, and a NULL of a key is distinct
+    expect(keys).not.toContain('places.kind,places.country')
+    expect(keys).not.toContain('spendings.transferId')
+    expect(keys).not.toContain(
+      'storeMemory.tin,storeMemory.kind,storeMemory.key,storeMemory.actorId',
+    )
   })
 })
 

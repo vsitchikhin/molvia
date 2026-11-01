@@ -16,7 +16,7 @@
 // read of one table: through a join a parent's identity repeats with every child — and a column of chance
 // among them decides the ties of those before it.
 //
-// **The rule is closed** (review of MOL-323, rounds 1–7): a list of the uses that compare by position
+// **The rule is closed** (review of MOL-323, rounds 1–8): a list of the uses that compare by position
 // missed one more each time it was attacked. So it goes the other way round. Rows are followed through
 // `await`, a cast, the methods that keep an order (`map`, `filter`, `flatMap`, `flat`, `slice`),
 // `JSON.stringify`, a spread of them alone, a branch of `?:`, `??` or `||`, an object they are put in, a
@@ -29,25 +29,27 @@
 // handed to a call — nor by one the parse cannot read (built by a call, a method, an import; `Boolean`,
 // `String` and `Number` are read) — `reduce`, `sort`, `toSorted`, a `for … of`, a `Set`, a `Map`,
 // `inArray`, `notInArray`, `Object.fromEntries`, `typeof`, discarded; under `expect`: `toHaveLength`,
-// `toContain` and `toContainEqual` of the rows, never of them made one string, `toBeDefined`,
-// `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, a `not` of any of them and of no other, `toEqual` of one row
-// or none written in place, or of `expect.arrayContaining`. Rows in the order of chance may besides be
-// compared with another read in the same order, if it is total — a unique key of the schema among its
-// columns, else its ties lie as the heap does — by the same columns, a snapshot with a snapshot of the same
-// helper, the read, a name given it, or either through the methods that keep an order — never with anything
-// the test builds. Anything else is refused, and the fix is an order, never a use the check does not know.
+// `toContain` and `toContainEqual` of the rows — of them made one string nothing but its length —
+// `toBeDefined`, `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, a `not` of any of them and of no other,
+// `toEqual` of one row or none written in place, or of `expect.arrayContaining`. Rows in the order of
+// chance may besides be compared with another read in the same order, if it is total — a unique key of
+// every table it reads among its columns, every part of the key a column and none of them NULL unless its
+// NULLs are one, else its ties lie as the heap does — by the same columns, a snapshot with a snapshot of
+// the same helper, the read, a name given it, or either through the methods that keep an order — never with
+// anything the test builds. Anything else is refused, and the fix is an order, never a use the check does
+// not know.
 //
 // What this is: a guard against the ordinary form, not against one built to slip past it. **The price,
 // named, by class:** an order of ties is taken as an order — a column every row read shares
-// (`.orderBy(t.threadId)` under `eq(t.threadId, …)`), a `sort` whose key repeats, an `order by` of SQL text
-// by whatever it names; a moment before an identity is refused even where the test wrote the moments itself
-// — the parse cannot tell who did, and the identity alone is the order; a row picked as the one — the
-// first, `find`, a key of a `Map` or `Object.fromEntries` — is taken as the only one: where more qualify,
-// the first in the heap answers, or for a key the last; what a `for … of` or a `reduce` collects is not
-// followed — a sum is their ordinary use; a callback that calls a method of a name from outside is refused
-// even where the method is pure (`want.includes(r.x)`) — the parse cannot tell; a function handed in as a
-// parameter is not followed; a field of an object of rows is not followed; a helper of another file is not
-// followed. Those go to review.
+// (`.orderBy(t.threadId)` under `eq(t.threadId, …)`), a parent's identity through a join, which its
+// children share, a `sort` whose key repeats, an `order by` of SQL text by whatever it names; a moment
+// before an identity is refused even where the test wrote the moments itself — the parse cannot tell who
+// did, and the identity alone is the order; a row picked as the one — the first, `find`, a key of a `Map`
+// or `Object.fromEntries` — is taken as the only one: where more qualify, the first in the heap answers, or
+// for a key the last; what a `for … of` or a `reduce` collects is not followed — a sum is their ordinary
+// use; a callback that calls a method of a name from outside is refused even where the method is pure
+// (`want.includes(r.x)`) — the parse cannot tell; a function handed in as a parameter is not followed; a
+// field of an object of rows is not followed; a helper of another file is not followed. Those go to review.
 //
 //   node bin/check-ordered-reads.mjs
 
@@ -170,14 +172,16 @@ export function uniqueKeys(source) {
       if (init.expression.getText(sf) !== 'pgTable') continue
       const table = declaration.name.text
       const [, columns, extras] = init.arguments
+      // the columns that hold no NULL: a key with NULL in it is no key — its NULLs are distinct (round 8, З1)
+      const filled = new Set()
       if (columns && ts.isObjectLiteralExpression(columns))
         for (const column of columns.properties) {
           if (!ts.isPropertyAssignment(column)) continue
-          const unique = callsOf(column.initializer).some((call) =>
-            /^(primaryKey|unique)$/.test(calledAs(call) ?? ''),
-          )
-          if (unique || identityColumn(column.initializer))
-            keys.push([`${table}.${column.name.getText(sf)}`])
+          const name = `${table}.${column.name.getText(sf)}`
+          const names = callsOf(column.initializer).map(calledAs)
+          const primary = names.includes('primaryKey') || identityColumn(column.initializer)
+          if (primary || names.includes('notNull')) filled.add(name)
+          if (primary || (names.includes('unique') && filled.has(name))) keys.push([name])
         }
       if (!extras || !(ts.isArrowFunction(extras) || ts.isFunctionExpression(extras))) continue
       const param = extras.parameters[0]?.name.getText(sf)
@@ -185,6 +189,12 @@ export function uniqueKeys(source) {
         ts.isPropertyAccessExpression(node) && node.expression.getText(sf) === param
           ? `${table}.${node.name.text}`
           : undefined
+      // a key whole: every part a column — an expression left out would shorten it (round 8, №17) — and no NULL
+      // in it unless its NULLs are one
+      const add = (parts, nullsAreOne) => {
+        if (parts.length === 0 || parts.some((part) => !part)) return
+        if (nullsAreOne || parts.every((part) => filled.has(part))) keys.push(parts)
+      }
       const visit = (node) => {
         if (ts.isCallExpression(node) && !ts.isPropertyAccessExpression(node.parent)) {
           const calls = callsOf(node)
@@ -201,11 +211,11 @@ export function uniqueKeys(source) {
               ts.isPropertyAssignment(listed) &&
               ts.isArrayLiteralExpression(listed.initializer)
             )
-              keys.push(listed.initializer.elements.map(columnOf).filter(Boolean))
+              add(listed.initializer.elements.map(columnOf), true)
           }
           if ((root === 'unique' || root === 'uniqueIndex') && !names.includes('where')) {
             const on = calls.find((call) => calledAs(call) === 'on')
-            if (on) keys.push(on.arguments.map(columnOf).filter(Boolean))
+            if (on) add(on.arguments.map(columnOf), names.includes('nullsNotDistinct'))
           }
         }
         ts.forEachChild(node, visit)
@@ -359,11 +369,18 @@ export function unorderedReads(
       const joined = names.some((name) => /join/i.test(name ?? ''))
       const unique = joined ? -1 : columns.findIndex((column) => named(column, identity))
       const deciding = unique === -1 ? columns : columns.slice(0, unique + 1)
+      const texts = deciding.map((column) => columnOf(column)?.getText(sf))
+      // the tables a read takes its rows from: a key of one is unique only among its own rows (review round 8, З2)
+      const tables = calls
+        .filter((call) => calledAs(call) === 'from' || /join/i.test(calledAs(call) ?? ''))
+        .map((call) => call.arguments[0]?.getText(sf))
+      const of = (table) => (column) => column.startsWith(`${table}.`)
       // a column of chance decides the ties of those before it: the order is chance
       if (!deciding.some((column) => named(column, chance))) return undefined
-      // total where a unique key of the schema is among its columns: only then is it one order (Ж3)
-      const texts = deciding.map((column) => columnOf(column)?.getText(sf))
-      const total = keys.some((key) => key.every((column) => texts.includes(column)))
+      // total where a unique key of every table read is among its columns: only then is it one order (Ж3, З2)
+      const total = tables.every((table) =>
+        keys.some((key) => key.every(of(table)) && key.every((column) => texts.includes(column))),
+      )
       return `chance:${total ? '!' : ''}${deciding.map((column) => column.getText(sf)).join(', ')}`
     }
     if (method === 'findMany') {
@@ -549,6 +566,9 @@ export function unorderedReads(
       }
       if (ts.isPropertyAccessExpression(p) && p.expression === n) {
         const name = p.name.text
+        // a method of the rows made one string reads them in place, whatever its name (round 8, З3)
+        if (text)
+          return name === 'length' ? { free: true } : { why: `.${name} of the rows as text` }
         if (!ts.isCallExpression(p.parent) || p.parent.expression !== p)
           return name === 'length' ? { free: true } : { why: `.${name}` }
         const doubt =
