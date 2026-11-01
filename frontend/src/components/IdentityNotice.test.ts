@@ -165,30 +165,39 @@ describe('IdentityNotice', () => {
           await nextTick()
           seen.push(view.find('.notice').exists())
         }
-        expect(seen).toEqual([true, true, true, true])
+        // The first read's skeleton holds it back; past the first answer no read moves it.
+        expect(seen).toEqual([false, true, true, true])
         expect(view.find('.notice').text()).toContain(en.identity.error.title)
         view.unmount()
       })
 
-      // Adversarial В1: at a launch the first screen draws its skeleton while `me()` is in the air.
-      // Held back, the card came over the answer, the field standing lower than its well; over the
-      // skeleton it moves only the skeleton, as before MOL-349.
-      it('a failure that comes under it comes at once, and stays over the answer', async () => {
-        useActorStore().state = 'loading'
-        const loading = ref(true)
-        const view = framed(() => (loading.value ? skeleton() : h('ul', { class: 'answer' })))
-        await nextTick()
-        const seen = [view.find('.notice').exists()]
-        useActorStore().state = 'error'
-        await nextTick()
-        await nextTick()
-        seen.push(view.find('.notice').exists())
-        loading.value = false
-        await nextTick()
-        await nextTick()
-        seen.push(view.find('.notice').exists())
-        expect(seen).toEqual([false, true, true])
-        view.unmount()
+      // Self-review №10, adversarial Г1: with the server down `me()` fails first, under the skeleton.
+      // Let in at once, the card came over the skeleton and went with the screen's own error a moment
+      // later. The price is the rarer case, `/actors/me` failing alone: the card comes with the answer.
+      it('a failure that comes under it waits: no card with the screen’s error, one with its answer', async () => {
+        for (const after of ['error', 'answer'] as const) {
+          useActorStore().state = 'loading'
+          const loading = ref(true)
+          const view = framed(() =>
+            loading.value
+              ? skeleton()
+              : after === 'error'
+                ? h(ScreenState, { kind: 'error', inline: true, title: 'Failed' })
+                : h('ul', { class: 'answer' }),
+          )
+          await nextTick()
+          const seen = [view.find('.notice').exists()]
+          useActorStore().state = 'error'
+          await nextTick()
+          await nextTick()
+          seen.push(view.find('.notice').exists())
+          loading.value = false
+          await nextTick()
+          await nextTick()
+          seen.push(view.find('.notice').exists())
+          expect(seen).toEqual(after === 'error' ? [false, false, false] : [false, false, true])
+          view.unmount()
+        }
       })
 
       it('must not fire: a card the screen’s word took away does not come back under one', async () => {

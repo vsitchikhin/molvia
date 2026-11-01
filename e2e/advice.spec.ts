@@ -517,30 +517,34 @@ test('a failed sign-in’s card stands through a search, and the field does not 
   expect(await topOf(page, '.search-field .well')).toBe(field)
 })
 
-// MOL-349, adversarial В1: at a launch `me()` fails while the first screen still draws its skeleton.
-// The card comes over the skeleton at once — held back, it came over the answer, and the field stood
-// lower than its well by the card's height.
-test('a failed sign-in at a launch: the card comes over the skeleton, the field stands where its well stood', async ({
+// MOL-349, self-review №10, adversarial Г1: at a launch with the server down `me()` fails first, under
+// the first screen's skeleton. Let in at once, the card came over the skeleton and went with the
+// screen's own error a moment later; a skeleton holds it back — not one frame of it.
+test('a launch with the server down: the sign-in’s card never shows, the screen says it', async ({
   page,
 }) => {
-  await page.emulateMedia({ reducedMotion: 'reduce' })
-  const who = await person(page)
-  await ratedPurchase(who, `Тан ${tag}`, 5)
-  await page.route('**/api/actors/me', (route) => route.fulfill({ status: 500, body: '{}' }))
-  let release: () => void = () => undefined
-  const held = new Promise<void>((resolve) => {
-    release = resolve
+  await person(page)
+  await page.addInitScript(() => {
+    const seen = { notice: false }
+    Object.assign(window, { molviaNoticeSeen: seen })
+    new MutationObserver(() => {
+      if (document.querySelector('.notice')) seen.notice = true
+    }).observe(document, { childList: true, subtree: true })
   })
+  await page.route('**/api/actors/me', (route) => route.fulfill({ status: 500, body: '{}' }))
   await page.route('**/api/advice', async (route) => {
-    await held
-    await route.continue()
+    // The screen's read answers after `me()`, as with a server down the two come in turn.
+    await new Promise((resolve) => setTimeout(resolve, 700))
+    await route.fulfill({ status: 500, body: '{}' })
   })
   await page.goto('/')
-  await expect(page.getByRole('heading', { name: 'Could not check the sign-in' })).toBeVisible()
-  const well = await topOf(page, '.skeleton-field')
-  release()
-  await expect(page.locator('section.take')).toBeVisible()
-  expect(await topOf(page, '.search-field .well')).toBe(well)
+  await expect(page.getByRole('heading', { name: 'The server did not answer' })).toBeVisible()
+  expect(
+    await page.evaluate(
+      () =>
+        (window as unknown as { molviaNoticeSeen: { notice: boolean } }).molviaNoticeSeen.notice,
+    ),
+  ).toBe(false)
 })
 
 /** Cold offline: the first answer lost with the connection, the cloud on the screen. */

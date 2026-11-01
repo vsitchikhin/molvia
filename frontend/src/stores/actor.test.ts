@@ -283,6 +283,30 @@ describe('an identity that could not be checked', () => {
     expect(seen).not.toContain('loading')
   })
 
+  // Adversarial Г2: the card's «Повторить» pressed while the identity asks again by itself sent
+  // nothing, came back at once and said «не удалось» again before any answer — and nothing when the
+  // real one failed. A second ask waits for the one in the air.
+  it('a second ask waits for the question in the air, and asks nothing more', async () => {
+    const { store } = await freshStore()
+    me.mockRejectedValueOnce(new Error('fetch failed'))
+    await store.start()
+    let fail: (error: Error) => void = () => undefined
+    me.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)))
+    const first = store.start({ quietly: true })
+    let tapDone = false
+    const tap = store.retry({ quietly: true }).then(() => {
+      tapDone = true
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(tapDone).toBe(false)
+    expect(me).toHaveBeenCalledTimes(2)
+    fail(new Error('fetch failed'))
+    await Promise.all([first, tap])
+    expect(tapDone).toBe(true)
+    expect(me).toHaveBeenCalledTimes(2)
+    expect(store.state).toBe('error')
+  })
+
   it('must not fire: «Повторить» by hand still shows the question', async () => {
     const { store } = await freshStore()
     me.mockRejectedValueOnce(new Error('fetch failed'))

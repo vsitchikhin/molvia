@@ -70,34 +70,20 @@ export default defineComponent({
     // Its own state is no word of the screen's, or it would silence itself.
     withoutAnswerWord()
 
-    // **Under a skeleton the notice neither comes nor goes** (self-review №4, adversarial Б1): what
-    // follows it, the screen's «нет связи» or its answer, decides. A failed sign-in known as the screen
-    // comes stands from its first frame, as before MOL-349 — after a skeleton comes an answer as a
-    // rule — and «без связи» is held back, since the screen's own comes after it. Settled once the
-    // screen under it has mounted (`flush: 'post'`): before that nobody has said or held anything.
-    const notice = ref<Notice | null>(
-      word ? (actor.state === 'error' ? 'error' : null) : noticeFor(actor.state),
-    )
-    // **A failure that comes under a skeleton comes at once** (adversarial В1): at a launch the first
-    // screen draws its skeleton while `me()` is in the air, and held back the card came over the answer,
-    // the field of «Что брать» standing lower than its well. Over the skeleton it moves only the skeleton,
-    // as before MOL-349. A card a word of the screen took away does not come back under one.
-    let arrived = false
-    watch(
-      () => actor.state,
-      (now) => {
-        // A watch hears a change only: `error` here is one that came.
-        arrived = now === 'error'
-      },
-      { flush: 'sync' },
-    )
+    // **Under a skeleton the notice neither comes nor goes** (self-review №4, №10, adversarial Б1, Г1):
+    // what follows it, the screen's word or its answer, decides. Counted as a word, the skeleton took a
+    // failed sign-in's card away at every read and the answer brought it back; letting a failure come
+    // under it, the card came over the skeleton with the server down and went with the screen's own
+    // error a moment later — at every launch and every screen opened while the server was down. Settled
+    // once the screen under it has mounted (`flush: 'post'`): before that nobody has said or held
+    // anything. **The price, named:** with `/actors/me` failing alone — rarer than a server down — the
+    // card comes with a screen's first answer, which stands one card lower than its skeleton.
+    const notice = ref<Notice | null>(word ? null : noticeFor(actor.state))
     function settle(): void {
       const wanted = noticeFor(actor.state)
       if (!wanted || word?.said.value) notice.value = null
-      else if (word?.held.value)
-        notice.value = notice.value || (arrived && wanted === 'error') ? wanted : null
+      else if (word?.held.value) notice.value = notice.value ? wanted : null
       else notice.value = wanted
-      arrived = false
     }
     onMounted(settle)
     watch(() => [actor.state, word?.said.value, word?.held.value], settle, { flush: 'post' })

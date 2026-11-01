@@ -114,8 +114,8 @@ export const useActorStore = defineStore('actor', () => {
         }
     }
   })
-  /** True while `start` is in flight, so a retry button cannot queue a second one. */
-  let running = false
+  /** The question `start` has in the air, so a retry button cannot queue a second one — it waits for it. */
+  let running: Promise<void> | null = null
   /**
    * How many questions about the identity are in flight. A refusal earned by one of them is the
    * answer being waited for, not news — `sessionEnded` steps aside while it is non-zero, or a
@@ -295,9 +295,17 @@ export const useActorStore = defineStore('actor', () => {
    * `online`, the app looked at again, a queue's own retry — which leave a failure or «offline» on the
    * screen until the answer, as the consent's questions do (Д1 of MOL-95).
    */
-  async function start({ quietly = false }: { quietly?: boolean } = {}): Promise<void> {
-    if (running) return
-    running = true
+  function start(options: { quietly?: boolean } = {}): Promise<void> {
+    // **A second ask waits for the one in the air** (MOL-349, adversarial Г2): returned at once, the
+    // card's «Повторить» pressed while the identity asked again by itself said «не удалось» again
+    // before any answer, and nothing when the real one failed.
+    running ??= ask(options).finally(() => {
+      running = null
+    })
+    return running
+  }
+
+  async function ask({ quietly = false }: { quietly?: boolean }): Promise<void> {
     if (!(quietly && (state.value === 'error' || state.value === 'offline')))
       state.value = 'loading'
     // «Выйти» in another window that this tab slept through (round 2, Д2): its own shelf still
@@ -307,31 +315,27 @@ export const useActorStore = defineStore('actor', () => {
       actor.value = null
       id.value = null
     }
-    try {
-      if (!navigator.onLine) {
-        // The identifier already on the device is usable without a network — a PWA precached
-        // for the shelf shows its cached screens as this person — but nothing has been
-        // checked, and saying «ready» would promise an entity nothing has fetched. The state
-        // stays «offline», which is both true and the one the offline text belongs to.
-        //
-        // **With no owner on the device there is nothing to show** (MOL-56, Q5): no drawers, no
-        // cached answers, and a person who has never signed in on this phone cannot start. That
-        // is the login screen's offline state and not a notice over an empty app.
-        const known = currentIdentity()
-        // An owner who pressed «Выйти» and was not confirmed yet is not somebody to open the
-        // app as (adversarial Б2): the drawer waits for the server's word to be erased.
-        if (!isIdentifier(known) || leavingOwner() === known) {
-          state.value = 'signed-out'
-          return
-        }
-        id.value = known
-        state.value = 'offline'
+    if (!navigator.onLine) {
+      // The identifier already on the device is usable without a network — a PWA precached
+      // for the shelf shows its cached screens as this person — but nothing has been
+      // checked, and saying «ready» would promise an entity nothing has fetched. The state
+      // stays «offline», which is both true and the one the offline text belongs to.
+      //
+      // **With no owner on the device there is nothing to show** (MOL-56, Q5): no drawers, no
+      // cached answers, and a person who has never signed in on this phone cannot start. That
+      // is the login screen's offline state and not a notice over an empty app.
+      const known = currentIdentity()
+      // An owner who pressed «Выйти» and was not confirmed yet is not somebody to open the
+      // app as (adversarial Б2): the drawer waits for the server's word to be erased.
+      if (!isIdentifier(known) || leavingOwner() === known) {
+        state.value = 'signed-out'
         return
       }
-      await load()
-    } finally {
-      running = false
+      id.value = known
+      state.value = 'offline'
+      return
     }
+    await load()
   }
 
   // A connection that came back is the commonest recovery there is, and until now it took a
