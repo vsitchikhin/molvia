@@ -408,7 +408,11 @@ the round trip through Telegram, and ask whose account this turned out to be.
   №1): the timer, `online`, the app looked at again and a queue's own retry leave `error` or `offline`
   on the screen until the answer, or the login screen showing the failure would blink to its skeleton
   at every try (adversarial Д1 of MOL-95). Only the login's «Повторить» by hand shows the question; the
-  card's asks quietly and says «Повторяем…» (self-review №5).
+  card's asks quietly and says «Повторяем…» (self-review №5). **The price, named** (self-review №9): a
+  section's own error — a search failed under the field — is a word of the screen as a full one is, and
+  takes the card away over an answered screen while it stands; counted as no word, the four screens
+  whose error is a section's («Деньги», «Траты», «Покупки», «Что брать») would stand two «Повторить»
+  with the server down, which kit-settings-7 was about. It takes two failures at once.
 - **The development seam is a button, and only in a development build.** It signed the app in by
   itself until now, which made the screen this epic exists for invisible in every working copy
   and unreachable to the end-to-end suite; `signedIn()` in `e2e/session.ts` now presses it, in

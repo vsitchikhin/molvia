@@ -517,6 +517,32 @@ test('a failed sign-in’s card stands through a search, and the field does not 
   expect(await topOf(page, '.search-field .well')).toBe(field)
 })
 
+// MOL-349, adversarial В1: at a launch `me()` fails while the first screen still draws its skeleton.
+// The card comes over the skeleton at once — held back, it came over the answer, and the field stood
+// lower than its well by the card's height.
+test('a failed sign-in at a launch: the card comes over the skeleton, the field stands where its well stood', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' })
+  const who = await person(page)
+  await ratedPurchase(who, `Тан ${tag}`, 5)
+  await page.route('**/api/actors/me', (route) => route.fulfill({ status: 500, body: '{}' }))
+  let release: () => void = () => undefined
+  const held = new Promise<void>((resolve) => {
+    release = resolve
+  })
+  await page.route('**/api/advice', async (route) => {
+    await held
+    await route.continue()
+  })
+  await page.goto('/')
+  await expect(page.getByRole('heading', { name: 'Could not check the sign-in' })).toBeVisible()
+  const well = await topOf(page, '.skeleton-field')
+  release()
+  await expect(page.locator('section.take')).toBeVisible()
+  expect(await topOf(page, '.search-field .well')).toBe(well)
+})
+
 /** Cold offline: the first answer lost with the connection, the cloud on the screen. */
 async function coldOffline(page: Page, context: BrowserContext): Promise<void> {
   let release: () => void = () => undefined

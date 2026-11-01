@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import { SESSION_COOKIE } from '@molvia/model'
 import type { Page } from '@playwright/test'
 import { open } from './session'
+import { recordLiveRegion } from './live-region'
 
 /**
  * How a request proves who it is, through a real browser (MOL-53). None of this can be shown
@@ -95,11 +96,23 @@ test('an identity the server did not check is said over an answered screen, and 
 }) => {
   // Плашка — про телефон, который уже знает своего владельца: на пустом устройстве это дверь.
   await open(page)
+  const said = await recordLiveRegion(page)
   await page.route('**/api/actors/me', (route) => route.fulfill({ status: 500, body: '{}' }))
   await page.reload()
-  const notice = page.getByRole('heading', { name: 'Could not check the sign-in' })
+  const title = 'Could not check the sign-in'
+  const notice = page.getByRole('heading', { name: title })
   await expect(notice).toBeVisible()
-  await expect(page.locator('.notice').getByRole('button', { name: 'Try again' })).toBeVisible()
+  await expect
+    .poll(async () => (await said()).filter((text) => text.includes(title)))
+    .toHaveLength(1)
+
+  // «Try again» failing the same way is still an answer, said again (MOL-19, C1), though asked quietly
+  // the card stands all the while (MOL-349, adversarial В2).
+  await page.locator('.notice').getByRole('button', { name: 'Try again' }).click()
+  await expect
+    .poll(async () => (await said()).filter((text) => text.includes(title)))
+    .toHaveLength(2)
+  await expect(notice).toBeVisible()
 
   // Asked again by time — the identity's own 5 s and on, the queues' 15 s — never by a tap.
   await page.unroute('**/api/actors/me')

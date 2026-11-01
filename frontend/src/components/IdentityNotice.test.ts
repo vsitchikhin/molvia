@@ -1,7 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
-import { defineComponent, h, nextTick, ref } from 'vue'
+import { defineComponent, h, nextTick, ref, watch } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import IconWallet from '~icons/mdi/wallet-outline'
 import en from '@/i18n/en.json'
@@ -12,6 +12,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { provideAnswerWord } from '@/composables/useAnswerWord'
 import { useActorStore } from '@/stores/actor'
 import type { IdentityState } from '@/stores/actor'
@@ -87,6 +88,41 @@ describe('IdentityNotice', () => {
     expect(render('offline').view.find('button').exists()).toBe(false)
   })
 
+  // Adversarial В2, C1 of MOL-19: asked again quietly, the card stands, and a tap that failed the same
+  // way would change none of its words — the answer to the tap is said again all the same.
+  it('says the same failure again after its «Повторить», standing all the while', async () => {
+    const actor = useActorStore()
+    actor.state = 'error'
+    vi.spyOn(actor, 'retry').mockResolvedValue(undefined)
+    const said: string[] = []
+    const Frame = defineComponent({
+      setup() {
+        const announcements = provideAnnouncer()
+        watch(announcements, (now, before) => {
+          for (const added of now.filter((a) => !before.some((b) => b.id === a.id)))
+            said.push(added.text)
+        })
+        provideAnswerWord()
+        return () => h('div', [h(IdentityNotice), h('ul', { class: 'answer' })])
+      },
+    })
+    const view = mount(Frame, {
+      global: { plugins: [pinia, createAppI18n('en')] },
+      attachTo: document.body,
+    })
+    const heard = () => said.filter((text) => text.includes(en.identity.error.title)).length
+    await vi.waitFor(() => {
+      expect(heard()).toBe(1)
+    })
+    await view.get('.notice button').trigger('click')
+    await flushPromises()
+    await vi.waitFor(() => {
+      expect(heard()).toBe(2)
+    })
+    expect(view.find('.notice').exists()).toBe(true)
+    view.unmount()
+  })
+
   // MOL-349, owner's В-1 «б» (С-2): over the screen's own «нет связи» the notice made two clouds, and
   // on «Что брать» stood over the field that chooses the answer.
   describe('says nothing where the screen says itself what became of its answer', () => {
@@ -131,6 +167,46 @@ describe('IdentityNotice', () => {
         }
         expect(seen).toEqual([true, true, true, true])
         expect(view.find('.notice').text()).toContain(en.identity.error.title)
+        view.unmount()
+      })
+
+      // Adversarial В1: at a launch the first screen draws its skeleton while `me()` is in the air.
+      // Held back, the card came over the answer, the field standing lower than its well; over the
+      // skeleton it moves only the skeleton, as before MOL-349.
+      it('a failure that comes under it comes at once, and stays over the answer', async () => {
+        useActorStore().state = 'loading'
+        const loading = ref(true)
+        const view = framed(() => (loading.value ? skeleton() : h('ul', { class: 'answer' })))
+        await nextTick()
+        const seen = [view.find('.notice').exists()]
+        useActorStore().state = 'error'
+        await nextTick()
+        await nextTick()
+        seen.push(view.find('.notice').exists())
+        loading.value = false
+        await nextTick()
+        await nextTick()
+        seen.push(view.find('.notice').exists())
+        expect(seen).toEqual([false, true, true])
+        view.unmount()
+      })
+
+      it('must not fire: a card the screen’s word took away does not come back under one', async () => {
+        useActorStore().state = 'error'
+        const loading = ref(false)
+        const view = framed(() =>
+          loading.value
+            ? skeleton()
+            : h(ScreenState, { kind: 'error', inline: true, title: 'Failed' }),
+        )
+        const seen: boolean[] = []
+        for (const now of [false, true, false]) {
+          loading.value = now
+          await nextTick()
+          await nextTick()
+          seen.push(view.find('.notice').exists())
+        }
+        expect(seen).toEqual([false, false, false])
         view.unmount()
       })
 

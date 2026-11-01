@@ -8,6 +8,7 @@
       :title="t('identity.error.title')"
       :body="t('identity.error.body')"
       :retrying="retrying"
+      :attempt="failed"
       @retry="retry"
     />
     <AppCard v-else>
@@ -77,18 +78,36 @@ export default defineComponent({
     const notice = ref<Notice | null>(
       word ? (actor.state === 'error' ? 'error' : null) : noticeFor(actor.state),
     )
+    // **A failure that comes under a skeleton comes at once** (adversarial В1): at a launch the first
+    // screen draws its skeleton while `me()` is in the air, and held back the card came over the answer,
+    // the field of «Что брать» standing lower than its well. Over the skeleton it moves only the skeleton,
+    // as before MOL-349. A card a word of the screen took away does not come back under one.
+    let arrived = false
+    watch(
+      () => actor.state,
+      (now) => {
+        // A watch hears a change only: `error` here is one that came.
+        arrived = now === 'error'
+      },
+      { flush: 'sync' },
+    )
     function settle(): void {
       const wanted = noticeFor(actor.state)
       if (!wanted || word?.said.value) notice.value = null
-      else if (word?.held.value) notice.value = notice.value ? wanted : null
+      else if (word?.held.value)
+        notice.value = notice.value || (arrived && wanted === 'error') ? wanted : null
       else notice.value = wanted
+      arrived = false
     }
     onMounted(settle)
     watch(() => [actor.state, word?.said.value, word?.held.value], settle, { flush: 'post' })
 
     // Asked quietly, the card standing with «Повторяем…» on its button (self-review №5): put to
     // `loading`, it went from under the thumb and the screen under it moved up and back.
+    // A tap that failed the same way is an answer, said again (C1 of MOL-19, adversarial В2): the card
+    // stands through the quiet question, so its words would not change.
     const retrying = ref(false)
+    const failed = ref(0)
     async function retry(): Promise<void> {
       retrying.value = true
       try {
@@ -96,9 +115,10 @@ export default defineComponent({
       } finally {
         retrying.value = false
       }
+      if (actor.state === 'error') failed.value += 1
     }
 
-    return { t, notice, retrying, retry }
+    return { t, notice, retrying, failed, retry }
   },
 })
 </script>

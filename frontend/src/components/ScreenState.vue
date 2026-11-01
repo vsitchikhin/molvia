@@ -210,6 +210,11 @@ export default defineComponent({
     silent: { type: Boolean, default: false },
     /** «Повторить» at work, the block standing meanwhile: «Повторяем…» in its place (MOL-225, MOL-349). */
     retrying: { type: Boolean, default: false },
+    /**
+     * Which failed answer the block stands for, where a retry leaves it standing: a new one says the same
+     * words again (C1, as `StatusStrip`'s) — the sign-in's card, asked again quietly (MOL-349, adversarial В2).
+     */
+    attempt: { type: Number, default: 0 },
   },
   emits: ['retry'],
   setup(props) {
@@ -370,7 +375,7 @@ export default defineComponent({
       withdraw = announce([props.title, props.body].filter(Boolean).join('. '), { held: true })
     }
     onMounted(speak)
-    watch(() => [props.title, props.body, props.silent], speak)
+    watch(() => [props.title, props.body, props.silent, props.attempt], speak)
 
     onBeforeUnmount(() => {
       withdraw?.()
