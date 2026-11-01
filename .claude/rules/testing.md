@@ -285,8 +285,12 @@ failure` give the same first row, `find` and `[...new Set()]` either way (round 
   `delete` returning rows is a read with no order (round 13). **For one read with no order it holds too**
   (round 14, О1): the net cannot tell values the same reversed, so the first row, `find`, `reduce`, `sort`, a
   part by `slice`, a value by its key and a loop that collects or leaves at a row are refused, and the rows go
-  through `onlyRow`, `sorted` or `sum`; a function of an import called in a callback or a loop is one of no known
-  answer — vitest's `expect` alone is known to keep nothing. It reads the helpers beside the tests too. It works by parsing as the clock check does,
+  through `onlyRow`, `sorted` or `sum`. **What a callback or a loop's body may change outside it is closed**
+  (round 15, П1: a query of postgres.js by its tag in a loop wrote the rows in the order they came, and was no
+  call): outside is a name declared outside, an import but vitest's `expect`, `this` and an alias of one; it is
+  changed by any write — an assignment taken apart, `++`, `delete`, a loop's target — by a call of it or of its
+  method, by being handed to a call or to `new`, by a template of any tag but Drizzle's `sql`, and by a function
+  of the platform not known pure (`fetch`). It reads the helpers beside the tests too. It works by parsing as the clock check does,
   names by TypeScript's binder, chance, identities and unique keys read from `schema.ts`. **It is closed at
   each of the three places it recognises something** (review of MOL-323, eleven rounds: a list of forms missed
   one more every round, so each place says what it knows and holds the rest in doubt, and **in doubt there is
