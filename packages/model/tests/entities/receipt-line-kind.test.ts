@@ -823,7 +823,7 @@ describe('an item standing on a line (MOL-293, В-1 «а», В-2 «а»)', () =>
 })
 
 describe('a line the model copied a letter short (MOL-331)', () => {
-  const LEXICON = { fats: new Set(['сыр']), brands: { միլկա: 'Milka' } }
+  const LEXICON = { fats: new Set(['сыр']), brands: { միլկա: 'Milka', 'կոկա կոլա': 'Coca-Cola' } }
   const copied = (printed: string, item: string) =>
     lineFitter(receiptLineParts(printed), WORDS, LEXICON)(item, { copied: true })
 
@@ -869,6 +869,8 @@ describe('a line the model copied a letter short (MOL-331)', () => {
     expect(copied('Պանիր «Միլա»', 'Сыр Milka')).toBe(true)
     expect(copied('Պանիր «Մին»', 'Сыр MINI')).toBe(false)
     expect(copied('Պանիր «Լեմն»', 'Сыр Lemon')).toBe(false)
+    // a word of a brand of the lexicon standing alone is no brand: «Cola» of «Coca-Cola» (round 4)
+    expect(copied('Պանիր «Կոլ»', 'Сыр Cola')).toBe(false)
     expect(copied('Պանիր «Պան» ելակ', 'Сыр «Пано» ежевика')).toBe(false)
   })
 

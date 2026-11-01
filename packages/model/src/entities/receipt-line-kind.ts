@@ -1154,13 +1154,16 @@ function sameLetters(a: string, b: string): boolean {
 const LITRES_MAX = 2
 
 /**
- * The words of an item's own brand: in «…», or a brand the lexicon spells in Latin, as a shelf's name writes one
+ * The words of an item's own brand: in «…», or a brand the lexicon spells in Latin, whole, as a shelf's name writes one
  * (MOL-261) — «Сыр «Пано»», «Печенье Milka»; never a flavour or a kind, «Чай киви», nor any other Latin word — a size
- * of `STANDARDS`, «Шоколад MINI», a flavour, «Чай Lemon» (round 3, Р3-А1).
+ * of `STANDARDS`, «Шоколад MINI», a flavour, «Чай Lemon» (round 3, Р3-А1) — nor a word of a brand standing alone: «Cola»
+ * of «Coca-Cola» (round 4).
  */
-function brandWordsOf(itemName: string, shelved: ReadonlySet<string>): Set<string> {
+function brandWordsOf(itemName: string, shelved: readonly (readonly string[])[]): Set<string> {
   const quoted = [...itemName.matchAll(/«([^»]*)»/gu)].flatMap((found) => wordsOf(found[1] ?? ''))
-  return new Set([...quoted, ...wordsOf(itemName).filter((word) => shelved.has(word))])
+  const words = wordsOf(itemName)
+  const whole = shelved.filter((brand) => brand.every((word) => words.includes(word)))
+  return new Set([...quoted, ...whole.flat()])
 }
 
 /** A word's letters, «ու» one: a letter of the key is not a letter of the word — «ш» is `sh` (adversarial А2). */
@@ -1389,12 +1392,10 @@ export function lineFitter(
   // a word of the brand with no word of the item by its letters stands on the one word a letter longer that the line
   // says nothing else of, a word of the item's own brand, and on that word alone (adversarial А1): «Դինա» names «Дина»
   // and never the «дыня» beside it, «Սուրճ «Կոֆ»» no «Кофе», «Թեյ «Կիվ»» no «Чай киви» (round 2, Р2-А1)
-  // the brands the lexicon spells in Latin, as an item's name may print them bare
-  const shelved = new Set(
-    Object.values(lexicon.brands ?? {})
-      .flatMap(wordsOf)
-      .filter((word) => /[a-z]/u.test(word)),
-  )
+  // the brands the lexicon spells in Latin, each its words, as an item's name may print them bare
+  const shelved = Object.values(lexicon.brands ?? {})
+    .map((spelt) => wordsOf(spelt).filter((word) => /[a-z]/u.test(word)))
+    .filter((words) => words.length > 0)
   const lostLetters = (item: readonly string[], own: ReadonlySet<string>): Set<string> =>
     new Set(
       brand.flatMap((one) => {
