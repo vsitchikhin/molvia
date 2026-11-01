@@ -1238,6 +1238,87 @@ describe('unorderedReads', () => {
     ).toEqual([])
   })
 
+  // review round 16, Р1: `console` is an output, and a spy or a stub on the platform hears every call in its order
+  const watching = (spy: string, body: string): string[] =>
+    unorderedReads(
+      FILE,
+      `import { expect, vi } from 'vitest'\n${spy}\n${inTest(body)}`,
+      CHANCE,
+      IDENTITY,
+      KEYS,
+    )
+
+  it.each([
+    ['console in a loop', '', 'for (const row of await db.select().from(t)) console.log(row.kind)'],
+    [
+      'console in a callback',
+      '',
+      'expect((await db.select().from(t)).every((r) => console.log(r))).toBe(true)',
+    ],
+    [
+      'a method of its own Map under a spy on the prototype',
+      "const spy = vi.spyOn(Map.prototype, 'set')",
+      'for (const row of await db.select().from(t)) new Map().set(row.k, row)',
+    ],
+    [
+      'a method of a literal under a spy on the prototype',
+      "const spy = vi.spyOn(Array.prototype, 'push')",
+      'for (const row of await db.select().from(t)) [row.kind].push(row.n)',
+    ],
+    [
+      'JSON under a spy on it',
+      "const spy = vi.spyOn(JSON, 'stringify')",
+      'for (const row of await db.select().from(t)) expect(JSON.stringify(row)).toBeDefined()',
+    ],
+    [
+      'Math under a stub of a global',
+      "vi.stubGlobal('fetch', vi.fn())",
+      'for (const row of await db.select().from(t)) expect(Math.max(row.n, 1)).toBeGreaterThan(0)',
+    ],
+    [
+      'a method of a row under a spy on a prototype',
+      "const spy = vi.spyOn(String.prototype, 'toUpperCase')",
+      'for (const row of await db.select().from(t)) expect(row.kind.toUpperCase()).toBeDefined()',
+    ],
+    [
+      'a function of the platform written over',
+      'Math.max = (...n) => n[0]',
+      'for (const row of await db.select().from(t)) expect(Math.max(row.n)).toBe(1)',
+    ],
+    [
+      'a property of the platform defined',
+      "Object.defineProperty(JSON, 'stringify', { value: () => '' })",
+      'for (const row of await db.select().from(t)) expect(JSON.stringify(row)).toBe("")',
+    ],
+    [
+      'a cast under a spy',
+      "const spy = vi.spyOn(globalThis, 'String')",
+      'expect((await db.select().from(t)).map(String)).toHaveLength(2)',
+    ],
+  ])('refuses %s (round 16)', (_, spy, body) => {
+    expect(watching(spy, body)).not.toEqual([])
+  })
+
+  it.each([
+    [
+      'the platform’s pure methods, nothing watched',
+      '',
+      'for (const row of await db.select().from(t)) expect(Math.max(row.n, JSON.stringify(row).length)).toBeGreaterThan(0)',
+    ],
+    [
+      'assertions alone under a spy on the platform',
+      "const spy = vi.spyOn(Map.prototype, 'set')",
+      'for (const row of await db.select().from(t)) expect(row.n).not.toBe(0)',
+    ],
+    [
+      'a spy on a name of the file',
+      "const store = { put() {} }\nconst spy = vi.spyOn(store, 'put')",
+      'for (const row of await db.select().from(t)) expect(Math.max(row.n, 1)).toBeGreaterThan(0)',
+    ],
+  ])('leaves alone %s (round 16)', (_, spy, body) => {
+    expect(watching(spy, body)).toEqual([])
+  })
+
   it('refuses onlyRow and sorted of the file itself, and one of the module under another use', () => {
     const local = (body: string): string[] =>
       unorderedReads(

@@ -60,8 +60,9 @@
 // may change anything outside it — closed, in doubt it does (round 15, П1): outside is a name declared outside,
 // an import but vitest's `expect`, `this`, and an alias of one; written by an assignment, its targets taken apart,
 // `++`, `delete`, a loop's target; called, its method called, handed to a call or to `new`; a query by a template
-// of any tag but Drizzle's `sql`; the platform's functions but its pure ones (`fetch`, `process.stdout.write`) — or
-// is one the parse cannot read; the platform's `Boolean`, `String`, `Number` are read. Of the rows made one string
+// of any tag but Drizzle's `sql`; the platform's functions but its pure ones (`fetch`, `process.stdout.write`,
+// `console`), and every one of them in a file that spies on or stubs the platform (round 16, Р1) — or is one the
+// parse cannot read; the platform's `Boolean`, `String`, `Number` are read. Of the rows made one string
 // nothing is free but its length. Rows in the order of chance may besides meet another read in the same total
 // order — a snapshot with a snapshot. Anything else is refused, and the fix is an order, or the rows through
 // `onlyRow`, `sorted`, `sum` — never a use the check does not know. **Every answer of «free» or «not a read»
@@ -125,7 +126,10 @@ const ORDERLESS = new Set(['some', 'every', 'includes'])
  * What the platform holds that changes nothing outside a callback (review round 15): the functions, and the roots
  * whose methods only read or make — `Object`'s too, but `assign` and `defineProperty` write their first argument,
  * which is judged as any argument is. Anything else of the platform called — `fetch`, `process.stdout.write`,
- * `setTimeout` — is in doubt.
+ * `setTimeout`, `console`, an output — is in doubt (round 16, Р1). **Pure only where the file watches none of the
+ * platform**: a spy or a stub on it — `vi.spyOn(console, 'log')`, `vi.spyOn(Map.prototype, 'set')`, `vi.stubGlobal`,
+ * a function of it written over — records every call in its order, so in such a file every call of the platform and
+ * every method of a value is in doubt, vitest's `expect` and its matchers alone known.
  */
 const PURE_FUNCTIONS = new Set([
   'String',
@@ -163,7 +167,6 @@ const PURE_GLOBALS = new Set([
   'Date',
   'Intl',
   'Buffer',
-  'console',
 ])
 /** The platform's casts: a callback of the first argument alone. */
 const CASTS = new Set(['Boolean', 'String', 'Number'])
@@ -763,13 +766,68 @@ export function unorderedReads(
     const [argument] = call.arguments
     if (!argument || NO_CALLBACK.has(method)) return undefined
     // the platform's casts take their first argument and nothing else (review round 5, №14)
-    if (ts.isIdentifier(argument) && CASTS.has(argument.text)) return undefined
+    if (ts.isIdentifier(argument) && CASTS.has(argument.text) && !watched) return undefined
     const callback = functionOf(argument)
     if (!callback) return 'by a callback the check cannot read'
     if (callback.parameters.length > 1) return 'by index'
     // an index without a parameter for it: the rest of the arguments, or a count kept outside (Д3)
     if (callback.parameters.some((parameter) => parameter.dotDotDotToken)) return 'by index'
     return countsOutside(callback) ? 'by what it changes outside' : undefined
+  }
+
+  /** Whether a name is the platform's: none of the file, none imported (`console`, `Map`, `globalThis`). */
+  const platform = (node) => {
+    let n = node
+    while (
+      ts.isPropertyAccessExpression(n) ||
+      ts.isElementAccessExpression(n) ||
+      ts.isParenthesizedExpression(n)
+    )
+      n = n.expression
+    return ts.isIdentifier(n) && !(symbolOf(n)?.declarations ?? []).length
+  }
+  /**
+   * Whether the file watches the platform (review round 16, Р1): a spy on it, a stub of it, a function of it written
+   * over, a property of it defined — then a call of the platform is no longer known to keep nothing.
+   */
+  const watched = (() => {
+    let found = false
+    const visit = (node) => {
+      if (ts.isCallExpression(node)) {
+        const callee = node.expression.getText(sf)
+        const [first] = node.arguments
+        if (/(^|\.)stubGlobal$/.test(callee)) found = true
+        if (
+          /(^|\.)spyOn$|^Object\.defineProperty$|^Reflect\.(set|defineProperty)$/.test(callee) &&
+          first &&
+          platform(first)
+        )
+          found = true
+      }
+      if (
+        ts.isBinaryExpression(node) &&
+        node.operatorToken.kind >= ts.SyntaxKind.FirstAssignment &&
+        node.operatorToken.kind <= ts.SyntaxKind.LastAssignment &&
+        !ts.isIdentifier(node.left) &&
+        platform(node.left)
+      )
+        found = true
+      if (!found) ts.forEachChild(node, visit)
+    }
+    visit(sf)
+    return found
+  })()
+  /** Whether a call's callee is vitest's `expect`, or a matcher of its chain: what keeps nothing, watched or not. */
+  const expectChain = (node) => {
+    let n = node
+    for (;;) {
+      if (ts.isPropertyAccessExpression(n) || ts.isElementAccessExpression(n)) n = n.expression
+      else if (ts.isCallExpression(n)) n = n.expression
+      else break
+    }
+    if (!ts.isIdentifier(n) || n.text !== 'expect') return false
+    const [first] = symbolOf(n)?.declarations ?? []
+    return Boolean(first && ts.isImportSpecifier(first) && importedFrom(first) === 'vitest')
   }
 
   /**
@@ -886,22 +944,26 @@ export function unorderedReads(
     }
     /** Whether calling or making what a callee names may change what is outside. */
     const callsOut = (callee) => {
+      // vitest's `expect` and its matchers keep nothing, the platform watched or not
+      if (expectChain(callee)) return false
       if (ts.isPropertyAccessExpression(callee) || ts.isElementAccessExpression(callee)) {
         const root = rootOf(callee)
         if (root.kind === ts.SyntaxKind.ThisKeyword) return true
-        // a method of a value the body made — a call's answer, a literal — is the body's
-        if (!ts.isIdentifier(root)) return false
+        // a method of a value the body made — a call's answer, a literal, a name of its own — is the body's, unless
+        // the file watches the platform: a spy on a prototype hears it too (`vi.spyOn(Map.prototype, 'set')`)
+        if (!ts.isIdentifier(root)) return watched
         const of = whose(root)
         if (of === undefined)
           return (
+            watched ||
             !PURE_GLOBALS.has(root.text) ||
             (root.text === 'Object' && !ts.isPropertyAccessExpression(callee))
           )
-        return of
+        return of || watched
       }
       if (ts.isIdentifier(callee)) {
         const of = whose(callee)
-        return of === undefined ? !PURE_FUNCTIONS.has(callee.text) : of
+        return of === undefined ? watched || !PURE_FUNCTIONS.has(callee.text) : of
       }
       // a callee the parse cannot name is in doubt
       return !(ts.isFunctionExpression(callee) || ts.isArrowFunction(callee))

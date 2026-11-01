@@ -101,7 +101,8 @@ async function failureNotices() {
 
 async function recorded() {
   await Promise.all(recordings)
-  return db.select().from(failures)
+  // by the fingerprint, a key: this file spies on `Map.prototype`, so a loop over rows with no order is in doubt
+  return db.select().from(failures).orderBy(failures.fingerprint)
 }
 
 describe('POST /client-errors — сбой телефона (MOL-144)', () => {
