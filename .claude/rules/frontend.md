@@ -525,7 +525,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     beside the ring and a wrapping line of its own under it.
   - **A figure shrinks to its box by its width** (`@include figure-fit`, adversarial А1…А6, В2): `min(size,
 100cqi / width)`, the size `--text-figure` for a card's figure or `1em` for one set in the text — a sum in a
-    row's tail, «Осталось» of «Бюджет» (В4) — and the width the figure's in its own size, set beside it by
+    row's tail, «Осталось» of «Бюджет» (В4), a purchase's sum alone under its name in a record's sheet (Ж1) — and the width the figure's in its own size, set beside it by
     `figureChars` (`--figure-width`, set by script) from a table of the face's characters, measured — the figures'
     face (Nunito 800: a figure 0.600, a no-break space 0.279, a comma 0.26, «֏» 0.765) or, for a sum in a row,
     the words' (Onest 600: a figure 0.673, 12 % wider — the figures' table let «Осталось» 4.6 px past its line at
