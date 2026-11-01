@@ -280,6 +280,49 @@ describe('unorderedReads', () => {
       'map(parseInt) — it takes the index',
       `expect((await db.select().from(t)).map((r) => r.n).map(parseInt)).toEqual([1, 2])`,
     ],
+    // round 6, №15: a lateral join is a join
+    [
+      'a parent identity then a child moment, by a lateral join',
+      `expect(await db.select().from(feedback).innerJoinLateral(sub, on).orderBy(t.id, ownerNotices.createdAt)).toEqual([a, b])`,
+    ],
+    // round 6, Е1, №16: a callback that takes the order outside, by a call, a field or an iterator
+    [
+      'every pushing outside',
+      `const seen = []\nexpect((await db.select().from(t)).every((r) => seen.push(r.text) > 0)).toBe(true)`,
+    ],
+    [
+      'some pushing outside in a block',
+      `const out = []\n;(await db.select().from(t)).some((r) => {\nout.push(r.text)\n})`,
+    ],
+    [
+      'map pushing outside, its answer a length',
+      `const out = []\nexpect((await db.select().from(t)).map((r) => out.push(r.text))).toHaveLength(2)`,
+    ],
+    [
+      'every by a count in a field',
+      `const at = { i: 0 }\nexpect((await db.select().from(t)).every((r) => r.text === texts[at.i++])).toBe(true)`,
+    ],
+    [
+      'every by an iterator',
+      `const next = want.values()\nexpect((await db.select().from(t)).every((r) => r.text === next.next().value)).toBe(true)`,
+    ],
+    [
+      'every handing an outside name to a call',
+      `const out = {}\nexpect((await db.select().from(t)).every((r) => Object.assign(out, { [r.k]: r.v }))).toBe(true)`,
+    ],
+    // round 6, Е2: not frees only a matcher free without it
+    [
+      'not.toHaveProperty by an index',
+      `expect(await db.select().from(t)).not.toHaveProperty('1.text', 'a')`,
+    ],
+    [
+      'not.toSatisfy',
+      `expect(await db.select().from(t)).not.toSatisfy((all) => all[0]?.text === 'b')`,
+    ],
+    [
+      'not.toMatch of the rows stringified',
+      `expect(JSON.stringify(await db.select().from(t))).not.toMatch(/a.*b/)`,
+    ],
   ])('refuses %s', (_, body) => {
     expect(found(body)).toHaveLength(1)
   })

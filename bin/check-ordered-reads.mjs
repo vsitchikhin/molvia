@@ -16,23 +16,24 @@
 // read of one table: through a join a parent's identity repeats with every child — and a column of chance
 // among them decides the ties of those before it.
 //
-// **The rule is closed** (review of MOL-323, rounds 1–5): a list of the uses that compare by position
+// **The rule is closed** (review of MOL-323, rounds 1–6): a list of the uses that compare by position
 // missed one more each time it was attacked. So it goes the other way round. Rows are followed through
 // `await`, a cast, the methods that keep an order (`map`, `filter`, `flatMap`, `flat`, `slice`),
 // `JSON.stringify`, a spread of them alone, a branch of `?:`, `??` or `||`, an object they are put in, a
 // name they are given — declared, assigned or taken from an array (`Promise.all`) — and a function of the
 // file that returns them. Rows with no order may end only where their order cannot tell: their length,
 // their first row (`[0]`, `at(0)`, `const [row] = …`), `find`, `some`, `every`, `includes` — never by a
-// callback handed the index of a row, by a parameter, the rest of its arguments or a count it keeps
-// outside, nor by one the parse cannot read (built by a call, a method, an import; `Boolean`, `String` and
-// `Number` are read) — `reduce`, `sort`, `toSorted`, a `for … of`, a `Set`, a `Map`, `inArray`,
-// `notInArray`, `Object.fromEntries`, `typeof`, discarded; under `expect`: `toHaveLength`, `toContain`,
-// `toContainEqual`, `toBeDefined`, `toBeUndefined`, `toBeTruthy`, `toBeFalsy`, a `not` of any of them,
-// `toEqual` of one row or none written in place, or of `expect.arrayContaining`. Rows in the order of
-// chance may besides be compared with another read in the same order — by the same columns, a snapshot with
-// a snapshot of the same helper, the read, a name given it, or either through the methods that keep an
-// order — never with anything the test builds. Anything else is refused, and the fix is an order, never a
-// use the check does not know.
+// callback handed the index of a row, by a parameter or the rest of its arguments, nor by one that changes
+// anything outside it — a name, a field, a method of a name from outside called (`seen.push`,
+// `next.next()`), a name from outside handed to a call — nor by one the parse cannot read (built by a call,
+// a method, an import; `Boolean`, `String` and `Number` are read) — `reduce`, `sort`, `toSorted`, a `for …
+// of`, a `Set`, a `Map`, `inArray`, `notInArray`, `Object.fromEntries`, `typeof`, discarded; under
+// `expect`: `toHaveLength`, `toContain`, `toContainEqual`, `toBeDefined`, `toBeUndefined`, `toBeTruthy`,
+// `toBeFalsy`, a `not` of any of them and of no other, `toEqual` of one row or none written in place, or of
+// `expect.arrayContaining`. Rows in the order of chance may besides be compared with another read in the
+// same order — by the same columns, a snapshot with a snapshot of the same helper, the read, a name given
+// it, or either through the methods that keep an order — never with anything the test builds. Anything else
+// is refused, and the fix is an order, never a use the check does not know.
 //
 // What this is: a guard against the ordinary form, not against one built to slip past it. **The price,
 // named, by class:** an order of ties is taken as an order — a column every row read shares
@@ -41,8 +42,9 @@
 // — the parse cannot tell who did, and the identity alone is the order; a row picked as the one — the
 // first, `find`, a key of a `Map` or `Object.fromEntries` — is taken as the only one: where more qualify,
 // the first in the heap answers, or for a key the last; what a `for … of` or a `reduce` collects is not
-// followed — a sum is their ordinary use; a field of an object of rows is not followed; a helper of another
-// file is not followed. Those go to review.
+// followed — a sum is their ordinary use; a callback that calls a method of a name from outside is refused
+// even where the method is pure (`want.includes(r.x)`) — the parse cannot tell; a field of an object of
+// rows is not followed; a helper of another file is not followed. Those go to review.
 //
 //   node bin/check-ordered-reads.mjs
 
@@ -280,7 +282,7 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
       if (columns.length === 0) return 'none'
       // an identity is unique in its own table only: through a join a parent's repeats with every child, and the
       // columns after it decide the children's order (review round 5, Д1)
-      const joined = names.some((name) => /join$/i.test(name ?? ''))
+      const joined = names.some((name) => /join/i.test(name ?? ''))
       const unique = joined ? -1 : columns.findIndex((column) => named(column, identity))
       const deciding = unique === -1 ? columns : columns.slice(0, unique + 1)
       // a column of chance decides the ties of those before it: the order is chance
@@ -345,19 +347,37 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
     if (callback.parameters.length > (INDEX_AT[method] ?? 1)) return 'by index'
     // an index without a parameter for it: the rest of the arguments, or a count kept outside (Д3)
     if (callback.parameters.some((parameter) => parameter.dotDotDotToken)) return 'by index'
-    return countsOutside(callback) ? 'by a count kept outside it' : undefined
+    return countsOutside(callback) ? 'by what it changes outside' : undefined
   }
 
   /** Whether a function changes a name declared outside it: `texts[i++]`, `n += 1`. */
   const countsOutside = (callback) => {
     let changes = false
     const outside = (target) => {
-      const declaration = ts.isIdentifier(target) ? symbolOf(target)?.valueDeclaration : undefined
+      let root = target
+      while (
+        ts.isPropertyAccessExpression(root) ||
+        ts.isElementAccessExpression(root) ||
+        ts.isParenthesizedExpression(root) ||
+        ts.isNonNullExpression(root)
+      )
+        root = root.expression
+      const declaration = ts.isIdentifier(root) ? symbolOf(root)?.valueDeclaration : undefined
       return Boolean(
         declaration && !(declaration.pos >= callback.pos && declaration.end <= callback.end),
       )
     }
     const visit = (node) => {
+      // a call of a method of a name from outside: `seen.push(row)`, `next.next()` (review round 6, Е1)
+      if (
+        ts.isCallExpression(node) &&
+        ts.isPropertyAccessExpression(node.expression) &&
+        outside(node.expression.expression)
+      )
+        changes = true
+      // or a name from outside handed to a call, which may change it: `Object.assign(out, row)`
+      if (ts.isCallExpression(node) && node.arguments.some((a) => ts.isIdentifier(a) && outside(a)))
+        changes = true
       if (
         (ts.isPostfixUnaryExpression(node) || ts.isPrefixUnaryExpression(node)) &&
         [ts.SyntaxKind.PlusPlusToken, ts.SyntaxKind.MinusMinusToken].includes(node.operator) &&
@@ -485,7 +505,7 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
         if (subject && ts.isPropertyAccessExpression(callee)) {
           const name = callee.name.text
           // `not` turns a comparison over, never into one the order cannot tell (review round 5, Д2)
-          if (negated(callee) && !COMPARES.has(name)) return { free: true }
+          if (negated(callee) && ORDERLESS_MATCHERS.has(name)) return { free: true }
           if (COMPARES.has(name))
             return { why: `${name}(…)`, againstRead: sameChance(subject, order) }
           return { why: `${name}(…)` }
@@ -532,9 +552,9 @@ export function unorderedReads(fileName, source, chance = new Set(), identity = 
     if (!ts.isPropertyAccessExpression(m)) return { why: 'expect' }
     let name = m.name.text
     // `not` turns a comparison over, never into one the order cannot tell (review round 5, Д2)
+    // and frees only a matcher that is free without it (review round 6, Е2)
     if (name === 'not') {
-      if (!ts.isPropertyAccessExpression(m.parent) || !COMPARES.has(m.parent.name.text))
-        return { free: true }
+      if (!ts.isPropertyAccessExpression(m.parent)) return { why: 'not' }
       m = m.parent
       name = m.name.text
     }
