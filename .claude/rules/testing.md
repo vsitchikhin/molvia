@@ -296,7 +296,13 @@ failure` give the same first row, `find` and `[...new Set()]` either way (round 
   and every method of a value is in doubt, vitest's `expect` and its matchers alone known — **those known to keep
   nothing, by a closed list** (round 17, С1): a snapshot keeps a count, the n-th `toMatchSnapshot` met with the n-th
   written, so in a loop it holds the rows' order; a snapshot, `expect.extend` and a matcher it adds are in doubt; the price, named: a spy
-  set in another file is not seen. It reads the helpers beside the tests too. It works by parsing as the clock check does,
+  set in another file is not seen. It reads the helpers beside the tests too. **And what a statement takes by the
+  heap's order, however its rows are used** (round 18, Т1, Т2): the net reverses the rows given and `onlyRow` counts
+  them, neither sees which rows a `limit` with no `order by` took, nor the order inside one row an `array_agg` with no
+  `order by` gathered. So SQL text where, at any level of its parentheses, a `limit`, an `offset`, a `fetch first` or a
+  `distinct on` stands with no `order by` of that level, an aggregate that keeps the order it is fed in or a window of
+  a place has none of its own, is refused — and a query of Drizzle taking a part of its rows (`limit`, `offset`,
+  `selectDistinctOn`, `findFirst`) by no order of insertion. It works by parsing as the clock check does,
   names by TypeScript's binder, chance, identities and unique keys read from `schema.ts`. **It is closed at
   each of the three places it recognises something** (review of MOL-323, eleven rounds: a list of forms missed
   one more every round, so each place says what it knows and holds the rest in doubt, and **in doubt there is
