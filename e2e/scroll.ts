@@ -41,6 +41,31 @@ export async function toTheEnd(page: Page): Promise<number> {
   return scrolled
 }
 
+/**
+ * Waits until the elements and what is in them stand where they stay (MOL-355): «Вернуть» rises `--space-2` into
+ * place by `appear` — 4 px low the frame `toBeVisible()` saw it, 7.3 at 80 ms, 8 at 210 — and stands on
+ * `--dock-height`, which `useHeight` measures a frame behind the strip growing under it. So the finite animations of
+ * each, then two frames for that measure; an endless animation, a breath, would hold it to the test's timeout
+ * (MOL-306).
+ */
+export async function stillIn(...elements: Locator[]): Promise<void> {
+  for (const element of elements)
+    await element.evaluate((node) =>
+      Promise.allSettled(
+        node
+          .getAnimations({ subtree: true })
+          .filter((animation) => animation.effect?.getComputedTiming().endTime !== Infinity)
+          .map((animation) => animation.finished),
+      ),
+    )
+  await elements[0]?.page().evaluate(
+    () =>
+      new Promise((resolve) => {
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      }),
+  )
+}
+
 export async function topOf(element: Locator): Promise<number> {
   return element.evaluate((node) => Math.round(node.getBoundingClientRect().top))
 }

@@ -244,6 +244,15 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   measures and widened «֏30,000» by 3/16 px on WebKit (run 40306940186, 66.203125 → 66.390625). Proved,
   not supposed: held until the first measure, it gave exactly those numbers on every attempt (run
   40646618731); in Chromium the same hold moved nothing. The width stays `toBe`.
+- **A box is measured once what it stands on has stopped moving** (MOL-355, `stillIn` of `e2e/scroll.ts`):
+  the finite animations of the element and of what it is measured against, then two frames. `toBeVisible()` is
+  true from an `appear`'s first frame, and «Вернуть» rose 4 → 8 px over 220 ms after it (sampled frame by frame);
+  it stands on `--dock-height`, which `useHeight` measures a frame behind a strip growing in the dock. On CI it
+  measured 7 over the strip on an account's screen (run 41457518633), with a `hover` before it — which waits for
+  the box to be still two frames, so the motion caught there was not proven to be the rise; the failure is not
+  reproduced. Proved: measured right after `toBeVisible()`, the box stood at 4, and at 8 with `stillIn`. The five
+  measures of «Вернуть» against the dock wait so. **The price, named:** a change that starts after the wait — an
+  answer late enough to bring «обновляем» — still moves what is measured after it.
 - **A weight is held as itself, never by a width alone** (MOL-306, review №4): Chromium in the CI image
   sets text on whole pixels, so «֏30,000» measured 66 at 600 and at 700 (69 on «Месяц»), while WebKit
   told them apart (66.390625 → 66.984375). A chosen row at 700 went green in every [phone] run — the twin
