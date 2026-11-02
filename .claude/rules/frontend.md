@@ -692,7 +692,8 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   «Списано» of a receipt's «Записать» had each shown its error and moved nothing — the button pressed said
   nothing more, a screen reader none of it. **A server's refusal put under a field is one too** — a day still to
   come, «не курс» — **only while the sheet is up**: an answer landing after the sheet was swept away moves no
-  focus into it. **A sheet with no `<form>` looks in itself**, the `$el` of its `BottomSheet`, a `<dialog>` —
+  focus into it; a trip's own rate refused after the choice moved on brings the choice back to it, its field
+  and its error with it (Р3-А3) — with no field, the refusal was nowhere. **A sheet with no `<form>` looks in itself**, the `$el` of its `BottomSheet`, a `<dialog>` —
   never a wrapper put in the markup for it. **«Новая строка» with no item focuses the item's button**
   (owner's В-2 «а»): it is no field of the kit, so it carries no `aria-invalid` — a button has none in ARIA 1.2 —
   and is read with its error as its description (`aria-describedby`), before the fields, as it stands first —
@@ -703,7 +704,10 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   магазин», «Выберите день» — `disabled` had left it out of the focus order with nothing said; a day typed
   wrong is no wait but a refusal, at the tap, the focus to «Когда» — **and so is a shop named in characters no
   place takes** (adversarial А2): «Выберите магазин» over a name typed was untrue, the name marked by nothing;
-  it is marked «Здесь есть знаки, которые не сохранить» and takes the focus; the action's word («Записать сумму») comes
+  it is marked «Здесь есть знаки, которые не сохранить» and takes the focus. **A shop is chosen by the place
+  the button takes**, not by a key (Р3-А1): a recent one tapped and then gone from the server's list waits
+  for a shop again; **and «today» is asked as it opens and as a day is typed** (Р3-А2), or the phone's
+  today after midnight was refused at the tap as a day still to come; the action's word («Записать сумму») comes
   once a shop is named, as «Перевести» and a verdict's say what they wait for. **The price, named:** a card of
   «Оценки» back from the queue refused opens with the focus on its title (`focusOnMount`) and its error in the
   field — a queue's answer, not a refusal at a send. **The checkbox is

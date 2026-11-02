@@ -534,6 +534,26 @@ describe('TripRateNotes', () => {
       expect(marked).toBe('true')
     })
 
+    // Отказ своего курса, пока выбор ушёл на банковский (adversarial Р3-А3 MOL-333): поля не было, и отказ
+    // не видел и не слышал никто — выбор возвращается на «свой», с полем и ошибкой под ним.
+    it('свой курс отказан, когда выбор уже ушёл: выбор снова «свой», поле отмечено и в фокусе', async () => {
+      let refuse: (error: unknown) => void = () => undefined
+      chooseTripRate.mockReturnValue(new Promise((_, reject) => (refuse = reject)))
+      const view = await render({ jump: { previous: null } })
+      const { save } = await ownRate(view, 'абв')
+      save.focus()
+      save.click()
+      await flushPromises()
+      inside(document.body.querySelector('dialog[open]'), ru.trip.rate.new).click()
+      await flushPromises()
+      refuse(new ApiError(ERROR.INVALID_RATE, undefined, true))
+      await flushPromises()
+      await flushPromises()
+      const field = document.body.querySelector('dialog[open]')?.querySelector('input')
+      expect(field?.getAttribute('aria-invalid')).toBe('true')
+      expect(document.activeElement).toBe(field)
+    })
+
     it('не должно сработать: отказ, пришедший в смахнутую шторку, фокус в неё не ставит', async () => {
       let refuse: (error: unknown) => void = () => undefined
       chooseTripRate.mockReturnValue(new Promise((_, reject) => (refuse = reject)))

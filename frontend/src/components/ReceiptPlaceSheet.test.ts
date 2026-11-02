@@ -10,6 +10,7 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { useRecentPlacesStore } from '@/stores/recentPlaces'
 
 const recentPlaces = vi.fn(() => Promise.resolve([] as { id: string; name: string }[]))
 vi.mock('@/api', () => ({
@@ -31,7 +32,16 @@ function mainButton(): HTMLButtonElement | undefined {
   return document.body.querySelector<HTMLButtonElement>('dialog[open] .footer button') ?? undefined
 }
 
-async function render(day: string, announced = false) {
+async function render(
+  day: string,
+  announced = false,
+  before: () => void = () => undefined,
+  current: { id: string; name: string; city: string } | null = {
+    id: PLACE,
+    name: 'Ереван Сити',
+    city: 'Гюмри',
+  },
+) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
     `molvia.settings.${ME}`,
@@ -40,6 +50,7 @@ async function render(day: string, announced = false) {
   const pinia = createPinia()
   setActivePinia(pinia)
   useActorStore().state = 'ready'
+  before()
   // The sheet lays an entry in the history: it needs the router, as on a screen.
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/purchases')
@@ -47,8 +58,8 @@ async function render(day: string, announced = false) {
   const props = {
     open: true,
     country: 'AM' as const,
-    current: { id: PLACE, name: 'Ереван Сити', city: 'Гюмри' },
-    read: true,
+    current,
+    read: current !== null,
     day,
     action: ACTION,
     onChosen: (place: unknown, on: string) => chosen.push([place, on]),
@@ -157,6 +168,55 @@ describe('ReceiptPlaceSheet (MOL-127): the day of the purchases', () => {
     expect(button?.textContent.trim()).toBe(ru.receipt.place.choose_day)
     expect(button?.getAttribute('aria-disabled')).toBe('true')
     expect(button?.disabled).toBe(false)
+    await press(view)
+    expect(chosen).toEqual([])
+  })
+
+  // «Today» read once at mounting refused the phone's today after midnight as a day still to come, at the
+  // tap and out loud (adversarial Р3-А2 of MOL-333).
+  it('after the phone’s midnight, today is no day to come', async () => {
+    vi.setSystemTime(new Date('2026-10-03T23:50:00Z'))
+    const { view, chosen } = await render('2026-10-03')
+    vi.setSystemTime(new Date('2026-10-04T00:10:00Z'))
+    const field = dayField()
+    field.value = '2026-10-04'
+    field.dispatchEvent(new Event('input'))
+    await flushPromises()
+    expect(view.html()).not.toContain(ru.spending.sheet.bad_day)
+    expect(field.getAttribute('aria-invalid')).toBeNull()
+    await press(view)
+    expect(chosen.map(([, on]) => on)).toEqual(['2026-10-04'])
+  })
+
+  // A shop is chosen by the place the button takes (adversarial Р3-А1 of MOL-333): a recent one tapped and
+  // then gone from the server's list left its key, and the button said the action's word over nothing.
+  it('a recent shop chosen, then gone from the server’s list: the button waits for a shop again', async () => {
+    let answer: (places: { id: string; name: string }[]) => void = () => undefined
+    recentPlaces.mockReturnValueOnce(new Promise((resolve) => (answer = resolve)))
+    const SAS = { id: 'aaaaaaaa-0000-4000-8000-000000000001', name: 'SAS', kind: 'store' as const }
+    const CITY = {
+      id: 'aaaaaaaa-0000-4000-8000-000000000002',
+      name: 'Ереван Сити',
+      kind: 'store' as const,
+    }
+    const { view, chosen } = await render(
+      '2026-10-03',
+      false,
+      () => {
+        useRecentPlacesStore().places = [SAS, CITY]
+      },
+      null,
+    )
+    const sas = view
+      .findAll('dialog[open] [role="radio"]')
+      .find((one) => one.text().includes('SAS'))
+    await sas?.trigger('click')
+    expect(mainButton()?.textContent.trim()).toBe(ACTION)
+    answer([CITY])
+    await flushPromises()
+    const button = mainButton()
+    expect(button?.textContent.trim()).toBe(ru.receipt.place.choose_place)
+    expect(button?.getAttribute('aria-disabled')).toBe('true')
     await press(view)
     expect(chosen).toEqual([])
   })

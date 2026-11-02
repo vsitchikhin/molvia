@@ -1,11 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
+import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { ReceiptLinkBody } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import LinkReceiptSheet from '@/components/LinkReceiptSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import type { ReceiptLinkOnPhoto } from '@/receipts/qrReader'
 import { ReaderFailed } from '@/scanner/barcodeReader'
 
@@ -138,6 +140,36 @@ describe('«Чек по ссылке» (MOL-232)', () => {
     expect(sendLink).not.toHaveBeenCalled()
     expect(document.activeElement).toBe(input)
     expect(marked).toBe('true')
+  })
+
+  it('Enter in the field with no link: the focus stays there and the refusal is said', async () => {
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/purchases')
+    // Under an announcer, as `App.vue` holds every sheet: what the sheet says lands in its region.
+    const host = mount(
+      defineComponent({
+        setup() {
+          provideAnnouncer()
+          return () => h(LinkReceiptSheet, { open: true })
+        },
+      }),
+      { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
+    )
+    mounted.push(host)
+    clock += 1000
+    await new Promise((resolve) => setTimeout(resolve, 120))
+    const sheet = host.findComponent(LinkReceiptSheet)
+    await toPaste(sheet)
+    const input = field(sheet)
+    input.element.focus()
+    await input.trigger('keydown', { key: 'Enter' })
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(sendLink).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(input.element)
+    expect(document.querySelector('dialog .region')?.textContent).toContain(
+      en.receipt.link.refusal.not_link,
+    )
   })
 
   it('says at once why a pasted link is no receipt to record, by the model’s own check', async () => {

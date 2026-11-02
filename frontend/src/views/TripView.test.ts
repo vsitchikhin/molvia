@@ -1432,12 +1432,15 @@ describe('TripView', () => {
       charged.value = '0'
       charged.dispatchEvent(new Event('input'))
       await flushPromises()
+      let marked: string | null = null
+      charged.addEventListener('focus', () => (marked = charged.getAttribute('aria-invalid')))
       inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
       await flushPromises()
       expect(queue.pending).toEqual([])
       expect(openSheets()[0]?.textContent).toContain(ru.spending.sheet.bad_amount)
       // и слышен: фокус в «Списано», уже отмеченном (MOL-333)
       expect(document.activeElement).toBe(charged)
+      expect(marked).toBe('true')
       charged.value = '1100,50'
       charged.dispatchEvent(new Event('input'))
       await flushPromises()

@@ -201,6 +201,9 @@ export default defineComponent({
         // where they can fix it. Anything else is the app's or the network's, and says so once.
         if (caught instanceof ApiError && caught.code === ERROR.INVALID_RATE) {
           error.value = ERROR.INVALID_RATE
+          // The refusal is of the own rate: chosen away while the answer was on its way, it comes back
+          // with its field and the error under it — or nothing would say it (adversarial Р3-А3 of MOL-333).
+          choice.value = 'manual'
           if (props.open) {
             void refuse(() => sheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
           }

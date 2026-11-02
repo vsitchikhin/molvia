@@ -97,6 +97,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { calendarDay, localDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useRecentPlacesStore } from '@/stores/recentPlaces'
@@ -154,11 +155,16 @@ export default defineComponent({
      * is later and the server takes it (`latestDay`) — a receipt printed after Yerevan's midnight on
      * a phone west of it is dated by a day this phone has not reached (adversarial В1, as the
      * spending's sheet, adversarial Л). A day misread far ahead is still refused (review 18).
+     * «Today» is asked again as the sheet opens and as a day is typed (adversarial Р3-А2 of MOL-333): read
+     * once, the phone's today after midnight was refused at the tap as a day still to come.
      */
-    const latest = computed(() => {
-      const today = localDay()
-      return props.day > today && props.day <= latestDay(new Date()) ? props.day : today
+    const today = useLocalDay()
+    watch(when, () => {
+      today.value = localDay()
     })
+    const latest = computed(() =>
+      props.day > today.value && props.day <= latestDay(new Date()) ? props.day : today.value,
+    )
 
     /**
      * A receipt of the person's own country takes a shop of their city, as «Где вы?» does. One of
@@ -188,6 +194,7 @@ export default defineComponent({
       () => props.open,
       (open) => {
         if (!open) return
+        today.value = localDay()
         when.value = props.day
         nameBad.value = false
         name.value = props.current ? '' : (props.proposed ?? '')
@@ -220,9 +227,14 @@ export default defineComponent({
     /**
      * What the button waits for, in the order of the form. A name or a day typed wrong is no wait but a
      * refusal at the tap (adversarial А2 of MOL-333): «Выберите магазин» over a shop typed was untrue.
+     * A shop is chosen by the place `done` takes, never by the key alone (Р3-А1): a recent one tapped and
+     * then gone from the server's list left the key, and the button promised what its tap did not do.
      */
+    const picked = computed(
+      () => choices.value.find((choice) => choice.key === chosen.value)?.place ?? null,
+    )
     const waitsFor = computed<'place' | 'day' | null>(() =>
-      chosen.value === null && !fresh.value && typedName.value === null
+      picked.value === null && !fresh.value && typedName.value === null
         ? 'place'
         : when.value === ''
           ? 'day'
@@ -266,13 +278,12 @@ export default defineComponent({
         if (name.value.trim()) chosen.value = null
       },
       done: () => {
-        const picked = choices.value.find((choice) => choice.key === chosen.value)?.place
         const place: PlaceDraft | null =
-          picked ??
+          picked.value ??
           (fresh.value && typedName.value ? { name: typedName.value, city: city.value } : null)
         // a shop named in what the server would not keep — a character no place takes
         nameBad.value =
-          !picked &&
+          !picked.value &&
           typedName.value !== null &&
           !newPlaceSchema.shape.name.safeParse(typedName.value).success
         if (nameBad.value || dayBad.value) {
