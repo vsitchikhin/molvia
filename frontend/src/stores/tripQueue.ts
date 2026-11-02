@@ -1084,10 +1084,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       const undoing =
         write.kind === 'add' &&
         kept.some((item) => item.write.kind === 'remove' && item.write.expenseId === write.body.id)
+      // …nor when it was corrected again while this body was out: these numbers are nobody's, the
+      // later correction waits in this write's place and reaches the row itself — sent after it, the
+      // amendment of the older body overwrote the person's last word (MOL-325, adversarial Б1).
       if (
         answered &&
         !undoing &&
         !gone &&
+        !superseded &&
         write.kind === 'add' &&
         !answeredAsSent(answered, write.body)
       ) {
