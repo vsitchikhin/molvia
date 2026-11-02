@@ -69,6 +69,16 @@
 // `onlyRow`, `sorted`, `sum` — never a use the check does not know. **Every answer of «free» or «not a read»
 // the check gives is one written here**; nothing else is let go.
 //
+// **4. What a statement takes by the heap's order, however its rows are used** (round 18, Т1, Т2): the net reverses
+// the rows a statement gives and `onlyRow` counts them, but neither sees which rows they are or the order inside one.
+// So SQL text — a template of any tag, a fragment of Drizzle's `sql`, a string run by `unsafe`, `query`, `execute` or
+// `sql.raw` — is refused where, at any level of its parentheses, a `limit`, an `offset`, a `fetch first` or a
+// `distinct on` stands with no `order by` of that level; where an aggregate that keeps the order it is fed in
+// (`array_agg`, `string_agg`, `json_agg`, `jsonb_object_agg`, `array(select …)`) has no `order by` of its own; where a
+// window of a place (`row_number`, `lag`, `first_value` …) is over no order, or over one named elsewhere. And a query
+// of Drizzle taking a part of its rows — `limit`, `offset`, `selectDistinctOn`, `findFirst`, `findMany` of a `limit` —
+// by no order, or by an order of chance.
+//
 // **The price, named, by class, and nothing outside these classes** — of rows with no order, what a form this
 // check does not follow hides: rows a helper of another file returns — the net reverses them, and values the
 // same reversed it cannot tell — and a read of the API's own code, which no test file holds; of rows in
@@ -453,6 +463,54 @@ const unorderedTemplate = (template) => {
   // an update, a delete or a merge returning rows returns them in no order, and can have none (round 13, Н2)
   if (/\b(update|delete|merge)\b/i.test(outside) && /\breturning\b/i.test(outside)) return true
   return /\bselect\b/i.test(all) && /\bfrom\b/i.test(all) && !/\border\s+by\b/i.test(outside)
+}
+
+/** The aggregates whose answer is the order they were fed in: an array, a text, a JSON array, an object whose key repeats. */
+const ORDERED_AGGREGATES =
+  /\b(array_agg|string_agg|json_agg|jsonb_agg|json_object_agg|jsonb_object_agg|json_arrayagg|xmlagg|array)\s*$/i
+/** The window functions whose answer is a place in the window's order. */
+const ORDERED_WINDOWS =
+  /\b(row_number|rank|dense_rank|percent_rank|cume_dist|ntile|lag|lead|first_value|last_value|nth_value)\s*\([^()]*\)\s*over\s*$/i
+
+/**
+ * Why a statement picks its rows, or what it gathers into one, by the order the heap gives them (review round 18,
+ * Т1, Т2), or undefined: at any level of its parentheses — a subquery as the statement — a `limit`, an `offset`, a
+ * `fetch first` or a `distinct on` with no `order by` of that level; an aggregate that keeps the order it is fed in
+ * (`array_agg`, `string_agg`, `json_agg`, `array(select …)`) with no `order by` of its own; a window of a place
+ * (`row_number() over ()`) with none, or one named elsewhere. The net reverses the rows a statement gives, and
+ * `onlyRow` counts them; neither sees which rows these are, or the order inside one of them.
+ */
+const pickedByChance = (template) => {
+  const { all } = sqlOf(template)
+  // each level by its own text, its parentheses' insides put aside: [text before it, its own text]
+  const levels = []
+  const stack = [{ before: '', own: '' }]
+  for (const char of all) {
+    if (char === '(') {
+      stack.push({ before: stack.at(-1).own, own: '' })
+      stack.at(-2).own += '(…'
+    } else if (char === ')' && stack.length > 1) {
+      levels.push(stack.pop())
+      stack.at(-1).own += ')'
+    } else stack.at(-1).own += char
+  }
+  levels.push(...stack)
+  for (const { before, own } of levels) {
+    const ordered = /\border\s+by\b/i.test(own)
+    if (!ordered && /\b(limit|offset|fetch\s+(first|next)|distinct\s+on)\b/i.test(own))
+      return 'a limit, an offset or a distinct on with no order by of its level'
+    if (!ordered && ORDERED_AGGREGATES.test(before))
+      return 'an aggregate with no order by of its own'
+    if (!ordered && ORDERED_WINDOWS.test(before)) return 'a window of a place with no order by'
+  }
+  if (
+    /\)\s*over\s+[a-z_]\w*/i.test(all) &&
+    /\b(row_number|rank|dense_rank|percent_rank|cume_dist|ntile|lag|lead|first_value|last_value|nth_value)\s*\(/i.test(
+      all,
+    )
+  )
+    return 'a window of a place named elsewhere'
+  return undefined
 }
 
 const literalIndex = (node) => {
@@ -1464,7 +1522,72 @@ export function unorderedReads(
       follow(read)
     }
   }
-  return [...new Set(found)].sort((a, b) => Number.parseInt(a) - Number.parseInt(b))
+  // what a statement picks or gathers by the heap's order, however its rows are used (review round 18, Т1, Т2)
+  const picks = []
+  const pick = (node, why) =>
+    picks.push(`${String(line(node))}: ${(lines[line(node) - 1] ?? '').trim()} — ${why}`)
+  const visitPicks = (node) => {
+    // SQL as text: a template of any tag — a query or a fragment of one — and a string run as SQL
+    if (ts.isTaggedTemplateExpression(node)) {
+      const why = pickedByChance(node.template)
+      if (why) pick(node, why)
+    }
+    if (
+      ts.isCallExpression(node) &&
+      (/^(sql\.raw)$/.test(node.expression.getText(sf)) ||
+        (ts.isPropertyAccessExpression(node.expression) &&
+          /^(unsafe|query|execute)$/.test(node.expression.name.text)))
+    ) {
+      const text = constant(node.arguments[0])
+      if (
+        text &&
+        (ts.isStringLiteral(text) ||
+          ts.isNoSubstitutionTemplateLiteral(text) ||
+          ts.isTemplateExpression(text))
+      ) {
+        const why = pickedByChance(text)
+        if (why) pick(node, why)
+      }
+    }
+    // a query of Drizzle that takes part of its rows — `limit`, `offset`, `selectDistinctOn` — by no order of insertion
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      !(ts.isPropertyAccessExpression(node.parent) && node.parent.expression === node)
+    ) {
+      const names = queryOf(node).map(calledAs)
+      const part = names.some((name) => /^(limit|offset|selectDistinctOn)$/.test(name ?? ''))
+      if (part && names.includes('from')) {
+        const order = names.includes('orderBy') ? readOf(node) : 'none'
+        if (order !== undefined && !/^(update|delete)$/.test(names.at(-2) ?? ''))
+          pick(
+            node,
+            `a part of the rows by ${order === 'none' ? 'no order' : 'an order of chance'}`,
+          )
+      }
+    }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      /^(findMany|findFirst)$/.test(node.expression.name.text)
+    ) {
+      const [query] = node.arguments
+      const keys =
+        query && ts.isObjectLiteralExpression(query)
+          ? query.properties.map((p) => p.name?.getText(sf))
+          : []
+      if (
+        (node.expression.name.text === 'findFirst' ||
+          keys.includes('limit') ||
+          keys.includes('offset')) &&
+        !keys.includes('orderBy')
+      )
+        pick(node, `${node.expression.name.text} of a part of the rows by no order`)
+    }
+    ts.forEachChild(node, visitPicks)
+  }
+  visitPicks(sf)
+  return [...new Set([...found, ...picks])].sort((a, b) => Number.parseInt(a) - Number.parseInt(b))
 }
 
 /**

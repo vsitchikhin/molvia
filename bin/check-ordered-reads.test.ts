@@ -1378,6 +1378,150 @@ describe('unorderedReads', () => {
     expect(found(body)).toEqual([])
   })
 
+  // review round 18, Т1, Т2: which rows a statement takes, or the order inside one it gathers — whatever their use
+  const statement = (body: string): string[] =>
+    unorderedReads(
+      FILE,
+      `import { sql } from 'drizzle-orm'\nimport { expect } from 'vitest'\nimport { onlyRow } from './rows'\n${inTest(body)}`,
+      CHANCE,
+      IDENTITY,
+      KEYS,
+    )
+
+  it.each([
+    ['a limit of Drizzle with no order', 'const row = onlyRow(await db.select().from(t).limit(1))'],
+    [
+      'an offset of Drizzle with no order',
+      'expect(await db.select().from(t).offset(1)).toHaveLength(1)',
+    ],
+    [
+      'a limit of Drizzle in an order of chance',
+      'const row = onlyRow(await db.select().from(sessions).orderBy(sessions.id).limit(1))',
+    ],
+    [
+      'a limit of a query begun in a const',
+      'const base = db.select().from(t)\nconst row = onlyRow(await base.limit(1))',
+    ],
+    [
+      'selectDistinctOn with no order',
+      'expect(await db.selectDistinctOn([t.kind]).from(t)).toHaveLength(2)',
+    ],
+    ['findFirst with no order', 'const row = await db.query.t.findFirst()'],
+    [
+      'findMany of a limit with no order',
+      'expect(await db.query.t.findMany({ limit: 1 })).toHaveLength(1)',
+    ],
+    [
+      'a limit of a template with no order',
+      'const row = onlyRow(await db.execute(sql`select kind from t limit 1`))',
+    ],
+    [
+      'an offset of a template',
+      'const row = onlyRow(await db.execute(sql`select kind from t offset 1`))',
+    ],
+    [
+      'fetch first',
+      'const row = onlyRow(await db.execute(sql`select kind from t fetch first 1 rows only`))',
+    ],
+    [
+      'distinct on with no order',
+      'expect(await db.execute(sql`select distinct on (kind) id from t`)).toHaveLength(2)',
+    ],
+    [
+      'a limit of a subquery under an order of the statement',
+      'expect(await db.execute(sql`select id from t where id = (select id from t limit 1) order by id`)).toHaveLength(1)',
+    ],
+    [
+      'a limit of a query by a tag',
+      'const row = onlyRow(await client`select kind from t limit 1`)',
+    ],
+    [
+      'a limit of unsafe SQL',
+      "const row = onlyRow(await client.unsafe('select kind from t limit 1'))",
+    ],
+    [
+      'a limit of sql.raw',
+      "const row = onlyRow(await db.execute(sql.raw('select kind from t limit 1')))",
+    ],
+    [
+      'array_agg with no order',
+      'const row = onlyRow(await db.execute(sql`select array_agg(kind) as kinds from t`))',
+    ],
+    [
+      'string_agg with no order',
+      "const row = onlyRow(await client`select string_agg(kind, ',') as kinds from t`)",
+    ],
+    [
+      'json_agg with no order',
+      'const row = onlyRow(await client`select json_agg(t) as all from t`)',
+    ],
+    [
+      'jsonb_object_agg with no order',
+      'const row = onlyRow(await client`select jsonb_object_agg(kind, id) as by from t`)',
+    ],
+    [
+      'array of a subquery with no order',
+      'const row = onlyRow(await client`select array(select kind from t) as kinds`)',
+    ],
+    [
+      'array_agg in a fragment of a select of Drizzle',
+      'const row = onlyRow(await db.select({ kinds: sql`array_agg(${t.kind})` }).from(t))',
+    ],
+    [
+      'row_number over nothing',
+      'expect(await client`select row_number() over () as n, kind from t order by kind`).toHaveLength(2)',
+    ],
+    [
+      'lag over a partition with no order',
+      'expect(await client`select lag(kind) over (partition by actor) as before from t order by id`).toHaveLength(2)',
+    ],
+    [
+      'a window of a place named elsewhere',
+      'expect(await client`select row_number() over w as n from t window w as (partition by kind) order by id`).toHaveLength(2)',
+    ],
+  ])('refuses %s (round 18)', (_, body) => {
+    expect(statement(body)).not.toEqual([])
+  })
+
+  it.each([
+    [
+      'a limit of Drizzle by an identity',
+      'const row = onlyRow(await db.select().from(t).orderBy(t.id).limit(1))',
+    ],
+    ['findFirst with an order', 'const row = await db.query.t.findFirst({ orderBy: (x) => x.id })'],
+    [
+      'a limit of a template with its order',
+      'const row = onlyRow(await db.execute(sql`select kind from t order by id limit 1`))',
+    ],
+    [
+      'a limit of a subquery with its order',
+      'expect(await db.execute(sql`select id from t where id = (select id from t order by id limit 1) order by id`)).toHaveLength(1)',
+    ],
+    [
+      'distinct on with its order',
+      'expect(await db.execute(sql`select distinct on (kind) id from t order by kind, id`)).toHaveLength(2)',
+    ],
+    [
+      'string_agg with its order',
+      "const row = onlyRow(await client`select string_agg(kind, ',' order by id) as kinds from t`)",
+    ],
+    [
+      'an aggregate the order cannot tell',
+      'const row = onlyRow(await client`select count(*), sum(n), max(kind) from t`)',
+    ],
+    [
+      'a sum over a window',
+      'expect(await client`select sum(n) over () as all, kind from t order by id`).toHaveLength(2)',
+    ],
+    [
+      'row_number over its order',
+      'expect(await client`select row_number() over (order by id) as n from t order by id`).toHaveLength(2)',
+    ],
+    ['limit in a title', "it('takes limit 1 rows', () => {})"],
+  ])('leaves alone %s (round 18)', (_, body) => {
+    expect(statement(body)).toEqual([])
+  })
+
   it('refuses onlyRow and sorted of the file itself, and one of the module under another use', () => {
     const local = (body: string): string[] =>
       unorderedReads(
