@@ -122,14 +122,18 @@ describe('what the letters found does not move (owner’s decision В-3)', () =>
 describe('one exact word does not make the other right, with the meaning too (MOL-46, MOL-332)', () => {
   /**
    * A row the letters found within one edit by the mean with a word two off is near neither by its
-   * letters nor by its meaning: one exact word lends the vector its sense as it lent the mean its edits.
-   * Made near by its meaning wherever found, each of these read «нашли» over another thing, where the
-   * screen says «не нашли» and offers «Предложить товар» (adversarial А2 of MOL-332, owner's В-3 «а»).
-   * Each stands clear of the threshold both ways (adversarial В2): «не нашли» is held by the nearest
-   * name the meaning alone would place — «Сахар», «Гель для бритья» at 0.375 and 0.382, the others
-   * below 0.35 — and the thing named first stands at 0.42–0.48, so near wherever found turns each red.
-   * «соус абрикосовый», «сода для посудомойки», «суп острый» stood 0.006–0.011 under it, on «Абрикосы»,
-   * «Сода пищевая», «Суп быстрого приготовления» (`.scratch/tasks/status/MOL-332-review-5-guards.json`).
+   * letters nor by its meaning: one exact word lends the vector its sense as it lent the mean its
+   * edits. Made near by its meaning wherever found, each of these read «нашли» over another thing,
+   * where the screen says «не нашли» and offers «Предложить товар» (adversarial А2 of MOL-332,
+   * owner's В-3 «а»). The first three are things people buy that the seed does not carry; the last
+   * two are swaps of seed words by a generator, taken for their margins — of the ten plausible ones
+   * only three stand clear both ways, and the guard holds the mechanism, not the words. Each stands
+   * clear of the threshold both ways (adversarial В2): «не нашли» is held by the nearest name the
+   * meaning alone would place — «Сахар», «Гель для бритья» at 0.375 and 0.382, the others below
+   * 0.35 — and the thing named first stands at 0.42–0.48, so near wherever found turns each red.
+   * «соус абрикосовый», «сода для посудомойки», «суп острый» stood 0.006–0.011 under it, on
+   * «Абрикосы», «Сода пищевая», «Суп быстрого приготовления»
+   * (`.scratch/tasks/status/MOL-332-review-5-guards.json`).
    */
   it.each([
     ['вода без сахара', 'Кола без сахара'],
