@@ -631,6 +631,15 @@ describe('ExchangeView: the rate and the list', () => {
     expect(removeExchange).not.toHaveBeenCalled()
   })
 
+  // The question has no caption of a month over it (MOL-329, adversarial Ж1).
+  it('the question names an exchange of last year with its year', async () => {
+    exchanges.mockResolvedValue(overview({ exchanges: [row({ exchangedOn: '2025-09-15' })] }))
+    const view = await render()
+    await askToRemove(view)
+    const sheets = document.querySelectorAll('dialog[open]')
+    expect(sheets[1]?.textContent).toContain('Sep 15, 2025')
+  })
+
   it('removes when confirmed, puts the focus on «Bring back», which brings the same row back', async () => {
     exchanges.mockResolvedValue(overview())
     removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))

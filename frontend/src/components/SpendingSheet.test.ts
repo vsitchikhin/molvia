@@ -279,6 +279,27 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
     expect(dayField().max).toBe('2026-09-29')
   }, 15_000)
 
+  // MOL-329, adversarial Ж1: a sheet has no caption of a month over it, so a day of another year says its year —
+  // in the field behind the line and on the line itself.
+  it('a day of last year says its year, on the field and on «Date, note, place»', async () => {
+    vi.setSystemTime(new Date('2027-01-05T10:00:00Z'))
+    moneyMonth.mockResolvedValue(month('2027-01-05'))
+    const view = await render()
+    await view
+      .findAll('button')
+      .find((one) => one.text().trim() === en.spending.summary.add)
+      ?.trigger('click')
+    await risen()
+    await openDetails()
+    dayField().value = '2026-12-20'
+    dayField().dispatchEvent(new Event('input'))
+    dayField().dispatchEvent(new Event('change'))
+    await flushPromises()
+    expect(topSheet().querySelector('.shown')?.textContent.trim()).toBe('December 20, 2026')
+    await detailsDone()
+    expect(detailsRow().textContent.trim()).toBe('Dec 20, 2026 · no note')
+  }, 15_000)
+
   it('a new spending on a day the phone has not reached is refused (must not fire)', async () => {
     moneyMonth.mockResolvedValue(month('2026-09-28'))
     const view = await render()

@@ -43,7 +43,7 @@ import IconChevronRight from '~icons/mdi/chevron-right'
 import { convertMoney, formatEstimate, formatMoney, receiptPaidOf } from '@molvia/model'
 import type { ExchangeRate, Money, ReceiptBalance } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
-import { calendarDay } from '@/days'
+import { calendarDayOfAnyYear } from '@/days'
 
 /**
  * The foot of a receipt on the review (handoff 05): «Строки», the receipt's total, what it is in the
@@ -63,6 +63,8 @@ export default defineComponent({
     rate: { type: Object as PropType<ExchangeRate | null>, default: null },
     /** The day the rate is of: the receipt's. */
     day: { type: String, required: true },
+    /** The screen's day (MOL-329): a receipt of December looked at in January says its year. */
+    today: { type: String, required: true },
     /** The name of the line the difference likely sits in. */
     suspect: { type: String as PropType<string | null>, default: null },
     /** A receipt with no items (MOL-227): the total alone, no «Строки» and no difference. */
@@ -80,7 +82,7 @@ export default defineComponent({
       try {
         return t('receipt.review.approx', {
           amount: formatEstimate(convertMoney(paid, rate), locale.value),
-          day: calendarDay(props.day, locale.value, { day: 'numeric', month: 'short' }),
+          day: calendarDayOfAnyYear(props.day, locale.value, props.today),
         })
       } catch {
         return null

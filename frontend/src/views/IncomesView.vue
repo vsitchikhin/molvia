@@ -182,7 +182,7 @@ import UndoStrip from '@/components/UndoStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useIncomes } from '@/composables/useIncomes'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { answeredAt, calendarDay, monthOf } from '@/days'
+import { answeredAt, calendarDayOfAnyYear, monthOf } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -345,7 +345,8 @@ export default defineComponent({
       t('income.row_line', {
         source: t(`income.source.${income.source}`),
         // A calendar day of Yerevan, never the moment of its midnight (adversarial Ж).
-        date: calendarDay(income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
+        // the question has no month's caption over it (MOL-329, adversarial Ж1)
+        date: calendarDayOfAnyYear(income.receivedOn, locale.value, today.value),
       })
     const sumsOf = (sums: readonly Money[]): string =>
       sums.map((sum) => formatMoney(sum, locale.value)).join(' · ')

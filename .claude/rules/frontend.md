@@ -1078,7 +1078,11 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   **A version of an amendment says its year** — «до 25 сент. 2025 г.: … · 16 сент. 2025 г.» in the sheets of an
   exchange and an income (adversarial Г2): a journal of them goes back across years. **So does a purchase waiting for its
   rating** — the card of «Оценки» and «последняя — {when}» of «Покупки» are `dayOfAnyYear` (adversarial Е1): the queue
-  has no window by age, and «14 окт.» of last year read as this one. **A phrase that puts its own word
+  has no window by age, and «14 окт.» of last year read as this one. **And so does a sheet's or a question's own day**
+  (`calendarDayOfAnyYear` in the place's own form, adversarial Ж1): no caption of a month stands over it to say the
+  year — the start of an account, the day, the line and the meta of a spending, «Когда» of «Где купили?», «Тут дешевле»'s
+  day, the rate's day of a receipt, «Удалить обмен?» and «Удалить доход?»; a card under its month's caption keeps its
+  day without one. **A phrase that puts its own word
   before the day takes a date, never «вчера»** (`dateOfAnyYear`, adversarial Д1, the rule of «Раньше …», MOL-204
   Р-9): «до 1 нояб.: …» of a version, «Чек от 30 окт., 23:30» and «Фото от …» of «Покупки»; a day said with no word
   before it keeps its «вчера» — «отправлен вчера», «записан вчера», «покупки на вчера, 23:40». **The prices, named:** a page put away is held by the browser, and its timer with it — coming back

@@ -135,12 +135,17 @@ export function calendarDay(
 
 /**
  * A calendar day short, the year only when not this one's: «23 окт.», «26 окт. 2023 г.» — a date read off a receipt
- * may be of any year, and a year left out hid one three years back (MOL-305).
+ * may be of any year, and a year left out hid one three years back (MOL-305). In the form a place prints its day by
+ * (`options`) — a sheet's own day has no caption of a month over it to say the year (MOL-329, adversarial Ж1).
  */
-export function calendarDayOfAnyYear(day: string, locale: string, today: string): string {
+export function calendarDayOfAnyYear(
+  day: string,
+  locale: string,
+  today: string,
+  options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' },
+): string {
   return calendarDay(day, locale, {
-    day: 'numeric',
-    month: 'short',
+    ...options,
     ...(day.slice(0, 4) === today.slice(0, 4) ? {} : { year: 'numeric' }),
   })
 }

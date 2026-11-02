@@ -238,7 +238,7 @@
     <ExchangeRemoveSheet
       v-model:open="removeOpen"
       :exchange="target"
-      :amounts="target ? `${amountsOf(target)} · ${rateLineOf(target)}` : ''"
+      :amounts="target ? `${amountsOf(target)} · ${rateLineOf(target, today)}` : ''"
       :busy="busy"
       :failed="removeFailed"
       @confirm="confirmRemove"

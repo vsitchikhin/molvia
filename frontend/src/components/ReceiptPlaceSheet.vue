@@ -98,7 +98,7 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { calendarDay, localDay } from '@/days'
+import { calendarDayOfAnyYear, localDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useRecentPlacesStore } from '@/stores/recentPlaces'
 import { placeIdOf } from '@/stores/receiptDrafts'
@@ -267,7 +267,10 @@ export default defineComponent({
       ),
       dayShown: computed(() => {
         if (!when.value) return ''
-        const shown = calendarDay(when.value, locale.value, { day: 'numeric', month: 'long' })
+        const shown = calendarDayOfAnyYear(when.value, locale.value, today.value, {
+          day: 'numeric',
+          month: 'long',
+        })
         return when.value === props.sentDay ? t('receipt.review.sent_day', { day: shown }) : shown
       }),
       choose: (key: string) => {

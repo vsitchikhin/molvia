@@ -151,7 +151,7 @@ import { parseSigned, signedAmount } from '@/components/accounts'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { shown } from '@/composables/useItemDetails'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { calendarDay, calendarDayOfAnyYear, localDay, shiftDay } from '@/days'
+import { calendarDayOfAnyYear, localDay, shiftDay } from '@/days'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -314,7 +314,10 @@ export default defineComponent({
 
     const dayWords = computed(() => {
       if (!startOn.value) return null
-      const date = calendarDay(startOn.value, locale.value)
+      const date = calendarDayOfAnyYear(startOn.value, locale.value, today.value, {
+        day: 'numeric',
+        month: 'long',
+      })
       if (startOn.value === today.value) return t('spending.sheet.date_today', { date })
       if (startOn.value === shiftDay(today.value, -1))
         return t('spending.sheet.date_yesterday', { date })

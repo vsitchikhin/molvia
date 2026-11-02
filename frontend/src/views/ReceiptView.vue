@@ -196,6 +196,7 @@
           :redeemed="detail.redeemed ?? null"
           :rate="detail.rate"
           :day="rateDay"
+          :today="today"
           :suspect="suspect"
           :no-items="noItems"
           @total="!locked && (totalOpen = true)"
@@ -1065,6 +1066,7 @@ export default defineComponent({
       locked,
       digits,
       rateDay,
+      today,
       retakeMounted,
       retake: () => {
         retakeMounted.value = true

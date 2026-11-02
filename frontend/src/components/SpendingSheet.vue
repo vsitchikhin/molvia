@@ -281,7 +281,7 @@ import type {
   SpendingTarget,
 } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, shiftDay } from '@/days'
+import { calendarDayOfAnyYear, localDay, shiftDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
 import { newId } from '@/ids'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -637,12 +637,14 @@ export default defineComponent({
         props.target.kind === 'add' ? 'spending.sheet.title_add' : 'spending.sheet.title_edit',
       )
     })
-    // A calendar day, whatever the zone of the phone (review Т-1).
-    const dayOf = (value: string) => calendarDay(value, locale.value)
+    // A calendar day, whatever the zone of the phone (review Т-1); a sheet has no month's caption over it, so a day
+    // of another year says its year (MOL-329, adversarial Ж1).
+    const dayOf = (value: string) =>
+      calendarDayOfAnyYear(value, locale.value, today.value, { day: 'numeric', month: 'long' })
     const meta = computed(() => {
       if (props.target.kind === 'trip') {
         const { row, day: finished } = props.target
-        const date = calendarDay(finished, locale.value, {
+        const date = calendarDayOfAnyYear(finished, locale.value, today.value, {
           weekday: 'short',
           day: 'numeric',
           month: 'long',

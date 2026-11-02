@@ -569,6 +569,25 @@ describe('IncomesView: recording, amending and removing', () => {
     expect(view.text()).not.toContain(en.income.failed)
   })
 
+  // The question has no caption of a month over it (MOL-329, adversarial Ж1).
+  it('the question names an income of last year with its year', async () => {
+    incomes.mockResolvedValue(
+      overview({
+        months: [
+          {
+            month: '2025-09',
+            sums: [{ minor: 9_961_500n, currency: 'RUB' }],
+            incomes: [row({ receivedOn: '2025-09-15' })],
+          },
+        ],
+      }),
+    )
+    const view = await render()
+    await askToRemove(view)
+    const sheets = document.querySelectorAll('dialog[open]')
+    expect(sheets[1]?.textContent).toContain('Sep 15, 2025')
+  })
+
   it('the bin asks first, then removes, puts the focus on «Bring back» and brings it back', async () => {
     incomes.mockResolvedValue(overview())
     removeIncome.mockResolvedValue(overview({ months: [] }))

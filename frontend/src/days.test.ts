@@ -104,6 +104,16 @@ describe('calendarDayOfAnyYear (MOL-305)', () => {
     expect(calendarDayOfAnyYear('2023-10-26', 'ru', '2026-10-30')).toBe('26 окт. 2023 г.')
     expect(calendarDayOfAnyYear('2026-12-31', 'ru', '2027-01-01')).toBe('31 дек. 2026 г.')
   })
+
+  // A sheet's own day in the form it prints it, the year beside it (MOL-329, adversarial Ж1).
+  it('takes the form of its place and adds the year to it', () => {
+    const long = { day: 'numeric', month: 'long' } as const
+    expect(calendarDayOfAnyYear('2025-09-16', 'en', '2026-11-02', long)).toBe('September 16, 2025')
+    expect(calendarDayOfAnyYear('2026-09-16', 'en', '2026-11-02', long)).toBe('September 16')
+    const digits = { day: '2-digit', month: '2-digit' } as const
+    expect(calendarDayOfAnyYear('2025-09-12', 'ru', '2026-11-02', digits)).toBe('12.09.2025')
+    expect(calendarDayOfAnyYear('2026-09-12', 'ru', '2026-11-02', digits)).toBe('12.09')
+  })
 })
 
 describe('dateOfAnyYear (MOL-204; MOL-329, adversarial А5)', () => {
