@@ -1,12 +1,12 @@
 import { randomUUID } from 'node:crypto'
-import { and, desc, eq, inArray, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, getTableColumns, inArray, isNull, sql } from 'drizzle-orm'
 import { DomainError, ERROR, STATISTICS_CONSENT_EDITION, verdictSchema } from '@molvia/model'
 import type { AdviceScope, NewVerdict, Verdict, VerdictPatch } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
 import { actors, items, verdicts } from './schema'
-import { liveItemId, noteTraceWrite } from './trace'
+import { liveItemId, noteTraceWrite, restampTraceWrite, verdictMoves } from './trace'
 
 export interface RatedVerdict {
   readonly verdict: Verdict
@@ -303,9 +303,17 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         `)
           const [first] = rows
           // A first verdict by a trace's id goes home with an undo while nobody touched it since
-          // (MOL-299, А2, А3): the moment is held to the microsecond, which a `Date` loses.
-          if (first?.inserted && asked !== undefined && asked.toLowerCase() !== first.itemId) {
-            await noteTraceWrite(tx, 'item', asked, 'verdict', { id: first.id, at: first.touched })
+          // (MOL-299, А2, А3): the moment is held to the microsecond, which a `Date` loses. One a merge
+          // moved, rated again by the trace's id, goes home with its new word (В2).
+          if (first !== undefined && asked !== undefined && asked.toLowerCase() !== first.itemId) {
+            if (first.inserted) {
+              await noteTraceWrite(tx, 'item', asked, 'verdict', {
+                id: first.id,
+                at: first.touched,
+              })
+            } else {
+              await restampTraceWrite(tx, 'item', asked, verdictMoves(first.id), first.touched)
+            }
           }
           return { row: first, withdrawn: prior !== undefined && prior.deletedAt !== null }
         }),
@@ -352,43 +360,65 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       if (patch.score !== undefined) set.score = patch.score
       if (patch.review !== undefined) set.review = patch.review
 
-      const [row] = await db
-        .update(verdicts)
-        .set(set)
-        .where(
-          and(
-            eq(verdicts.actorId, actorId),
-            // An id from before a merge reaches the survivor's verdict (MOL-106).
-            sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
-            // Products only until 0.3 — the path names an item, and a product has no place.
-            isNull(verdicts.placeId),
-            isNull(verdicts.deletedAt),
-          ),
-        )
-        .returning()
-      return row ? toVerdict(row) : null
+      return db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(verdicts)
+          .set(set)
+          .where(
+            and(
+              eq(verdicts.actorId, actorId),
+              // An id from before a merge reaches the survivor's verdict (MOL-106).
+              sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
+              // Products only until 0.3 — the path names an item, and a product has no place.
+              isNull(verdicts.placeId),
+              isNull(verdicts.deletedAt),
+            ),
+          )
+          .returning({
+            ...getTableColumns(verdicts),
+            touched: sql<string>`${verdicts.updatedAt}::text`,
+          })
+        if (!row) return null
+        // amended by a trace's id: still the person's word about the trace (MOL-299, В2)
+        if (row.itemId !== itemId.toLowerCase()) {
+          await restampTraceWrite(tx, 'item', itemId, verdictMoves(row.id), row.touched)
+        }
+        return toVerdict(row)
+      })
     },
 
     async withdraw(actorId, itemId) {
       if (idOrNull(actorId) === null || idOrNull(itemId) === null) return false
 
-      const withdrawn = await db
-        .update(verdicts)
-        // The text is erased with the withdrawal: whoever deletes a review expects it gone,
-        // and the gate needs only that the row existed and when. A CHECK holds the pair.
-        .set({ deletedAt: sql`clock_timestamp()`, review: null })
-        .where(
-          and(
-            eq(verdicts.actorId, actorId),
-            // An id from before a merge reaches the survivor's verdict (MOL-106).
-            sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
-            isNull(verdicts.placeId),
-            // A second withdrawal finds nothing: the first one's time is the one that stands.
-            isNull(verdicts.deletedAt),
-          ),
-        )
-        .returning({ id: verdicts.id })
-      return withdrawn.length > 0
+      return db.transaction(async (tx) => {
+        const withdrawn = await tx
+          .update(verdicts)
+          // The text is erased with the withdrawal: whoever deletes a review expects it gone,
+          // and the gate needs only that the row existed and when. A CHECK holds the pair.
+          .set({ deletedAt: sql`clock_timestamp()`, review: null })
+          .where(
+            and(
+              eq(verdicts.actorId, actorId),
+              // An id from before a merge reaches the survivor's verdict (MOL-106).
+              sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
+              isNull(verdicts.placeId),
+              // A second withdrawal finds nothing: the first one's time is the one that stands.
+              isNull(verdicts.deletedAt),
+            ),
+          )
+          .returning({
+            id: verdicts.id,
+            itemId: verdicts.itemId,
+            touched: sql<string>`${verdicts.updatedAt}::text`,
+          })
+        // withdrawn by a trace's id: the trace's verdict, withdrawn (MOL-299, В2)
+        for (const row of withdrawn) {
+          if (row.itemId !== itemId.toLowerCase()) {
+            await restampTraceWrite(tx, 'item', itemId, verdictMoves(row.id), row.touched)
+          }
+        }
+        return withdrawn.length > 0
+      })
     },
 
     async forItem(actorId, itemId, placeId) {

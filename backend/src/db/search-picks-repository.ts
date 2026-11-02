@@ -3,7 +3,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { searchQueryKey } from './items-repository'
 import { QUERY_KEY_MAX_OCTETS, searchPicks } from './schema'
-import { liveItemId, noteTraceWrite } from './trace'
+import { liveItemId, noteTraceWrite, restampTraceWrite } from './trace'
 
 export interface SearchPickRepository {
   /**
@@ -56,10 +56,21 @@ export function createSearchPickRepository(db: Conn): SearchPickRepository {
             inserted: sql<boolean>`xmax = 0`,
             at: sql<string>`${searchPicks.lastPickedAt}::text`,
           })
-        // A new pick by a trace's id goes home with an undo (MOL-299, А2); one added to the
-        // survivor's own stays the survivor's, as it was before the merge.
-        if (row?.inserted && row.itemId !== itemId.toLowerCase()) {
-          await noteTraceWrite(tx, 'item', itemId, 'pick', { queryKey: key, at: row.at }, actorId)
+        // A new pick by a trace's id goes home with an undo (MOL-299, А2), and so does one a merge
+        // moved, picked again by it (В1); one added to the survivor's own stays the survivor's, as it
+        // was before the merge — no move of the way names it.
+        if (row !== undefined && row.itemId !== itemId.toLowerCase()) {
+          if (row.inserted) {
+            await noteTraceWrite(tx, 'item', itemId, 'pick', { queryKey: key, at: row.at }, actorId)
+          } else {
+            await restampTraceWrite(
+              tx,
+              'item',
+              itemId,
+              sql`mv.what = 'pick' and mv.actor_id = ${actorId}::uuid and mv.key->>'queryKey' = ${key}`,
+              row.at,
+            )
+          }
         }
       }),
     )

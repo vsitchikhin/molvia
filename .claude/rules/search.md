@@ -836,7 +836,11 @@ report.
   said of the survivor by the next receipt, a pick of it under the same query, went to the trace whole (Б1,
   Б2). Each verdict, pick and word a merge moves or swaps — or a trace's id writes — is written with its
   moment to the microsecond (`updated_at`, `last_picked_at`, `written_at`), and the undo moves or swaps back
-  only a row still at it; a swap kept leaves the trace's row withdrawn. **The prices, named:** the trace's
+  only a row still at it; a swap kept leaves the trace's row withdrawn. **Touched by the trace's id, the row
+  is still the trace's** (adversarial В1, В2): a pick repeated from a phone's queue, a verdict given again,
+  amended or withdrawn by a bot's button land on the survivor's row as any write by a trace's id, and they
+  move its moves' moment with them (`restampTraceWrite`), so it goes home — swapped back, for a swap. A row
+  no move of the way names, the survivor's own from before, keeps nothing and stays. **The prices, named:** the trace's
   own score is lost where the person rated the survivor over it (the row was one), and the trace's row so
   kept holds the survivor's old score with its `rated_at`, withdrawn — the gate, the reminder and the copy
   read it (Б4: the journal keeps no score, since it outlives the person's erasure); an **item** written by a
@@ -844,8 +848,11 @@ report.
   survivor's second (В-7 «а»: the search shows the survivor, so it is rare); a row the trace's id changed
   rather than wrote — a pick added to, a verdict amended — stays where it is; a write by a trace that an
   `unmerge` commits between its row and its note stays with the survivor too (Б5, owner's В-8 «а»: the
-  owner's hand once a morning against milliseconds); and a move written before MOL-299 has no moment and
-  goes back as it did. **A dry run of `make merge` prints no number** (adversarial А4): the identity it takes is
+  owner's hand once a morning against milliseconds); a word of the shop's memory settled again after a
+  purchase removed (`settleWords`, MOL-240) takes another moment and stays with the survivor while its
+  purchase goes home — the memory says the survivor until the API's next start settles it whole (№9 of
+  the self-review, owner's В-9 «а»); and a move written before MOL-299 has no moment and goes back as it
+  did. **A dry run of `make merge` prints no number** (adversarial А4): the identity it takes is
   not rolled back, and «make unmerge ID=» of a dry run named a merge that would never be.
 - **The night** (`mergeTick`): a minute timer in the API, from 04:30 Yerevan — after the copy of the
   database at 04:00, so a copy before every merge exists — claimed by its day in

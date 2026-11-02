@@ -1004,6 +1004,16 @@ describe("the undo takes home what a trace's id wrote after the merge (MOL-299, 
     expect(await db.execute(sql`select item_id from item_barcodes`)).toEqual([{ item_id: younger }])
   }, 10_000)
 
+  it("takes home a pick the merge moved, picked again by the trace's id (В1)", async () => {
+    const picks = createSearchPickRepository(db)
+    await picks.remember(owner, 'малоко', younger)
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    // the same pick from a phone's queue, by the trace's id
+    await picks.remember(owner, 'малоко', younger)
+    await merges.unmerge(id)
+    expect(await pickOf('maloko')).toEqual({ item_id: younger, picks: 2 })
+  })
+
   it("leaves a word and a pick the survivor's id touched since (Б1, Б2)", async () => {
     const id = numbered(await merges.mergeItems(younger, older, NIGHT))
     const memory = createStoreMemoryRepository(db)
@@ -1126,6 +1136,48 @@ describe('the undo leaves a verdict the person touched after the merge (MOL-299,
     await merges.unmerge(id)
     expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
       { score: 5, live: true },
+      undefined,
+    ])
+  })
+
+  it("takes home a verdict the merge moved, rated again by the trace's id (В2)", async () => {
+    await verdict(owner, younger, { score: 2 })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    // a bot's button for a purchase of before the night
+    await rateItem({ items: createItemRepository(db), verdicts }, owner, younger, { score: 1 })
+    await merges.unmerge(id)
+    expect([await scoreOn(younger), await scoreOn(older)]).toEqual([
+      { score: 1, live: true },
+      undefined,
+    ])
+  })
+
+  it("swaps back a swapped verdict amended by the trace's id, and one withdrawn by it (В2)", async () => {
+    await verdict(owner, older, { score: 5, ratedAt: '2026-09-01T10:00:00Z' })
+    await verdict(owner, younger, { score: 2, ratedAt: '2026-09-02T10:00:00Z' })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await verdicts.amend(owner, younger, { score: 3 })
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      { score: 3, live: true },
+    ])
+    const again = numbered(await merges.mergeItems(younger, older, { by: 'hand' }))
+    expect(await verdicts.withdraw(owner, younger)).toBe(true)
+    await merges.unmerge(again)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      { score: 3, live: false },
+    ])
+  })
+
+  it("leaves the survivor's own verdict rated again by the trace's id", async () => {
+    await verdict(owner, older, { score: 5 })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await rateItem({ items: createItemRepository(db), verdicts }, owner, younger, { score: 4 })
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 4, live: true },
       undefined,
     ])
   })
