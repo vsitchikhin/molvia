@@ -211,6 +211,11 @@ lost (adversarial round 3, Т3). Named, since it needs a rollback. **Both edges 
 from its beginning**: begun before `--from` and in after it, «lost» may go below zero; begun on
 the last day and in on the next, it is a loss inside the window (review В2). Printed as they are.
 Then a row per day that counted anything.
+**The pairs of the search's memory are the last block** (MOL-330, `search.md`): different pairs «query →
+item taken» — a person, a key, the item it stands for now — of whoever accepted `PICKS_CONSENT_EDITION` and is
+counted, and the people behind them; all of them at the moment of reading, not the window's, since pairs gather
+for as long as people type. Beside `PICKS_MEASURE_MIN_PAIRS`, printed with no verdict; read with gate 0.2,
+whose decision closes the measure if the pairs never come.
 
 ## What «Что брать» shows, and what it refuses to (MOL-31)
 

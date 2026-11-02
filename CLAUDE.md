@@ -97,6 +97,9 @@ The log's writer, the cohort and both gate queries are pinned in `.claude/rules/
   day the login began, with no id at all; a device's repeat says `again=1`, so «began» is people
   rather than taps; a second way in is filed above `LOGIN_SECOND_WAY_PERCENT` (25 %) lost, read as
   the third block of `make gates`.
+- **The search's memory is measured on people's picks only by edition 6** (MOL-330, `PICKS_CONSENT_EDITION`):
+  «Это видно только вам» was the promise, so the measure is a purpose the statistics' consent names; `make gates`
+  prints the pairs of whoever accepted it and is counted, beside 70 (`PICKS_MEASURE_MIN_PAIRS`), no verdict.
 
 ## Money
 
