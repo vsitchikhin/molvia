@@ -1428,6 +1428,23 @@ describe('trip queue', () => {
         expect(held.debited()).toEqual(DEBITED)
       })
 
+      it('счёт со «Списано» выбран до правки строки из очереди — правка та же покупка, «списано» остаётся (В-2 «а»)', async () => {
+        const held = server()
+        const queue = fresh()
+        queue.enqueue(add(MILK, '520'))
+        await settled()
+
+        queue.enqueue(payment())
+        queue.enqueue(corrected())
+        held.release(true)
+        await settled()
+        await queue.flush()
+
+        // Правка встаёт на место своей покупки, до счёта: сервер видит смену цены раньше «списано».
+        expect(held.log).toEqual(['POST 52000', 'POST 75000', 'PATCH 75000', 'PAY'])
+        expect(held.debited()).toEqual(DEBITED)
+      })
+
       it('законченная запись на экране — ответ даёт ей строку, правка уходит правкой (путь «Записанных»)', async () => {
         const held = server('2026-09-19T09:00:00.000Z')
         const queue = fresh()
