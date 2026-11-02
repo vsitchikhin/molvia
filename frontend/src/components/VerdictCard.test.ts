@@ -297,7 +297,7 @@ describe('VerdictCard', () => {
       defineComponent({
         setup() {
           said.app = provideAnnouncer()
-          return () => h(VerdictCard, { card: milk })
+          return () => h(VerdictCard, { card: milk, today: '2026-09-20' })
         },
       }),
       { global: { plugins: [createAppI18n('en')] }, attachTo: document.body },
