@@ -1246,8 +1246,8 @@ describe('trip queue', () => {
 
     describe('правка, положенная пока запись в пути (MOL-325)', () => {
       /** 1 л за 750 вместо 0,9 л за 520: правка меняет и количество, не только цену. */
-      function corrected(): QueuedWrite {
-        const write = add(MILK, '750')
+      function corrected(price = '750'): QueuedWrite {
+        const write = add(MILK, price)
         if (write.kind !== 'add') throw new Error('add')
         return { ...write, body: { ...write.body, quantity: parseQuantity('1', 'l') } }
       }
@@ -1295,11 +1295,17 @@ describe('trip queue', () => {
               }
             }),
         )
-        addExpense.mockImplementation((_tripId, body) => {
+        let gate: Promise<void> | null = null
+        addExpense.mockImplementation(async (_tripId, body) => {
+          if (gate) {
+            const waiting = gate
+            gate = null
+            await waiting
+          }
           log.push(`POST ${String(body.amount?.minor)}`)
-          if (row) return Promise.resolve({ trip: viewOf(row), created: false })
+          if (row) return { trip: viewOf(row), created: false }
           row = body
-          return Promise.resolve({ trip: viewOf(body), created: true })
+          return { trip: viewOf(body), created: true }
         })
         updateExpense.mockImplementation((_tripId, _id, patch) => {
           log.push(`PATCH ${String(patch.amount?.minor)}`)
@@ -1331,6 +1337,16 @@ describe('trip queue', () => {
           log,
           /** Запись, как её показал бы экран до ответа: без этой строки. */
           shown: () => viewOf(null),
+          /** Следующий `POST` висит, пока не отпустят: связь вернулась, но слабая. */
+          holdNext: () => {
+            let open: () => void = () => undefined
+            gate = new Promise((resolve) => {
+              open = resolve
+            })
+            return () => {
+              open()
+            }
+          },
         }
       }
 
@@ -1426,6 +1442,31 @@ describe('trip queue', () => {
 
         expect(held.log).toEqual(['POST 52000', 'PATCH 75000', 'PAY'])
         expect(held.debited()).toEqual(DEBITED)
+      })
+
+      it('ответ потерялся, и пока в пути повтор, строку поправили ещё раз — побеждает последняя правка (Б1)', async () => {
+        const held = server()
+        const queue = fresh()
+        queue.enqueue(add(MILK, '520'))
+        await settled()
+        queue.enqueue(corrected())
+        held.release(true)
+        await settled()
+
+        // Связь вернулась на слабом сигнале: повтор с 750 висит, строка всё ещё «отправляется».
+        const open = held.holdNext()
+        void queue.flush()
+        await settled()
+        queue.enqueue(corrected('800'))
+        queue.enqueue(payment())
+        open()
+        await queue.flush()
+
+        // Правка старого тела, отправленная следом, затёрла бы 800 и сняла бы «списано».
+        expect(held.log).toEqual(['POST 52000', 'POST 75000', 'PATCH 80000', 'PAY'])
+        expect(held.row()?.amount).toEqual(parseMoney('800', 'AMD'))
+        expect(held.debited()).toEqual(DEBITED)
+        expect(queue.pending).toEqual([])
       })
 
       it('законченная запись, на экране уже другая — правка идёт вторым POST, но на своём месте (А2, цена)', async () => {
