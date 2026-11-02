@@ -971,23 +971,34 @@ describe('what lives how long (В-3)', () => {
 
 /**
  * am-05 as no log may carry it (MOL-327): every Armenian word of its lines from three letters, in any case,
- * and every number of four digits and more it prints — its articles, prices, total, tax and fiscal numbers,
- * the till's day — without its leading zeros.
+ * and every number of four digits and more without its leading zeros — each figure it prints, its digits
+ * joined across a point or a comma (never a space, which parts its columns), and each amount of its truth
+ * in whole drams, as a till rounds them, and in hundredths, as the server keeps money.
  */
 const PRINTED = am05.readings.join('\n')
 const PRINTED_WORDS = [...new Set(PRINTED.toLowerCase().match(/\p{Script=Armenian}{3,}/gu))]
+const PRINTED_AMOUNTS = [
+  am05.expected.total,
+  ...am05.expected.lines.flatMap((line) => [line.unit_price, line.sum]),
+].filter((amount) => amount !== null)
 const PRINTED_NUMBERS = [
   ...new Set(
-    (PRINTED.match(/\d{4,}/g) ?? [])
-      .map((number) => number.replace(/^0+/, ''))
+    [
+      ...(PRINTED.match(/\d+(?:[.,]\d+)*/g) ?? []),
+      ...PRINTED_AMOUNTS.flatMap((amount) =>
+        [Math.round(amount), Math.round(amount * 100)].map(String),
+      ),
+    ]
+      .map((number) => number.replace(/[.,]/g, '').replace(/^0+/, ''))
       .filter((number) => number.length >= 4),
   ),
 ]
 
 /**
- * What of am-05 a log carries, read without what a run puts in it by chance (MOL-327): pino's stamps and
- * Fastify's time of a request, taken by their values — a field of the server under the same name is read —
- * the places of a stack's frames, which are the checkout's, and the receipt's id, which is the test's.
+ * What of am-05 a log carries, read without what a run puts in it by chance (MOL-327): pino's stamps, the
+ * run's moment as a date and Fastify's time of a request, taken by their values — a field of the server under
+ * the same name is read — the places of a stack's frames, which are the checkout's, and the receipt's id,
+ * which is the test's.
  */
 function receiptIn(lines: readonly string[], stamp: number, receiptId: string): string[] {
   const stamps = `"time":${String(stamp)},"pid":${String(process.pid)},"hostname":${JSON.stringify(hostname())},`
@@ -995,6 +1006,7 @@ function receiptIn(lines: readonly string[], stamp: number, receiptId: string): 
     .map((line) =>
       line
         .replace(stamps, '')
+        .replaceAll(new Date(stamp).toISOString(), '<now>')
         .replace(/,"responseTime":[\d.e+-]+(?=,"msg":"request (?:completed|errored)"\}\s*$)/, '')
         .replace(/(?<=[( ])(?:\/|node:|file:)[^"()]*?:\d+:\d+/g, '<place>')
         .replaceAll(receiptId, '<receipt>'),
@@ -1084,6 +1096,7 @@ describe('the queue through the server', () => {
         'incoming request',
       )
       logging.log.info({ res: { statusCode: 200 }, responseTime: 8676.41 }, 'request completed')
+      logging.log.info({ before: new Date(stamp).toISOString() }, 'receipts purged')
       logging.log.error(
         { frames: ['at read (/tmp/8676/backend/src/x.ts:8676:41)', 'at /tmp/8676/x.js:1:2'] },
         'catalogue has no till names',
@@ -1103,6 +1116,9 @@ describe('the queue through the server', () => {
         lowered: 'կաթ իգիթ',
         article: '0401/1163909 23 м 740 370',
         till: 'GY0000000001 01.10.2026 12:00:00',
+        vat: formatInCurrency('1446.36', 'AMD', 'ru', exactFigures(2)),
+        price: '1 260',
+        sumMinor: 60885,
       }
       for (const [field, leak] of Object.entries(leaks)) {
         lines.length = 0
