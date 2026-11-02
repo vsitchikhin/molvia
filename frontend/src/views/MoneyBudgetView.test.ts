@@ -1433,6 +1433,7 @@ describe('MoneyBudgetView: a plan typed across midnight (MOL-329)', () => {
       { timeout: 8_000, interval: 100 },
     )
     expect(document.querySelector('dialog[open]')?.textContent).toContain('From September on')
+    const reads = moneyBudget.mock.calls.length
     await pressUntil(en.budget.sheet.save, () => {
       expect(setBudgetPlan).toHaveBeenCalledWith({
         categoryId: RENT,
@@ -1440,5 +1441,10 @@ describe('MoneyBudgetView: a plan typed across midnight (MOL-329)', () => {
         plan: { kind: 'amount', amount: amd('270000') },
       })
     })
+    // A plan from September on holds in October: the month shown is read again (adversarial Г1 of round 4).
+    await vi.waitFor(() => {
+      expect(moneyBudget.mock.calls.length).toBeGreaterThan(reads)
+    })
+    expect(moneyBudget).toHaveBeenLastCalledWith('2026-10')
   }, 30_000)
 })
