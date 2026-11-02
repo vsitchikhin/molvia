@@ -789,11 +789,20 @@ describe('SpendingSheet: «Дата, заметка, место» behind one lin
     // A bell: a character that draws nothing, which the server refuses.
     await typeInto(textField(en.spending.sheet.note_placeholder), `Lunch${String.fromCharCode(7)}`)
     await detailsDone()
+    // The focus comes once the note is marked, so it is read with its error (MOL-235, MOL-333).
+    // the details are mounted shut with the sheet: the very field they open on
+    const note = document.querySelector<HTMLInputElement>(
+      `input[placeholder="${en.spending.sheet.note_placeholder}"]`,
+    )
+    if (!note) throw new Error('no note field')
+    let marked: string | null = null
+    note.addEventListener('focus', () => (marked = note.getAttribute('aria-invalid')))
     await pressUntil(en.spending.sheet.save, () => {
       expect(topSheet().textContent).toContain(en.spending.sheet.bad_text)
     })
     await flushPromises()
     expect(document.activeElement).toBe(textField(en.spending.sheet.note_placeholder))
+    expect(marked).toBe('true')
     expect(detailsRow().getAttribute('aria-invalid')).toBe('true')
     expect(recordSpending).not.toHaveBeenCalled()
     // Put right, the mark goes with the error.
