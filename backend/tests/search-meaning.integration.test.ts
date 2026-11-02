@@ -119,23 +119,47 @@ describe('what the letters found does not move (owner’s decision В-3)', () =>
   })
 })
 
-describe('a name found by meaning is near wherever it stands (MOL-332, owner’s В-2 «а»)', () => {
+describe('one exact word does not make the other right, with the meaning too (MOL-46, MOL-332)', () => {
   /**
-   * The place is the mean's and the letters' nearness the worst word's: «кокосовое малако» (0 and 2
-   * edits) keeps «Молоко кокосовое» first by its letters, and its meaning made it near only where it
-   * also moved it — so the typo less read «не нашли», and «кокосовае малако» (1 and 2), a typo more,
-   * read near. The row is near either way now, and keeps its place.
+   * A row the letters found within one edit by the mean with a word two off is near neither by its
+   * letters nor by its meaning: one exact word lends the vector its sense as it lent the mean its edits.
+   * Made near by its meaning wherever found, each of these read «нашли» over another thing, where the
+   * screen says «не нашли» and offers «Предложить товар» (adversarial А2 of MOL-332, owner's В-3 «а»).
    */
-  it.each(['кокосовое малако', 'малако кокосовое', 'кокосовае малако'])(
-    '«%s» — «Молоко кокосовое» is near',
-    async (query) => {
-      const answer = await repo.search(query, 20, nobody, await queryMeaning(embedder, query))
-      expect(answer.nearIds).toContain(await idOf('Молоко кокосовое'))
-    },
-  )
+  it.each([
+    ['вода без сахара', 'Кола без сахара'],
+    ['соус абрикосовый', 'Сок абрикосовый'],
+    ['гель для мангала', 'Уголь для мангала'],
+    ['сода для посудомойки', 'Соль для посудомойки'],
+    ['суп острый', 'Соус острый'],
+  ])('«%s» → «%s», far', async (query, name) => {
+    const { names, near } = await search(query)
+    expect([names[0], near]).toEqual([name, false])
+  })
 
-  it('«кокосовое малако» still names «Молоко кокосовое» first, by its letters', async () => {
-    expect((await search('кокосовое малако')).names[0]).toBe('Молоко кокосовое')
+  /**
+   * The price of it, named (MOL-332, owner's В-3 «а»): the meaning makes a row near only where it also
+   * places it, so a typo more may read near where the typo less does not — «кокосовое малако» (0 and 2
+   * edits) keeps «Молоко кокосовое» first and not near, «кокосовае малако» (1 and 2) near. On the seed
+   * the answer is near either way, by «Кокос»; the row is what moves — «проверьте» on a receipt's line,
+   * and none of «Что брать» past its twentieth.
+   */
+  it('«кокосовое малако» — «Молоко кокосовое» first and not near; «кокосовае малако» — near', async () => {
+    const milk = await idOf('Молоко кокосовое')
+    const fewer = await repo.search(
+      'кокосовое малако',
+      20,
+      nobody,
+      await queryMeaning(embedder, 'кокосовое малако'),
+    )
+    const more = await repo.search(
+      'кокосовае малако',
+      20,
+      nobody,
+      await queryMeaning(embedder, 'кокосовае малако'),
+    )
+    expect([fewer.items[0]?.id, fewer.nearIds.includes(milk)]).toEqual([milk, false])
+    expect(more.nearIds).toContain(milk)
   })
 })
 
@@ -144,8 +168,9 @@ describe('a word on its way finds by its spelling (MOL-332, owner’s В-1 «а�
    * The price of the meaning, as of the letters' «молоч» → «Мука»: a cut word is read by how it is
    * spelt, and what it finds is near. «cheesecak» is cheese to the model (0.412), where right finds of
    * a shelf stand as close — «алкоголь» → «Водка» 0.406, «кисломолочка» → «Молоко» 0.419 — so no
-   * threshold tells them apart (`.scratch/tasks/requirements/MOL-332.md`). Pinned, so a change of the
-   * model or the threshold shows here.
+   * threshold tells them apart (`.scratch/tasks/status/MOL-332-measure.json`). The seed carries no
+   * cheesecake; with one in the catalogue it stays below the threshold (0.35, 0.40) and the cheese stands
+   * alone. Pinned, so a change of the model or the threshold shows here.
    */
   it.each([
     ['cheesecak', 'Сыр чечил'],
@@ -251,7 +276,7 @@ const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean, Answer?
   ['гигиена', null, false],
   ['косметика', null, false],
   ['уход за собой', null, false],
-  ['для кошки', 'Корм для кошек', true], // MOL-332: near by its meaning, though its word is two off
+  ['для кошки', 'Корм для кошек', false],
   ['зоотовары', 'Пелёнки для животных', true],
   ['для питомца', 'Лакомство для собак', true, ['Пелёнки для животных', true]], // either way: ARM, x86
 ]

@@ -209,8 +209,9 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   dictionary could. MOL-47 measured them a third time with the search by meaning (31.10.2026): none
   moved — under four letters there is no vector, «Cheesecake» is no nearer by meaning, and «Сааар»
   answers as the letters do — and one appeared: «cheesecak» finds «Сыр чечил» by its meaning alone
-  and calls the answer near, a price of a word on its way (MOL-332, «By meaning» below). A name without a size ranks level with a wrong size — unknown
-  is not worse than wrong, which is likely right.
+  and calls the answer near — a price of a word on its way (MOL-332, «By meaning» below). A name
+  without a size ranks level with a wrong size — unknown is not worse than wrong, which is likely
+  right.
 - **The answer says how near it is (MOL-46), and nothing is dropped for it.** The budget is
   absolute: `pelmeni` is two edits from `zeleni` of «Чай зелёный» exactly as `malako` is from
   `moloko`. Six rules on the letters were measured against the whole corpus and 241 two-edit
@@ -446,10 +447,9 @@ whose item was there, 29 found it sure, none another item, 3 a new one; all 71 w
 there stayed new. **The n is small**: of the 32, 10 by the names, 22 through the search — 10
 different glosses, seven lines of them one bag. **The axis of the candidates moves nothing**, 0.10
 to 0.30. **A budget of 1 moves nothing with the meaning; a budget of 3** — the nearness and the
-meaning's place moving with it, as the constants do — **turned four lines from sure to «проверьте»**:
-a coconut drink, its mean within one edit and a word two off, whose meaning made it near only where it
-also moved it. MOL-332 made a name found by meaning near wherever it stands (below), and since then no
-point of the grid moves a line with the meaning (`.scratch/tasks/status/MOL-332-lines-branch.md`). No point is better on both halves, so by MOL-14's rule nothing moves: a gloss is
+meaning's place moving with it, as the constants do — **turns four lines from sure to «проверьте»**:
+a coconut drink, its mean within one edit and a word two off (see «Where a name found by meaning
+stands», MOL-332). No point is better on both halves, so by MOL-14's rule nothing moves: a gloss is
 short and clean («молоко», «кинза шт»), and what decides is around the search — the names, the kind
 and brand of MOL-293, the heading. The three lines lost are those rules', each with its item in the
 search's answer, all of Haiku's — a carrot under a heading of grapes, which the till itself
@@ -588,16 +588,23 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   two-letter query — holds with room to spare.
 - **Where a name found by meaning stands** (owner's decision В-3): after everything within one edit
   by the mean, before two edits — `MEANING_DISTANCE`, the nearer by meaning first; so nothing the
-  letters found within one edit moves. «молоко» keeps every milk above the kefir; «овощи» puts the
-  carrot above the flour. **A name found by meaning is near wherever it stands** (MOL-332, owner's
-  В-2 «а»): its place is the mean's, and the letters' nearness the worst word's, so a name the mean
-  keeps within one edit with a word two off kept its place and lost the meaning's nearness with it —
-  «кокосовое малако» (0 and 2 edits) read «не нашли» over «Молоко кокосовое» first, and «кокосовае
-  малако» (1 and 2), a typo more, read near (adversarial А3 of MOL-47). Now both are near and the order
-  is as it was: on the seed, of 989 shelf words, owner's words and their cuts, ten answers differ and
-  only by the rows called near — «для кошки» the one answer that turns, «не нашли» to near over «Корм
-  для кошек»; 103 lines of the owner's receipts and MOL-293's 321 move no line to another item, and
-  eleven of the bench's to sure, every one its own (`.scratch/tasks/requirements/MOL-332.md`). **A name found
+  letters found within one edit moves, and an answer with such a name is near. «молоко» keeps every
+  milk above the kefir; «овощи» puts the carrot above the flour. **A name the mean keeps within one
+  edit while a word of it is two off is near neither way — a price, named** (MOL-332, owner's В-3
+  «а»): its place is the mean's, the letters' nearness the worst word's, and the meaning makes near
+  only what it places, so a typo more may read near where the typo less does not. «кокосовое малако»
+  (0 and 2 edits) keeps «Молоко кокосовое» first and not near, «кокосовае малако» (1 and 2) near. On
+  the seed the answer is near either way, by «Кокос»: the row is what differs — «проверьте» on a
+  receipt's line, none of «Что брать» past its twentieth — and «не нашли» stands over it only where
+  nothing else is near (the six names of adversarial А3 of MOL-47). **Near wherever found was tried
+  and taken back** (adversarial А1, А2 of MOL-332): one exact word lends the vector its sense as it
+  lent the mean its edits, so «мыло детское» read «нашли» over «Масло детское» — review А of MOL-46
+  undone by the model — and on the seed «вода без сахара» over «Кола без сахара». On the seed's typo
+  ladders and word swaps (`.scratch/tasks/status/MOL-332-review-probe-3.json`) it made 374 rows of
+  the thing meant near and 1 196 of another — three for one at any threshold of 0.40–0.60; the
+  letters deciding instead brought the dog food back to «не нашли» and fewer typos near than now. No
+  rule is better on both halves, and none is monotone, since the model is not: «агады» and «агади»,
+  one key, stand either side of 0.40. **A name found
   both ways takes the nearer place**: «собачий корм» finds the dog food two edits away by its
   letters and close by its meaning, and left at two it stood under the treat the meaning alone
   found — so «собачий корм» and «корм собакам» are near now, MOL-46's price taken back. The person's
@@ -612,12 +619,12 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   the shelf words, the owner's words of `seed-words.ts` — the first row the letters gave, unmoved —
   and the things that must find nothing near.
 - **The prices, named.** A word still being typed finds by its spelling: «молоч» on its way to
-  «молочка» shows «Мука» and «Мочалка» above the milk two edits away, for a keystroke. **So does its
-  meaning, near** (MOL-332, owner's В-1 «а»): «cheesecak» is cheese to the model, «Сыр чечил» at 0.412,
-  «кроссо» «Круассан», «морепр» «Морс» — of the 135 words and cuts the meaning alone answers near on
-  the seed, 106 are cuts. No threshold tells them from a shelf: «алкоголь» → «Водка» stands at 0.406,
-  «кисломолочка» → «Молоко» at 0.419, and an answer by meaning alone called far turned 28 shelf words
-  to «не нашли», a threshold of 0.42 six right ones for four wrong. «молочка»
+  «молочка» shows «Мука» and «Мочалка» above the milk two edits away, for a keystroke. **So does
+  its meaning, near** (MOL-332, owner's В-1 «а»): «cheesecak» is cheese to the model, «Сыр чечил» at
+  0.412, «кроссо» «Круассан», «морепр» «Морс» — of the 135 words and cuts the meaning alone answers
+  near on the seed, 106 are cuts. No threshold tells them from a shelf: «алкоголь» → «Водка» stands
+  at 0.406, «кисломолочка» → «Молоко» at 0.419; an answer by meaning alone called far turned 28
+  shelf words to «не нашли», a threshold of 0.42 six right ones for four wrong. «молочка»
   reaches the milks and not the kefir or the curd — the name alone goes into the vector (В-4), and
   the kefir stays below the threshold; a section of the seed as data would be a task of its own.
   **Armenian and Georgian shelf words find the wrong thing, near** — the model reads them by their

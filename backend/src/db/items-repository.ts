@@ -191,12 +191,6 @@ const MEANING_THRESHOLD = 0.4
  * nothing the letters found within one edit moves. A name found both ways takes the nearer of the
  * two: «собачий корм» finds «Корм для собак» two edits away by its letters and near by its meaning,
  * and kept at two it stood below the treat the meaning alone found.
- *
- * The place only: a name found by meaning is near wherever it stands (MOL-332, owner's В-2 «а»). The
- * place is decided by the mean and nearness by the worst word, so a row within one edit by the mean
- * with a word two off kept its place, was not near by its letters, and lost the meaning's nearness
- * with its place — «кокосовое малако» read «не нашли» over «Молоко кокосовое», and «кокосовае малако»,
- * a typo more, read near.
  */
 const MEANING_DISTANCE = NEAR_DISTANCE + 0.5
 
@@ -522,11 +516,15 @@ export function rankedCandidates(
             order by ${itemEmbeddings.embedding} <=> ${vectorLiteral(meaning.vector)}::halfvec
             limit ${MEANING_NEIGHBOURS}`
 
-  // Found by its meaning — a row near whatever its letters (MOL-332). Over the final select's \`mg\`.
-  const foundByMeaning = sql`coalesce(mg.sim >= ${MEANING_THRESHOLD}, false)`
   // Placed by its meaning: found by it and not within one edit by its letters — the row that takes
-  // \`MEANING_DISTANCE\`. Over the final select's \`r\` and \`mg\`.
-  const byMeaning = sql`(${foundByMeaning} and not coalesce(r.distance <= ${NEAR_DISTANCE}, false))`
+  // \`MEANING_DISTANCE\` and makes the answer near. Over the final select's \`r\` and \`mg\`.
+  //
+  // Near only where it is placed, a price (MOL-332, owner's В-3 «а»): a row within one edit by the mean
+  // with a word two off is not near, though a typo more would make it so. Near wherever found, the
+  // meaning called «Масло детское» found for «мыло детское» — one exact word lends the vector its
+  // sense as it lent the mean its edits (MOL-46, review А) — three false rows for one right.
+  const byMeaning = sql`coalesce(mg.sim >= ${MEANING_THRESHOLD}
+                               and not coalesce(r.distance <= ${NEAR_DISTANCE}, false), false)`
 
   return sql`
     with query_words as (
@@ -782,11 +780,11 @@ export function rankedCandidates(
     -- нашли» over what it shows, rather than «нашли» over a list with nothing near in it.
     --
     -- A name found by meaning is near (owner's decision В-3 of MOL-105): «овощи» that finds the
-    -- potato is a find, not «не нашли» over it — wherever it stands (MOL-332).
+    -- potato is a find, not «не нашли» over it.
     ordered as (
       select r.id,
              coalesce(r.words_worst <= ${NEAR_DISTANCE} or r.admitted or m.item_id is not null, false)
-               or ${foundByMeaning} as near,
+               or ${byMeaning} as near,
       -- What only a learnt word let in stands below what the search found by its words or the
       -- person took before, and above what it found by a typo (owner's decisions on review,
       -- MOL-45 И, О and Т): «кефир» learnt as the milk taken in its place stops standing above the
