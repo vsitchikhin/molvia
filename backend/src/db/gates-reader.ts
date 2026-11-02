@@ -1,6 +1,11 @@
 import { getTableColumns, sql } from 'drizzle-orm'
 import type { SQL, SQLWrapper } from 'drizzle-orm'
-import { GATE_RATINGS, GATE_RATINGS_WINDOW_HOURS, PICKS_CONSENT_EDITION } from '@molvia/model'
+import {
+  GATE_RATINGS,
+  GATE_RATINGS_WINDOW_HOURS,
+  PICKS_CONSENT_EDITION,
+  PICKS_MEASURE_PER_PERSON,
+} from '@molvia/model'
 import type { CohortReturn } from './events-repository'
 import type { Conn, Db } from './index'
 import type { CohortReached } from './verdicts-repository'
@@ -41,14 +46,20 @@ export interface GatesReport {
 }
 
 /**
- * The pairs «query → item taken» the measure of the search's memory may read (MOL-330): different pairs —
- * a person, a key, the item it stands for now — of people who accepted `PICKS_CONSENT_EDITION` and have
- * not turned the statistics off, and how many people stand behind them. Not of the window: pairs gather
- * for as long as people type, so it is all of them at the moment of reading.
+ * The pairs «query → item taken» the measure of the search's memory reads (MOL-330), of the people of gate 0.2's window
+ * — who appeared in `[from, to)`, so the release of 0.2 as `FROM` leaves out whoever came before it (review 1, Р-8) —
+ * who accepted `PICKS_CONSENT_EDITION` and keep the statistics on. A pair is a person, a key and the item it stands for
+ * now; a person's own word (`admits`) is no pair of the measure (Р-7) and is counted apart; a key the person typed on
+ * the way to another key of the same item is the same pair (owner's В-2 «а»); and no more than
+ * `PICKS_MEASURE_PER_PERSON` of one person's count (В-1 «а»). All of them at the moment of reading: pairs gather for as
+ * long as people type.
  */
 export interface PicksMeasured {
+  /** Towards `PICKS_MEASURE_MIN_PAIRS`: ordinary pairs, at most `PICKS_MEASURE_PER_PERSON` a person. */
   readonly pairs: number
   readonly people: number
+  /** The people's own words — a query that found nothing and the item taken after it — never in the line. */
+  readonly words: number
 }
 
 /**
@@ -187,7 +198,7 @@ export function createGatesReader(db: Db): GatesReader {
             receipts: await receiptsIn(tx, from, to, receiptDays),
             modelReceipts: await receiptsIn(tx, from, to, modelReceiptDays),
             taxReceipts: await taxReceiptsIn(tx, from, to),
-            picks: await picksMeasured(tx),
+            picks: await picksMeasured(tx, from, to),
           }
         },
         { isolationLevel: 'repeatable read', accessMode: 'read only' },
@@ -351,21 +362,38 @@ async function taxReceiptsIn(tx: Conn, from: Date, to: Date): Promise<TaxReceipt
   return { firstDay, lastDay, ...theSums(row) }
 }
 
-async function picksMeasured(tx: Conn): Promise<PicksMeasured> {
-  // The item a pick stands for now, as the search reads it: two twins merged are one pair (MOL-106).
-  const [row] = await tx.execute<{ pairs: number; people: number }>(sql`
-    select count(*)::int as pairs, count(distinct p.actor_id)::int as people
-    from (
-      select distinct ${searchPicks.actorId} as actor_id, ${searchPicks.queryKey} as query_key,
-             coalesce(${items.mergedInto}, ${items.id}) as item_id
+async function picksMeasured(tx: Conn, from: Date, to: Date): Promise<PicksMeasured> {
+  // The item a pick stands for now, as the search reads it: two twins merged are one pair (MOL-106); a word once, a word
+  // always, as the merge folds it.
+  const [row] = await tx.execute<{ pairs: number; people: number; words: number }>(sql`
+    with live as (
+      select ${searchPicks.actorId} as actor_id, ${searchPicks.queryKey} as query_key,
+             coalesce(${items.mergedInto}, ${items.id}) as item_id, bool_or(${searchPicks.admits}) as admits
       from ${searchPicks}
       join ${items} on ${items.id} = ${searchPicks.itemId}
       join ${actors} on ${actors.id} = ${searchPicks.actorId}
       where ${actors.consentVersion} >= ${PICKS_CONSENT_EDITION}::int
         and ${actors.analyticsOffAt} is null
-    ) p
+        and ${actors.createdAt} >= ${from.toISOString()}::timestamptz
+        and ${actors.createdAt} < ${to.toISOString()}::timestamptz
+      group by 1, 2, 3
+    ),
+    ordinary as (
+      select l.actor_id
+      from live l
+      where not l.admits
+        and not exists (
+          select 1 from live o
+          where o.actor_id = l.actor_id and o.item_id = l.item_id and not o.admits
+            and o.query_key <> l.query_key and starts_with(o.query_key, l.query_key))
+    ),
+    per_person as (select actor_id, count(*) as n from ordinary group by actor_id)
+    select coalesce(sum(least(n, ${PICKS_MEASURE_PER_PERSON}::int)), 0)::int as pairs,
+           count(*)::int as people,
+           (select count(*) from live where admits)::int as words
+    from per_person
   `)
-  return { pairs: row?.pairs ?? 0, people: row?.people ?? 0 }
+  return { pairs: row?.pairs ?? 0, people: row?.people ?? 0, words: row?.words ?? 0 }
 }
 
 function theSums<T>(row: T | undefined): T {

@@ -53,3 +53,10 @@ export const RECEIPT_EDITS_STOP_PERCENT = 33.3
  * measure» (owner's В-2 «а»).
  */
 export const PICKS_MEASURE_MIN_PAIRS = 70
+
+/**
+ * How many of one person's pairs count towards `PICKS_MEASURE_MIN_PAIRS` (MOL-330, owner's В-1 «а» of review 1): ten,
+ * so seventy means seven people at least — a contribution is a person, not a row, and sixty pairs of one newcomer and
+ * one each of nine others are nineteen, not sixty-nine.
+ */
+export const PICKS_MEASURE_PER_PERSON = 10

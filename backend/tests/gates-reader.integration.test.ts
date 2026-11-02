@@ -264,9 +264,10 @@ describe('the gates reader', () => {
     expect(report.reminders).toMatchObject({ firstSteps: 0, items: 0, rated: 0, offBlocked: 0 })
   })
 
-  // MOL-330: the pairs the search's memory is measured on — only of whoever accepted the edition that names the
-  // measure and keeps the statistics on; a pick on a twin is the survivor's pair; a person's own word is a pair.
-  it('counts the pairs of the search memory of those who accepted its edition and are counted', async () => {
+  // MOL-330: the pairs the search's memory is measured on — only of the window's people who accepted the edition that
+  // names the measure and are counted; a pick on a twin is the survivor's pair; a key typed on the way to another of the
+  // same item is that pair (В-2 «а»); a person's own word is no pair, counted apart (Р-7); ten a person at most (В-1 «а»).
+  it('counts the pairs of the search memory of the window’s people who accepted its edition', async () => {
     const counted = { consentVersion: PICKS_CONSENT_EDITION, consentedAt: new Date() }
     const milk = await insertItem(db)
     const twin = await insertItem(db, { name: 'Молоко «Ашхар» 1 л', mergedInto: milk })
@@ -276,22 +277,46 @@ describe('the gates reader', () => {
     const before = await insertCounted(db, { consentVersion: PICKS_CONSENT_EDITION - 1 })
     const none = await insertActor(db)
     const off = await insertActor(db, { ...counted, analyticsOffAt: new Date() })
+    // the owner, there before the release of 0.2: not one of its people (Р-8)
+    const owner = await insertActor(db, {
+      ...counted,
+      createdAt: new Date(window.from.getTime() - DAY),
+    })
     await db.insert(searchPicks).values([
       { actorId: first, queryKey: 'moloko', itemId: milk, picks: 3 },
       { actorId: first, queryKey: 'moloko', itemId: twin },
       { actorId: first, queryKey: 'mol', itemId: milk },
       { actorId: first, queryKey: 'kislomolochka', itemId: kefir, admits: true },
       { actorId: second, queryKey: 'moloko', itemId: milk },
+      { actorId: second, queryKey: 'mol', itemId: kefir },
       { actorId: before, queryKey: 'moloko', itemId: milk },
       { actorId: none, queryKey: 'moloko', itemId: milk },
       { actorId: off, queryKey: 'moloko', itemId: milk },
+      { actorId: owner, queryKey: 'moloko', itemId: milk },
     ])
 
-    expect((await reader.read(window)).picks).toEqual({ pairs: 4, people: 2 })
+    expect((await reader.read(window)).picks).toEqual({ pairs: 3, people: 2, words: 1 })
+  })
+
+  it('counts at most ten pairs of one person towards the line (В-1 «а»)', async () => {
+    const one = await insertActor(db, {
+      consentVersion: PICKS_CONSENT_EDITION,
+      consentedAt: new Date(),
+    })
+    const shelf: string[] = []
+    for (let i = 0; i < 12; i += 1)
+      shelf.push(
+        await insertItem(db, { name: `Товар ${String(i)}`, searchKey: `tovar ${String(i)}` }),
+      )
+    await db
+      .insert(searchPicks)
+      .values(shelf.map((itemId, i) => ({ actorId: one, queryKey: `tovar ${String(i)}`, itemId })))
+
+    expect((await reader.read(window)).picks).toEqual({ pairs: 10, people: 1, words: 0 })
   })
 
   it('reads no pairs where there are none', async () => {
-    expect((await reader.read(window)).picks).toEqual({ pairs: 0, people: 0 })
+    expect((await reader.read(window)).picks).toEqual({ pairs: 0, people: 0, words: 0 })
   })
 
   it('reads inside a read-only, repeatable-read transaction', async () => {
