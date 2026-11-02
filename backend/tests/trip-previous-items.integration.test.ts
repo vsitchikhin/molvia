@@ -7,6 +7,7 @@ import { buildServer } from '@/server'
 import { PREVIOUS_ITEMS_LIMIT } from '@/usecases/previous-items'
 import { connectDrizzle } from './db'
 import { insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 const app = buildServer({ db })
@@ -273,10 +274,12 @@ describe('«Брали здесь в прошлый раз» (MOL-209)', () => {
 })
 
 async function expenseOf(tripId: string, itemId: string): Promise<string> {
-  const [row] = await db
-    .select({ id: expenses.id })
-    .from(expenses)
-    .where(and(eq(expenses.tripId, tripId), eq(expenses.itemId, itemId)))
+  const row = onlyRow(
+    await db
+      .select({ id: expenses.id })
+      .from(expenses)
+      .where(and(eq(expenses.tripId, tripId), eq(expenses.itemId, itemId))),
+  )
   if (!row) throw new Error('no such purchase')
   return row.id
 }

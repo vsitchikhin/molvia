@@ -21,6 +21,7 @@ import {
   signIn,
   tripContext,
 } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The test here past half a second on CI carries a timeout of 10 s: it took 774 ms there at worst
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -203,7 +204,7 @@ describe('«Вернуть» (MOL-76)', () => {
     await call(me, 'DELETE', `/trips/${trip}`)
     await markedAgo(trip, '9 minutes')
     await call(me, 'DELETE', `/trips/${trip}`)
-    const [row] = await db.select().from(trips).where(eq(trips.id, trip))
+    const row = onlyRow(await db.select().from(trips).where(eq(trips.id, trip)))
     expect(row?.deletedAt?.getTime()).toBeLessThan(Date.now() - 8 * 60 * 1000)
   })
 
@@ -274,13 +275,13 @@ describe('«Вернуть» вместе с «Завершить» (MOL-76, р�
   it('уже завершённый — время не двигается; время телефона из будущего отброшено', async () => {
     const me = await owner()
     const finished = await tripWithMilk(me, { finished: true })
-    const [before] = await db.select().from(trips).where(eq(trips.id, finished.trip))
+    const before = onlyRow(await db.select().from(trips).where(eq(trips.id, finished.trip)))
     await call(me, 'DELETE', `/trips/${finished.trip}`)
     const back = await call(me, 'POST', `/trips/${finished.trip}/restore`, {
       finish: { finishedOnDeviceAt: '2026-09-01T10:00:00.000Z' },
     })
     expect(back.statusCode).toBe(200)
-    const [after] = await db.select().from(trips).where(eq(trips.id, finished.trip))
+    const after = onlyRow(await db.select().from(trips).where(eq(trips.id, finished.trip)))
     expect(after?.finishedAt).toEqual(before?.finishedAt)
     expect(after?.finishedOnDeviceAt).toBeNull()
 
@@ -323,7 +324,7 @@ describe('старт из очереди после удаления (MOL-76, Р
     expect(fresh.statusCode).toBe(201)
     const view = tripViewCodec.parse(fresh.json())
     expect(view.expenses).toEqual([])
-    const [row] = await db.select().from(trips).where(eq(trips.id, id))
+    const row = onlyRow(await db.select().from(trips).where(eq(trips.id, id)))
     expect(row?.deletedAt).toBeNull()
   })
 })
@@ -340,7 +341,7 @@ describe('минутный таймер (MOL-76)', () => {
     await createTripRepository(db).purgeStale()
 
     const left = await db.select({ id: trips.id }).from(trips).where(eq(trips.actorId, me.id))
-    expect(left.map((row) => row.id).sort()).toEqual([recent.trip, live.trip].sort())
+    expect(sorted(left.map((row) => row.id))).toEqual([recent.trip, live.trip].sort())
     expect(await db.select().from(expenses).where(eq(expenses.id, stale.expense))).toEqual([])
     expect(await db.select().from(expenses).where(eq(expenses.id, recent.expense))).toHaveLength(1)
   })

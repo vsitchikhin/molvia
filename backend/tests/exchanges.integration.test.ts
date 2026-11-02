@@ -29,6 +29,7 @@ import {
   signIn,
   tripContext,
 } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 9 tests here past half a second on CI carry a timeout of 10 s: the slowest took 646 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -1059,7 +1060,7 @@ describe('правка обмена с историей (MOL-42)', () => {
   it('правит на месте, прежняя версия — в истории, место в дне и курс — по новой', async () => {
     const me = await owner()
     const { id } = await recorded(me, { note: 'ВТБ банкомат' })
-    const [before] = await db.select().from(exchanges)
+    const before = onlyRow(await db.select().from(exchanges))
 
     const response = await amend(me.cookie, id, {
       received: { amount: '95000', currency: 'AMD' },
@@ -1087,7 +1088,7 @@ describe('правка обмена с историей (MOL-42)', () => {
       },
     ])
     expect(overview.wallet?.rate.scaled).toBe(parseRate('4.75'))
-    const [after] = await db.select().from(exchanges)
+    const after = onlyRow(await db.select().from(exchanges))
     expect(after?.createdAt).toEqual(before?.createdAt)
   })
 
@@ -1176,7 +1177,7 @@ describe('обмен дня, до которого Ереван не дошёл 
   const tokyo = '2026-09-11'
 
   async function actorOf(id: string, today?: string) {
-    const [actor] = await db.select().from(actors).where(eq(actors.id, id))
+    const actor = onlyRow(await db.select().from(actors).where(eq(actors.id, id)))
     if (!actor) throw new Error('no actor')
     return today === undefined ? actor : { ...actor, today }
   }
@@ -1230,7 +1231,7 @@ describe('границы дня — в поясе телефона (MOL-121)', (
   const minutes = (at: Date, by: number) => new Date(at.getTime() + by * 60_000)
 
   async function asking(id: string, at: Date, zone: string) {
-    const [actor] = await db.select().from(actors).where(eq(actors.id, id))
+    const actor = onlyRow(await db.select().from(actors).where(eq(actors.id, id)))
     if (!actor) throw new Error('no actor')
     const today = new Intl.DateTimeFormat('en-CA', { timeZone: zone }).format(at)
     return { ...actor, today, zone }

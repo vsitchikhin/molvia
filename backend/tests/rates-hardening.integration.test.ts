@@ -18,6 +18,7 @@ import { buildServer } from '@/server'
 import { FALLBACK_AFTER_FAILURES, officialRatesRefresh } from '@/usecases/refresh-official-rates'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 572 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -251,7 +252,7 @@ describe('Б. Курс, сдвинутый в 100 раз, — скачок и в
     await run()
 
     const stored = await db.select().from(officialRates)
-    expect(stored.find((row) => row.currency === 'RUB')).toMatchObject({ jump: false })
+    expect(onlyRow(stored.filter((row) => row.currency === 'RUB'))).toMatchObject({ jump: false })
   })
 
   it('контроль: ноль и отрицательный курс отвергнуты целиком', () => {

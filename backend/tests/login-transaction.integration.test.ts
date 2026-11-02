@@ -7,6 +7,7 @@ import { actors, loginRequests, sessions } from '@/db/schema'
 import { completeLogin } from '@/usecases/complete-login'
 import { connectDrizzle } from './db'
 import { anHourFromNow, clearAll, telegramId } from './fixtures'
+import { sorted } from './rows'
 
 // The test here past half a second on CI carries a timeout of 10 s: it took 502 ms there at worst
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -125,10 +126,14 @@ describe('atomic login', () => {
     ])
     expect(results.map((result) => result.status)).toEqual(['authenticated', 'authenticated'])
     expect(await first.db.select().from(actors)).toHaveLength(1)
+    // two logins at once: neither is written first, so the rows are compared with no order (MOL-323)
     const written = await first.db.select().from(sessions)
     expect(written).toHaveLength(2)
-    expect(written[0]?.actorId).toBe(written[1]?.actorId)
-    expect(written.map((row) => row.deviceName)).toEqual(['iPhone · Safari', 'iPhone · Safari'])
+    expect(new Set(written.map((row) => row.actorId)).size).toBe(1)
+    expect(sorted(written.map((row) => row.deviceName))).toEqual([
+      'iPhone · Safari',
+      'iPhone · Safari',
+    ])
   })
 
   it('a session failure rolls back consumption and a newly created owner', async () => {

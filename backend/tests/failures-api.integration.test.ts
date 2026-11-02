@@ -12,6 +12,7 @@ import { failures, ownerNotices } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll } from './fixtures'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 
@@ -74,7 +75,7 @@ describe('сбой API — в таблицу (MOL-143)', () => {
     const response = await app.inject({ method: 'GET', url: `/test/boom/${PERSON_ID}?q=сыр` })
     expect(response.statusCode).toBe(500)
 
-    const [row] = await recorded()
+    const row = onlyRow(await recorded())
     expect(row).toMatchObject({
       source: 'api',
       errorName: 'TypeError',
@@ -92,10 +93,11 @@ describe('сбой API — в таблицу (MOL-143)', () => {
 
     const everything = await db.execute(sql`
       select f::text as row from ${failures} f
-      union all select n::text from ${ownerNotices} n`)
+      union all select n::text from ${ownerNotices} n
+      order by row`)
     expect(everything.length).toBeGreaterThan(0)
     expect(JSON.stringify([...everything])).not.toMatch(/Сыр|Ширакаци|Аня/)
-    const [row] = await recorded()
+    const row = onlyRow(await recorded())
     expect(row?.code).toBe('22P02')
   })
 
@@ -117,12 +119,12 @@ describe('сбой API — в таблицу (MOL-143)', () => {
   it('владельцу — одно уведомление на отпечаток в сборке, повтор копит счёт', async () => {
     await app.inject({ method: 'GET', url: `/test/boom/${PERSON_ID}` })
     await app.inject({ method: 'GET', url: '/test/boom/another' })
-    const [row] = await recorded()
+    const row = onlyRow(await recorded())
     expect(row?.count).toBe(2)
 
     const queued = await db.select().from(ownerNotices)
     expect(queued).toHaveLength(1)
-    expect(queued[0]?.payload).toMatchObject({
+    expect(onlyRow(queued)?.payload).toMatchObject({
       kind: 'failure',
       route: 'GET /test/boom/:itemId',
       errorName: 'TypeError',
@@ -156,7 +158,7 @@ describe('бот и канал владельцу — /internal (MOL-143)', () =
     })
     expect(response.statusCode).toBe(204)
     // Answered at once and written behind the answer: the row is waited for, never raced (№13).
-    const [row] = await recorded()
+    const row = onlyRow(await recorded())
     expect(row).toMatchObject({ source: 'bot', route: 'callback:rate', errorName: 'GrammyError' })
   })
 

@@ -38,6 +38,7 @@ import { createTripRepository } from '@/db/trips-repository'
 import { buildServer } from '@/server'
 import { connect, connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
+import { onlyRow, sorted, sum } from './rows'
 
 // The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 857 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -211,7 +212,7 @@ describe('«Записать»', () => {
     expect(answer.tripId).toBe(tripId)
     expect(answer.receipt).toMatchObject({ status: 'recorded', tripId })
 
-    const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+    const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
     expect(trip).toMatchObject({
       actorId: me,
       startedOn: '2026-09-26',
@@ -222,10 +223,12 @@ describe('«Записать»', () => {
       currency: 'AMD',
     })
     expect(trip?.finishedAt).not.toBeNull()
-    const [place] = await db
-      .select()
-      .from(places)
-      .where(eq(places.id, trip?.placeId ?? ''))
+    const place = onlyRow(
+      await db
+        .select()
+        .from(places)
+        .where(eq(places.id, trip?.placeId ?? '')),
+    )
     expect(place).toMatchObject({ name: 'Ереван Сити', city: 'Гюмри' })
 
     const bought = await db
@@ -236,8 +239,8 @@ describe('«Записать»', () => {
     expect(bought).toHaveLength(4)
     const smoked = await db.select().from(items).where(eq(items.name, 'Сыр Лори копчёный'))
     expect(smoked).toHaveLength(1)
-    expect(smoked[0]?.createdBy).toBe(me)
-    expect(bought.filter((row) => row.itemId === smoked[0]?.id)).toHaveLength(2)
+    expect(onlyRow(smoked)?.createdBy).toBe(me)
+    expect(bought.filter((row) => row.itemId === onlyRow(smoked)?.id)).toHaveLength(2)
 
     const lines = await db
       .select()
@@ -506,12 +509,14 @@ describe('«Записать»', () => {
         const waiting = async (n: number) => {
           const deadline = Date.now() + 2_000
           while (Date.now() < deadline) {
-            const [row] = await watcher<{ n: number }[]>`
+            const row = onlyRow(
+              await watcher<{ n: number }[]>`
             select count(*)::int as n from pg_locks
             where locktype = 'advisory' and not granted and objsubid = 2
               and classid = hashtext('trips')::oid and objid = hashtext(${me})::oid
               and database = (select oid from pg_database where datname = current_database())
-          `
+          `,
+            )
             if ((row?.n ?? 0) >= n) return
             await new Promise((resolve) => setTimeout(resolve, 10))
           }
@@ -632,7 +637,7 @@ describe('«Записать»', () => {
       ],
     })
     expect(response.statusCode).toBe(200)
-    const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+    const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
     expect(trip?.receiptMinor).toBe(215_000n)
   }, 15_000)
 
@@ -675,13 +680,13 @@ describe('«Записать»', () => {
         expect.objectContaining({ name: 'Сметана 20%' }),
       ])
       // no total read: the money is the lines, the typed ones too
-      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
       expect(trip?.receiptMinor).toBe(313_000n)
       // a line typed has no row of the receipt, and teaches the shop nothing
       expect(
         await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id)),
       ).toHaveLength(1)
-      const sourCream = made.find((item) => item.name === 'Сметана 20%')?.id
+      const sourCream = onlyRow(made.filter((item) => item.name === 'Сметана 20%'))?.id
       const remembered = await db.select({ itemId: storeMemory.itemId }).from(storeMemory)
       expect(remembered.length).toBeGreaterThan(0)
       expect(remembered.every((word) => word.itemId === sourCream)).toBe(true)
@@ -714,7 +719,7 @@ describe('«Записать»', () => {
         ],
       })
       expect(response.statusCode).toBe(200)
-      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
       expect(trip?.receiptMinor).toBe(170_000n)
       expect(await db.select().from(expenses).where(eq(expenses.tripId, tripId))).toHaveLength(2)
     })
@@ -773,10 +778,12 @@ describe('«Записать»', () => {
     expect(prices.json()).toMatchObject({ prices: { itemId: milk, places: [] } })
     // Must not fire: the receipt's total stays the one recorded, and the gift still waits for a
     // verdict (Р-4). The gift's 0 in a trip's money is held on the manual path, by `/trips/:id`.
-    const [trip] = await db
-      .select()
-      .from(trips)
-      .where(eq(trips.id, rows[0]?.tripId ?? ''))
+    const trip = onlyRow(
+      await db
+        .select()
+        .from(trips)
+        .where(eq(trips.id, onlyRow(rows)?.tripId ?? '')),
+    )
     expect(trip?.receiptMinor).toBe(30_000n)
     const pending = await app.inject({
       method: 'GET',
@@ -886,7 +893,7 @@ describe('«Записать»', () => {
         .from(storeMemory)
         .where(eq(storeMemory.kind, 'sku'))
         .orderBy(asc(storeMemory.key))
-      const [days] = await db.select().from(receiptDays)
+      const days = onlyRow(await db.select().from(receiptDays))
       return { bought, made, read, words, days }
     }
 
@@ -1136,7 +1143,7 @@ describe('«Записать»', () => {
     })
     const moneyOf = async (receipt: string, payload: ReturnType<typeof body>) => {
       expect((await record(me, receipt, payload)).statusCode).toBe(200)
-      const [trip] = await db.select().from(trips).where(eq(trips.id, payload.tripId))
+      const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, payload.tripId)))
       return trip?.receiptMinor
     }
     // misread below the lines (В5): 2 190 of lines, 190 printed — the lines
@@ -1190,7 +1197,7 @@ describe('«Записать»', () => {
     })
     const moneyOf = async (receipt: string, payload: ReturnType<typeof body>) => {
       expect((await record(me, receipt, payload)).statusCode).toBe(200)
-      const [trip] = await db.select().from(trips).where(eq(trips.id, payload.tripId))
+      const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, payload.tripId)))
       return trip?.receiptMinor
     }
     // 2 190 of lines and 21,90 sent to the card: «Ընդամենը» 2 211,90 left the card
@@ -1239,7 +1246,7 @@ describe('«Записать»', () => {
     const echoed = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '6' })
     expect(await moneyOf(echoed, body({ total: amount(2_190) }))).toBe(221_190n)
     const days = await db.select().from(receiptDays)
-    expect(days.reduce((all, day) => all + day.totalsCorrected, 0)).toBe(0)
+    expect(sum(days.map((day) => day.totalsCorrected))).toBe(0)
     // any other figure it sends is the person's word, taken as it is
     const typedOver = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '7' })
     expect(await moneyOf(typedOver, body({ total: amount(2_200) }))).toBe(220_000n)
@@ -1319,10 +1326,12 @@ describe('«Записать»', () => {
       ],
     })
     expect(recorded.statusCode).toBe(200)
-    const [bought] = await db
-      .select({ id: expenses.id })
-      .from(expenses)
-      .where(and(eq(expenses.tripId, tripId), eq(expenses.itemId, cheese)))
+    const bought = onlyRow(
+      await db
+        .select({ id: expenses.id })
+        .from(expenses)
+        .where(and(eq(expenses.tripId, tripId), eq(expenses.itemId, cheese))),
+    )
     const cookie = await signIn(db, me)
     const removed = await app.inject({
       method: 'DELETE',
@@ -1339,7 +1348,7 @@ describe('«Записать»', () => {
       .where(eq(receiptLineImages.receiptId, id))
     expect(rows.map((row) => row.position)).toEqual([0])
     // the receipt still dates its trip and names it «из чека»
-    const [receipt] = await db.select().from(receipts).where(eq(receipts.id, id))
+    const receipt = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
     expect(receipt).toMatchObject({ status: 'recorded', tripId, tin: TIN })
     const view = await app.inject({ method: 'GET', url: `/trips/${tripId}`, headers: { cookie } })
     const trip = tripViewCodec.parse(view.json())
@@ -1378,19 +1387,23 @@ describe('«Записать»', () => {
       return tripId
     }
     const wordsOf = async (actorId: string) =>
-      (await db.select().from(storeMemory).where(eq(storeMemory.actorId, actorId)))
-        .map((word) => `${word.kind}:${word.itemId === milk ? 'milk' : 'cheese'}`)
-        .sort()
+      sorted(
+        (await db.select().from(storeMemory).where(eq(storeMemory.actorId, actorId))).map(
+          (word) => `${word.kind}:${word.itemId === milk ? 'milk' : 'cheese'}`,
+        ),
+      )
     const all = ['sku:cheese', 'sku:milk', 'text:cheese', 'text:milk']
     const first = await recordTwo(me)
     const second = await recordTwo(me)
     await recordTwo(stranger)
     const cookie = await signIn(db, me)
     const removeCheese = async (tripId: string) => {
-      const [bought] = await db
-        .select({ id: expenses.id })
-        .from(expenses)
-        .where(and(eq(expenses.tripId, tripId), eq(expenses.itemId, cheese)))
+      const bought = onlyRow(
+        await db
+          .select({ id: expenses.id })
+          .from(expenses)
+          .where(and(eq(expenses.tripId, tripId), eq(expenses.itemId, cheese))),
+      )
       const removed = await app.inject({
         method: 'DELETE',
         url: `/trips/${tripId}/expenses/${bought?.id ?? ''}`,
@@ -1454,11 +1467,10 @@ describe('«Записать»', () => {
         ],
       })
       expect(answer.statusCode).toBe(200)
-      const [bought] = await db
-        .select({ id: expenses.id })
-        .from(expenses)
-        .where(eq(expenses.tripId, tripId))
-      const [receipt] = await db.select().from(receipts).where(eq(receipts.id, id))
+      const bought = onlyRow(
+        await db.select({ id: expenses.id }).from(expenses).where(eq(expenses.tripId, tripId)),
+      )
+      const receipt = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
       return { tripId, expenseId: bought?.id ?? '', recordedAt: receipt?.recordedAt }
     }
     const remove = (actorId: string, bought: { tripId: string; expenseId: string }) =>
@@ -1560,7 +1572,9 @@ describe('«Записать»', () => {
         ],
       })
       expect(answer.statusCode).toBe(200)
-      const [line] = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
+      const line = onlyRow(
+        await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id)),
+      )
       expect(line?.asRead).toBe(false)
       // the purchase put back to the sum read: the record's judgement stands
       await db.update(expenses).set({ amountMinor: 37_000n }).where(eq(expenses.tripId, tripId))
@@ -1876,11 +1890,13 @@ describe('«Записать»', () => {
       ],
     })
     expect(response.statusCode).toBe(200)
-    const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
-    const [place] = await db
-      .select()
-      .from(places)
-      .where(eq(places.id, trip?.placeId ?? ''))
+    const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
+    const place = onlyRow(
+      await db
+        .select()
+        .from(places)
+        .where(eq(places.id, trip?.placeId ?? '')),
+    )
     // a venue and its dishes have no screen before 0.3: «Оценки», the reminder and «Что брать» read
     // products only, so a meal is recorded as a shop's purchases and stays there to be rated
     expect(place).toMatchObject({ name: 'KFC', kind: 'store' })
@@ -1899,6 +1915,7 @@ describe('«Записать»', () => {
       .select({ hs: receiptLines.hs })
       .from(receiptLines)
       .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
     expect(lines.map((line) => line.hs)).toEqual(['56.10', '56.10'])
   })
 
@@ -1916,11 +1933,11 @@ describe('«Записать»', () => {
         lines: [],
       })
       expect(response.statusCode).toBe(200)
-      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
       expect(trip).toMatchObject({ startedOn: '2026-09-26', receiptMinor: 170_000n })
       expect(trip?.finishedAt).not.toBeNull()
       expect(await db.select().from(expenses)).toEqual([])
-      const [held] = await db.select().from(receipts).where(eq(receipts.id, id))
+      const held = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
       expect([held?.status, held?.tripId]).toEqual(['recorded', tripId])
       expect(await db.select().from(receiptDays)).toMatchObject([
         { recorded: 1, lines: 0, linesEdited: 0, totalsCorrected: 0 },
@@ -1939,7 +1956,7 @@ describe('«Записать»', () => {
         lines: [],
       })
       expect(response.statusCode).toBe(200)
-      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
       expect(trip?.receiptMinor).toBe(180_000n)
       expect(await db.select().from(receiptDays)).toMatchObject([
         { recorded: 1, totalsCorrected: 1 },
@@ -1959,7 +1976,7 @@ describe('«Записать»', () => {
       expect(codeOf(response)).toBe(ERROR.RECEIPT_TOTAL_REQUIRED)
       expect(await db.select().from(trips)).toEqual([])
       expect(await db.select().from(places)).toEqual([])
-      const [held] = await db.select().from(receipts).where(eq(receipts.id, id))
+      const held = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
       expect(held?.status).toBe('parsed')
     })
 
@@ -1977,7 +1994,7 @@ describe('«Записать»', () => {
       })
       expect(off.statusCode).toBe(409)
       expect(codeOf(off)).toBe(ERROR.RECEIPT_TOTAL_REQUIRED)
-      const [trip] = await db.select().from(trips).where(eq(trips.id, tripId))
+      const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
       expect(trip?.receiptMinor).toBe(170_000n)
     })
 
@@ -2053,7 +2070,7 @@ describe('the account of «Записать» (MOL-312)', () => {
   })
 
   async function tripOf(id: string) {
-    const [trip] = await db.select().from(trips).where(eq(trips.id, id))
+    const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, id)))
     return trip
   }
 

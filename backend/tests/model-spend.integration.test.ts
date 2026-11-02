@@ -24,9 +24,9 @@ afterAll(async () => {
 })
 
 const told = async () =>
-  (await db.select({ payload: ownerNotices.payload }).from(ownerNotices)).map((row) =>
-    ownerNoticeSchema.parse(row.payload),
-  )
+  (
+    await db.select({ payload: ownerNotices.payload }).from(ownerNotices).orderBy(ownerNotices.id)
+  ).map((row) => ownerNoticeSchema.parse(row.payload))
 
 describe('the cap (Т-4, В-2 «а»)', () => {
   it('lets a call through to the cap exactly, and refuses the one a micro-dollar past it', async () => {

@@ -26,6 +26,7 @@ import {
   trips,
   verdicts,
 } from '@/db/schema'
+import { onlyRow } from './rows'
 
 // The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 809 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -202,7 +203,7 @@ describe('one verdict per «actor + item + place»', () => {
       .update(verdicts)
       .set({ deletedAt: sql`clock_timestamp()`, review: null })
       .where(eq(verdicts.id, id))
-    const [row] = await db.select().from(verdicts)
+    const row = onlyRow(await db.select().from(verdicts))
     expect(row?.review).toBeNull()
     expect(row?.score).toBe(2)
   })
@@ -392,7 +393,7 @@ describe('the rate snapshot of a trip', () => {
     const placeId = await insertPlace(db)
     await insertTrip(db, { actorId, placeId, currency: 'AMD', ...rate })
 
-    const [row] = await db.select().from(trips)
+    const row = onlyRow(await db.select().from(trips))
     expect(row?.rateScaled).toBe(4_820_000n)
   })
 
@@ -421,7 +422,7 @@ describe('the catalogue', () => {
   it('keeps an item with no barcodes at all — loose goods have none', async () => {
     const itemId = await insertItem(db, { name: 'Сыр «Чанах» на развес', searchKey: 'sir chanah' })
 
-    const [row] = await db.select().from(items)
+    const row = onlyRow(await db.select().from(items))
     expect(row?.id).toBe(itemId)
     await expect(db.select().from(itemBarcodes)).resolves.toHaveLength(0)
   })
@@ -557,7 +558,7 @@ describe('references lead somewhere', () => {
 
     await db.execute(sql`delete from actors where id = ${actorId}`)
 
-    const [row] = await db.select().from(items)
+    const row = onlyRow(await db.select().from(items))
     expect(row?.createdBy).toBeNull()
   })
 })
@@ -655,7 +656,7 @@ describe('a verdict knows what kind of thing it rates', () => {
 
     await db.update(verdicts).set({ score: 5 }).where(eq(verdicts.id, id))
 
-    const [row] = await db.select().from(verdicts)
+    const row = onlyRow(await db.select().from(verdicts))
     // Without this the column never moves, and «a re-rating is visible» is a tautology.
     expect(row?.updatedAt.getTime()).toBeGreaterThan(ratedAt.getTime())
   })
@@ -673,7 +674,7 @@ describe('a verdict knows what kind of thing it rates', () => {
     // instrument here, so a mechanism the query builder owns would miss every second path.
     await db.execute(sql`update verdicts set score = 5 where id = ${id}`)
 
-    const [row] = await db.select().from(verdicts)
+    const row = onlyRow(await db.select().from(verdicts))
     expect(row?.updatedAt.getTime()).toBeGreaterThan(ratedAt.getTime())
   })
 
@@ -696,7 +697,7 @@ describe('a verdict knows what kind of thing it rates', () => {
       await tx.update(verdicts).set({ score: 5 }).where(eq(verdicts.id, id))
     })
 
-    const [row] = await db.select().from(verdicts)
+    const row = onlyRow(await db.select().from(verdicts))
     expect(row?.score).toBe(5)
     expect(row?.updatedAt.getTime()).toBeGreaterThanOrEqual(row?.ratedAt.getTime() ?? 0)
   })
@@ -730,23 +731,23 @@ describe('a verdict knows what kind of thing it rates', () => {
     const itemId = await insertItem(db)
     const id = randomUUID()
     await db.insert(verdicts).values({ id, actorId, itemId, itemKind, score: 2 })
-    const [before] = await db.select().from(verdicts)
+    const before = onlyRow(await db.select().from(verdicts))
 
     // A repeated request, a review edited to the same text, a repair migration walking every
     // row: the column says the row changed, not that something passed over it.
     await db.execute(sql`update verdicts set score = score where id = ${id}`)
 
-    const [after] = await db.select().from(verdicts)
+    const after = onlyRow(await db.select().from(verdicts))
     expect(after?.updatedAt.getTime()).toBe(before?.updatedAt.getTime())
   })
 
   it("moves an actor's updated_at when their settings change", async () => {
     const actorId = await insertActor(db)
-    const [before] = await db.select().from(actors)
+    const before = onlyRow(await db.select().from(actors))
 
     await db.execute(sql`update actors set city = 'Ереван' where id = ${actorId}`)
 
-    const [after] = await db.select().from(actors)
+    const after = onlyRow(await db.select().from(actors))
     expect(after?.updatedAt.getTime()).toBeGreaterThan(before?.updatedAt.getTime() ?? 0)
   })
 })
@@ -1053,7 +1054,7 @@ describe('the session, which is a key rather than data', () => {
 
     const left = await db.select().from(sessions)
     expect(left).toHaveLength(1)
-    expect(left[0]?.actorId).toBe(otherId)
+    expect(onlyRow(left)?.actorId).toBe(otherId)
     await expect(db.select().from(loginRequests)).resolves.toHaveLength(1)
   })
 })

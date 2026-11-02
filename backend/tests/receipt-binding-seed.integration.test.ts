@@ -11,6 +11,7 @@ import { NO_EMBEDDER } from '@/embeddings/embedder'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem } from './fixtures'
+import { onlyRow } from './rows'
 
 /**
  * The lines of an Armenian receipt against the whole seed with its till names and headings — the catalogue of
@@ -54,10 +55,10 @@ async function bind(printed: string, hs: string | null = null) {
     [line(printed, hs)],
   )
   if (!bound) throw new Error('no binding')
-  const [row] =
+  const row =
     bound.itemId === null
-      ? []
-      : await db.select({ name: items.name }).from(items).where(eq(items.id, bound.itemId))
+      ? undefined
+      : onlyRow(await db.select({ name: items.name }).from(items).where(eq(items.id, bound.itemId)))
   return { ...bound, name: row?.name ?? null }
 }
 
@@ -72,9 +73,13 @@ describe('a line by the seed’s own till name (MOL-293, adversarial А1)', () =
     ['Գարեջուր ոչ ալկոհոլային', 'Пиво безалкогольное'],
     ['Ծիրան չորացրած', 'Курага'],
     ['Կոկոսի ընկույզ', 'Кокос'],
-  ])('binds «%s» to its own «%s»', async (printed, own) => {
-    expect(await bind(printed)).toMatchObject({ name: own, match: 'search' })
-  })
+  ])(
+    'binds «%s» to its own «%s»',
+    async (printed, own) => {
+      expect(await bind(printed)).toMatchObject({ name: own, match: 'search' })
+    },
+    15_000,
+  )
 })
 
 describe('a heading a till prints for the kind, seen on paper (MOL-331)', () => {

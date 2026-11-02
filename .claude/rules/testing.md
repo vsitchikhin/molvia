@@ -4,10 +4,11 @@ paths:
   - '**/vitest*.config.ts'
   - 'bin/test-time-reporter*'
   - 'bin/check-clock-bounds*'
+  - 'bin/check-ordered-reads*'
   - 'packages/model/tests/support/clock*'
 ---
 
-# Tests: their own timeout, and a bound on the clock
+# Tests: their own timeout, a bound on the clock, the order of a read
 
 The detail behind the timeout line of `CLAUDE.md` › Testing (MOL-243). The area owns no tests of its
 own — every test belongs to the area it tests — and its tools in `bin/` are mapped with the root's
@@ -218,6 +219,129 @@ of the measure and with every test merged. So CI checks every run instead (owner
   parse of receipts (MOL-265), `normalisations` in `support/text.ts`: «found once», «refused before the
   normalisation». Twice the work, or a hundred times a third of a millisecond, is under any bound a clock
   keeps on CI. A count is no rule of the domain and no state anyone reads but a test.
+
+## Rows a test uses in an order are read in an order (MOL-323)
+
+**Postgres promises no order without `ORDER BY`**, and an integration test that reads rows and compares them
+to an array written in order depends on where the rows lie. `clearAll` empties the tables by `DELETE`, not
+`TRUNCATE`, so the space of the rows before is free, and a row inserted later may come back first; a plan
+that moves from an index to a scan as the statistics change moves the order with it. «То же фото дважды» in
+`feedback-bot` read its four words with no order and failed so on a pull request that touched only the PWA
+(CI 41022785698): `['', 1], ['Вот', 1], ['Вот', 0], ['', 1]`.
+
+- **The order of insertion is an identity `id` or a position** (`receipt_lines.position`), or a key the test
+  writes in its own order (`official_rates`, by its `date`). **A uuid is an order of values, not of
+  insertion**: 17 tables of the schema have one, and `randomUUID()` puts two rows written one after the other
+  either way round (review of MOL-323, round 1: of 24 pairs, 14 came back reversed). **Nor is a moment**,
+  whatever its name and whoever writes it: `now()` is one for every row of a transaction, and a repository
+  writes one `at` for a whole batch (`failures-repository`: of a batch reordered,
+  `orderBy(ownerNotices.createdAt)` gave it back reversed — round 3). **An order is decided by its columns up
+  to the first identity** — what follows one decides nothing (round 4), in a read of one table: through a join
+  a parent's identity repeats with every child, and the child's moment after it decides (round 5) — **and a
+  column of chance among them makes it chance**: it decides the ties of those before it (`orderBy(t.kind,
+t.id)` with a uuid `id`). So `orderBy(t.id, t.createdAt)` with an identity `id` is an order, and
+  `orderBy(t.createdAt, t.id)` is not: the moment decides, even where the test wrote the moments — order by
+  the identity alone. Rows in the order of chance may be compared with another read in the same order, **if it
+  is total** — a unique key of every table it reads among its columns (round 7: a batch of one moment,
+  rewritten between two reads, came back the other way), the key whole — an expression in it is no part of it
+  to leave out — and with no NULL in it unless its NULLs are one (`nullsNotDistinct`; round 8: words of nobody
+  tied) — a snapshot with a snapshot of the same helper (`erasure`, its picks and plans ordered by their whole
+  key) — never with anything the test builds, a constant or ids pushed as written included: six reader
+  versions alike are compared as a set (`receipt-model`).
+- **Rows with no order of insertion at all are compared with none**: two logins at once
+  (`login-transaction`) write neither first, so their sessions are compared as a set — `new Set`, `toSorted`
+  — not by a uuid that only looks like an order.
+- **Every read used in an order, rows alike included** (owner's В-3 «б»): `['56.10', '56.10']` cannot flake
+  today, and the rule with no exception is the one a guard can hold; a test that later makes the rows
+  differ does not become a flake.
+- **Not `TRUNCATE` instead** (Р-2): it would hide the flake, not close it — the order is still not promised.
+  Nor an assertion made indifferent to the order where the test means one: the rows in the order they were
+  written read as the test's story.
+- **The net is the run's half** (rounds 12–14): `backend/tests/unordered-rows.ts`, the first setup file of
+  the integration tests, **reverses** the rows of every `SELECT` with no `order by` of its own, and of every
+  `UPDATE`, `DELETE` and `MERGE` returning them — on the prototype of postgres.js's query, of its ESM and its
+  CommonJS build, so every client of the process: the test's, the app's, a transaction's, a migration's.
+  Reversed, not turned by one: the turn moved the first row only and left rows 2…n as the heap gave them, so
+  `find`, the first row and `[...new Set()]` of «то же фото дважды» passed it (round 13, Н1); reversal is the
+  one order that puts each two rows the other way round. `INSERT`'s rows keep the order of its `VALUES`, as a
+  test may lean on. A test leaning on which of two such rows comes first fails on its first run where the values
+  it reads differ reversed. **What it cannot hold**: values the same reversed — kinds `failure, silence,
+failure` give the same first row, `find` and `[...new Set()]` either way (round 14, О1), and no fixed order
+  tells every use, two columns asking for two orders at once; two reads reversed alike, a snapshot met by a
+  snapshot; and an order the statement has, of chance or of ties, which it never touches. All three are the
+  check's, and so the check holds every use of rows with no order by itself; the net is what a form it follows
+  wrong runs into. Its own test, `unordered-rows.integration.test.ts`, reads with no order on purpose and is the
+  one file the check leaves out.
+- **The one row, values sorted and a sum are taken through `backend/tests/rows.ts`** (round 14): `onlyRow` —
+  the one row or none, two or more an error, since which comes first is no row's to say; `sorted` — values that
+  are not objects, or arrays of them, sorted, so that two that sort alike are the same value; `sum` — whole
+  numbers, the same in any order. A first row, `find`, `sort`, `reduce` of rows with no order is the order they
+  came in, and these hold at run time what makes them free; `onlyRow` over `[row] =` of every read by a key costs
+  nothing a key does not promise and fails loud the day the read finds two.
+- **`bin/check-ordered-reads.mjs` holds it in `npm run lint`, before the run** (owner's В-2 «в»): for two reads
+  with no order compared, and for an order the statement has — chance and ties, which the net cannot see — it is
+  what holds; a `Set`, a `Map` and an object
+  of `Object.fromEntries` keep the order they were filled in and are followed through, a `Set` compared whole with
+  another tells no order, but a `Map` or an object compared whole reads the last row of a key repeated — its value by
+  its key, whole — and is refused (round 21, Ф1); `Array.from`'s mapping is a callback of the rows, read as `map`'s (round 22, Х1); and an `update` or a
+  `delete` returning rows is a read with no order (round 13). **For one read with no order it holds too**
+  (round 14, О1): the net cannot tell values the same reversed, so the first row, `find`, `reduce`, `sort`, a
+  part by `slice`, a value by its key and a loop that collects or leaves at a row are refused, and the rows go
+  through `onlyRow`, `sorted` or `sum`. **What a callback or a loop's body may change outside it is closed**
+  (round 15, П1: a query of postgres.js by its tag in a loop wrote the rows in the order they came, and was no
+  call): outside is a name declared outside, an import but vitest's `expect`, `this` and an alias of one; it is
+  changed by any write — an assignment taken apart, `++`, `delete`, a loop's target — by a call of it or of its
+  method, by being handed to a call or to `new`, by a template of any tag but Drizzle's `sql`, and by a function
+  of the platform not known pure (`fetch`, `console` — an output). **In a file that spies on or stubs the
+  platform none of it is pure** (round 16, Р1): `vi.spyOn(console, 'log')`, `vi.spyOn(Map.prototype, 'set')`,
+  `vi.stubGlobal`, a function of it written over hear every call in its order, so there every call of the platform
+  and every method of a value is in doubt, vitest's `expect` and its matchers alone known — **those known to keep
+  nothing, by a closed list** (round 17, С1): a snapshot keeps a count, the n-th `toMatchSnapshot` met with the n-th
+  written, so in a loop it holds the rows' order; a snapshot, `expect.extend` and a matcher it adds are in doubt; the price, named: a spy
+  set in another file is not seen. It reads the helpers beside the tests too. **And what a statement takes by the
+  heap's order, however its rows are used** (round 18, Т1, Т2): the net reverses the rows given and `onlyRow` counts
+  them, neither sees which rows a `limit` with no `order by` took, nor the order inside one row an `array_agg` with no
+  `order by` gathered. So SQL text where, at any level of its parentheses, a `limit`, an `offset`, a `fetch first` or a
+  `distinct on` stands with no `order by` of that level, an aggregate that keeps the order it is fed in or a window of
+  a place has none of its own, is refused — and a query of Drizzle taking a part of its rows (`limit`, `offset`,
+  `selectDistinctOn`, `findFirst`) by no order of insertion, wherever the query began — carried on from a function
+  of the file that returns it, its order is the chain's own, an identity first, or none (round 20, У1). It works by parsing as the clock check does,
+  names by TypeScript's binder, chance, identities and unique keys read from `schema.ts`. **It is closed at
+  each of the three places it recognises something** (review of MOL-323, eleven rounds: a list of forms missed
+  one more every round, so each place says what it knows and holds the rest in doubt, and **in doubt there is
+  no order**): **what reads** — a Drizzle chain, its `const` beginning and a helper's included (carried on
+  from any other name it is refused), `findMany` in doubt, `execute`, `unsafe`, `query` and a file's executing
+  helper of any text (one the parse cannot read is a read with no order), a template by its tag — Drizzle's
+  `sql`, by its import, a fragment wherever it stands, any other a query wherever it stands — rows handed to
+  `then`, every file read; **what orders** — `orderBy` of columns of tables the schema names (by an import
+  alias or a namespace too), directly, by a `const` or spread; anything else is no order of insertion; uuid
+  and `timestamp` are chance, decided up to the first identity in a read of one table, total only with a whole
+  unique key of every table read; **what the rows are used for** — they may end only where their order cannot
+  tell (the list is in its head), a callback of those is in doubt where it takes an index, changes anything
+  outside it or cannot be read, a `not` frees only a matcher free without it, of rows made one string only the
+  length is free, and rows of chance may meet another read in the same total order. Anything else is refused;
+  the fix is an order or `onlyRow`, `sorted`, `sum`, never a use the check does not know. **The price, named, by
+  class, and nothing outside these classes** — of rows with no order, what a form the check does not follow
+  hides: rows a helper of another file returns (the net reverses them, values the same reversed it cannot
+  tell) and a read of the API's own code, which no test file holds; of rows in an order the statement has: an
+  order of ties is taken as an order (a column every row read shares, a parent's identity through a join, an
+  order of SQL text by whatever it names); an order of values the test wrote is the test's (a column neither a
+  uuid nor a moment is not judged); a moment before an identity is refused even where the test wrote the
+  moments; a callback calling a pure method of a name of this file or of an import is refused. «A row picked as
+  the one» and «what a loop or a `reduce` collects» were prices until round 14: 255 uses now go through `onlyRow`, 35 through `sorted` and `sum`. Those go to review. **Every answer of «free» or «not a read» the check
+  gives is written in its head, nothing else is let go; a form an ordinary test writes, found outside these
+  classes, is a defect of the check, fixed at the place it slipped through by the same rule of doubt — never a new
+  list.** **What the check is** (owner's decision, 02.11.2026, after round 18 of review): a guard against a read
+  written the ordinary way, not against a form built to slip past it — the boundary of `check-clock-bounds.mjs`.
+  Parsing cannot prove what arbitrary code does with rows: rounds 15–17 found a write by a tag in a loop, a spy on
+  `console`, a snapshot in a loop, none of them in a test of the repository, and each closure was the next one's
+  surface. So a form found that hides an ordinary read — a `limit` with no `order by`, an `array_agg` (round 18) — is
+  a new line in the check; a form built only to slip past it is review's, and no defect of the check.
+- **How it was proved**: the read of «то же фото дважды» on master with its first word deleted and inserted
+  again under the same id — the row then lies last in the heap and the index alike — gives CI's diff
+  exactly, and with `orderBy` it is green. `update … set x = x` proves nothing: a HOT update leaves the row
+  where the index sees it (`.scratch/tasks/selftests/MOL-323-attack.md`). The guard on master's tests finds
+  every read the task ordered, and none on the branch.
 
 ## A page's timers go with its window (MOL-286)
 

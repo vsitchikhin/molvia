@@ -38,6 +38,7 @@ import {
   insertPlace,
   telegramId,
 } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 796 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -53,7 +54,8 @@ beforeEach(() => clearAll(db))
 async function rowsMentioning(needle: string, digits = false): Promise<string[]> {
   const tables = await db.execute<{ table_name: string }>(sql`
     select table_name from information_schema.tables
-    where table_schema = 'public' and table_type = 'BASE TABLE'`)
+    where table_schema = 'public' and table_type = 'BASE TABLE'
+    order by table_name`)
   const found: string[] = []
   for (const { table_name } of tables) {
     // A Telegram id is a number: match it whole, not inside some other number.
@@ -68,31 +70,71 @@ async function rowsMentioning(needle: string, digits = false): Promise<string[]>
 
 async function snapshot(actorId: string) {
   return {
-    actor: await db.select().from(actors).where(eq(actors.id, actorId)),
-    verdicts: await db.select().from(verdicts).where(eq(verdicts.actorId, actorId)),
-    picks: await db.select().from(searchPicks).where(eq(searchPicks.actorId, actorId)),
-    events: await db.select().from(events).where(eq(events.actorId, actorId)),
+    actor: await db.select().from(actors).where(eq(actors.id, actorId)).orderBy(actors.id),
+    verdicts: await db
+      .select()
+      .from(verdicts)
+      .where(eq(verdicts.actorId, actorId))
+      .orderBy(verdicts.id),
+    picks: await db
+      .select()
+      .from(searchPicks)
+      .where(eq(searchPicks.actorId, actorId))
+      .orderBy(searchPicks.actorId, searchPicks.queryKey, searchPicks.itemId),
+    events: await db.select().from(events).where(eq(events.actorId, actorId)).orderBy(events.id),
     expenses: await db.execute(sql`
-      select e.* from expenses e join trips t on t.id = e.trip_id where t.actor_id = ${actorId}`),
-    sessions: await db.execute(sql`select * from sessions where actor_id = ${actorId}`),
-    exchanges: await db.select().from(exchanges).where(eq(exchanges.actorId, actorId)),
-    incomes: await db.select().from(incomes).where(eq(incomes.actorId, actorId)),
-    spendings: await db.select().from(spendings).where(eq(spendings.actorId, actorId)),
+      select e.* from expenses e join trips t on t.id = e.trip_id where t.actor_id = ${actorId}
+      order by e.id`),
+    sessions: await db.execute(sql`select * from sessions where actor_id = ${actorId} order by id`),
+    exchanges: await db
+      .select()
+      .from(exchanges)
+      .where(eq(exchanges.actorId, actorId))
+      .orderBy(exchanges.id),
+    incomes: await db
+      .select()
+      .from(incomes)
+      .where(eq(incomes.actorId, actorId))
+      .orderBy(incomes.id),
+    spendings: await db
+      .select()
+      .from(spendings)
+      .where(eq(spendings.actorId, actorId))
+      .orderBy(spendings.id),
     categories: await db
       .select()
       .from(spendingCategories)
-      .where(eq(spendingCategories.actorId, actorId)),
-    monthRates: await db.select().from(moneyMonthRates).where(eq(moneyMonthRates.actorId, actorId)),
-    plans: await db.select().from(budgetPlans).where(eq(budgetPlans.actorId, actorId)),
-    feedback: await db.select().from(feedback).where(eq(feedback.actorId, actorId)),
+      .where(eq(spendingCategories.actorId, actorId))
+      .orderBy(spendingCategories.id),
+    monthRates: await db
+      .select()
+      .from(moneyMonthRates)
+      .where(eq(moneyMonthRates.actorId, actorId))
+      .orderBy(moneyMonthRates.month, moneyMonthRates.base, moneyMonthRates.quote),
+    plans: await db
+      .select()
+      .from(budgetPlans)
+      .where(eq(budgetPlans.actorId, actorId))
+      .orderBy(budgetPlans.actorId, budgetPlans.categoryId, budgetPlans.fromMonth),
+    feedback: await db
+      .select()
+      .from(feedback)
+      .where(eq(feedback.actorId, actorId))
+      .orderBy(feedback.id),
     replies: await db.execute(sql`
       select r.* from feedback_replies r join feedback f on f.id = r.feedback_id
-      where f.actor_id = ${actorId}`),
-    accounts: await db.select().from(moneyAccounts).where(eq(moneyAccounts.actorId, actorId)),
+      where f.actor_id = ${actorId}
+      order by r.id`),
+    accounts: await db
+      .select()
+      .from(moneyAccounts)
+      .where(eq(moneyAccounts.actorId, actorId))
+      .orderBy(moneyAccounts.id),
     checks: await db
       .select()
       .from(moneyAccountChecks)
-      .where(eq(moneyAccountChecks.actorId, actorId)),
+      .where(eq(moneyAccountChecks.actorId, actorId))
+      .orderBy(moneyAccountChecks.id),
   }
 }
 
@@ -172,7 +214,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
 
     await erasure.erase(tg, { dryRun: false })
 
-    const [item] = await db.select().from(items).where(eq(items.id, ownItem))
+    const item = onlyRow(await db.select().from(items).where(eq(items.id, ownItem)))
     expect(item?.createdBy).toBeNull()
     expect(item?.name).toBe('Рынок-сыр')
   }, 10_000)
@@ -187,7 +229,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
 
     const codes = await db.select().from(itemBarcodes).where(eq(itemBarcodes.itemId, itemId))
     expect(codes).toHaveLength(1)
-    expect(codes[0]?.addedBy).toBeNull()
+    expect(onlyRow(codes)?.addedBy).toBeNull()
   })
 
   it('места остаются все — и то, где бывал только он (решение Q4)', async () => {
@@ -299,7 +341,9 @@ describe('подтверждение входа и стирание одного
     const tg = telegramId()
     // Started in the browser, not confirmed yet: the row has no Telegram id for erasure to lock.
     const requestId = await insertLoginRequest(db)
-    const [request] = await db.select().from(loginRequests).where(eq(loginRequests.id, requestId))
+    const request = onlyRow(
+      await db.select().from(loginRequests).where(eq(loginRequests.id, requestId)),
+    )
     const holder = connectDrizzle()
     try {
       let confirming: Promise<unknown> | undefined
@@ -455,7 +499,7 @@ describe('стирание оставляет одно число — сколь
       await expect(erasure.erase(tg, { dryRun: false })).resolves.toMatchObject({ counted: true })
     }
 
-    expect((await weeks()).sort()).toEqual([
+    expect(sorted(await weeks())).toEqual([
       ['2026-10-05', 2],
       ['2026-10-12', 1],
     ])
@@ -476,7 +520,7 @@ describe('стирание оставляет одно число — сколь
     await erasure.erase(mondayInYerevan, { dryRun: false })
     await erasure.erase(sundayInYerevan, { dryRun: false })
 
-    expect((await weeks()).sort()).toEqual([
+    expect(sorted(await weeks())).toEqual([
       ['2026-10-05', 1],
       ['2026-10-12', 1],
     ])

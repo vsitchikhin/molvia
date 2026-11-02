@@ -31,7 +31,8 @@ export async function setup(): Promise<void> {
       await admin.unsafe(`create database "${database}"`)
     }
     const copies = await admin<{ datname: string }[]>`
-      select datname from pg_database where datname like ${`${database.replaceAll('_', '\\_')}\\_w%`}`
+      select datname from pg_database where datname like ${`${database.replaceAll('_', '\\_')}\\_w%`}
+      order by datname`
     for (const { datname } of copies) {
       await admin.unsafe(`drop database if exists "${datname}" with (force)`)
     }

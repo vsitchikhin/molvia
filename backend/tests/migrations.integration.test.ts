@@ -5,6 +5,7 @@ import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
 import { MIGRATIONS } from '@/db/migrate'
+import { onlyRow } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -140,9 +141,11 @@ describe('the migration chain on a database that already holds rows', () => {
 
     for (const entry of rest) await apply(entry)
 
-    const [trip] = await sql<{ rate_scaled: string | null }[]>`
+    const trip = onlyRow(
+      await sql<{ rate_scaled: string | null }[]>`
       select rate_scaled from trips where id = ${tripId}
-    `
+    `,
+    )
     // The trip survives; only the rate that could never convert anything is gone.
     expect(trip?.rate_scaled).toBeNull()
 
@@ -158,17 +161,21 @@ describe('the migration chain on a database that already holds rows', () => {
       { place_id: null, item_kind: 'product', score: 5 },
     ])
 
-    const [future] = await sql<{ ahead: boolean }[]>`
+    const future = onlyRow(
+      await sql<{ ahead: boolean }[]>`
       select rated_at > now() as ahead from verdicts where id = ${futureVerdictId}
-    `
+    `,
+    )
     expect(future?.ahead).toBe(false)
 
     const places = await sql<{ id: string }[]>`select id from places`
     expect(places.map((row) => row.id)).toEqual([keptPlaceId])
 
-    const [movedTrip] = await sql<{ place_id: string }[]>`
+    const movedTrip = onlyRow(
+      await sql<{ place_id: string }[]>`
       select place_id from trips where id = ${tripId}
-    `
+    `,
+    )
     // The duplicate did not just disappear: the trip moved to the surviving card, so the
     // price history comes back together instead of splitting.
     expect(movedTrip?.place_id).toBe(keptPlaceId)
@@ -176,9 +183,11 @@ describe('the migration chain on a database that already holds rows', () => {
     await expect(sql`select 1 from events`).resolves.toHaveLength(0)
     await expect(sql`select 1 from search_picks`).resolves.toHaveLength(0)
 
-    const [repaired] = await sql<{ search_key: string }[]>`
+    const repaired = onlyRow(
+      await sql<{ search_key: string }[]>`
       select search_key from items where id = ${blankItemId}
-    `
+    `,
+    )
     expect(repaired?.search_key).toBe(`nokey-${blankItemId}`)
   }, 15_000)
 })

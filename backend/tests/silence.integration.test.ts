@@ -12,6 +12,7 @@ import { createSilenceRepository } from '@/db/silence-repository'
 import { claimSilenceNotices, eraseSilent } from '@/usecases/silence'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertLoginRequest } from './fixtures'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 const silence = createSilenceRepository(db)
@@ -39,22 +40,23 @@ function silentFor(days: number): Date {
 }
 
 async function rowOf(actorId: string) {
-  const [row] = await db
-    .select({
-      warning: actors.silenceWarning,
-      warnedAt: actors.silenceWarnedAt,
-      updatedAt: actors.updatedAt,
-    })
-    .from(actors)
-    .where(eq(actors.id, actorId))
+  const row = onlyRow(
+    await db
+      .select({
+        warning: actors.silenceWarning,
+        warnedAt: actors.silenceWarnedAt,
+        updatedAt: actors.updatedAt,
+      })
+      .from(actors)
+      .where(eq(actors.id, actorId)),
+  )
   return row ?? null
 }
 
 async function telegramOf(actorId: string): Promise<number> {
-  const [row] = await db
-    .select({ id: actors.telegramUserId })
-    .from(actors)
-    .where(eq(actors.id, actorId))
+  const row = onlyRow(
+    await db.select({ id: actors.telegramUserId }).from(actors).where(eq(actors.id, actorId)),
+  )
   if (row === undefined) throw new Error('the owner is gone')
   return row.id
 }

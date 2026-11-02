@@ -46,6 +46,7 @@ import {
   trips,
   verdicts,
 } from '@/db/schema'
+import { onlyRow } from './rows'
 
 /**
  * The minimal rows a foreign key demands, so a test states only what it is actually about.
@@ -262,7 +263,7 @@ export function ownPrices(actorId: string, itemIds: readonly string[], limit?: n
 
 /** Settings captured by the client before a new trip is sent. */
 export async function tripContext(db: Db, owner: string): Promise<ActorSettings> {
-  const [row] = await db.select().from(actors).where(eq(actors.id, owner))
+  const row = onlyRow(await db.select().from(actors).where(eq(actors.id, owner)))
   return actorSettingsSchema.parse(
     row && {
       country: row.country,

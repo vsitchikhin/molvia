@@ -34,6 +34,7 @@ import type { ReadReport } from '@/usecases/read-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -406,7 +407,7 @@ describe('the queue', () => {
     expect(images).toHaveLength(25)
     expect(images.every((image) => image.confirmedAt === null)).toBe(true)
     expect(images.some((image) => /ՀՎՀՀ|Ընդամենը|Ֆիսկալ/.test(image.readText))).toBe(false)
-    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
     expect([row?.readerVersion, row?.attempts, row?.layout, row?.paidBy]).toEqual([
       'tesseract 5.5.0 · test',
       1,
@@ -437,7 +438,7 @@ describe('the queue', () => {
         },
       }),
     )
-    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
     expect([row?.status, row?.paidBy]).toEqual(['parsed', 'card'])
   }, 15_000)
 
@@ -590,7 +591,7 @@ describe('the queue', () => {
     const asked = await askedAll(me, id)
     expect(asked.lines.map((line) => line.sum?.minor ?? null)).toEqual([null, 74_000n])
     expect(asked.readPartly).toBe(true)
-    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
     expect(row?.readPartly).toBe(true)
   })
 
@@ -679,7 +680,7 @@ describe('the queue', () => {
     const [{ today } = { today: '' }] = await db.execute<{ today: string }>(
       sql`select to_char(((now() at time zone 'UTC') + interval '4 hours')::date, 'YYYY-MM-DD') as today`,
     )
-    expect(rows[0]?.day).toBe(today)
+    expect(onlyRow(rows)?.day).toBe(today)
     const columns = await db.execute<{ column_name: string; data_type: string }>(sql`
       select column_name, data_type from information_schema.columns where table_name = 'receipt_days'`)
     expect(columns.every((c) => c.data_type === 'integer' || c.column_name === 'day')).toBe(true)
@@ -717,7 +718,7 @@ describe('the queue', () => {
       }),
     )
     expect(reports).toEqual([{ kind: 'reader_unavailable', reason: 'unreachable' }])
-    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
     expect([row?.status, row?.attempts]).toEqual(['queued', 0])
     await readAll(benchReader())
     expect(receiptDetailCodec.parse((await get(me, `/receipts/${id}`)).json()).receipt.status).toBe(
@@ -731,9 +732,9 @@ describe('the queue', () => {
     const next = await queued(me)
     const reader = benchReader()
     const read = reader.read.bind(reader)
-    const poisonPhoto = (
-      await db.select().from(receiptParts).where(eq(receiptParts.receiptId, poison))
-    )[0]!.photo
+    const poisonPhoto = onlyRow(
+      await db.select().from(receiptParts).where(eq(receiptParts.receiptId, poison)),
+    )!.photo
     reader.read = (photo, languages, mode) =>
       photo.equals(poisonPhoto)
         ? Promise.reject(new ReaderDropped('dropped'))
@@ -742,8 +743,8 @@ describe('the queue', () => {
     // the neighbour is read in the same round, not held behind the photo that fells the reader
     expect(first.map((r) => r.kind)).toEqual(['reader_dropped', 'read', 'reader_dropped'])
     const rows = await db.select().from(receipts)
-    expect(rows.find((r) => r.id === next)?.status).toBe('parsed')
-    expect(rows.find((r) => r.id === poison)).toMatchObject({
+    expect(onlyRow(rows.filter((r) => r.id === next))?.status).toBe('parsed')
+    expect(onlyRow(rows.filter((r) => r.id === poison))).toMatchObject({
       status: 'failed',
       failure: 'unreadable',
       attempts: 2,
@@ -790,7 +791,7 @@ describe('the queue', () => {
       }),
     )
     expect(reports[0]).toMatchObject({ kind: 'error' })
-    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
     expect([row?.status, row?.failure]).toEqual(['failed', 'unreadable'])
   })
 
@@ -803,7 +804,7 @@ describe('the queue', () => {
       }),
     )
     expect(reports.map((r) => r.kind)).toEqual(['strips_failed', 'read'])
-    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
     expect(row?.status).toBe('parsed')
     expect(await db.select().from(receiptLineImages)).toEqual([])
   }, 10_000)
@@ -813,7 +814,7 @@ describe('the queue', () => {
     const id = await queued(me)
     await db.delete(receiptParts).where(eq(receiptParts.receiptId, id))
     await readAll(benchReader())
-    const [row] = await db.select().from(receipts).where(eq(receipts.id, id))
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
     expect([row?.status, row?.failure]).toEqual(['failed', 'unreadable'])
   })
 
@@ -825,8 +826,11 @@ describe('the queue', () => {
     await db.update(receipts).set({ status: 'reading', attempts: 2 }).where(eq(receipts.id, twice))
     await repository.requeueInterrupted()
     const rows = await db.select().from(receipts)
-    expect(rows.find((r) => r.id === once)).toMatchObject({ status: 'queued', failure: null })
-    expect(rows.find((r) => r.id === twice)).toMatchObject({
+    expect(onlyRow(rows.filter((r) => r.id === once))).toMatchObject({
+      status: 'queued',
+      failure: null,
+    })
+    expect(onlyRow(rows.filter((r) => r.id === twice))).toMatchObject({
       status: 'failed',
       failure: 'unreadable',
     })
@@ -955,7 +959,7 @@ describe('what lives how long (В-3)', () => {
     expect((await db.select().from(receipts)).map((r) => r.id)).toEqual([id])
     expect(await db.select().from(receiptParts)).toEqual([])
     const lines = await db.select().from(receiptLines)
-    expect(lines.map((line) => line.position).sort()).toEqual([0, 1])
+    expect(sorted(lines.map((line) => line.position))).toEqual([0, 1])
     const images = await db.select().from(receiptLineImages)
     expect(images.some((image) => image.position === 0)).toBe(false)
     expect(images.some((image) => image.position === 1)).toBe(true)

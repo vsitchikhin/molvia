@@ -30,6 +30,7 @@ import * as schema from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle, testDatabaseUrl } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -451,7 +452,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
       await transfer(me, body)
       const { id } = body
       const feeRate = async () =>
-        (await db.select().from(spendings).where(eq(spendings.transferId, id)))[0]?.rateScaled
+        onlyRow(await db.select().from(spendings).where(eq(spendings.transferId, id)))?.rateScaled
       expect(await feeRate()).toBe(parseRate('390'))
       // The bank corrected the day since.
       await rates.upsert([official('USD', '395', day)])
@@ -517,7 +518,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
         await racing.close()
         await pool.end()
       }
-      const [fee] = await db.select().from(spendings).where(eq(spendings.transferId, id))
+      const fee = onlyRow(await db.select().from(spendings).where(eq(spendings.transferId, id)))
       expect(fee?.deletedAt).not.toBeNull()
       expect(await balanceOf(me, card)).toBe('314000 USD')
     }, 30_000)
@@ -596,7 +597,9 @@ describe('«Перевод» между своими счетами (MOL-253)', 
 
   describe('комиссия — трата, но только вместе с переводом', () => {
     async function feeOf(transferId: string) {
-      const [fee] = await db.select().from(spendings).where(eq(spendings.transferId, transferId))
+      const fee = onlyRow(
+        await db.select().from(spendings).where(eq(spendings.transferId, transferId)),
+      )
       if (!fee) throw new Error('no fee')
       return fee
     }
@@ -653,7 +656,7 @@ describe('«Перевод» между своими счетами (MOL-253)', 
         { id: written.id, revision: 2, earlierVersions: [{ revision: 1, fee: { minor: 2000n } }] },
       ])
       expect(content?.spendings.find((one) => one.transferId === written.id)).toBeDefined()
-      const [row] = await db.select().from(actors).where(eq(actors.id, me.id))
+      const row = onlyRow(await db.select().from(actors).where(eq(actors.id, me.id)))
       if (!row) throw new Error('no owner')
       const report = await createErasureRepository(db).erase(row.telegramUserId, { dryRun: false })
       expect(report.erased.account_transfers).toBe(1)

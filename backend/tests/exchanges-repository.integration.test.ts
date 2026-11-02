@@ -7,6 +7,7 @@ import { createExchangeRepository } from '@/db/exchanges-repository'
 import { actors, exchanges, expenses } from '@/db/schema'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip } from './fixtures'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 const repository = createExchangeRepository(db)
@@ -76,7 +77,7 @@ describe('exchanges: запись', () => {
     ]) {
       await expect(repository.add(owner, other)).rejects.toMatchObject({ code: ERROR.CONFLICT })
     }
-    const [row] = await db.select().from(exchanges)
+    const row = onlyRow(await db.select().from(exchanges))
     expect(row?.receivedMinor).toBe(9_500_000n)
   })
 
@@ -87,7 +88,7 @@ describe('exchanges: запись', () => {
     await repository.add(stranger, input)
 
     await expect(repository.add(owner, input)).rejects.toMatchObject({ code: ERROR.CONFLICT })
-    const [row] = await db.select().from(exchanges)
+    const row = onlyRow(await db.select().from(exchanges))
     expect(row?.actorId).toBe(stranger)
   })
 

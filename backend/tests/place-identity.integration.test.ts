@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm'
 import { placeNameIdentity } from '@molvia/model'
 import { placeIdentity } from '@/db/schema'
 import { connectDrizzle } from './db'
+import {} from './rows'
 
 const { db, close } = connectDrizzle()
 afterAll(close)
@@ -60,7 +61,8 @@ it('answers exactly what the unique index over places computes', async () => {
         from unnest(array[${sql.join(
           CORPUS.map((name) => sql`${name}`),
           sql`, `,
-        )}]::text[]) as value`,
+        )}]::text[]) as value
+        order by value`,
   )
   expect(rows.length).toBe(CORPUS.length)
   for (const row of rows) {
@@ -107,7 +109,8 @@ it('answers the same for every letter of the scripts a shop name is written in',
           from unnest(array[${sql.join(
             batch.map((name) => sql`${name}`),
             sql`, `,
-          )}]::text[]) as value`,
+          )}]::text[]) as value
+          order by value`,
     )
     for (const row of rows) {
       const mine = placeNameIdentity(row.name)

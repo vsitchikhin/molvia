@@ -25,6 +25,7 @@ import { places, searchPicks, trips } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn, tripContext } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The 15 tests here past half a second on CI carry a timeout of 10 s: the slowest took 964 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -148,7 +149,7 @@ describe('поход у полки — фикстуры хендоффа', () =>
     expect(view.currency).toBe('USD')
     expect(view.rate).toBeNull()
     expect(view.converted).toBeNull()
-    const [place] = await db.select().from(places).where(eq(places.id, view.place.id))
+    const place = onlyRow(await db.select().from(places).where(eq(places.id, view.place.id)))
     expect(place).toMatchObject({ name: 'SAS', country: 'AM', city: 'Ереван', kind: 'store' })
   }, 10_000)
 
@@ -354,10 +355,10 @@ describe('завершённый поход (В-8)', () => {
     const actor = await insertActor(db)
     const tripId = trip(await start(actor)).id
     await call('POST', `/trips/${tripId}/finish`, actor)
-    const [first] = await db.select().from(trips).where(eq(trips.id, tripId))
+    const first = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
 
     expect((await call('POST', `/trips/${tripId}/finish`, actor)).status).toBe(204)
-    const [again] = await db.select().from(trips).where(eq(trips.id, tripId))
+    const again = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
     expect(again?.finishedAt).toEqual(first?.finishedAt)
   })
 })
@@ -603,7 +604,7 @@ describe('личное слово (MOL-45) пишется добавлением
     await call('POST', `/trips/${tripId}/expenses`, actor, body)
 
     const rows = await db.select().from(searchPicks)
-    expect(rows.map((row) => [row.picks, row.admits]).sort()).toEqual([
+    expect(sorted(rows.map((row) => [row.picks, row.admits]))).toEqual([
       [1, false],
       [1, true],
     ])
@@ -662,7 +663,7 @@ describe('курс в походе (MOL-39)', () => {
 
     expect(await current(actor)).toEqual(before)
     expect(trip(await start(actor, 'Ереван Сити', id)).rate).toEqual(before.rate)
-    const [row] = await db.select().from(trips).where(eq(trips.id, id))
+    const row = onlyRow(await db.select().from(trips).where(eq(trips.id, id)))
     expect(row?.rateScaled).toBe(4_312_300n)
   })
 
@@ -760,7 +761,7 @@ describe('скачок курса и выбор человека (MOL-39, Р-19)
       // 10 000 ֏ / 4.305
       converted: { amount: '2322.88', currency: 'RUB' },
     })
-    const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
+    const row = onlyRow(await db.select().from(trips).where(eq(trips.id, view.id)))
     expect(row).toMatchObject({ rateScaled: 431_230_000n, rateChoice: 'previous' })
     expect(await current(actor)).toEqual(trip(chosen))
   })
@@ -801,7 +802,7 @@ describe('скачок курса и выбор человека (MOL-39, Р-19)
 
     expect((await choose(stranger, view.id, 'previous')).status).toBe(404)
     expect((await choose(stranger, randomUUID(), 'previous')).status).toBe(404)
-    const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
+    const row = onlyRow(await db.select().from(trips).where(eq(trips.id, view.id)))
     expect(row?.rateChoice).toBeNull()
   })
 
@@ -845,7 +846,7 @@ describe('скачок курса и выбор человека (MOL-39, Р-19)
       converted: { amount: '2320.19', currency: 'RUB' },
       rateStale: false,
     })
-    const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
+    const row = onlyRow(await db.select().from(trips).where(eq(trips.id, view.id)))
     expect(row).toMatchObject({ rateScaled: 431_230_000n, rateManualScaled: 4_310_000n })
   }, 10_000)
 
@@ -914,7 +915,7 @@ describe('скачок курса и выбор человека (MOL-39, Р-19)
     expect(
       (await call('PUT', `/trips/${view.id}/rate-choice`, actor, { choice: 'manual' })).status,
     ).toBe(400)
-    const [row] = await db.select().from(trips).where(eq(trips.id, view.id))
+    const row = onlyRow(await db.select().from(trips).where(eq(trips.id, view.id)))
     expect(row).toMatchObject({ rateManualScaled: null, rateChoice: null })
   }, 10_000)
 
@@ -998,10 +999,12 @@ describe('курс устарел (MOL-39, Р-18)', () => {
 // phone could have lived through is dropped rather than refused — as a device's moment is.
 describe('день телефона у похода (MOL-121)', () => {
   async function days(id: string) {
-    const [row] = await db
-      .select({ startedOn: trips.startedOn, finishedOn: trips.finishedOn })
-      .from(trips)
-      .where(eq(trips.id, id))
+    const row = onlyRow(
+      await db
+        .select({ startedOn: trips.startedOn, finishedOn: trips.finishedOn })
+        .from(trips)
+        .where(eq(trips.id, id)),
+    )
     return row
   }
 

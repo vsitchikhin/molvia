@@ -35,6 +35,7 @@ import type { TaxReport } from '@/usecases/read-tax-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, signIn } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -169,9 +170,9 @@ function round(purs: Purs): Promise<number> {
 
 /** The receipt's row with its link beside it — kept in a table of its own (adversarial А4). */
 const row = async (id: string) => {
-  const [found] = await db.select().from(receipts).where(eq(receipts.id, id))
+  const found = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
   if (found === undefined) return undefined
-  const [held] = await db.select().from(receiptLinks).where(eq(receiptLinks.receiptId, id))
+  const held = onlyRow(await db.select().from(receiptLinks).where(eq(receiptLinks.receiptId, id)))
   return { ...found, link: held?.link ?? null }
 }
 const days = () => db.select().from(receiptDays)
@@ -180,7 +181,7 @@ async function taxDay(): Promise<Record<string, number>> {
   const rows = await db.select().from(taxReceiptDays)
   expect(rows).toHaveLength(1)
   return Object.fromEntries(
-    Object.entries(rows[0] ?? {}).filter(([key, n]) => key !== 'day' && n !== 0),
+    Object.entries(onlyRow(rows) ?? {}).filter(([key, n]) => key !== 'day' && n !== 0),
   ) as Record<string, number>
 }
 const due = (id: string) =>
@@ -296,19 +297,21 @@ describe('the tax office’s queue', () => {
       attempts: 1,
       readerVersion: 'purs',
     })
-    const lines = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
+    const lines = await db
+      .select()
+      .from(receiptLines)
+      .where(eq(receiptLines.receiptId, id))
+      .orderBy(receiptLines.position)
     expect(
-      lines
-        .sort((a, b) => a.position - b.position)
-        .map(({ printed, qtyMilli, qtyUnit, priceMinor, sumMinor, settled, match }) => ({
-          printed,
-          qtyMilli,
-          qtyUnit,
-          priceMinor,
-          sumMinor,
-          settled,
-          match,
-        })),
+      lines.map(({ printed, qtyMilli, qtyUnit, priceMinor, sumMinor, settled, match }) => ({
+        printed,
+        qtyMilli,
+        qtyUnit,
+        priceMinor,
+        sumMinor,
+        settled,
+        match,
+      })),
     ).toEqual([
       {
         printed: 'SECER KRISTAL 1KG SUNOKO KOM',
@@ -362,9 +365,11 @@ describe('the tax office’s queue', () => {
       attempts: 1,
       link: expect.any(String) as unknown,
     })
-    const [{ pause } = { pause: 0 }] = await db.execute<{ pause: number }>(
-      sql`select extract(epoch from next_attempt_at - clock_timestamp())::int as pause from receipts where id = ${id}`,
-    )
+    const { pause } = onlyRow(
+      await db.execute<{ pause: number }>(
+        sql`select extract(epoch from next_attempt_at - clock_timestamp())::int as pause from receipts where id = ${id}`,
+      ),
+    ) ?? { pause: 0 }
     expect(pause).toBeGreaterThan(50)
     expect(pause).toBeLessThanOrEqual(60)
     // not due yet: the round asks nothing
@@ -372,9 +377,11 @@ describe('the tax office’s queue', () => {
 
     await due(id)
     await round(purs)
-    const [{ second } = { second: 0 }] = await db.execute<{ second: number }>(
-      sql`select extract(epoch from next_attempt_at - clock_timestamp())::int as second from receipts where id = ${id}`,
-    )
+    const { second } = onlyRow(
+      await db.execute<{ second: number }>(
+        sql`select extract(epoch from next_attempt_at - clock_timestamp())::int as second from receipts where id = ${id}`,
+      ),
+    ) ?? { second: 0 }
     expect(second).toBeGreaterThan(110)
     expect(second).toBeLessThanOrEqual(120)
 
@@ -517,7 +524,9 @@ describe('the tax office’s queue', () => {
     // the first ask of the round is Boris's: Anna was asked about within the hour
     await round(purs)
     const [askedAbout] = purs.asked
-    const [borisReceipt] = await db.select().from(receipts).where(eq(receipts.actorId, boris.id))
+    const borisReceipt = onlyRow(
+      await db.select().from(receipts).where(eq(receipts.actorId, boris.id)),
+    )
     expect(askedAbout).toBe((await row(borisReceipt?.id ?? ''))?.link)
   }, 10_000)
 
@@ -548,7 +557,7 @@ describe('the tax office’s queue', () => {
     )
     await round(office(found({ journal })))
     const lines = await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id))
-    const at = (position: number) => lines.find((line) => line.position === position)
+    const at = (position: number) => onlyRow(lines.filter((line) => line.position === position))
     expect(at(0)).toMatchObject({ itemId: sugar, match: 'search' })
     // the brand and the pack after the kind are words the catalogue has not: new, never a guess
     expect(at(1)).toMatchObject({ itemId: null, match: 'new' })
@@ -601,7 +610,7 @@ describe('«Записать» a receipt by its link', () => {
     expect(response.statusCode).toBe(200)
     expect(receiptRecordedCodec.parse(response.json()).receipt.status).toBe('recorded')
 
-    const [trip] = await db.select().from(trips).where(eq(trips.id, payload.tripId))
+    const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, payload.tripId)))
     expect(trip).toMatchObject({
       startedOn: '2025-07-18',
       currency: 'RSD',
@@ -610,7 +619,7 @@ describe('«Записать» a receipt by its link', () => {
       finishedOnDeviceAt: new Date('2025-07-18T06:56:00Z'),
     })
     const memory = await db.select().from(storeMemory).where(eq(storeMemory.tin, TIN))
-    expect(memory.map((word) => word.key).sort()).toEqual([
+    expect(sorted(memory.map((word) => word.key))).toEqual([
       'banana kg',
       toSearchKey('SECER KRISTAL 1KG SUNOKO KOM'),
     ])
@@ -1057,7 +1066,7 @@ describe('«Привязать штрихкоды?» at «Записать» (MO
     expect(response.statusCode).toBe(200)
     const answer = receiptRecordedCodec.parse(response.json())
     expect(answer.codes).toEqual([{ position: 0, code: CODE, outcome: 'written' }])
-    const [written] = await holders()
+    const written = onlyRow(await holders())
     expect(written).toMatchObject({ code: CODE, addedBy: me.id })
     expect(await taxDay()).toMatchObject({ recorded: 1, codesWritten: 1 })
   }, 10_000)

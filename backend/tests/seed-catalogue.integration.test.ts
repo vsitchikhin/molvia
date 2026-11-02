@@ -10,6 +10,7 @@ import { CATALOGUE_SEED } from '@/catalogue-seed'
 import { CATALOGUE_SEED_NODES } from '@/catalogue-seed-nodes'
 import { itemHeadings, itemNames, items } from '@/db/schema'
 import { createSeedRepository } from '@/db/seed-repository'
+import { onlyRow } from './rows'
 
 /**
  * The seed against a real Postgres (MOL-112): the whole list, through `createUnlessNamed`, in one
@@ -31,7 +32,7 @@ const FULL_RUN_MS = 145_000
 const few = lines.slice(0, 5)
 
 async function itemCount(): Promise<number> {
-  const [row] = await db.select({ n: count() }).from(items)
+  const row = onlyRow(await db.select({ n: count() }).from(items))
   return row?.n ?? 0
 }
 
@@ -72,7 +73,9 @@ describe('SeedRepository.seed', () => {
     expect(again.added).toBe(0)
     expect(again.kept).toHaveLength(few.length)
     expect(await itemCount()).toBe(few.length)
-    const [authored] = await db.select({ n: count() }).from(items).where(isNull(items.createdBy))
+    const authored = onlyRow(
+      await db.select({ n: count() }).from(items).where(isNull(items.createdBy)),
+    )
     expect(authored?.n).toBe(few.length)
   })
 
@@ -89,7 +92,7 @@ describe('SeedRepository.seed', () => {
 
     expect(report.added).toBe(few.length - 1)
     expect(report.kept).toEqual([{ name: 'молоко', unit: 'kg', seeded: 'l' }])
-    const [kept] = await db.select().from(items).where(eq(items.id, id))
+    const kept = onlyRow(await db.select().from(items).where(eq(items.id, id)))
     expect(kept).toMatchObject({ name: 'молоко', defaultUnit: 'kg', createdBy: actor })
   })
 
@@ -211,7 +214,7 @@ describe('SeedRepository.seed — the same thing under another spelling', () => 
       'կովի կաթ',
     ])
     expect(written.map((row) => row.name)).not.toContain('կաթ 1.5%')
-    const [codes] = await db.select({ n: count() }).from(itemHeadings)
+    const codes = onlyRow(await db.select({ n: count() }).from(itemHeadings))
     expect(codes?.n).toBe(3)
   })
 })

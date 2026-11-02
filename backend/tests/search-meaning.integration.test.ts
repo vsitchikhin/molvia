@@ -24,6 +24,7 @@ import { env } from '@/env'
 import { buildServer } from '@/server'
 import { embedMissing } from '@/usecases/embed-items'
 import { queryMeaning } from '@/usecases/query-meaning'
+import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 const repo = createItemRepository(db)
@@ -54,7 +55,7 @@ async function search(query: string, actorId: string = nobody) {
 }
 
 async function idOf(name: string): Promise<string> {
-  const [row] = await db.select({ id: items.id }).from(items).where(eq(items.name, name))
+  const row = onlyRow(await db.select({ id: items.id }).from(items).where(eq(items.name, name)))
   if (!row) throw new Error(`the seed has «${name}»`)
   return row.id
 }

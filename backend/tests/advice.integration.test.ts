@@ -22,6 +22,7 @@ import {
   insertTrip,
   signIn,
 } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 5 tests here past half a second on CI carry a timeout of 10 s: the slowest took 780 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -499,7 +500,7 @@ describe('журнал событий', () => {
 
     const rows = await viewsOf(actorId)
     expect(rows).toHaveLength(1)
-    expect(rows[0]?.payload).toEqual({ subject: 'product' })
+    expect(onlyRow(rows)?.payload).toEqual({ subject: 'product' })
   })
 
   it('не пишет просмотр тому, кто не принял редакцию 2: сборка, которая не обновилась (MOL-236)', async () => {

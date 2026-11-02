@@ -26,6 +26,7 @@ import {
 } from '@/usecases/record-failure'
 import { connectDrizzle } from './db'
 import { clearAll } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -100,7 +101,8 @@ async function failureNotices() {
 
 async function recorded() {
   await Promise.all(recordings)
-  return db.select().from(failures)
+  // by the fingerprint, a key: this file spies on `Map.prototype`, so a loop over rows with no order is in doubt
+  return db.select().from(failures).orderBy(failures.fingerprint)
 }
 
 describe('POST /client-errors — сбой телефона (MOL-144)', () => {
@@ -109,7 +111,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
     expect(response.statusCode).toBe(204)
     expect(response.headers['cache-control']).toBe('no-store')
 
-    const [row] = await recorded()
+    const row = onlyRow(await recorded())
     expect(row).toMatchObject({
       source: 'phone',
       errorName: 'TypeError',
@@ -133,7 +135,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
   it('владелец слышит о новом отпечатке со сборкой и платформой телефона', async () => {
     await send({ reports: [REPORT] }, '198.51.100.9')
     await recorded()
-    const notices = await db.select().from(ownerNotices)
+    const notices = await db.select().from(ownerNotices).orderBy(ownerNotices.id)
     expect(
       notices.map((notice) => ownerNoticesSchema.shape.notices.element.parse(notice.payload)),
     ).toEqual([
@@ -152,7 +154,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
     const other = { ...REPORT, catcher: 'vue', platform: 'android browser' }
     await send({ reports: [REPORT, REPORT, other] }, '198.51.100.10')
     const rows = await recorded()
-    expect(rows.map((row) => [row.route, row.platform, row.count]).sort()).toEqual([
+    expect(sorted(rows.map((row) => [row.route, row.platform, row.count]))).toEqual([
       ['screen:advice', 'ios 18 app', 2],
       ['vue:advice', 'android browser', 1],
     ])
@@ -185,7 +187,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
     expect(past.json()).toEqual({ code: ERROR.CLIENT_ERRORS_RATE_LIMITED })
 
     expect((await send({ reports: [REPORT] }, '203.0.113.2')).statusCode).toBe(204)
-    const [row] = await recorded()
+    const row = onlyRow(await recorded())
     expect(row?.count).toBe(PHONE_REPORTS_PER_ADDRESS + 1)
   }, 10_000)
 
@@ -224,8 +226,7 @@ describe('POST /client-errors — сбой телефона (MOL-144)', () => {
 
   it('адрес, по которому считается предел, не пишется ни в лог, ни в таблицу', async () => {
     await send({ reports: [REPORT] }, '198.51.100.77')
-    const rows = await recorded()
-    expect(JSON.stringify(rows)).not.toContain('198.51.100.77')
+    for (const row of await recorded()) expect(JSON.stringify(row)).not.toContain('198.51.100.77')
     expect(lines.join('\n')).not.toContain('198.51.100.77')
   })
 })
@@ -286,7 +287,7 @@ describe('поток выдуманных сбоев не топит канал 
     reporter.take({ errorName: 'Liar0', frames }, phone, 'index-BTCsHrpw', 'liar')
     const rows = await recorded()
     expect(rows.map((row) => row.errorName)).toContain('RealDefect')
-    expect(rows.find((row) => row.errorName === 'Liar0')?.count).toBe(2)
+    expect(onlyRow(rows.filter((row) => row.errorName === 'Liar0'))?.count).toBe(2)
   }, 15_000)
 
   it('волна одного сбоя у абонентов одного оператора — все отпечатки в таблице (Г1)', async () => {

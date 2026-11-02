@@ -7,6 +7,7 @@ import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { loginRequests } from '@/db/schema'
 import { connectDrizzle } from './db'
 import { anHourFromNow, clearAll } from './fixtures'
+import { onlyRow } from './rows'
 
 // The test here past half a second on CI carries a timeout of 10 s: it took 556 ms there at worst
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -62,7 +63,7 @@ describe('запрос входа: секрет только хешем', () => 
   it('не хранит самого секрета ни в одной колонке', async () => {
     const request = await asked()
 
-    const [row] = await db.select().from(loginRequests)
+    const row = onlyRow(await db.select().from(loginRequests))
     expect(JSON.stringify(row)).not.toContain(request.secret)
     expect(row?.secretHash).toMatch(/^[0-9a-f]{64}$/)
   })
@@ -195,7 +196,7 @@ describe('вход судится до записи, а не после', () => 
   it('имя подрезается до записи, а не на чтении', async () => {
     const request = await asked('  iPhone · Safari  ')
 
-    const [row] = await db.select().from(loginRequests)
+    const row = onlyRow(await db.select().from(loginRequests))
     expect(row?.deviceName).toBe('iPhone · Safari')
     expect((await repository.byCode(request.code))?.deviceName).toBe('iPhone · Safari')
   })
@@ -275,7 +276,7 @@ describe('кнопку в боте нажали', () => {
 
     expect(await repository.confirm(request.code, 424_242_424)).toBeNull()
 
-    const [row] = await db.select().from(loginRequests)
+    const row = onlyRow(await db.select().from(loginRequests))
     expect(row?.telegramUserId).toBe(TELEGRAM_ID)
   })
 

@@ -36,6 +36,7 @@ import { moneyMonthOf } from '@/usecases/money-month'
 import { recordSpending } from '@/usecases/spendings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 628 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -312,10 +313,12 @@ describe('счёт, заведённый на свой день, стартуе�
     await exchange()
     await exchange()
     expect((await balanceOf(me, id)).balance).toEqual({ minor: 1084n, currency: 'USD' })
-    const [row] = await db
-      .select({ createdOn: moneyAccounts.createdOn })
-      .from(moneyAccounts)
-      .where(eq(moneyAccounts.id, id))
+    const row = onlyRow(
+      await db
+        .select({ createdOn: moneyAccounts.createdOn })
+        .from(moneyAccounts)
+        .where(eq(moneyAccounts.id, id)),
+    )
     expect(row?.createdOn).toBe(today)
   })
 
@@ -378,10 +381,12 @@ describe('счёт, заведённый на свой день, стартуе�
       },
     })
     expect(made.statusCode, made.body).toBe(201)
-    const [row] = await db
-      .select({ createdOn: moneyAccounts.createdOn })
-      .from(moneyAccounts)
-      .where(eq(moneyAccounts.id, id))
+    const row = onlyRow(
+      await db
+        .select({ createdOn: moneyAccounts.createdOn })
+        .from(moneyAccounts)
+        .where(eq(moneyAccounts.id, id)),
+    )
     expect(row?.createdOn).toBe(phoneDay)
   })
 
@@ -717,7 +722,7 @@ describe('удалить или убрать (п. 2)', () => {
       .set({ deletedAt: sql`clock_timestamp() - interval '11 minutes'` })
       .where(eq(moneyAccounts.id, id))
     await accountsRepository.purgeStale()
-    const [row] = await db.select().from(spendings).where(eq(spendings.id, body.id))
+    const row = onlyRow(await db.select().from(spendings).where(eq(spendings.id, body.id)))
     expect(row?.accountId).toBeNull()
     expect(await db.select().from(moneyAccounts).where(eq(moneyAccounts.id, id))).toEqual([])
   })
@@ -1010,7 +1015,7 @@ describe('после ревью (MOL-115, Р-3, Д1–Д6)', () => {
                 and (given_account_id is not null or received_account_id is not null))
            + (select count(*) from trips where actor_id = ${me.id} and account_id is not null)
            as named`)
-    expect(Number(rows[0]?.named)).toBe(0)
+    expect(Number(onlyRow(rows)?.named)).toBe(0)
     expect(spent.response.statusCode).toBe(201)
   }, 10_000)
 
@@ -1025,7 +1030,7 @@ describe('после ревью (MOL-115, Р-3, Д1–Д6)', () => {
       .where(eq(moneyAccounts.id, id))
     const again = await call(me, 'POST', '/money/accounts', body)
     expect(again.statusCode).toBe(201)
-    const [row] = await db.select().from(spendings).where(eq(spendings.id, spending.id))
+    const row = onlyRow(await db.select().from(spendings).where(eq(spendings.id, spending.id)))
     expect(row?.accountId).toBeNull()
   })
 
@@ -1210,7 +1215,7 @@ describe('день сверки — день телефона (MOL-121)', () => 
   const instant = new Date('2026-09-10T16:00:00Z')
 
   async function actorOf(me: Owner, today?: string) {
-    const [actor] = await db.select().from(actors).where(eq(actors.id, me.id))
+    const actor = onlyRow(await db.select().from(actors).where(eq(actors.id, me.id)))
     if (!actor) throw new Error('no actor')
     return today === undefined ? actor : { ...actor, today }
   }
@@ -1408,7 +1413,7 @@ describe('поход — днём телефона (MOL-121)', () => {
   // live, not frozen by the closing day Yerevan has already passed.
   it('месяц телефона западнее Еревана в последний час идёт, а не заморожен (Т-2)', async () => {
     const me = await owner()
-    const [actor] = await db.select().from(actors).where(eq(actors.id, me.id))
+    const actor = onlyRow(await db.select().from(actors).where(eq(actors.id, me.id)))
     if (!actor) throw new Error('no actor')
     const moscow = new Date('2026-09-30T20:30:00Z')
     const asked = await moneyMonthOf(

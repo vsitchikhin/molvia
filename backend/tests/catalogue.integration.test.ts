@@ -25,6 +25,7 @@ import { SEARCH_LIMIT } from '@/usecases/search-catalogue'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aStrangersCookie, clearAll, insertActor, signIn } from './fixtures'
+import { onlyRow } from './rows'
 
 // The 7 tests here past half a second on CI carry a timeout of 10 s: the slowest took 940 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -557,7 +558,7 @@ describe('POST /catalogue/items — «Предложить товар»', () => 
     expect(reply.raw).not.toContain(actor)
     expect(reply.headers['cache-control']).toBe('no-store')
 
-    const [row] = await db.select().from(items).where(eq(items.id, entry.id))
+    const row = onlyRow(await db.select().from(items).where(eq(items.id, entry.id)))
     expect(row?.createdBy).toBe(actor)
   })
 

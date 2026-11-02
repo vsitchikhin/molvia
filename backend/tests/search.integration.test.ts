@@ -9,6 +9,7 @@ import type { Conn } from '@/db/index'
 import { itemBarcodes, items } from '@/db/schema'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The 5 tests here past half a second on CI carry a timeout of their own (MOL-266), ten times their
 // worst there, rounded up to 5 s, so the time reporter names one only on a run slower than any yet
@@ -58,7 +59,7 @@ describe('the migrated database', () => {
       select extname from pg_extension
       where extname in ('pg_trgm', 'unaccent', 'fuzzystrmatch')
     `
-    expect(rows.map((row) => row.extname).sort()).toEqual(['fuzzystrmatch', 'pg_trgm', 'unaccent'])
+    expect(sorted(rows.map((row) => row.extname))).toEqual(['fuzzystrmatch', 'pg_trgm', 'unaccent'])
   })
 
   it('answers with an edit distance — the measure ranking will use', async () => {
@@ -120,11 +121,13 @@ describe('the search key under its index', () => {
     await insertItem(db, { name: 'Молоко «Ашхар»', searchKey: 'moloko ashar' })
     await insertItem(db, { name: 'Марианна', searchKey: 'mariana' })
 
-    const [row] = await sql<{ by_key: number; by_name: number }[]>`
+    const row = onlyRow(
+      await sql<{ by_key: number; by_name: number }[]>`
       select max(word_similarity('moloko', search_key)) as by_key,
              max(word_similarity('moloko', name)) as by_name
       from items
-    `
+    `,
+    )
     expect(Number(row?.by_key)).toBeGreaterThan(0.3)
     // The reason the key exists at all: unaccent does not transliterate Cyrillic, so the
     // same query scores nothing against the name a person actually reads.

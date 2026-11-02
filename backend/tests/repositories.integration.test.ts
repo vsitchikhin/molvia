@@ -14,6 +14,7 @@ import { createItemRepository } from '@/db/items-repository'
 import { createPlaceRepository } from '@/db/places-repository'
 import { createTripRepository } from '@/db/trips-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
+import { onlyRow } from './rows'
 
 // The test here past half a second on CI carries a timeout of 10 s: it took 531 ms there at worst
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -100,9 +101,11 @@ describe('владелец', () => {
 
     expect(updated?.city).toBe('Ереван')
     // По той же причине, что и у вердикта: сравнение идёт там, где метки не теряют точность.
-    const [row] = await db.execute<{ apart: boolean }>(sql`
+    const row = onlyRow(
+      await db.execute<{ apart: boolean }>(sql`
       select updated_at > created_at as apart from actors where id = ${id}::uuid
-    `)
+    `),
+    )
     expect(row?.apart).toBe(true)
     expect(updated?.createdAt).toEqual(before?.createdAt)
   })
@@ -474,9 +477,11 @@ describe('вердикты', () => {
     // 10 таких случаев из 300. Домен это и не запрещает — `verdictSchema` требует
     // `updatedAt >= ratedAt`, — так что проверка строгого «>» через `Date` была строже
     // домена и краснела бы по расписанию часов, а не по состоянию кода.
-    const [row] = await db.execute<{ apart: boolean }>(sql`
+    const row = onlyRow(
+      await db.execute<{ apart: boolean }>(sql`
       select updated_at > rated_at as apart from verdicts where id = ${second.id}::uuid
-    `)
+    `),
+    )
     expect(row?.apart).toBe(true)
     expect(second.updatedAt.getTime()).toBeGreaterThanOrEqual(second.ratedAt.getTime())
   }, 10_000)

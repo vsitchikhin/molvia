@@ -22,6 +22,7 @@ import { remindRatings } from '@/usecases/remind-ratings'
 import type { QuietToday } from '@/usecases/remind-ratings'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
+import { onlyRow } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -119,7 +120,9 @@ async function verdict(who: Person, itemId: string, at: Date, deletedAt: Date | 
 }
 
 async function ladderOf(who: Person) {
-  const [row] = await db.select().from(ratingReminders).where(eq(ratingReminders.actorId, who.id))
+  const row = onlyRow(
+    await db.select().from(ratingReminders).where(eq(ratingReminders.actorId, who.id)),
+  )
   return row ? { step: row.step, remindedOn: row.remindedOn, windowFrom: row.windowFrom } : null
 }
 
@@ -569,7 +572,7 @@ describe('одна выдача не роняет другие (адверсар
       [anna.tg]: ['Молоко'],
       [boris.tg]: ['Хлеб'],
     })
-    const [day] = await db.select().from(reminderDays)
+    const day = onlyRow(await db.select().from(reminderDays))
     expect(day).toMatchObject({ firstSteps: 2, items: 2 })
   }, 10_000)
 
@@ -881,7 +884,9 @@ describe('две выдачи одной минуты разом (ревью Т-
 
     expect(await race('2026-07-16')).toBe(1)
     expect(await ladderOf(anna)).toMatchObject({ step: 2, remindedOn: '2026-07-16' })
-    const [day] = await db.select().from(reminderDays).where(eq(reminderDays.day, '2026-07-16'))
+    const day = onlyRow(
+      await db.select().from(reminderDays).where(eq(reminderDays.day, '2026-07-16')),
+    )
     expect(day?.secondSteps).toBe(1)
     expect(failures).toEqual([])
   })

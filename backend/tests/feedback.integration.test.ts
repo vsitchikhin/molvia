@@ -24,6 +24,7 @@ import {
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { aScreenshot, clearAll, insertActor, signIn } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The 2 tests here past half a second on CI carry a timeout of 10 s: the slowest took 644 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -98,7 +99,7 @@ describe('POST /feedback (MOL-147)', () => {
     expect(reply.statusCode).toBe(201)
     expect(reply.headers['cache-control']).toBe('no-store')
     const { number } = reply.json<{ number: number }>()
-    const [row] = await db.select().from(feedback).where(eq(feedback.id, number))
+    const row = onlyRow(await db.select().from(feedback).where(eq(feedback.id, number)))
     expect(row).toMatchObject({
       actorId: anna,
       kind: 'bug',
@@ -130,7 +131,7 @@ describe('POST /feedback (MOL-147)', () => {
     )
 
     expect(reply.statusCode).toBe(201)
-    const [row] = await db.select().from(feedback)
+    const row = onlyRow(await db.select().from(feedback))
     expect(row).toMatchObject({
       kind: 'idea',
       text: 'Хочу видеть цены в рублях',
@@ -259,10 +260,12 @@ describe('POST /feedback (MOL-147)', () => {
 
 /** The thread a message is of — the first message's number — as a reply to it carries it. */
 async function threadOf(feedbackId: number): Promise<number> {
-  const [row] = await db
-    .select({ thread: feedback.threadKey })
-    .from(feedback)
-    .where(eq(feedback.id, feedbackId))
+  const row = onlyRow(
+    await db
+      .select({ thread: feedback.threadKey })
+      .from(feedback)
+      .where(eq(feedback.id, feedbackId)),
+  )
   if (row === undefined) throw new Error('no message')
   return row.thread
 }
@@ -323,7 +326,7 @@ describe('срок — год от последнего сообщения ни�
 
     const left = await db.select({ id: feedback.id, thread: feedback.threadId }).from(feedback)
     const threads = new Set(left.map((row) => row.thread ?? row.id))
-    expect([...threads].sort((a, b) => a - b)).toEqual([answered, continued, recent])
+    expect(sorted(threads)).toEqual([answered, continued, recent])
     expect(threads).not.toContain(old)
     expect(threads).not.toContain(lapsed)
     expect(threads).not.toContain(stale)
@@ -331,10 +334,7 @@ describe('срок — год от последнего сообщения ни�
     const replies = await db
       .select({ feedbackId: feedbackReplies.feedbackId })
       .from(feedbackReplies)
-    expect(replies.map((row) => row.feedbackId).sort((a, b) => a - b)).toEqual([
-      answered,
-      continued,
-    ])
+    expect(sorted(replies.map((row) => row.feedbackId))).toEqual([answered, continued])
   })
 
   it('не трогает ничего моложе года — ни чужого, ни своего', async () => {
@@ -362,10 +362,9 @@ async function refusedBy(write: Promise<unknown>): Promise<string | undefined> {
 }
 
 async function telegramOf(actorId: string) {
-  const [row] = await db
-    .select({ telegram: actors.telegramUserId })
-    .from(actors)
-    .where(eq(actors.id, actorId))
+  const row = onlyRow(
+    await db.select({ telegram: actors.telegramUserId }).from(actors).where(eq(actors.id, actorId)),
+  )
   if (row === undefined) throw new Error('no actor')
   return row.telegram
 }
@@ -390,7 +389,7 @@ describe('схема нитей держит первое сообщение и 
       .select({ id: feedback.id })
       .from(feedback)
       .where(eq(feedback.actorId, boris))
-    expect(left.map((row) => row.id).sort((a, b) => a - b)).toEqual([borisFirst, borisContinued])
+    expect(sorted(left.map((row) => row.id))).toEqual([borisFirst, borisContinued])
   })
 
   it('продолжение называет только первое сообщение нити, не продолжение (В5б)', async () => {
@@ -423,7 +422,7 @@ describe('схема нитей держит первое сообщение и 
     const word = await aMessage(anna, now, { id: fresh, reply: freshReply })
     await createFeedbackRepository(db).purgeStale()
     const left = await db.select({ id: feedback.id }).from(feedback)
-    expect(left.map((row) => row.id).sort((a, b) => a - b)).toEqual([fresh, word])
+    expect(sorted(left.map((row) => row.id))).toEqual([fresh, word])
   })
 
   it('ответ не встаёт под сообщение с чужой нитью в своей колонке', async () => {
@@ -545,7 +544,7 @@ describe('снимки к сообщению (MOL-167)', () => {
 
     expect(reply.statusCode).toBe(201)
     const { number } = reply.json<{ number: number }>()
-    const [row] = await db.select().from(feedback).where(eq(feedback.id, number))
+    const row = onlyRow(await db.select().from(feedback).where(eq(feedback.id, number)))
     expect(row?.pictures).toBe(3)
     const kept = await picturesOf(number)
     expect(
@@ -582,7 +581,7 @@ describe('снимки к сообщению (MOL-167)', () => {
 
     const alone = await send({ ...silent, pictures: [aScreenshot()] }, cookie)
     expect(alone.statusCode).toBe(201)
-    const [row] = await db.select().from(feedback)
+    const row = onlyRow(await db.select().from(feedback))
     expect(row).toMatchObject({ text: '', pictures: 1 })
 
     const nothing = await send({ ...message(), text: undefined }, cookie)
@@ -660,10 +659,9 @@ describe('снимки к сообщению (MOL-167)', () => {
     const boris = await insertActor(db)
     await send(message({ pictures: [aScreenshot()] }), await signIn(db, anna))
     await send(message({ pictures: [aScreenshot()] }), await signIn(db, boris))
-    const [annas] = await db
-      .select({ telegram: actors.telegramUserId })
-      .from(actors)
-      .where(eq(actors.id, anna))
+    const annas = onlyRow(
+      await db.select({ telegram: actors.telegramUserId }).from(actors).where(eq(actors.id, anna)),
+    )
 
     await createErasureRepository(db).erase(annas?.telegram ?? 0, { dryRun: false })
 

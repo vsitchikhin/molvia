@@ -19,6 +19,7 @@ import { embedMissing } from '@/usecases/embed-items'
 import { mergeNight } from '@/usecases/merge-twins'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, insertPlace } from './fixtures'
+import { sorted } from './rows'
 
 const { db, close } = connectDrizzle()
 const quiet = { info: () => undefined, warn: () => undefined }
@@ -159,7 +160,7 @@ describe('the night on the seed', () => {
       from catalogue_merges m
       join places f on f.id = m.from_place
       join places t on t.id = m.into_place`)
-    const pairs = merged.map((row) => `${row.from} → ${row.into}`).sort()
+    const pairs = sorted(merged.map((row) => `${row.from} → ${row.into}`))
     expect(pairs).toEqual(SAME_PLACE.map(([into, from]) => `${from} → ${into}`).sort())
   })
 })

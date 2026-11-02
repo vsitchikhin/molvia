@@ -11,6 +11,7 @@ import { expenses, trips } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The 6 tests here past half a second on CI carry a timeout of 10 s: the slowest took 868 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -143,10 +144,10 @@ describe('PUT /trips/:id/receipt (MOL-78)', () => {
     const me = await owner()
     const id = await trip(me)
     await receipt(me, id, '1400')
-    const [before] = await db.select().from(trips).where(eq(trips.id, id))
+    const before = onlyRow(await db.select().from(trips).where(eq(trips.id, id)))
     const again = await receipt(me, id, '1400.00')
     expect(again.statusCode).toBe(200)
-    const [after] = await db.select().from(trips).where(eq(trips.id, id))
+    const after = onlyRow(await db.select().from(trips).where(eq(trips.id, id)))
     // A repeat from the queue is not a change: a check must not see the trip move again.
     expect(after?.receiptSetAt).toEqual(before?.receiptSetAt)
 
@@ -154,7 +155,7 @@ describe('PUT /trips/:id/receipt (MOL-78)', () => {
     expect(off.receipt).toBeNull()
     expect(off.total).toEqual([amd(57_000n)])
     expect(off.gap).toBeNull()
-    const [cleared] = await db.select().from(trips).where(eq(trips.id, id))
+    const cleared = onlyRow(await db.select().from(trips).where(eq(trips.id, id)))
     // Taking the sum off is a change a check has to see too.
     expect(cleared?.receiptSetAt?.getTime()).toBeGreaterThan(before?.receiptSetAt?.getTime() ?? 0)
   }, 10_000)
@@ -182,7 +183,7 @@ describe('PUT /trips/:id/receipt (MOL-78)', () => {
       expect(answer.statusCode).toBe(404)
       expect(answer.json()).toMatchObject({ code: ERROR.NOT_FOUND })
     }
-    const [untouched] = await db.select().from(trips).where(eq(trips.id, id))
+    const untouched = onlyRow(await db.select().from(trips).where(eq(trips.id, id)))
     expect(untouched?.receiptMinor).toBeNull()
     expect(
       (
@@ -319,12 +320,12 @@ describe('одно правило денег записи — все читат�
     // At home the typo is fixed: the receipt was still paid before the exchange.
     await receipt(me, id, '1450')
     expect(await hint.spentSince(me.id, 'AMD', exchange)).toBe(0n)
-    const [row] = await db.select().from(trips).where(eq(trips.id, id))
+    const row = onlyRow(await db.select().from(trips).where(eq(trips.id, id)))
     expect(row?.receiptSetAt?.getTime()).toBeGreaterThan(exchange.getTime())
 
     // Taken off and typed anew: a new receipt, after the exchange.
     await receipt(me, id, null)
-    const [cleared] = await db.select().from(trips).where(eq(trips.id, id))
+    const cleared = onlyRow(await db.select().from(trips).where(eq(trips.id, id)))
     expect(cleared?.receiptFirstAt).toBeNull()
     await receipt(me, id, '1450')
     expect(await hint.spentSince(me.id, 'AMD', exchange)).toBe(145_000n)
@@ -392,8 +393,10 @@ describe('сумма по чеку и «списано» (MOL-78, Р-3)', () => 
     })
     expect(paid.statusCode, paid.body).toBe(200)
     const rows = await db.select().from(expenses).where(eq(expenses.tripId, id))
-    const unpriced = rows.find((row) => row.amountMinor === null)
-    const priced = rows.find((row) => row.amountMinor !== null)
+    // two purchases have no price and either will do: the one of the least id, never the one that came first
+    const [bread] = sorted(rows.filter((row) => row.amountMinor === null).map((row) => row.id))
+    const unpriced = onlyRow(rows.filter((row) => row.id === bread))
+    const priced = onlyRow(rows.filter((row) => row.amountMinor !== null))
     if (!unpriced || !priced) throw new Error('no purchases')
     const kept = { minor: 30_000n, currency: 'RUB' }
     const debited = async () =>

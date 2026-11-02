@@ -26,6 +26,7 @@ import {
   insertPlace,
   insertTrip,
 } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The 5 tests here past half a second on CI carry a timeout of 10 s: the slowest took 923 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -142,11 +143,11 @@ async function everything(): Promise<void> {
 }
 
 const namedBy = async (table: string, itemId: string) =>
-  (
+  onlyRow(
     await db.execute<{ n: number }>(
       sql`select count(*)::int as n from ${sql.raw(table)} where item_id = ${itemId}`,
-    )
-  )[0]?.n
+    ),
+  )?.n
 
 describe('a merge of items', () => {
   it('moves every row that names the younger item, and writes each down', async () => {
@@ -169,10 +170,10 @@ describe('a merge of items', () => {
         1,
       ])
     }
-    const [trace] = await db.select().from(items).where(eq(items.id, younger))
+    const trace = onlyRow(await db.select().from(items).where(eq(items.id, younger)))
     expect(trace?.mergedInto).toBe(older)
     const moved = await db.select({ what: catalogueMergeMoves.what }).from(catalogueMergeMoves)
-    expect(moved.map((row) => row.what).sort()).toEqual(
+    expect(sorted(moved.map((row) => row.what))).toEqual(
       [
         'barcode',
         'expense',
@@ -184,7 +185,7 @@ describe('a merge of items', () => {
         'verdict',
       ].sort(),
     )
-    const [journal] = await db.select().from(catalogueMerges)
+    const journal = onlyRow(await db.select().from(catalogueMerges))
     expect([journal?.subject, journal?.by, journal?.edits, journal?.meaning]).toEqual([
       'item',
       'night',
@@ -206,7 +207,7 @@ describe('a merge of items', () => {
     const third = await insertItem(db, { name: 'Молако 3,2%', searchKey: 'molako 3 2' })
     await merges.mergeItems(third, younger, NIGHT)
     await merges.mergeItems(younger, older, NIGHT)
-    const [row] = await db.select().from(items).where(eq(items.id, third))
+    const row = onlyRow(await db.select().from(items).where(eq(items.id, third)))
     expect(row?.mergedInto).toBe(older)
   })
 
@@ -387,7 +388,7 @@ describe('a merge of places', () => {
     const live = await db.execute(sql`
       select place_id, score from verdicts where deleted_at is null`)
     expect(live).toEqual([{ place_id: kept, score: 5 }])
-    const [row] = await db.select().from(places).where(eq(places.id, merged))
+    const row = onlyRow(await db.select().from(places).where(eq(places.id, merged)))
     expect(row?.mergedInto).toBe(kept)
     await merges.unmerge(outcome.id)
     expect(await snapshot()).toEqual(before)
@@ -408,10 +409,9 @@ describe('the journal and erasure', () => {
       insert into search_picks (actor_id, query_key, item_id) values (${owner}, 'maloko', ${younger})`)
     const outcome = await merges.mergeItems(younger, older, NIGHT)
     if (!('id' in outcome)) throw new Error('not merged')
-    const [person] = await db
-      .select({ tg: actors.telegramUserId })
-      .from(actors)
-      .where(eq(actors.id, owner))
+    const person = onlyRow(
+      await db.select({ tg: actors.telegramUserId }).from(actors).where(eq(actors.id, owner)),
+    )
     if (!person) throw new Error('no person')
     await createErasureRepository(db).erase(person.tg, { dryRun: false })
     const left = await db.execute(sql`
@@ -447,10 +447,10 @@ async function bought(itemId: string): Promise<string> {
 }
 
 const itemOfExpense = async (id: string) =>
-  (await db.execute<{ item_id: string }>(sql`select item_id from expenses where id = ${id}`))[0]
+  onlyRow(await db.execute<{ item_id: string }>(sql`select item_id from expenses where id = ${id}`))
     ?.item_id
 const tracedTo = async (id: string) =>
-  (await db.select({ to: items.mergedInto }).from(items).where(eq(items.id, id)))[0]?.to
+  onlyRow(await db.select({ to: items.mergedInto }).from(items).where(eq(items.id, id)))?.to
 
 function numbered(outcome: Awaited<ReturnType<MergeRepository['mergeItems']>>): number {
   if (!('id' in outcome)) throw new Error(`not merged: ${outcome.refused}`)
@@ -474,11 +474,11 @@ describe('the undo of a chain, from its end (adversarial А3, Б1)', () => {
   /** The person's live score on each, as «Что брать» shows it. */
   const scores = async () => {
     const read = async (itemId: string) =>
-      (
+      onlyRow(
         await db.execute<{ score: number; review: string | null }>(sql`
           select score, review from verdicts
-          where actor_id = ${owner} and item_id = ${itemId} and deleted_at is null`)
-      )[0] ?? null
+          where actor_id = ${owner} and item_id = ${itemId} and deleted_at is null`),
+      ) ?? null
     return { A: await read(a), B: await read(b), C: await read(c) }
   }
 
@@ -704,11 +704,11 @@ describe('the undo of a fan into one survivor (review №11, adversarial В1, В
 
   const scores = async () => {
     const read = async (itemId: string) =>
-      (
+      onlyRow(
         await db.execute<{ score: number }>(sql`
           select score from verdicts
-          where actor_id = ${owner} and item_id = ${itemId} and deleted_at is null`)
-      )[0]?.score ?? null
+          where actor_id = ${owner} and item_id = ${itemId} and deleted_at is null`),
+      )?.score ?? null
     return [await read(a), await read(b), await read(d)]
   }
 
@@ -863,7 +863,7 @@ describe('a fan where the later merge only withdrew (review №12, adversarial �
     )
     expect(names.map((row) => row.item_id).sort()).toEqual([a, b, d].sort())
     const headings = await db.execute<{ item_id: string }>(sql`select item_id from item_hs`)
-    expect(headings.map((row) => row.item_id).sort()).toEqual([a, b, d].sort())
+    expect(sorted(headings.map((row) => row.item_id))).toEqual([a, b, d].sort())
   })
 
   it('leaves the survivor as it was, the fan undone from the earlier merge on (adversarial Е1)', async () => {

@@ -5,6 +5,7 @@ import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
 import { MIGRATIONS } from '@/db/migrate'
+import { onlyRow } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
 // times their worst there, rounded up to 5 s (MOL-266): their work, past a tenth of vitest's 5 s. The
@@ -52,7 +53,7 @@ async function apply(entry: JournalEntry): Promise<void> {
 }
 
 async function countOf(table: string): Promise<number> {
-  const [row] = await sql<{ n: number }[]>`select count(*)::int as n from ${sql(table)}`
+  const row = onlyRow(await sql<{ n: number }[]>`select count(*)::int as n from ${sql(table)}`)
   return row?.n ?? 0
 }
 

@@ -7,6 +7,7 @@ import { createSessionRepository } from '@/db/sessions-repository'
 import { sessions } from '@/db/schema'
 import { connectDrizzle } from './db'
 import { anHourFromNow, clearAll, insertActor } from './fixtures'
+import { onlyRow, sorted } from './rows'
 
 // The test here past half a second on CI carries a timeout of 10 s: it took 578 ms there at worst
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -44,7 +45,7 @@ describe('сессия — ключ, и в базе от него только �
 
     await repository.create(randomUUID(), actorId, secret, 'iPhone · Safari', anHourFromNow())
 
-    const [row] = await db.select().from(sessions)
+    const row = onlyRow(await db.select().from(sessions))
     // По всей строке, а не по одной колонке: вопрос «не утёк ли токен» — про таблицу целиком,
     // и колонка, добавленная позже, должна попасть под ту же проверку сама собой.
     expect(JSON.stringify(row)).not.toContain(secret)
@@ -155,7 +156,7 @@ describe('сессия — ключ, и в базе от него только �
     )
 
     const rows = await db.select().from(sessions)
-    expect(rows.map((row) => row.deviceName).sort()).toEqual(['a'.repeat(80), 'iPhone · Safari'])
+    expect(sorted(rows.map((row) => row.deviceName))).toEqual(['a'.repeat(80), 'iPhone · Safari'])
   })
 
   it('срок в прошлом — отказ нашей схемы, а не 23514 насквозь, и строки не остаётся', async () => {
@@ -267,7 +268,7 @@ describe('срок продлевается использованием, но �
 
     const until = await repository.touch(id, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS)
 
-    const [row] = await db.select().from(sessions).where(eq(sessions.id, id))
+    const row = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
     expect(until).not.toBeNull()
     expect(row?.expiresAt).toEqual(until)
     expect(row?.lastSeenAt.getTime()).toBeGreaterThan(Date.now() - HOUR)
@@ -278,11 +279,11 @@ describe('срок продлевается использованием, но �
 
   it('до суток не пишет ничего и говорит об этом «ничем»', async () => {
     const { id } = await seen(SESSION_TOUCH_AFTER_HOURS - 1)
-    const [before] = await db.select().from(sessions).where(eq(sessions.id, id))
+    const before = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
 
     expect(await repository.touch(id, SESSION_TOUCH_AFTER_HOURS, SESSION_LIFETIME_DAYS)).toBeNull()
 
-    const [after] = await db.select().from(sessions).where(eq(sessions.id, id))
+    const after = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
     expect(after?.lastSeenAt).toEqual(before?.lastSeenAt)
     expect(after?.expiresAt).toEqual(before?.expiresAt)
   })
