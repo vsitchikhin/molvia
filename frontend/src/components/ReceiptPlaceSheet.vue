@@ -1,5 +1,10 @@
 <template>
-  <BottomSheet :open="open" :on-closed="onClosed" @update:open="$emit('update:open', $event)">
+  <BottomSheet
+    ref="sheet"
+    :open="open"
+    :on-closed="onClosed"
+    @update:open="$emit('update:open', $event)"
+  >
     <template #title>{{ t('receipt.place.title') }}</template>
     <template #meta>{{ meta }}</template>
 
@@ -57,8 +62,16 @@
     </div>
 
     <template #footer>
-      <AppButton size="large" block :disabled="!ready" @click="done">
-        {{ action ?? t('receipt.place.done') }}
+      <!-- Not now while something is missing, saying what (MOL-174, Ф-6); a day typed wrong is refused
+           at the tap and heard there (MOL-333, В-3 «б»): `disabled` left the focus order in silence. -->
+      <AppButton size="large" block :inactive="waitsFor !== null" @click="done">
+        {{
+          waitsFor === 'place'
+            ? t('receipt.place.choose_place')
+            : waitsFor === 'day'
+              ? t('receipt.place.choose_day')
+              : (action ?? t('receipt.place.done'))
+        }}
       </AppButton>
     </template>
   </BottomSheet>
@@ -82,6 +95,7 @@ import type { ReceiptCountry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { calendarDay, localDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useRecentPlacesStore } from '@/stores/recentPlaces'
@@ -199,9 +213,12 @@ export default defineComponent({
     const dayBad = computed(
       () => when.value !== '' && !(isRateDay(when.value) && when.value <= latest.value),
     )
-    const ready = computed(
-      () => (chosen.value !== null || fresh.value) && when.value !== '' && !dayBad.value,
+    /** What the button waits for, in the order of the form; a day typed wrong is no wait but a refusal. */
+    const waitsFor = computed<'place' | 'day' | null>(() =>
+      chosen.value === null && !fresh.value ? 'place' : when.value === '' ? 'day' : null,
     )
+    const sheet = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
 
     return {
       t,
@@ -215,7 +232,8 @@ export default defineComponent({
       when,
       latest,
       dayBad,
-      ready,
+      waitsFor,
+      sheet,
       meta: computed(() =>
         props.read && props.current
           ? t('receipt.place.read', { place: props.current.name, city: props.current.city })
@@ -238,7 +256,11 @@ export default defineComponent({
         const place: PlaceDraft | null =
           picked ??
           (fresh.value && typedName.value ? { name: typedName.value, city: city.value } : null)
-        if (!place || !when.value || dayBad.value) return
+        if (dayBad.value) {
+          void refuse(() => sheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
+          return
+        }
+        if (!place || !when.value) return
         emit('chosen', place, when.value)
         emit('update:open', false)
       },

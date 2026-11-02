@@ -952,7 +952,18 @@ describe('ReceiptView (MOL-127)', () => {
       await button(view, ru.receipt.review.record_sum).trigger('click')
       await flushPromises()
       expect(recordReceipt).not.toHaveBeenCalled()
-      expect(sheet()?.textContent).toContain(ru.receipt.review.record_sum)
+      // Not now until a shop is named, saying so on itself (MOL-333, В-3 «б»); then the action's word.
+      expect(sheet()?.querySelector('.footer button')?.textContent.trim()).toBe(
+        ru.receipt.place.choose_place,
+      )
+      const name = sheet()?.querySelector<HTMLInputElement>('input:not([type="date"])')
+      if (!name) throw new Error('нет поля магазина')
+      name.value = 'Ереван Сити'
+      name.dispatchEvent(new Event('input'))
+      await flushPromises()
+      expect(sheet()?.querySelector('.footer button')?.textContent.trim()).toBe(
+        ru.receipt.review.record_sum,
+      )
     })
   })
 
