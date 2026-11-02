@@ -56,6 +56,7 @@
         v-model="query"
         :remembered="remembered"
         :fetched-at="fetchedAt"
+        :today="today"
         :refreshes="refreshes"
         @edit="edit"
         @rate="rate"
@@ -201,8 +202,9 @@ import type { StripKind } from '@/components/StatusStrip.vue'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
 import type { SavedVerdict, Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
-import { purchaseDay, timeOfDay } from '@/days'
+import { answeredAt } from '@/days'
 import { focusScreenTitle } from '@/transitions'
 
 /**
@@ -280,8 +282,8 @@ export default defineComponent({
       await nextTick()
       if (held && document.activeElement === document.body) focusScreenTitle()
     })
-    const day = (when: Date) => purchaseDay(when, locale.value)
-    const time = (when: Date) => timeOfDay(when, locale.value)
+    // The screen's day, asked again as the app comes back: the list's age is said from it (MOL-329).
+    const today = useLocalDay()
     const cityGenitive = (city: string) =>
       i18n.te(`advice.cities_genitive.${city}`) ? t(`advice.cities_genitive.${city}`) : city
 
@@ -326,7 +328,7 @@ export default defineComponent({
       const at = advice.fetchedAt.value
       const stale = advice.stale.value
       if (stale && at && !searching.value) {
-        const when = { day: day(at), time: time(at) }
+        const when = { when: answeredAt(at, locale.value, today.value) }
         // Only the server breaking leaves nothing that would fire again by itself: the one with «Повторить».
         if (stale === 'error') return { kind: 'unanswered', text: t('advice.stale_error', when) }
         if (stale === 'offline') {
@@ -432,6 +434,7 @@ export default defineComponent({
       shown: advice.shown,
       total: advice.total,
       fetchedAt: advice.fetchedAt,
+      today,
       attempt: advice.attempt,
       editing,
       edit,

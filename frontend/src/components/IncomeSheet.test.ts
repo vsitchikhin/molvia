@@ -399,6 +399,54 @@ describe('IncomeSheet', () => {
 
 // MOL-189, Ф-34, owner's В-1 «а»: removing is the amendment's, and only where the screen offers
 // «Вернуть» after it — never in a new income, never from an account's journal.
+// MOL-329, adversarial А2: a version's day is the sheet's day, which moves as the app comes back.
+describe('IncomeSheet: a version after midnight (MOL-329)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // «до» takes a date, never «вчера» (adversarial Д1); past New Year's midnight the date says its year.
+  it('a version of the 31st: no year at 23:50, its year once the app is back after New Year’s midnight', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-31T23:50:00.000Z'))
+    const at = new Date('2026-12-31T23:45:00.000Z')
+    const [version] = amended.history
+    if (!version) throw new Error('the fixture has a version')
+    const late: IncomeView = {
+      ...amended,
+      amendedAt: at,
+      history: [{ ...version, replacedAt: at }],
+    }
+    const view = await render(overview(), late)
+    expect(view.get('.versions li').text()).toMatch(/^until Dec 31: /)
+
+    vi.setSystemTime(new Date('2027-01-01T00:10:00.000Z'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(view.get('.versions li').text().replaceAll('\u00a0', ' ')).toMatch(
+      /^until Dec 31, 2026: /,
+    )
+  })
+
+  // Adversarial Г2 of round 4: a version of last year says the year of «until» and of its day.
+  it('a version of last year says its year', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00.000Z'))
+    const at = new Date('2025-09-25T09:00:00.000Z')
+    const [version] = amended.history
+    if (!version) throw new Error('the fixture has a version')
+    const old: IncomeView = {
+      ...amended,
+      receivedOn: '2025-09-15',
+      amendedAt: at,
+      history: [{ ...version, receivedOn: '2025-09-15', replacedAt: at }],
+    }
+    const view = await render(overview(), old)
+    const line = view.get('.versions li').text().replaceAll('\u00a0', ' ')
+    expect(line).toMatch(/^until Sep 25, 2025: .*Sep 15, 2025/)
+  })
+})
+
 describe('IncomeSheet: removing from the amendment (MOL-189)', () => {
   const words = (view: VueWrapper) => view.findAll('button').map((button) => button.text())
 

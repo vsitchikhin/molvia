@@ -209,10 +209,11 @@ import { useAccountChoice } from '@/composables/useAccountChoice'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, purchaseDay } from '@/days'
+import { calendarDayOfAnyYear, dateOfAnyYear, localDay } from '@/days'
 import { newId } from '@/ids'
 import type { IncomeDraft } from '@/composables/useIncomes'
 import { incomesOf } from '@/composables/useIncomes'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useOnline } from '@/composables/useOnline'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -308,7 +309,9 @@ export default defineComponent({
     const source = ref<IncomeSource | ''>('')
     const amountError = ref<ErrorCode | null>(null)
     const sourceMissing = ref(false)
-    const today = ref(localDay())
+    // The sheet's day moves as the app comes back and at midnight, so its words follow it while the day it
+    // opened on stays the record's (MOL-329, adversarial А2, А3).
+    const today = useLocalDay()
     const day = ref(today.value)
     const held = ref('')
     const note = ref('')
@@ -446,10 +449,12 @@ export default defineComponent({
     /** «до 25 сент.: 99 615 ₽ · Зарплата · 15 сент. · Викаса» */
     function versionOf(version: IncomeView['history'][number]): string {
       const words = {
-        until: purchaseDay(version.replacedAt, locale.value),
+        // Always a date, its year when another (adversarial Г2): «до» puts its own word before the day, and
+        // «до вчера» is no Russian (adversarial Д1, the rule of «Раньше …», MOL-204 Р-9).
+        until: dateOfAnyYear(version.replacedAt, locale.value, today.value),
         amount: formatMoney(version.amount, locale.value),
         source: t(`income.source.${version.source}`),
-        date: calendarDay(version.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
+        date: calendarDayOfAnyYear(version.receivedOn, locale.value, today.value),
       }
       return version.note
         ? t('income.sheet.version_note', { ...words, note: version.note })
@@ -461,7 +466,7 @@ export default defineComponent({
       const details = [
         formatMoney(income.amount, locale.value),
         t(`income.source.${income.source}`),
-        calendarDay(income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
+        calendarDayOfAnyYear(income.receivedOn, locale.value, today.value),
         ...(income.heldBefore
           ? [
               t('income.sheet.current_held', {

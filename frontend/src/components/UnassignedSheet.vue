@@ -71,6 +71,7 @@ import UndoStrip from '@/components/UndoStrip.vue'
 import { operationRowProps, shortDay } from '@/components/accounts'
 import type { Removed } from '@/components/spending'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useOwnCategories } from '@/composables/useOwnCategories'
 import { useReconnect } from '@/composables/useReconnect'
 import { useAccountsStore } from '@/stores/accounts'
@@ -105,6 +106,8 @@ export default defineComponent({
   },
   setup(props) {
     const { t, locale } = useI18n()
+    // The screen's day: a row with no account may be of any year, and says so (MOL-329, Р3-2).
+    const today = useLocalDay()
     const store = useAccountsStore()
     const spendings = useSpendingQueueStore()
     const trips = useTripQueueStore()
@@ -190,7 +193,7 @@ export default defineComponent({
             : row.kind === 'trip'
               ? (row.place ?? '')
               : t('accounts.account.exchange')
-      return `${what} · ${shortDay(row.day, locale.value)}`
+      return `${what} · ${shortDay(row.day, locale.value, today.value)}`
     }
 
     const operationOpen = ref(false)

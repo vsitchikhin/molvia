@@ -205,9 +205,10 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import { pageOrder, shortDay } from '@/components/accounts'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { shown } from '@/composables/useItemDetails'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTransfers } from '@/composables/useTransfers'
-import { localDay } from '@/days'
+import { dateOfAnyYear, localDay } from '@/days'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
@@ -271,7 +272,8 @@ export default defineComponent({
 
     const amount = ref('')
     const fee = ref('')
-    const today = ref(localDay())
+    // The sheet's day moves as the app comes back and at midnight (MOL-329, adversarial А2, А3).
+    const today = useLocalDay()
     const day = ref(today.value)
     const note = ref('')
     const fromId = ref<string | null>(null)
@@ -437,15 +439,15 @@ export default defineComponent({
     const amendedLine = computed(() => {
       const at = editing.value?.amendedAt
       if (!at) return null
-      const date = new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(
-        at,
-      )
+      const date = dateOfAnyYear(at, locale.value, today.value)
       return t('transfer.amended', { date })
     })
 
     const dayWords = computed(() => {
       if (!isRateDay(day.value)) return null
-      return day.value === today.value ? t('transfer.today') : shortDay(day.value, locale.value)
+      return day.value === today.value
+        ? t('transfer.today')
+        : shortDay(day.value, locale.value, today.value)
     })
 
     /** «2 500 $ → «Доллары» · комиссия 20 $ · 8 окт. · заметка» — what is recorded now. */
@@ -456,7 +458,7 @@ export default defineComponent({
         ...(transfer.fee
           ? [t('transfer.current_fee', { amount: formatMoney(transfer.fee, locale.value) })]
           : []),
-        shortDay(transfer.transferredOn, locale.value),
+        shortDay(transfer.transferredOn, locale.value, today.value),
         ...(transfer.note ? [transfer.note] : []),
       ].join(' · ')
     }

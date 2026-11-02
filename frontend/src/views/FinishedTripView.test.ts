@@ -14,7 +14,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, parseMoney, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import ru from '@/i18n/ru.json'
-import { dayOfAnyYear, timeOfDay } from '@/days'
+import { dayOfAnyYear, localDay, timeOfDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { routes } from '@/router'
@@ -225,11 +225,31 @@ describe('FinishedTripView: шапка и состояния (MOL-207)', () => {
     expect(view.text()).not.toContain(NOT_FINISHED)
   })
 
+  // MOL-329: the record's day is said from the screen's day, asked again as the app comes back.
+  it('день в шапке после полуночи — «вчера», приложение снова на экране', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    try {
+      vi.setSystemTime(new Date('2026-09-19T23:50:00.000Z'))
+      trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+      const view = await render()
+      expect(subtitle(view).text()).toBe('Гюмри · сегодня, 09:00')
+
+      vi.setSystemTime(new Date('2026-09-20T00:10:00.000Z'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(subtitle(view).text()).toBe('Гюмри · вчера, 09:00')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('офлайн с памятью — место, город и день в шапке, одна полоса без «Повторить»', async () => {
     trip.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
     const view = await render()
     expect(view.get('h1').text()).toBe('Ереван Сити')
-    expect(subtitle(view).text()).toBe(`Гюмри · ${dayOfAnyYear(at, 'ru')}, ${timeOfDay(at, 'ru')}`)
+    expect(subtitle(view).text()).toBe(
+      `Гюмри · ${dayOfAnyYear(at, 'ru', localDay())}, ${timeOfDay(at, 'ru')}`,
+    )
     const strips = view.findAll('.strip')
     expect(strips).toHaveLength(1)
     expect(strips[0]?.classes()).toContain('offline')
@@ -297,7 +317,7 @@ describe('FinishedTripView: шапка и состояния (MOL-207)', () => {
     trip.mockResolvedValue(fromReceipt)
     const view = await render(null)
     expect(subtitle(view).text()).toBe(
-      `${dayOfAnyYear(at, 'ru')}, ${timeOfDay(at, 'ru')} · ${ru.receipt.recorded.from_receipt}`,
+      `${dayOfAnyYear(at, 'ru', localDay())}, ${timeOfDay(at, 'ru')} · ${ru.receipt.recorded.from_receipt}`,
     )
   })
 })

@@ -148,7 +148,8 @@ import { formatRating, unitPriceText } from '@/components/adviceRow'
 import { useCheaperHint } from '@/composables/useCheaperHint'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useLineFigures } from '@/composables/useLineFigures'
-import { calendarDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { calendarDayOfAnyYear } from '@/days'
 import type { ReviewLine } from '@/receipts/review'
 import type { LineDraft, LineFigures } from '@/stores/receiptDrafts'
 
@@ -242,8 +243,10 @@ export default defineComponent({
       currency: () => props.currency,
       unit: () => unit.value,
     })
+    // One's own history goes back across years, and a sheet has no month's caption over it (MOL-329, Ж1).
+    const today = useLocalDay()
     const shortDay = (day: string) =>
-      calendarDay(day, locale.value, { day: '2-digit', month: '2-digit' })
+      calendarDayOfAnyYear(day, locale.value, today.value, { day: '2-digit', month: '2-digit' })
     const sameItem = computed(() => hintItem !== null && item.value.id === hintItem)
     const itemHint = computed(() => {
       const found = sameItem.value ? hint.value.item : null

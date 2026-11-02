@@ -3,7 +3,7 @@ import { formatMoney, formatRate, formatRateBeside, yerevanDate } from '@molvia/
 import type { ExchangeRate, ExchangeView } from '@molvia/model'
 import { signedAmount } from '@/components/accounts'
 import { bankWords } from '@/components/spending'
-import { calendarDay } from '@/days'
+import { calendarDay, calendarDayOfAnyYear } from '@/days'
 
 /** What the card of an exchange says of the central bank of its day, each part on its own line. */
 export interface OfficialWords {
@@ -42,7 +42,7 @@ export interface ExchangeWords {
   readonly dayOf: (exchange: ExchangeView) => string
   readonly moneyOf: (value: ExchangeView['given']) => string
   readonly amountsOf: (exchange: ExchangeView) => string
-  readonly rateLineOf: (exchange: ExchangeView) => string
+  readonly rateLineOf: (exchange: ExchangeView, today: string) => string
   readonly officialOf: (exchange: ExchangeView) => OfficialWords | null
   readonly noOfficialOf: (exchange: ExchangeView) => string
   /** The bank an exchange's pair is measured by, named — «ЦБ РА», «НБ Грузии» (MOL-110). */
@@ -76,9 +76,12 @@ export function useExchangeWords(): ExchangeWords {
     })
   }
 
-  /** The day and the rate it was made at — the day alone for amounts no rate in the band says. */
-  function rateLineOf(exchange: ExchangeView): string {
-    const date = dayOf(exchange)
+  /**
+   * The day and the rate it was made at — the day alone for amounts no rate in the band says. «Удалить обмен?» has
+   * no month's caption over it, so a day of another year says its year (MOL-329, adversarial Ж1).
+   */
+  function rateLineOf(exchange: ExchangeView, today: string): string {
+    const date = calendarDayOfAnyYear(exchange.exchangedOn, locale.value, today)
     return exchange.rate ? t('exchange.row_rate', { date, rate: rateOf(exchange.rate) }) : date
   }
 

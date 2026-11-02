@@ -79,7 +79,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
+import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCheck from '~icons/mdi/check'
@@ -98,7 +98,7 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { calendarDay, localDay } from '@/days'
+import { calendarDayOfAnyYear, localDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useRecentPlacesStore } from '@/stores/recentPlaces'
 import { placeIdOf } from '@/stores/receiptDrafts'
@@ -157,24 +157,12 @@ export default defineComponent({
      * spending's sheet, adversarial Л). A day misread far ahead is still refused (review 18).
      * «Today» is asked again as the sheet opens and as a day is typed (adversarial Р3-А2 of MOL-333): read
      * once, the phone's today after midnight was refused at the tap as a day still to come. And at the
-     * phone's midnight while the sheet is up (Р5-А1): between the asks, the error stood under today's day.
+     * phone's midnight while the sheet is up (Р5-А1): `useLocalDay` moves at midnight itself (MOL-329), so the
+     * sheet keeps no timer of its own.
      */
     const today = useLocalDay()
     watch(when, () => {
       today.value = localDay()
-    })
-    let midnight: ReturnType<typeof setTimeout> | undefined
-    function untilMidnight(): void {
-      clearTimeout(midnight)
-      const now = new Date()
-      const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
-      midnight = setTimeout(() => {
-        today.value = localDay()
-        untilMidnight()
-      }, next.getTime() - now.getTime())
-    }
-    onBeforeUnmount(() => {
-      clearTimeout(midnight)
     })
     const latest = computed(() =>
       props.day > today.value && props.day <= latestDay(new Date()) ? props.day : today.value,
@@ -207,12 +195,8 @@ export default defineComponent({
     watch(
       () => props.open,
       (open) => {
-        if (!open) {
-          clearTimeout(midnight)
-          return
-        }
+        if (!open) return
         today.value = localDay()
-        untilMidnight()
         when.value = props.day
         nameBad.value = false
         name.value = props.current ? '' : (props.proposed ?? '')
@@ -283,7 +267,10 @@ export default defineComponent({
       ),
       dayShown: computed(() => {
         if (!when.value) return ''
-        const shown = calendarDay(when.value, locale.value, { day: 'numeric', month: 'long' })
+        const shown = calendarDayOfAnyYear(when.value, locale.value, today.value, {
+          day: 'numeric',
+          month: 'long',
+        })
         return when.value === props.sentDay ? t('receipt.review.sent_day', { day: shown }) : shown
       }),
       choose: (key: string) => {

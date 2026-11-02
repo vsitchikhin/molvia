@@ -18,7 +18,7 @@ const milk: PendingVerdict = {
 
 function render(draft?: VerdictDraft, city: string | null = null) {
   return mount(VerdictCard, {
-    props: { card: milk, draft, city },
+    props: { card: milk, draft, city, today: '2026-09-20' },
     global: { plugins: [createAppI18n('en')] },
     attachTo: document.body,
   })
@@ -41,6 +41,23 @@ describe('VerdictCard', () => {
     expect(view.get('h2').text()).toContain(en.verdict.question_tail)
     expect(view.get('.context').text()).toBe('Sep 12 · Ереван Сити')
     view.unmount()
+  })
+
+  // «Оценки» keeps a purchase not rated for as long as it waits (MOL-329, adversarial Е1): «Oct 14» of last year read as this one.
+  it('MOL-329: a purchase of another year says its year; «yesterday» across New Year stays a word', () => {
+    const old = mount(VerdictCard, {
+      props: { card: { ...milk, boughtAt: new Date(2025, 9, 14, 17, 40) }, today: '2026-11-02' },
+      global: { plugins: [createAppI18n('en')] },
+    })
+    expect(old.get('.context').text()).toBe('Oct 14, 2025 · Ереван Сити')
+    old.unmount()
+
+    const eve = mount(VerdictCard, {
+      props: { card: { ...milk, boughtAt: new Date(2025, 11, 31, 22, 0) }, today: '2026-01-01' },
+      global: { plugins: [createAppI18n('en')] },
+    })
+    expect(eve.get('.context').text()).toBe('yesterday · Ереван Сити')
+    eve.unmount()
   })
 
   it('MOL-120: names the city the queue gives it, in brackets when the dictionary has no case', () => {
@@ -297,7 +314,7 @@ describe('VerdictCard', () => {
       defineComponent({
         setup() {
           said.app = provideAnnouncer()
-          return () => h(VerdictCard, { card: milk })
+          return () => h(VerdictCard, { card: milk, today: '2026-09-20' })
         },
       }),
       { global: { plugins: [createAppI18n('en')] }, attachTo: document.body },
@@ -321,7 +338,7 @@ describe('VerdictCard', () => {
     quiet.unmount()
 
     const moved = mount(VerdictCard, {
-      props: { card: milk, focusOnMount: true },
+      props: { card: milk, focusOnMount: true, today: '2026-09-20' },
       global: { plugins: [createAppI18n('en')] },
       attachTo: document.body,
     })

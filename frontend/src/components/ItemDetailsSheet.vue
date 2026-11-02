@@ -166,7 +166,8 @@ import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useItemDetails } from '@/composables/useItemDetails'
 import { keyedIn } from '@/composables/useKeyboardInset'
 import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
-import { calendarDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { calendarDayOfAnyYear } from '@/days'
 import { useRecentItemsStore } from '@/stores/recentItems'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -353,8 +354,10 @@ export default defineComponent({
       currency: () => details.currency.value,
       unit: () => details.unit.value,
     })
+    // One's own history goes back across years, and a sheet has no month's caption over it (MOL-329, Ж1).
+    const today = useLocalDay()
     const shortDay = (day: string) =>
-      calendarDay(day, locale.value, { day: '2-digit', month: '2-digit' })
+      calendarDayOfAnyYear(day, locale.value, today.value, { day: '2-digit', month: '2-digit' })
     const HINT_ICONS = {
       best: IconArrowDown,
       there: IconArrowDown,

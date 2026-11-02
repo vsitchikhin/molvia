@@ -161,6 +161,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import UpdateBand from '@/components/UpdateBand.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useReconnect } from '@/composables/useReconnect'
 import { provideStateStrip } from '@/composables/useStateStrip'
 import { purchaseDay } from '@/days'
@@ -198,6 +199,8 @@ export default defineComponent({
   },
   setup() {
     const { t, locale } = useI18n()
+    // The screen's day, asked again as the app comes back: the day words are said from it (MOL-329).
+    const today = useLocalDay()
     const login = useLoginStore()
     const actor = useActorStore()
     // No strip at the door: an error keeps its buttons, and the door only learns it is there.
@@ -244,7 +247,7 @@ export default defineComponent({
       if (!view) return null
       return {
         place: `${view.city} · ${view.spendCurrency} → ${view.incomeCurrency}`,
-        day: purchaseDay(view.createdAt, locale.value),
+        day: purchaseDay(view.createdAt, locale.value, today.value),
       }
     })
 

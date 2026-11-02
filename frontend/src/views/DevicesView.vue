@@ -78,6 +78,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SessionEndSheet from '@/components/SessionEndSheet.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useSessions } from '@/composables/useSessions'
 import { dayOfAnyYear } from '@/days'
 
@@ -104,6 +105,8 @@ export default defineComponent({
   },
   setup() {
     const { t, locale } = useI18n()
+    // The screen's day, asked again as the app comes back: the day words are said from it (MOL-329).
+    const today = useLocalDay()
     const sessions = useSessions()
     const sheetOpen = ref(false)
     const target = ref<SessionView | null>(null)
@@ -137,7 +140,7 @@ export default defineComponent({
       if (!open) sessions.endFailed.value = false
     })
 
-    const dayOf = (when: Date): string => dayOfAnyYear(when, locale.value)
+    const dayOf = (when: Date): string => dayOfAnyYear(when, locale.value, today.value)
     const nameOf = (session: SessionView): string => session.deviceName ?? t('devices.unknown')
     // «на Неизвестное устройство» is the name put into a sentence as it is; an unknown device gets
     // a sentence of its own, with the words in their case (self-review С-4).

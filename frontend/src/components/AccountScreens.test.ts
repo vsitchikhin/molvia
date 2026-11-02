@@ -839,6 +839,23 @@ describe('ReconcileSheet (handoff 05)', () => {
 })
 
 describe('AccountSheet (handoff 03)', () => {
+  // A sheet has no caption of a month over it to say the year (MOL-329, adversarial Ж1).
+  it('the start of an account of last year says its year', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
+    try {
+      const old = account('Cash ֏', 'AMD', { startOn: '2025-09-16' })
+      const view = await mounted(
+        AccountSheet,
+        { open: true, account: old, spendCurrency: 'AMD' },
+        withAccounts([old]),
+      )
+      expect(view.text()).toContain('September 16, 2025')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('refuses an empty name and a name already there, under the field, before sending', async () => {
     const cash = account('Cash ֏')
     const view = await mounted(

@@ -147,10 +147,11 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
-import { parseSigned, shortDay, signedAmount } from '@/components/accounts'
+import { parseSigned, signedAmount } from '@/components/accounts'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, shiftDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { calendarDayOfAnyYear, localDay, shiftDay } from '@/days'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -208,7 +209,8 @@ export default defineComponent({
     const currency = ref<Currency>('AMD')
     const kind = ref<Kind>('spending')
     const start = ref('')
-    const today = ref(localDay())
+    // The sheet's day moves as the app comes back and at midnight (MOL-329, adversarial А2, А3).
+    const today = useLocalDay()
     const startOn = ref(today.value)
     const nameProblem = ref<string | null>(null)
     const startBad = ref(false)
@@ -289,7 +291,9 @@ export default defineComponent({
       const account = current.value
       if (!account) return t('accounts.sheet.meta_add')
       return account.hasOperations
-        ? t('accounts.sheet.meta_has_ops', { date: shortDay(account.startOn, locale.value) })
+        ? t('accounts.sheet.meta_has_ops', {
+            date: calendarDayOfAnyYear(account.startOn, locale.value, today.value),
+          })
         : t('accounts.no_operations')
     })
 
@@ -310,7 +314,10 @@ export default defineComponent({
 
     const dayWords = computed(() => {
       if (!startOn.value) return null
-      const date = calendarDay(startOn.value, locale.value)
+      const date = calendarDayOfAnyYear(startOn.value, locale.value, today.value, {
+        day: 'numeric',
+        month: 'long',
+      })
       if (startOn.value === today.value) return t('spending.sheet.date_today', { date })
       if (startOn.value === shiftDay(today.value, -1))
         return t('spending.sheet.date_yesterday', { date })
@@ -330,7 +337,7 @@ export default defineComponent({
       return [
         held.name,
         signedAmount(held.start, locale.value),
-        shortDay(held.startOn, locale.value),
+        calendarDayOfAnyYear(held.startOn, locale.value, today.value),
       ].join(' · ')
     }
 

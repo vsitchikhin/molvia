@@ -281,11 +281,12 @@ import type {
   SpendingTarget,
 } from '@/components/spending'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, shiftDay } from '@/days'
+import { calendarDayOfAnyYear, localDay, shiftDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
 import { newId } from '@/ids'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import type { SpendingFields } from '@/stores/spendingQueue'
@@ -366,7 +367,9 @@ export default defineComponent({
     const amount = ref('')
     const currency = ref<Currency>('AMD')
     const categoryId = ref<string | null>(null)
-    const today = ref(localDay())
+    // The sheet's day moves as the app comes back and at midnight, so its words follow it while the day it
+    // opened on stays the record's (MOL-329, adversarial А2, А3).
+    const today = useLocalDay()
     const day = ref(today.value)
     /**
      * The latest day the sheet lets through: the phone's today, or the day of the spending being
@@ -634,12 +637,14 @@ export default defineComponent({
         props.target.kind === 'add' ? 'spending.sheet.title_add' : 'spending.sheet.title_edit',
       )
     })
-    // A calendar day, whatever the zone of the phone (review Т-1).
-    const dayOf = (value: string) => calendarDay(value, locale.value)
+    // A calendar day, whatever the zone of the phone (review Т-1); a sheet has no month's caption over it, so a day
+    // of another year says its year (MOL-329, adversarial Ж1).
+    const dayOf = (value: string) =>
+      calendarDayOfAnyYear(value, locale.value, today.value, { day: 'numeric', month: 'long' })
     const meta = computed(() => {
       if (props.target.kind === 'trip') {
         const { row, day: finished } = props.target
-        const date = calendarDay(finished, locale.value, {
+        const date = calendarDayOfAnyYear(finished, locale.value, today.value, {
           weekday: 'short',
           day: 'numeric',
           month: 'long',

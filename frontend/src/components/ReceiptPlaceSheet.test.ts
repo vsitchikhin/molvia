@@ -116,6 +116,15 @@ describe('ReceiptPlaceSheet (MOL-127): the day of the purchases', () => {
     vi.restoreAllMocks()
   })
 
+  // MOL-329, adversarial Ж1: a receipt of December looked at in January — the sheet says the year of its day.
+  it('a day of last year says its year in «Когда»', async () => {
+    vi.setSystemTime(new Date('2027-01-02T10:00:00Z'))
+    await render('2026-12-31')
+    expect(document.body.querySelector('dialog[open] .shown')?.textContent.trim()).toBe(
+      '31 декабря 2026 г.',
+    )
+  })
+
   it('the day printed after Yerevan’s midnight passes on a phone west of it (adversarial В1)', async () => {
     const { view, button, chosen } = await render('2026-10-04')
     expect(button?.getAttribute('aria-disabled')).toBeNull()

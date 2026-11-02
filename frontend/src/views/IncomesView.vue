@@ -90,7 +90,7 @@
             <ul class="cards">
               <AppReveal group>
                 <li v-for="income in month.incomes" :key="income.id">
-                  <IncomeCard :income="income" :today="shownToday()" @edit="edit" />
+                  <IncomeCard :income="income" :today="today" @edit="edit" />
                 </li>
               </AppReveal>
             </ul>
@@ -182,7 +182,7 @@ import UndoStrip from '@/components/UndoStrip.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useIncomes } from '@/composables/useIncomes'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { answeredAt, calendarDay, monthOf, shownDay } from '@/days'
+import { answeredAt, calendarDayOfAnyYear, monthOf } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -213,10 +213,9 @@ export default defineComponent({
     const incomes = useIncomes()
     // «Сегодня» of the cards, asked again when the app comes back into view (MOL-121, adversarial Н).
     const today = useLocalDay()
-    // The day the captions and the cards speak by, one for both: the later of the screen's and the
-    // clock's, as `answeredAt` (adversarial А1, Б1) — past New Year's midnight, drawn again by a
-    // write's answer, «December 2026» stood over a card of the 31st that said «Today».
-    const shownToday = (): string => shownDay(today.value)
+    // The day the captions and the cards speak by, one for both, as `answeredAt` (adversarial А1, Б1) —
+    // past New Year's midnight, drawn again by a write's answer, «December 2026» stood over a card of the
+    // 31st that said «Today». The screen's day moves at midnight too (MOL-329), never the clock's.
     const sheetOpen = ref(false)
     // The income the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -346,7 +345,8 @@ export default defineComponent({
       t('income.row_line', {
         source: t(`income.source.${income.source}`),
         // A calendar day of Yerevan, never the moment of its midnight (adversarial Ж).
-        date: calendarDay(income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
+        // the question has no month's caption over it (MOL-329, adversarial Ж1)
+        date: calendarDayOfAnyYear(income.receivedOn, locale.value, today.value),
       })
     const sumsOf = (sums: readonly Money[]): string =>
       sums.map((sum) => formatMoney(sum, locale.value)).join(' · ')
@@ -355,7 +355,7 @@ export default defineComponent({
     const whenOf = (at: Date): string => answeredAt(at, locale.value, today.value)
 
     return {
-      shownToday,
+      today,
       skeletonPlates,
       t,
       ...incomes,
@@ -380,7 +380,7 @@ export default defineComponent({
       sumsOf,
       whenOf,
       // The year only where it is not the phone's (В-2 «а»).
-      monthOf: (month: string) => monthOf(month, locale.value, shownToday()),
+      monthOf: (month: string) => monthOf(month, locale.value, today.value),
       IconCashPlus,
     }
   },

@@ -202,6 +202,7 @@
 </template>
 
 <script lang="ts">
+import { answeredAt } from '@/days'
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
@@ -227,7 +228,7 @@ import SpendingSheet from '@/components/SpendingSheet.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { countedWhen, pageOrder } from '@/components/accounts'
+import { pageOrder } from '@/components/accounts'
 import { budgetAmount } from '@/components/spending'
 import { useMoneyScreen } from '@/composables/useMoneyScreen'
 import { useReconnect } from '@/composables/useReconnect'
@@ -291,7 +292,9 @@ export default defineComponent({
       return {
         totals,
         live,
-        asOf: accounts.failed ? countedWhen(overview.countedAt, locale.value) : null,
+        asOf: accounts.failed
+          ? answeredAt(overview.countedAt, locale.value, screen.today.value)
+          : null,
       }
     })
 

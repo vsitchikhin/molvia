@@ -185,12 +185,17 @@ export default defineComponent({
     // swept away may be answered while it is open again for another (adversarial В1 of MOL-192): the
     // write belongs to the opening it was sent from, never to the one on screen when it lands.
     let opening = 0
+    // The month the plan is typed for, taken as the sheet opens: the screen's month moves at midnight with
+    // the screen in view (MOL-329), and a September plan saved two seconds past it went in from October
+    // (adversarial В2 of round 3) — a sheet keeps the day it opened on, as the spending's does.
+    const month = ref(props.month)
 
     watch(
       () => props.open,
       (open) => {
         if (!open) return
         opening++
+        month.value = props.month
         sending.value = false
         removing.value = false
         const plan = props.plan
@@ -247,9 +252,9 @@ export default defineComponent({
     })
     /** «С октября и дальше. Сентябрь не меняется.» — what the plan is of in time (Р-9). */
     const fromWords = computed(() => {
-      const before = monthName(previousMonth(props.month), locale.value)
+      const before = monthName(previousMonth(month.value), locale.value)
       return t('budget.sheet.from', {
-        month: monthGenitive(props.month, t),
+        month: monthGenitive(month.value, t),
         before: before.charAt(0).toLocaleUpperCase(locale.value) + before.slice(1),
       })
     })
@@ -304,7 +309,7 @@ export default defineComponent({
       sending.value = true
       removing.value = plan === null
       try {
-        await props.save({ categoryId: id, from: props.month, plan })
+        await props.save({ categoryId: id, from: month.value, plan })
         finished(
           {
             kind: plan ? 'saved' : 'removed',

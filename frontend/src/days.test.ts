@@ -3,12 +3,12 @@ import { yerevanDate } from '@molvia/model'
 import {
   answeredAt,
   calendarDayOfAnyYear,
+  dateOfAnyYear,
   dayOfAnyYear,
   dayWords,
   localDay,
   monthOf,
   purchaseDay,
-  shownDay,
   timeOfDay,
 } from '@/days'
 
@@ -17,24 +17,24 @@ const at = (day: number, hour: number, minute = 0) => new Date(2026, 8, day, hou
 
 describe('purchaseDay', () => {
   it('names today and yesterday in words, in the app language', () => {
-    expect(purchaseDay(at(19, 9), 'ru', at(19, 21))).toBe('сегодня')
-    expect(purchaseDay(at(18, 9), 'ru', at(19, 21))).toBe('вчера')
-    expect(purchaseDay(at(18, 9), 'en', at(19, 21))).toBe('yesterday')
+    expect(purchaseDay(at(19, 9), 'ru', '2026-09-19')).toBe('сегодня')
+    expect(purchaseDay(at(18, 9), 'ru', '2026-09-19')).toBe('вчера')
+    expect(purchaseDay(at(18, 9), 'en', '2026-09-19')).toBe('yesterday')
   })
 
   it('counts by the calendar: 23:50 is yesterday at 00:10', () => {
-    expect(purchaseDay(at(18, 23, 50), 'ru', at(19, 0, 10))).toBe('вчера')
-    expect(purchaseDay(at(19, 0, 10), 'ru', at(19, 23, 50))).toBe('сегодня')
+    expect(purchaseDay(at(18, 23, 50), 'ru', '2026-09-19')).toBe('вчера')
+    expect(purchaseDay(at(19, 0, 10), 'ru', '2026-09-19')).toBe('сегодня')
   })
 
   it('from the day before yesterday on, the date', () => {
-    expect(purchaseDay(at(17, 12), 'ru', at(19, 12))).toBe('17 сент.')
-    expect(purchaseDay(at(12, 12), 'en', at(19, 12))).toBe('Sep 12')
+    expect(purchaseDay(at(17, 12), 'ru', '2026-09-19')).toBe('17 сент.')
+    expect(purchaseDay(at(12, 12), 'en', '2026-09-19')).toBe('Sep 12')
   })
 
   it('С-7: a phone clock behind the server still calls a purchase from just now today', () => {
-    expect(purchaseDay(at(19, 23, 59), 'ru', at(19, 12))).toBe('сегодня')
-    expect(purchaseDay(at(20, 0, 5), 'ru', at(19, 23, 58))).toBe('сегодня')
+    expect(purchaseDay(at(19, 23, 59), 'ru', '2026-09-19')).toBe('сегодня')
+    expect(purchaseDay(at(20, 0, 5), 'ru', '2026-09-19')).toBe('сегодня')
   })
 })
 
@@ -53,50 +53,48 @@ describe('timeOfDay', () => {
 
 describe('answeredAt (MOL-187)', () => {
   it('names the answer by the day the screen holds, with its time', () => {
-    expect(answeredAt(at(19, 23, 40), 'ru', '2026-09-19', at(19, 23, 45))).toBe('сегодня, 23:40')
-    expect(answeredAt(at(17, 14, 5), 'ru', '2026-09-19', at(19, 9))).toBe('17 сент., 14:05')
+    expect(answeredAt(at(19, 23, 40), 'ru', '2026-09-19')).toBe('сегодня, 23:40')
+    expect(answeredAt(at(17, 14, 5), 'ru', '2026-09-19')).toBe('17 сент., 14:05')
   })
 
   it('А2: the same answer, the screen on the next day, is yesterday’s — whatever the clock says', () => {
-    expect(answeredAt(at(19, 23, 40), 'en', '2026-09-20', at(19, 23, 50))).toBe(
+    expect(answeredAt(at(19, 23, 40), 'en', '2026-09-20')).toBe('yesterday, 11:40 PM')
+  })
+
+  // MOL-329, adversarial А4: the clock is never read here — a strip redrawn past midnight said «вчера» over
+  // rows still «сегодня». The screen's day moves at midnight itself (`useLocalDay`).
+  it('the screen still on yesterday is the day the answer is named by, whatever the clock says', () => {
+    expect(answeredAt(at(19, 23, 58), 'en', '2026-09-19')).toBe('today, 11:58 PM')
+  })
+
+  it('an answer of another year says its year (MOL-215, adversarial Б2)', () => {
+    expect(answeredAt(new Date(2025, 9, 30, 10, 5), 'en', '2026-11-02')).toBe(
+      'Oct 30, 2025, 10:05 AM',
+    )
+    // «Вчера» beats the year, as `dayOfAnyYear` has it.
+    expect(answeredAt(new Date(2025, 11, 31, 23, 40), 'en', '2026-01-01')).toBe(
       'yesterday, 11:40 PM',
     )
   })
 
-  it('Б2: the screen still on yesterday, the clock past midnight — yesterday’s too', () => {
-    expect(answeredAt(at(19, 23, 58), 'en', '2026-09-19', at(20, 0, 5))).toBe('yesterday, 11:58 PM')
-  })
-
-  it('an answer of another year says its year (MOL-215, adversarial Б2)', () => {
-    expect(
-      answeredAt(new Date(2025, 9, 30, 10, 5), 'en', '2026-11-02', new Date(2026, 10, 2, 12)),
-    ).toBe('Oct 30, 2025, 10:05 AM')
-    // «Вчера» beats the year, as `dayOfAnyYear` has it.
-    expect(
-      answeredAt(new Date(2025, 11, 31, 23, 40), 'en', '2026-01-01', new Date(2026, 0, 1, 9)),
-    ).toBe('yesterday, 11:40 PM')
-  })
-
-  it('an answer of a day neither has reached yet is today’s, never a date', () => {
-    expect(answeredAt(at(20, 0, 10), 'ru', '2026-09-19', at(19, 23, 58))).toBe('сегодня, 00:10')
+  it('an answer of a day the screen has not reached yet is today’s, never a date', () => {
+    expect(answeredAt(at(20, 0, 10), 'ru', '2026-09-19')).toBe('сегодня, 00:10')
   })
 })
 
 describe('dayOfAnyYear (MOL-57, self-review С-5)', () => {
   it('this year it is the purchase day, words included', () => {
-    expect(dayOfAnyYear(at(18, 9), 'ru', at(19, 21))).toBe('вчера')
-    expect(dayOfAnyYear(at(1, 9), 'ru', at(19, 21))).toBe('1 сент.')
+    expect(dayOfAnyYear(at(18, 9), 'ru', '2026-09-19')).toBe('вчера')
+    expect(dayOfAnyYear(at(1, 9), 'ru', '2026-09-19')).toBe('1 сент.')
   })
 
   it('another year carries the year', () => {
-    expect(dayOfAnyYear(new Date(2025, 8, 12), 'ru', at(19, 12))).toBe('12 сент. 2025 г.')
-    expect(dayOfAnyYear(new Date(2025, 11, 30, 20), 'ru', new Date(2026, 0, 1, 9))).toBe(
-      '30 дек. 2025 г.',
-    )
+    expect(dayOfAnyYear(new Date(2025, 8, 12), 'ru', '2026-09-19')).toBe('12 сент. 2025 г.')
+    expect(dayOfAnyYear(new Date(2025, 11, 30, 20), 'ru', '2026-01-01')).toBe('30 дек. 2025 г.')
   })
 
   it('across New Year yesterday is still «вчера», not a date with a year', () => {
-    expect(dayOfAnyYear(new Date(2025, 11, 31, 20), 'ru', new Date(2026, 0, 1, 9))).toBe('вчера')
+    expect(dayOfAnyYear(new Date(2025, 11, 31, 20), 'ru', '2026-01-01')).toBe('вчера')
   })
 })
 
@@ -106,15 +104,26 @@ describe('calendarDayOfAnyYear (MOL-305)', () => {
     expect(calendarDayOfAnyYear('2023-10-26', 'ru', '2026-10-30')).toBe('26 окт. 2023 г.')
     expect(calendarDayOfAnyYear('2026-12-31', 'ru', '2027-01-01')).toBe('31 дек. 2026 г.')
   })
+
+  // A sheet's own day in the form it prints it, the year beside it (MOL-329, adversarial Ж1).
+  it('takes the form of its place and adds the year to it', () => {
+    const long = { day: 'numeric', month: 'long' } as const
+    expect(calendarDayOfAnyYear('2025-09-16', 'en', '2026-11-02', long)).toBe('September 16, 2025')
+    expect(calendarDayOfAnyYear('2026-09-16', 'en', '2026-11-02', long)).toBe('September 16')
+    const digits = { day: '2-digit', month: '2-digit' } as const
+    expect(calendarDayOfAnyYear('2025-09-12', 'ru', '2026-11-02', digits)).toBe('12.09.2025')
+    expect(calendarDayOfAnyYear('2026-09-12', 'ru', '2026-11-02', digits)).toBe('12.09')
+  })
 })
 
-describe('shownDay (MOL-187, Б2; MOL-188, А1)', () => {
-  it('is the later of the screen’s day and the clock’s', () => {
-    // Past midnight, the screen not told yet: the clock's.
-    expect(shownDay('2026-12-31', new Date(2027, 0, 1, 0, 5))).toBe('2027-01-01')
-    // A screen's day ahead of the clock — a phone whose clock lags: the screen's.
-    expect(shownDay('2026-10-19', new Date(2026, 9, 18, 12))).toBe('2026-10-19')
-    expect(shownDay('2026-10-18', new Date(2026, 9, 18, 12))).toBe('2026-10-18')
+describe('dateOfAnyYear (MOL-204; MOL-329, adversarial А5)', () => {
+  it('is always a date, the year only when not the screen’s, the month short or whole', () => {
+    expect(dateOfAnyYear(at(18, 9), 'ru', '2026-09-19')).toBe('18 сент.')
+    expect(dateOfAnyYear(new Date(2025, 8, 21), 'ru', '2026-09-19')).toBe('21 сент. 2025 г.')
+    expect(dateOfAnyYear(new Date(2025, 8, 21), 'en', '2026-09-19', 'long')).toBe(
+      'September 21, 2025',
+    )
+    expect(dateOfAnyYear(at(21, 9), 'ru', '2026-09-22', 'long')).toBe('21 сентября')
   })
 })
 

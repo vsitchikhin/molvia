@@ -291,6 +291,50 @@ describe('VerdictsView', () => {
     expect(view.get('.question').text()).toContain('Хлеб')
   })
 
+  // MOL-329: the day of the list and of the purchase are said from the screen's day, asked again on return.
+  describe('days past midnight (MOL-329)', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function remembered(at: Date, now: Date) {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(at)
+      const late = { ...milk, boughtAt: new Date('2026-10-30T23:45:00.000Z') }
+      pendingVerdicts.mockResolvedValue({ items: [late], total: 1 })
+      ;(await render()).view.unmount()
+      vi.setSystemTime(now)
+      online(false)
+      pendingVerdicts.mockRejectedValue(new ApiError(ERROR.INTERNAL, 'Failed to fetch'))
+      return (await render()).view
+    }
+
+    it('23:50 — «today»; 00:10 and the app back in view — «yesterday», the strip and the card', async () => {
+      const view = await remembered(
+        new Date('2026-10-30T23:46:00.000Z'),
+        new Date('2026-10-30T23:50:00.000Z'),
+      )
+      expect(view.get('.strip').text()).toBe(en.verdict.stale.replace('{when}', 'today, 11:46 PM'))
+      expect(view.text()).toContain('today · SAS')
+
+      vi.setSystemTime(new Date('2026-10-31T00:10:00.000Z'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(view.get('.strip').text()).toBe(
+        en.verdict.stale.replace('{when}', 'yesterday, 11:46 PM'),
+      )
+      expect(view.text()).toContain('yesterday · SAS')
+    })
+
+    it('a list of another year says its year', async () => {
+      const view = await remembered(
+        new Date('2025-10-30T10:05:00.000Z'),
+        new Date('2026-11-02T12:00:00.000Z'),
+      )
+      expect(view.get('.strip').text()).toContain('2025')
+    })
+  })
+
   it("В-2: a list from memory and a rating kept offline — one strip, the rating's", async () => {
     pendingVerdicts.mockResolvedValue({ items: [milk, bread], total: 2 })
     ;(await render()).view.unmount()

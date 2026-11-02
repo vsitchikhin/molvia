@@ -34,6 +34,7 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { dayOfAnyYear } from '@/days'
 
 /**
@@ -68,6 +69,8 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
+    // The screen's day, asked again as the app comes back: the day words are said from it (MOL-329).
+    const today = useLocalDay()
     const sheet = ref<{ close: (steps?: number) => void } | null>(null)
     function confirm(): void {
       emit('confirm')
@@ -77,7 +80,7 @@ export default defineComponent({
     const meta = computed(() =>
       [
         props.place,
-        props.day ? dayOfAnyYear(props.day, locale.value) : null,
+        props.day ? dayOfAnyYear(props.day, locale.value, today.value) : null,
         t('trip.items_count', { n: props.items }, props.items),
       ]
         .filter((part) => part !== null && part !== '')

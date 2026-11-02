@@ -71,7 +71,7 @@ import type {
 } from '@/stores/spendingQueue'
 import { spendingOf } from '@/stores/spendingQueue'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
-import { dayWords } from '@/days'
+import { calendarDayOfAnyYear, dayWords, shiftDay } from '@/days'
 
 /**
  * What the screen of «Деньги» draws, put together from the server's month and the phone's queue
@@ -636,7 +636,13 @@ export function detailsLine(
   today: string,
   none: string,
 ): string {
-  const day = isRateDay(fields.day) ? dayWords(fields.day, locale, today) : null
+  // «Вчера» beats the year; any other day of another year says it, a sheet having no month's caption (MOL-329 Ж1)
+  const near = fields.day === today || fields.day === shiftDay(today, -1)
+  const day = !isRateDay(fields.day)
+    ? null
+    : near
+      ? dayWords(fields.day, locale, today)
+      : calendarDayOfAnyYear(fields.day, locale, today)
   const typed = [fields.note, fields.place]
     .filter((part) => !drawsNothing(part))
     .map((part) => part.trim())

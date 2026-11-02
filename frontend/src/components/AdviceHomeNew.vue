@@ -138,6 +138,7 @@ import ListRow from '@/components/ListRow.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { usePendingFrom } from '@/composables/usePendingFrom'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { UNDER_WAY, useReceipts } from '@/composables/useReceipts'
@@ -228,7 +229,7 @@ export default defineComponent({
         return queue.phase.value === 'empty' ? 'new' : 'unknown'
       }),
       asking: computed(() => queue.phase.value === 'loading'),
-      pendingFrom: usePendingFrom(queue),
+      pendingFrom: usePendingFrom(queue, useLocalDay()),
       goTab: (tab: 'purchases' | 'verdicts') => void goTab(tab),
     }
   },

@@ -19,6 +19,38 @@ const SELECT = [
     message: 'A select is AppField kind="select" or CurrencySelect (MOL-235).',
   },
 ]
+/**
+ * The screen's day (MOL-329, self-review №2): a day word is counted from `useLocalDay` or a `today` the
+ * screen hands down — the clock read in its place, `localDay()` or `localDay(new Date())` written out
+ * (adversarial В1), is the clock where the words are drawn, which a required argument of `days.ts` takes as
+ * gladly; a day held in `ref`, `shallowRef`, `computed` or `reactive` of the clock moves neither as the app
+ * comes back nor at midnight (adversarial А2, А3, Б3б, В1); and a default of the clock is read once — the
+ * mechanism the task was opened against (Б3а). The clock read a line before into a name, or handed down as a
+ * prop, is review's: a selector cannot follow a name (Б3в, self-review Р2-4). `localDay(moment)` is the day
+ * of a moment, not the clock, and passes. The clock has spellings without end — `new Date(Date.now())`,
+ * `new globalThis.Date()` — and the rule holds the two ordinary ones; the rest is review's (adversarial Г3).
+ */
+const DAY_WORDS =
+  'purchaseDay|dayOfAnyYear|dateOfAnyYear|answeredAt|dayWords|calendarDayOfAnyYear|shortDay'
+const CLOCK =
+  "CallExpression[callee.name='localDay']:matches([arguments.length=0], [arguments.0.type='NewExpression'][arguments.0.callee.name='Date'][arguments.0.arguments.length=0])"
+const DAY = [
+  {
+    selector: `CallExpression[callee.name=/^(${DAY_WORDS})$/] ${CLOCK}`,
+    message:
+      "A day is said from the screen's day — useLocalDay or its today — never localDay() in place (MOL-329).",
+  },
+  {
+    selector: `CallExpression[callee.name=/^(ref|shallowRef|computed|reactive)$/] ${CLOCK}`,
+    message:
+      "A screen's day is useLocalDay(): it moves as the app comes back and at midnight (MOL-329).",
+  },
+  {
+    selector: `AssignmentPattern > ${CLOCK}.right`,
+    message:
+      "A default of localDay() is read once: take the screen's day, useLocalDay or its today (MOL-329).",
+  },
+]
 
 /**
  * The attributes that make a field of the kit outside it (MOL-177, MOL-235), one list a field. HTML
@@ -264,11 +296,18 @@ export default defineConfigWithVueTs(
   // (adversarial Р2-А2) — so in this rule, one option list a file, the kit's two files keeping theirs.
   {
     files: ['src/**/*.vue'],
-    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...SELECT] },
+    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...SELECT, ...DAY] },
   },
   {
     files: ['src/components/AppField.vue', 'src/components/CurrencySelect.vue'],
-    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY] },
+    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...DAY] },
+  },
+  // The screen's day in the scripts (MOL-329): the rule above reads a template, this one the code. The
+  // tests compute what a screen should say from the clock they set, and `useLocalDay` is the one holder.
+  {
+    files: ['src/**/*.ts', 'src/**/*.vue'],
+    ignores: ['src/**/*.test.ts', 'src/composables/useLocalDay.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...DAY] },
   },
   prettier,
 )

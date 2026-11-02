@@ -228,6 +228,7 @@
 </template>
 
 <script lang="ts">
+import { answeredAt } from '@/days'
 import { computed, defineComponent, nextTick, ref, useId } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -247,7 +248,6 @@ import type { BudgetOutcome, BudgetSubject } from '@/components/BudgetPlanSheet.
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
-import { countedWhen } from '@/components/accounts'
 import { budgetAmount, spendingLook } from '@/components/spending'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
@@ -327,7 +327,7 @@ export default defineComponent({
     const amount = (value: Money) => budgetAmount(value, locale.value)
     const percent = (value: number) =>
       new Intl.NumberFormat(locale.value, { style: 'percent' }).format(value / 100)
-    const when = (at: Date) => countedWhen(at, locale.value)
+    const when = (at: Date) => answeredAt(at, locale.value, today.value)
 
     const overall = computed(() => {
       // No row counted, or over a plan known in part: «осталось» is not said as a figure (review 9, 10).

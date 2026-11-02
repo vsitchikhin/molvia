@@ -41,7 +41,7 @@ import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import RatingScale from '@/components/RatingScale.vue'
 import { placeLabel } from '@/components/placeLabel'
-import { purchaseDay } from '@/days'
+import { dayOfAnyYear } from '@/days'
 import { SCORES } from '@/components/rating'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
@@ -87,6 +87,8 @@ export default defineComponent({
      * city (MOL-120) — the queue decides, since the card alone cannot know.
      */
     city: { type: String as PropType<string | null>, default: null },
+    /** The screen's day (`useLocalDay`): «сегодня» and «вчера» of the purchase are said from it (MOL-329). */
+    today: { type: String, required: true },
   },
   emits: {
     save: (score: Score, review: string) =>
@@ -119,7 +121,7 @@ export default defineComponent({
     const returnedWith = props.draft?.error ? props.draft.score : null
     let saved = false
 
-    const day = computed(() => purchaseDay(props.card.boughtAt, locale.value))
+    const day = computed(() => dayOfAnyYear(props.card.boughtAt, locale.value, props.today))
     const place = computed(() => placeLabel(props.card.placeName, props.city, i18n))
 
     // Synchronous, so an error set right after an edit in `save` is not cleared by it later.

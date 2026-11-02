@@ -269,6 +269,7 @@ import type { StripKind } from '@/components/StatusStrip.vue'
 import TripNotices from '@/components/TripNotices.vue'
 import TripUndoStrip from '@/components/TripUndoStrip.vue'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { usePendingFrom } from '@/composables/usePendingFrom'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { WORKING, rejectedReason, useReceipts } from '@/composables/useReceipts'
@@ -278,7 +279,14 @@ import { useTripHistory } from '@/composables/useTripHistory'
 import type { HistoryRow } from '@/composables/useTripHistory'
 import { useTripRows } from '@/composables/useTripRows'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
-import { calendarDayOfAnyYear, dateOfAnyYear, dayOfAnyYear, purchaseDay, timeOfDay } from '@/days'
+import {
+  answeredAt,
+  calendarDayOfAnyYear,
+  dateOfAnyYear,
+  dayOfAnyYear,
+  purchaseDay,
+  timeOfDay,
+} from '@/days'
 import { useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -325,7 +333,9 @@ export default defineComponent({
     const { history, rows, loading, loadingMore, trouble, failures, moved } = screen
     const verdicts = useVerdictQueue()
     const pending = computed(() => verdicts.count.value)
-    const pendingFrom = usePendingFrom(verdicts)
+    // The screen's day: every day it says is counted from it, asked again as the app comes back (MOL-329).
+    const today = useLocalDay()
+    const pendingFrom = usePendingFrom(verdicts, today)
 
     const { trip, local, tripId } = useCurrentTrip()
     const { rows: tripRows } = useTripRows(tripId, trip, () => t('trip.queued.unnamed'))
@@ -453,7 +463,9 @@ export default defineComponent({
       const key = kind === 'offline' ? 'purchases.stale' : 'purchases.stale_error'
       return {
         kind: kind === 'offline' ? 'offline' : 'unanswered',
-        text: at ? t(key, when(at)) : t(`${key}_untimed`),
+        text: at
+          ? t(key, { when: answeredAt(at, locale.value, today.value) })
+          : t(`${key}_untimed`),
         attempt: failures.value + retriesFailed.value,
       }
     })
@@ -469,8 +481,14 @@ export default defineComponent({
       if (receipts.attempt.value > before) retriesFailed.value += 1
     }
 
+    // «Чек от …», «Фото от …» put their own word before the day: always a date, never «от вчера» (adversarial
+    // Д1, the rule of «Раньше …», MOL-204 Р-9).
+    const dated = (at: Date) => ({
+      day: dateOfAnyYear(at, locale.value, today.value),
+      time: timeOfDay(at, locale.value),
+    })
     const when = (at: Date) => ({
-      day: purchaseDay(at, locale.value),
+      day: purchaseDay(at, locale.value, today.value),
       time: timeOfDay(at, locale.value),
     })
     // A printed day is a calendar day, never a moment (review 23). A receipt with no date of its own stands on the
@@ -478,7 +496,11 @@ export default defineComponent({
     // one that prints that day, it was the same row.
     const readDay = (row: ReceiptRow): { day: string; sent: boolean } => {
       const printed = row.summary?.header?.date
-      if (printed) return { day: calendarDayOfAnyYear(printed, locale.value), sent: false }
+      if (printed)
+        return {
+          day: calendarDayOfAnyYear(printed, locale.value, today.value),
+          sent: false,
+        }
       return { day: when(row.capturedAt).day, sent: true }
     }
     const readDayWords = (row: ReceiptRow): string => {
@@ -488,14 +510,14 @@ export default defineComponent({
     function receiptTitle(row: ReceiptRow): string {
       // a receipt by its link has no photo to name (MOL-232)
       if (row.state === 'rejected' && row.parts > 0)
-        return t('purchases.rejected_title', when(row.capturedAt))
+        return t('purchases.rejected_title', dated(row.capturedAt))
       const place = row.summary?.place?.name
       if (place && row.state !== 'waiting' && row.state !== 'sending') return place
       if (row.state === 'parsed' || row.state === 'recording' || row.state === 'failed') {
         const { day, sent } = readDay(row)
         return t(sent ? 'receipt.review.title_sent' : 'receipt.review.title_no_place', { day })
       }
-      return t('purchases.receipt_from', when(row.capturedAt))
+      return t('purchases.receipt_from', dated(row.capturedAt))
     }
     function receiptMeta(row: ReceiptRow): string {
       // a receipt by its link has no parts: it is a link (MOL-232)
@@ -613,14 +635,14 @@ export default defineComponent({
       receiptsState,
       earlierDay: computed(() => {
         const last = rows.value.at(-1)
-        return last ? dateOfAnyYear(last.at, locale.value) : ''
+        return last ? dateOfAnyYear(last.at, locale.value, today.value) : ''
       }),
       open,
       pending,
       pendingFrom,
       positions,
       recordedMeta: (row: HistoryRow): string => {
-        const day = dayOfAnyYear(row.at, locale.value)
+        const day = dayOfAnyYear(row.at, locale.value, today.value)
         if (row.itemCount === null) return day
         // a trip with its sum and no purchase — from a receipt with no items or typed by hand (MOL-78) —
         // is the sum, never «0 позиций»; «по чеку» says «из чека» already (MOL-227, Р-6, review 1 № 2)
