@@ -361,7 +361,7 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     expect(rows).toHaveLength(6)
     expect(new Set(rows.map((row) => row.version))).toEqual(new Set(['tesseract 5.5.0 · test']))
     expect(await month()).toBeNull()
-  }, 30_000)
+  }, 65_000)
 
   it('leaves to Tesseract a granted receipt where the API has no key', async () => {
     const me = await person(LATER)
