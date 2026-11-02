@@ -186,6 +186,57 @@ test.describe('the trip', () => {
     await expect(page).toHaveURL(/\/purchases$/)
   })
 
+  test('a purchase corrected while its add is on its way reaches the server corrected (MOL-325)', async ({
+    page,
+  }) => {
+    // The server writes the purchase at once, and its answer is held back until the person has
+    // corrected the line: a repeat of the same id is answered «200, nothing changed», so the
+    // correction must reach the row some other way. Laid before the page opens (MOL-249).
+    let release: () => void = () => undefined
+    const answerHeld = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let held = false
+    await page.route('**/api/trips/*/expenses', async (route) => {
+      if (route.request().method() !== 'POST' || held) {
+        await route.continue()
+        return
+      }
+      held = true
+      const response = await route.fetch()
+      await answerHeld
+      await route.fulfill({ response })
+    })
+    const setting = await device(page)
+    await startTrip(page, 'Ереван Сити')
+    await expect.poll(async () => (await setting.current())?.place.name).toBe('Ереван Сити')
+
+    await addItem(page, setting.word, '570')
+    await expect.poll(() => held).toBe(true)
+    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+
+    // The line still waits for its answer, so it opens as itself — the same purchase.
+    await row(page).first().click()
+    await page.waitForTimeout(400)
+    await sheet(page).getByLabel('How much').fill('0.9')
+    await sheet(page).getByLabel('Price as on the tag').fill('580')
+    await sheet(page).getByRole('button', { name: 'Record' }).click()
+    await expect(sheet(page)).toBeHidden()
+    release()
+
+    await expect
+      .poll(async () => (await setting.current())?.expenses)
+      .toEqual([
+        expect.objectContaining({
+          // As the wire spells them: thousandths of a unit, hundredths of a dram.
+          quantity: { value: '0.900', unit: 'l' },
+          amount: { amount: '580.00', currency: 'AMD' },
+        }),
+      ])
+    await expect(row(page).first()).toContainText('֏580')
+    await expect(page.getByText('was not accepted')).toHaveCount(0)
+  })
+
   test('an empty trip is deleted at once, and the next one starts (MOL-76)', async ({ page }) => {
     const setting = await device(page)
     await startTrip(page, 'SAS')
