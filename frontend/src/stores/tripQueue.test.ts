@@ -1244,27 +1244,101 @@ describe('trip queue', () => {
       expect(queue.pending).toEqual([])
     })
 
-    it('правка, положенная пока запись в пути, не уходит с ответом на прежнюю', async () => {
-      let answered: (trip: { trip: TripView; created: boolean }) => void = () => undefined
-      addExpense.mockReturnValueOnce(
-        new Promise((resolve) => {
-          answered = resolve
-        }),
-      )
-      addExpense.mockResolvedValue({ trip: answer('750.00'), created: true })
-      const queue = fresh()
-      queue.enqueue(add(MILK, '520'))
-      await settled()
+    describe('правка, положенная пока запись в пути (MOL-325)', () => {
+      /** 1 л за 750 вместо 0,9 л за 520: правка меняет и количество, не только цену. */
+      function corrected(): QueuedWrite {
+        const write = add(MILK, '750')
+        if (write.kind !== 'add') throw new Error('add')
+        return { ...write, body: { ...write.body, quantity: parseQuantity('1', 'l') } }
+      }
 
-      // Человек правит цену, пока первая версия висит в сети.
-      queue.enqueue(add(MILK, '750'))
-      answered({ trip: answer('520.00'), created: true })
-      await queue.flush()
+      /**
+       * Сервер, как `expenses.add`: первое тело выигрывает, повтор того же id отвечает строкой,
+       * какая есть, с `created: false`, — а правка (`PATCH`) строку меняет. Первый `POST` висит,
+       * пока его не отпустят; `lost` — сервер его записал, а ответ до телефона не дошёл.
+       */
+      function server() {
+        let row: AddExpenseBody | null = null
+        const viewOf = (kept: AddExpenseBody): TripView => {
+          const trip = answered1(MILK, '0.9', '520')
+          return {
+            ...trip,
+            expenses: trip.expenses.map((expense) => ({
+              ...expense,
+              quantity: kept.quantity ?? null,
+              amount: kept.amount ?? null,
+            })),
+          }
+        }
+        let release: (lost: boolean) => void = () => undefined
+        addExpense.mockImplementationOnce(
+          (_tripId, body) =>
+            new Promise((resolve, reject) => {
+              release = (lost) => {
+                row = body
+                if (lost) reject(offline())
+                else resolve({ trip: viewOf(body), created: true })
+              }
+            }),
+        )
+        addExpense.mockImplementation((_tripId, body) => {
+          if (row) return Promise.resolve({ trip: viewOf(row), created: false })
+          row = body
+          return Promise.resolve({ trip: viewOf(body), created: true })
+        })
+        updateExpense.mockImplementation((_tripId, _id, patch) => {
+          if (!row) return Promise.reject(new ApiError(ERROR.NOT_FOUND, undefined, true))
+          row = {
+            ...row,
+            ...(patch.quantity !== undefined ? { quantity: patch.quantity ?? undefined } : {}),
+            ...(patch.amount !== undefined ? { amount: patch.amount ?? undefined } : {}),
+          }
+          return Promise.resolve(viewOf(row))
+        })
+        return {
+          release: (lost = false) => {
+            release(lost)
+          },
+          row: () => row,
+        }
+      }
 
-      // Правка не выброшена ответом на прежнее тело — она ушла второй.
-      expect(addExpense).toHaveBeenCalledTimes(2)
-      expect(addExpense.mock.calls[1]?.[1].amount?.minor).toBe(75_000n)
-      expect(queue.pending).toEqual([])
+      it('ответ на прежнее тело пришёл — правка уходит правкой, второго POST нет', async () => {
+        const held = server()
+        const queue = fresh()
+        queue.enqueue(add(MILK, '520'))
+        await settled()
+
+        // Человек правит строку, пока первая версия висит в сети.
+        queue.enqueue(corrected())
+        held.release()
+        await queue.flush()
+
+        expect(addExpense).toHaveBeenCalledTimes(1)
+        expect(held.row()?.quantity).toEqual(parseQuantity('1', 'l'))
+        expect(held.row()?.amount).toEqual(parseMoney('750', 'AMD'))
+        expect(queue.pending).toEqual([])
+        expect(queue.rejected).toEqual([])
+      })
+
+      it('ответ потерялся — повтор POST сервер не применяет, и следом уходит правка', async () => {
+        const held = server()
+        const queue = fresh()
+        queue.enqueue(add(MILK, '520'))
+        await settled()
+
+        queue.enqueue(corrected())
+        held.release(true)
+        await settled()
+        // Связь вернулась: очередь шлёт правку той же покупкой, а телефон не знает, что строка есть.
+        await queue.flush()
+
+        expect(addExpense).toHaveBeenCalledTimes(2)
+        expect(held.row()?.quantity).toEqual(parseQuantity('1', 'l'))
+        expect(held.row()?.amount).toEqual(parseMoney('750', 'AMD'))
+        expect(queue.pending).toEqual([])
+        expect(queue.rejected).toEqual([])
+      })
     })
 
     it('отказ на прежнее тело не становится плашкой, когда правка уже в очереди', async () => {
