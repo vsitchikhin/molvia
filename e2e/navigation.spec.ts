@@ -6,6 +6,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { randomUUID } from 'node:crypto'
 import { actorCodec, settingsOf } from '@molvia/model'
+import { stillIn } from './scroll'
 import { asBrowser, open } from './session'
 
 /**
@@ -428,6 +429,7 @@ test.describe('safe areas', () => {
       window.scrollTo(0, document.documentElement.scrollHeight)
     })
     await page.waitForTimeout(300)
+    await stillIn(strip, page.locator('.dock'))
     const [undo, dock, last] = await Promise.all([
       strip.boundingBox(),
       page.locator('.dock').boundingBox(),
@@ -498,6 +500,7 @@ test.describe('safe areas', () => {
       await page.waitForFunction(() => !document.documentElement.hasAttribute('data-nav'))
       const add = page.locator('.dock').getByRole('button', { name: 'Добавить счёт' })
       await expect(add).toBeVisible()
+      await stillIn(strip, page.locator('.dock'))
       const [box, dock, button] = await Promise.all([
         strip.boundingBox(),
         page.locator('.dock').boundingBox(),
@@ -566,6 +569,7 @@ test.describe('safe areas', () => {
       await page.waitForFunction(() => !document.documentElement.hasAttribute('data-nav'))
       const reconcile = page.locator('.dock').getByRole('button', { name: 'Сверить с фактом' })
       await expect(reconcile).toBeVisible()
+      await stillIn(strip, page.locator('.dock'))
       const [box, dock, button] = await Promise.all([
         strip.boundingBox(),
         page.locator('.dock').boundingBox(),

@@ -1116,6 +1116,10 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   by the vitest global setup — a test run can never truncate data entered by hand. Each worker
   runs its files in a copy of it (`…_test_w<n>`, MOL-164), so the files go in parallel. This is
   why `make check` needs `make up` first, and why CI runs a Postgres service.
+- **A test is written past the six ways tests here have flaked** (owner, 02.11.2026; `.claude/rules/testing.md`):
+  chance in «not there», an order Postgres never promised, the real clock, work left past the end, a box measured
+  mid-motion, a race of the network or the focus in e2e. Read before the commit, and a flake of one found in a task
+  is fixed in it, not filed.
 - **When a test fails, look for the bug in the code first** — do not adjust the test to
   match the behaviour. A test proves the app works, not the other way round. And **never by
   making it tolerate leftovers**: that hides the cause and leaves the suite depending on the
