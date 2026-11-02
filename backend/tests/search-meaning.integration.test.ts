@@ -143,8 +143,11 @@ describe('one exact word does not make the other right, with the meaning too (MO
    * edits) keeps «Молоко кокосовое» first and not near, «кокосовае малако» (1 and 2) near — there the
    * answer is near either way, by «Кокос», and the row is what moves: «проверьте» on a receipt's line,
    * none of «Что брать» past its twentieth. Where nothing else is near the whole answer moves, as on 52
-   * of the seed's 711 typo ladders (adversarial Б1 of MOL-332): «шакалад белый» reads «не нашли» over
-   * «Шоколад белый», «шакалод белый» «нашли».
+   * of the seed's 711 typo ladders (adversarial Б1 of MOL-332). Each side is pinned by the example that
+   * stands furthest from the threshold, so a shift of a vector shows as what it moves: «не нашли» over
+   * «Вода минеральная» is held by «Вода мицеллярная», nearest of what the meaning alone would place,
+   * at 0.360; «нашли» by «Шоколад белый» itself at 0.481. «шакалад белый» holds «не нашли» by
+   * «Капуста белокочанная» at 0.390, too close (adversarial В1).
    */
   it('«кокосовое малако» — «Молоко кокосовое» first and not near; «кокосовае малако» — near', async () => {
     const milk = await idOf('Молоко кокосовое')
@@ -164,11 +167,14 @@ describe('one exact word does not make the other right, with the meaning too (MO
     expect(more.nearIds).toContain(milk)
   })
 
-  it('«шакалад белый» reads «не нашли» over «Шоколад белый», «шакалод белый» «нашли»', async () => {
-    const fewer = await search('шакалад белый')
-    const more = await search('шакалод белый')
-    expect([fewer.names[0], fewer.near]).toEqual(['Шоколад белый', false])
-    expect([more.names[0], more.near]).toEqual(['Шоколад белый', true])
+  it('two typos read «не нашли» over the thing meant first: «вода мениральная»', async () => {
+    const { names, near } = await search('вода мениральная')
+    expect([names[0], near]).toEqual(['Вода минеральная', false])
+  })
+
+  it('three typos read «нашли» over it: «шакалод белый»', async () => {
+    const { names, near } = await search('шакалод белый')
+    expect([names[0], near]).toEqual(['Шоколад белый', true])
   })
 })
 
