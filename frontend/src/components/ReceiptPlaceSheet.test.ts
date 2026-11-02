@@ -206,6 +206,7 @@ describe('ReceiptPlaceSheet (MOL-109, adversarial А2): a receipt of another cou
   afterEach(() => {
     for (const view of mounted.splice(0)) view.unmount()
     localStorage.clear()
+    vi.restoreAllMocks()
   })
 
   const select = () => document.body.querySelector<HTMLSelectElement>('dialog[open] select')
@@ -238,6 +239,31 @@ describe('ReceiptPlaceSheet (MOL-109, adversarial А2): a receipt of another cou
     const button = mainButton()
     expect(button?.textContent.trim()).toBe(ru.receipt.place.choose_place)
     expect(button?.getAttribute('aria-disabled')).toBe('true')
+  })
+
+  // A shop typed in a name no place takes is no wait but a refusal (adversarial А2 of MOL-333): the button
+  // said «Выберите магазин» over it, the name unmarked.
+  it('a name no place takes: the tap marks it and the focus goes to it', async () => {
+    clock = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    const view = await away(null)
+    clock += 1000
+    const name = view.get('input:not([type="date"])')
+    await name.setValue(`Ереван Сити${String.fromCodePoint(0xe000)}`)
+    await flushPromises()
+    const button = view.get('dialog[open] .footer button')
+    expect(button.text()).toBe(ACTION)
+    expect(button.attributes('aria-disabled')).toBeUndefined()
+    ;(button.element as HTMLButtonElement).focus()
+    ;(button.element as HTMLButtonElement).click()
+    await flushPromises()
+    expect(view.emitted('chosen')).toBeUndefined()
+    expect(name.element.getAttribute('aria-invalid')).toBe('true')
+    expect(view.text()).toContain(ru.spending.sheet.bad_text)
+    expect(document.activeElement).toBe(name.element)
+    // put right, the mark goes with the error
+    await name.setValue('Ереван Сити')
+    expect(name.element.getAttribute('aria-invalid')).toBeNull()
   })
 
   it('takes the city read off the receipt first', async () => {

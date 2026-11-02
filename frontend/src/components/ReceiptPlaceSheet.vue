@@ -39,6 +39,7 @@
         :maxlength="NAME_MAX"
         autocapitalize="sentences"
         enterkeyhint="done"
+        :error-text="nameBad ? t('spending.sheet.bad_text') : null"
         @update:model-value="typed"
       />
 
@@ -213,10 +214,18 @@ export default defineComponent({
     const dayBad = computed(
       () => when.value !== '' && !(isRateDay(when.value) && when.value <= latest.value),
     )
-    /** What the button waits for, in the order of the form; a day typed wrong is no wait but a refusal. */
+    /**
+     * What the button waits for, in the order of the form. A name or a day typed wrong is no wait but a
+     * refusal at the tap (adversarial А2 of MOL-333): «Выберите магазин» over a shop typed was untrue.
+     */
     const waitsFor = computed<'place' | 'day' | null>(() =>
-      chosen.value === null && !fresh.value ? 'place' : when.value === '' ? 'day' : null,
+      chosen.value === null && !fresh.value && typedName.value === null
+        ? 'place'
+        : when.value === ''
+          ? 'day'
+          : null,
     )
+    const nameBad = ref(false)
     const sheet = ref<{ $el: Element } | null>(null)
     const refuse = useFieldRefusal()
 
@@ -232,6 +241,7 @@ export default defineComponent({
       when,
       latest,
       dayBad,
+      nameBad,
       waitsFor,
       sheet,
       meta: computed(() =>
@@ -247,8 +257,10 @@ export default defineComponent({
       choose: (key: string) => {
         chosen.value = key
         name.value = ''
+        nameBad.value = false
       },
       typed: () => {
+        nameBad.value = false
         if (name.value.trim()) chosen.value = null
       },
       done: () => {
@@ -256,7 +268,12 @@ export default defineComponent({
         const place: PlaceDraft | null =
           picked ??
           (fresh.value && typedName.value ? { name: typedName.value, city: city.value } : null)
-        if (dayBad.value) {
+        // a shop named in what the server would not keep — a character no place takes
+        nameBad.value =
+          !picked &&
+          typedName.value !== null &&
+          !newPlaceSchema.shape.name.safeParse(typedName.value).success
+        if (nameBad.value || dayBad.value) {
           void refuse(() => sheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
           return
         }

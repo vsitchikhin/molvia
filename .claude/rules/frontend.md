@@ -695,10 +695,15 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   focus into it. **A sheet with no `<form>` looks in itself**, the `$el` of its `BottomSheet`, a `<dialog>` —
   never a wrapper put in the markup for it. **«Новая строка» with no item focuses the item's button**
   (owner's В-2 «а»): it is no field of the kit, so it carries no `aria-invalid` — a button has none in ARIA 1.2 —
-  and is read with its error as its description (`aria-describedby`), before the fields, as it stands first.
+  and is read with its error as its description (`aria-describedby`), before the fields, as it stands first —
+  **and said by it where the focus stands there already** (adversarial А1): the search put away with no pick
+  gives the focus back to the button, and Safari's tap on «Готово» leaves it there; `useFieldRefusal` takes
+  the words of `aria-errormessage`, else of what describes the control.
   **«Где купили?» is not now while a shop or a day is missing, saying which** (owner's В-3 «б»): «Выберите
   магазин», «Выберите день» — `disabled` had left it out of the focus order with nothing said; a day typed
-  wrong is no wait but a refusal, at the tap, the focus to «Когда»; the action's word («Записать сумму») comes
+  wrong is no wait but a refusal, at the tap, the focus to «Когда» — **and so is a shop named in characters no
+  place takes** (adversarial А2): «Выберите магазин» over a name typed was untrue, the name marked by nothing;
+  it is marked «Здесь есть знаки, которые не сохранить» and takes the focus; the action's word («Записать сумму») comes
   once a shop is named, as «Перевести» and a verdict's say what they wait for. **The price, named:** a card of
   «Оценки» back from the queue refused opens with the focus on its title (`focusOnMount`) and its error in the
   field — a queue's answer, not a refusal at a send. **The checkbox is

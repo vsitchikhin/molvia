@@ -101,6 +101,22 @@ describe('ReceiptAddedLineSheet — a refusal is heard (MOL-333)', () => {
     expect(described).toBe(ru.receipt.added.item_missing)
   })
 
+  // The search put away with no pick gives the focus back to the item's button; a tap Safari does not
+  // move the focus for leaves it there, and a description changed under it is read by nobody — so the
+  // button's error is said, by what describes it (adversarial А1 of MOL-333).
+  it('no item, the focus already on its button: its error is said', async () => {
+    const { saved } = await render()
+    const item = sheet()?.querySelector<HTMLButtonElement>('[data-field="item"]')
+    if (!item) throw new Error('нет кнопки товара')
+    item.focus()
+    press(ru.receipt.added.done)
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(saved).toEqual([])
+    expect(document.activeElement).toBe(item)
+    expect(sheet()?.querySelector('.region')?.textContent).toContain(ru.receipt.added.item_missing)
+  })
+
   it('must not fire: with an item the button is described by nothing', async () => {
     await render({ key: 'k', item: { name: 'Сыр' }, figures: { quantity: null, amount: null } })
     const item = sheet()?.querySelector<HTMLButtonElement>('[data-field="item"]')
