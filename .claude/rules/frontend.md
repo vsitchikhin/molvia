@@ -561,8 +561,11 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     figure of fourteen keeps its size at 100 % on 320. Twelve figures of «Деньги», and since MOL-334 the totals of a
     receipt (`ReceiptTotal`, its sum and chevron under «Итог чека» where the two do not fit, the card one column of
     `minmax(0, 1fr)`) and of a record (`TripTotalCard`), the sum in a row of a record (`TripRow`, the words' table),
-    «За единицу» of the three sheets that draw it (under its label where the two do not fit) and the price of «Брали
-    здесь» (`AdviceTakeCard`, `strong`).
+    «За единицу» of the three sheets that draw it (under its label where the two do not fit), the price of «Брали
+    здесь» (`AdviceTakeCard`, `strong`), each sum of another currency under a record's total (its line breaks between
+    them: at 200 % «1 234 567,89 / ₽», adversarial С1), and — owner's В-6 «а» — a price per unit in the words of a row's
+    meta and of «Тут дешевле», a piece of the phrase of its own (`aroundFigure` of `figure.ts`): «125 403, / 50 ֏»,
+    «125 403,50 / ֏/кг» at 200 % (С2, С3).
   - **The tab label stops growing at 125 %**: `--text-tab`, `min(var(--text-caption), 13.75px)`, as iOS keeps its
     tab bar (В-3 «а»); a token, named one by one in Stylelint's list of sizes. The tab bar is fixed and in no width
     of the page, so `large-text` reads every label within its column.
@@ -597,30 +600,40 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     not fit, the name's bar likewise. `large-text` holds every screen of «Деньги» with its answer held, before the
     device remembers one, and the record's sheet with the trip's answer held: a check that measured the skeleton
     only when it caught it passed it by (self-review 6, №1).
-  - **A word wider than its line breaks, with a hyphen only while the text is large** (MOL-321's В-2 «а»,
-    «Сфотогра-фируйте»; MOL-334's В-2 «а», everywhere words are): `overflow-wrap: break-word` on `body` at every size —
-    «налогоплательщика» stood «Данные и приватность» 33 px sideways at 200 % — which moves no least width, so 100 %
-    keeps its look; and one rule of `main.scss`, `html[data-large-text] body`: `hyphens: auto` from six letters, two a
-    side, as Russian print carries them — with three «Настройки» had no place for one and broke «Настро|йки». It was
-    three rules of three components (a screen's title, a block button, the newcomer's heading, the last two from twelve
-    letters); a row of the kit, a sheet's title, a pill and a paragraph broke «разраб|отчику», «Закончит|ь». What is
-    typed is never hyphenated. `data-large-text` is set by `useLargeText` from a box one rem wide while a rem is over
-    17.6 px — a width in `rem` tells the box, not the text, and a block of a pair is narrow at 100 % too. At 100 % no
-    engine hyphenates: Safari knows no `hyphenate-limit-chars` in any version, and WebKit hyphenates any word at a
-    line's end («Запишите первые по-купки», self-review №2). **The pills of a record by hand stand one under the other
-    across the strip below 12rem** (`TripView`, `.pair` its own container), the word with its hyphen: with its glyph
-    «Штрихкод» stood 7 px past the phone at 200 %. **The prices, named:** a word with no place for a hyphen — a name
-    of the catalogue, a word of another script — still breaks inside, as MOL-318 has it; Safari hyphenates more short
-    words at a line's end than Chrome; CI's Chromium may have no dictionary, so e2e reads the style and the eye the
-    hyphen; at 200 % the docked strip and the tab bar take half a window of 720 — the list ends over them and
-    scrolls, but a tap aimed by a script scrolled under them («Написать разработчику»); and a zoom of Chrome's own —
-    its setting, apart from the system's size the tag passes — narrows the window in CSS pixels, 213 at 150 %, a phone
-    narrower than the 320 the project holds, where `--text-tab` limits nothing and `data-large-text` is never set,
-    as a pinch is.
+  - **A word wider than its line breaks, and with large text words take a hyphen by the dictionary, by where they
+    stand** (MOL-321's В-2 «а»; MOL-334's В-2 «а», В-5 «а»): `overflow-wrap: break-word` on `body` at every size —
+    «налогоплательщика» stood «Данные и приватность» 33 px sideways at 200 % — which moves no least width, so 100 % keeps
+    its look; and one rule of `main.scss` under `html[data-large-text]`. **`hyphens: auto` cuts any word of the length
+    at a line's end, wide or not** (adversarial Х1), so where the length starts is the whole choice: in a unit of one to
+    three words — a title (`h1`–`h3`), a row of the kit (`.list-row .title`, `.nav-row .label`), a button — from six
+    letters, two a side as Russian print carries them (with three «Настройки» had no place for one and broke
+    «Настро|йки»; at 200 % «Написать разработчику» read «Написа|ть разраб|отчику»); in a paragraph and a row's meta
+    from twelve, inherited from `body`: from six there, «Данные и приватность» cut 394 words that would have stood
+    whole at 200 % and 192 already at 115 %, from twelve 21. **A segment's word never takes one** (MOL-189): a hyphen
+    lowers its least width, and a row whose words no longer overflow would not stand one under another. What is typed
+    never takes one either. It was three rules of three components before (a screen's title, a block button, the
+    newcomer's heading). `data-large-text` is set by `useLargeText` from a box one rem wide while a rem is over 17.6 px
+    — a width in `rem` tells the box, not the text, and a block of a pair is narrow at 100 % too. At 100 % no engine
+    hyphenates: Safari knows no `hyphenate-limit-chars` in any version, and WebKit hyphenates any word at a line's end
+    («Запишите первые по-купки», self-review №2). **The pills of a record by hand stand one under the other across
+    the strip below 12rem** (`TripView`, `.pair` its own container), the word with its hyphen: with its glyph
+    «Штрихкод» stood 7 px past the phone at 200 %. **The prices, named:** a unit still cuts a word that would fit at
+    a line's end now and then — none to one a screen at 200 %, 21–29 words of twelve letters and more in the
+    paragraphs of «Данные и приватность» at 150–200 % (`.scratch/tasks/selftests/MOL-334-options.probe.spec.ts`); at
+    200 % a word of seven to eleven letters wider than a paragraph's line breaks with no hyphen («Напоми|нания»);
+    Chromium counts a word with its quotes, so a brand of five letters in «…» takes one — «Та-шир» at 150 % (adversarial
+    Х2) — and a name taken out of the units broke worse, «Ташир / » / молоты / й»; a word of another script has no
+    dictionary of the document's language and breaks with none; Safari hyphenates more short words at a line's end
+    than Chrome; CI's Chromium may have no dictionary, so e2e reads the style and the eye the hyphen; at 200 % the
+    docked strip and the tab bar take half a window of 720 — the list ends over them and scrolls, but a tap aimed by
+    a script scrolled under them («Написать разработчику»); and a zoom of Chrome's own — its setting, apart from the
+    system's size the tag passes — narrows the window in CSS pixels, 213 at 150 %, a phone narrower than the 320 the
+    project holds, where `--text-tab` limits nothing and `data-large-text` is never set, as a pinch is.
   - **A key of the 1–5 scale is never under 44 px** (MOL-334, owner's В-3 «а»): five equal shares of the row, never
     the digit's own width, and with large text (`rating` below 15rem) the gap `--space-keys`, 4 px as a touch is;
-    in the card of «Оценки» the scale then takes the card's sides (`verdict` below 15rem) — its padding grows with the
-    text, and at 200 % the keys had 190 px, 23 px past the phone, at 150 % a key was 36 px. 46 and 49 now; at 100 %
+    in the card of «Оценки» the row of keys then takes the card's sides (`verdict` below 15rem) — its padding grows with
+    the text, and at 200 % the keys had 190 px, 23 px past the phone, at 150 % a key was 36 px; the keys alone, the
+    score as it stands and the scale's ends keep the card's padding (review №3). 46 and 49 now; at 100 %
     the 44 and the gap of 8 as before. The sheet of «Что брать» needs no sides: its column is wide enough.
 - **A note is `AppNote`, a tag in a row `AppTag`** (beyond FIXES, seven
   handoffs drew each their own way): a note on `surface-2` with an 18 icon and 13 words, or `warn` on
