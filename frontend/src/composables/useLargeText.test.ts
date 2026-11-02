@@ -79,9 +79,16 @@ describe('the system’s font size (MOL-334)', () => {
       /\.(scss|vue)$/.test(path),
     )
     expect(sheets.length).toBeGreaterThan(50)
-    // A declaration of the rule itself, not of a rule nested in it: `html[data-large-text] { .x { … } }` is fine.
-    const root = /(?:^|[}\s;])(?:html|:root)\b[^{},;]*\{[^{}]*?\bfont-size\s*:/m
-    const offenders = sheets.filter((path) => root.test(read(new URL(path, src))))
+    // Every rule's own declarations — up to its first nested rule — under a list of selectors one of which is the
+    // root itself: `html, body { … }` counts, `html[data-large-text] body` is the body's and `html { .x { … } }` the
+    // nested rule's.
+    const setsRoot = (sheet: string): boolean =>
+      [...sheet.matchAll(/([^{};]*)\{([^{}]*)/g)].some(
+        ([, selectors = '', declarations = '']) =>
+          /\bfont-size\s*:/.test(declarations) &&
+          selectors.split(',').some((one) => /^\s*(?:html|:root)(?:[[:.][^\s>+~]*)?\s*$/.test(one)),
+      )
+    const offenders = sheets.filter((path) => setsRoot(read(new URL(path, src))))
     expect(offenders).toEqual([])
   })
 })
