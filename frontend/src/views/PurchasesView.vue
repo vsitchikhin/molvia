@@ -481,6 +481,12 @@ export default defineComponent({
       if (receipts.attempt.value > before) retriesFailed.value += 1
     }
 
+    // «Чек от …», «Фото от …» put their own word before the day: always a date, never «от вчера» (adversarial
+    // Д1, the rule of «Раньше …», MOL-204 Р-9).
+    const dated = (at: Date) => ({
+      day: dateOfAnyYear(at, locale.value, today.value),
+      time: timeOfDay(at, locale.value),
+    })
     const when = (at: Date) => ({
       day: purchaseDay(at, locale.value, today.value),
       time: timeOfDay(at, locale.value),
@@ -504,14 +510,14 @@ export default defineComponent({
     function receiptTitle(row: ReceiptRow): string {
       // a receipt by its link has no photo to name (MOL-232)
       if (row.state === 'rejected' && row.parts > 0)
-        return t('purchases.rejected_title', when(row.capturedAt))
+        return t('purchases.rejected_title', dated(row.capturedAt))
       const place = row.summary?.place?.name
       if (place && row.state !== 'waiting' && row.state !== 'sending') return place
       if (row.state === 'parsed' || row.state === 'recording' || row.state === 'failed') {
         const { day, sent } = readDay(row)
         return t(sent ? 'receipt.review.title_sent' : 'receipt.review.title_no_place', { day })
       }
-      return t('purchases.receipt_from', when(row.capturedAt))
+      return t('purchases.receipt_from', dated(row.capturedAt))
     }
     function receiptMeta(row: ReceiptRow): string {
       // a receipt by its link has no parts: it is a link (MOL-232)

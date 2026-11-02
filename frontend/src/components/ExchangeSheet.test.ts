@@ -723,12 +723,13 @@ describe('ExchangeSheet: a version after midnight (MOL-329)', () => {
     vi.useRealTimers()
   })
 
-  it('«until today» at 23:50, «until yesterday» once the app is back after midnight', async () => {
+  // «до» takes a date, never «вчера» (adversarial Д1); past New Year's midnight the date says its year.
+  it('a version of the 31st: no year at 23:50, its year once the app is back after New Year’s midnight', async () => {
     vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(new Date('2026-10-30T23:50:00.000Z'))
+    vi.setSystemTime(new Date('2026-12-31T23:50:00.000Z'))
     const [base] = overview().exchanges
     if (!base) throw new Error('the fixture has an exchange')
-    const at = new Date('2026-10-30T23:45:00.000Z')
+    const at = new Date('2026-12-31T23:45:00.000Z')
     const amended: ExchangeView = {
       ...base,
       revision: 2,
@@ -746,12 +747,14 @@ describe('ExchangeSheet: a version after midnight (MOL-329)', () => {
       ],
     }
     const view = await render(overview({ exchanges: [amended] }), amended)
-    expect(view.get('.versions li').text()).toMatch(/^until today: /)
+    expect(view.get('.versions li').text()).toMatch(/^until Dec 31: /)
 
-    vi.setSystemTime(new Date('2026-10-31T00:10:00.000Z'))
+    vi.setSystemTime(new Date('2027-01-01T00:10:00.000Z'))
     document.dispatchEvent(new Event('visibilitychange'))
     await flushPromises()
-    expect(view.get('.versions li').text()).toMatch(/^until yesterday: /)
+    expect(view.get('.versions li').text().replaceAll('\u00a0', ' ')).toMatch(
+      /^until Dec 31, 2026: /,
+    )
   })
 
   // Adversarial Г2 of round 4: a version of last year says the year of «until» and of its day.

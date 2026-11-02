@@ -2098,7 +2098,7 @@ describe('PurchasesView (MOL-128)', () => {
       const { view } = await overnight()
       expect(view.get('.strip').text()).toBe('Без связи · покупки на сегодня, 23:40')
       expect(rows(view)[0]?.text()).toContain('сегодня')
-      expect(view.text()).toContain('Чек от сегодня, 23:30')
+      expect(view.text()).toContain('Чек от 30 окт., 23:30')
       expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити», последняя — сегодня')
 
       // Nothing comes back to redraw the rows: every read fails offline, as at the shelf in the morning.
@@ -2110,7 +2110,7 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.get('.strip').text()).toBe('Без связи · покупки на вчера, 23:40')
       expect(rows(view)[0]?.text()).toContain('вчера')
       expect(rows(view)[0]?.text()).not.toContain('сегодня')
-      expect(view.text()).toContain('Чек от вчера, 23:30')
+      expect(view.text()).toContain('Чек от 30 окт., 23:30')
       expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити», последняя — вчера')
     })
 
@@ -2137,7 +2137,7 @@ describe('PurchasesView (MOL-128)', () => {
       await vi.advanceTimersByTimeAsync(3_000)
       expect(view.get('.strip').text()).toContain('Сервер не ответил · покупки на вчера, 23:40')
       expect(rows(view)[0]?.text()).toContain('вчера')
-      expect(view.text()).toContain('Чек от вчера, 23:30')
+      expect(view.text()).toContain('Чек от 30 окт., 23:30')
       expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити», последняя — вчера')
 
       const asked = tripHistory.mock.calls.length

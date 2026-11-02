@@ -223,7 +223,7 @@ import { useLocalDay } from '@/composables/useLocalDay'
 import { useOnline } from '@/composables/useOnline'
 import { useAccountsStore } from '@/stores/accounts'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDayOfAnyYear, dayOfAnyYear, localDay } from '@/days'
+import { calendarDayOfAnyYear, dateOfAnyYear, localDay } from '@/days'
 import { newId } from '@/ids'
 
 type Side = 'given' | 'received'
@@ -519,8 +519,9 @@ export default defineComponent({
     /** «до 25 сент.: 20 000 ₽ → 100 000 ֏ · 16 сент. · ВТБ банкомат» */
     function versionOf(version: ExchangeView['history'][number]): string {
       const words = {
-        // A version may be of another year — an amendment of last year's — and says it (adversarial Г2).
-        until: dayOfAnyYear(version.replacedAt, locale.value, today.value),
+        // Always a date, its year when another (adversarial Г2): «до» puts its own word before the day, and
+        // «до вчера» is no Russian (adversarial Д1, the rule of «Раньше …», MOL-204 Р-9).
+        until: dateOfAnyYear(version.replacedAt, locale.value, today.value),
         amounts: t('exchange.row_amounts', {
           given: formatMoney(version.given, locale.value),
           received: formatMoney(version.received, locale.value),
