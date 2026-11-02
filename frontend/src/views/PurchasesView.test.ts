@@ -796,7 +796,7 @@ describe('PurchasesView (MOL-128)', () => {
       expect(tripHistory).toHaveBeenCalledTimes(4)
       // The rows are the other window's answer: nothing on screen is from memory, nobody failed.
       expect(rows(view)).toHaveLength(1)
-      expect(view.findAll('.strip')).toHaveLength(0)
+      expect(view.findAll('.strip').map((strip) => strip.text())).toEqual([])
       expect(view.find('.state').exists()).toBe(false)
     })
 
@@ -827,15 +827,18 @@ describe('PurchasesView (MOL-128)', () => {
         expect(rows(view)).toHaveLength(2)
         expect(rows(view)[0]?.text()).toContain('12 позиций')
         expect(rows(view)[0]?.text()).toMatch(/9\s870/)
-        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(view.findAll('.strip').map((strip) => strip.text())).toEqual([])
         expect(view.find('.state').exists()).toBe(false)
       }
     })
 
     it('соседнее окно двигает число строки под каждым чтением — полосы нет, число и сумма, которых ответ не сказал, неизвестны (MOL-307, Б2, В-2 «а»)', async () => {
       const before = new Date(NOW.getTime() - 5000)
+      // One row: `trip` reads the clock, and a millisecond between the answer and the copy is
+      // another page — «Сервер не ответил» over a server that answered every time.
+      const row = trip(1)
       const counted = (n: number) => ({
-        ...trip(1),
+        ...row,
         itemCount: n,
         total: [parseMoney(String(n * 500), 'AMD')],
       })
@@ -861,7 +864,7 @@ describe('PurchasesView (MOL-128)', () => {
         // Asked four times and answered every time: nothing on screen says it did not.
         expect(tripHistory).toHaveBeenCalledTimes(4)
         expect(rows(view)).toHaveLength(1)
-        expect(view.findAll('.strip')).toHaveLength(0)
+        expect(view.findAll('.strip').map((strip) => strip.text())).toEqual([])
         expect(rows(view)[0]?.text()).not.toContain('позиц')
         expect(rows(view)[0]?.text()).not.toContain('֏')
       }
