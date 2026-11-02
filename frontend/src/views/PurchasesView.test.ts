@@ -55,7 +55,8 @@ const PLACE = 'aaaaaaaa-0000-4000-8000-000000000001'
 const OPEN = 'bbbbbbbb-0000-4000-8000-0000000000aa'
 
 function trip(n: number, name = 'Ереван Сити'): TripHistoryEntry {
-  const finishedAt = new Date(Date.now() - n * 86_400_000)
+  // from the file's day, not the clock: a row made as a block is collected is made before the file's clock
+  const finishedAt = new Date(NOW.getTime() - n * 86_400_000)
   return {
     id: `bbbbbbbb-0000-4000-8000-00000000000${String(n)}`,
     place: { id: PLACE, kind: 'store', name },
@@ -103,7 +104,22 @@ function openTrip(bought = 0): TripViewModel {
 // One moment for the whole file: two cards «bought yesterday» are bought at the same instant —
 // read anew, the second was now and then a millisecond newer, and the order of places turned on CI
 // (MOL-143 gave most tests one call; the one MOL-120 test it missed failed on MOL-171's CI).
-const NOW = new Date()
+// And one day: the file's clock starts at it in every test (MOL-352), so no real midnight falls between a fixture
+// and the screen's «сегодня», and no 1 January makes the year before's «Раньше …» a date of another year. The
+// fixtures' receipts are of 26.09.2026, and a day before the 28th made one of them «вчера».
+const NOW = new Date('2026-10-15T12:00:00.000Z')
+
+/**
+ * The file's clock (MOL-352): `NOW`, then real time a millisecond a step — never still, since Vue drops a handler
+ * attached at the very moment of its event (`e._vts <= invoker.attached`), and a click on «Начать запись» was lost.
+ * Every fake timer of the file goes through it, so `Date` is never the real one again.
+ */
+function fileClock(
+  ...more: ('setTimeout' | 'clearTimeout' | 'setInterval' | 'clearInterval')[]
+): void {
+  vi.useFakeTimers({ toFake: ['Date', ...more], shouldAdvanceTime: true, advanceTimeDelta: 1 })
+  vi.setSystemTime(NOW)
+}
 
 function yesterday(): Date {
   const at = new Date(NOW)
@@ -207,6 +223,7 @@ function inside(sheet: Element | null, text: string): HTMLButtonElement {
 
 describe('PurchasesView (MOL-128)', () => {
   beforeEach(() => {
+    fileClock()
     localStorage.clear()
     sessionStorage.clear()
     tripHistory.mockReset()
@@ -235,6 +252,8 @@ describe('PurchasesView (MOL-128)', () => {
     while (mounted.length) mounted.pop()?.unmount()
     vi.restoreAllMocks()
     document.body.innerHTML = ''
+    // A block that put the real clock back would have it in this test and every one after (MOL-352).
+    expect(new Date().toISOString().slice(0, 10), 'the file’s clock').toBe('2026-10-15')
   })
 
   describe('без чека (Д-3, ревью 12)', () => {
@@ -695,10 +714,10 @@ describe('PurchasesView (MOL-128)', () => {
     // The pauses before asking again run on a fake clock: the whole ladder is checked, and no
     // test waits for real seconds (review Р-11). `flushPromises` goes through `setImmediate`.
     beforeEach(() => {
-      vi.useFakeTimers({ toFake: ['setTimeout'] })
+      fileClock('setTimeout')
     })
     afterEach(() => {
-      vi.useRealTimers()
+      fileClock()
     })
 
     const key = `molvia.trip-history.${ME}`
@@ -1488,10 +1507,10 @@ describe('PurchasesView (MOL-128)', () => {
 
     describe('слова полосы — заново только на попытку человека (адверсариальное А1)', () => {
       beforeEach(() => {
-        vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+        fileClock('setTimeout', 'clearTimeout', 'setInterval', 'clearInterval')
       })
       afterEach(() => {
-        vi.useRealTimers()
+        fileClock()
       })
 
       it('чек разбирается, опрос падает — попытка полосы та же; «Повторить», упавший, — новая', async () => {
@@ -2073,11 +2092,10 @@ describe('PurchasesView (MOL-128)', () => {
     }
 
     afterEach(() => {
-      vi.useRealTimers()
+      fileClock()
     })
 
     async function overnight(read = READ) {
-      vi.useFakeTimers({ toFake: ['Date'] })
       vi.setSystemTime(BEFORE)
       vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
       tripHistory.mockRejectedValue(new Error('Failed to fetch'))
@@ -2117,7 +2135,7 @@ describe('PurchasesView (MOL-128)', () => {
     // Adversarial А4 of review 1: the clock read where a word was drawn made a strip redrawn by «Повторить» say
     // «вчера» over rows still «сегодня». The screen's day moves at midnight itself, so every word moves with it.
     it('полночь при открытом экране: всё «вчера» разом, без события; «Повторить» после — то же', async () => {
-      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+      fileClock('setTimeout', 'clearTimeout')
       vi.setSystemTime(new Date('2026-10-30T23:59:58.000Z'))
       tripHistory.mockRejectedValue(new Error('HTTP 500'))
       receipts.mockResolvedValue(receiptsResponseCodec.parse({ receipts: [reading] }))
@@ -2154,7 +2172,7 @@ describe('PurchasesView (MOL-128)', () => {
     // Review 5, Р5-1: after Д1 «Чек от» is a date, so only New Year moves it — by the screen's day, never the clock's.
     // Adversarial Е1: a purchase still waiting for its rating may be of last year, and says so.
     it('Новый год при открытом экране: «Чек от 31 дек.» берёт год; неоценённая покупка прошлого года — с годом', async () => {
-      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+      fileClock('setTimeout', 'clearTimeout')
       vi.setSystemTime(new Date('2026-12-31T23:59:58.000Z'))
       tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
       receipts.mockResolvedValue(

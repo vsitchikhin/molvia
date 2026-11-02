@@ -14,6 +14,32 @@ The detail behind the timeout line of `CLAUDE.md` › Testing (MOL-243). The are
 own — every test belongs to the area it tests — and its tools in `bin/` are mapped with the root's
 (`docs/map/workspace.md`), so it has no code map.
 
+## A test is written past the six ways tests here have flaked (owner, 02.11.2026)
+
+Every flake of the epic «Тех долг» (MOL-296) to 02.11.2026 was a test written so, never the product, and
+each fell into one of six classes known before it was written. A new or
+changed test is read against them before its commit, and a flake of one of them found in a task is fixed in
+that task, not filed.
+
+1. **Chance in «not there»** — a uuid, a stamp of the log, a key: `not.toContain('600')` over a whole line of
+   JSON met the digits of an id or of the epoch (MOL-316, MOL-327). Assert the field, not the line; a bait
+   no uuid or moment can spell.
+2. **An order Postgres never promised** — no `ORDER BY`, a heap after `DELETE`, a tie in one millisecond
+   (MOL-323, MOL-356, MOL-252). Read in an order, or compare with how the rows lie (`ctid`), never with the
+   order they were written; `bin/check-ordered-reads.mjs` and the net hold most of it, below.
+3. **The clock** — two readings of it in a fixture and the screen, a real midnight, the 1st of January, a
+   wait of so many milliseconds (MOL-324, MOL-352, MOL-308). One clock the test sets, which moves (`fileClock`
+   of `PurchasesView.test.ts`: Vue drops a handler attached in the very moment of its event); wait for an
+   event, never a time.
+4. **Work left past the end** — a timer, a request, a write in the air (MOL-286, MOL-351). Whatever a test
+   starts it waits for or stops before its file ends; and one copy's databases are one run's (`workspace.md`).
+5. **A box or a frame measured mid-motion** — `toBeVisible()` from an animation's first frame, a late face,
+   a dropped frame (MOL-355, MOL-306, MOL-267, MOL-292). `stillIn`, `facesIn`, the frame's own time; a Mac's
+   pixels are not CI's.
+6. **A race of the network or the focus in e2e** — a click before the page is ready, `setOffline` after the
+   request left (MOL-217, MOL-249, MOL-262, MOL-269). Wait for the state that proves it, lay a route before
+   `open()`, `goOffline`.
+
 ## A test whose work takes over half a second on CI takes its own timeout
 
 **vitest gives a test 5 s and a hook 10 s, and gives no second try.** No `vitest.config.ts` sets
