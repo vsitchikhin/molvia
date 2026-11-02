@@ -837,8 +837,13 @@ report.
   survivor is near the other side too («Сыр чанох» merged into «Сыр чанах», whose pair with «Сыр чунух»
   is 0.64: never asked) — in `report`, where nothing merged, it is named as it is.
 - **`CATALOGUE_MERGE`**: `on` merges, `report` says what it would and merges nothing — it only sweeps
-  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `report` until
-  the owner says `on`** (В-3): the thresholds stand on a corpus, not yet on strangers' twins. A pair
+  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production ran `report` until
+  the owner said `on`** (В-3): the thresholds stood on a corpus, not yet on live twins. **`on` since
+  02.11.2026** (MOL-299, owner's rule В-3 «а»: `on` before the tag of 0.2 once no pair the night would
+  merge is false): 28 nights of `report`, 06.10…02.11, named none to merge — not one false, nor one true —
+  and of 14 candidates 12 were the seed against itself, set apart by hand, one a receipt's twin across two
+  scripts, merged by hand. The rule has met no live twin yet; what stands between a false merge and «Что
+  брать» is the morning's report with its numbers and `make unmerge`. A pair
   only reported comes with its command **`make apart FROM= INTO=`** (review №7, owner's decision
   05.10.2026): the owner says two things are apart before `on` merges them. `catalogue_apart` holds the
   pair by its ids; the night reads it as a pair undone — by the live things its ends stand in now —

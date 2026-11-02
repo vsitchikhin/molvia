@@ -47,7 +47,7 @@ const envSchema = z.object({
   /**
    * The nightly merge of twins in the catalogue (MOL-106): `on` merges, `report` only says what it
    * would, `off` does not look. Off by default — a copy, CI and the tests never merge by a timer;
-   * production passes `report` until the owner says `on` (В-3).
+   * production passes `on` since 02.11.2026 (MOL-299), after four weeks of `report` (В-3).
    */
   CATALOGUE_MERGE: catalogueMergeModeSchema.default('off'),
   /**
