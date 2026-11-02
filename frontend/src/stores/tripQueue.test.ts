@@ -1252,22 +1252,35 @@ describe('trip queue', () => {
         return { ...write, body: { ...write.body, quantity: parseQuantity('1', 'l') } }
       }
 
+      /** «Списано со счёта» за запись, как в шторке «Закончить» (MOL-312). */
+      const DEBITED = parseMoney('750', 'AMD')
+      const CARD = 'aaaaaaaa-0000-4000-8000-0000000000c1'
+
       /**
-       * Сервер, как `expenses.add`: первое тело выигрывает, повтор того же id отвечает строкой,
-       * какая есть, с `created: false`, — а правка (`PATCH`) строку меняет. Первый `POST` висит,
-       * пока его не отпустят; `lost` — сервер его записал, а ответ до телефона не дошёл.
+       * Сервер, как `trip-expenses.ts`: первое тело выигрывает, повтор того же id отвечает строкой,
+       * какая есть, с `created: false`; правка (`PATCH`) строку меняет, а смена цены снимает
+       * «списано» (Р-32, суммы по чеку нет); `payTrip` кладёт счёт и «списано». Первый `POST`
+       * висит, пока его не отпустят; `lost` — сервер его записал, а ответ до телефона не дошёл.
+       * `log` — порядок, в котором записи дошли до сервера.
        */
-      function server() {
+      function server(finishedAt: string | null = null) {
+        const log: string[] = []
         let row: AddExpenseBody | null = null
-        const viewOf = (kept: AddExpenseBody): TripView => {
-          const trip = answered1(MILK, '0.9', '520')
+        let debited: unknown = null
+        const viewOf = (kept: AddExpenseBody | null): TripView => {
+          const trip = {
+            ...answered1(MILK, '0.9', '520'),
+            finishedAt: finishedAt === null ? null : new Date(finishedAt),
+          }
           return {
             ...trip,
-            expenses: trip.expenses.map((expense) => ({
-              ...expense,
-              quantity: kept.quantity ?? null,
-              amount: kept.amount ?? null,
-            })),
+            expenses: kept
+              ? trip.expenses.map((expense) => ({
+                  ...expense,
+                  quantity: kept.quantity ?? null,
+                  amount: kept.amount ?? null,
+                }))
+              : [],
           }
         }
         let release: (lost: boolean) => void = () => undefined
@@ -1275,6 +1288,7 @@ describe('trip queue', () => {
           (_tripId, body) =>
             new Promise((resolve, reject) => {
               release = (lost) => {
+                log.push(`POST ${String(body.amount?.minor)}`)
                 row = body
                 if (lost) reject(offline())
                 else resolve({ trip: viewOf(body), created: true })
@@ -1282,12 +1296,16 @@ describe('trip queue', () => {
             }),
         )
         addExpense.mockImplementation((_tripId, body) => {
+          log.push(`POST ${String(body.amount?.minor)}`)
           if (row) return Promise.resolve({ trip: viewOf(row), created: false })
           row = body
           return Promise.resolve({ trip: viewOf(body), created: true })
         })
         updateExpense.mockImplementation((_tripId, _id, patch) => {
+          log.push(`PATCH ${String(patch.amount?.minor)}`)
           if (!row) return Promise.reject(new ApiError(ERROR.NOT_FOUND, undefined, true))
+          if (patch.amount !== undefined && patch.amount?.minor !== row.amount?.minor)
+            debited = null
           row = {
             ...row,
             ...(patch.quantity !== undefined ? { quantity: patch.quantity ?? undefined } : {}),
@@ -1295,13 +1313,32 @@ describe('trip queue', () => {
           }
           return Promise.resolve(viewOf(row))
         })
+        payTrip.mockImplementation((_tripId, body) => {
+          log.push('PAY')
+          debited = (body as { debited: unknown }).debited
+          return Promise.resolve(viewOf(row))
+        })
+        finishTrip.mockImplementation(() => {
+          log.push('FINISH')
+          return Promise.resolve()
+        })
         return {
           release: (lost = false) => {
             release(lost)
           },
           row: () => row,
+          debited: () => debited,
+          log,
+          /** Запись, как её показал бы экран до ответа: без этой строки. */
+          shown: () => viewOf(null),
         }
       }
+
+      const payment = (): QueuedWrite => ({
+        kind: 'payment',
+        tripId: TRIP,
+        body: { accountId: CARD, debited: DEBITED },
+      })
 
       it('ответ на прежнее тело пришёл — правка уходит правкой, второго POST нет', async () => {
         const held = server()
@@ -1314,7 +1351,7 @@ describe('trip queue', () => {
         held.release()
         await queue.flush()
 
-        expect(addExpense).toHaveBeenCalledTimes(1)
+        expect(held.log).toEqual(['POST 52000', 'PATCH 75000'])
         expect(held.row()?.quantity).toEqual(parseQuantity('1', 'l'))
         expect(held.row()?.amount).toEqual(parseMoney('750', 'AMD'))
         expect(queue.pending).toEqual([])
@@ -1333,11 +1370,80 @@ describe('trip queue', () => {
         // Связь вернулась: очередь шлёт правку той же покупкой, а телефон не знает, что строка есть.
         await queue.flush()
 
-        expect(addExpense).toHaveBeenCalledTimes(2)
+        expect(held.log).toEqual(['POST 52000', 'POST 75000', 'PATCH 75000'])
         expect(held.row()?.quantity).toEqual(parseQuantity('1', 'l'))
         expect(held.row()?.amount).toEqual(parseMoney('750', 'AMD'))
         expect(queue.pending).toEqual([])
         expect(queue.rejected).toEqual([])
+      })
+
+      it('ответ потерялся, после правки выбран счёт со «Списано» — правка встаёт на своё место, до него (А1)', async () => {
+        const held = server()
+        const queue = fresh()
+        queue.enqueue(add(MILK, '520'))
+        await settled()
+
+        queue.enqueue(corrected())
+        queue.enqueue(payment())
+        held.release(true)
+        await settled()
+        await queue.flush()
+
+        // Дописанная в конец, правка цены пришла бы после счёта и сняла бы «списано» (Р-32).
+        expect(held.log).toEqual(['POST 52000', 'POST 75000', 'PATCH 75000', 'PAY'])
+        expect(held.debited()).toEqual(DEBITED)
+        expect(held.row()?.amount).toEqual(parseMoney('750', 'AMD'))
+      })
+
+      it('то же через «Закончить» — правка до счёта и окончания записи (А1, MOL-312)', async () => {
+        const held = server()
+        const queue = fresh()
+        queue.enqueue(add(MILK, '520'))
+        await settled()
+
+        queue.enqueue(corrected())
+        queue.enqueue(payment())
+        queue.enqueue({ kind: 'finish', tripId: TRIP, finishedOnDeviceAt: new Date() })
+        held.release(true)
+        await settled()
+        await queue.flush()
+
+        expect(held.log).toEqual(['POST 52000', 'POST 75000', 'PATCH 75000', 'PAY', 'FINISH'])
+        expect(held.debited()).toEqual(DEBITED)
+      })
+
+      it('законченная запись на экране — ответ даёт ей строку, правка уходит правкой (путь «Записанных»)', async () => {
+        const held = server('2026-09-19T09:00:00.000Z')
+        const queue = fresh()
+        useTripHistoryStore().selected = held.shown()
+        queue.enqueue(add(MILK, '520'))
+        await settled()
+
+        queue.enqueue(corrected())
+        queue.enqueue(payment())
+        held.release()
+        await queue.flush()
+
+        expect(held.log).toEqual(['POST 52000', 'PATCH 75000', 'PAY'])
+        expect(held.debited()).toEqual(DEBITED)
+      })
+
+      it('законченная запись, на экране уже другая — правка идёт вторым POST, но на своём месте (А2, цена)', async () => {
+        const held = server('2026-09-19T09:00:00.000Z')
+        const queue = fresh()
+        queue.enqueue(add(MILK, '520'))
+        await settled()
+
+        queue.enqueue(corrected())
+        queue.enqueue(payment())
+        // Пока первый `POST` в пути, человек ушёл смотреть другую запись: эту телефон не держит.
+        useTripHistoryStore().selected = answer('0.00', OTHER, '2026-09-18T09:00:00.000Z', 'SAS')
+        held.release()
+        await queue.flush()
+
+        expect(held.log).toEqual(['POST 52000', 'POST 75000', 'PATCH 75000', 'PAY'])
+        expect(held.debited()).toEqual(DEBITED)
+        expect(held.row()?.amount).toEqual(parseMoney('750', 'AMD'))
       })
     })
 
