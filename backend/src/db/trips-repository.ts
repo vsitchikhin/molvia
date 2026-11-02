@@ -55,6 +55,8 @@ export type TripToStart = NewTrip & {
   readonly id: string
   /** The phone's today at the tap (MOL-121), already judged; none from an old queue. */
   readonly startedOn?: string | null
+  /** The place's trace the phone named it by, when the place is its survivor (MOL-299, Б3). */
+  readonly placeAsked?: string
 }
 
 /** A trip recorded from a receipt (MOL-126): its place, the receipt's day, and its moment if printed. */
@@ -66,7 +68,7 @@ export interface RecordedTrip {
   /** The account it was paid from and «списано», as `paymentOf` settled them (MOL-312). */
   readonly accountId: string | null
   readonly debited: Money | null
-  /** The place's id the phone named, when the place read is another — a trace's survivor (MOL-299). */
+  /** The place's trace the phone named by its id or name, when the place is its survivor (MOL-299). */
   readonly placeAsked?: string
 }
 
@@ -392,7 +394,15 @@ export function createTripRepository(db: Conn): TripRepository {
               startedOn: input.startedOn ?? null,
             })
             .returning()
-          return { trip: toTrip(theRow(row, 'trips')), created: true }
+          const started = theRow(row, 'trips')
+          // At a trace's place by its name: an undo takes the trip home (MOL-299, Б3).
+          if (
+            input.placeAsked !== undefined &&
+            input.placeAsked.toLowerCase() !== started.placeId
+          ) {
+            await noteTraceWrite(tx, 'place', input.placeAsked, 'trip', { id: started.id })
+          }
+          return { trip: toTrip(started), created: true }
         }),
       )
     },

@@ -821,22 +821,31 @@ report.
 - **What a trace's id writes after its merge goes home with the undo** (MOL-299, adversarial А2): a
   purchase a phone queued before the night, a first verdict by a bot's button, a new pick, a word of the
   shop's memory, a code, a receipt's trip at a place named by its id — `liveItemId` lands each on the
-  survivor past the journal, and `unmerge` left it there for good. So the path that writes it notes the
+  survivor past the journal, and `unmerge` left it there for good. **A place by its trace's name too**
+  (adversarial Б3, owner's В-7 «а»): «Начать запись» and a receipt's new place find a shop by its name,
+  the main way a place is named, and `places.ensure` answers a trace's name with the survivor and the
+  trace beside it (`trace`), so the trip goes home as well. So the path that writes it notes the
   row under every merge on the trace's way to the survivor (`noteTraceWrite`), where the id asked is not
   the row's now, and the undo takes it a merge back as it takes what the merge moved — a chain step by
   step, from its end. A verdict is noted only as a first one, a pick only as a new row: one added to the
-  survivor's own was the survivor's before the merge. **A verdict the person touched since stays**
+  survivor's own was the survivor's before the merge. **A verdict, a pick or a word the person touched since
+  stays**
   (adversarial А3): rated, amended or withdrawn on the survivor, it is their word about the survivor, and
   taken home or swapped back it put that word on the trace, crossing the scores — «Курица вареная» 1
-  merged, the person gives «Курица жареная» 5, and the undo gave «вареная» the 5. Each verdict the merge
-  moves or swaps is written with its `updated_at` to the microsecond, and the undo moves or swaps back only
-  a row still at it; a swap kept leaves the trace's row withdrawn. **The prices, named:** the trace's own
-  score is lost where the person rated the survivor over it (the row was one); the trace's row so kept
-  holds the survivor's old score, withdrawn — the gate, the reminder and the copy read it; what is written
-  by a trace's **name** — «Предложить товар», a receipt's new line, a place at the door — stays with the
-  survivor, the name being the survivor's second; a row the trace's id changed rather than wrote — a pick
-  added to, a verdict amended — stays where it is; and a move written before MOL-299 has no moment and goes
-  back as it did. **A dry run of `make merge` prints no number** (adversarial А4): the identity it takes is
+  merged, the person gives «Курица жареная» 5, and the undo gave «вареная» the 5; a word of the shop's memory
+  said of the survivor by the next receipt, a pick of it under the same query, went to the trace whole (Б1,
+  Б2). Each verdict, pick and word a merge moves or swaps — or a trace's id writes — is written with its
+  moment to the microsecond (`updated_at`, `last_picked_at`, `written_at`), and the undo moves or swaps back
+  only a row still at it; a swap kept leaves the trace's row withdrawn. **The prices, named:** the trace's
+  own score is lost where the person rated the survivor over it (the row was one), and the trace's row so
+  kept holds the survivor's old score with its `rated_at`, withdrawn — the gate, the reminder and the copy
+  read it (Б4: the journal keeps no score, since it outlives the person's erasure); an **item** written by a
+  trace's name — «Предложить товар», a receipt's new line — stays with the survivor, the name being the
+  survivor's second (В-7 «а»: the search shows the survivor, so it is rare); a row the trace's id changed
+  rather than wrote — a pick added to, a verdict amended — stays where it is; a write by a trace that an
+  `unmerge` commits between its row and its note stays with the survivor too (Б5, owner's В-8 «а»: the
+  owner's hand once a morning against milliseconds); and a move written before MOL-299 has no moment and
+  goes back as it did. **A dry run of `make merge` prints no number** (adversarial А4): the identity it takes is
   not rolled back, and «make unmerge ID=» of a dry run named a merge that would never be.
 - **The night** (`mergeTick`): a minute timer in the API, from 04:30 Yerevan — after the copy of the
   database at 04:00, so a copy before every merge exists — claimed by its day in

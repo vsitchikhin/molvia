@@ -429,11 +429,16 @@ export function createMergeRepository(db: Conn): MergeRepository {
         actorId: row.actor_id,
       })
     }
-    const picks = await tx.execute<{ actor_id: string; query_key: string }>(sql`
+    // A pick and a word of the shop's memory with their moments, as a verdict (MOL-299, Б1, Б2).
+    const picks = await tx.execute<{ actor_id: string; query_key: string; at: string }>(sql`
       update search_picks set item_id = ${into} where item_id = ${from}
-      returning actor_id, query_key`)
+      returning actor_id, query_key, last_picked_at::text as at`)
     for (const row of picks) {
-      moved.push({ what: 'pick', key: { queryKey: row.query_key }, actorId: row.actor_id })
+      moved.push({
+        what: 'pick',
+        key: { queryKey: row.query_key, at: row.at },
+        actorId: row.actor_id,
+      })
     }
 
     for (const row of await tx.execute<{ code: string }>(
@@ -457,12 +462,11 @@ export function createMergeRepository(db: Conn): MergeRepository {
       returning hs`)) {
       moved.push({ what: 'item_hs', key: { hs: row.hs } })
     }
-    ids(
-      await tx.execute<{ id: string }>(
-        sql`update store_memory set item_id = ${into} where item_id = ${from} returning id`,
-      ),
-      'store_memory',
-    )
+    for (const row of await tx.execute<{ id: string; at: string }>(sql`
+      update store_memory set item_id = ${into} where item_id = ${from}
+      returning id, written_at::text as at`)) {
+      moved.push({ what: 'store_memory', key: { id: row.id, at: row.at } })
+    }
     for (const row of await tx.execute<{ receipt_id: string; position: number }>(sql`
       update receipt_lines set item_id = ${into} where item_id = ${from}
       returning receipt_id, position`)) {
@@ -644,12 +648,13 @@ export function createMergeRepository(db: Conn): MergeRepository {
         // Every row goes back only from where this merge put it — the survivor, or what that was merged
         // into since. A row moved on by somebody's own act after the merge is theirs and stays: a code
         // given to another item, a new word of the shop's memory (adversarial А4); a row a later merge
-        // took on and whose undo came first is home already (А3). So does a verdict the person touched
-        // since — rated, amended or withdrawn on the survivor, it is their word about the survivor, and
-        // taken home, or swapped back, it put that word on the trace (MOL-299, А3). Its moment is held to
-        // the microsecond; a move written before MOL-299 has none and goes back as it did.
-        const untouched = (row: SQL, at: string | number | undefined) =>
-          at === undefined ? sql`true` : sql`${row}.updated_at = ${at}::timestamptz`
+        // took on and whose undo came first is home already (А3). So does a verdict, a pick or a word of
+        // the shop's memory the person touched since — rated, picked or said again on the survivor, it is
+        // their word about the survivor, and taken home, or swapped back, it put that word on the trace
+        // (MOL-299, А3, Б1, Б2). Its moment is held to the microsecond; a move written before MOL-299 has
+        // none and goes back as it did.
+        const untouched = (moment: SQL, at: string | number | undefined) =>
+          at === undefined ? sql`true` : sql`${moment} = ${at}::timestamptz`
         for (const move of moves) {
           const key = move.key
           switch (move.what) {
@@ -665,7 +670,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
               // Skipped when the trace has got a verdict of the same person since: never two.
               await tx.execute(sql`
                 update verdicts v set ${column} = ${from}
-                where v.id = ${key.id} and v.${column} = ${now} and ${untouched(sql`v`, key.at)}
+                where v.id = ${key.id} and v.${column} = ${now} and ${untouched(sql`v.updated_at`, key.at)}
                   and not exists (
                     select 1 from verdicts o
                     where o.actor_id = v.actor_id and o.id <> v.id
@@ -682,7 +687,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
                     select 1 from catalogue_merge_moves s
                     join verdicts k on k.id = (s.key->>'kept')::uuid
                     where s.merge_id = ${id} and s.what = 'verdict_swapped'
-                      and s.key->>'trace' = ${key.id}::text and s.key ? 'at'
+                      and s.key->>'trace' = ${key.id}::text
                       and k.updated_at <> (s.key->>'at')::timestamptz)`)
               break
             case 'verdict_swapped':
@@ -694,14 +699,14 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 where (v.id, o.id) in ((${key.kept}::uuid, ${key.trace}::uuid),
                                        (${key.trace}::uuid, ${key.kept}::uuid))
                   and exists (select 1 from verdicts k where k.id = ${key.kept} and k.${column} = ${now}
-                                and ${untouched(sql`k`, key.at)})
+                                and ${untouched(sql`k.updated_at`, key.at)})
                   and exists (select 1 from verdicts t where t.id = ${key.trace} and t.${column} = ${from})`)
               break
             case 'pick':
               await tx.execute(sql`
                 update search_picks set item_id = ${from}
                 where actor_id = ${move.actor_id} and query_key = ${key.queryKey}
-                  and item_id = ${now}
+                  and item_id = ${now} and ${untouched(sql`last_picked_at`, key.at)}
                   and not exists (select 1 from search_picks o
                                   where o.actor_id = ${move.actor_id}
                                     and o.query_key = ${key.queryKey} and o.item_id = ${from})`)
@@ -770,7 +775,8 @@ export function createMergeRepository(db: Conn): MergeRepository {
             }
             case 'store_memory':
               await tx.execute(sql`
-                update store_memory set item_id = ${from} where id = ${key.id} and item_id = ${now}`)
+                update store_memory set item_id = ${from}
+                where id = ${key.id} and item_id = ${now} and ${untouched(sql`written_at`, key.at)}`)
               break
             case 'receipt_line':
               await tx.execute(sql`

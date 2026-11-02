@@ -51,11 +51,15 @@ export function createSearchPickRepository(db: Conn): SearchPickRepository {
               admits: sql`${searchPicks.admits} or ${admits}`,
             },
           })
-          .returning({ itemId: searchPicks.itemId, inserted: sql<boolean>`xmax = 0` })
+          .returning({
+            itemId: searchPicks.itemId,
+            inserted: sql<boolean>`xmax = 0`,
+            at: sql<string>`${searchPicks.lastPickedAt}::text`,
+          })
         // A new pick by a trace's id goes home with an undo (MOL-299, А2); one added to the
         // survivor's own stays the survivor's, as it was before the merge.
         if (row?.inserted && row.itemId !== itemId.toLowerCase()) {
-          await noteTraceWrite(tx, 'item', itemId, 'pick', { queryKey: key }, actorId)
+          await noteTraceWrite(tx, 'item', itemId, 'pick', { queryKey: key, at: row.at }, actorId)
         }
       }),
     )

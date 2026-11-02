@@ -337,13 +337,14 @@ export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
           kind: storeMemory.kind,
           key: storeMemory.key,
           itemId: storeMemory.itemId,
+          at: sql<string>`${storeMemory.writtenAt}::text`,
         })
       // A word about a trace's id goes home with an undo (MOL-299, А2).
       const asked = new Map(last.map((word) => [memoryKey(word), word.itemId.toLowerCase()]))
       for (const row of written) {
         const itemId = asked.get(memoryKey(row))
         if (itemId !== undefined && itemId !== row.itemId) {
-          await noteTraceWrite(db, 'item', itemId, 'store_memory', { id: row.id })
+          await noteTraceWrite(db, 'item', itemId, 'store_memory', { id: row.id, at: row.at })
         }
       }
     },

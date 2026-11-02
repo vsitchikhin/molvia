@@ -367,6 +367,33 @@ describe('startTrip', () => {
     expect(view.place.name).toBe('Ереван Сити')
   })
 
+  it('names the trace a shop was found by, for the undo of its merge (MOL-299, Б3)', async () => {
+    const TRACE = '00000000-0000-4000-8000-0000000000aa'
+    const started: unknown[] = []
+    const repositories = fakeRepositories({
+      ...emptyCache,
+      ...viewReads,
+      places: { ...viewReads.places, ensure: () => Promise.resolve({ ...place, trace: TRACE }) },
+      trips: {
+        byId: () => Promise.resolve(null),
+        start: (...args) => {
+          started.push(args)
+          return Promise.resolve({ trip, created: true })
+        },
+      },
+    })
+
+    await startTrip(transactWith(repositories), actor, {
+      id: TRIP,
+      context: settingsOf(actor),
+      place: { kind: 'store', name: 'Ереван Сит' },
+    })
+
+    expect(started).toEqual([
+      [ACTOR, { id: TRIP, placeId: place.id, startedOn: null, placeAsked: TRACE }, 'AMD', null],
+    ])
+  })
+
   it('passes a repeat on as not created — the route answers 200', async () => {
     const repositories = fakeRepositories({
       ...emptyCache,
