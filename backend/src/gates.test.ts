@@ -141,6 +141,7 @@ const REPORT: GatesReport = {
     within1d: 1,
     later: 0,
   },
+  picks: { pairs: 41, people: 9, words: 3 },
 }
 
 function run(argv: string[], report: GatesReport | Error = REPORT) {
@@ -276,6 +277,20 @@ describe('gates — чтение ворот вручную', () => {
     expect(lines.find((line) => line.includes('lines put right'))).toBe(
       '     lines put right                     0 of 0     —',
     )
+  })
+
+  it('пары памяти поиска без единой — нули и черта, без вердикта (MOL-330)', async () => {
+    const { exit, lines } = run(['--from', '2026-10-05'], {
+      ...REPORT,
+      picks: { pairs: 0, people: 0, words: 0 },
+    })
+    await exit
+    expect(lines.slice(-4)).toEqual([
+      '0.2  · pairs for the search memory (MOL-330)        measured from 70 pairs',
+      '     pairs «query → item taken»          0          at most 10 a person, edition 6, statistics on',
+      '       people behind them                0',
+      '     own words                           0          not in the line',
+    ])
   })
 
   it('день --from — полночь по Еревану, без --to — до сейчас', async () => {
@@ -467,6 +482,11 @@ describe('gates — чтение ворот вручную', () => {
       '       1 hour                            1',
       '       1 day                             1',
       '       later                             0',
+      '',
+      '0.2  · pairs for the search memory (MOL-330)        measured from 70 pairs',
+      '     pairs «query → item taken»          41         at most 10 a person, edition 6, statistics on',
+      '       people behind them                9',
+      '     own words                           3          not in the line',
     ])
     expect(lines.join('\n')).not.toMatch(/STOP|pass|fail/)
   })

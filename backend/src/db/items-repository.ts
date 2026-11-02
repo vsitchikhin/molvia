@@ -327,7 +327,8 @@ const MAX_SYNONYMS = 16
  * holds the last word to an exact start. Typed letter by letter on MOL-14's shelf a pick lifts
  * its item 18 times at 2, 9 at 3, 5 at 4; at 2 it also harms 5 times — a pick for Coca-Cola
  * on «ко» tops «Колбаса» on «кол». Once at 3 too, but through the equal key, not this prefix:
- * a sausage picked on «кол» tops the cola the owner's «кол» means. Real picks decide (MOL-47).
+ * a sausage picked on «кол» tops the cola the owner's «кол» means. Real picks decide: 0.2's people's, from
+ * 70 pairs of those who accepted edition 6, read by `make gates` (MOL-330).
  */
 const REMEMBERED_PREFIX = 3
 
