@@ -1007,9 +1007,16 @@ const PRINTED_NUMBERS = [
  * What of am-05 a log carries, read without what a run puts in it by chance (MOL-327): pino's stamps, the
  * run's moment as a date and Fastify's time of a request, taken by their values — a field of the server under
  * the same name is read — the places of a stack's frames, which are the checkout's, and the receipt's id,
- * which is the test's.
+ * which is the test's. Besides what am-05 prints, `kept` is what the server kept of it, looked for as it keeps
+ * it: a number of four digits and more as stored, leading zeros and all, any other value whole and by its
+ * Armenian and Russian words.
  */
-function receiptIn(lines: readonly string[], stamp: number, receiptId: string): string[] {
+function receiptIn(
+  lines: readonly string[],
+  stamp: number,
+  receiptId: string,
+  kept: readonly unknown[] = [],
+): string[] {
   const stamps = `"time":${String(stamp)},"pid":${String(process.pid)},"hostname":${JSON.stringify(hostname())},`
   const said = lines
     .map((line) =>
@@ -1024,9 +1031,21 @@ function receiptIn(lines: readonly string[], stamp: number, receiptId: string): 
   const lowered = said.toLowerCase()
   // a group of thousands is any space — Intl's no-break and narrow ones as `formatInCurrency` prints them
   const digits = said.replace(/(?<=\d)[\s,.](?=\d)/g, '')
+  const values = kept.filter((value) => value !== null && value !== undefined).map(String)
+  const words = new Set([
+    ...PRINTED_WORDS,
+    ...values
+      .filter((value) => !/^\d+$/.test(value))
+      .map((value) => value.toLowerCase())
+      .flatMap((value) => [
+        value,
+        ...(value.match(/[\p{Script=Armenian}\p{Script=Cyrillic}]{3,}/gu) ?? []),
+      ]),
+  ])
+  const numbers = new Set([...PRINTED_NUMBERS, ...values.filter((value) => /^\d{4,}$/.test(value))])
   return [
-    ...PRINTED_WORDS.filter((word) => lowered.includes(word)),
-    ...PRINTED_NUMBERS.filter((number) => digits.includes(number)),
+    ...[...words].filter((word) => lowered.includes(word)),
+    ...[...numbers].filter((number) => digits.includes(number)),
   ]
 }
 
@@ -1084,7 +1103,37 @@ describe('the queue through the server', () => {
       expect(log).toContain(receipt.id)
       expect(log).toContain('"ms":0,')
       expect(log).toContain('receipt read')
-      expect(receiptIn(lines, stamp, receipt.id)).toEqual([])
+      // what the server kept of the receipt, in the form it keeps it (adversarial Д1, Д2)
+      const head = onlyRow(
+        await db
+          .select({
+            tin: receipts.tin,
+            receiptNo: receipts.receiptNo,
+            printedOn: receipts.printedOn,
+            totalMinor: receipts.totalMinor,
+            readTotalMinor: receipts.readTotalMinor,
+            cashbackMinor: receipts.cashbackMinor,
+            redeemedMinor: receipts.redeemedMinor,
+          })
+          .from(receipts)
+          .where(eq(receipts.id, receipt.id)),
+      )
+      const kept = await db
+        .select({
+          printed: receiptLines.printed,
+          translation: receiptLines.translation,
+          hs: receiptLines.hs,
+          sku: receiptLines.sku,
+          priceMinor: receiptLines.priceMinor,
+          sumMinor: receiptLines.sumMinor,
+          discountMinor: receiptLines.discountMinor,
+        })
+        .from(receiptLines)
+        .where(eq(receiptLines.receiptId, receipt.id))
+        .orderBy(receiptLines.position)
+      expect(kept.map((line) => line.translation)).toContain('Молоко «Игит» 3,2%')
+      const values = [...Object.values(head ?? {}), ...kept.flatMap((line) => Object.values(line))]
+      expect(receiptIn(lines, stamp, receipt.id, values)).toEqual([])
     } finally {
       await reading.close()
     }
@@ -1110,7 +1159,8 @@ describe('the queue through the server', () => {
         { frames: ['at read (/tmp/8676/backend/src/x.ts:8676:41)', 'at /tmp/8676/x.js:1:2'] },
         'catalogue has no till names',
       )
-      expect(receiptIn(lines, stamp, id)).toEqual([])
+      const kept = ['Молоко «Игит» 3,2%', '0401']
+      expect(receiptIn(lines, stamp, id, kept)).toEqual([])
       const leaks: Record<string, unknown> = {
         time: 'Կաթ «Իգիթ»',
         pid: '01234567',
@@ -1130,11 +1180,13 @@ describe('the queue through the server', () => {
         sumMinor: 60885,
         vatWhole: formatInCurrency('1446', 'AMD', 'ru', exactFigures(2)),
         printedOn: '2026-10-01',
+        translation: 'молоко',
+        hs: '0401',
       }
       for (const [field, leak] of Object.entries(leaks)) {
         lines.length = 0
         logging.log.info({ [field]: leak }, 'receipt read')
-        expect(receiptIn(lines, stamp, id), field).not.toEqual([])
+        expect(receiptIn(lines, stamp, id, kept), field).not.toEqual([])
       }
     } finally {
       await logging.close()
