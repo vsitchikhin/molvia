@@ -124,6 +124,22 @@ describe('«Чек по ссылке» (MOL-232)', () => {
     expect(sendLink).not.toHaveBeenCalled()
   })
 
+  // A link refused is heard (MOL-333): «Отправить» kept the focus, and the error under the field was unheard.
+  it('«Отправить» with an empty field: the focus goes to the field, already marked', async () => {
+    const sheet = await render()
+    await toPaste(sheet)
+    const input = field(sheet).element
+    let marked: string | null = null
+    input.addEventListener('focus', () => (marked = input.getAttribute('aria-invalid')))
+    const sending = send(sheet)
+    ;(sending?.element as HTMLButtonElement | undefined)?.focus()
+    await sending?.trigger('click')
+    await flushPromises()
+    expect(sendLink).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(input)
+    expect(marked).toBe('true')
+  })
+
   it('says at once why a pasted link is no receipt to record, by the model’s own check', async () => {
     const sheet = await render()
     await toPaste(sheet)

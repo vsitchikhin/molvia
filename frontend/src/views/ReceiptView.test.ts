@@ -1400,9 +1400,17 @@ describe('ReceiptView — the account it was paid from (MOL-312)', () => {
       JSON.stringify({ [ID]: { accountId: roubles.id, debited: '0' } }),
     )
     const { view } = await render()
-    await button(view, 'Записать 2 покупки').trigger('click')
+    const charged = view.get('.charged input').element as HTMLInputElement
+    let marked: string | null = null
+    charged.addEventListener('focus', () => (marked = charged.getAttribute('aria-invalid')))
+    const record = button(view, 'Записать 2 покупки')
+    ;(record.element as HTMLButtonElement).focus()
+    await record.trigger('click')
     await flushPromises()
     expect(recordReceipt).not.toHaveBeenCalled()
     expect(view.find('.charged').text()).toContain(ru.spending.sheet.bad_amount)
+    // and heard (MOL-333): the focus goes from «Записать» to «Списано», already marked
+    expect(document.activeElement).toBe(charged)
+    expect(marked).toBe('true')
   })
 })

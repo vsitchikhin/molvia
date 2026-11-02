@@ -132,6 +132,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import { useBarcodeScan } from '@/composables/useBarcodeScan'
 import { useCamera } from '@/composables/useCamera'
 import { useCameraHint } from '@/composables/useCameraHint'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { videoFrames } from '@/scanner/capture'
 import { sheetTitleOf } from '@/transitions'
 
@@ -188,6 +189,9 @@ export default defineComponent({
     const video = ref<HTMLVideoElement | null>(null)
     const frame = ref<HTMLElement | null>(null)
     const form = ref<HTMLFormElement | null>(null)
+    // Digits refused are heard (MOL-235, MOL-333): Enter in the field keeps the focus there and says
+    // the error; «Найти» hands it to the field, marked.
+    const refuse = useFieldRefusal()
     const typing = ref(false)
     // Up from the opening until the sheet is put away — its slide down included (adversarial Е).
     const shown = ref(props.open)
@@ -314,7 +318,10 @@ export default defineComponent({
     function submitTyped(): void {
       const result = typedBarcode(typed.value)
       if (result.ok) done(result.code)
-      else typedError.value = result.error
+      else {
+        typedError.value = result.error
+        void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
+      }
     }
 
     const sheet = ref<{ $el: Element } | null>(null)

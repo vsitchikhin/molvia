@@ -184,6 +184,28 @@ describe('MoneyCategoriesView: «Добавить категорию» in the st
     expect(useSpendingQueueStore().pending).toHaveLength(0)
   })
 
+  // A name refused is heard (MOL-333): «Add» kept the focus, and the error under the name was unheard.
+  it('a name taken: the focus goes from «Add» to the name, already marked', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
+    const view = await render()
+    await addButton(view)?.trigger('click')
+    await risen()
+    const input = document.querySelector<HTMLInputElement>('dialog[open] input')
+    if (!input) throw new Error('no field')
+    input.value = 'Armenian lessons'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    let marked: string | null = null
+    input.addEventListener('focus', () => (marked = input.getAttribute('aria-invalid')))
+    const add = sheetButton(en.spending.new_category.save)
+    add.focus()
+    add.click()
+    await flushPromises()
+    expect(addSpendingCategory).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(input)
+    expect(marked).toBe('true')
+  })
+
   it('must not fire: offline with no list ever shown, there is no strip (7h)', async () => {
     online(false)
     spendingCategories.mockRejectedValue(new TypeError('network'))
