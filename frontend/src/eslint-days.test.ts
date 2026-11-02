@@ -115,6 +115,12 @@ export function wordsOf(at: Date, today = localDay()): string {
 
   // The boundary, named (adversarial Б3в, self-review Р2-4): the clock read a line before into a name is
   // review's — a selector cannot follow a name. Held here so a change of the rule says what it reaches.
+  // Adversarial Г3 of round 4: the clock has spellings without end; the rule holds the two ordinary ones.
+  it('lets a third spelling of the clock pass — the price, named', async () => {
+    const code = script("return [answeredAt(at, 'ru', localDay(new Date(Date.now())))]")
+    expect(await said(code, 'composables/usePendingFrom.ts')).toEqual([])
+  }, 145_000)
+
   it('lets the clock read into a name a line before pass — the price, named', async () => {
     const code = script("const day = localDay()\n  return [answeredAt(at, 'ru', day)]")
     expect(await said(code, 'composables/usePendingFrom.ts')).toEqual([])

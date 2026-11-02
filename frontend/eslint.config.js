@@ -27,7 +27,8 @@ const SELECT = [
  * comes back nor at midnight (adversarial А2, А3, Б3б, В1); and a default of the clock is read once — the
  * mechanism the task was opened against (Б3а). The clock read a line before into a name, or handed down as a
  * prop, is review's: a selector cannot follow a name (Б3в, self-review Р2-4). `localDay(moment)` is the day
- * of a moment, not the clock, and passes.
+ * of a moment, not the clock, and passes. The clock has spellings without end — `new Date(Date.now())`,
+ * `new globalThis.Date()` — and the rule holds the two ordinary ones; the rest is review's (adversarial Г3).
  */
 const DAY_WORDS =
   'purchaseDay|dayOfAnyYear|dateOfAnyYear|answeredAt|dayWords|calendarDayOfAnyYear|shortDay'

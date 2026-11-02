@@ -1026,7 +1026,8 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   it can see** (`no-restricted-syntax`, `vue/no-restricted-syntax`, `eslint-days.test.ts`; self-review №2, Р2-4,
   adversarial Б3, В1): the clock — `localDay()` or `localDay(new Date())` written out — inside a day word's call, a day
   held in `ref`, `shallowRef`, `computed` or `reactive` of it, and a default of it, read once — a string from the clock
-  passes any type; `localDay(moment)` is the day of a moment and passes. **The clock read into
+  passes any type; `localDay(moment)` is the day of a moment and passes. **The clock has spellings without end**
+  (`new Date(Date.now())`, adversarial Г3): the rule holds the two ordinary ones, and the rest is review's. **The clock read into
   a name a line before, or handed down as a prop, is review's**: a selector cannot follow a name, and the test holds
   that boundary as it is. With the clock as the default every word counted its day
   where it was drawn: after a night «Покупки» said «вчера в 23:40» in the strip — the failed read on return happened to
@@ -1046,7 +1047,10 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   back into view (adversarial З of MOL-121); «Деньги» and «Бюджет» are held by tests, «Графики» by the same
   `useLocalDay` (self-review Р3-4). **A sheet that writes by the month keeps the month it opened on** (adversarial В2
   of round 3): `BudgetPlanSheet` takes the month as it opens, so a September plan saved past midnight is September's,
-  never the month that moved under the thumb. **The prices, named:** a page put away is held by the browser, and its timer with it — coming back
+  never the month that moved under the thumb; **and the month shown is read again after it** (`useKeptAnswer.written`,
+  adversarial Г1): a plan from September on holds in October, and the answer of the write is September's.
+  **A version of an amendment says its year** — «до 25 сент. 2025 г.: … · 16 сент. 2025 г.» in the sheets of an
+  exchange and an income (adversarial Г2): a journal of them goes back across years. **The prices, named:** a page put away is held by the browser, and its timer with it — coming back
   into view looks again; a screen's day ahead of a phone whose clock was set back stays ahead until the next look; and
   one test is green on master too, a guard of the rule — the search's strip of «Что брать» on return, redrawn there by
   the read the return makes (the strip of «Покупки» on return, the same, is an assertion inside a test red on master).
