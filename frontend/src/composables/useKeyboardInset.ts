@@ -103,7 +103,7 @@ export function useKeyboardInset(
     element.style.setProperty('--viewport-height', tall)
     if (`${lift} ${tall}` === placed) return
     placed = `${lift} ${tall}`
-    reveal(element)
+    revealTypedIn(element)
   }
 
   // A field of the sheet focused with no keys up yet, on a touch screen: the sheet takes the height
@@ -142,7 +142,7 @@ export function useKeyboardInset(
     const current = ++focusing
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        if (current === focusing && active.value && target.value) reveal(target.value)
+        if (current === focusing && active.value && target.value) revealTypedIn(target.value)
       })
     })
   }
@@ -192,7 +192,7 @@ export function useKeyboardInset(
     watch(
       edge,
       () => {
-        if (active.value && target.value) reveal(target.value)
+        if (active.value && target.value) revealTypedIn(target.value)
       },
       { flush: 'post' },
     )
@@ -245,21 +245,37 @@ export function typedIn(sheet: HTMLElement): HTMLElement | null {
  * first, between the edges its `scroll-padding` leaves: a pinned footer covers the end (MOL-182).
  * A field taller than that is left where it is: the browser keeps its caret in sight. Done once
  * more, it moves nothing (adversarial А3).
+ *
+ * **A field's error is seen with it** (MOL-354, adversarial А1): the field last over the footer stood
+ * on its edge, and the error a refusal grew under it stood under the footer — the field marked, the
+ * reason nowhere. Both while both fit between the edges; else the field alone, as before.
  */
-function reveal(sheet: HTMLElement): void {
+export function revealTypedIn(sheet: HTMLElement): void {
   const field = typedIn(sheet)
   if (!field) return
   const box = sheet.getBoundingClientRect()
   const top = box.top + padding(getComputedStyle(sheet).scrollPaddingTop)
   const bottom = box.bottom - footerEdge(sheet)
   const place = field.getBoundingClientRect()
+  const error = errorOf(field)?.getBoundingClientRect()
+  const end =
+    error && error.bottom - place.top <= bottom - top
+      ? Math.max(place.bottom, error.bottom)
+      : place.bottom
   const above = top - place.top
-  const below = place.bottom - bottom
+  const below = end - bottom
   if (above > 0 && below > 0) return
   // A scroll lands on whole pixels, a field does not: rounded outwards, or a fraction stays under
   // the edge — and rounded so that the field's top never goes past the sheet's.
   if (above > 0) sheet.scrollTop -= Math.ceil(above)
   else if (below > 0) sheet.scrollTop += Math.min(Math.ceil(below), Math.floor(-above))
+}
+
+/** The error a field marked wrong names (`aria-errormessage`): the kit's, drawn under it. */
+function errorOf(field: HTMLElement): HTMLElement | null {
+  const id =
+    field.getAttribute('aria-invalid') === 'true' && field.getAttribute('aria-errormessage')
+  return id ? document.getElementById(id) : null
 }
 
 /** How far a pinned footer covers the sheet's end: its `scroll-padding-bottom`. */

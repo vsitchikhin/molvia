@@ -1,7 +1,7 @@
 import { mount } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h, nextTick, ref } from 'vue'
-import { useKeyboardInset } from '@/composables/useKeyboardInset'
+import { revealTypedIn, useKeyboardInset } from '@/composables/useKeyboardInset'
 
 /** A visual viewport the test moves by hand, the way a keyboard opening would. */
 function fakeViewport(height: number, offsetTop = 0, scale = 1) {
@@ -561,6 +561,48 @@ describe('useKeyboardInset keeps the focused field above a pinned footer', () =>
     sheet.querySelector<HTMLElement>('[data-button]')?.focus()
     await frames()
     expect(sheet.scrollTop).toBe(100)
+  })
+
+  // The field last over the footer stands on its edge, and the error a refusal grows under it stood
+  // under the footer (MOL-354, adversarial А1): the field is shown with its error.
+  async function refused(field: Box, error: Box, marked = true) {
+    const view = await typing(field)
+    const message = document.createElement('p')
+    message.id = 'note-error'
+    view.sheet.append(message)
+    if (marked) view.input.setAttribute('aria-invalid', 'true')
+    view.input.setAttribute('aria-errormessage', message.id)
+    message.getBoundingClientRect = () => {
+      const moved = view.sheet.scrollTop - 100
+      return rect({ top: error.top - moved, bottom: error.bottom - moved })
+    }
+    return view
+  }
+
+  it('brings a field’s error into sight with it, above the footer', async () => {
+    const { sheet } = await refused({ top: 400, bottom: 440 }, { top: 444, bottom: 463 })
+    revealTypedIn(sheet)
+    expect(sheet.scrollTop).toBe(123)
+  })
+
+  it('must not fire: words under a field not marked wrong', async () => {
+    const { sheet } = await refused({ top: 400, bottom: 440 }, { top: 444, bottom: 463 }, false)
+    revealTypedIn(sheet)
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  it('a field and its error taller than the sheet’s room: the field alone, as before', async () => {
+    const { sheet } = await refused({ top: 400, bottom: 440 }, { top: 444, bottom: 560 })
+    revealTypedIn(sheet)
+    expect(sheet.scrollTop).toBe(100)
+  })
+
+  it('a footer that grew over a field marked wrong brings its error back with it', async () => {
+    const { sheet, edge } = await refused({ top: 380, bottom: 420 }, { top: 424, bottom: 443 })
+    sheet.style.scrollPaddingBottom = '80px'
+    edge.value = 80
+    await nextTick()
+    expect(sheet.scrollTop).toBe(123)
   })
 
   it('must not fire: a footer that grew in a shut sheet', async () => {

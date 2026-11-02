@@ -874,6 +874,59 @@ test.describe('the sheet', () => {
       expect(field.bottom).toBeLessThanOrEqual(footer.top)
     })
 
+    // The note last over the footer, refused at the tap with the focus left in it — Safari's tap, played
+    // by a click that moves no focus: its error grew under it and stood under the footer, the field
+    // marked and the reason nowhere (MOL-354, adversarial А1). The sheet shows the field with its error.
+    test('a field refused at the tap, the focus left in it, has its error above the footer', async ({
+      page,
+    }) => {
+      await openLong(page)
+      await longSheet(page)
+        .getByRole('button', { name: 'Row 15' })
+        .evaluate((row: HTMLElement) => {
+          row.focus({ preventScroll: true })
+        })
+      await page.keyboard.press('Tab')
+      await expect(note(page)).toBeFocused()
+      await expect.poll(async () => under(await boxes(page))).toBeLessThanOrEqual(0)
+      // On the footer's very edge, where the keys coming up leave the field typed in.
+      await longSheet(page).evaluate((dialog) => {
+        const field = dialog.querySelector('input')
+        const footer = dialog.querySelector('.footer')
+        if (!field || !footer) throw new Error('no note or footer')
+        dialog.scrollTop -=
+          footer.getBoundingClientRect().top - field.getBoundingClientRect().bottom
+      })
+      expect(Math.abs(under(await boxes(page)))).toBeLessThanOrEqual(1)
+      await note(page).fill(`A note${String.fromCodePoint(0xe000)}`)
+      await longSheet(page)
+        .getByRole('button', { name: 'Record', exact: true })
+        .dispatchEvent('click')
+      await expect(note(page)).toHaveAttribute('aria-invalid', 'true')
+      await expect(note(page)).toBeFocused()
+      const error = longSheet(page).locator('[id$="-error"]')
+      await expect(error).toHaveText('This has characters that cannot be saved')
+      // Seen, not only above: what stands at its middle is the error itself, and its bottom is over the
+      // footer's top.
+      await expect
+        .poll(() =>
+          error.evaluate((message) => {
+            const footer = message.closest('dialog')?.querySelector('.footer')
+            const box = message.getBoundingClientRect()
+            const hit = document.elementFromPoint(
+              box.left + box.width / 2,
+              box.top + box.height / 2,
+            )
+            return {
+              seen: hit !== null && message.contains(hit),
+              over: (footer?.getBoundingClientRect().top ?? Number.NaN) - box.bottom >= -1,
+            }
+          }),
+        )
+        .toEqual({ seen: true, over: true })
+      await expect(longSheet(page)).toBeVisible()
+    })
+
     // Pinned, the footer is still in the sheet's own scroll: a pull with the content scrolled down
     // scrolls it back, from the footer as from anywhere, and presses nothing (MOL-80).
     test('a pull down from it with the content scrolled scrolls, and keeps the sheet', async ({
