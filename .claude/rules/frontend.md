@@ -1643,10 +1643,16 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   recent shops and the keys up, the name marked and its reason nowhere. **Taller with its error than the room,
   the field's top stands at the edge and the error is seen as far as the room goes** (adversarial А2): at 200 %
   on 320 over the keys a field of 88 and three lines of 113 had 191, and the field alone, the first rule, hid
-  every line; the label over the field is what goes. A field whose top is cut is brought down alone, as before. **A refusal brings it into sight once it has grown** (`useFieldRefusal`, in a sheet, while the focus
+  every line; the label over the field is what goes. A field whose top is cut is brought down alone, as before.
+  **A field marked wrong asks the footer room for the first line of its error too** (`roomFor`, adversarial А3):
+  at 200 % in a window of 300–330 over the keys the field of 88 had 109 over a footer of 153, the footer stayed
+  pinned, and 12 px of a line of 38 stood in sight; now it goes with the content, as for a field with no room.
+  A line of it, as of the field, and by its own line height, not its box, which grows as it comes; the footer is
+  settled again as the content grows (`panelBox`), since a refusal changes neither the sheet's box nor the
+  footer's, and pinned again once the field is put right. **A refusal brings it into sight once it has grown** (`useFieldRefusal`, in a sheet, while the focus
   is in the field): with the focus there already — Safari's tap — nothing else moved the sheet. `e2e/sheet`
   holds both on the kit's long sheet, whose note is refused so, in Chromium and WebKit — the large text at
-  200 % on 320×360. **A footer is let go only when it leaves no room for the field typed in, in a sheet that scrolls**
+  200 % on 320×360 (А2) and 360×320 (А3). **A footer is let go only when it leaves no room for the field typed in, in a sheet that scrolls**
   (`loose`, adversarial А1, round 2): over the keys of a turned phone the sheet has some 107 px, and
   the edit of a spending a footer of 121 — pinned, it covered the whole sheet and the sum being typed
   with it; the kit's one button, 77, left 29 px of a field of 44. Let go, it goes with the content as
