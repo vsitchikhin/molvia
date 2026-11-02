@@ -2458,7 +2458,9 @@
       "when": "When",
       "city": "City",
       "done": "Done",
-      "name": "Shop"
+      "name": "Shop",
+      "choose_place": "Choose the shop",
+      "choose_day": "Choose the day"
     },
     "recorded": {
       "title": "Saved {n} purchase | Saved {n} purchases",

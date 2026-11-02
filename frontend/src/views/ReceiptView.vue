@@ -203,7 +203,7 @@
         <!-- The account it was paid from (MOL-312): a draft of the review, recorded with «Записать». Grown in
              where «Счета» answer after the review, as it pushes what stands under it (review Р1-3). -->
         <AppReveal>
-          <AppCard v-if="showsAccount" class="block account">
+          <AppCard v-if="showsAccount" ref="paymentCard" class="block account">
             <AccountRow
               :label="t('accounts.picker.row_spending')"
               :account="account"
@@ -429,6 +429,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { api } from '@/api'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useOnline } from '@/composables/useOnline'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
@@ -627,6 +628,9 @@ export default defineComponent({
       },
     })
     const debitedBad = ref(false)
+    // «Списано» refused at «Записать» is heard (MOL-235, MOL-333): on the screen, in the app's region.
+    const paymentCard = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
     const pickerOpen = ref(false)
     function pickAccount(next: string | null): void {
       debitedBad.value = false
@@ -922,6 +926,9 @@ export default defineComponent({
       const paid = paymentBody()
       if (paid === 'bad') {
         debitedBad.value = true
+        void refuse(() =>
+          paymentCard.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'),
+        )
         return
       }
       const barcodes = bind === true ? lineCodes.value.map((code) => code.position) : undefined
@@ -979,6 +986,7 @@ export default defineComponent({
       charged,
       debited,
       debitedBad,
+      paymentCard,
       pickerOpen,
       pickAccount,
       draft,

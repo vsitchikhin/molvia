@@ -876,7 +876,7 @@ describe('AccountSheet (handoff 03)', () => {
       })
       const save = button(view, en.accounts.sheet.save)
       ;(save?.element as HTMLButtonElement).focus()
-      return { date, save, invalidAtFocus: () => invalidAtFocus }
+      return { view, date, save, invalidAtFocus: () => invalidAtFocus }
     }
 
     it('cleared on the phone: nothing is sent, the focus goes to the day, marked', async () => {
@@ -899,6 +899,24 @@ describe('AccountSheet (handoff 03)', () => {
       expect(
         document.getElementById(date.attributes('aria-errormessage') ?? '')?.textContent,
       ).toContain(en.error.money_account_in_future)
+    })
+
+    // MOL-333, adversarial Р2-А3: the answer landing after the sheet was swept away moves no focus into it.
+    it('must not fire: refused by the server after the sheet was put away, it moves no focus', async () => {
+      let refuse: (error: unknown) => void = () => undefined
+      addMoneyAccount.mockReturnValue(new Promise((_, reject) => (refuse = reject)))
+      const { view, save } = await typed('2026-10-31')
+      await save?.trigger('click')
+      await flushPromises()
+      await view.setProps({ open: false })
+      await flushPromises()
+      const outside = document.createElement('button')
+      document.body.append(outside)
+      outside.focus()
+      refuse(new ApiError(ERROR.MONEY_ACCOUNT_IN_FUTURE, 'future', true))
+      await flushPromises()
+      await flushPromises()
+      expect(document.activeElement).toBe(outside)
     })
   })
 

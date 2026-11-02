@@ -353,6 +353,8 @@ export default defineComponent({
     // The first field marked, in the order of the form — the name, the start, its day (adversarial Р5-А1:
     // a day refused alone, on the phone or by the server, had no field to go to).
     async function focusFirstProblem(): Promise<void> {
+      // never into a sheet swept away while the server's answer was on its way (MOL-333, Р2-А3)
+      if (!props.open) return
       await refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
     }
 

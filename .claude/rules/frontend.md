@@ -685,9 +685,34 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   transfer, the purchase, a plan of «Бюджет», an account; a bare `focus()` on a refused field is the defect,
   the purchase's price the commonest at the shelf. **A sheet of several fields finds the first one marked
   in its own form** (`[aria-invalid="true"]`), never by a list of its fields: an account's day refused
-  alone, on the phone or by the server, was in none of them and moved no focus (adversarial Р5-А1). **The price, named:** a sheet that moves no focus on a refusal at all — an
-  exchange, an income, a receipt's lines, total and place, a trip's rate, a verdict — shows its error and
-  is heard only on reaching the field, as on master; MOL-333 brings them to it. **The checkbox is
+  alone, on the phone or by the server, was in none of them and moved no focus (adversarial Р5-А1). **No refusal
+  at a send is left that moves no focus** (MOL-333): the exchange, the income, a receipt's line, its new line,
+  its total and its sum, «Где купили?», a trip's rate, a verdict on its sheet and on «Оценки», the digits typed
+  in the scanner, one's own category, a message to the developer, a Serbian receipt's link, «Закончить» and
+  «Списано» of a receipt's «Записать» had each shown its error and moved nothing — the button pressed said
+  nothing more, a screen reader none of it. **A server's refusal put under a field is one too** — a day still to
+  come, «не курс» — **only while the sheet is up**: an answer landing after the sheet was swept away moves no
+  focus into it; a trip's own rate refused after the choice moved on brings the choice back to it, its field
+  and its error with it (Р3-А3) — with no field, the refusal was nowhere. **A sheet with no `<form>` looks in itself**, the `$el` of its `BottomSheet`, a `<dialog>` —
+  never a wrapper put in the markup for it. **«Новая строка» with no item focuses the item's button**
+  (owner's В-2 «а»): it is no field of the kit, so it carries no `aria-invalid` — a button has none in ARIA 1.2 —
+  and is read with its error as its description (`aria-describedby`), before the fields, as it stands first —
+  **and said by it where the focus stands there already** (adversarial А1): the search put away with no pick
+  gives the focus back to the button, and Safari's tap on «Готово» leaves it there; `useFieldRefusal` takes
+  the words of `aria-errormessage`, else of what describes the control.
+  **«Где купили?» is not now while a shop or a day is missing, saying which** (owner's В-3 «б»): «Выберите
+  магазин», «Выберите день» — `disabled` had left it out of the focus order with nothing said; a day typed
+  wrong is no wait but a refusal, at the tap, the focus to «Когда» — **and so is a shop named in characters no
+  place takes** (adversarial А2): «Выберите магазин» over a name typed was untrue, the name marked by nothing;
+  it is marked «Здесь есть знаки, которые не сохранить» and takes the focus. **A shop is chosen by the place
+  the button takes**, not by a key (Р3-А1): a recent one tapped and then gone from the server's list waits
+  for a shop again; **and «today» is asked as it opens, as a day is typed, at the tap and at the phone's
+  midnight while it is up** (Р3-А2, Р4-А1, Р5-А1), or the phone's today after midnight was refused at the tap as
+  a day still to come, and marked so before it; a phone asleep over the midnight is caught by the app back in
+  view (`useLocalDay`), not by the timer, which a sleeping phone holds; the action's word («Записать сумму») comes
+  once a shop is named, as «Перевести» and a verdict's say what they wait for. **The price, named:** a card of
+  «Оценки» back from the queue refused opens with the focus on its title (`focusOnMount`) and its error in the
+  field — a queue's answer, not a refusal at a send. **The checkbox is
   `AppCheckbox`** (В-4 «а»), a native checkbox the kit draws, by the grammar of `AppSwitch`: off a square edged in
   `graphic`, on `accent-solid` with a ✓, not now `inactive` — `aria-disabled`, focusable, a tap, a tap on its
   words and Space put back (`e2e/kit-inactive` in both engines) — and the focus a field's, on the row; its

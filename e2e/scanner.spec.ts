@@ -231,7 +231,14 @@ test.describe('with no camera', () => {
     await scanner(page).getByLabel('Digits under the barcode').fill('4850000000003')
     await scanner(page).getByLabel('Digits under the barcode').press('Enter')
 
-    await expect(scanner(page).getByText("The digits don't add up — check the code")).toBeVisible()
+    // Under the field, taken outside the sheet's live region (`e2e.md`): the focus stays in the field, so the
+    // same words are said there too (MOL-333) — and that is held as well.
+    await expect(
+      scanner(page).locator('form').getByText("The digits don't add up — check the code"),
+    ).toBeVisible()
+    await expect(scanner(page).locator('.region')).toContainText(
+      "The digits don't add up — check the code",
+    )
     await expect(scanner(page)).toBeVisible()
     // The edge doubled, as a row of the kit draws an error: a hairline is lost in bad light (MOL-211).
     // Read once the well's colour has settled: its edge comes by a transition, the shadow at once, and

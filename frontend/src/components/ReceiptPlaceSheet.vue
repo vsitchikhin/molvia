@@ -1,5 +1,10 @@
 <template>
-  <BottomSheet :open="open" :on-closed="onClosed" @update:open="$emit('update:open', $event)">
+  <BottomSheet
+    ref="sheet"
+    :open="open"
+    :on-closed="onClosed"
+    @update:open="$emit('update:open', $event)"
+  >
     <template #title>{{ t('receipt.place.title') }}</template>
     <template #meta>{{ meta }}</template>
 
@@ -34,6 +39,7 @@
         :maxlength="NAME_MAX"
         autocapitalize="sentences"
         enterkeyhint="done"
+        :error-text="nameBad ? t('spending.sheet.bad_text') : null"
         @update:model-value="typed"
       />
 
@@ -57,15 +63,23 @@
     </div>
 
     <template #footer>
-      <AppButton size="large" block :disabled="!ready" @click="done">
-        {{ action ?? t('receipt.place.done') }}
+      <!-- Not now while something is missing, saying what (MOL-174, Ф-6); a day typed wrong is refused
+           at the tap and heard there (MOL-333, В-3 «б»): `disabled` left the focus order in silence. -->
+      <AppButton size="large" block :inactive="waitsFor !== null" @click="done">
+        {{
+          waitsFor === 'place'
+            ? t('receipt.place.choose_place')
+            : waitsFor === 'day'
+              ? t('receipt.place.choose_day')
+              : (action ?? t('receipt.place.done'))
+        }}
       </AppButton>
     </template>
   </BottomSheet>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch } from 'vue'
+import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCheck from '~icons/mdi/check'
@@ -82,8 +96,9 @@ import type { ReceiptCountry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { calendarDay } from '@/days'
+import { calendarDay, localDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useRecentPlacesStore } from '@/stores/recentPlaces'
 import { placeIdOf } from '@/stores/receiptDrafts'
@@ -132,16 +147,37 @@ export default defineComponent({
     const places = useRecentPlacesStore()
     const chosen = ref<string | null>(null)
     const name = ref('')
+    /** A shop named in what no place takes, refused at the tap (adversarial А2 of MOL-333). */
+    const nameBad = ref(false)
     const when = ref(props.day)
     /**
      * The latest day the sheet lets through: the phone's today, or the day it opened with when that
      * is later and the server takes it (`latestDay`) — a receipt printed after Yerevan's midnight on
      * a phone west of it is dated by a day this phone has not reached (adversarial В1, as the
      * spending's sheet, adversarial Л). A day misread far ahead is still refused (review 18).
+     * «Today» is asked again as the sheet opens and as a day is typed (adversarial Р3-А2 of MOL-333): read
+     * once, the phone's today after midnight was refused at the tap as a day still to come. And at the
+     * phone's midnight while the sheet is up (Р5-А1): between the asks, the error stood under today's day.
      */
     // The screen's day, which moves as the app comes back and at midnight (MOL-329): in a `computed` the clock
     // was read once and the field's bound stood on yesterday after a night.
     const today = useLocalDay()
+    watch(when, () => {
+      today.value = localDay()
+    })
+    let midnight: ReturnType<typeof setTimeout> | undefined
+    function untilMidnight(): void {
+      clearTimeout(midnight)
+      const now = new Date()
+      const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+      midnight = setTimeout(() => {
+        today.value = localDay()
+        untilMidnight()
+      }, next.getTime() - now.getTime())
+    }
+    onBeforeUnmount(() => {
+      clearTimeout(midnight)
+    })
     const latest = computed(() =>
       props.day > today.value && props.day <= latestDay(new Date()) ? props.day : today.value,
     )
@@ -173,8 +209,14 @@ export default defineComponent({
     watch(
       () => props.open,
       (open) => {
-        if (!open) return
+        if (!open) {
+          clearTimeout(midnight)
+          return
+        }
+        today.value = localDay()
+        untilMidnight()
         when.value = props.day
+        nameBad.value = false
         name.value = props.current ? '' : (props.proposed ?? '')
         chosen.value = props.current ? 'current' : null
         const read = props.current ? settingsCityOf(props.current.city) : null
@@ -202,9 +244,24 @@ export default defineComponent({
     const dayBad = computed(
       () => when.value !== '' && !(isRateDay(when.value) && when.value <= latest.value),
     )
-    const ready = computed(
-      () => (chosen.value !== null || fresh.value) && when.value !== '' && !dayBad.value,
+    /**
+     * What the button waits for, in the order of the form. A name or a day typed wrong is no wait but a
+     * refusal at the tap (adversarial А2 of MOL-333): «Выберите магазин» over a shop typed was untrue.
+     * A shop is chosen by the place `done` takes, never by the key alone (Р3-А1): a recent one tapped and
+     * then gone from the server's list left the key, and the button promised what its tap did not do.
+     */
+    const picked = computed(
+      () => choices.value.find((choice) => choice.key === chosen.value)?.place ?? null,
     )
+    const waitsFor = computed<'place' | 'day' | null>(() =>
+      picked.value === null && !fresh.value && typedName.value === null
+        ? 'place'
+        : when.value === ''
+          ? 'day'
+          : null,
+    )
+    const sheet = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
 
     return {
       t,
@@ -218,7 +275,9 @@ export default defineComponent({
       when,
       latest,
       dayBad,
-      ready,
+      nameBad,
+      waitsFor,
+      sheet,
       meta: computed(() =>
         props.read && props.current
           ? t('receipt.place.read', { place: props.current.name, city: props.current.city })
@@ -232,16 +291,28 @@ export default defineComponent({
       choose: (key: string) => {
         chosen.value = key
         name.value = ''
+        nameBad.value = false
       },
       typed: () => {
+        nameBad.value = false
         if (name.value.trim()) chosen.value = null
       },
       done: () => {
-        const picked = choices.value.find((choice) => choice.key === chosen.value)?.place
         const place: PlaceDraft | null =
-          picked ??
+          picked.value ??
           (fresh.value && typedName.value ? { name: typedName.value, city: city.value } : null)
-        if (!place || !when.value || dayBad.value) return
+        // «today» asked at the tap too: a day typed before the phone's midnight and pressed after it (Р4-А1)
+        today.value = localDay()
+        // a shop named in what the server would not keep — a character no place takes
+        nameBad.value =
+          !picked.value &&
+          typedName.value !== null &&
+          !newPlaceSchema.shape.name.safeParse(typedName.value).success
+        if (nameBad.value || dayBad.value) {
+          void refuse(() => sheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
+          return
+        }
+        if (!place || !when.value) return
         emit('chosen', place, when.value)
         emit('update:open', false)
       },

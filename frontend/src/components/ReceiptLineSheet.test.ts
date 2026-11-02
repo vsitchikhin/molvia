@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { parseMoney, parseQuantity } from '@molvia/model'
 import type { ReceiptReviewLine } from '@molvia/model'
@@ -10,6 +11,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import { routes } from '@/router'
 import ItemPickSheet from '@/components/ItemPickSheet.vue'
 import ReceiptLineSheet from '@/components/ReceiptLineSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import type { ReviewLine } from '@/receipts/review'
 import type { LineDraft } from '@/stores/receiptDrafts'
 
@@ -76,7 +78,7 @@ let clock = 0
 const mounted: VueWrapper[] = []
 const sheet = () => document.body.querySelector('dialog[open]')
 
-async function render(line = chocolate(), over: Record<string, unknown> = {}) {
+async function render(line = chocolate(), over: Record<string, unknown> = {}, announced = false) {
   const pinia = createPinia()
   setActivePinia(pinia)
   // The sheet lays an entry in the history: it needs the router, as on a screen.
@@ -84,22 +86,34 @@ async function render(line = chocolate(), over: Record<string, unknown> = {}) {
   const router = createRouter({ history: createWebHistory(), routes })
   await router.push('/purchases')
   const saved: LineDraft[] = []
-  const view = mount(ReceiptLineSheet, {
-    props: {
-      open: true,
-      line,
-      total: 3,
-      currency: 'AMD',
-      lang: 'hy',
-      place: null,
-      country: 'AM',
-      digits: 0,
-      onSaved: (draft: LineDraft) => saved.push(draft),
-      ...over,
-    },
+  const props = {
+    open: true,
+    line,
+    total: 3,
+    currency: 'AMD' as const,
+    lang: 'hy',
+    place: null,
+    country: 'AM' as const,
+    digits: 0,
+    onSaved: (draft: LineDraft) => saved.push(draft),
+    ...over,
+  }
+  const mounting = {
     global: { plugins: [router, pinia, createAppI18n('ru')] },
     attachTo: document.body,
-  })
+  }
+  // Under an announcer, as `App.vue` holds every sheet: what the sheet says lands in its region.
+  const view: VueWrapper = announced
+    ? mount(
+        defineComponent({
+          setup() {
+            provideAnnouncer()
+            return () => h(ReceiptLineSheet, props)
+          },
+        }),
+        mounting,
+      )
+    : mount(ReceiptLineSheet, { props, ...mounting })
   mounted.push(view)
   await flushPromises()
   clock += 1000
@@ -194,6 +208,39 @@ describe('ReceiptLineSheet (MOL-127)', () => {
     press(ru.receipt.line.save)
     await flushPromises()
     expect(saved).toEqual([])
+  })
+
+  // A field refused at «Сохранить» is heard (MOL-333): the focus stayed on the button, and nothing was said.
+  it('a quantity it cannot read: the focus goes to it, already marked', async () => {
+    const { saved } = await render()
+    const quantity = sheet()?.querySelector<HTMLInputElement>('[data-field="quantity"]')
+    if (!quantity) throw new Error('нет поля «Сколько»')
+    quantity.value = 'не число'
+    quantity.dispatchEvent(new Event('input'))
+    let marked: string | null = null
+    quantity.addEventListener('focus', () => (marked = quantity.getAttribute('aria-invalid')))
+    await flushPromises()
+    press(ru.receipt.line.save)
+    await flushPromises()
+    expect(saved).toEqual([])
+    expect(document.activeElement).toBe(quantity)
+    expect(marked).toBe('true')
+  })
+
+  it('a sum refused with the focus in it is said', async () => {
+    const { saved } = await render(chocolate(), {}, true)
+    const amount = sheet()?.querySelector<HTMLInputElement>('[data-field="amount"]')
+    if (!amount) throw new Error('нет поля цены')
+    amount.value = '57о'
+    amount.dispatchEvent(new Event('input'))
+    amount.focus()
+    await flushPromises()
+    press(ru.receipt.line.save)
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(saved).toEqual([])
+    expect(document.activeElement).toBe(amount)
+    expect(sheet()?.querySelector('.region')?.textContent).toContain(ru.error.invalid_amount)
   })
 
   it('«Не записывать» is written at once, whatever the figures (review 17)', async () => {

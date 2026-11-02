@@ -132,6 +132,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import FeedbackPictures from '@/components/FeedbackPictures.vue'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { PictureRefused, base64Of, pictureFromFile } from '@/feedbackPicture'
 import type { PictureRefusal } from '@/feedbackPicture'
 import SegmentedControl from '@/components/SegmentedControl.vue'
@@ -268,6 +269,8 @@ export default defineComponent({
     const pictureNote = ref<string | null>(null)
     const kinds = ref<{ $el?: HTMLElement } | null>(null)
     const field = ref<{ $el?: HTMLElement } | null>(null)
+    // Words refused are heard (MOL-235, MOL-333): the focus to the field, marked, or its error said.
+    const refuse = useFieldRefusal()
 
     /** What this opening attaches: the screen it was opened over, the build, the platform, the code. */
     const opened = ref<FeedbackAttached | null>(null)
@@ -527,6 +530,7 @@ export default defineComponent({
         // A kind and a text that draws something are there, and still the schema refuses: a
         // character that cannot be sent — said under the field rather than left to a grey button.
         unsupported.value = true
+        void refuse(() => field.value?.$el?.querySelector<HTMLElement>('[aria-invalid="true"]'))
         return
       }
       const mine = opening

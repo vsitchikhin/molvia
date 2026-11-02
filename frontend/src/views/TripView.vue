@@ -129,7 +129,7 @@
          tap away from «Добавить позицию». An empty one finished is a row of nothing in «Покупки»
          for good: it is offered to go instead, and finishing it stays the second action (MOL-76,
          В-2). Away, the screen goes up to «Покупки» — there is nothing left on it. -->
-    <BottomSheet v-model:open="finishing" :on-closed="leaveIfOver">
+    <BottomSheet ref="finishSheet" v-model:open="finishing" :on-closed="leaveIfOver">
       <template #title>{{
         finishingEmpty ? t('trip.remove.empty.title') : t('trip.finish_confirm.title')
       }}</template>
@@ -278,6 +278,7 @@ import TripTotalCard from '@/components/TripTotalCard.vue'
 import type { TripRowView } from '@/components/tripRow'
 import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { shown } from '@/composables/useItemDetails'
 import type { RetryPurchase } from '@/composables/useItemDetails'
@@ -369,6 +370,9 @@ export default defineComponent({
     /** Answers that failed, so a retry failing the same way is said again (MOL-181, C1). */
     const attempt = ref(0)
     const finishing = ref(false)
+    // The sum or «Списано» refused at «Закончить» is heard (MOL-235, MOL-333): the first one marked.
+    const finishSheet = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
     /** Taken when «Закончить» is tapped: a row arriving while the sheet is up does not reword it. */
     const finishingEmpty = ref(false)
     const removing = ref(false)
@@ -504,7 +508,12 @@ export default defineComponent({
       // the account likewise (MOL-312): «Списано» that is not money holds the finish
       const paid = finishingEmpty.value ? undefined : paymentBody()
       debitedBad.value = paid === 'bad'
-      if (receipt === null || paid === 'bad') return
+      if (receipt === null || paid === 'bad') {
+        void refuse(() =>
+          finishSheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'),
+        )
+        return
+      }
       if (id && receipt) queue.enqueue({ kind: 'receipt', tripId: id, body: { receipt } })
       const payment = receipt ? paymentAfterSum(paid) : changedPayment(paid)
       if (id && payment) {
@@ -744,6 +753,7 @@ export default defineComponent({
       receiptText,
       receiptCurrency,
       receiptBad,
+      finishSheet,
       receiptOpen,
       receiptWaiting,
       receiptCurrent,

@@ -3,6 +3,7 @@ import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type {
@@ -12,6 +13,7 @@ import type {
   SpendingCategoryView,
 } from '@molvia/model'
 import ListRow from '@/components/ListRow.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -182,6 +184,67 @@ describe('MoneyCategoriesView: «Добавить категорию» in the st
     )
     expect(addSpendingCategory).not.toHaveBeenCalled()
     expect(useSpendingQueueStore().pending).toHaveLength(0)
+  })
+
+  // A name refused is heard (MOL-333): «Add» kept the focus, and the error under the name was unheard.
+  it('a name taken: the focus goes from «Add» to the name, already marked', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
+    const view = await render()
+    await addButton(view)?.trigger('click')
+    await risen()
+    const input = document.querySelector<HTMLInputElement>('dialog[open] input')
+    if (!input) throw new Error('no field')
+    input.value = 'Armenian lessons'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    let marked: string | null = null
+    input.addEventListener('focus', () => (marked = input.getAttribute('aria-invalid')))
+    const add = sheetButton(en.spending.new_category.save)
+    add.focus()
+    add.click()
+    await flushPromises()
+    expect(addSpendingCategory).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(input)
+    expect(marked).toBe('true')
+  })
+
+  it('a name taken, Enter in it: the focus stays in the name and its error is said in the sheet', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const actor = useActorStore()
+    actor.id = ACTOR
+    actor.state = 'ready'
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/money/categories')
+    // Under an announcer, as `App.vue` holds the screen: what its sheet says lands in the sheet's region.
+    const host = mount(
+      defineComponent({
+        setup() {
+          provideAnnouncer()
+          return () => h(MoneyCategoriesView)
+        },
+      }),
+      { attachTo: document.body, global: { plugins: [pinia, router, createAppI18n('en')] } },
+    )
+    views.push(host)
+    await flushPromises()
+    await addButton(host.findComponent(MoneyCategoriesView))?.trigger('click')
+    await risen()
+    const input = document.querySelector<HTMLInputElement>('dialog[open] input')
+    if (!input) throw new Error('no field')
+    input.value = 'Armenian lessons'
+    input.dispatchEvent(new Event('input'))
+    await flushPromises()
+    input.focus()
+    input.closest('form')?.dispatchEvent(new Event('submit', { cancelable: true }))
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(addSpendingCategory).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(input)
+    expect(document.querySelector('dialog[open] .region')?.textContent).toContain(
+      en.spending.new_category.bad_taken,
+    )
   })
 
   it('must not fire: offline with no list ever shown, there is no strip (7h)', async () => {

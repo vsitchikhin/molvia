@@ -212,6 +212,24 @@ describe('TransferSheet (MOL-253)', () => {
     expect(amount.attributes('aria-invalid')).toBeUndefined()
   })
 
+  // A server's refusal under a field is heard (MOL-333, adversarial Р2-А2): the day said it and the focus
+  // stayed on «Transfer».
+  it('a day the server refuses: the focus goes from «Transfer» to the day, marked', async () => {
+    recordTransfer.mockRejectedValue(new ApiError(ERROR.TRANSFER_IN_FUTURE, 'future', true))
+    const view = await sheet({ from: card.id }, withAccounts([card, dollars]))
+    await typeAmount(view, '2000')
+    const day = view.get<HTMLInputElement>('input[type="date"]').element
+    let marked: string | null = null
+    day.addEventListener('focus', () => (marked = day.getAttribute('aria-invalid')))
+    ;(mainButton(view).element as HTMLButtonElement).focus()
+    await mainButton(view).trigger('click')
+    await flushPromises()
+    await flushPromises()
+    expect(recordTransfer).toHaveBeenCalledTimes(1)
+    expect(document.activeElement).toBe(day)
+    expect(marked).toBe('true')
+  })
+
   it('offline: one yellow line, the button says it waits, nothing is sent', async () => {
     const view = await sheet({ from: card.id, online: false }, withAccounts([card, dollars]))
     expect(view.text()).toContain('No connection. You can transfer once online')

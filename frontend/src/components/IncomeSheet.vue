@@ -31,7 +31,7 @@
       </template>
     </StatusStrip>
 
-    <form class="form" @submit.prevent="submit">
+    <form ref="form" class="form" @submit.prevent="submit">
       <div class="pair">
         <AppField
           v-model="amount"
@@ -206,6 +206,7 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { bankWords } from '@/components/spending'
 import { useAccountChoice } from '@/composables/useAccountChoice'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
 import { calendarDayOfAnyYear, dayOfAnyYear, localDay } from '@/days'
@@ -294,6 +295,14 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t, locale } = useI18n()
     const id = useId()
+    const form = ref<HTMLFormElement | null>(null)
+    // A field refused is heard (MOL-235, MOL-333): the first one marked in the form, the server's
+    // refusal of the day too — never into a sheet swept away while the answer was on its way.
+    const refuse = useFieldRefusal()
+    function refuseField(): void {
+      if (props.open)
+        void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
+    }
 
     const amount = ref('')
     const currency = ref<Currency>('RUB')
@@ -497,8 +506,17 @@ export default defineComponent({
       }
       const typedNote = note.value.trim() ? exchangeNoteSchema.safeParse(note.value) : null
       noteInvalid.value = typedNote !== null && !typedNote.success
-      if (!parsed || amountError.value || chosen === '') return
-      if (heldError.value || dayInvalid.value || noteInvalid.value) return
+      if (
+        !parsed ||
+        amountError.value ||
+        chosen === '' ||
+        heldError.value ||
+        dayInvalid.value ||
+        noteInvalid.value
+      ) {
+        refuseField()
+        return
+      }
 
       const fields = {
         amount: parsed,
@@ -530,6 +548,7 @@ export default defineComponent({
       } catch (caught) {
         if (caught instanceof ApiError && caught.code === ERROR.INCOME_IN_FUTURE) {
           dayError.value = ERROR.INCOME_IN_FUTURE
+          refuseField()
         } else {
           failed.value = true
         }
@@ -549,6 +568,7 @@ export default defineComponent({
       typed,
       t,
       id,
+      form,
       amount,
       currency,
       source,
