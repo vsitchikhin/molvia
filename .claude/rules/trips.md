@@ -56,16 +56,20 @@ The detail behind the trip lines of `CLAUDE.md`.
   head is taken, so the correction, found already a row of a trip the phone knows — the current one, or a finished
   one on screen — goes as `PATCH`; and **`answeredAsSent`** — where the phone did not know (the answer lost), the
   repeated `POST` is read rather than trusted: numbers that come back other than the ones sent put a `PATCH` with
-  them **in the place of that `POST`**, never at the end of the queue. The correction was made before whatever waits
-  behind it, and at the end it landed after an account with «списано» chosen since — «Закончить» of MOL-312 — and the
-  price change took «списано» off on the server (Р-32, adversarial А1 of MOL-325): every request answered 200, and
-  the figure typed was gone. A refusal of the old body is no notice while the correction waits (`superseded`), and
-  the correction goes under a key of its own, which the old body's answer does not take out (В2-1). **The price,
+  them **in the place of that `POST`** — at the end only where another window has taken that write out. The
+  correction was made before whatever waits behind it, and at the end it landed after an account with «списано» chosen
+  since — «Закончить» of MOL-312 — and the price change took «списано» off on the server (Р-32, adversarial А1 of
+  MOL-325): every request answered 200, and the figure typed was gone. **And none at all where the line was corrected
+  again while that `POST` was out** (`superseded`, adversarial Б1): those numbers are nobody's, the later correction
+  waits in the write's place and reaches the row itself — by `alreadyWritten`, or its own `POST` read the same way —
+  and the amendment of the older body, sent after it, put the person's last word back to the one before. A refusal of
+  the old body is no notice while the correction waits (`superseded` too), and the correction goes under a key of its
+  own, which the old body's answer does not take out (В2-1). **The price,
   named** (adversarial А2): a finished trip neither current nor on screen is a trip the phone does not hold, so its
   correction goes as a second `POST`, answered with the old numbers, and the `PATCH` follows it in its place — one
   request more, nothing lost. `tripQueue.test.ts` holds each way against a fake of the server that keeps the first
   body and takes «списано» off a price change — the order of the requests, the account and «Закончить» after the
-  correction, a finished trip on screen and not; `e2e/trip.spec.ts` the whole way against the real API with the
+  correction, a second correction while the repeat is out, a finished trip on screen and not; `e2e/trip.spec.ts` the whole way against the real API with the
   `POST` held on its way — before the server, since a row the server has written comes back with the screen's own
   read and the line opens as that row; each guard taken out turns its test red.
 - **A receipt has a queue of its own by these rules** (`receiptQueue`, MOL-127): the receipt, its

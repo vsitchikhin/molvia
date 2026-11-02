@@ -1075,9 +1075,10 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
       // The server kept numbers other than the ones just sent: its row is what this purchase was
       // written as, and the correction the person has made since has to reach it as an amendment
       // (раунд 2, Г1). Queued after the re-read above, or storage would hand the queue back
-      // without it — and in the place of the write it stands for, never at the end: the
-      // correction was made before whatever waits behind it, and an account with «списано» chosen
-      // after it was taken off by the price change landing later (MOL-325, adversarial А1).
+      // without it — and in the place of the write it stands for, at the end only where another
+      // window took that write out: the correction was made before whatever waits behind it, and an
+      // account with «списано» chosen after it was taken off by the price change landing later
+      // (MOL-325, adversarial А1).
       const write = head.write
       // …unless the purchase has been undone meanwhile: the amendment would reach a row that is
       // about to go and come back as «не принято» about a thing the person threw away (П-3).
