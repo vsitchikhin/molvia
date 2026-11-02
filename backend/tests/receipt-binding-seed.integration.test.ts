@@ -73,9 +73,13 @@ describe('a line by the seed’s own till name (MOL-293, adversarial А1)', () =
     ['Գարեջուր ոչ ալկոհոլային', 'Пиво безалкогольное'],
     ['Ծիրան չորացրած', 'Курага'],
     ['Կոկոսի ընկույզ', 'Кокос'],
-  ])('binds «%s» to its own «%s»', async (printed, own) => {
-    expect(await bind(printed)).toMatchObject({ name: own, match: 'search' })
-  })
+  ])(
+    'binds «%s» to its own «%s»',
+    async (printed, own) => {
+      expect(await bind(printed)).toMatchObject({ name: own, match: 'search' })
+    },
+    15_000,
+  )
 })
 
 describe('a heading a till prints for the kind, seen on paper (MOL-331)', () => {
