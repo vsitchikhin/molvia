@@ -425,7 +425,10 @@ on are counted or exported. `make gates` prints the pairs of gate 0.2's people �
 release, so the owner's are not among them (review 1, Р-8) — beside `PICKS_MEASURE_MIN_PAIRS` (70, MOL-47's
 В-1), **counted as the measure reads them**: a person's own word is no pair (Р-7, printed apart), a key typed on the
 way to another key of the same item is that pair (owner's В-2 «а»), and no more than ten of one person's count
-(`PICKS_MEASURE_PER_PERSON`, В-1 «а»: seventy is seven people at least). The measure starts there, and not
+(`PICKS_MEASURE_PER_PERSON`, В-1 «а»: seventy is seven people at least). **«On the way» is read by the key, as
+the memory reads it** (review 2, Р2-А1): a fold rewrites letters already typed — «дет» is `det`, «детское» `deцkoe`,
+«Nutric» `nutrik`, «Մածո» `maцo` — so such a cut is a pair of its own, the price named: 13 names of the seed's 605,
+nine of them «… детский»; the ten a person bounds it. The measure starts there, and not
 reached by the decision on gate 0.2 the task closes with «nothing to measure» and 3 stays (owner's В-2
 «а»). The stored key is no typed text: typing is simulated by the key's own prefixes, which is what the
 memory compares, and meaning (MOL-105) cannot be replayed — named. A person's own words are a list of candidates for
