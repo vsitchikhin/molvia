@@ -19,7 +19,9 @@
       <span v-if="row.expense?.printed" class="printed">{{ row.expense.printed }}</span>
     </template>
     <template #tail
-      ><span class="amount">{{ amount ?? '—' }}</span></template
+      ><span class="amount" :style="figureChars(amount ?? '—', 'text')">{{
+        amount ?? '—'
+      }}</span></template
     >
   </ListRow>
 </template>
@@ -30,6 +32,7 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatMoney, formatQuantity, formatUnitPrice } from '@molvia/model'
 import AppTag from '@/components/AppTag.vue'
+import { figureChars } from '@/components/figure'
 import ListRow from '@/components/ListRow.vue'
 import type { TripRowView } from './tripRow'
 
@@ -97,7 +100,7 @@ export default defineComponent({
         .join(' · '),
     )
 
-    return { t, open, meta, amount }
+    return { t, open, meta, amount, figureChars }
   },
 })
 </script>
@@ -119,6 +122,15 @@ export default defineComponent({
 .quantity,
 .amount {
   font-variant-numeric: tabular-nums;
+}
+
+/* Never broken, and shrunk to the row less its padding where even the whole row is narrower, as an
+   operation's (MOL-321): at 200 % «125 403,50 ֏» stood past the card and read «25 403,50 ֏» (MOL-334). The
+   list card is the container (`AppCard list`). */
+.amount {
+  @include figure-fit(1em, $less: calc(2 * var(--space-4)));
+
+  white-space: nowrap;
 }
 
 .printed {
