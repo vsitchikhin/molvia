@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { hostname } from 'node:os'
 import { Readable } from 'node:stream'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -966,15 +967,51 @@ describe('what lives how long (В-3)', () => {
   }, 15_000)
 })
 
+/**
+ * am-05 as no log may carry it (MOL-327): every Armenian word its lines print, its tax number — its fiscal
+ * number holds it — and its total, in any spelling of the digits.
+ */
+const PRINTED_WORDS = [...new Set(am05.readings.join('\n').match(/\p{Script=Armenian}{3,}/gu))]
+const PRINTED_NUMBERS = /1234567|8676/g
+
+/**
+ * What of am-05 a log carries, read without what a run puts in it by chance (MOL-327): pino's stamps and
+ * Fastify's time of a request, taken by their values — a field of the server under the same name is read —
+ * the places of a stack's frames, which are the checkout's, and the receipt's id, which is the test's.
+ */
+function receiptIn(lines: readonly string[], stamp: number, receiptId: string): string[] {
+  const stamps = `"time":${String(stamp)},"pid":${String(process.pid)},"hostname":${JSON.stringify(hostname())},`
+  const said = lines
+    .map((line) =>
+      line
+        .replace(stamps, '')
+        .replace(/,"responseTime":[\d.e+-]+(?=,"msg":"request (?:completed|errored)"\}\s*$)/, '')
+        .replace(/(?<=[( ])(?:\/|node:|file:)[^"()]*?:\d+:\d+/g, '<place>')
+        .replaceAll(receiptId, '<receipt>'),
+    )
+    .join('')
+  const digits = said.replace(/(?<=\d)[ ,.](?=\d)/g, '')
+  return [
+    ...PRINTED_WORDS.filter((word) => said.includes(word)),
+    ...(digits.match(PRINTED_NUMBERS) ?? []),
+  ]
+}
+
+/** A moment of the last ten seconds whose milliseconds end in «8676», am-05's total. */
+function stampOf8676(): number {
+  const now = Date.now()
+  return now - ((now - 8676) % 10_000)
+}
+
 describe('the queue through the server', () => {
   afterEach(() => vi.useRealTimers())
 
   it('reads a receipt once its last part arrives, and logs neither its text nor its tax number', async () => {
-    // «8676», the receipt's total, once stood in pino's time (MOL-327): every run puts it in the time and
-    // in the receipt's id, and the log is read without the logger's stamps and that id.
-    const now = Date.now()
-    vi.useFakeTimers({ toFake: ['Date'] })
-    vi.setSystemTime(now - ((now - 8676) % 10_000))
+    // «8676», the receipt's total, once stood in pino's time (MOL-327): every run puts it there and in the
+    // receipt's id, and the clocks stand — the reading's `ms` is 0.
+    const stamp = stampOf8676()
+    vi.useFakeTimers({ toFake: ['Date', 'performance'] })
+    vi.setSystemTime(stamp)
     const lines: string[] = []
     const reading = buildServer({
       db,
@@ -1009,17 +1046,54 @@ describe('the queue through the server', () => {
           .receipt.status
       }
       expect(status).toBe('parsed')
-      expect(lines.join('')).toMatch(/"time":\d+8676[,}]/)
-      const stamps = new Set(['time', 'responseTime', 'pid', 'hostname'])
-      const said = lines
-        .map((line) => Object.entries(JSON.parse(line) as Record<string, unknown>))
-        .map((entry) => entry.filter(([key]) => !stamps.has(key)))
-        .map((entry) => JSON.stringify(entry).replaceAll(receipt.id, '<receipt>'))
-        .join('\n')
-      expect(said).toContain('receipt read')
-      expect(said).not.toMatch(/01234567|Կաթ|Իգիթ|8676/)
+      const log = lines.join('')
+      expect(log).toContain(`"time":${String(stamp)},`)
+      expect(log).toContain('"ms":0,')
+      expect(log).toContain('receipt read')
+      expect(receiptIn(lines, stamp, receipt.id)).toEqual([])
     } finally {
       await reading.close()
+    }
+  }, 15_000)
+
+  // The check above, held by what it must and must not find (MOL-327, adversarial А1–А4).
+  it('the log is read for the receipt in any field and spelling, and never for what a run puts there', async () => {
+    const stamp = stampOf8676()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(stamp)
+    const lines: string[] = []
+    const logging = buildServer({ db, logStream: { write: (line) => lines.push(line) } })
+    await logging.ready()
+    try {
+      const id = '8676b45a-3f1c-4e2a-9d7b-6c0e5f3a2b17'
+      logging.log.info(
+        { req: { id: 'req-1', method: 'PUT', url: `/receipts/${id}/parts/1` } },
+        'incoming request',
+      )
+      logging.log.info({ res: { statusCode: 200 }, responseTime: 8676.41 }, 'request completed')
+      logging.log.error(
+        { frames: ['at read (/tmp/8676/backend/src/x.ts:8676:41)', 'at /tmp/8676/x.js:1:2'] },
+        'catalogue has no till names',
+      )
+      expect(receiptIn(lines, stamp, id)).toEqual([])
+      const leaks: Record<string, unknown> = {
+        time: 'Կաթ «Իգիթ»',
+        pid: '01234567',
+        hostname: '8 676,41',
+        responseTime: 8676.41,
+        line: 'Թուզ կգ',
+        fiscal: 'Ֆիսկալ համար 12345678',
+        tin: 1234567,
+        total: '8,676.41',
+        minor: 867641,
+      }
+      for (const [field, leak] of Object.entries(leaks)) {
+        lines.length = 0
+        logging.log.info({ [field]: leak }, 'receipt read')
+        expect(receiptIn(lines, stamp, id), field).not.toEqual([])
+      }
+    } finally {
+      await logging.close()
     }
   }, 15_000)
 })
