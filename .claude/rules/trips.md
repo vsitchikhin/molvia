@@ -523,8 +523,9 @@ finish made with no signal. Moved with the first page only, written with every p
 where a shelf refused either, since that shelf keeps the page before (А5); a cache from before it has none, and the strip says no time. **Every day on the screen is the screen's day's**
 (MOL-329, `frontend.md`): the strip's moment by `answeredAt` — «покупки на вчера, 23:40», with its year when another —
 and the rows of «Записаны», the receipts' titles, «последняя — вчера» of «ждут оценки» and «Раньше …» from the same
-`useLocalDay`; before it the strip came right after a night only because the failed read on return redrew it, and the
-rows under it, drawn in the cards' slots, stayed «сегодня». **The price,
+`useLocalDay`, which moves at midnight too; before it the strip came right after a night only because the failed read on
+return redrew it, the rows under it, drawn in the cards' slots, stayed «сегодня», and «Повторить» after midnight redrew
+the strip alone into «вчера» (adversarial А4 of review 1). **The price,
 named:** a window on the previous build loads the history without moving it, so the strip may name a moment
 older than the list, never a newer one. **Offline, «Показать ещё» gives way to «Раньше {day} — со связью»** —
 the day of the last row shown, always as a date — so the list does not read as whole (П.5 of MOL-128). **The

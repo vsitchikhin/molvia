@@ -1015,19 +1015,27 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   «Без связи · чек из памяти» was a bare `<p>` with a cloud — stood under the notice, two clouds
   (adversarial А1); it is a `StatusStrip` now.
 - **Every day a screen says is counted from the screen's day** (MOL-329, owner's В-1 «б», В-2 «б»): «сегодня»,
-  «вчера», a date with its year or without — of a strip's moment, a row, a card, a sheet's version, a receipt, a
-  device. The day is `useLocalDay` of the screen, asked again as the app comes back into view, and a card or a sheet
-  takes it from its screen (`today`) or holds its own; the functions of `days.ts` take it **as a required argument** —
-  `purchaseDay`, `dayOfAnyYear`, `dateOfAnyYear` by `shownMidnight(today)`, `dayWords`, `calendarDayOfAnyYear` by
-  `today`, `answeredAt` by `today` — so a place that leaves it out fails `npm run typecheck`. With the clock as the
-  default every place counted the day once, where its words were drawn, and nothing redrew them after a night: «Покупки»
-  said «вчера в 23:40» in the strip — the failed read on return happened to redraw it — over a row and a receipt still
-  «сегодня»; «Что брать», «Оценки», the record typed by hand and the recorded one said «сегодня» of yesterday, and a
-  strip's moment of another year had no year. **A strip's moment is `answeredAt`, `{when}` in the screen's words** —
-  «покупки на сегодня, 23:40», «список на 30 окт. 2025 г., 10:05» — the form of «Настройки» and «Деньги». **The prices,
-  named:** a screen left in view across midnight with nothing redrawing it still says «сегодня» until something does —
-  no screen ticks (MOL-187, Б2); and two tests are green on master too, held as guards of the rule — the strip of
-  «Покупки» and the search's strip of «Что брать» on return, redrawn there by the read the return makes.
+  «вчера», a date with its year or without — of a strip's moment, a row, a card, a sheet's version and its day, a
+  receipt, a device, an account put away. **The screen's day is one value, `useLocalDay`**, looked at again as the app
+  comes back into view and **at midnight with the screen in view** (a timer to the next local midnight, review 1,
+  adversarial А4); a card takes it from its screen (`today`), a sheet holds its own `useLocalDay` — never
+  `ref(localDay())`, which moved only as the sheet opened (А2, А3). **The functions of `days.ts` never read the clock**:
+  `purchaseDay`, `dayOfAnyYear`, `dateOfAnyYear`, `dayWords`, `calendarDayOfAnyYear`, `answeredAt` take that day as a
+  required `today` — a place that leaves it out fails `npm run typecheck` — and **ESLint refuses `localDay()` read in its
+  place and a day held in `ref(localDay())`** (`no-restricted-syntax`, `vue/no-restricted-syntax`, `eslint-days.test.ts`;
+  self-review №2): a string from the clock passes any type. With the clock as the default every word counted its day
+  where it was drawn: after a night «Покупки» said «вчера в 23:40» in the strip — the failed read on return happened to
+  redraw it — over a row and a receipt still «сегодня»; and with the later of the screen's day and the clock's
+  (`shownDay`, MOL-187 Б2, taken out) a strip redrawn by «Повторить» after midnight said «вчера» over rows not redrawn
+  (А4). **A moment printed by `Intl` in place has no year — so none is** (А5): the balances' age is `answeredAt`, not
+  the bare hour of `countedWhen`, gone; the day an account was put away and a transfer amended is `dateOfAnyYear`.
+  **A strip's moment is `answeredAt`, `{when}` in the screen's words** — «покупки на сегодня, 23:40», «остатки на 30
+  окт. 2025 г., 10:05», «Список на вчера, 23:46 — обновим…» of «Оценки» (self-review №1). **A sheet opened before
+  midnight keeps the day it opened on** — the spending was made then — and its words say «Вчера» of it after midnight,
+  never «Сегодня». **The prices, named:** a page put away is held by the browser, and its timer with it — coming back
+  into view looks again; a screen's day ahead of a phone whose clock was set back stays ahead until the next look; and
+  one test is green on master too, a guard of the rule — the search's strip of «Что брать» on return, redrawn there by
+  the read the return makes (the strip of «Покупки» on return, the same, is an assertion inside a test red on master).
 - **A sheet has a live region of its own, and while it is up everything is said there** (MOL-181,
   owner's В-2 «а»). The app's region is outside the modal `<dialog>`, inert while it is open, and
   nothing said there is read (feedback С-10). `BottomSheet` gives its region to the app's announcer
