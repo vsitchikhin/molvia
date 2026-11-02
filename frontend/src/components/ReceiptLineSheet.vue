@@ -86,7 +86,9 @@
       <div class="per-unit-box">
         <div class="per-unit">
           <span class="per-unit-label">{{ t('item.unit_price_label') }}</span>
-          <span class="per-unit-value">{{ perUnit ?? '—' }}</span>
+          <span class="per-unit-value" :style="figureChars(perUnit ?? '—')">{{
+            perUnit ?? '—'
+          }}</span>
         </div>
         <p v-if="itemHint" :key="itemHint.text" class="cheaper" :class="`cheaper-${itemHint.kind}`">
           <span>{{ itemHint.text }}</span>
@@ -145,6 +147,7 @@ import ItemPickSheet from '@/components/ItemPickSheet.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { formatRating, unitPriceText } from '@/components/adviceRow'
+import { figureChars } from '@/components/figure'
 import { useCheaperHint } from '@/composables/useCheaperHint'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useLineFigures } from '@/composables/useLineFigures'
@@ -399,6 +402,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       t,
       ERROR,
       NAME_MAX,
@@ -613,8 +617,12 @@ export default defineComponent({
   background: var(--good-tint);
 }
 
+/* A line that wraps only where its least widths do not fit, and the box its figure measures itself against
+   (MOL-321): at 150 % «12 800 ֏/кг» stood past it (MOL-334). */
 .per-unit {
   display: flex;
+  flex-wrap: wrap;
+  container-type: inline-size;
   gap: var(--space-3);
   align-items: baseline;
   justify-content: space-between;
@@ -623,14 +631,16 @@ export default defineComponent({
 }
 
 .per-unit-label {
+  flex: 1 1 min-content;
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
 }
 
 .per-unit-value {
   @include display-type;
+  @include figure-fit(var(--text-title));
 
-  font-size: var(--text-title);
+  margin-inline-start: auto;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

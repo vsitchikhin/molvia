@@ -37,7 +37,9 @@
       <div class="per-unit-box">
         <div class="per-unit">
           <span class="per-unit-label">{{ t('item.unit_price_label') }}</span>
-          <span class="per-unit-value">{{ perUnit ?? '—' }}</span>
+          <span class="per-unit-value" :style="figureChars(perUnit ?? '—')">{{
+            perUnit ?? '—'
+          }}</span>
         </div>
         <AppReveal>
           <!-- Keyed by its words: a line that says something else goes and comes rather than changing
@@ -159,6 +161,7 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { formatRating, unitPriceText } from '@/components/adviceRow'
+import { figureChars } from '@/components/figure'
 import { useCheaperHint } from '@/composables/useCheaperHint'
 import type { HintRecord } from '@/composables/useCheaperHint'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
@@ -601,6 +604,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       t,
       open,
       form,
@@ -660,8 +664,12 @@ export default defineComponent({
   color: var(--good-ink);
 }
 
+/* A line that wraps only where its least widths do not fit, and the box its figure measures itself against
+   (MOL-321): at 150 % «12 800 ֏/кг» stood past it (MOL-334). */
 .per-unit {
   display: flex;
+  flex-wrap: wrap;
+  container-type: inline-size;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
@@ -705,14 +713,16 @@ export default defineComponent({
 }
 
 .per-unit-label {
+  flex: 1 1 min-content;
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
 }
 
 .per-unit-value {
   @include display-type;
+  @include figure-fit(var(--text-title));
 
-  font-size: var(--text-title);
+  margin-inline-start: auto;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
