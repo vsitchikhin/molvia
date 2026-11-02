@@ -30,7 +30,7 @@ async function said(code: string, file: string): Promise<string[]> {
     .map((message) => message.message)
 }
 
-const script = (body: string) => `import { computed, ref, shallowRef } from 'vue'
+const script = (body: string) => `import { computed, reactive, ref, shallowRef } from 'vue'
 import { answeredAt, localDay, purchaseDay } from '@/days'
 
 export function probe(at: Date, today: string): string[] {
@@ -68,8 +68,15 @@ describe('the screen`s day (MOL-329)', () => {
     expect(await said(script("return [purchaseDay(at, 'ru', String(localDay()))]"), file)).toEqual([
       IN_PLACE,
     ])
-    // The screen's own day passes.
+    // The clock with its argument written out is the clock (adversarial В1 of round 3).
+    expect(await said(script("return [answeredAt(at, 'ru', localDay(new Date()))]"), file)).toEqual(
+      [IN_PLACE],
+    )
+    // The screen's own day passes, and so does the day of a moment.
     expect(await said(script("return [answeredAt(at, 'ru', today)]"), file)).toEqual([])
+    expect(await said(script("return [purchaseDay(at, 'ru', localDay(at)), today]"), file)).toEqual(
+      [],
+    )
   }, 145_000)
 
   it('refuses a day held in ref, shallowRef or computed of localDay() — a component, a module', async () => {
@@ -80,6 +87,11 @@ describe('the screen`s day (MOL-329)', () => {
     expect(await said(held('ref(localDay())'), 'stores/accounts.ts')).toEqual([HELD])
     expect(await said(held('shallowRef(localDay())'), 'stores/accounts.ts')).toEqual([HELD])
     expect(await said(held('computed(() => localDay())'), 'stores/accounts.ts')).toEqual([HELD])
+    expect(await said(held('computed(() => localDay(new Date()))'), 'stores/accounts.ts')).toEqual([
+      HELD,
+    ])
+    const kept = script('const kept = reactive({ today: localDay() })\n  return [kept.today]')
+    expect(await said(kept, 'stores/accounts.ts')).toEqual([HELD])
   }, 145_000)
 
   // Adversarial Б3а: a default argument is read once — the mechanism the task was opened against.
@@ -91,6 +103,8 @@ export function wordsOf(at: Date, today = localDay()): string {
 }
 `
     expect(await said(code, 'composables/usePendingFrom.ts')).toEqual([DEFAULT])
+    const written = code.replace('today = localDay()', 'today = localDay(new Date())')
+    expect(await said(written, 'composables/usePendingFrom.ts')).toEqual([DEFAULT])
   }, 145_000)
 
   it('refuses localDay() in place in a template', async () => {
