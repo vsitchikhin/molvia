@@ -607,8 +607,8 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   the seed «вода без сахара» over «Кола без сахара». That decides it, and no number does: on the
   seed's typo ladders and word swaps (`.scratch/tasks/status/MOL-332-review-probe-3.json`) it made
   370 rows of the thing meant near on the ladders and 1 192 of another on the swaps at 0.40, and
-  more of another at every threshold to 0.60, but the swaps were made by a generator — 328 of the 1
-  192 differ from their query by «для» alone — so the ratio is the generators', not people's
+  more of another at every threshold to 0.60, but the swaps were made by a generator — 328 of the
+  1 192 differ from their query by «для» alone — so the ratio is the generators', not people's
   (adversarial Б2). The letters deciding instead brought the dog food back to «не нашли» and fewer
   typos near than now. No rule is better on both halves, and none is monotone, since the model is
   not: «агады» and «агади», one key, stand either side of 0.40. **A name found both ways takes the
