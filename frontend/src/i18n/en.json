@@ -261,9 +261,9 @@
       "body": "Photograph a receipt — we read the lines, you check them and save with one button. No receipt — “Add by hand”."
     },
     "error_capture": "You can still photograph a receipt or add by hand",
-    "stale": "Offline · purchases as of {day}, {time}",
+    "stale": "Offline · purchases as of {when}",
     "stale_untimed": "Offline · purchases saved on this phone",
-    "stale_error": "The server did not answer · purchases as of {day}, {time}",
+    "stale_error": "The server did not answer · purchases as of {when}",
     "stale_error_untimed": "The server did not answer · purchases saved on this phone",
     "earlier_online": "Earlier than {day} — once online",
     "offline": {
@@ -425,9 +425,9 @@
     "ratings_count": "{n} rating | {n} ratings",
     "rating_line": "{rating} · {count}",
     "truncated": "Showing {shown} of {total}",
-    "stale": "Offline · the list as of {day}, {time}",
-    "stale_error": "The server did not answer — the list as of {day}, {time}",
-    "stale_loading": "Refreshing · the list as of {day}, {time}",
+    "stale": "Offline · the list as of {when}",
+    "stale_error": "The server did not answer — the list as of {when}",
+    "stale_loading": "Refreshing · the list as of {when}",
     "edit_action": "Change the rating",
     "edit": {
       "meta": "Only your own rating changes",
@@ -454,7 +454,7 @@
       "body_capture": "We’ll show the list as soon as you’re back online. You can photograph a receipt now"
     },
     "city_reloading": "Refreshing · the list for {city}",
-    "stale_other_city": "Offline · the list for {oldCity} as of {day}, {time}. Prices for {city} will appear once you are back online",
+    "stale_other_city": "Offline · the list for {oldCity} as of {when}. Prices for {city} will appear once you are back online",
     "cities_genitive": {
       "Гюмри": "Gyumri",
       "Ереван": "Yerevan",
@@ -474,7 +474,7 @@
         "body_offline": "Without a connection we search only what was rated. The whole catalogue — with a connection"
       },
       "error_body": "The search did not go through. Try again — or clear the field: the list is still there",
-      "offline": "Offline · searching only the list as of {day}, {time}",
+      "offline": "Offline · searching only the list as of {when}",
       "offline_more": "Unrated items and the whole catalogue — once there is a connection"
     },
     "home": {

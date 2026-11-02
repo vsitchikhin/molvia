@@ -680,8 +680,8 @@
         <VerdictBadge level="take" />
         <p class="name">{{ t('dev.kit.sample_milk') }}</p>
       </AppCard>
-      <VerdictCard :card="verdictCard" />
-      <VerdictCard :card="verdictCard" :draft="verdictDraft" />
+      <VerdictCard :card="verdictCard" :today="today" />
+      <VerdictCard :card="verdictCard" :draft="verdictDraft" :today="today" />
     </section>
 
     <AppButton block @click="sheetOpen = true">{{ t('dev.kit.open_sheet') }}</AppButton>
@@ -871,6 +871,7 @@ import { budgetAmount, journalRowProps } from '@/components/spending'
 import type { JournalRow } from '@/components/spending'
 import VerdictBadge from '@/components/VerdictBadge.vue'
 import VerdictCard from '@/components/VerdictCard.vue'
+import { localDay } from '@/days'
 
 /**
  * Every piece of the kit in its states, on one page, and a sheet in a real history — reached in
@@ -1322,6 +1323,7 @@ export default defineComponent({
     }
     return {
       t,
+      today: localDay(),
       ERROR,
       levels: Object.values(VERDICT_LEVEL),
       iconPx: {

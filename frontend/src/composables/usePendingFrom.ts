@@ -1,11 +1,11 @@
 import { computed } from 'vue'
-import type { ComputedRef } from 'vue'
+import type { ComputedRef, Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { cityWhereNameRepeats, placeNameIdentity } from '@molvia/model'
 import type { PendingVerdict } from '@molvia/model'
 import { placeLabel } from '@/components/placeLabel'
 import type { VerdictQueue } from '@/composables/useVerdictQueue'
-import { purchaseDay } from '@/days'
+import { purchaseDay, shownMidnight } from '@/days'
 
 const placeOfCard = (card: PendingVerdict) => ({ name: card.placeName, city: card.placeCity })
 
@@ -22,9 +22,12 @@ const placeOfCard = (card: PendingVerdict) => ({ name: card.placeName, city: car
  * travelled leaves every name as it was (`cityWhereNameRepeats`). Names are newest first. When the
  * server holds more than the page, one or two places are not claimed for all — whether there are
  * others the phone cannot tell, and says nothing (adversarial В2, round 4, Л2); three already are
- * «and others», page or no page.
+ * «and others», page or no page. «Последняя — вчера» is counted from the screen's day (`today`, MOL-329).
  */
-export function usePendingFrom(queue: VerdictQueue): ComputedRef<string | null> {
+export function usePendingFrom(
+  queue: VerdictQueue,
+  today: Ref<string>,
+): ComputedRef<string | null> {
   const i18n = useI18n()
   const { t, locale } = i18n
   return computed(() => {
@@ -56,7 +59,7 @@ export function usePendingFrom(queue: VerdictQueue): ComputedRef<string | null> 
         ? null
         : t('trip.home.pending.one_place', {
             place: a,
-            when: purchaseDay(latest.boughtAt, locale.value),
+            when: purchaseDay(latest.boughtAt, locale.value, shownMidnight(today.value)),
           })
     }
     if (places.size > 2) return t('trip.home.pending.more_places', { a, b })

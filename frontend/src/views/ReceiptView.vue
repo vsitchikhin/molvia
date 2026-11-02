@@ -432,7 +432,8 @@ import { api } from '@/api'
 import { useOnline } from '@/composables/useOnline'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
-import { calendarDayOfAnyYear, dayOfAnyYear, localDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { calendarDayOfAnyYear, dayOfAnyYear, localDay, shownDay, shownMidnight } from '@/days'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { afterStep, useNavigation } from '@/navigation'
@@ -492,6 +493,8 @@ export default defineComponent({
   },
   setup() {
     const { t, locale } = useI18n()
+    // The screen's day, asked again as the app comes back: the day words are said from it (MOL-329).
+    const today = useLocalDay()
     const route = useRoute()
     const router = useRouter()
     const { goUp } = useNavigation()
@@ -650,8 +653,8 @@ export default defineComponent({
 
     const dayOf = (at: Date | string) =>
       typeof at === 'string'
-        ? calendarDayOfAnyYear(at, locale.value)
-        : dayOfAnyYear(at, locale.value)
+        ? calendarDayOfAnyYear(at, locale.value, shownDay(today.value))
+        : dayOfAnyYear(at, locale.value, shownMidnight(today.value))
     const positions = (n: number): string => t('trip.items_count', { n }, n)
 
     const title = computed(() => {

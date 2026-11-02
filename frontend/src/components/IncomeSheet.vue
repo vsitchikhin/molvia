@@ -208,7 +208,7 @@ import { bankWords } from '@/components/spending'
 import { useAccountChoice } from '@/composables/useAccountChoice'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, purchaseDay } from '@/days'
+import { calendarDay, localDay, purchaseDay, shownMidnight } from '@/days'
 import { newId } from '@/ids'
 import type { IncomeDraft } from '@/composables/useIncomes'
 import { incomesOf } from '@/composables/useIncomes'
@@ -437,7 +437,7 @@ export default defineComponent({
     /** «до 25 сент.: 99 615 ₽ · Зарплата · 15 сент. · Викаса» */
     function versionOf(version: IncomeView['history'][number]): string {
       const words = {
-        until: purchaseDay(version.replacedAt, locale.value),
+        until: purchaseDay(version.replacedAt, locale.value, shownMidnight(today.value)),
         amount: formatMoney(version.amount, locale.value),
         source: t(`income.source.${version.source}`),
         date: calendarDay(version.receivedOn, locale.value, { day: 'numeric', month: 'short' }),

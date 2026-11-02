@@ -8,7 +8,8 @@ import { currencySchema, formatMoney } from '@molvia/model'
 import type { CatalogueEntry, Currency, Money, TripExpenseView } from '@molvia/model'
 import type { TripRowView } from '@/components/tripRow'
 import type { CodeHeld } from '@/stores/receiptQueue'
-import { dayOfAnyYear, timeOfDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { dayOfAnyYear, shownMidnight, timeOfDay } from '@/days'
 import { upTarget, useNavigation } from '@/navigation'
 import { useActorStore } from '@/stores/actor'
 import { useTripHistoryStore } from '@/stores/tripHistory'
@@ -73,6 +74,8 @@ export function useFinishedTrip(): FinishedTrip {
   const route = useRoute()
   const router = useRouter()
   const { t, locale } = useI18n()
+  // The screen's day, asked again as the app comes back: «вчера, 18:40» is said from it (MOL-329).
+  const today = useLocalDay()
   const queue = useTripQueueStore()
   const { goBack, goTab, goUp } = useNavigation()
   /**
@@ -123,7 +126,7 @@ export function useFinishedTrip(): FinishedTrip {
     if (!at) return null
     const city = selected.trip.value?.placeCity ?? selected.local.value?.view?.placeCity
     const when = t('trip.history.when', {
-      day: dayOfAnyYear(at, locale.value),
+      day: dayOfAnyYear(at, locale.value, shownMidnight(today.value)),
       time: timeOfDay(at, locale.value),
     })
     // Recorded from a receipt (MOL-126): said beside the day, as «Записаны» says it (MOL-127).

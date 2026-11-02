@@ -3,10 +3,13 @@
  * «12 сент.» (MOL-28, Р-6). By the calendar of the phone, not by 24-hour spans: bought at 23:50
  * and asked at 00:10 is «yesterday» to a person, however few minutes passed.
  *
+ * `now` is the screen's day (`shownMidnight`), never a default of the clock (MOL-329): read where the
+ * words were drawn, it stayed yesterday's on a row the night did not redraw.
+ *
  * Presentation, not a rule: the words come from `Intl` in the app's language, and the caps of
  * the card are a style, never the text.
  */
-export function purchaseDay(when: Date, locale: string, now = new Date()): string {
+export function purchaseDay(when: Date, locale: string, now: Date): string {
   // Never in the future: a phone whose clock lags the server's would call today's purchase by
   // its date (self-review С-7).
   const days = Math.max(0, Math.round((startOfDay(now) - startOfDay(when)) / DAY_MS))
@@ -21,7 +24,7 @@ export function purchaseDay(when: Date, locale: string, now = new Date()): strin
  * for as long as it is used, so «вошли 12 сент.» may be a September of another year. Only where a
  * date can be that old — a purchase card is never older than its trip.
  */
-export function dayOfAnyYear(when: Date, locale: string, now = new Date()): string {
+export function dayOfAnyYear(when: Date, locale: string, now: Date): string {
   // «Вчера» beats the year: 31 December seen on 1 January is yesterday, whatever the calendar.
   const days = Math.round((startOfDay(now) - startOfDay(when)) / DAY_MS)
   if (when.getFullYear() === now.getFullYear() || days <= 1) return purchaseDay(when, locale, now)
@@ -37,7 +40,7 @@ export function dayOfAnyYear(when: Date, locale: string, now = new Date()): stri
  * that puts its own word before the day, «Раньше 19 сент. — со связью» (MOL-204, Р-9), where «Раньше
  * вчера» is no Russian.
  */
-export function dateOfAnyYear(when: Date, locale: string, now = new Date()): string {
+export function dateOfAnyYear(when: Date, locale: string, now: Date): string {
   return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
@@ -62,11 +65,20 @@ export function timeOfDay(when: Date, locale: string): string {
  * (adversarial А2 of MOL-187), and the clock's is right for a redraw made past midnight before the
  * screen heard of it (round 2, Б2). An answer of a day neither has reached yet is today's.
  */
-export function answeredAt(at: Date, locale: string, today = localDay(), now = new Date()): string {
-  const [year = 0, month = 1, date = 1] = shownDay(today, now).split('-').map(Number)
+export function answeredAt(at: Date, locale: string, today: string, now = new Date()): string {
   // With its year when another: a memory may be that old — the settings' moment moves only with an
   // answer (MOL-215, adversarial Б2), and a kept month may be read last a year ago.
-  return `${dayOfAnyYear(at, locale, new Date(year, month - 1, date))}, ${timeOfDay(at, locale)}`
+  return `${dayOfAnyYear(at, locale, shownMidnight(today, now))}, ${timeOfDay(at, locale)}`
+}
+
+/**
+ * The screen's day as a moment, its local midnight: what `purchaseDay`, `dayOfAnyYear` and `dateOfAnyYear`
+ * count from (MOL-329). Every word of a day on a screen is said from the same day, or a strip said «вчера»
+ * over a row of a later moment still «сегодня».
+ */
+export function shownMidnight(today: string, now = new Date()): Date {
+  const [year = 0, month = 1, date = 1] = shownDay(today, now).split('-').map(Number)
+  return new Date(year, month - 1, date)
 }
 
 /**
@@ -123,7 +135,7 @@ export function calendarDay(
  * A calendar day short, the year only when not this one's: «23 окт.», «26 окт. 2023 г.» — a date read off a receipt
  * may be of any year, and a year left out hid one three years back (MOL-305).
  */
-export function calendarDayOfAnyYear(day: string, locale: string, today = localDay()): string {
+export function calendarDayOfAnyYear(day: string, locale: string, today: string): string {
   return calendarDay(day, locale, {
     day: 'numeric',
     month: 'short',
@@ -156,7 +168,7 @@ export function localDay(now = new Date()): string {
  * A day as a card heads it (MOL-121, В-1): «Сегодня», «Вчера», otherwise «27 сент.» — counted from
  * the phone's today, day against day, never from a moment. It stands alone, so it starts a line.
  */
-export function dayWords(day: string, locale: string, today = localDay()): string {
+export function dayWords(day: string, locale: string, today: string): string {
   if (day !== today && day !== shiftDay(today, -1)) {
     return calendarDay(day, locale, { day: 'numeric', month: 'short' })
   }

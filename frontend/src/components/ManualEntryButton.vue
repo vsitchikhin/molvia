@@ -61,8 +61,9 @@ import BottomSheet from '@/components/BottomSheet.vue'
 import ListRow from '@/components/ListRow.vue'
 import StartTripSheet from '@/components/StartTripSheet.vue'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useTripRows } from '@/composables/useTripRows'
-import { purchaseDay, timeOfDay } from '@/days'
+import { purchaseDay, shownMidnight, timeOfDay } from '@/days'
 import { afterStep } from '@/navigation'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -91,6 +92,8 @@ export default defineComponent({
   },
   setup(_props, { emit }) {
     const { t, locale } = useI18n()
+    // The screen's day, asked again as the app comes back: the day words are said from it (MOL-329).
+    const today = useLocalDay()
     const router = useRouter()
     const trips = useTripStore()
     const queue = useTripQueueStore()
@@ -117,7 +120,7 @@ export default defineComponent({
             place,
             meta: since
               ? t('trip.manual_since', {
-                  day: purchaseDay(since, locale.value),
+                  day: purchaseDay(since, locale.value, shownMidnight(today.value)),
                   time: timeOfDay(since, locale.value),
                 })
               : null,

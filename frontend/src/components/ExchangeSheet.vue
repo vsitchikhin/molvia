@@ -221,7 +221,7 @@ import { useAccountChoice } from '@/composables/useAccountChoice'
 import { useOnline } from '@/composables/useOnline'
 import { useAccountsStore } from '@/stores/accounts'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, purchaseDay } from '@/days'
+import { calendarDay, localDay, purchaseDay, shownMidnight } from '@/days'
 import { newId } from '@/ids'
 
 type Side = 'given' | 'received'
@@ -507,7 +507,7 @@ export default defineComponent({
     /** «до 25 сент.: 20 000 ₽ → 100 000 ֏ · 16 сент. · ВТБ банкомат» */
     function versionOf(version: ExchangeView['history'][number]): string {
       const words = {
-        until: purchaseDay(version.replacedAt, locale.value),
+        until: purchaseDay(version.replacedAt, locale.value, shownMidnight(today.value)),
         amounts: t('exchange.row_amounts', {
           given: formatMoney(version.given, locale.value),
           received: formatMoney(version.received, locale.value),
