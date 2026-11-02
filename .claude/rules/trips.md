@@ -67,7 +67,11 @@ The detail behind the trip lines of `CLAUDE.md`.
   own, which the old body's answer does not take out (В2-1). **The price,
   named** (adversarial А2): a finished trip neither current nor on screen is a trip the phone does not hold, so its
   correction goes as a second `POST`, answered with the old numbers, and the `PATCH` follows it in its place — one
-  request more, nothing lost. `tripQueue.test.ts` holds each way against a fake of the server that keeps the first
+  request more, nothing lost. **And a correction in the queue is the same purchase, never a change after an account**
+  (owner's В-2 «а», adversarial Б2): an account with «списано» chosen after the `add` and before the correction stays,
+  since the correction lands in the `add`'s place, before it — as it has on the path «first `POST` on its way» since
+  MOL-22, and now on «the answer lost» too; with the answer come, the line is the server's row, and the same taps take
+  «списано» off (Р-32, `money-accounts.md`). `tripQueue.test.ts` holds each way against a fake of the server that keeps the first
   body and takes «списано» off a price change — the order of the requests, the account and «Закончить» after the
   correction, a second correction while the repeat is out, a finished trip on screen and not; `e2e/trip.spec.ts` the whole way against the real API with the
   `POST` held on its way — before the server, since a row the server has written comes back with the screen's own
