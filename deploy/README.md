@@ -742,6 +742,73 @@ is 0.2's question, with the lawyer («Персональные данные», s
 database password and `BOT_API_SECRET` are generated anew, BotFather shows the bot's token
 (`/mybots` → API Token), the GHCR token is issued anew. Images are in GHCR, code in git.
 
+## Rotating the secrets (MOL-287)
+
+Every secret of production, where it lives and how it is changed. A leaked secret is changed first
+and investigated after; step 2 of the procedure on a leak (Confluence 12124161) points here. All of
+`.env.prod` is read at `up -d`, so a changed line reaches a container only when it is recreated —
+`docker compose … up -d <service>` recreates exactly the services whose environment changed.
+`$C` below is `docker compose -f docker-compose.prod.yml --env-file .env.prod`, run in `~/molvia`.
+
+**Drilled on the production stack run locally** (MOL-287, the images of `sha-3e04137`); the rest
+are other services' consoles, written as their documentation has them and not drilled.
+
+| Secret                                 | Where                                              | Downtime                              |
+| -------------------------------------- | -------------------------------------------------- | ------------------------------------- |
+| `POSTGRES_PASSWORD`                    | `.env.prod`; **and the role in the volume**        | the API's restart                     |
+| `BOT_API_SECRET`                       | `.env.prod`                                        | the API's and the bot's restart       |
+| `GRAFANA_ADMIN_PASSWORD`               | `.env.prod`                                        | Grafana's restart                     |
+| `TELEGRAM_BOT_TOKEN`                   | `.env.prod`, BotFather                             | the bot's restart; no login meanwhile |
+| `ALERTS_BOT_TOKEN`                     | `.env.prod`, BotFather                             | Grafana's restart                     |
+| `CLAUDE_API_KEY`                       | `.env.prod`, Anthropic console                     | none — Tesseract reads meanwhile      |
+| `BOT_PULSE_URL`, `ALERTS_PULSE_URL`    | `.env.prod`, healthchecks.io                       | none                                  |
+| `HC_UP_URL`                            | the Worker's secret, healthchecks.io               | none                                  |
+| `HC_CERT_URL`                          | GitHub repository secret, healthchecks.io          | none                                  |
+| `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` | GitHub environment `production`, `authorized_keys` | none                                  |
+| `CLOUDFLARE_API_TOKEN`                 | GitHub environment `production`, Cloudflare        | none                                  |
+| R2 access key                          | `~/.config/rclone/rclone.conf`, Cloudflare         | none                                  |
+| the copies' age key                    | `backup.env` (`AGE_RECIPIENT`), the owner's Mac    | none                                  |
+| people's sessions                      | `sessions`                                         | everybody signs in again              |
+
+- **`POSTGRES_PASSWORD` lives in the database's volume, not only in `.env.prod`** (drilled): the
+  variable sets the role's password when the volume is created and never again. Changing the line
+  alone leaves the API unable to connect — `password authentication failed` — on its next start. In
+  this order: `$C exec -T postgres psql -U molvia -d molvia -c "alter role molvia password '<new>'"`,
+  then the line in `.env.prod`, then `$C up -d backend postgres-exporter`. A connection already open
+  keeps working until then; the downtime is the API's restart.
+- **`BOT_API_SECRET`** (drilled): 43 characters of base64url — anything else and the API does not
+  start (`openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`). Change the line, then
+  `$C up -d backend bot` — both at once: the old secret is refused (`401`) the moment the API is back,
+  and a bot still on it cannot confirm a login or claim a reminder.
+- **`GRAFANA_ADMIN_PASSWORD`** (drilled): the line, then `$C up -d grafana`; the old password is
+  refused after it. Should it ever stay — Grafana keeps its admin in `grafana_data` — the reset is
+  `$C exec grafana grafana cli admin reset-admin-password '<new>'`.
+- **`TELEGRAM_BOT_TOKEN`**: BotFather → `/revoke` for `@molvia_bot` — the old token dies there — the
+  new one into `.env.prod`, `$C up -d bot`. Until the bot is back nobody can sign in; the bot exits on a
+  revoked token (`401`) rather than retrying, so a restart loop says the line was not changed.
+  **`ALERTS_BOT_TOKEN`** the same for the alarms' bot, then `$C up -d grafana`.
+- **`CLAUDE_API_KEY`**: a new key in the console's workspace, the line, `$C up -d backend`, then the
+  old key deleted in the console. Without a working key the model's receipts wait ten minutes and
+  Tesseract reads them (`receipts.md`).
+- **The ping URLs**: a check's URL cannot be changed, so a leaked one means a new check in
+  healthchecks.io with the Telegram integration, its URL where the old one was — `.env.prod` and
+  `$C up -d bot` / `grafana`, the Worker's secret (Signals, «Where it is set»), `gh secret set
+HC_CERT_URL` — and the old check deleted. See the new one turn green before deleting the old.
+- **`DEPLOY_SSH_KEY`**: a new pair as in «Once: the deploy key», its line appended to
+  `~/.ssh/authorized_keys` with the same `restrict,command=…` before the old one is removed, the
+  environment's secret replaced, one rollout seen green, then the old line removed.
+- **`CLOUDFLARE_API_TOKEN`**: Cloudflare → My Profile → API Tokens → «Roll» on the token — the same
+  permissions, «Workers Scripts: Edit» — and `gh secret set CLOUDFLARE_API_TOKEN --env production`.
+- **R2**: a new API token for the bucket in Cloudflare, `rclone config update r2
+access_key_id=… secret_access_key=…` on the machine, `sudo systemctl start molvia-backup.service`
+  seen green in healthchecks.io, then the old token deleted.
+- **The age key**: a new pair on the Mac (`age-keygen -o ~/.config/molvia/backup.key.new`), its
+  public half into `AGE_RECIPIENT` of `backup.env`. **The old private key is kept fourteen days** —
+  the copies already in R2 are encrypted to it and live that long — then deleted.
+- **People's sessions**, when a token may have leaked from the database: `$C exec -T postgres psql
+-U molvia -d molvia -c 'delete from sessions'` — revoking is deleting the row (`auth.md`), so every
+  device gets `401` and the login screen on its next request.
+
 ## The Postgres image is part of the contract
 
 The database runs `pgvector/pgvector:0.8.7-pg17-bookworm` — the exact tag, in `docker-compose.yml`,
