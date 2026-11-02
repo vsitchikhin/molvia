@@ -1015,7 +1015,7 @@ function receiptIn(
   lines: readonly string[],
   stamp: number,
   receiptId: string,
-  kept: readonly unknown[] = [],
+  kept: readonly unknown[],
 ): string[] {
   const stamps = `"time":${String(stamp)},"pid":${String(process.pid)},"hostname":${JSON.stringify(hostname())},`
   const said = lines
