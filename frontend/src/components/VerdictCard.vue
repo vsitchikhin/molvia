@@ -182,11 +182,12 @@ export default defineComponent({
   padding: var(--space-6) var(--space-4);
 }
 
-/* With large text the scale takes the card's sides, but for its gap (owner's В-3 «а», MOL-334): its padding grows
-   with the text, and at 200 % the five keys had 190 px of a phone's 320 — 23 px past it. At 100 % on 320 the card
-   is 16rem and keeps its sides. */
+/* With large text the row of keys takes the card's sides, but for its gap (owner's В-3 «а», MOL-334): its padding
+   grows with the text, and at 200 % the five keys had 190 px of a phone's 320 — 23 px past it. The keys alone: the
+   score as it stands and the scale's ends keep the card's padding, as the question over them does (review №3). At
+   100 % on 320 the card is 16rem and keeps its sides. */
 @container verdict (width < 15rem) {
-  .keys {
+  .keys :deep(.scale) {
     margin-inline: calc(var(--space-keys) - var(--space-4));
   }
 }
