@@ -61,7 +61,14 @@ export default defineComponent({
     // held, the login was drawn scrolled off the window, all of it above it on an iPhone (MOL-138,
     // adversarial А).
     watch(closed, async (now) => {
-      if (!now) return
+      // The door opened onto the app: a screen comes in the door's place, from its top, as a move puts a
+      // new screen. The step of the terms stands taller than a phone, and the person scrolled down to
+      // «Принимаю» — the screen came in scrolled by as much (MOL-330). Not a public screen, which stayed
+      // where it was being read.
+      if (!now) {
+        if (!route.meta.public) window.scrollTo(0, 0)
+        return
+      }
       releaseHeightHold()
       // A door shut over the app — the session ended on another phone — took the screen and the focus
       // with it: the focus goes to the door's heading, as a move's does (MOL-216, self-review №1). Not
