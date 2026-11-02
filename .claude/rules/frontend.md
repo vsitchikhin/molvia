@@ -1638,12 +1638,15 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   without one the browser's scroll is the whole answer (MOL-135, adversarial А). **A footer that grows over the field typed in** — an error,
   «Вернуть» — moves that edge up as a lower sheet would, and the field is brought back above it; only a
   field typed in, only in an open sheet. **A field is in sight with its error** (MOL-354, adversarial А1): the
-  error a refusal grows under the field (`aria-errormessage`, by `AppReveal`) is kept above the edge with it,
-  while both fit, else the field alone, as before — the field last over the footer stood on its edge, and its
-  error grew under the footer: «Где вы?» with two recent shops and the keys up, the name marked and its reason
-  nowhere. **A refusal brings it into sight once it has grown** (`useFieldRefusal`, in a sheet, while the focus
+  error a refusal grows under the field (`aria-errormessage`, by `AppReveal`) is kept above the edge with it —
+  the field last over the footer stood on its edge, and its error grew under the footer: «Где вы?» with two
+  recent shops and the keys up, the name marked and its reason nowhere. **Taller with its error than the room,
+  the field's top stands at the edge and the error is seen as far as the room goes** (adversarial А2): at 200 %
+  on 320 over the keys a field of 88 and three lines of 113 had 191, and the field alone, the first rule, hid
+  every line; the label over the field is what goes. A field whose top is cut is brought down alone, as before. **A refusal brings it into sight once it has grown** (`useFieldRefusal`, in a sheet, while the focus
   is in the field): with the focus there already — Safari's tap — nothing else moved the sheet. `e2e/sheet`
-  holds it on the kit's long sheet, whose note is refused so, in Chromium and WebKit. **A footer is let go only when it leaves no room for the field typed in, in a sheet that scrolls**
+  holds both on the kit's long sheet, whose note is refused so, in Chromium and WebKit — the large text at
+  200 % on 320×360. **A footer is let go only when it leaves no room for the field typed in, in a sheet that scrolls**
   (`loose`, adversarial А1, round 2): over the keys of a turned phone the sheet has some 107 px, and
   the edit of a spending a footer of 121 — pinned, it covered the whole sheet and the sum being typed
   with it; the kit's one button, 77, left 29 px of a field of 44. Let go, it goes with the content as
