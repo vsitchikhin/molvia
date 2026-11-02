@@ -4,6 +4,8 @@ import {
   GATE_RATINGS_WINDOW_HOURS,
   GATE_RETURN_STOP_PERCENT,
   LOGIN_SECOND_WAY_PERCENT,
+  PICKS_CONSENT_EDITION,
+  PICKS_MEASURE_MIN_PAIRS,
   RECEIPT_EDITS_STOP_PERCENT,
   yerevanDate,
   yerevanMidnight,
@@ -14,6 +16,7 @@ import type {
   GatesReport,
   GatesWindow,
   LoginsInWindow,
+  PicksMeasured,
   ReceiptsInWindow,
   RemindersInWindow,
   TaxReceiptsInWindow,
@@ -168,6 +171,24 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     ...receiptLines(report.modelReceipts, '0.2r', '· read by the model (MOL-272)'),
     '',
     ...taxReceiptLines(report.taxReceipts),
+    '',
+    ...picksLines(report.picks),
+  ]
+}
+
+/**
+ * The pairs the search's memory is measured on (MOL-330, owner's В-2 «а»): read with every reading of gate
+ * 0.2, since the measure waits for them and closes with that gate if they never come. All of them at the
+ * moment of reading, not the window's; a trigger beside its `n`, no verdict.
+ */
+function picksLines({ pairs, people }: PicksMeasured): string[] {
+  return [
+    `0.2  ${'· pairs for the search memory (MOL-330)'.padEnd(47)}measured from ${String(PICKS_MEASURE_MIN_PAIRS)} pairs`,
+    row('pairs «query → item taken»', [
+      String(pairs),
+      `all, edition ${String(PICKS_CONSENT_EDITION)} accepted, statistics on`,
+    ]),
+    row('  people behind them', [String(people), '']),
   ]
 }
 

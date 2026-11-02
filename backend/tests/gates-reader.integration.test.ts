@@ -4,8 +4,9 @@
  */
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { sql } from 'drizzle-orm'
+import { PICKS_CONSENT_EDITION } from '@molvia/model'
 import { connectDrizzle } from './db'
-import { clearAll, insertCounted } from './fixtures'
+import { clearAll, insertActor, insertCounted, insertItem } from './fixtures'
 import { createGatesReader } from '@/db/gates-reader'
 import {
   erasures,
@@ -13,6 +14,7 @@ import {
   modelReceiptDays,
   receiptDays,
   reminderDays,
+  searchPicks,
   taxReceiptDays,
 } from '@/db/schema'
 
@@ -260,6 +262,36 @@ describe('the gates reader', () => {
       to: new Date('2026-10-08T00:00:00+04:00'),
     })
     expect(report.reminders).toMatchObject({ firstSteps: 0, items: 0, rated: 0, offBlocked: 0 })
+  })
+
+  // MOL-330: the pairs the search's memory is measured on — only of whoever accepted the edition that names the
+  // measure and keeps the statistics on; a pick on a twin is the survivor's pair; a person's own word is a pair.
+  it('counts the pairs of the search memory of those who accepted its edition and are counted', async () => {
+    const counted = { consentVersion: PICKS_CONSENT_EDITION, consentedAt: new Date() }
+    const milk = await insertItem(db)
+    const twin = await insertItem(db, { name: 'Молоко «Ашхар» 1 л', mergedInto: milk })
+    const kefir = await insertItem(db, { name: 'Кефир', searchKey: 'kefir' })
+    const first = await insertActor(db, counted)
+    const second = await insertActor(db, counted)
+    const before = await insertCounted(db, { consentVersion: PICKS_CONSENT_EDITION - 1 })
+    const none = await insertActor(db)
+    const off = await insertActor(db, { ...counted, analyticsOffAt: new Date() })
+    await db.insert(searchPicks).values([
+      { actorId: first, queryKey: 'moloko', itemId: milk, picks: 3 },
+      { actorId: first, queryKey: 'moloko', itemId: twin },
+      { actorId: first, queryKey: 'mol', itemId: milk },
+      { actorId: first, queryKey: 'kislomolochka', itemId: kefir, admits: true },
+      { actorId: second, queryKey: 'moloko', itemId: milk },
+      { actorId: before, queryKey: 'moloko', itemId: milk },
+      { actorId: none, queryKey: 'moloko', itemId: milk },
+      { actorId: off, queryKey: 'moloko', itemId: milk },
+    ])
+
+    expect((await reader.read(window)).picks).toEqual({ pairs: 4, people: 2 })
+  })
+
+  it('reads no pairs where there are none', async () => {
+    expect((await reader.read(window)).picks).toEqual({ pairs: 0, people: 0 })
   })
 
   it('reads inside a read-only, repeatable-read transaction', async () => {

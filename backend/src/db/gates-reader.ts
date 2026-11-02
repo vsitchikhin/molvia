@@ -1,11 +1,20 @@
 import { getTableColumns, sql } from 'drizzle-orm'
 import type { SQL, SQLWrapper } from 'drizzle-orm'
-import { GATE_RATINGS, GATE_RATINGS_WINDOW_HOURS } from '@molvia/model'
+import { GATE_RATINGS, GATE_RATINGS_WINDOW_HOURS, PICKS_CONSENT_EDITION } from '@molvia/model'
 import type { CohortReturn } from './events-repository'
 import type { Conn, Db } from './index'
 import type { CohortReached } from './verdicts-repository'
 import { createEventRepository } from './events-repository'
-import { loginDays, modelReceiptDays, receiptDays, reminderDays, taxReceiptDays } from './schema'
+import {
+  actors,
+  items,
+  loginDays,
+  modelReceiptDays,
+  receiptDays,
+  reminderDays,
+  searchPicks,
+  taxReceiptDays,
+} from './schema'
 import { createVerdictRepository } from './verdicts-repository'
 import { yerevanDay, yerevanWeek } from './yerevan-week'
 
@@ -28,6 +37,18 @@ export interface GatesReport {
   /** The same of the receipts the model read (MOL-272, В-6): `model_receipt_days`. */
   readonly modelReceipts: ReceiptsInWindow
   readonly taxReceipts: TaxReceiptsInWindow
+  readonly picks: PicksMeasured
+}
+
+/**
+ * The pairs «query → item taken» the measure of the search's memory may read (MOL-330): different pairs —
+ * a person, a key, the item it stands for now — of people who accepted `PICKS_CONSENT_EDITION` and have
+ * not turned the statistics off, and how many people stand behind them. Not of the window: pairs gather
+ * for as long as people type, so it is all of them at the moment of reading.
+ */
+export interface PicksMeasured {
+  readonly pairs: number
+  readonly people: number
 }
 
 /**
@@ -166,6 +187,7 @@ export function createGatesReader(db: Db): GatesReader {
             receipts: await receiptsIn(tx, from, to, receiptDays),
             modelReceipts: await receiptsIn(tx, from, to, modelReceiptDays),
             taxReceipts: await taxReceiptsIn(tx, from, to),
+            picks: await picksMeasured(tx),
           }
         },
         { isolationLevel: 'repeatable read', accessMode: 'read only' },
@@ -327,6 +349,23 @@ async function taxReceiptsIn(tx: Conn, from: Date, to: Date): Promise<TaxReceipt
     .where(sql`${day} between ${firstDay}::date and ${lastDay}::date`)
   // a sum over no rows is still one row: `coalesce` makes every one of them a zero
   return { firstDay, lastDay, ...theSums(row) }
+}
+
+async function picksMeasured(tx: Conn): Promise<PicksMeasured> {
+  // The item a pick stands for now, as the search reads it: two twins merged are one pair (MOL-106).
+  const [row] = await tx.execute<{ pairs: number; people: number }>(sql`
+    select count(*)::int as pairs, count(distinct p.actor_id)::int as people
+    from (
+      select distinct ${searchPicks.actorId} as actor_id, ${searchPicks.queryKey} as query_key,
+             coalesce(${items.mergedInto}, ${items.id}) as item_id
+      from ${searchPicks}
+      join ${items} on ${items.id} = ${searchPicks.itemId}
+      join ${actors} on ${actors.id} = ${searchPicks.actorId}
+      where ${actors.consentVersion} >= ${PICKS_CONSENT_EDITION}::int
+        and ${actors.analyticsOffAt} is null
+    ) p
+  `)
+  return { pairs: row?.pairs ?? 0, people: row?.people ?? 0 }
 }
 
 function theSums<T>(row: T | undefined): T {
