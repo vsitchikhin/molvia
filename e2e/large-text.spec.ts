@@ -851,6 +851,28 @@ for (const size of ['150%', '200%'])
       )
       await page.keyboard.press('Escape')
       await expect(page.locator('dialog[open]')).toHaveCount(0)
+      // The scale in the sheet of «Что брать»: its column is wide enough with no card's sides to take.
+      await page.goto('/')
+      const card = page.locator('button.tap').first()
+      await expect(card).toBeVisible()
+      // At 200 % the docked strip takes half the window, and a tap aimed by a script lands under it (MOL-321's price,
+      // `frontend.md`): the card is clicked as itself; the list may be answered again as it comes in, and a click on
+      // the card it replaced opens nothing.
+      await expect(async () => {
+        if ((await page.locator('dialog[open]').count()) === 0) await card.dispatchEvent('click')
+        await expect(page.locator('dialog[open]')).toHaveCount(1, { timeout: 1000 })
+      }).toPass()
+      const rating = page.locator('dialog[open]').last()
+      await expect(rating.locator('.scale .key')).toHaveCount(5)
+      await expect
+        .poll(() => rating.evaluate((dialog) => dialog.getAnimations({ subtree: true }).length))
+        .toBe(0)
+      await facesIn(page)
+      for (const key of await rating.locator('.scale .key').all())
+        expect((await key.boundingBox())!.width).toBeGreaterThanOrEqual(44)
+      expect(await rating.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)).toBe(0)
+      await page.keyboard.press('Escape')
+      await expect(page.locator('dialog[open]')).toHaveCount(0)
       await page.goto('/purchases/manual')
       expect(await sheetSideways(page, page.getByRole('button', { name: 'Закончить' }))).toBe(0)
       await page.goto('/settings')
