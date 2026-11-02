@@ -708,8 +708,9 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   the button takes**, not by a key (Р3-А1): a recent one tapped and then gone from the server's list waits
   for a shop again; **and «today» is asked as it opens, as a day is typed, at the tap and at the phone's
   midnight while it is up** (Р3-А2, Р4-А1, Р5-А1), or the phone's today after midnight was refused at the tap as
-  a day still to come, and marked so before it; a phone asleep over the midnight is caught by the app back in
-  view (`useLocalDay`), not by the timer, which a sleeping phone holds; the action's word («Записать сумму») comes
+  a day still to come, and marked so before it — the midnight by `useLocalDay`'s own timer since MOL-329, the
+  sheet keeping none of its own; a phone asleep over the midnight is caught by the app back in view, not by the
+  timer, which a sleeping phone holds; the action's word («Записать сумму») comes
   once a shop is named, as «Перевести» and a verdict's say what they wait for. **The price, named:** a card of
   «Оценки» back from the queue refused opens with the focus on its title (`focusOnMount`) and its error in the
   field — a queue's answer, not a refusal at a send. **The checkbox is
@@ -1075,7 +1076,10 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   never the month that moved under the thumb; **and the month shown is read again after it** (`useKeptAnswer.written`,
   adversarial Г1): a plan from September on holds in October, and the answer of the write is September's.
   **A version of an amendment says its year** — «до 25 сент. 2025 г.: … · 16 сент. 2025 г.» in the sheets of an
-  exchange and an income (adversarial Г2): a journal of them goes back across years. **The prices, named:** a page put away is held by the browser, and its timer with it — coming back
+  exchange and an income (adversarial Г2): a journal of them goes back across years. **A phrase that puts its own word
+  before the day takes a date, never «вчера»** (`dateOfAnyYear`, adversarial Д1, the rule of «Раньше …», MOL-204
+  Р-9): «до 1 нояб.: …» of a version, «Чек от 30 окт., 23:30» and «Фото от …» of «Покупки»; a day said with no word
+  before it keeps its «вчера» — «отправлен вчера», «записан вчера», «покупки на вчера, 23:40». **The prices, named:** a page put away is held by the browser, and its timer with it — coming back
   into view looks again; a screen's day ahead of a phone whose clock was set back stays ahead until the next look; and
   one test is green on master too, a guard of the rule — the search's strip of «Что брать» on return, redrawn there by
   the read the return makes (the strip of «Покупки» on return, the same, is an assertion inside a test red on master).
