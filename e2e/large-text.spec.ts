@@ -4,7 +4,7 @@ import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
-import { facesIn } from './scroll'
+import { facesIn, stillIn } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 /**
@@ -292,11 +292,15 @@ async function aReceipt(page: Page, ru: boolean): Promise<void> {
     })
   const edges = page.locator('dialog[open]').filter({ hasText: L('Края чека', 'Receipt edges') })
   await expect(edges).toBeVisible()
-  // Until it has risen a sheet takes no tap (MOL-69).
-  await page.waitForTimeout(400)
+  // Until it has risen a sheet takes no tap, and then for a double tap's floor (MOL-69), as `receipts.spec` waits.
+  const risen = async (sheet: Locator): Promise<void> => {
+    await stillIn(sheet)
+    await page.waitForTimeout(350)
+  }
+  await risen(edges)
   await edges.getByRole('button', { name: L('Готово', 'Done') }).click()
   await expect(edges).toHaveCount(0)
-  await page.waitForTimeout(400)
+  await risen(page.locator('dialog[open]').last())
   await page.getByRole('button', { name: L('Отправить чек', 'Send receipt') }).click()
   await expect(page.locator('dialog[open]')).toHaveCount(0)
   const parsed = async (): Promise<string | null> => {
@@ -805,6 +809,7 @@ for (const size of ['150%', '200%'])
       await page.goto('/purchases/manual')
       await expect(page.locator('.dock button').first()).toBeVisible()
       await facesIn(page)
+      await stillIn(page.locator('.dock'))
       for (const button of await page.locator('.dock button').all())
         expect(
           (await button.boundingBox())!.x + (await button.boundingBox())!.width,
@@ -814,6 +819,7 @@ for (const size of ['150%', '200%'])
       const keys = page.locator('.scale .key')
       await expect(keys).toHaveCount(5)
       await facesIn(page)
+      await stillIn(page.locator('.verdict'))
       const boxes = await keys.evaluateAll((all) =>
         all.map((key) => key.getBoundingClientRect().toJSON() as DOMRect),
       )
