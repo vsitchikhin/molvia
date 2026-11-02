@@ -1076,7 +1076,9 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   never the month that moved under the thumb; **and the month shown is read again after it** (`useKeptAnswer.written`,
   adversarial Г1): a plan from September on holds in October, and the answer of the write is September's.
   **A version of an amendment says its year** — «до 25 сент. 2025 г.: … · 16 сент. 2025 г.» in the sheets of an
-  exchange and an income (adversarial Г2): a journal of them goes back across years. **A phrase that puts its own word
+  exchange and an income (adversarial Г2): a journal of them goes back across years. **So does a purchase waiting for its
+  rating** — the card of «Оценки» and «последняя — {when}» of «Покупки» are `dayOfAnyYear` (adversarial Е1): the queue
+  has no window by age, and «14 окт.» of last year read as this one. **A phrase that puts its own word
   before the day takes a date, never «вчера»** (`dateOfAnyYear`, adversarial Д1, the rule of «Раньше …», MOL-204
   Р-9): «до 1 нояб.: …» of a version, «Чек от 30 окт., 23:30» and «Фото от …» of «Покупки»; a day said with no word
   before it keeps its «вчера» — «отправлен вчера», «записан вчера», «покупки на вчера, 23:40». **The prices, named:** a page put away is held by the browser, and its timer with it — coming back
