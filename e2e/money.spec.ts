@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { fakeKeyboard } from './keyboard'
-import { facesIn, standAt, topOf } from './scroll'
+import { facesIn, standAt, stillIn, topOf } from './scroll'
 import { asBrowser, launchOffline, signedIn } from './session'
 import { chooseCategory } from './category'
 import { fillDetails, openDetails } from './spending-details'
@@ -82,6 +82,7 @@ test('a spending lands in the month, and a removal comes back with «Верну�
   await page.waitForTimeout(1000)
   // One place (Ф-29): 8 over the strip, and «Добавить трату» whole under it and the one tapped.
   const add = page.getByRole('button', { name: 'Добавить трату' })
+  await stillIn(page.locator('.undo-strip'), page.locator('.dock'))
   const [strip, dock, added] = await Promise.all([
     page.locator('.undo-strip').boundingBox(),
     page.locator('.dock').boundingBox(),

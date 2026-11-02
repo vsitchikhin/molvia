@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
-import { standAt, topOf } from './scroll'
+import { standAt, stillIn, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -337,6 +337,7 @@ test('an exchange is removed from its amendment, the question over it, «Вер�
   await expect(undo).toContainText('Обмен удалён: 20 000 ₽ → 95 000 ֏')
   const restore = undo.getByRole('button', { name: 'Вернуть' })
   await expect(restore).toBeFocused()
+  await stillIn(undo, page.locator('.dock'))
   const [strip, dock] = await Promise.all([undo.boundingBox(), page.locator('.dock').boundingBox()])
   expect((strip?.y ?? 0) + (strip?.height ?? 0)).toBeLessThanOrEqual(dock?.y ?? 0)
 
