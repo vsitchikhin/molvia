@@ -620,11 +620,13 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `minmax(0, 1fr)`; a name kept on one line — a row of chips, a cut name — has no width of its own
   (`contain: inline-size`), and words that may hold a name break it (`overflow-wrap: anywhere`) — a grid
   column of `auto` takes the least width of what stands in it, and a name is forty letters of one word.
-- **Nor does large text on «Деньги», «Настройки» and a newcomer's «Что брать»** (MOL-321; the rest — MOL-334):
-  Android's 150 % and 200 % on 320 stand within the phone (`e2e/large-text.spec.ts`). A row of segments its words
-  do not fit stands them one under another, the word whole; what stands beside something turns by `@container`
-  in `rem`; a card's figure shrinks to its card by its length (`figure-fit`); a line wraps only where the least
-  widths do not fit, and a hyphen comes only with large text (`data-large-text`) — so 100 % keeps its look.
+- **Nor does large text, anywhere in the app** (MOL-321, MOL-334): Android's 150 % and 200 % on 320 stand within the
+  phone (`e2e/large-text.spec.ts`), and the system's font size is the root's (`<meta name="text-scale">`, Chrome 146+,
+  owner's В-1 «а»), so no stylesheet sets the root's `font-size`. A row of segments its words do not fit stands them
+  one under another, the word whole; what stands beside something turns by `@container` in `rem`; a card's figure
+  shrinks to its card by its length (`figure-fit`); a line wraps only where the least widths do not fit; a word wider
+  than its line breaks (`overflow-wrap: break-word` on `body`), with a hyphen from six letters only while the text is
+  large (`data-large-text`) — so 100 % keeps its look; a key of the 1–5 scale is never under 44 px.
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
   history, and puts the page back — and focus, wherever the platform gave it — by what it was
   opened from (MOL-63, MOL-80). **Its press is heard on the document**: iOS hands a tap on the
