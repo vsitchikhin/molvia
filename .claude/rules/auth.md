@@ -63,7 +63,9 @@ is in `bot.md`.
   those paths — no route, a path that does not decode. The bot uses a separate `BOT_API_SECRET`,
   never the Telegram token; Caddy additionally blocks its internal paths from outside.
   **Thirty starts in a rolling minute, across the database**, including consumed requests:
-  the quota is serialized with an advisory lock. Its shared denial-of-service price is accepted.
+  the quota is serialized with an advisory lock. Its shared denial-of-service price was accepted while only
+  the owner was on production; the audit before 0.2 reopened it — one `curl` holds the door shut for everyone —
+  and a quota per address is to replace it before `v0.2.0` (MOL-287 Ф-1, MOL-359, `security.md`).
   Expired requests are removed at start, at boot and every minute; no login writes `events`.
 - **What became of every login is counted as it happens, into `login_days` (MOL-68).** Nothing is
   left to count afterwards: «Это не я» and a collected session only put a request out, and the
