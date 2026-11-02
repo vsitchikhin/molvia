@@ -21,7 +21,12 @@
       <span class="sum" :class="{ guess: flipped }" :style="figureChars(big)">{{ big }}</span>
       <!-- Money paid in another currency — and, flipped, the exact sum — under the figure on a line of
            its own: beside «≈» in the same currency it read «1 000 ₽ ≈ 1 347 ₽» (adversarial А4). -->
-      <span v-if="rest.length > 0" class="line">{{ rest.join(' · ') }}</span>
+      <span v-if="rest.length > 0" class="line"
+        ><template v-for="(sum, index) in rest" :key="sum"
+          ><template v-if="index > 0"> · </template
+          ><span class="money" :style="figureChars(sum, 'text')">{{ sum }}</span></template
+        ></span
+      >
       <!-- One line of parts, every figure with its words (Ф-23): what the prices say beside a receipt's
            sum (MOL-207), how much has a price, «≈» and the rate. -->
       <span v-if="parts.length > 0" class="line">
@@ -187,6 +192,15 @@ export default defineComponent({
 /* At the leading of the skeleton's line, so the card is as tall as its bars (MOL-178). */
 .line {
   line-height: var(--leading-snug);
+}
+
+/* Each sum of another currency whole, shrunk to the card where even the card is narrower (`figure-fit`, MOL-321):
+   at 200 % «1 234 567,89 ₽» broke before its sign, «₽1,234,567.8 / 9» in English (adversarial С1). The line breaks
+   between the sums. */
+.money {
+  @include figure-fit(1em);
+
+  white-space: nowrap;
 }
 
 /* A part of the rate, «≈» or «С ценой» is whole (review 3, №2), a phrase of the receipt wraps between

@@ -52,18 +52,30 @@
             data-hint="item"
           >
             <component :is="itemHint.icon" class="hint-icon" aria-hidden="true" />
-            <span>{{ itemHint.text }}</span>
+            <span
+              >{{ itemHint.parts.before
+              }}<span class="money" :style="figureChars(itemHint.parts.figure, 'text')">{{
+                itemHint.parts.figure
+              }}</span
+              >{{ itemHint.parts.after }}</span
+            >
           </p>
         </AppReveal>
         <AppReveal>
           <p
             v-if="alternativeHint"
-            :key="alternativeHint"
+            :key="alternativeHint.text"
             class="hint hint-alternative"
             data-hint="alternative"
           >
             <IconSwapHorizontal class="hint-icon" aria-hidden="true" />
-            <span>{{ alternativeHint }}</span>
+            <span
+              >{{ alternativeHint.parts.before
+              }}<span class="money" :style="figureChars(alternativeHint.parts.figure, 'text')">{{
+                alternativeHint.parts.figure
+              }}</span
+              >{{ alternativeHint.parts.after }}</span
+            >
           </p>
         </AppReveal>
       </div>
@@ -161,7 +173,7 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { formatRating, unitPriceText } from '@/components/adviceRow'
-import { figureChars } from '@/components/figure'
+import { aroundFigure, figureChars } from '@/components/figure'
 import { useCheaperHint } from '@/composables/useCheaperHint'
 import type { HintRecord } from '@/composables/useCheaperHint'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
@@ -375,22 +387,26 @@ export default defineComponent({
         price: unitPriceText(item.place.unitPrice, t, locale.value),
         day: shortDay(item.place.day),
       }
+      const text = t(`item.cheaper.${item.kind}${item.here ? '_here' : ''}`, named)
       return {
         kind: item.kind,
         icon: HINT_ICONS[item.kind],
-        text: t(`item.cheaper.${item.kind}${item.here ? '_here' : ''}`, named),
+        text,
+        parts: aroundFigure(text, named.price),
       }
     })
     const alternativeHint = computed(() => {
       const other = hint.value.alternative
       if (!other) return null
-      return t('item.cheaper.alternative', {
+      const price = unitPriceText(other.place.unitPrice, t, locale.value)
+      const text = t('item.cheaper.alternative', {
         name: other.name,
-        price: unitPriceText(other.place.unitPrice, t, locale.value),
+        price,
         place: other.place.name,
         day: shortDay(other.place.day),
         rating: formatRating(other.rating, locale.value),
       })
+      return { text, parts: aroundFigure(text, price) }
     })
 
     // Read out through the app's one live region, not a region of its own born with the sheet —
@@ -400,7 +416,7 @@ export default defineComponent({
       [
         perUnit.value ? t('item.unit_price_announced', { value: perUnit.value }) : null,
         itemHint.value?.text ?? null,
-        alternativeHint.value,
+        alternativeHint.value?.text ?? null,
       ]
         .filter((line) => line !== null)
         .join('. '),
@@ -688,6 +704,15 @@ export default defineComponent({
   font-size: var(--text-footnote);
   line-height: var(--leading-snug);
   overflow-wrap: anywhere;
+  container-type: inline-size;
+}
+
+/* The price whole in the words around it, shrunk to the line less the icon where even the line is narrower
+   (`figure-fit`, MOL-334, owner's В-6 «а»): at 200 % «125 403,50 ֏/кг» broke as «125 403,50 / ֏/кг». */
+.money {
+  @include figure-fit(1em, $less: calc(var(--icon-sm) + var(--space-2)));
+
+  white-space: nowrap;
 }
 
 .hint-icon {

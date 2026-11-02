@@ -11,7 +11,13 @@
       ><span class="name">{{ row.name }}</span></template
     >
     <template v-if="meta" #meta
-      ><span class="quantity">{{ meta }}</span></template
+      ><span class="quantity"
+        >{{ metaParts.before
+        }}<span class="money" :style="figureChars(metaParts.figure, 'text')">{{
+          metaParts.figure
+        }}</span
+        >{{ metaParts.after }}</span
+      ></template
     >
     <template v-if="row.mark || row.expense?.printed" #below>
       <AppTag v-if="row.mark" tone="warn">{{ t(`trip.queued.${row.mark}`) }}</AppTag>
@@ -32,7 +38,7 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatMoney, formatQuantity, formatUnitPrice } from '@molvia/model'
 import AppTag from '@/components/AppTag.vue'
-import { figureChars } from '@/components/figure'
+import { aroundFigure, figureChars } from '@/components/figure'
 import ListRow from '@/components/ListRow.vue'
 import type { TripRowView } from './tripRow'
 
@@ -83,13 +89,13 @@ export default defineComponent({
       props.row.amount ? formatMoney(props.row.amount, locale.value) : null,
     )
 
+    const perUnitAmount = computed(() =>
+      props.row.unitPrice ? formatUnitPrice(props.row.unitPrice, locale.value) : '',
+    )
     const perUnit = computed(() => {
       const price = props.row.unitPrice
       return price
-        ? t('trip.unit_price', {
-            amount: formatUnitPrice(price, locale.value),
-            unit: t(`item.unit_${price.unit}`),
-          })
+        ? t('trip.unit_price', { amount: perUnitAmount.value, unit: t(`item.unit_${price.unit}`) })
         : null
     })
 
@@ -100,7 +106,12 @@ export default defineComponent({
         .join(' · '),
     )
 
-    return { t, open, meta, amount, figureChars }
+    /** The price per unit a piece of its own in the meta, whole and shrunk to the row (MOL-334, В-6 «а»). */
+    const metaParts = computed(() =>
+      aroundFigure(meta.value, amount.value ? perUnitAmount.value : ''),
+    )
+
+    return { t, open, meta, metaParts, amount, figureChars }
   },
 })
 </script>
@@ -122,6 +133,15 @@ export default defineComponent({
 .quantity,
 .amount {
   font-variant-numeric: tabular-nums;
+}
+
+/* The price per unit in the meta whole, shrunk to the words' column where even that is narrower (`figure-fit`,
+   MOL-334, owner's В-6 «а»): at 200 % «125 403,50 ֏ за л» broke as «125 403, / 50 ֏» in a column of 126 px — the row
+   less its padding, the chevron and its gap. */
+.money {
+  @include figure-fit(1em, $less: calc(2 * var(--space-4) + var(--icon) + var(--space-3)));
+
+  white-space: nowrap;
 }
 
 /* Never broken, and shrunk to the row less its padding where even the whole row is narrower, as an

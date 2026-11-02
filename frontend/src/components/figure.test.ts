@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { figureChars } from '@/components/figure'
+import { aroundFigure, figureChars } from '@/components/figure'
 
 const width = (text: string) => Number(Object.values(figureChars(text) as object)[0])
 
@@ -41,5 +41,35 @@ describe('figureChars (MOL-321)', () => {
 
   it('takes a character it does not know as a capital, the widest a figure holds', () => {
     expect(width('Q')).toBeGreaterThan(width('8'))
+  })
+})
+
+describe('aroundFigure (MOL-334)', () => {
+  it('cuts a phrase around its sum, the words on either side kept as they are', () => {
+    expect(
+      aroundFigure('В Ереван Сити брали по 125 403,50 ֏/кг — 03.11', '125 403,50 ֏/кг'),
+    ).toEqual({
+      before: 'В Ереван Сити брали по ',
+      figure: '125 403,50 ֏/кг',
+      after: ' — 03.11',
+    })
+  })
+
+  it('takes the first place the sum stands, and a sum at the very start or end', () => {
+    expect(aroundFigure('500 ֏ и 500 ֏', '500 ֏')).toEqual({
+      before: '',
+      figure: '500 ֏',
+      after: ' и 500 ֏',
+    })
+    expect(aroundFigure('1 л · 500 ֏', '500 ֏')).toEqual({
+      before: '1 л · ',
+      figure: '500 ֏',
+      after: '',
+    })
+  })
+
+  it('must not cut a phrase without the sum, nor around an empty one', () => {
+    expect(aroundFigure('без цены', '500 ֏')).toEqual({ before: 'без цены', figure: '', after: '' })
+    expect(aroundFigure('без цены', '')).toEqual({ before: 'без цены', figure: '', after: '' })
   })
 })
