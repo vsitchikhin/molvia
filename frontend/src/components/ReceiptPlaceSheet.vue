@@ -281,6 +281,8 @@ export default defineComponent({
         const place: PlaceDraft | null =
           picked.value ??
           (fresh.value && typedName.value ? { name: typedName.value, city: city.value } : null)
+        // «today» asked at the tap too: a day typed before the phone's midnight and pressed after it (Р4-А1)
+        today.value = localDay()
         // a shop named in what the server would not keep — a character no place takes
         nameBad.value =
           !picked.value &&

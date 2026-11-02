@@ -188,6 +188,22 @@ describe('ReceiptPlaceSheet (MOL-127): the day of the purchases', () => {
     expect(chosen.map(([, on]) => on)).toEqual(['2026-10-04'])
   })
 
+  // And at the tap (adversarial Р4-А1 of MOL-333): a day typed before the phone's midnight, rightly
+  // marked then, and tapped after it is today's.
+  it('a day typed before the phone’s midnight and tapped after it is taken', async () => {
+    vi.setSystemTime(new Date('2026-10-03T23:58:00Z'))
+    const { view, chosen } = await render('2026-10-03')
+    vi.setSystemTime(new Date('2026-10-03T23:59:00Z'))
+    const field = dayField()
+    field.value = '2026-10-04'
+    field.dispatchEvent(new Event('input'))
+    await flushPromises()
+    expect(field.getAttribute('aria-invalid')).toBe('true')
+    vi.setSystemTime(new Date('2026-10-04T00:01:00Z'))
+    await press(view)
+    expect(chosen.map(([, on]) => on)).toEqual(['2026-10-04'])
+  })
+
   // A shop is chosen by the place the button takes (adversarial Р3-А1 of MOL-333): a recent one tapped and
   // then gone from the server's list left its key, and the button said the action's word over nothing.
   it('a recent shop chosen, then gone from the server’s list: the button waits for a shop again', async () => {
