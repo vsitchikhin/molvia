@@ -64,10 +64,14 @@ file holds what belongs to no single area, and what the audit found missing.
   `.env.prod.example`, in the same pull request. **The database's password lives in its volume too**, so
   changing the line alone breaks the API, and it takes only what a URL takes bare — compose puts it into
   `DATABASE_URL` as it is (drilled and attacked, MOL-287). **A secret never goes on a command line**: argv
-  is everybody's in `ps`, and the history keeps it on the machine that leaked.
+  is everybody's in `ps`, and the history keeps it on the machine that leaked. Typed at `read -rs`, it goes
+  into a pipe, a heredoc, a shell builtin or a command's environment — never its arguments, a variable's
+  expansion included (MOL-287, adversarial Р2-А2).
 - **The images are public** (ghcr, pulled anonymously): nothing secret goes into a layer, a build argument
-  or the PWA's bundle — the audit read all five images and the bundle. A secret reaches a container only
-  through compose's environment from `.env.prod` on the machine.
+  or the PWA's bundle — the audit read all six images and the bundle. A secret reaches a container only
+  through compose's environment from `.env.prod` on the machine. **The machine has no login to the
+  registry**, so a new image's package is made public before its first rollout — GitHub creates it
+  private.
 - **The repository is public, its history and every pull request's ref included**: a token committed is
   read before it is removed, and a force push removes nothing (`CLAUDE.md`). A secret found there is
   rotated, never rewritten out. gitleaks over the whole history found none (MOL-287); a guard in CI is

@@ -11,9 +11,10 @@ same machine and the same network; only Caddy is reachable from outside.
 3. Copy two files across: `docker-compose.prod.yml` and a filled-in `.env.prod`
    (see `.env.prod.example`). The source tree is not needed — images come from the
    registry.
-4. Log the machine in to the registry once:
-   `echo <token> | docker login ghcr.io -u <user> --password-stdin`
-   The token needs `read:packages` and nothing else.
+4. No login to the registry: the packages on GHCR are public, and the machine pulls with none
+   (MOL-287). **A new image's package is made public before its first rollout** — GitHub creates
+   a package private — or the machine cannot pull it, and for `grafana` and `victoria`, which never
+   judge a rollout, the metrics would stay on the old tag in silence.
 5. Give the journal its term — **logs live fourteen days** (MOL-58). Every container logs to
    journald (`docker-compose.prod.yml`, `x-logging`), and the term is the host's:
 
@@ -699,8 +700,17 @@ key never comes to this machine — a compromised server cannot read old copies.
    ```bash
    read -rs -p 'Access key id: ' AK; echo; read -rs -p 'Secret access key: ' SK; echo
    read -r -p 'Endpoint (https://<account>.eu.r2.cloudflarestorage.com): ' EP
-   rclone config create r2 s3 provider=Cloudflare access_key_id="$AK" \
-     secret_access_key="$SK" endpoint="$EP" no_check_bucket=true no_head=true
+   (umask 077; mkdir -p ~/.config/rclone; cat > ~/.config/rclone/rclone.conf <<CONF
+   [r2]
+   type = s3
+   provider = Cloudflare
+   access_key_id = $AK
+   secret_access_key = $SK
+   endpoint = $EP
+   no_check_bucket = true
+   no_head = true
+   CONF
+   )
    unset AK SK EP
    ```
 
@@ -740,7 +750,7 @@ is 0.2's question, with the lawyer («Персональные данные», s
 
 **What is not copied, on purpose:** `.env.prod`. Nothing in it is lost with the machine — the
 database password and `BOT_API_SECRET` are generated anew, BotFather shows the bot's token
-(`/mybots` → API Token), the GHCR token is issued anew. Images are in GHCR, code in git.
+(`/mybots` → API Token). Images are in GHCR, public, code in git.
 
 ## Rotating the secrets (MOL-287)
 
@@ -751,8 +761,10 @@ when it is recreated, and compose recreates every service whose environment chan
 named on the command line takes the services it depends on with it** when theirs changed too.
 `$C` below is `docker compose -f docker-compose.prod.yml --env-file .env.prod`, run in `~/molvia`.
 **A secret never goes on a command line**: argv is read by every user of the machine in `ps`, and
-the shell's history keeps it on the disk of the very machine that leaked — a value is read from a
-prompt or kept in a shell variable, as `deploy/grafana/start.sh` passes its password by stdin.
+the shell's history keeps it on the disk of the very machine that leaked. A value is typed at a
+prompt (`read -rs`) and then goes **into a pipe, a heredoc, a shell builtin or a command's
+environment — never its arguments, a variable's expansion included**: `"$X"` handed to an outside
+command is in its argv while it runs. `deploy/grafana/start.sh` passes its password by stdin.
 
 **Drilled on the production stack run locally** (MOL-287, the images of `sha-3e04137`): the
 database's password, `BOT_API_SECRET`, Grafana's password. The rest are other services' consoles,
@@ -804,7 +816,8 @@ written as their documentation has them and not drilled.
 - **`GRAFANA_ADMIN_PASSWORD`** (drilled): the line, then `$C up -d grafana` — `start.sh` sets the
   admin's password from it at every start, and stops Grafana if it cannot. Then the old one is refused:
   `curl -s -o /dev/null -w '%{http_code}' -u admin:<old> http://127.0.0.1:3000/api/user` answers
-  `401` (type the old one at a prompt: `read -rs OLD`, then `-u "admin:$OLD"`).
+  `401` — the old one typed at `read -rs OLD` and handed to curl by stdin:
+  `printf 'user = "admin:%s"\n' "$OLD" | curl -K - -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/user`.
 - **`TELEGRAM_BOT_TOKEN`**: BotFather → `/revoke` for `@molvia_bot` — the old token dies there — the
   new one into `.env.prod`, `$C up -d bot`. Until the bot is back nobody can sign in; the bot exits on a
   revoked token (`401`) rather than retrying, so a restart loop says the line was not changed.
@@ -826,19 +839,25 @@ written as their documentation has them and not drilled.
   environment's secret replaced, one rollout seen green, then the old line removed.
 - **`CLOUDFLARE_API_TOKEN`**: Cloudflare → My Profile → API Tokens → «Roll» on the token — the same
   permissions, «Workers Scripts: Edit» — and `gh secret set CLOUDFLARE_API_TOKEN --env production`.
-- **The GHCR token**: the packages are public — an image is pulled with no login (MOL-287) — so the
-  login of step 4 of «Once, on a new machine» guards nothing: `docker logout ghcr.io` on the machine
-  and the token deleted in GitHub, and there is nothing left to rotate.
-- **R2**: a new API token for the bucket in Cloudflare, `rclone config update r2 access_key_id=…
-secret_access_key=…` on the machine (typed at `rclone config`'s prompt, not as arguments),
-  `sudo systemctl start molvia-backup.service` seen green in healthchecks.io, then the old token deleted.
+- **The GHCR token**: the packages are public — all six images are pulled with no login (MOL-287) —
+  so a login the machine still holds guards nothing: `docker logout ghcr.io` on it, the token deleted
+  in GitHub, and there is nothing left to rotate («Once, on a new machine», step 4).
+- **R2**: a new API token for the bucket in Cloudflare; on the machine the two keys typed at
+  `read -rs AK`, `read -rs SK` and written into the file by the environment,
+  `AK="$AK" SK="$SK" perl -pi -e 's/^access_key_id = .*/access_key_id = $ENV{AK}/; s/^secret_access_key = .*/secret_access_key = $ENV{SK}/' ~/.config/rclone/rclone.conf`
+  — `rclone config update … secret_access_key=…` would put the key in argv; then
+  `sudo systemctl start molvia-backup.service` seen green in healthchecks.io, and the old token deleted.
 - **The age key**: `restore.sh` reads one file, `~/.config/molvia/backup.key` (`AGE_KEY`), and age
   tries every key in it. So the new key goes **into that file, beside the old one**:
   `age-keygen >> ~/.config/molvia/backup.key` (it prints the public key), the public key into
   `AGE_RECIPIENT` of `backup.env`, and `restore.sh --drill` the next morning reads the new copy.
   **The old key stays in the file fourteen days** — the copies in R2 encrypted to it live that long —
   then its three lines are removed. A new file in place of the old one leaves every copy before it
-  unreadable; a key beside it under another name is a key `restore.sh` never reads.
+  unreadable; a key beside it under another name is a key `restore.sh` never reads. **The copy in the
+  password manager is the second half of the key** («Restoring», above) and is replaced by the file
+  as it now is, both keys — and again when the old one goes. Left as it was, it reads no copy made
+  after the rotation, and fourteen days on none at all: a Mac lost then — the very machine a leak
+  puts in doubt — leaves every copy noise.
 - **People's sessions**, when a token may have leaked from the database:
   `$C exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "delete from sessions; delete from login_requests"'`
   — revoking is deleting the row (`auth.md`), so every device gets `401` and the login screen on its
