@@ -1253,3 +1253,82 @@ describe('the account’s sheet over a page kept from before (MOL-196, adversari
     expect(nowOf(view)).toBe('now ֏98,000')
   })
 })
+
+// MOL-329, adversarial А1, А5: the balances' age and the day an account was put away are said from the
+// screen's day — `answeredAt`, a date with its year when another — never the clock's default or `Intl` in place.
+describe('the screen`s day (MOL-329)', () => {
+  const READ = new Date('2026-10-30T23:40:00.000Z')
+  const BEFORE = new Date('2026-10-30T23:50:00.000Z')
+  const AFTER = new Date('2026-10-31T00:10:00.000Z')
+  const offline = () => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  const stripText = (view: VueWrapper) => view.getComponent(StatusStrip).props('text') as string
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('А1: a page kept from another year says its year, on «Счета» and on the account', async () => {
+    useAccountsStore(session()).accept(page([cash()], new Date('2025-09-26T10:05:00Z')))
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const list = await open(AccountsView, '/money/accounts', session())
+    expect(stripText(list)).toMatch(/^The server did not answer · balances as of Sep 26, 2025, /)
+
+    rememberJournal(OWNER, journal(cash(), [spendingRow(TAXI, '-500', CASH)]))
+    offline()
+    moneyAccounts.mockRejectedValue(new TypeError('Failed to fetch'))
+    accountJournal.mockRejectedValue(new TypeError('Failed to fetch'))
+    const account = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(stripText(account)).toMatch(/^Offline · balances as of Sep 26, 2025, /)
+  })
+
+  it('А1: the account offline — «today» at 23:50, «yesterday» once the app is back after midnight', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(BEFORE)
+    useAccountsStore(session()).accept(page([cash()], READ))
+    rememberJournal(OWNER, journal(cash(), [spendingRow(TAXI, '-500', CASH)]))
+    offline()
+    moneyAccounts.mockRejectedValue(new TypeError('Failed to fetch'))
+    accountJournal.mockRejectedValue(new TypeError('Failed to fetch'))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(stripText(view)).toBe('Offline · balances as of today, 11:40 PM')
+
+    vi.setSystemTime(AFTER)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await settle()
+    expect(stripText(view)).toBe('Offline · balances as of yesterday, 11:40 PM')
+  })
+
+  it('А1: the account, server silent — a failed read on return says «yesterday» too', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(BEFORE)
+    useAccountsStore(session()).accept(page([cash()], READ))
+    rememberJournal(OWNER, journal(cash(), [spendingRow(TAXI, '-500', CASH)]))
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    accountJournal.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(stripText(view)).toBe('The server did not answer · balances as of today, 11:40 PM')
+
+    vi.setSystemTime(AFTER)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await settle()
+    expect(stripText(view)).toBe('The server did not answer · balances as of yesterday, 11:40 PM')
+  })
+
+  it('А5: an account put away last year says the year, on its screen and in the list', async () => {
+    const removed = cash({ archivedAt: new Date('2025-09-21T10:00:00Z') })
+    moneyAccounts.mockResolvedValue(page([removed]))
+    accountJournal.mockResolvedValue(journal(removed, []))
+    const account = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(account.get('.balance ~ .note').text()).toContain('September 21, 2025')
+
+    moneyAccounts.mockResolvedValue(page([removed, cash({ id: OTHER, name: 'Card ֏' })]))
+    const list = await open(AccountsView, '/money/accounts', session())
+    await list
+      .findAll('button')
+      .find((one) => one.attributes('aria-expanded') !== undefined)
+      ?.trigger('click')
+    await settle()
+    // The date is kept whole on its line by no-break spaces (`whole`).
+    expect(list.text().replaceAll('\u00a0', ' ')).toMatch(/put away Sep 21, 2025/)
+  })
+})

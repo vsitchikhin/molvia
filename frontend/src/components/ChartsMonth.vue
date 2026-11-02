@@ -105,14 +105,13 @@ import DeviationBars from '@/components/DeviationBars.vue'
 import DonutChart from '@/components/DonutChart.vue'
 import PaceLine from '@/components/PaceLine.vue'
 import ScreenState from '@/components/ScreenState.vue'
-import { countedWhen } from '@/components/accounts'
 import { figureChars } from '@/components/figure'
 import { longMonth, monthGenitive, signedPercent } from '@/components/charts'
 import SectionCaption from '@/components/SectionCaption.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { useMoneyChartMonth } from '@/composables/useMoneyCharts'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { calendarDay } from '@/days'
+import { answeredAt, calendarDay } from '@/days'
 
 /**
  * «Графики → Месяц» (MOL-158, handoff MOL-157 03): where the month went, what went past the usual
@@ -156,7 +155,7 @@ export default defineComponent({
     )
 
     const whole = (value: Money) => formatEstimate(value, locale.value)
-    const when = (at: Date) => countedWhen(at, locale.value)
+    const when = (at: Date) => answeredAt(at, locale.value, today.value)
     const nameOf = (category: SpendingCategoryView) =>
       category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
 

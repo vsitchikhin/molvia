@@ -15,7 +15,7 @@ import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { spendingLook, tripIcon, tripTint, unbroken } from '@/components/spending'
 import type { OperationRowProps, Translate } from '@/components/spending'
-import { calendarDay, timeOfDay } from '@/days'
+import { calendarDay } from '@/days'
 
 /** The minus of a figure — U+2212, never the hyphen `Intl` prints (handoff 01, 08). */
 const MINUS = '\u2212'
@@ -54,17 +54,6 @@ export function parseSigned(text: string, currency: Currency): Money | null {
 /** «16 сент.» — a day of an account, its start or its check. */
 export function shortDay(day: string, locale: string): string {
   return calendarDay(day, locale, { day: 'numeric', month: 'short' })
-}
-
-/**
- * When the balances on screen were counted — «14:05» today, «25 сент., 14:05» before: offline the
- * age of the figures is said exactly (handoff 02, «на 14:05»).
- */
-export function countedWhen(at: Date, locale: string, now = new Date()): string {
-  const time = timeOfDay(at, locale)
-  if (at.toDateString() === now.toDateString()) return time
-  const day = new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(at)
-  return `${day}, ${time}`
 }
 
 /**

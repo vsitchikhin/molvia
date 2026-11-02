@@ -171,6 +171,7 @@
 </template>
 
 <script lang="ts">
+import { useLocalDay } from '@/composables/useLocalDay'
 import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -207,7 +208,7 @@ import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { shown } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTransfers } from '@/composables/useTransfers'
-import { localDay } from '@/days'
+import { dateOfAnyYear, localDay } from '@/days'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
@@ -271,7 +272,8 @@ export default defineComponent({
 
     const amount = ref('')
     const fee = ref('')
-    const today = ref(localDay())
+    // The sheet's day moves as the app comes back and at midnight (MOL-329, adversarial А2, А3).
+    const today = useLocalDay()
     const day = ref(today.value)
     const note = ref('')
     const fromId = ref<string | null>(null)
@@ -437,9 +439,7 @@ export default defineComponent({
     const amendedLine = computed(() => {
       const at = editing.value?.amendedAt
       if (!at) return null
-      const date = new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(
-        at,
-      )
+      const date = dateOfAnyYear(at, locale.value, today.value)
       return t('transfer.amended', { date })
     })
 

@@ -8,14 +8,14 @@
       <StatusStrip
         v-if="phase === 'ready' && !online && overview"
         kind="offline"
-        :text="t('accounts.screen.offline', { time: when(overview.countedAt) })"
+        :text="t('accounts.screen.offline', { when: when(overview.countedAt) })"
       />
       <!-- By the last read, not by whether this session had an answer before it: the page shown is
            older than the read that failed, as «Деньги» say of the same money (MOL-183, Б1). -->
       <StatusStrip
         v-else-if="phase === 'ready' && failed === 'error' && overview"
         kind="unanswered"
-        :text="t('accounts.screen.unanswered', { time: when(overview.countedAt) })"
+        :text="t('accounts.screen.unanswered', { when: when(overview.countedAt) })"
         :attempt="store.failures"
       >
         <template #action>
@@ -281,6 +281,8 @@
 </template>
 
 <script lang="ts">
+import { useLocalDay } from '@/composables/useLocalDay'
+import { answeredAt, dateOfAnyYear } from '@/days'
 import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -312,14 +314,7 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import TransferSheet from '@/components/TransferSheet.vue'
 import UnassignedSheet from '@/components/UnassignedSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import {
-  canTransfer,
-  countedWhen,
-  pageOrder,
-  removedOf,
-  shortDay,
-  signedAmount,
-} from '@/components/accounts'
+import { canTransfer, pageOrder, removedOf, shortDay, signedAmount } from '@/components/accounts'
 import { bankWords, rateWords } from '@/components/spending'
 import { figureChars } from '@/components/figure'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -365,6 +360,8 @@ export default defineComponent({
   },
   setup() {
     const { t, locale } = useI18n()
+    // The screen's day: the balances' age and the day a removed account was put away are said from it (MOL-329).
+    const today = useLocalDay()
     const store = useAccountsStore()
     useAccountsOnScreen()
     const actor = useActorStore()
@@ -450,7 +447,7 @@ export default defineComponent({
         ? t('accounts.screen.row_checked', { currency, date: day(lastCheckedOn) })
         : t('accounts.screen.row_started', { currency, date: day(startOn) })
     }
-    const when = (at: Date) => countedWhen(at, locale.value)
+    const when = (at: Date) => answeredAt(at, locale.value, today.value)
 
     /**
      * «По моему курсу: 4,62 ֏ за 1 ₽ · 390,00 ֏ за 1 $» — the currencies the accounts hold, each once,
@@ -486,11 +483,7 @@ export default defineComponent({
         currency: account.currency,
         amount: signedAmount(account.balance, locale.value),
         date: account.archivedAt
-          ? whole(
-              new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'short' }).format(
-                account.archivedAt,
-              ),
-            )
+          ? whole(dateOfAnyYear(account.archivedAt, locale.value, today.value))
           : day(account.startOn),
       })
     }
