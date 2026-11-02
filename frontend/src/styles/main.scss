@@ -12,6 +12,27 @@ body {
   color: var(--text);
   background: var(--sunken);
   -webkit-font-smoothing: antialiased;
+
+  // A word wider than its line breaks rather than stands past it (MOL-334): at 200 % «налогоплательщика» of
+  // «Данные и приватность» took the page 33 px sideways. Only where a word alone does not fit — least widths
+  // stay as they were, and at 100 % nothing changes.
+  overflow-wrap: break-word;
+}
+
+// With large text a word wider than its line breaks where print breaks it, with a hyphen, from six letters —
+// everywhere words are: a screen's and a sheet's title, a row of the kit, a button, a paragraph (MOL-334, owner's
+// В-2 «а»; the screen's title and the newcomer's heading had it since MOL-321). At 200 % «Написать
+// разработчику» read «Написа|ть разраб|отчику». Two letters on a side, as Russian print carries them: with three
+// «Настройки» has no place for a hyphen and broke «Настро|йки». Only while the text is large (`useLargeText`):
+// Safari knows no limit, and WebKit hyphenates any word at a line's end — «Запишите первые по-купки» at 100 %.
+// What is typed is never hyphenated.
+html[data-large-text] body {
+  hyphens: auto;
+  hyphenate-limit-chars: 6 2 2;
+}
+
+html[data-large-text] :is(input, textarea) {
+  hyphens: manual;
 }
 
 *,

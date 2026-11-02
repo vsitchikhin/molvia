@@ -818,12 +818,23 @@ export default defineComponent({
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  container-type: inline-size;
 
   /* Half the line each by the outer box — a basis of 0 left the secondary's edge out, and the pair
      came 2 px apart — and never narrower than its word, which is what sends one under the other. */
   > * {
     flex: 1 0 calc((100% - var(--space-2)) / 2);
     min-width: max-content;
+  }
+}
+
+/* With large text one word and its glyph may be wider than the strip itself: the pills stand one under the other
+   across it, the word broken with a hyphen where it must (MOL-334) — at 200 % «Штрихкод» stood 7 px past the phone,
+   «Закончить» with it. At 100 % on 320 the strip is 18rem. */
+@container (width < 12rem) {
+  .pair > * {
+    flex-basis: 100%;
+    min-width: 0;
   }
 }
 

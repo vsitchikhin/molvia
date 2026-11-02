@@ -503,15 +503,6 @@ export default defineComponent({
      (MOL-318). */
   overflow-wrap: anywhere;
 
-  /* With large text a word wider than the line breaks where print breaks it, with a hyphen, from six letters — the
-     newcomer's heading's rule (MOL-321, owner's В-2 «а»): at 150 % «Устройства» broke as «Устройст|ва», at 200 %
-     «Катего|рии», «Бюдж|ет» (adversarial Л5). Never at 100 %, where no title breaks. Safari knows no limit, and WebKit
-     hyphenates any word at a line's end — the price of the block button's hyphen, accepted there (self-review 13). */
-  html[data-large-text] & {
-    hyphens: auto;
-    hyphenate-limit-chars: 6 3 3;
-  }
-
   /* Focused by the router after a move, for screen readers; nothing for the eye to see. */
   &:focus {
     outline: none;
