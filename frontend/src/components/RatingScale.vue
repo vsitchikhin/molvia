@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="rating">
     <!-- The score as it stands, kept while another digit is chosen: the point a change is made
          from (Ф-25, С-9). The messages are the app's one global scope; unnamed, intlify warned at
          every mount. -->
@@ -82,16 +82,30 @@ export default defineComponent({
   }
 }
 
+/* The scale measures its own width (MOL-334, В-3 «а»): with large text its keys share it with the smallest gap. */
+.rating {
+  container: rating / inline-size;
+}
+
 .scale {
   display: flex;
   gap: var(--space-2);
   justify-content: space-between;
 }
 
+@container rating (width < 15rem) {
+  .scale {
+    gap: var(--space-keys);
+  }
+}
+
 .key {
   @include display-type;
 
+  /* Five equal shares of the row, never the digit's own width: at 150 % a key had 36 px (MOL-334). */
   flex: 1;
+  min-width: 0;
+  padding-inline: 0;
   min-height: var(--rating-key);
   border: var(--hairline) solid var(--border-strong);
   border-radius: var(--radius);

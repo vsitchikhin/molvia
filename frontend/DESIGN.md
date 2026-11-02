@@ -155,6 +155,7 @@ spacing:
   6: '24px'
   8: '32px'
   tail: '49px'
+  keys: '4px'
 components:
   button-primary:
     backgroundColor: '{colors.accent-solid}'

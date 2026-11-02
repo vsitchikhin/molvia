@@ -109,6 +109,10 @@
   --touch-target-lg: 3.25rem; /* 52 — the sheet's main action, the most frequent tap in the product */
   --rating-key: 3.5rem; /* 56 — a key of the 1–5 scale, the one action of «Оценки» */
 
+  /* The keys' gap with large text, in px as a touch is (MOL-334, В-3 «а»): five keys of 44 and four gaps of a
+     rem stood 23 px past a phone of 320 at 200 %. */
+  --space-keys: 4px;
+
   /* Icons (Ф-9, MOL-173): one step per role. An icon takes its step as font-size and is 1em
      itself (@include icon), so the rule that checks a size checks the icon too. */
   --icon-xs: 0.875rem; /* 14 — inside a pill of 13: the verdict, «Отправляем…» */

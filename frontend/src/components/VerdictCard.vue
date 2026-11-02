@@ -7,7 +7,7 @@
       {{ card.name }}<br />{{ t('verdict.question_tail') }}
     </h2>
 
-    <RatingScale v-model="score" :current="returnedWith" />
+    <RatingScale v-model="score" class="keys" :current="returnedWith" />
 
     <AppField
       v-model="review"
@@ -178,7 +178,17 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .verdict {
+  container: verdict / inline-size;
   padding: var(--space-6) var(--space-4);
+}
+
+/* With large text the scale takes the card's sides, but for its gap (owner's В-3 «а», MOL-334): its padding grows
+   with the text, and at 200 % the five keys had 190 px of a phone's 320 — 23 px past it. At 100 % on 320 the card
+   is 16rem and keeps its sides. */
+@container verdict (width < 15rem) {
+  .keys {
+    margin-inline: calc(var(--space-keys) - var(--space-4));
+  }
 }
 
 .question {
