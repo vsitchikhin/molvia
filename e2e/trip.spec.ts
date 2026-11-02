@@ -189,11 +189,14 @@ test.describe('the trip', () => {
   test('a purchase corrected while its add is on its way reaches the server corrected (MOL-325)', async ({
     page,
   }) => {
-    // The server writes the purchase at once, and its answer is held back until the person has
-    // corrected the line: a repeat of the same id is answered «200, nothing changed», so the
-    // correction must reach the row some other way. Laid before the page opens (MOL-249).
+    // The purchase's `POST` is held on its way until the person has corrected the line, and then
+    // lands with the old numbers: a repeat of the same id is answered «200, nothing changed», so
+    // the correction must reach the row some other way. Held before the server, not after it: a
+    // row the server has written comes back with the screen's own read of the record, and the line
+    // then opens as the server's row, not as the purchase still on its way (CI, first try). Laid
+    // before the page opens (MOL-249).
     let release: () => void = () => undefined
-    const answerHeld = new Promise<void>((resolve) => {
+    const postHeld = new Promise<void>((resolve) => {
       release = resolve
     })
     let held = false
@@ -203,9 +206,8 @@ test.describe('the trip', () => {
         return
       }
       held = true
-      const response = await route.fetch()
-      await answerHeld
-      await route.fulfill({ response })
+      await postHeld
+      await route.continue()
     })
     const setting = await device(page)
     await startTrip(page, 'Ереван Сити')
@@ -213,7 +215,7 @@ test.describe('the trip', () => {
 
     await addItem(page, setting.word, '570')
     await expect.poll(() => held).toBe(true)
-    await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+    expect((await setting.current())?.expenses).toEqual([])
 
     // The line still waits for its answer, so it opens as itself — the same purchase.
     await row(page).first().click()
