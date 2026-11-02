@@ -79,7 +79,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref, watch } from 'vue'
+import { computed, defineComponent, onBeforeUnmount, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconCheck from '~icons/mdi/check'
@@ -156,11 +156,25 @@ export default defineComponent({
      * a phone west of it is dated by a day this phone has not reached (adversarial В1, as the
      * spending's sheet, adversarial Л). A day misread far ahead is still refused (review 18).
      * «Today» is asked again as the sheet opens and as a day is typed (adversarial Р3-А2 of MOL-333): read
-     * once, the phone's today after midnight was refused at the tap as a day still to come.
+     * once, the phone's today after midnight was refused at the tap as a day still to come. And at the
+     * phone's midnight while the sheet is up (Р5-А1): between the asks, the error stood under today's day.
      */
     const today = useLocalDay()
     watch(when, () => {
       today.value = localDay()
+    })
+    let midnight: ReturnType<typeof setTimeout> | undefined
+    function untilMidnight(): void {
+      clearTimeout(midnight)
+      const now = new Date()
+      const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1)
+      midnight = setTimeout(() => {
+        today.value = localDay()
+        untilMidnight()
+      }, next.getTime() - now.getTime())
+    }
+    onBeforeUnmount(() => {
+      clearTimeout(midnight)
     })
     const latest = computed(() =>
       props.day > today.value && props.day <= latestDay(new Date()) ? props.day : today.value,
@@ -193,8 +207,12 @@ export default defineComponent({
     watch(
       () => props.open,
       (open) => {
-        if (!open) return
+        if (!open) {
+          clearTimeout(midnight)
+          return
+        }
         today.value = localDay()
+        untilMidnight()
         when.value = props.day
         nameBad.value = false
         name.value = props.current ? '' : (props.proposed ?? '')
