@@ -217,8 +217,12 @@ test.describe('the trip', () => {
     await expect.poll(() => held).toBe(true)
     expect((await setting.current())?.expenses).toEqual([])
 
-    // The line still waits for its answer, so it opens as itself — the same purchase.
+    // The line still waits for its answer, so it opens as itself — the same purchase, «Record»; a
+    // row of the server's would open with «Save», and the correction would be a plain amendment.
     await row(page).first().click()
+    await expect(sheet(page).getByRole('button', { name: 'Record' })).toBeVisible()
+    await expect(sheet(page).getByRole('button', { name: 'Save' })).toHaveCount(0)
+    // The sheet takes no tap while it rises, nor in the double-tap floor after it (MOL-69).
     await page.waitForTimeout(400)
     await sheet(page).getByLabel('How much').fill('0.9')
     await sheet(page).getByLabel('Price as on the tag').fill('580')
@@ -235,6 +239,8 @@ test.describe('the trip', () => {
           amount: { amount: '580.00', currency: 'AMD' },
         }),
       ])
+    // One line on the phone too: the same id, never a second purchase beside the first.
+    await expect(row(page)).toHaveCount(1)
     await expect(row(page).first()).toContainText('֏580')
     await expect(page.getByText('was not accepted')).toHaveCount(0)
   })
