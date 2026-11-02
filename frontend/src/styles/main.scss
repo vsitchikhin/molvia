@@ -19,16 +19,26 @@ body {
   overflow-wrap: break-word;
 }
 
-// With large text a word wider than its line breaks where print breaks it, with a hyphen, from six letters —
-// everywhere words are: a screen's and a sheet's title, a row of the kit, a button, a paragraph (MOL-334, owner's
-// В-2 «а»; the screen's title and the newcomer's heading had it since MOL-321). At 200 % «Написать
-// разработчику» read «Написа|ть разраб|отчику». Two letters on a side, as Russian print carries them: with three
-// «Настройки» has no place for a hyphen and broke «Настро|йки». Only while the text is large (`useLargeText`):
-// Safari knows no limit, and WebKit hyphenates any word at a line's end — «Запишите первые по-купки» at 100 %.
-// What is typed is never hyphenated.
+// With large text words break with a hyphen by the dictionary (MOL-334, owner's В-2 «а», В-5 «а»): `hyphens: auto`
+// cuts any word of the length at a line's end, wide or not, so where the length starts is the whole choice. In a
+// unit of one to three words — a title, a row of the kit, a button — from six letters, two a side as Russian print
+// carries them: at 200 % «Написать разработчику» read «Написа|ть разраб|отчику», and with three a side «Настройки»
+// broke «Настро|йки». In a paragraph and a row's meta from twelve: from six, «Данные и приватность» cut 394 words
+// that would have stood whole at 200 %, 192 already at 115 % (adversarial Х1); from twelve 21, and a word of seven
+// to eleven letters wider than its line breaks with none. A segment's word never breaks (MOL-189), nor does what is
+// typed. Only while the text is large (`useLargeText`): Safari knows no limit, and WebKit hyphenates any word at a
+// line's end — «Запишите первые по-купки» at 100 %.
 html[data-large-text] body {
   hyphens: auto;
+  hyphenate-limit-chars: 12 5 5;
+}
+
+html[data-large-text] :is(h1, h2, h3, .list-row .title, .nav-row .label, .button) {
   hyphenate-limit-chars: 6 2 2;
+}
+
+html[data-large-text] .segment .word {
+  hyphens: manual;
 }
 
 html[data-large-text] :is(input, textarea) {
