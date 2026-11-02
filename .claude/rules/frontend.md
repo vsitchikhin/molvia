@@ -711,7 +711,11 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   a day still to come, and marked so before it — the midnight by `useLocalDay`'s own timer since MOL-329, the
   sheet keeping none of its own; a phone asleep over the midnight is caught by the app back in view, not by the
   timer, which a sleeping phone holds; the action's word («Записать сумму») comes
-  once a shop is named, as «Перевести» and a verdict's say what they wait for. **The price, named:** a card of
+  once a shop is named, as «Перевести» and a verdict's say what they wait for. **«Где вы?» is the same choice and
+  waits the same way** (MOL-354, owner's В-1 «а»): «Начать запись» is not now while the name draws nothing, saying
+  «Выберите магазин» — the words of «Где купили?», no second key — and a name no place takes is refused at the tap,
+  marked and focused; with no settings it is not now under the action's own word, since the state over the field
+  says why and «Выберите магазин» over a name typed would be untrue. **The price, named:** a card of
   «Оценки» back from the queue refused opens with the focus on its title (`focusOnMount`) and its error in the
   field — a queue's answer, not a refusal at a send. **The checkbox is
   `AppCheckbox`** (В-4 «а»), a native checkbox the kit draws, by the grammar of `AppSwitch`: off a square edged in
