@@ -365,7 +365,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Every write to a trip goes through the queue on the device (MOL-24)**, online or not; storage
   is the queue, one window sends at a time under `navigator.locks`, and a refusal other than the
   ones that hold is set aside, never retried. A receipt — its parts, removal, «Записать» — goes
-  through a queue of its own by the same rules (`receiptQueue`, MOL-127).
+  through a queue of its own by the same rules (`receiptQueue`, MOL-127). **A purchase corrected while its
+  `add` was out reaches the row as `PATCH`, in that `add`'s place** (MOL-325): at the end of the queue it
+  landed after an account chosen since and took its «списано» off.
 - **A removed trip is marked** (MOL-76): «Вернуть» for ten minutes, **every reader filters the
   mark** except erasure, the timer and an account's «удалить или убрать». **A new shot of its
   receipt is recorded meanwhile, and then its «Вернуть» is a 409** (MOL-254): one paper, one record.

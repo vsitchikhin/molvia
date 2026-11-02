@@ -186,6 +186,65 @@ test.describe('the trip', () => {
     await expect(page).toHaveURL(/\/purchases$/)
   })
 
+  test('a purchase corrected while its add is on its way reaches the server corrected (MOL-325)', async ({
+    page,
+  }) => {
+    // The purchase's `POST` is held on its way until the person has corrected the line, and then
+    // lands with the old numbers: a repeat of the same id is answered «200, nothing changed», so
+    // the correction must reach the row some other way. Held before the server, not after it: a
+    // row the server has written comes back with the screen's own read of the record, and the line
+    // then opens as the server's row, not as the purchase still on its way (CI, first try). Laid
+    // before the page opens (MOL-249).
+    let release: () => void = () => undefined
+    const postHeld = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    let held = false
+    await page.route('**/api/trips/*/expenses', async (route) => {
+      if (route.request().method() !== 'POST' || held) {
+        await route.continue()
+        return
+      }
+      held = true
+      await postHeld
+      await route.continue()
+    })
+    const setting = await device(page)
+    await startTrip(page, 'Ереван Сити')
+    await expect.poll(async () => (await setting.current())?.place.name).toBe('Ереван Сити')
+
+    await addItem(page, setting.word, '570')
+    await expect.poll(() => held).toBe(true)
+    expect((await setting.current())?.expenses).toEqual([])
+
+    // The line still waits for its answer, so it opens as itself — the same purchase, «Record»; a
+    // row of the server's would open with «Save», and the correction would be a plain amendment.
+    await row(page).first().click()
+    await expect(sheet(page).getByRole('button', { name: 'Record' })).toBeVisible()
+    await expect(sheet(page).getByRole('button', { name: 'Save' })).toHaveCount(0)
+    // The sheet takes no tap while it rises, nor in the double-tap floor after it (MOL-69).
+    await page.waitForTimeout(400)
+    await sheet(page).getByLabel('How much').fill('0.9')
+    await sheet(page).getByLabel('Price as on the tag').fill('580')
+    await sheet(page).getByRole('button', { name: 'Record' }).click()
+    await expect(sheet(page)).toBeHidden()
+    release()
+
+    await expect
+      .poll(async () => (await setting.current())?.expenses)
+      .toEqual([
+        expect.objectContaining({
+          // As the wire spells them: thousandths of a unit, hundredths of a dram.
+          quantity: { value: '0.900', unit: 'l' },
+          amount: { amount: '580.00', currency: 'AMD' },
+        }),
+      ])
+    // One line on the phone too: the same id, never a second purchase beside the first.
+    await expect(row(page)).toHaveCount(1)
+    await expect(row(page).first()).toContainText('֏580')
+    await expect(page.getByText('was not accepted')).toHaveCount(0)
+  })
+
   test('an empty trip is deleted at once, and the next one starts (MOL-76)', async ({ page }) => {
     const setting = await device(page)
     await startTrip(page, 'SAS')
