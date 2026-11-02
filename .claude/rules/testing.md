@@ -281,7 +281,9 @@ failure` give the same first row, `find` and `[...new Set()]` either way (round 
 - **`bin/check-ordered-reads.mjs` holds it in `npm run lint`, before the run** (owner's В-2 «в»): for two reads
   with no order compared, and for an order the statement has — chance and ties, which the net cannot see — it is
   what holds; a `Set`, a `Map` and an object
-  of `Object.fromEntries` keep the order they were filled in and are followed through, and an `update` or a
+  of `Object.fromEntries` keep the order they were filled in and are followed through, a `Set` compared whole with
+  another tells no order, but a `Map` or an object compared whole reads the last row of a key repeated — its value by
+  its key, whole — and is refused (round 21, Ф1); and an `update` or a
   `delete` returning rows is a read with no order (round 13). **For one read with no order it holds too**
   (round 14, О1): the net cannot tell values the same reversed, so the first row, `find`, `reduce`, `sort`, a
   part by `slice`, a value by its key and a loop that collects or leaves at a row are refused, and the rows go

@@ -192,8 +192,8 @@ const NO_CALLBACK = new Set(['includes', 'slice', 'flat'])
 const ORDERLESS_CALLS = new Set(['inArray', 'notInArray'])
 /**
  * What keeps the rows in the order they were put in, and is followed as they are (review round 13, Н3): a `Set`, a
- * `Map`, an object of `Object.fromEntries`. Its size, `has`, `get` and a value by its key cannot tell the order; a
- * `Set`, a `Map` or an object compared with another by `toEqual` neither — vitest compares them with no order; spread,
+ * `Map`, an object of `Object.fromEntries`. Its size and `has` cannot tell the order, nor a `Set` compared with another
+ * by `toEqual`; a value by its key can, and a `Map` or an object compared whole reads it (rounds 14, 21); spread,
  * `Array.from`, `values()`, `Object.keys` and the like give the rows back in that order.
  */
 const CONTAINERS = { Set: 'set', Map: 'map', 'Object.fromEntries': 'object' }
@@ -1398,8 +1398,11 @@ export function unorderedReads(
       if (UNPACKS.has(callee)) return { unpacked: p }
       if (/^expect(\.soft)?$/.test(callee)) {
         const end = matched(p, order)
-        // compared with another by `toEqual`, a Set, a Map, an object tell no order
-        return end.why && /^(toEqual|toStrictEqual|toMatchObject)/.test(end.why)
+        // compared with another by `toEqual`, a Set tells no order; a Map and an object hold the last row of a key
+        // repeated, and the comparison reads it — its value by its key, whole (review round 21, Ф1)
+        return container === 'set' &&
+          end.why &&
+          /^(toEqual|toStrictEqual|toMatchObject)/.test(end.why)
           ? { free: true }
           : end
       }

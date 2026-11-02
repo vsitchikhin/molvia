@@ -887,10 +887,6 @@ describe('unorderedReads', () => {
       `expect(new Set((await db.select().from(t)).map((r) => r.kind))).toEqual(new Set([a, b]))`,
     ],
     [
-      'an object against an object',
-      `expect(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v]))).toEqual({ a: 1, b: 2 })`,
-    ],
-    [
       'a loop over a Set',
       `for (const kind of new Set((await db.select().from(t)).map((r) => r.kind))) expect(kind).toBeDefined()`,
     ],
@@ -968,6 +964,23 @@ describe('unorderedReads', () => {
     [
       'a value of an object by its key',
       `expect(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v]))[a]).toBe(1)`,
+    ],
+    // round 21, Ф1: whole, a Map or an object reads the last row of a key repeated, as by its key
+    [
+      'an object against an object',
+      `expect(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v]))).toEqual({ a: 1, b: 2 })`,
+    ],
+    [
+      'a Map against a Map',
+      `expect(new Map((await db.select().from(t)).map((r) => [r.k, r.v]))).toEqual(new Map([[a, 1]]))`,
+    ],
+    [
+      'an object named, against an object',
+      `const by = Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v]))\nexpect(by).toStrictEqual({ a: 1 })`,
+    ],
+    [
+      'an object matched',
+      `expect(Object.fromEntries((await db.select().from(t)).map((r) => [r.k, r.v]))).toMatchObject({ a: 1 })`,
     ],
     [
       'a field of an object by its key',
