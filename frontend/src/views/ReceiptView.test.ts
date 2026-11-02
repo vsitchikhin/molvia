@@ -736,6 +736,24 @@ describe('ReceiptView (MOL-127)', () => {
     expect(foot).toMatch(/≈ 202/)
   })
 
+  // MOL-329, adversarial Ж1: the rate's day names its year when it is not the screen's — December seen in January.
+  it('names the year of a rate of another year at the foot', async () => {
+    const shown = detail()
+    receipt.mockResolvedValue({
+      ...shown,
+      // Yerevan's midnight of 30 December 2025
+      rate: {
+        base: 'RUB',
+        quote: 'AMD',
+        scaled: 4_000_000n,
+        source: 'official',
+        asOf: new Date('2025-12-29T20:00:00Z'),
+      },
+    })
+    const { view } = await render()
+    expect(view.get('.total').text()).toContain('30 дек. 2025 г.')
+  })
+
   it('says «проверьте» of figures the font’s swaps put right, and why (MOL-290)', async () => {
     const one = detail()
     receipt.mockResolvedValue({

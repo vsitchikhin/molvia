@@ -858,6 +858,68 @@ describe('AdviceView', () => {
     expect(retries()).toHaveLength(0)
   })
 
+  // MOL-329: the list's age is said from the screen's day, asked again as the app comes back, with its year.
+  describe('the list`s age past midnight (MOL-329)', () => {
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function remembered(at: Date, now: Date) {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(at)
+      advice.mockResolvedValue(answer([milk]))
+      ;(await render()).view.unmount()
+      vi.setSystemTime(now)
+      online(false)
+      advice.mockRejectedValue(broke())
+      return (await render()).view
+    }
+
+    it('23:50 — «today»; 00:10 and the app back in view — «yesterday»', async () => {
+      const view = await remembered(
+        new Date('2026-10-30T23:40:00.000Z'),
+        new Date('2026-10-30T23:50:00.000Z'),
+      )
+      expect(strips(view)).toEqual([
+        { kind: 'offline', text: 'Offline · the list as of today, 11:40 PM' },
+      ])
+
+      vi.setSystemTime(new Date('2026-10-31T00:10:00.000Z'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(strips(view)).toEqual([
+        { kind: 'offline', text: 'Offline · the list as of yesterday, 11:40 PM' },
+      ])
+    })
+
+    it('a query typed before midnight: the search`s strip says «yesterday» once the app is back', async () => {
+      const view = await remembered(
+        new Date('2026-10-30T23:40:00.000Z'),
+        new Date('2026-10-30T23:50:00.000Z'),
+      )
+      await view.get('input[type="search"]').setValue('мол')
+      await flushPromises()
+      expect(strips(view)).toEqual([
+        { kind: 'offline', text: 'Offline · searching only the list as of today, 11:40 PM' },
+      ])
+
+      vi.setSystemTime(new Date('2026-10-31T00:10:00.000Z'))
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(strips(view)).toEqual([
+        { kind: 'offline', text: 'Offline · searching only the list as of yesterday, 11:40 PM' },
+      ])
+    })
+
+    it('a list of another year says its year', async () => {
+      const view = await remembered(
+        new Date('2025-10-30T10:05:00.000Z'),
+        new Date('2026-11-02T12:00:00.000Z'),
+      )
+      expect(strips(view)[0]?.text).toContain('2025')
+    })
+  })
+
   it('the server broke with a list remembered: the strip offers the retry the screen cannot make', async () => {
     advice.mockResolvedValue(answer([milk]))
     await render()

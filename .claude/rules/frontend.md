@@ -708,8 +708,9 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   the button takes**, not by a key (Р3-А1): a recent one tapped and then gone from the server's list waits
   for a shop again; **and «today» is asked as it opens, as a day is typed, at the tap and at the phone's
   midnight while it is up** (Р3-А2, Р4-А1, Р5-А1), or the phone's today after midnight was refused at the tap as
-  a day still to come, and marked so before it; a phone asleep over the midnight is caught by the app back in
-  view (`useLocalDay`), not by the timer, which a sleeping phone holds; the action's word («Записать сумму») comes
+  a day still to come, and marked so before it — the midnight by `useLocalDay`'s own timer since MOL-329, the
+  sheet keeping none of its own; a phone asleep over the midnight is caught by the app back in view, not by the
+  timer, which a sleeping phone holds; the action's word («Записать сумму») comes
   once a shop is named, as «Перевести» and a verdict's say what they wait for. **The price, named:** a card of
   «Оценки» back from the queue refused opens with the focus on its title (`focusOnMount`) and its error in the
   field — a queue's answer, not a refusal at a send. **The checkbox is
@@ -1039,6 +1040,55 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   `sayAnswerWord` in the screen's own `setup` hears nothing, and a strip drawn in place — the receipt's
   «Без связи · чек из памяти» was a bare `<p>` with a cloud — stood under the notice, two clouds
   (adversarial А1); it is a `StatusStrip` now.
+- **Every day a screen says is counted from the screen's day** (MOL-329, owner's В-1 «б», В-2 «б»): «сегодня»,
+  «вчера», a date with its year or without — of a strip's moment, a row, a card, a sheet's version and its day, a
+  receipt, a device, an account put away. **The screen's day is one value, `useLocalDay`**, looked at again as the app
+  comes back into view and **at midnight with the screen in view** (a timer to the next local midnight, review 1,
+  adversarial А4); a card takes it from its screen (`today`), a sheet holds its own `useLocalDay` — never
+  `ref(localDay())`, which moved only as the sheet opened (А2, А3). **The functions of `days.ts` never read the clock**:
+  `purchaseDay`, `dayOfAnyYear`, `dateOfAnyYear`, `dayWords`, `calendarDayOfAnyYear`, `answeredAt` — and `shortDay` of
+  `accounts.ts`, a day of an account's operations in a check, «без счёта», a transfer (self-review Р3-2) — take that day as a
+  required `today` — a place that leaves it out fails `npm run typecheck` — and **ESLint refuses the clock in the forms
+  it can see** (`no-restricted-syntax`, `vue/no-restricted-syntax`, `eslint-days.test.ts`; self-review №2, Р2-4,
+  adversarial Б3, В1): the clock — `localDay()` or `localDay(new Date())` written out — inside a day word's call, a day
+  held in `ref`, `shallowRef`, `computed` or `reactive` of it, and a default of it, read once — a string from the clock
+  passes any type; `localDay(moment)` is the day of a moment and passes. **The clock has spellings without end**
+  (`new Date(Date.now())`, adversarial Г3): the rule holds the two ordinary ones, and the rest is review's. **The clock read into
+  a name a line before, or handed down as a prop, is review's**: a selector cannot follow a name, and the test holds
+  that boundary as it is. With the clock as the default every word counted its day
+  where it was drawn: after a night «Покупки» said «вчера в 23:40» in the strip — the failed read on return happened to
+  redraw it — over a row and a receipt still «сегодня»; and with the later of the screen's day and the clock's
+  (`shownDay`, MOL-187 Б2, taken out) a strip redrawn by «Повторить» after midnight said «вчера» over rows not redrawn
+  (А4). **A moment printed by `Intl` in place has no year — so none is** (А5): the balances' age is `answeredAt`, not
+  the bare hour of `countedWhen`, gone; the day an account was put away and a transfer amended is `dateOfAnyYear`, and
+  an account's start, its check and the days of its journal — which goes back to the start, across years — say a year
+  of their own (`calendarDayOfAnyYear`, a weekday with its year, adversarial Б2). **A year that ends with its own full
+  stop closes the sentence with it** — «Убран из выбора 21 сентября 2025 г. История…», never «г..» (Б1).
+  **A strip's moment is `answeredAt`, `{when}` in the screen's words** — «покупки на сегодня, 23:40», «остатки на 30
+  окт. 2025 г., 10:05», «Список на вчера, 23:46 — обновим…» of «Оценки» (self-review №1). **A sheet opened before
+  midnight keeps the day it opened on** — the spending was made then — and its words say «Вчера» of it after midnight,
+  never «Сегодня». **The screen's month and year follow the same day, at midnight too** (self-review Р2-3): «Деньги»,
+  «Графики» and «Бюджет» with no month in the address go on to the new month as midnight passes with the screen in
+  view — the month before is no running month past it, and «к тому же дню» of it would lie — as they did on coming
+  back into view (adversarial З of MOL-121); «Деньги» and «Бюджет» are held by tests, «Графики» by the same
+  `useLocalDay` (self-review Р3-4). **A sheet that writes by the month keeps the month it opened on** (adversarial В2
+  of round 3): `BudgetPlanSheet` takes the month as it opens, so a September plan saved past midnight is September's,
+  never the month that moved under the thumb; **and the month shown is read again after it** (`useKeptAnswer.written`,
+  adversarial Г1): a plan from September on holds in October, and the answer of the write is September's.
+  **A version of an amendment says its year** — «до 25 сент. 2025 г.: … · 16 сент. 2025 г.» in the sheets of an
+  exchange and an income (adversarial Г2): a journal of them goes back across years. **So does a purchase waiting for its
+  rating** — the card of «Оценки» and «последняя — {when}» of «Покупки» are `dayOfAnyYear` (adversarial Е1): the queue
+  has no window by age, and «14 окт.» of last year read as this one. **And so does a sheet's or a question's own day**
+  (`calendarDayOfAnyYear` in the place's own form, adversarial Ж1): no caption of a month stands over it to say the
+  year — the start of an account, the day, the line and the meta of a spending, «Когда» of «Где купили?», «Тут дешевле»'s
+  day, the rate's day of a receipt, «Удалить обмен?» and «Удалить доход?»; a card under its month's caption keeps its
+  day without one. **A phrase that puts its own word
+  before the day takes a date, never «вчера»** (`dateOfAnyYear`, adversarial Д1, the rule of «Раньше …», MOL-204
+  Р-9): «до 1 нояб.: …» of a version, «Чек от 30 окт., 23:30» and «Фото от …» of «Покупки»; a day said with no word
+  before it keeps its «вчера» — «отправлен вчера», «записан вчера», «покупки на вчера, 23:40». **The prices, named:** a page put away is held by the browser, and its timer with it — coming back
+  into view looks again; a screen's day ahead of a phone whose clock was set back stays ahead until the next look; and
+  one test is green on master too, a guard of the rule — the search's strip of «Что брать» on return, redrawn there by
+  the read the return makes (the strip of «Покупки» on return, the same, is an assertion inside a test red on master).
 - **A sheet has a live region of its own, and while it is up everything is said there** (MOL-181,
   owner's В-2 «а»). The app's region is outside the modal `<dialog>`, inert while it is open, and
   nothing said there is read (feedback С-10). `BottomSheet` gives its region to the app's announcer

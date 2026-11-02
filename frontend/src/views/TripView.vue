@@ -279,6 +279,7 @@ import type { TripRowView } from '@/components/tripRow'
 import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { shown } from '@/composables/useItemDetails'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
@@ -352,6 +353,8 @@ export default defineComponent({
   },
   setup() {
     const { t, locale } = useI18n()
+    // The screen's day, asked again as the app comes back: the day words are said from it (MOL-329).
+    const today = useLocalDay()
     const router = useRouter()
     const itemEntry = useItemEntryStore()
     const { goTab, goUp } = useNavigation()
@@ -415,7 +418,7 @@ export default defineComponent({
       return since
         ? t('trip.manual_meta', {
             when: t('trip.manual_since', {
-              day: purchaseDay(since, locale.value),
+              day: purchaseDay(since, locale.value, today.value),
               time: timeOfDay(since, locale.value),
             }),
           })

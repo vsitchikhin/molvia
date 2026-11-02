@@ -580,14 +580,14 @@ nothing up.
   refused there by the same trim, the line said «без заметки» and the sheet «нельзя сохранить» of one
   empty field (self-review 6). **The fields are the spending sheet's own**
   (`SpendingDetailsSheet` shows them): «‹», Esc, «back», a pull down and «Готово» all keep what was
-  typed — there was no undo with them in the form either — and nothing is checked there. **«Сохранить
+  typed — there was no undo with them in the form either — and nothing is checked there. **A day of another year says
+  its year**, on the line and on the field behind it (MOL-329, adversarial Ж1): a spending of last year is opened from
+  «Траты» of its month, and the sheet has no caption of the month over it — «Вчера» across New Year stays a word. **«Сохранить
   трату» opens it on the field it finds wrong, only when that is the first one wrong** in the order of
   the form — the sum, «списано», a chip, then the day, the note, the place: opened over an error above
   it, it would hide that error. **While a field behind it is wrong the line is marked** (`invalid`, a
   `--bad` edge and `aria-invalid`, as «Счёт ›» with an account refused): gone back with «‹», the error was
-  nowhere on the sheet, and «Сохранить» seemed to open the details by itself. **The prices, named:** a
-  day of another year is «28 сент.» with no year, as `dayWords` says it everywhere — the field behind
-  says it whole; the focus put on a field as the details open raises no keyboard on iOS, which takes a
+  nowhere on the sheet, and «Сохранить» seemed to open the details by itself. **The prices, named:** the focus put on a field as the details open raises no keyboard on iOS, which takes a
   tap — the field is focused and its error said; and Enter there does nothing, as in the form before:
   «Готово» is in the footer, out of the fields' way; at 320 the line takes two lines even as «Сегодня · без
   заметки» (185 px of words in a label of 166), the field 62 for 52, and a long note ends in «…» after the second

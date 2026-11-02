@@ -374,6 +374,16 @@ describe('the line of «Дата, заметка, место» (MOL-199, Ф-17)'
     expect(line('2026-09-28', '', '', 'en')).toBe('Sep 28 · no note')
   })
 
+  // A spending of last year opened from «Траты» of its month: the sheet has no caption of the month (MOL-329, Ж1).
+  it('says the year of a day of another year; «Вчера» across New Year stays a word', () => {
+    const of = (day: string, on: string, locale = 'ru') =>
+      detailsLine({ day, note: '', place: '' }, locale, on, 'без заметки')
+    expect(of('2025-09-12', '2026-11-02')).toBe('12 сент. 2025 г. · без заметки')
+    expect(of('2025-09-12', '2026-11-02', 'en')).toBe('Sep 12, 2025 · без заметки')
+    expect(of('2026-12-31', '2027-01-01')).toBe('Вчера · без заметки')
+    expect(of('2026-12-30', '2027-01-01')).toBe('30 дек. 2026 г. · без заметки')
+  })
+
   it('puts the note and the place after it as typed, quoting nothing of its own', () => {
     expect(line('2026-09-29', 'Кофе с собой', '«Кофеман»')).toBe('Вчера · Кофе с собой · «Кофеман»')
     expect(line(today, 'Обед', 'Кинза')).toBe('Сегодня · Обед · Кинза')

@@ -12,7 +12,7 @@
     <StatusStrip
       v-if="phase === 'memory' && fetchedAt"
       kind="offline"
-      :text="t('advice.search.offline', { day: day(fetchedAt), time: time(fetchedAt) })"
+      :text="t('advice.search.offline', { when: when(fetchedAt) })"
     />
     <slot v-else-if="phase === 'idle'" name="strip" />
   </div>
@@ -122,7 +122,7 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import type { CheapRow, NeverRow, TakeRow } from '@/components/adviceRow'
 import { useAdviceSearch } from '@/composables/useAdviceSearch'
 import { useAnnouncer } from '@/composables/useAnnouncer'
-import { purchaseDay, timeOfDay } from '@/days'
+import { answeredAt } from '@/days'
 
 /** The found items laid out by group, each in the order the search gave it. */
 interface Found {
@@ -173,6 +173,8 @@ export default defineComponent({
     /** The list the phone keeps: searched on the phone with no connection (В-3). */
     remembered: { type: Object as PropType<AdviceResponse | null>, default: null },
     fetchedAt: { type: Date as PropType<Date | null>, default: null },
+    /** The screen's day (`useLocalDay`), which the list's age is said from (MOL-329). */
+    today: { type: String, required: true },
     /** Raised after a verdict is saved: the rows on screen are asked for again. */
     refreshes: { type: Number, default: 0 },
   },
@@ -270,8 +272,7 @@ export default defineComponent({
       retry: search.retry,
       entered,
       left,
-      day: (when: Date) => purchaseDay(when, locale.value),
-      time: (when: Date) => timeOfDay(when, locale.value),
+      when: (at: Date) => answeredAt(at, locale.value, props.today),
     }
   },
 })

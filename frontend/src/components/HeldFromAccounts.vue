@@ -16,6 +16,7 @@ import type { AccountsHeldResponse, Currency, Money } from '@molvia/model'
 import { api } from '@/api'
 import { shortDay, signedAmount } from '@/components/accounts'
 import { useAccountsStore } from '@/stores/accounts'
+import { useLocalDay } from '@/composables/useLocalDay'
 
 /**
  * «По счетам на 25 сент.: 5 920,81 ₽ · Подставить» under «сколько было до» of an exchange and an
@@ -38,6 +39,8 @@ export default defineComponent({
   },
   setup(props) {
     const { t, locale } = useI18n()
+    // The screen's day: an old exchange's day says its year (MOL-329, Р3-2).
+    const today = useLocalDay()
     const store = useAccountsStore()
     const answer = ref<AccountsHeldResponse | null>(null)
     let latest = 0
@@ -66,7 +69,7 @@ export default defineComponent({
       if (!held) return ''
       const amount = signedAmount(held, locale.value)
       return t('accounts.held_hint', {
-        date: shortDay(props.day, locale.value),
+        date: shortDay(props.day, locale.value, today.value),
         amount: answer.value?.approximate ? `≈ ${amount}` : amount,
       })
     })

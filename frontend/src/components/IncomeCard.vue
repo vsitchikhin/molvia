@@ -57,7 +57,7 @@ export default defineComponent({
   },
   setup(props) {
     const { t, locale } = useI18n()
-    const dayOf = (when: Date): string => purchaseDay(when, locale.value)
+    const dayOf = (when: Date): string => purchaseDay(when, locale.value, props.today)
     const accounts = useAccountsStore()
     return {
       t,

@@ -671,6 +671,19 @@ describe('MoneyView: what the review found (MOL-82)', () => {
     expect(moneyMonth).toHaveBeenLastCalledWith('2026-10', undefined)
   })
 
+  // MOL-329, self-review Р2-3: the screen's day moves at midnight with the screen in view, and the month of
+  // «Деньги» with it — past midnight September is no running month, and «к тому же дню» of it would lie.
+  it('midnight at the end of the month, the screen in view: it goes on to the new month by itself', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+    vi.setSystemTime(new Date('2026-09-30T23:59:00Z'))
+    moneyMonth.mockResolvedValue(month())
+    await render()
+    expect(moneyMonth).toHaveBeenLastCalledWith('2026-09', undefined)
+
+    await vi.advanceTimersByTimeAsync(2 * 60_000)
+    expect(moneyMonth).toHaveBeenLastCalledWith('2026-10', undefined)
+  })
+
   it('Т-7: the way to one’s categories is there before anything is spent', async () => {
     moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
     const view = await render()
