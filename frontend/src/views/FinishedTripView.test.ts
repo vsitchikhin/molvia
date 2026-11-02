@@ -14,7 +14,7 @@ import { ApiError } from '@molvia/client'
 import { ERROR, parseMoney, tripViewCodec } from '@molvia/model'
 import type { TripView } from '@molvia/model'
 import ru from '@/i18n/ru.json'
-import { dayOfAnyYear, localDay, shownMidnight, timeOfDay } from '@/days'
+import { dayOfAnyYear, localDay, timeOfDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { routes } from '@/router'
@@ -248,7 +248,7 @@ describe('FinishedTripView: шапка и состояния (MOL-207)', () => {
     const view = await render()
     expect(view.get('h1').text()).toBe('Ереван Сити')
     expect(subtitle(view).text()).toBe(
-      `Гюмри · ${dayOfAnyYear(at, 'ru', shownMidnight(localDay()))}, ${timeOfDay(at, 'ru')}`,
+      `Гюмри · ${dayOfAnyYear(at, 'ru', localDay())}, ${timeOfDay(at, 'ru')}`,
     )
     const strips = view.findAll('.strip')
     expect(strips).toHaveLength(1)
@@ -317,7 +317,7 @@ describe('FinishedTripView: шапка и состояния (MOL-207)', () => {
     trip.mockResolvedValue(fromReceipt)
     const view = await render(null)
     expect(subtitle(view).text()).toBe(
-      `${dayOfAnyYear(at, 'ru', shownMidnight(localDay()))}, ${timeOfDay(at, 'ru')} · ${ru.receipt.recorded.from_receipt}`,
+      `${dayOfAnyYear(at, 'ru', localDay())}, ${timeOfDay(at, 'ru')} · ${ru.receipt.recorded.from_receipt}`,
     )
   })
 })

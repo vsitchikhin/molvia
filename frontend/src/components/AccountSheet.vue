@@ -122,6 +122,7 @@
 </template>
 
 <script lang="ts">
+import { useLocalDay } from '@/composables/useLocalDay'
 import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -208,7 +209,8 @@ export default defineComponent({
     const currency = ref<Currency>('AMD')
     const kind = ref<Kind>('spending')
     const start = ref('')
-    const today = ref(localDay())
+    // The sheet's day moves as the app comes back and at midnight (MOL-329, adversarial А2, А3).
+    const today = useLocalDay()
     const startOn = ref(today.value)
     const nameProblem = ref<string | null>(null)
     const startBad = ref(false)

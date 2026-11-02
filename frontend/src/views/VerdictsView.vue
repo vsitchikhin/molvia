@@ -177,7 +177,7 @@ import type { StripKind } from '@/components/StatusStrip.vue'
 import VerdictCard from '@/components/VerdictCard.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
-import { dayOfAnyYear, shownMidnight } from '@/days'
+import { answeredAt } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 import type { Score } from '@/stores/verdictDrafts'
@@ -251,11 +251,11 @@ export default defineComponent({
       if (queue.stale.value === 'error') void queue.retry()
     }
 
-    // The screen's day, asked again as the app comes back (MOL-329). The list's moment moves only with an
-    // answer, so one of another year says its year, as the strip of «Настройки» does (MOL-215 Б2).
+    // The screen's day, asked again as the app comes back and at midnight (MOL-329). The list's moment is
+    // said as every strip says it — the day, its time, its year when another (self-review №1).
     const today = useLocalDay()
     function day(when: Date): string {
-      return dayOfAnyYear(when, locale.value, shownMidnight(today.value))
+      return answeredAt(when, locale.value, today.value)
     }
 
     function afterMove(): void {

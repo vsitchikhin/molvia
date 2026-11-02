@@ -285,8 +285,6 @@ import {
   dateOfAnyYear,
   dayOfAnyYear,
   purchaseDay,
-  shownDay,
-  shownMidnight,
   timeOfDay,
 } from '@/days'
 import { useNavigation } from '@/navigation'
@@ -484,7 +482,7 @@ export default defineComponent({
     }
 
     const when = (at: Date) => ({
-      day: purchaseDay(at, locale.value, shownMidnight(today.value)),
+      day: purchaseDay(at, locale.value, today.value),
       time: timeOfDay(at, locale.value),
     })
     // A printed day is a calendar day, never a moment (review 23). A receipt with no date of its own stands on the
@@ -494,7 +492,7 @@ export default defineComponent({
       const printed = row.summary?.header?.date
       if (printed)
         return {
-          day: calendarDayOfAnyYear(printed, locale.value, shownDay(today.value)),
+          day: calendarDayOfAnyYear(printed, locale.value, today.value),
           sent: false,
         }
       return { day: when(row.capturedAt).day, sent: true }
@@ -631,14 +629,14 @@ export default defineComponent({
       receiptsState,
       earlierDay: computed(() => {
         const last = rows.value.at(-1)
-        return last ? dateOfAnyYear(last.at, locale.value, shownMidnight(today.value)) : ''
+        return last ? dateOfAnyYear(last.at, locale.value, today.value) : ''
       }),
       open,
       pending,
       pendingFrom,
       positions,
       recordedMeta: (row: HistoryRow): string => {
-        const day = dayOfAnyYear(row.at, locale.value, shownMidnight(today.value))
+        const day = dayOfAnyYear(row.at, locale.value, today.value)
         if (row.itemCount === null) return day
         // a trip with its sum and no purchase — from a receipt with no items or typed by hand (MOL-78) —
         // is the sum, never «0 позиций»; «по чеку» says «из чека» already (MOL-227, Р-6, review 1 № 2)

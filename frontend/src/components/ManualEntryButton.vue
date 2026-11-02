@@ -63,7 +63,7 @@ import StartTripSheet from '@/components/StartTripSheet.vue'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useTripRows } from '@/composables/useTripRows'
-import { purchaseDay, shownMidnight, timeOfDay } from '@/days'
+import { purchaseDay, timeOfDay } from '@/days'
 import { afterStep } from '@/navigation'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -120,7 +120,7 @@ export default defineComponent({
             place,
             meta: since
               ? t('trip.manual_since', {
-                  day: purchaseDay(since, locale.value, shownMidnight(today.value)),
+                  day: purchaseDay(since, locale.value, today.value),
                   time: timeOfDay(since, locale.value),
                 })
               : null,

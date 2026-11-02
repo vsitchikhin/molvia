@@ -283,7 +283,7 @@ import { shown } from '@/composables/useItemDetails'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTripReceipt } from '@/composables/useTripReceipt'
-import { localDay, purchaseDay, shownMidnight, timeOfDay } from '@/days'
+import { localDay, purchaseDay, timeOfDay } from '@/days'
 import { afterStep, useNavigation } from '@/navigation'
 import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
@@ -414,7 +414,7 @@ export default defineComponent({
       return since
         ? t('trip.manual_meta', {
             when: t('trip.manual_since', {
-              day: purchaseDay(since, locale.value, shownMidnight(today.value)),
+              day: purchaseDay(since, locale.value, today.value),
               time: timeOfDay(since, locale.value),
             }),
           })

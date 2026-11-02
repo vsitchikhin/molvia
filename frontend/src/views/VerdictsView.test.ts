@@ -314,13 +314,15 @@ describe('VerdictsView', () => {
         new Date('2026-10-30T23:46:00.000Z'),
         new Date('2026-10-30T23:50:00.000Z'),
       )
-      expect(view.get('.strip').text()).toBe(en.verdict.stale.replace('{when}', 'today'))
+      expect(view.get('.strip').text()).toBe(en.verdict.stale.replace('{when}', 'today, 11:46 PM'))
       expect(view.text()).toContain('today · SAS')
 
       vi.setSystemTime(new Date('2026-10-31T00:10:00.000Z'))
       document.dispatchEvent(new Event('visibilitychange'))
       await flushPromises()
-      expect(view.get('.strip').text()).toBe(en.verdict.stale.replace('{when}', 'yesterday'))
+      expect(view.get('.strip').text()).toBe(
+        en.verdict.stale.replace('{when}', 'yesterday, 11:46 PM'),
+      )
       expect(view.text()).toContain('yesterday · SAS')
     })
 

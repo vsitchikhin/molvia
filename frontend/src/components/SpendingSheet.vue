@@ -221,6 +221,7 @@
 </template>
 
 <script lang="ts">
+import { useLocalDay } from '@/composables/useLocalDay'
 import { computed, defineComponent, nextTick, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -366,7 +367,9 @@ export default defineComponent({
     const amount = ref('')
     const currency = ref<Currency>('AMD')
     const categoryId = ref<string | null>(null)
-    const today = ref(localDay())
+    // The sheet's day moves as the app comes back and at midnight, so its words follow it while the day it
+    // opened on stays the record's (MOL-329, adversarial А2, А3).
+    const today = useLocalDay()
     const day = ref(today.value)
     /**
      * The latest day the sheet lets through: the phone's today, or the day of the spending being

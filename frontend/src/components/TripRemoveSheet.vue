@@ -35,7 +35,7 @@ import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { dayOfAnyYear, shownMidnight } from '@/days'
+import { dayOfAnyYear } from '@/days'
 
 /**
  * «Удалить поход?» (MOL-76, Р-2): asked only of a trip with purchases, and it names what goes —
@@ -80,7 +80,7 @@ export default defineComponent({
     const meta = computed(() =>
       [
         props.place,
-        props.day ? dayOfAnyYear(props.day, locale.value, shownMidnight(today.value)) : null,
+        props.day ? dayOfAnyYear(props.day, locale.value, today.value) : null,
         t('trip.items_count', { n: props.items }, props.items),
       ]
         .filter((part) => part !== null && part !== '')

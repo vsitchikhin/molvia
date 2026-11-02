@@ -433,7 +433,7 @@ import { useOnline } from '@/composables/useOnline'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { calendarDayOfAnyYear, dayOfAnyYear, localDay, shownDay, shownMidnight } from '@/days'
+import { calendarDayOfAnyYear, dayOfAnyYear, localDay } from '@/days'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { afterStep, useNavigation } from '@/navigation'
@@ -653,8 +653,8 @@ export default defineComponent({
 
     const dayOf = (at: Date | string) =>
       typeof at === 'string'
-        ? calendarDayOfAnyYear(at, locale.value, shownDay(today.value))
-        : dayOfAnyYear(at, locale.value, shownMidnight(today.value))
+        ? calendarDayOfAnyYear(at, locale.value, today.value)
+        : dayOfAnyYear(at, locale.value, today.value)
     const positions = (n: number): string => t('trip.items_count', { n }, n)
 
     const title = computed(() => {

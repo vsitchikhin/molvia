@@ -2114,6 +2114,43 @@ describe('PurchasesView (MOL-128)', () => {
       expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити», последняя — вчера')
     })
 
+    // Adversarial А4 of review 1: the clock read where a word was drawn made a strip redrawn by «Повторить» say
+    // «вчера» over rows still «сегодня». The screen's day moves at midnight itself, so every word moves with it.
+    it('полночь при открытом экране: всё «вчера» разом, без события; «Повторить» после — то же', async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+      vi.setSystemTime(new Date('2026-10-30T23:59:58.000Z'))
+      tripHistory.mockRejectedValue(new Error('HTTP 500'))
+      receipts.mockResolvedValue(receiptsResponseCodec.parse({ receipts: [reading] }))
+      pendingVerdicts.mockResolvedValue({
+        items: [card(1, 'Ереван Сити', new Date('2026-10-30T23:45:00.000Z'))],
+        total: 1,
+      })
+      const { view } = await render({
+        before: () => {
+          remember([row])
+          localStorage.setItem(`molvia.trip-history-at.${ME}`, READ.toISOString())
+        },
+      })
+      expect(view.get('.strip').text()).toContain('Сервер не ответил · покупки на сегодня, 23:40')
+      expect(rows(view)[0]?.text()).toContain('сегодня')
+
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(view.get('.strip').text()).toContain('Сервер не ответил · покупки на вчера, 23:40')
+      expect(rows(view)[0]?.text()).toContain('вчера')
+      expect(view.text()).toContain('Чек от вчера, 23:30')
+      expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити», последняя — вчера')
+
+      const asked = tripHistory.mock.calls.length
+      await view
+        .findAll('button')
+        .find((one) => one.text() === ru.state.retry)
+        ?.trigger('click')
+      await flushPromises()
+      expect(tripHistory.mock.calls.length).toBeGreaterThan(asked)
+      expect(view.get('.strip').text()).toContain('покупки на вчера, 23:40')
+      expect(rows(view)[0]?.text()).toContain('вчера')
+    })
+
     // A shelf moves its moment only with an answer, and «на 30 окт.» of last year read as this one (MOL-215 Б2).
     it('ответ другого года — полоса называет год', async () => {
       const { view } = await overnight(new Date('2025-10-30T10:05:00.000Z'))

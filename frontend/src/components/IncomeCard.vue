@@ -37,7 +37,7 @@ import { formatMoney } from '@molvia/model'
 import type { IncomeView } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import OperationCardHead from '@/components/OperationCardHead.vue'
-import { calendarDay, dayWords, purchaseDay, shownMidnight } from '@/days'
+import { calendarDay, dayWords, purchaseDay } from '@/days'
 import { useAccountsStore } from '@/stores/accounts'
 
 /**
@@ -57,8 +57,7 @@ export default defineComponent({
   },
   setup(props) {
     const { t, locale } = useI18n()
-    const dayOf = (when: Date): string =>
-      purchaseDay(when, locale.value, shownMidnight(props.today))
+    const dayOf = (when: Date): string => purchaseDay(when, locale.value, props.today)
     const accounts = useAccountsStore()
     return {
       t,

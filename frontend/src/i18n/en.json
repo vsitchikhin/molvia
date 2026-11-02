@@ -1953,7 +1953,7 @@
     "savings_tag": "savings",
     "total": "Total",
     "total_foot": "Spendable {spendable} · savings {savings}",
-    "stale": "Offline · balances as of {time}",
+    "stale": "Offline · balances as of {when}",
     "unassigned": "{n} entry isn't in any balance | {n} entries aren't in any balance",
     "load_failed": "Couldn't load balances",
     "done": "Done",
@@ -1990,8 +1990,8 @@
       "removed": "Deleted: {name}",
       "removed_announced": "Deleted: {name}. Undo within 10 seconds",
       "archived_done": "“{name}” put away — find it under “Put away”",
-      "offline": "Offline · balances as of {time}. Accounts and checks wait for a connection",
-      "unanswered": "The server did not answer · balances as of {time}",
+      "offline": "Offline · balances as of {when}. Accounts and checks wait for a connection",
+      "unanswered": "The server did not answer · balances as of {when}",
       "empty": {
         "body": "Add cash and cards — balances will follow your spending, income, exchanges and purchases"
       },
@@ -2164,7 +2164,7 @@
     "card_from": "from “{name}”",
     "card_to": "to “{name}”",
     "card_name": "“{name}”",
-    "stale_error": "Couldn’t refresh — balances as of {time}"
+    "stale_error": "Couldn’t refresh — balances as of {when}"
   },
   "update": {
     "ready": "A new version is out",

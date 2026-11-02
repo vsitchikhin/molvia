@@ -178,6 +178,7 @@
 </template>
 
 <script lang="ts">
+import { useLocalDay } from '@/composables/useLocalDay'
 import { computed, defineComponent, reactive, ref, toRef, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -221,7 +222,7 @@ import { useAccountChoice } from '@/composables/useAccountChoice'
 import { useOnline } from '@/composables/useOnline'
 import { useAccountsStore } from '@/stores/accounts'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, purchaseDay, shownMidnight } from '@/days'
+import { calendarDay, localDay, purchaseDay } from '@/days'
 import { newId } from '@/ids'
 
 type Side = 'given' | 'received'
@@ -309,7 +310,9 @@ export default defineComponent({
     const amounts = reactive<Record<Side, string>>({ given: '', received: '' })
     const currencies = reactive<Record<Side, Currency>>({ given: 'RUB', received: 'AMD' })
     const amountErrors = reactive<Record<Side, ErrorCode | null>>({ given: null, received: null })
-    const today = ref(localDay())
+    // The sheet's day moves as the app comes back and at midnight, so its words follow it while the day it
+    // opened on stays the record's (MOL-329, adversarial А2, А3).
+    const today = useLocalDay()
     const day = ref(today.value)
     const held = ref('')
     const note = ref('')
@@ -507,7 +510,7 @@ export default defineComponent({
     /** «до 25 сент.: 20 000 ₽ → 100 000 ֏ · 16 сент. · ВТБ банкомат» */
     function versionOf(version: ExchangeView['history'][number]): string {
       const words = {
-        until: purchaseDay(version.replacedAt, locale.value, shownMidnight(today.value)),
+        until: purchaseDay(version.replacedAt, locale.value, today.value),
         amounts: t('exchange.row_amounts', {
           given: formatMoney(version.given, locale.value),
           received: formatMoney(version.received, locale.value),

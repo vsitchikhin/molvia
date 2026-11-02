@@ -257,6 +257,28 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
     expect(dayField().max).toBe('2026-09-28')
   }, 15_000)
 
+  // MOL-329, adversarial А3: the sheet's day moves as the app comes back, and its words follow it — the day
+  // chosen at the opening stays the spending's, now «Yesterday», never «Today» of yesterday.
+  it('opened at 23:50 and back in view after midnight: the line says «Yesterday» of the day it holds', async () => {
+    vi.setSystemTime(new Date('2026-09-28T23:50:00Z'))
+    moneyMonth.mockResolvedValue(month('2026-09-28'))
+    const view = await render()
+    await view
+      .findAll('button')
+      .find((one) => one.text().trim() === en.spending.summary.add)
+      ?.trigger('click')
+    await risen()
+    expect(detailsRow().textContent.trim()).toBe('Today · no note')
+
+    vi.setSystemTime(new Date('2026-09-29T00:10:00Z'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await risen()
+    expect(detailsRow().textContent.trim()).toBe('Yesterday · no note')
+    await openDetails()
+    expect(dayField().value).toBe('2026-09-28')
+    expect(dayField().max).toBe('2026-09-29')
+  }, 15_000)
+
   it('a new spending on a day the phone has not reached is refused (must not fire)', async () => {
     moneyMonth.mockResolvedValue(month('2026-09-28'))
     const view = await render()

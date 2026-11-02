@@ -164,7 +164,7 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useReconnect } from '@/composables/useReconnect'
 import { provideStateStrip } from '@/composables/useStateStrip'
-import { purchaseDay, shownMidnight } from '@/days'
+import { purchaseDay } from '@/days'
 import { focusScreenTitle } from '@/transitions'
 import { usePwaUpdate } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
@@ -247,7 +247,7 @@ export default defineComponent({
       if (!view) return null
       return {
         place: `${view.city} · ${view.spendCurrency} → ${view.incomeCurrency}`,
-        day: purchaseDay(view.createdAt, locale.value, shownMidnight(today.value)),
+        day: purchaseDay(view.createdAt, locale.value, today.value),
       }
     })
 

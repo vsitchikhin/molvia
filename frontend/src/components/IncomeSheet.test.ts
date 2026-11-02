@@ -299,6 +299,33 @@ describe('IncomeSheet', () => {
 
 // MOL-189, Ф-34, owner's В-1 «а»: removing is the amendment's, and only where the screen offers
 // «Вернуть» after it — never in a new income, never from an account's journal.
+// MOL-329, adversarial А2: a version's day is the sheet's day, which moves as the app comes back.
+describe('IncomeSheet: a version after midnight (MOL-329)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('«until today» at 23:50, «until yesterday» once the app is back after midnight', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-30T23:50:00.000Z'))
+    const at = new Date('2026-10-30T23:45:00.000Z')
+    const [version] = amended.history
+    if (!version) throw new Error('the fixture has a version')
+    const late: IncomeView = {
+      ...amended,
+      amendedAt: at,
+      history: [{ ...version, replacedAt: at }],
+    }
+    const view = await render(overview(), late)
+    expect(view.get('.versions li').text()).toMatch(/^until today: /)
+
+    vi.setSystemTime(new Date('2026-10-31T00:10:00.000Z'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(view.get('.versions li').text()).toMatch(/^until yesterday: /)
+  })
+})
+
 describe('IncomeSheet: removing from the amendment (MOL-189)', () => {
   const words = (view: VueWrapper) => view.findAll('button').map((button) => button.text())
 

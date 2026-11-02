@@ -3,16 +3,17 @@
  * «12 сент.» (MOL-28, Р-6). By the calendar of the phone, not by 24-hour spans: bought at 23:50
  * and asked at 00:10 is «yesterday» to a person, however few minutes passed.
  *
- * `now` is the screen's day (`shownMidnight`), never a default of the clock (MOL-329): read where the
- * words were drawn, it stayed yesterday's on a row the night did not redraw.
+ * Counted from `today`, the screen's day (`useLocalDay`), and never from the clock (MOL-329): read where
+ * the words were drawn, the clock made each word of a screen as old as its last redraw — after midnight a
+ * strip redrawn by «Повторить» said «вчера» over a row still «сегодня» (adversarial А4).
  *
  * Presentation, not a rule: the words come from `Intl` in the app's language, and the caps of
  * the card are a style, never the text.
  */
-export function purchaseDay(when: Date, locale: string, now: Date): string {
+export function purchaseDay(when: Date, locale: string, today: string): string {
   // Never in the future: a phone whose clock lags the server's would call today's purchase by
   // its date (self-review С-7).
-  const days = Math.max(0, Math.round((startOfDay(now) - startOfDay(when)) / DAY_MS))
+  const days = Math.max(0, daysBetween(when, today))
   if (days === 0 || days === 1) {
     return new Intl.RelativeTimeFormat(locale, { numeric: 'auto' }).format(-days, 'day')
   }
@@ -24,10 +25,10 @@ export function purchaseDay(when: Date, locale: string, now: Date): string {
  * for as long as it is used, so «вошли 12 сент.» may be a September of another year. Only where a
  * date can be that old — a purchase card is never older than its trip.
  */
-export function dayOfAnyYear(when: Date, locale: string, now: Date): string {
+export function dayOfAnyYear(when: Date, locale: string, today: string): string {
   // «Вчера» beats the year: 31 December seen on 1 January is yesterday, whatever the calendar.
-  const days = Math.round((startOfDay(now) - startOfDay(when)) / DAY_MS)
-  if (when.getFullYear() === now.getFullYear() || days <= 1) return purchaseDay(when, locale, now)
+  if (sameYear(when, today) || daysBetween(when, today) <= 1)
+    return purchaseDay(when, locale, today)
   return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
@@ -38,13 +39,19 @@ export function dayOfAnyYear(when: Date, locale: string, now: Date): string {
 /**
  * A day as a date always, the year only when not this one: «19 сент.», never «вчера» — for a sentence
  * that puts its own word before the day, «Раньше 19 сент. — со связью» (MOL-204, Р-9), where «Раньше
- * вчера» is no Russian.
+ * вчера» is no Russian. The month is short unless a sentence wants it whole — «убран из выбора 21 сентября
+ * 2025 г.» (MOL-329, adversarial А5: a moment kept for good printed by `Intl` in place had no year).
  */
-export function dateOfAnyYear(when: Date, locale: string, now: Date): string {
+export function dateOfAnyYear(
+  when: Date,
+  locale: string,
+  today: string,
+  month: 'short' | 'long' = 'short',
+): string {
   return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
-    month: 'short',
-    ...(when.getFullYear() === now.getFullYear() ? {} : { year: 'numeric' }),
+    month,
+    ...(sameYear(when, today) ? {} : { year: 'numeric' }),
   }).format(when)
 }
 
@@ -60,35 +67,16 @@ export function timeOfDay(when: Date, locale: string): string {
 
 /**
  * When the answer on screen came — «сегодня, 14:05», «14 окт., 14:05», «30 окт. 2025 г., 10:05» — for the strip of the
- * connection (MOL-181). Counted from the later of the day the screen holds (`useLocalDay`) and the
- * clock's: the screen's day draws the strip again when the app comes back into view on another day
- * (adversarial А2 of MOL-187), and the clock's is right for a redraw made past midnight before the
- * screen heard of it (round 2, Б2). An answer of a day neither has reached yet is today's.
+ * connection (MOL-181). Counted from the screen's day (`useLocalDay`), which moves when the app comes back
+ * into view (adversarial А2 of MOL-187) and at midnight with the screen in view (MOL-329) — so a redraw past
+ * midnight says what every other word of the screen says (MOL-187's Б2 read the clock here, and a strip
+ * redrawn alone said «вчера» over rows still «сегодня»). An answer of a day the screen has not reached yet is
+ * today's.
  */
-export function answeredAt(at: Date, locale: string, today: string, now = new Date()): string {
+export function answeredAt(at: Date, locale: string, today: string): string {
   // With its year when another: a memory may be that old — the settings' moment moves only with an
   // answer (MOL-215, adversarial Б2), and a kept month may be read last a year ago.
-  return `${dayOfAnyYear(at, locale, shownMidnight(today, now))}, ${timeOfDay(at, locale)}`
-}
-
-/**
- * The screen's day as a moment, its local midnight: what `purchaseDay`, `dayOfAnyYear` and `dateOfAnyYear`
- * count from (MOL-329). Every word of a day on a screen is said from the same day, or a strip said «вчера»
- * over a row of a later moment still «сегодня».
- */
-export function shownMidnight(today: string, now = new Date()): Date {
-  const [year = 0, month = 1, date = 1] = shownDay(today, now).split('-').map(Number)
-  return new Date(year, month - 1, date)
-}
-
-/**
- * The day a screen draws its words by: the later of the day it holds (`useLocalDay`) and the clock's.
- * The held day is asked again only when the app comes back into view, so a redraw made past midnight
- * before the screen heard of it would speak of yesterday (MOL-187, Б2; MOL-188, А1).
- */
-export function shownDay(today: string, now = new Date()): string {
-  const clock = localDay(now)
-  return clock > today ? clock : today
+  return `${dayOfAnyYear(at, locale, today)}, ${timeOfDay(at, locale)}`
 }
 
 /**
@@ -115,6 +103,19 @@ const DAY_MS = 86_400_000
 // or from summer time adds or takes away.
 function startOfDay(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
+}
+
+/** Calendar days from the moment's day to `today`, a day of the phone's calendar. */
+function daysBetween(when: Date, today: string): number {
+  const [year = 0, month = 1, date = 1] = today.split('-').map(Number)
+  const midnight = new Date(2000, month - 1, date)
+  // `setFullYear`, since the constructor reads a year under 100 as 19xx (a clock at year 1, MOL-121).
+  midnight.setFullYear(year)
+  return Math.round((midnight.getTime() - startOfDay(when)) / DAY_MS)
+}
+
+function sameYear(when: Date, today: string): boolean {
+  return when.getFullYear() === Number(today.slice(0, 4))
 }
 
 /**
