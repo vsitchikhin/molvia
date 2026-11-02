@@ -191,7 +191,9 @@ the round trip through Telegram, and ask whose account this turned out to be.
   is all along the one the person was going to: a link from the bot to `/advice` opens «Что
   брать» the moment they are in. A `/login` entry would have to be written into the rules of
   «back» (MOL-17) and would need to remember, separately from the address bar, where the person
-  was headed. The one price is the tab's title, which the screen sets and puts back.
+  was headed. The one price is the tab's title, which the screen sets and puts back. **Opened onto the
+  app, the door puts the screen at its top** (MOL-330): the step of the terms stands taller than a phone,
+  and the screen came in scrolled down as far as «Принимаю»; a public screen stays where it was read.
 - **Behind the door a public screen leads back to the door** (MOL-216, Е-9): «Данные и
   приватность» and «Условия» open without a session, and their parent is «Настройки», where nobody
   is let in — the chevron said «‹ Настройки» and `App.vue` drew the login at `/settings`. While

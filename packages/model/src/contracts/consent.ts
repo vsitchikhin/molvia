@@ -13,7 +13,7 @@ import { z } from 'zod'
  * not exist yet. Which edition to ask about is the phone's (Р-3): the person accepts the text they
  * are shown, and that is the text of their build.
  */
-export const POLICY_VERSION = 5
+export const POLICY_VERSION = 6
 
 /**
  * The first edition whose text asks consent to the statistics (MOL-236): Armenia's law knows no
@@ -22,6 +22,15 @@ export const POLICY_VERSION = 5
  * build not yet updated) or none is neither written nor counted.
  */
 export const STATISTICS_CONSENT_EDITION = 2
+
+/**
+ * The first edition that names the measure of the search among the statistics (MOL-330, owner's В-1 «а»): what a
+ * person took by which query is theirs alone, «Это видно только вам», until they accepted that the developer measures
+ * the search by those pairs — by key, with no name and no account's number, the export deleted after the measure. A
+ * new purpose, so an edition: who accepted an older one is never in the measure, nor is whoever turned «Учитывать
+ * меня в статистике» off. Never below `STATISTICS_CONSENT_EDITION`: the measure is part of that consent.
+ */
+export const PICKS_CONSENT_EDITION = 6
 
 /**
  * The first edition that says where Anthropic has a receipt's photo (MOL-319, owner's В-2 «а»): it stores in
