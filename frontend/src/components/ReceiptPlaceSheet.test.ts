@@ -266,6 +266,26 @@ describe('ReceiptPlaceSheet (MOL-109, adversarial А2): a receipt of another cou
     expect(name.element.getAttribute('aria-invalid')).toBeNull()
   })
 
+  it('must not fire: opened again, the name refused before is not marked (adversarial Р2-А1)', async () => {
+    clock = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    const view = await away(null)
+    clock += 1000
+    await view
+      .get('input:not([type="date"])')
+      .setValue(`Ереван Сити${String.fromCodePoint(0xe000)}`)
+    ;(view.get('dialog[open] .footer button').element as HTMLButtonElement).click()
+    await flushPromises()
+    expect(view.get('input:not([type="date"])').element.getAttribute('aria-invalid')).toBe('true')
+    await view.setProps({ open: false })
+    await flushPromises()
+    await view.setProps({ open: true })
+    await flushPromises()
+    const name = view.get('input:not([type="date"])').element
+    expect(name.getAttribute('aria-invalid')).toBeNull()
+    expect(view.text()).not.toContain(ru.spending.sheet.bad_text)
+  })
+
   it('takes the city read off the receipt first', async () => {
     await away({ name: 'SAS', city: 'Ереван' })
     expect(select()?.value).toBe('Ереван')

@@ -146,6 +146,8 @@ export default defineComponent({
     const places = useRecentPlacesStore()
     const chosen = ref<string | null>(null)
     const name = ref('')
+    /** A shop named in what no place takes, refused at the tap (adversarial А2 of MOL-333). */
+    const nameBad = ref(false)
     const when = ref(props.day)
     /**
      * The latest day the sheet lets through: the phone's today, or the day it opened with when that
@@ -187,6 +189,7 @@ export default defineComponent({
       (open) => {
         if (!open) return
         when.value = props.day
+        nameBad.value = false
         name.value = props.current ? '' : (props.proposed ?? '')
         chosen.value = props.current ? 'current' : null
         const read = props.current ? settingsCityOf(props.current.city) : null
@@ -225,7 +228,6 @@ export default defineComponent({
           ? 'day'
           : null,
     )
-    const nameBad = ref(false)
     const sheet = ref<{ $el: Element } | null>(null)
     const refuse = useFieldRefusal()
 
