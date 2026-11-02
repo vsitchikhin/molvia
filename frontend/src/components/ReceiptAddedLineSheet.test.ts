@@ -30,7 +30,7 @@ async function render(line: AddedLineDraft | null = null) {
   const props = {
     open: true,
     line,
-    currency: 'AMD',
+    currency: 'AMD' as const,
     onSaved: (draft: AddedLineDraft) => saved.push(draft),
   }
   // Under an announcer, as `App.vue` holds every sheet: what the sheet says lands in its region.

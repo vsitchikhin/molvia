@@ -46,7 +46,7 @@ async function render(day: string, announced = false) {
   const chosen: [unknown, string][] = []
   const props = {
     open: true,
-    country: 'AM',
+    country: 'AM' as const,
     current: { id: PLACE, name: 'Ереван Сити', city: 'Гюмри' },
     read: true,
     day,
