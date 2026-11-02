@@ -317,14 +317,18 @@ export function createMergeRepository(db: Conn): MergeRepository {
         // The rows stay where they are and trade what they say: the winner's words, score and moments
         // go to the survivor's row, the loser's to the trace's. Moved as rows, the two would cross
         // through the unique key, which holds row by row.
-        await tx.execute(sql`
+        const swapped = await tx.execute<{ id: string; at: string }>(sql`
           update verdicts v
           set score = o.score, review = o.review, rated_at = o.rated_at,
               updated_at = o.updated_at, deleted_at = o.deleted_at
           from verdicts o
           where (v.id, o.id) in ((${row.trace}::uuid, ${row.kept}::uuid),
-                                 (${row.kept}::uuid, ${row.trace}::uuid))`)
-        moved.push({ what: 'verdict_swapped', key: { kept: row.kept, trace: row.trace } })
+                                 (${row.kept}::uuid, ${row.trace}::uuid))
+          returning v.id, v.updated_at::text as at`)
+        // The survivor's row as the merge left it, to the microsecond: touched since, it holds the
+        // person's word about the survivor, and the undo leaves it (MOL-299, А3).
+        const at = swapped.find((one) => one.id === row.kept)?.at
+        moved.push({ what: 'verdict_swapped', key: { kept: row.kept, trace: row.trace, at } })
       }
       const withdrawn = await tx.execute(sql`
         update verdicts set deleted_at = greatest(clock_timestamp(), rated_at), review = null
@@ -363,16 +367,16 @@ export function createMergeRepository(db: Conn): MergeRepository {
             where t.item_id = ${from}`,
       )),
     )
-    ids(
-      await tx.execute<{ id: string }>(sql`
-        update verdicts t set item_id = ${into}
-        where t.item_id = ${from}
-          and not exists (select 1 from verdicts k
-                          where k.actor_id = t.actor_id and k.item_id = ${into}
-                            and k.place_id is not distinct from t.place_id)
-        returning id`),
-      'verdict',
-    )
+    // With its moment, as `verdict_swapped` (MOL-299, А3).
+    for (const row of await tx.execute<{ id: string; at: string }>(sql`
+      update verdicts t set item_id = ${into}
+      where t.item_id = ${from}
+        and not exists (select 1 from verdicts k
+                        where k.actor_id = t.actor_id and k.item_id = ${into}
+                          and k.place_id is not distinct from t.place_id)
+      returning id, updated_at::text as at`)) {
+      moved.push({ what: 'verdict', key: { id: row.id, at: row.at } })
+    }
 
     // A pick of the same query on both: one row, the counts added and «own word» kept if either was;
     // the trace's figures and the survivor's own written down, so the undo puts both back (А7).
@@ -495,14 +499,14 @@ export function createMergeRepository(db: Conn): MergeRepository {
             where t.place_id = ${from}`,
       )),
     )
-    for (const row of await tx.execute<{ id: string }>(sql`
+    for (const row of await tx.execute<{ id: string; at: string }>(sql`
       update verdicts t set place_id = ${into}
       where t.place_id = ${from}
         and not exists (select 1 from verdicts k
                         where k.actor_id = t.actor_id and k.item_id = t.item_id
                           and k.place_id = ${into})
-      returning id`)) {
-      moved.push({ what: 'verdict', key: { id: row.id } })
+      returning id, updated_at::text as at`)) {
+      moved.push({ what: 'verdict', key: { id: row.id, at: row.at } })
     }
     for (const row of await tx.execute<{ id: string }>(
       sql`update places set merged_into = ${into} where merged_into = ${from} returning id`,
@@ -640,7 +644,12 @@ export function createMergeRepository(db: Conn): MergeRepository {
         // Every row goes back only from where this merge put it — the survivor, or what that was merged
         // into since. A row moved on by somebody's own act after the merge is theirs and stays: a code
         // given to another item, a new word of the shop's memory (adversarial А4); a row a later merge
-        // took on and whose undo came first is home already (А3).
+        // took on and whose undo came first is home already (А3). So does a verdict the person touched
+        // since — rated, amended or withdrawn on the survivor, it is their word about the survivor, and
+        // taken home, or swapped back, it put that word on the trace (MOL-299, А3). Its moment is held to
+        // the microsecond; a move written before MOL-299 has none and goes back as it did.
+        const untouched = (row: SQL, at: string | number | undefined) =>
+          at === undefined ? sql`true` : sql`${row}.updated_at = ${at}::timestamptz`
         for (const move of moves) {
           const key = move.key
           switch (move.what) {
@@ -656,7 +665,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
               // Skipped when the trace has got a verdict of the same person since: never two.
               await tx.execute(sql`
                 update verdicts v set ${column} = ${from}
-                where v.id = ${key.id} and v.${column} = ${now}
+                where v.id = ${key.id} and v.${column} = ${now} and ${untouched(sql`v`, key.at)}
                   and not exists (
                     select 1 from verdicts o
                     where o.actor_id = v.actor_id and o.id <> v.id
@@ -664,9 +673,17 @@ export function createMergeRepository(db: Conn): MergeRepository {
                       and o.place_id is not distinct from ${item ? sql`v.place_id` : sql`${from}::uuid`})`)
               break
             case 'verdict_withdrawn':
+              // Kept withdrawn where its swap stays (below): the trace's row holds the survivor's
+              // old words then, never the trace's.
               await tx.execute(sql`
                 update verdicts set deleted_at = null
-                where id = ${key.id} and ${column} = ${from} and deleted_at is not null`)
+                where id = ${key.id} and ${column} = ${from} and deleted_at is not null
+                  and not exists (
+                    select 1 from catalogue_merge_moves s
+                    join verdicts k on k.id = (s.key->>'kept')::uuid
+                    where s.merge_id = ${id} and s.what = 'verdict_swapped'
+                      and s.key->>'trace' = ${key.id}::text and s.key ? 'at'
+                      and k.updated_at <> (s.key->>'at')::timestamptz)`)
               break
             case 'verdict_swapped':
               await tx.execute(sql`
@@ -676,7 +693,8 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 from verdicts o
                 where (v.id, o.id) in ((${key.kept}::uuid, ${key.trace}::uuid),
                                        (${key.trace}::uuid, ${key.kept}::uuid))
-                  and exists (select 1 from verdicts k where k.id = ${key.kept} and k.${column} = ${now})
+                  and exists (select 1 from verdicts k where k.id = ${key.kept} and k.${column} = ${now}
+                                and ${untouched(sql`k`, key.at)})
                   and exists (select 1 from verdicts t where t.id = ${key.trace} and t.${column} = ${from})`)
               break
             case 'pick':

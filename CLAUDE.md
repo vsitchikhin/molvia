@@ -203,8 +203,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A merged item or place stays a trace** (`merged_into`): its name is the survivor's second name,
   every write by an id goes through `liveItemId` / `livePlaceId`, the search answers the survivor once;
   one person's two verdicts stay two rows, so the gate does not move. **Production runs
-  `CATALOGUE_MERGE=on` since 02.11.2026** (MOL-299: 28 nights of `report`, not one false pair);
-  `make unmerge ID=` takes a merge back, a chain from its end.
+  `CATALOGUE_MERGE=report` until MOL-358** (MOL-299: 28 nights named no pair to merge, so the rule has met
+  no live twin; it merges «Курица вареная» into «Курица жареная» by itself); `make unmerge ID=` takes a
+  merge back, a chain from its end, with what a trace's id wrote since — never a verdict touched since.
 
 - **«Брали здесь в прошлый раз» is the server's, the phone keeps it per place** (MOL-209): the last
   finished trip with a purchase at the trip's place before it, less what this trip holds — the server's

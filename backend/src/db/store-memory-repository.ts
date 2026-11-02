@@ -5,7 +5,7 @@ import { storeMemoryWords } from '@molvia/model'
 import type { Currency, Money, StoreMemoryKind, StoreMemoryWord } from '@molvia/model'
 import type { Conn, Db } from './index'
 import { storeMemory } from './schema'
-import { liveItemId } from './trace'
+import { liveItemId, noteTraceWrite } from './trace'
 
 /**
  * What the memory says a key is: the item, and whether it is the person's own word; the shelf price of
@@ -303,7 +303,7 @@ export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
       if (last.length === 0) return
       // the lock the removals settle the person's words under (MOL-240, round 3, Р3-3)
       await lockWords(db, [actorId])
-      await db
+      const written = await db
         .insert(storeMemory)
         .values(
           last.map((word) => ({
@@ -332,6 +332,20 @@ export function createStoreMemoryRepository(db: Conn): StoreMemoryRepository {
             writtenAt: sql`now()`,
           },
         })
+        .returning({
+          id: storeMemory.id,
+          kind: storeMemory.kind,
+          key: storeMemory.key,
+          itemId: storeMemory.itemId,
+        })
+      // A word about a trace's id goes home with an undo (MOL-299, А2).
+      const asked = new Map(last.map((word) => [memoryKey(word), word.itemId.toLowerCase()]))
+      for (const row of written) {
+        const itemId = asked.get(memoryKey(row))
+        if (itemId !== undefined && itemId !== row.itemId) {
+          await noteTraceWrite(db, 'item', itemId, 'store_memory', { id: row.id })
+        }
+      }
     },
   }
 }

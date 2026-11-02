@@ -818,6 +818,26 @@ report.
   «Молоко 3,2%», does not merge into what that went into (А5). The owner's `make merge` still may (В-2). A
   pick has no id, so its move names its person and **goes with the person by the cascade**
   (`ACTOR_REFERENCES`); the copy of a person's data leaves the journal out, the pick itself being in it.
+- **What a trace's id writes after its merge goes home with the undo** (MOL-299, adversarial А2): a
+  purchase a phone queued before the night, a first verdict by a bot's button, a new pick, a word of the
+  shop's memory, a code, a receipt's trip at a place named by its id — `liveItemId` lands each on the
+  survivor past the journal, and `unmerge` left it there for good. So the path that writes it notes the
+  row under every merge on the trace's way to the survivor (`noteTraceWrite`), where the id asked is not
+  the row's now, and the undo takes it a merge back as it takes what the merge moved — a chain step by
+  step, from its end. A verdict is noted only as a first one, a pick only as a new row: one added to the
+  survivor's own was the survivor's before the merge. **A verdict the person touched since stays**
+  (adversarial А3): rated, amended or withdrawn on the survivor, it is their word about the survivor, and
+  taken home or swapped back it put that word on the trace, crossing the scores — «Курица вареная» 1
+  merged, the person gives «Курица жареная» 5, and the undo gave «вареная» the 5. Each verdict the merge
+  moves or swaps is written with its `updated_at` to the microsecond, and the undo moves or swaps back only
+  a row still at it; a swap kept leaves the trace's row withdrawn. **The prices, named:** the trace's own
+  score is lost where the person rated the survivor over it (the row was one); the trace's row so kept
+  holds the survivor's old score, withdrawn — the gate, the reminder and the copy read it; what is written
+  by a trace's **name** — «Предложить товар», a receipt's new line, a place at the door — stays with the
+  survivor, the name being the survivor's second; a row the trace's id changed rather than wrote — a pick
+  added to, a verdict amended — stays where it is; and a move written before MOL-299 has no moment and goes
+  back as it did. **A dry run of `make merge` prints no number** (adversarial А4): the identity it takes is
+  not rolled back, and «make unmerge ID=» of a dry run named a merge that would never be.
 - **The night** (`mergeTick`): a minute timer in the API, from 04:30 Yerevan — after the copy of the
   database at 04:00, so a copy before every merge exists — claimed by its day in
   `catalogue_merge_runs`, so two instances never run one night and a night slept through runs on waking;
@@ -837,13 +857,18 @@ report.
   survivor is near the other side too («Сыр чанох» merged into «Сыр чанах», whose pair with «Сыр чунух»
   is 0.64: never asked) — in `report`, where nothing merged, it is named as it is.
 - **`CATALOGUE_MERGE`**: `on` merges, `report` says what it would and merges nothing — it only sweeps
-  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production ran `report` until
-  the owner said `on`** (В-3): the thresholds stood on a corpus, not yet on live twins. **`on` since
-  02.11.2026** (MOL-299, owner's rule В-3 «а»: `on` before the tag of 0.2 once no pair the night would
-  merge is false): 28 nights of `report`, 06.10…02.11, named none to merge — not one false, nor one true —
-  and of 14 candidates 12 were the seed against itself, set apart by hand, one a receipt's twin across two
-  scripts, merged by hand. The rule has met no live twin yet; what stands between a false merge and «Что
-  брать» is the morning's report with its numbers and `make unmerge`. A pair
+  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `report` until
+  MOL-358** (В-3; MOL-299): the thresholds stand on a corpus, not on live twins. **28 nights of `report`,
+  06.10…02.11, named none to merge** — not one false, nor one true, so the rule has met no live twin — and
+  the owner's rule for `on` (В-3 «а» of MOL-299: before the tag of 0.2, once no pair the night would merge
+  is false) let it in for one evening, 02.11. **The adversarial pass of MOL-299 found the false pair the
+  nights could not**: a way of cooking one letter apart merges by itself — «Курица вареная» into «Курица
+  жареная» at 0.929, «Грибы тушёные» into «Грибы сушёные» at 0.946, seven pairs of seven — since a word is
+  one edit and the model reads a name by its letters; the seed has no such pair, people's items do. So
+  production went back to `report` on 03.11, before a night merged anything, and MOL-358 mends the rule and
+  turns `on` as its last step. Of the 14 candidates of those nights 12 were the seed against itself, set
+  apart by hand, one a receipt's twin across two scripts merged by hand (#1), and one a place in Gyumri
+  left as it is. A pair
   only reported comes with its command **`make apart FROM= INTO=`** (review №7, owner's decision
   05.10.2026): the owner says two things are apart before `on` merges them. `catalogue_apart` holds the
   pair by its ids; the night reads it as a pair undone — by the live things its ends stand in now —

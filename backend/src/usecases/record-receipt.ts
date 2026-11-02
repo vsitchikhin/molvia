@@ -346,6 +346,8 @@ export async function recordReceipt(
       {
         id: body.tripId,
         placeId: place.id,
+        // the id named, for the undo of a merge of places to take the trip home (MOL-299, А2)
+        ...('id' in body.place ? { placeAsked: body.place.id } : {}),
         day: body.purchasedOn,
         deviceAt:
           held.printedOn === body.purchasedOn

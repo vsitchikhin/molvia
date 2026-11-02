@@ -6,7 +6,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
 import { actors, items, verdicts } from './schema'
-import { liveItemId } from './trace'
+import { liveItemId, noteTraceWrite } from './trace'
 
 export interface RatedVerdict {
   readonly verdict: Verdict
@@ -24,8 +24,11 @@ export interface RatedVerdict {
 }
 
 export interface VerdictRepository {
-  /** Rating and re-rating are the same call: the second one replaces the first opinion. */
-  put(actorId: string, input: NewVerdict): Promise<RatedVerdict>
+  /**
+   * Rating and re-rating are the same call: the second one replaces the first opinion. `asked` is the
+   * id the person rated by, when the item read was another — a trace's survivor (MOL-299, А2).
+   */
+  put(actorId: string, input: NewVerdict, asked?: string): Promise<RatedVerdict>
   /**
    * Changes part of the person's verdict on a product; `review: null` erases the text, which
    * `put` cannot do. `null` when there is nothing of theirs to change — none, withdrawn, or
@@ -229,7 +232,7 @@ const PAST_READABLE = Date.parse('+010000-01-01T00:00:00Z')
 
 export function createVerdictRepository(db: Conn): VerdictRepository {
   return {
-    async put(actorId, input) {
+    async put(actorId, input, asked) {
       const placeId = input.placeId ?? null
 
       /*
@@ -269,7 +272,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             .for('update')
 
           const rows = await tx.execute<
-            VerdictShape & { inserted: boolean } & Record<string, unknown>
+            VerdictShape & { inserted: boolean; touched: string } & Record<string, unknown>
           >(sql`
           insert into ${verdicts} (id, actor_id, item_id, item_kind, place_id, score, review)
           select
@@ -295,9 +298,16 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
             review,
             rated_at as "ratedAt",
             updated_at as "updatedAt",
+            updated_at::text as touched,
             xmax = 0 as inserted
         `)
-          return { row: rows[0], withdrawn: prior !== undefined && prior.deletedAt !== null }
+          const [first] = rows
+          // A first verdict by a trace's id goes home with an undo while nobody touched it since
+          // (MOL-299, А2, А3): the moment is held to the microsecond, which a `Date` loses.
+          if (first?.inserted && asked !== undefined && asked.toLowerCase() !== first.itemId) {
+            await noteTraceWrite(tx, 'item', asked, 'verdict', { id: first.id, at: first.touched })
+          }
+          return { row: first, withdrawn: prior !== undefined && prior.deletedAt !== null }
         }),
       )
 
@@ -328,6 +338,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       // it, and that refusal is left untranslated on purpose (the use case must catch it
       // first, so reaching the database with it is a defect in this server).
       if (!row) throw new DomainError(ERROR.NOT_FOUND)
+      // `touched` goes along and `verdictSchema` drops it
       const { inserted, ...verdict } = row
       return { verdict: toVerdict(verdict), created: inserted || withdrawn, first: inserted }
     },

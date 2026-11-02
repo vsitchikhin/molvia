@@ -3,7 +3,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { searchQueryKey } from './items-repository'
 import { QUERY_KEY_MAX_OCTETS, searchPicks } from './schema'
-import { liveItemId } from './trace'
+import { liveItemId, noteTraceWrite } from './trace'
 
 export interface SearchPickRepository {
   /**
@@ -37,19 +37,27 @@ export function createSearchPickRepository(db: Conn): SearchPickRepository {
     // the item from the input the expense was written with. A missing item is a
     // foreign-key refusal and reaches the caller like everywhere else.
     await translateFailures(() =>
-      db
-        .insert(searchPicks)
-        // A pick of an id from before a merge is the survivor's (MOL-106).
-        .values({ actorId, queryKey: key, itemId: liveItemId(itemId), admits })
-        .onConflictDoUpdate({
-          target: [searchPicks.actorId, searchPicks.queryKey, searchPicks.itemId],
-          set: {
-            picks: sql`${searchPicks.picks} + 1`,
-            lastPickedAt: sql`now()`,
-            // Once a synonym, always: an ordinary pick under the same key does not unlearn it.
-            admits: sql`${searchPicks.admits} or ${admits}`,
-          },
-        }),
+      db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(searchPicks)
+          // A pick of an id from before a merge is the survivor's (MOL-106).
+          .values({ actorId, queryKey: key, itemId: liveItemId(itemId), admits })
+          .onConflictDoUpdate({
+            target: [searchPicks.actorId, searchPicks.queryKey, searchPicks.itemId],
+            set: {
+              picks: sql`${searchPicks.picks} + 1`,
+              lastPickedAt: sql`now()`,
+              // Once a synonym, always: an ordinary pick under the same key does not unlearn it.
+              admits: sql`${searchPicks.admits} or ${admits}`,
+            },
+          })
+          .returning({ itemId: searchPicks.itemId, inserted: sql<boolean>`xmax = 0` })
+        // A new pick by a trace's id goes home with an undo (MOL-299, А2); one added to the
+        // survivor's own stays the survivor's, as it was before the merge.
+        if (row?.inserted && row.itemId !== itemId.toLowerCase()) {
+          await noteTraceWrite(tx, 'item', itemId, 'pick', { queryKey: key }, actorId)
+        }
+      }),
     )
   }
 

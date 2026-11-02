@@ -63,8 +63,12 @@ export async function mergeCommand(
         write(`not merged: ${REFUSED[outcome.refused] ?? outcome.refused}`)
         return 1
       }
+      // A dry run's number is no merge's: the identity it took is not rolled back, and the merge
+      // made with --yes takes the next one (MOL-299, adversarial А4).
       write(
-        `merged as #${String(outcome.id)} — make unmerge ID=${String(outcome.id)} takes it back`,
+        dryRun
+          ? 'would be merged — its number, for make unmerge ID=, comes with --yes'
+          : `merged as #${String(outcome.id)} — make unmerge ID=${String(outcome.id)} takes it back`,
       )
       write(done)
       return 0

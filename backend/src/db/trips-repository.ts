@@ -26,6 +26,7 @@ import { recordedTwinOf } from './receipts-repository'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { expenses, trips, places, receipts } from './schema'
 import { forgetWordsOf } from './store-memory-repository'
+import { noteTraceWrite } from './trace'
 import { tripMoneyRows } from './trip-money'
 import type { TripMoneyRow } from './trip-money'
 
@@ -65,6 +66,8 @@ export interface RecordedTrip {
   /** The account it was paid from and «списано», as `paymentOf` settled them (MOL-312). */
   readonly accountId: string | null
   readonly debited: Money | null
+  /** The place's id the phone named, when the place read is another — a trace's survivor (MOL-299). */
+  readonly placeAsked?: string
 }
 
 export interface TripRepository {
@@ -446,6 +449,10 @@ export function createTripRepository(db: Conn): TripRepository {
             .onConflictDoNothing({ target: trips.id })
             .returning()
           if (row === undefined) throw new DomainError(ERROR.CONFLICT)
+          // At a trace's place by its id: an undo takes the trip home (MOL-299, А2).
+          if (input.placeAsked !== undefined && input.placeAsked.toLowerCase() !== row.placeId) {
+            await noteTraceWrite(tx, 'place', input.placeAsked, 'trip', { id: row.id })
+          }
           return toTrip(row)
         }),
       )
