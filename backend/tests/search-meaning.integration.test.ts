@@ -119,6 +119,43 @@ describe('what the letters found does not move (owner’s decision В-3)', () =>
   })
 })
 
+describe('a name found by meaning is near wherever it stands (MOL-332, owner’s В-2 «а»)', () => {
+  /**
+   * The place is the mean's and the letters' nearness the worst word's: «кокосовое малако» (0 and 2
+   * edits) keeps «Молоко кокосовое» first by its letters, and its meaning made it near only where it
+   * also moved it — so the typo less read «не нашли», and «кокосовае малако» (1 and 2), a typo more,
+   * read near. The row is near either way now, and keeps its place.
+   */
+  it.each(['кокосовое малако', 'малако кокосовое', 'кокосовае малако'])(
+    '«%s» — «Молоко кокосовое» is near',
+    async (query) => {
+      const answer = await repo.search(query, 20, nobody, await queryMeaning(embedder, query))
+      expect(answer.nearIds).toContain(await idOf('Молоко кокосовое'))
+    },
+  )
+
+  it('«кокосовое малако» still names «Молоко кокосовое» first, by its letters', async () => {
+    expect((await search('кокосовое малако')).names[0]).toBe('Молоко кокосовое')
+  })
+})
+
+describe('a word on its way finds by its spelling (MOL-332, owner’s В-1 «а»)', () => {
+  /**
+   * The price of the meaning, as of the letters' «молоч» → «Мука»: a cut word is read by how it is
+   * spelt, and what it finds is near. «cheesecak» is cheese to the model (0.412), where right finds of
+   * a shelf stand as close — «алкоголь» → «Водка» 0.406, «кисломолочка» → «Молоко» 0.419 — so no
+   * threshold tells them apart (`.scratch/tasks/requirements/MOL-332.md`). Pinned, so a change of the
+   * model or the threshold shows here.
+   */
+  it.each([
+    ['cheesecak', 'Сыр чечил'],
+    ['кроссо', 'Круассан'],
+  ])('«%s» → «%s», near', async (query, name) => {
+    const { names, near } = await search(query)
+    expect([names[0], near]).toEqual([name, true])
+  })
+})
+
 /**
  * Every shelf word of the corpus and every thing the seed does not carry (MOL-105), pinned whole:
  * the name seen first and whether the answer is near — the poor answers too, since a change of the
@@ -214,7 +251,7 @@ const SHELF_ANSWERS: readonly (readonly [string, string | null, boolean, Answer?
   ['гигиена', null, false],
   ['косметика', null, false],
   ['уход за собой', null, false],
-  ['для кошки', 'Корм для кошек', false],
+  ['для кошки', 'Корм для кошек', true], // MOL-332: near by its meaning, though its word is two off
   ['зоотовары', 'Пелёнки для животных', true],
   ['для питомца', 'Лакомство для собак', true, ['Пелёнки для животных', true]], // either way: ARM, x86
 ]
