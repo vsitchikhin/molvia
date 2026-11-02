@@ -1,10 +1,13 @@
 import { randomUUID } from 'node:crypto'
+import { hostname } from 'node:os'
 import { Readable } from 'node:stream'
 import { eq, sql } from 'drizzle-orm'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import {
   ERROR,
+  exactFigures,
+  formatInCurrency,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
   receiptDetailCodec,
@@ -966,8 +969,101 @@ describe('what lives how long (В-3)', () => {
   }, 15_000)
 })
 
+/**
+ * am-05 as no log may carry it (MOL-327): every Armenian word of its lines from three letters, in any case;
+ * the day of the purchase as the server keeps it; and every number of four digits and more without its
+ * leading zeros — each figure it prints, its digits joined across a point or a comma, or across a space only
+ * before a decimal comma (elsewhere a space parts its columns), and each amount — printed or of its truth — in
+ * whole drams, as a till rounds them, and in hundredths, as the server keeps money. A guard against the receipt
+ * written the ordinary way, not against a form built to slip past it.
+ */
+const PRINTED = am05.readings.join('\n')
+const PRINTED_WORDS = [
+  ...new Set(PRINTED.toLowerCase().match(/\p{Script=Armenian}{3,}/gu)),
+  am05.expected.date,
+]
+const PRINTED_FIGURES = PRINTED.match(/\d{1,3}(?: \d{3})+,\d+|\d+(?:[.,]\d+)*/g) ?? []
+const PRINTED_AMOUNTS = [
+  am05.expected.total,
+  ...am05.expected.lines.flatMap((line) => [line.unit_price, line.sum]),
+  ...PRINTED_FIGURES.filter((figure) => /[.,]\d{2}$/.test(figure)).map((figure) =>
+    Number(figure.replaceAll(' ', '').replace(',', '.')),
+  ),
+].filter((amount) => amount !== null)
+const PRINTED_NUMBERS = [
+  ...new Set(
+    [
+      ...PRINTED_FIGURES,
+      ...PRINTED_AMOUNTS.flatMap((amount) =>
+        [Math.round(amount), Math.round(amount * 100)].map(String),
+      ),
+    ]
+      .map((number) => number.replace(/[ .,]/g, '').replace(/^0+/, ''))
+      .filter((number) => number.length >= 4),
+  ),
+]
+
+/**
+ * What of am-05 a log carries, read without what a run puts in it by chance (MOL-327): pino's stamps, the
+ * run's moment as a date and Fastify's time of a request, taken by their values — a field of the server under
+ * the same name is read — the places of a stack's frames, which are the checkout's, and the receipt's id,
+ * which is the test's. Besides what am-05 prints, `kept` is what the server kept of it, looked for as it keeps
+ * it: a number of four digits and more as stored, leading zeros and all, any other value whole and by its
+ * Armenian and Russian words.
+ */
+function receiptIn(
+  lines: readonly string[],
+  stamp: number,
+  receiptId: string,
+  kept: readonly unknown[],
+): string[] {
+  const stamps = `"time":${String(stamp)},"pid":${String(process.pid)},"hostname":${JSON.stringify(hostname())},`
+  const said = lines
+    .map((line) =>
+      line
+        .replace(stamps, '')
+        .replaceAll(new Date(stamp).toISOString(), '<now>')
+        .replace(/,"responseTime":[\d.e+-]+(?=,"msg":"request (?:completed|errored)"\}\s*$)/, '')
+        .replace(/(?<=[( ])(?:\/|node:|file:)[^"()]*?:\d+:\d+/g, '<place>')
+        .replaceAll(receiptId, '<receipt>'),
+    )
+    .join('')
+  const lowered = said.toLowerCase()
+  // a group of thousands is any space — Intl's no-break and narrow ones as `formatInCurrency` prints them
+  const digits = said.replace(/(?<=\d)[\s,.](?=\d)/g, '')
+  const values = kept.filter((value) => value !== null && value !== undefined).map(String)
+  const words = new Set([
+    ...PRINTED_WORDS,
+    ...values
+      .filter((value) => !/^\d+$/.test(value))
+      .map((value) => value.toLowerCase())
+      .flatMap((value) => [
+        value,
+        ...(value.match(/[\p{Script=Armenian}\p{Script=Cyrillic}]{3,}/gu) ?? []),
+      ]),
+  ])
+  const numbers = new Set([...PRINTED_NUMBERS, ...values.filter((value) => /^\d{4,}$/.test(value))])
+  return [
+    ...[...words].filter((word) => lowered.includes(word)),
+    ...[...numbers].filter((number) => digits.includes(number)),
+  ]
+}
+
+/** A moment of the last ten seconds whose milliseconds end in «8676», am-05's total. */
+function stampOf8676(): number {
+  const now = Date.now()
+  return now - ((now - 8676) % 10_000)
+}
+
 describe('the queue through the server', () => {
+  afterEach(() => vi.useRealTimers())
+
   it('reads a receipt once its last part arrives, and logs neither its text nor its tax number', async () => {
+    // «8676», the receipt's total, once stood in pino's time (MOL-327): every run puts it there and in the
+    // receipt's id, and the clocks stand — the reading's `ms` is 0.
+    const stamp = stampOf8676()
+    vi.useFakeTimers({ toFake: ['Date', 'performance'] })
+    vi.setSystemTime(stamp)
     const lines: string[] = []
     const reading = buildServer({
       db,
@@ -977,7 +1073,7 @@ describe('the queue through the server', () => {
     await reading.ready()
     try {
       const me = await owner()
-      const receipt = body()
+      const receipt = body({ id: '8676b45a-3f1c-4e2a-9d7b-6c0e5f3a2b17' })
       await reading.inject({
         method: 'POST',
         url: '/receipts',
@@ -1003,10 +1099,99 @@ describe('the queue through the server', () => {
       }
       expect(status).toBe('parsed')
       const log = lines.join('')
+      expect(log).toContain(`"time":${String(stamp)},`)
+      expect(log).toContain(receipt.id)
+      expect(log).toContain('"ms":0,')
       expect(log).toContain('receipt read')
-      expect(log).not.toMatch(/01234567|Կաթ|Իգիթ|8676/)
+      // what the server kept of the receipt, in the form it keeps it (adversarial Д1, Д2)
+      const head = onlyRow(
+        await db
+          .select({
+            tin: receipts.tin,
+            receiptNo: receipts.receiptNo,
+            printedOn: receipts.printedOn,
+            totalMinor: receipts.totalMinor,
+            readTotalMinor: receipts.readTotalMinor,
+            cashbackMinor: receipts.cashbackMinor,
+            redeemedMinor: receipts.redeemedMinor,
+          })
+          .from(receipts)
+          .where(eq(receipts.id, receipt.id)),
+      )
+      const kept = await db
+        .select({
+          printed: receiptLines.printed,
+          translation: receiptLines.translation,
+          hs: receiptLines.hs,
+          sku: receiptLines.sku,
+          priceMinor: receiptLines.priceMinor,
+          sumMinor: receiptLines.sumMinor,
+          discountMinor: receiptLines.discountMinor,
+        })
+        .from(receiptLines)
+        .where(eq(receiptLines.receiptId, receipt.id))
+        .orderBy(receiptLines.position)
+      // kept holds lines, and their Russian words too — by its form, not a dictionary's text that may change
+      expect(kept.length).toBeGreaterThan(0)
+      expect(kept.some((line) => /\p{Script=Cyrillic}/u.test(line.translation ?? ''))).toBe(true)
+      const values = [...Object.values(head ?? {}), ...kept.flatMap((line) => Object.values(line))]
+      expect(receiptIn(lines, stamp, receipt.id, values)).toEqual([])
     } finally {
       await reading.close()
+    }
+  }, 15_000)
+
+  // The check above, held by what it must and must not find (MOL-327, adversarial А1–А4).
+  it('the log is read for the receipt in any field and spelling, and never for what a run puts there', async () => {
+    const stamp = stampOf8676()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(stamp)
+    const lines: string[] = []
+    const logging = buildServer({ db, logStream: { write: (line) => lines.push(line) } })
+    await logging.ready()
+    try {
+      const id = '8676b45a-3f1c-4e2a-9d7b-6c0e5f3a2b17'
+      logging.log.info(
+        { req: { id: 'req-1', method: 'PUT', url: `/receipts/${id}/parts/1` } },
+        'incoming request',
+      )
+      logging.log.info({ res: { statusCode: 200 }, responseTime: 8676.41 }, 'request completed')
+      logging.log.info({ before: new Date(stamp).toISOString() }, 'receipts purged')
+      logging.log.error(
+        { frames: ['at read (/tmp/8676/backend/src/x.ts:8676:41)', 'at /tmp/8676/x.js:1:2'] },
+        'catalogue has no till names',
+      )
+      const kept = ['Молоко «Игит» 3,2%', '0401']
+      expect(receiptIn(lines, stamp, id, kept)).toEqual([])
+      const leaks: Record<string, unknown> = {
+        time: 'Կաթ «Իգիթ»',
+        pid: '01234567',
+        hostname: '8 676,41',
+        responseTime: 8676.41,
+        line: 'Թուզ կգ',
+        fiscal: 'Ֆիսկալ համար 12345678',
+        tin: 1234567,
+        total: '8,676.41',
+        minor: 867641,
+        formatted: formatInCurrency('8676.41', 'AMD', 'ru', exactFigures(2)),
+        lowered: 'կաթ իգիթ',
+        article: '0401/1163909 23 м 740 370',
+        till: 'GY0000000001 01.10.2026 12:00:00',
+        vat: formatInCurrency('1446.36', 'AMD', 'ru', exactFigures(2)),
+        price: '1 260',
+        sumMinor: 60885,
+        vatWhole: formatInCurrency('1446', 'AMD', 'ru', exactFigures(2)),
+        printedOn: '2026-10-01',
+        translation: 'молоко',
+        hs: '0401',
+      }
+      for (const [field, leak] of Object.entries(leaks)) {
+        lines.length = 0
+        logging.log.info({ [field]: leak }, 'receipt read')
+        expect(receiptIn(lines, stamp, id, kept), field).not.toEqual([])
+      }
+    } finally {
+      await logging.close()
     }
   }, 15_000)
 })
