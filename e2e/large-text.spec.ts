@@ -195,10 +195,11 @@ async function aMonth(page: Page): Promise<{ card: string; savings: string; dina
 }
 
 /**
- * A record of yesterday at «Ереван Сити»: ground coffee by the kilogram, rated, so «Что брать» names its price —
- * «12 800 ֏/кг» stood past the plate of «За единицу» at 150 % (MOL-334) — and ten kilos of it, «128 000 ֏», with a
- * total of six figures, «131 143,50 ֏» took the record 102 px sideways at 200 %; milk and bread wait in «Оценки».
- * Then a record by hand still open: «Продолжить» on «Покупки».
+ * A record at «Ереван Сити»: ground coffee by the kilogram, rated, so «Что брать» names its price — «12 800 ֏/кг» stood
+ * past the plate of «За единицу» at 150 % (MOL-334) — here ten kilos at «125 403,50 ֏/кг», a price per unit of six
+ * figures; caviar for «1 234 567,89 ₽», a sum of another currency under the total and in a row's meta, which broke
+ * inside at 200 % (adversarial С1, С3); milk and bread wait in «Оценки». Then a record by hand still open, the coffee
+ * dearer there: «Продолжить» on «Покупки», and «Тут дешевле» naming the price of «Ереван Сити» (С2).
  */
 async function aLife(page: Page): Promise<{ finished: string }> {
   const headers = await asBrowser(page)
@@ -217,22 +218,24 @@ async function aLife(page: Page): Promise<{ finished: string }> {
   const coffee = await item('Кофе «Ташир» молотый', 'kg')
   const milk = await item('Молоко «Марианна» 3,2 %', 'l')
   const bread = await item('Хлеб «Матнакаш»', 'piece')
+  const caviar = await item('Икра «Русское море»', 'piece')
   const finished = randomUUID()
   await post(page, '/api/trips', {
     context,
     id: finished,
     place: { kind: 'store', name: 'Ереван Сити' },
   })
-  for (const [itemId, value, unit, amount] of [
-    [coffee, '10', 'kg', '128000'],
-    [milk, '1', 'l', '2543.50'],
-    [bread, '2', 'piece', '600'],
+  for (const [itemId, value, unit, amount, currency] of [
+    [coffee, '10', 'kg', '1254035', 'AMD'],
+    [milk, '1', 'l', '2543.50', 'AMD'],
+    [bread, '2', 'piece', '600', 'AMD'],
+    [caviar, '1', 'piece', '1234567.89', 'RUB'],
   ] as const)
     await post(page, `/api/trips/${finished}/expenses`, {
       id: randomUUID(),
       itemId,
       quantity: { value, unit },
-      amount: { amount, currency: 'AMD' },
+      amount: { amount, currency },
     })
   await post(page, `/api/trips/${finished}/finish`, {})
   const rated = await page.request.put(`/api/verdicts/${coffee}`, { headers, data: { score: 5 } })
@@ -242,10 +245,24 @@ async function aLife(page: Page): Promise<{ finished: string }> {
   await post(page, `/api/trips/${open}/expenses`, {
     id: randomUUID(),
     itemId: coffee,
-    quantity: { value: '0.25', unit: 'kg' },
-    amount: { amount: '3200', currency: 'AMD' },
+    quantity: { value: '1', unit: 'kg' },
+    amount: { amount: '1300000', currency: 'AMD' },
   })
   return { finished }
+}
+
+/** How many lines each element's text stands on, at most: a sum is one (`frontend.md`, «A sum never breaks»). */
+function linesOf(page: Page, selector: string): Promise<number> {
+  return page.locator(selector).evaluateAll((all) =>
+    Math.max(
+      0,
+      ...all.map((one) => {
+        const range = document.createRange()
+        range.selectNodeContents(one)
+        return new Set([...range.getClientRects()].map((line) => Math.round(line.top))).size
+      }),
+    ),
+  )
 }
 
 /** Every word of a box on its lines: none cut by its box (`scrollWidth`) — «Написать разработч…» at 100 % on 320. */
@@ -796,6 +813,15 @@ for (const size of ['150%', '200%'])
       await facesIn(page)
       expect(await pastCard(page, '.total .sum', '.total')).toBeLessThanOrEqual(0.5)
       expect(await pastCard(page, '.list-row .amount', '.list-row')).toBeLessThanOrEqual(0.5)
+      // A sum of another currency under the total and a price per unit in a row's meta, each whole and within: at 200 %
+      // «1 234 567,89 / ₽», «125 403, / 50 ֏» (adversarial С1, С3; owner's В-6 «а»).
+      for (const [money, box] of [
+        ['.total .money', '.total'],
+        ['.list-row .quantity .money', '.list-row'],
+      ] as const) {
+        expect(await linesOf(page, money), money).toBe(1)
+        expect(await pastCard(page, money, box), money).toBeLessThanOrEqual(0.5)
+      }
       // «Продолжить» whole in its card (А12 of MOL-321's review): its pill stands 8 into the row's padding by the
       // kit's rule (MOL-191), so the card is the edge.
       await page.goto('/purchases')
@@ -830,10 +856,16 @@ for (const size of ['150%', '200%'])
       }
       // Every word of a row and a screen's text with a hyphen from six letters (owner's В-2 «а»); CI's Chromium may
       // have no dictionary, so the style is read.
+      // From six letters in a unit of words, from twelve in a paragraph, never in a segment (owner's В-5 «а»): from six
+      // in a paragraph «Данные и приватность» cut 394 words that would have stood whole (adversarial Х1).
       await page.goto('/settings')
-      await expect(page.locator('.list-row .title').first()).toHaveCSS('hyphens', 'auto')
+      const title = page.locator('.list-row .title').first()
+      await expect(title).toHaveCSS('hyphens', 'auto')
+      await expect(title).toHaveCSS('hyphenate-limit-chars', '6 2 2')
+      await expect(page.locator('.segment .word').first()).toHaveCSS('hyphens', 'manual')
       await page.goto('/privacy')
       await expect(page.locator('dd').first()).toHaveCSS('hyphens', 'auto')
+      await expect(page.locator('dd').first()).toHaveCSS('hyphenate-limit-chars', '12 5 5')
     })
 
     test('the sheets beyond «Деньги» stand within the phone', async ({ page }) => {
@@ -855,6 +887,17 @@ for (const size of ['150%', '200%'])
       expect(await pastCard(page, 'dialog[open] .per-unit-value', '.per-unit')).toBeLessThanOrEqual(
         0.5,
       )
+      await page.keyboard.press('Escape')
+      await expect(page.locator('dialog[open]')).toHaveCount(0)
+      // «Тут дешевле» names the cheaper price whole within its line: «125 403,50 / ֏/кг» at 200 % (adversarial С2).
+      await page.goto('/purchases/manual')
+      await page.locator('.list-row').filter({ hasText: 'Кофе' }).click()
+      const hint = page.locator('dialog[open] [data-hint="item"]')
+      await expect(hint).toBeVisible()
+      await stillIn(page.locator('dialog[open]').last())
+      await facesIn(page)
+      expect(await linesOf(page, 'dialog[open] .hint .money')).toBe(1)
+      expect(await pastCard(page, 'dialog[open] .hint .money', '.hint')).toBeLessThanOrEqual(0.5)
       await page.keyboard.press('Escape')
       await expect(page.locator('dialog[open]')).toHaveCount(0)
       // The scale in the sheet of «Что брать»: its column is wide enough with no card's sides to take.
@@ -895,6 +938,26 @@ for (const size of ['150%', '200%'])
       expect(await pastCard(page, '.total .amount', '.total')).toBeLessThanOrEqual(0.5)
       expect(await sheetSideways(page, page.locator('.total button.main'))).toBe(0)
       expect(await sheetSideways(page, page.locator('button.receipt-line').first())).toBe(0)
+      // «За единицу» of a line of the receipt and of a line typed, a price per unit of six figures within its plate —
+      // the plate hides what stands past it, so no width of the sheet tells (review №2).
+      for (const opener of [
+        page.locator('button.receipt-line').first(),
+        page.getByRole('button', { name: /Добавить строку/ }),
+      ]) {
+        await opener.click()
+        const sheet = page.locator('dialog[open]').last()
+        await expect(sheet.locator('input[data-field="amount"]')).toBeVisible()
+        await stillIn(sheet)
+        await sheet.locator('input[data-field="quantity"]').fill('1')
+        await sheet.locator('input[data-field="amount"]').fill('125403,50')
+        await expect(sheet.locator('.per-unit-value')).toContainText('125')
+        await facesIn(page)
+        expect(
+          await pastCard(page, 'dialog[open] .per-unit-value', '.per-unit'),
+        ).toBeLessThanOrEqual(0.5)
+        await page.keyboard.press('Escape')
+        await expect(page.locator('dialog[open]')).toHaveCount(0)
+      }
     })
 
     // In English a whole sum of drams is «֏125,403», wider for its count than Russian's «125 403 ֏» — a count at
