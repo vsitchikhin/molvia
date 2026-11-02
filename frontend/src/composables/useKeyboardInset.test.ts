@@ -591,10 +591,18 @@ describe('useKeyboardInset keeps the focused field above a pinned footer', () =>
     expect(sheet.scrollTop).toBe(100)
   })
 
-  it('a field and its error taller than the sheet’s room: the field alone, as before', async () => {
+  // At 200 % on 320 over the keys a field and three lines of its error were taller than the room, and the
+  // field alone, shown instead, hid all three (adversarial А2): its top goes to the edge, no further.
+  it('a field and its error taller than the room: the field’s top at the edge, the error as far as it goes', async () => {
     const { sheet } = await refused({ top: 400, bottom: 440 }, { top: 444, bottom: 560 })
     revealTypedIn(sheet)
-    expect(sheet.scrollTop).toBe(100)
+    expect(sheet.scrollTop).toBe(200)
+  })
+
+  it('a field whose top is cut, its error under the footer: the field alone is brought down, as before', async () => {
+    const { sheet } = await refused({ top: 290, bottom: 330 }, { top: 334, bottom: 460 })
+    revealTypedIn(sheet)
+    expect(sheet.scrollTop).toBe(90)
   })
 
   it('a footer that grew over a field marked wrong brings its error back with it', async () => {

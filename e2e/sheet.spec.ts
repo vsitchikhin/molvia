@@ -874,12 +874,12 @@ test.describe('the sheet', () => {
       expect(field.bottom).toBeLessThanOrEqual(footer.top)
     })
 
-    // The note last over the footer, refused at the tap with the focus left in it — Safari's tap, played
-    // by a click that moves no focus: its error grew under it and stood under the footer, the field
-    // marked and the reason nowhere (MOL-354, adversarial А1). The sheet shows the field with its error.
-    test('a field refused at the tap, the focus left in it, has its error above the footer', async ({
-      page,
-    }) => {
+    /**
+     * The note last over the footer, put on the footer's very edge — where the keys coming up leave the
+     * field typed in — and refused at the tap with the focus left in it: Safari's tap, played by a click
+     * that moves no focus (MOL-354, adversarial А1).
+     */
+    async function refuseTheNote(page: Page) {
       await openLong(page)
       await longSheet(page)
         .getByRole('button', { name: 'Row 15' })
@@ -889,7 +889,6 @@ test.describe('the sheet', () => {
       await page.keyboard.press('Tab')
       await expect(note(page)).toBeFocused()
       await expect.poll(async () => under(await boxes(page))).toBeLessThanOrEqual(0)
-      // On the footer's very edge, where the keys coming up leave the field typed in.
       await longSheet(page).evaluate((dialog) => {
         const field = dialog.querySelector('input')
         const footer = dialog.querySelector('.footer')
@@ -906,6 +905,15 @@ test.describe('the sheet', () => {
       await expect(note(page)).toBeFocused()
       const error = longSheet(page).locator('[id$="-error"]')
       await expect(error).toHaveText('This has characters that cannot be saved')
+      return error
+    }
+
+    // Its error grew under it and stood under the footer, the field marked and the reason nowhere
+    // (adversarial А1): the sheet shows the field with its error.
+    test('a field refused at the tap, the focus left in it, has its error above the footer', async ({
+      page,
+    }) => {
+      const error = await refuseTheNote(page)
       // Seen, not only above: what stands at its middle is the error itself, and its bottom is over the
       // footer's top.
       await expect
@@ -925,6 +933,46 @@ test.describe('the sheet', () => {
         )
         .toEqual({ seen: true, over: true })
       await expect(longSheet(page)).toBeVisible()
+    })
+
+    // At 200 % on 320 over the keys the note and its error are taller than the room, and the field alone,
+    // shown instead, hid every line of it (adversarial А2): the field's top goes to the edge and the error
+    // is seen as far as the room goes — its first line at least.
+    test('with large text, taller than the room with its error, its top stays and its error begins in sight', async ({
+      page,
+    }) => {
+      await page.setViewportSize({ width: 320, height: 360 })
+      await page.addInitScript(() => {
+        document.addEventListener('DOMContentLoaded', () => {
+          const style = document.createElement('style')
+          style.textContent = 'html { font-size: 200% }'
+          document.head.append(style)
+        })
+      })
+      const error = await refuseTheNote(page)
+      await expect
+        .poll(() =>
+          error.evaluate((message) => {
+            const dialog = message.closest('dialog')
+            const field = dialog?.querySelector('input')
+            const footer = dialog?.querySelector('.footer')
+            if (!dialog || !field || !footer) throw new Error('no sheet, note or footer')
+            const edge =
+              dialog.getBoundingClientRect().top +
+              (Number.parseFloat(getComputedStyle(dialog).scrollPaddingTop) || 0)
+            const box = message.getBoundingClientRect()
+            const line = Number.parseFloat(getComputedStyle(message).lineHeight) || 0
+            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + line / 2)
+            const top = field.getBoundingClientRect().top
+            return {
+              // the case itself: the field with its error does not fit between the edges
+              tall: box.bottom - top > footer.getBoundingClientRect().top - edge,
+              fieldTop: top - edge >= -1,
+              firstLine: hit !== null && message.contains(hit),
+            }
+          }),
+        )
+        .toEqual({ tall: true, fieldTop: true, firstLine: true })
     })
 
     // Pinned, the footer is still in the sheet's own scroll: a pull with the content scrolled down

@@ -248,7 +248,10 @@ export function typedIn(sheet: HTMLElement): HTMLElement | null {
  *
  * **A field's error is seen with it** (MOL-354, adversarial А1): the field last over the footer stood
  * on its edge, and the error a refusal grew under it stood under the footer — the field marked, the
- * reason nowhere. Both while both fit between the edges; else the field alone, as before.
+ * reason nowhere. **Taller with its error than the room, the field's top stands at the edge and the
+ * error is seen as far as the room goes** (adversarial А2): at 200 % on 320 over the keys a field of 88
+ * and three lines of 113 had 191, and the field alone, shown instead, hid all three; its label above it
+ * is what goes. A field whose top is already cut is brought down alone, as before.
  */
 export function revealTypedIn(sheet: HTMLElement): void {
   const field = typedIn(sheet)
@@ -257,13 +260,10 @@ export function revealTypedIn(sheet: HTMLElement): void {
   const top = box.top + padding(getComputedStyle(sheet).scrollPaddingTop)
   const bottom = box.bottom - footerEdge(sheet)
   const place = field.getBoundingClientRect()
-  const error = errorOf(field)?.getBoundingClientRect()
-  const end =
-    error && error.bottom - place.top <= bottom - top
-      ? Math.max(place.bottom, error.bottom)
-      : place.bottom
   const above = top - place.top
-  const below = end - bottom
+  const error = errorOf(field)?.getBoundingClientRect()
+  let below = Math.max(place.bottom, error?.bottom ?? place.bottom) - bottom
+  if (above > 0 && below > 0) below = place.bottom - bottom
   if (above > 0 && below > 0) return
   // A scroll lands on whole pixels, a field does not: rounded outwards, or a fraction stays under
   // the edge — and rounded so that the field's top never goes past the sheet's.
