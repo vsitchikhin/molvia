@@ -10,6 +10,7 @@ import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import TripRateNotes from '@/components/TripRateNotes.vue'
+import TripRateSheet from '@/components/TripRateSheet.vue'
 import { useTripStore } from '@/stores/trip'
 
 const chooseTripRate = vi.fn<(tripId: string, body: RateChoiceBody) => Promise<TripView>>()
@@ -501,6 +502,55 @@ describe('TripRateNotes', () => {
 
       expect(document.body.querySelector('dialog[open]')).not.toBeNull()
       expect(document.body.textContent).toContain(ru.error.invalid_rate)
+    })
+
+    /** Шторка, открытая на «свой», что набрано в её поле, и её «Сохранить». */
+    async function ownRate(view: VueWrapper, typed: string) {
+      await button(view, ru.trip.rate.choose).trigger('click')
+      await flushPromises()
+      clock += 1000
+      inside(document.body.querySelector('dialog[open]'), ru.trip.rate.mine).click()
+      await flushPromises()
+      const field = document.body.querySelector('dialog[open]')?.querySelector('input')
+      if (!field) throw new Error('нет поля своего курса')
+      field.value = typed
+      field.dispatchEvent(new Event('input'))
+      await flushPromises()
+      return { field, save: inside(document.body.querySelector('dialog[open]'), ru.trip.rate.save) }
+    }
+
+    // «Не курс» слышен (MOL-333): фокус оставался на «Сохранить», и ничего не звучало.
+    it('свой курс, который не курс: фокус уходит с кнопки в поле, уже отмеченное', async () => {
+      chooseTripRate.mockRejectedValue(new ApiError(ERROR.INVALID_RATE, undefined, true))
+      const view = await render({ jump: { previous: null } })
+      const { field, save } = await ownRate(view, 'абв')
+      let marked: string | null = null
+      field.addEventListener('focus', () => (marked = field.getAttribute('aria-invalid')))
+      save.focus()
+      save.click()
+      await flushPromises()
+      await flushPromises()
+      expect(document.activeElement).toBe(field)
+      expect(marked).toBe('true')
+    })
+
+    it('не должно сработать: отказ, пришедший в смахнутую шторку, фокус в неё не ставит', async () => {
+      let refuse: (error: unknown) => void = () => undefined
+      chooseTripRate.mockReturnValue(new Promise((_, reject) => (refuse = reject)))
+      const view = await render({ jump: { previous: null } })
+      const { save } = await ownRate(view, 'абв')
+      save.click()
+      await flushPromises()
+      // Убрана, пока ответ в пути: `open` гаснет сразу, шторка уезжает следом.
+      view.findComponent(TripRateSheet).vm.$emit('update:open', false)
+      await flushPromises()
+      const outside = document.createElement('button')
+      document.body.append(outside)
+      outside.focus()
+      refuse(new ApiError(ERROR.INVALID_RATE, undefined, true))
+      await flushPromises()
+      await flushPromises()
+      expect(document.activeElement).toBe(outside)
     })
   })
 })

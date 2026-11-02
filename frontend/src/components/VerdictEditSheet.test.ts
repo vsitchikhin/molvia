@@ -1,15 +1,18 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { Rating, VerdictAmendment, VerdictCard } from '@molvia/model'
 import VerdictEditSheet from '@/components/VerdictEditSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { forgetWritesInFlight } from '@/stores/verdictWrites'
 import type { SavedVerdict, Score } from '@/components/rating'
 import { createAppI18n } from '@/i18n'
+import en from '@/i18n/en.json'
 import { routes } from '@/router'
 
 const amendVerdict = vi.fn<(itemId: string, patch: VerdictAmendment) => Promise<VerdictCard>>()
@@ -67,26 +70,39 @@ interface Options {
   readonly shared?: boolean
   /** A write of the item got no answer: no verdict is known as the person's (З1–З4). */
   readonly unsure?: boolean
+  /** Under an announcer, as `App.vue` holds every sheet: what the sheet says lands in its region. */
+  readonly announced?: boolean
 }
 
 async function render(options: Options = {}) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/advice')
 
-  const view = mount(VerdictEditSheet, {
-    props: {
-      itemId: ITEM,
-      name: 'Колбаса «Молочная»',
-      mine: options.mine ?? true,
-      shared: options.shared ?? false,
-      ownScore: options.ownScore ?? null,
-      ownReview: options.ownReview ?? null,
-      unsure: options.unsure ?? false,
-      onSaved,
-    },
+  const props = {
+    itemId: ITEM,
+    name: 'Колбаса «Молочная»',
+    mine: options.mine ?? true,
+    shared: options.shared ?? false,
+    ownScore: options.ownScore ?? null,
+    ownReview: options.ownReview ?? null,
+    unsure: options.unsure ?? false,
+    onSaved,
+  }
+  const mounting = {
     attachTo: document.body,
     global: { plugins: [router, createPinia(), createAppI18n('en')] },
-  })
+  }
+  const view: VueWrapper = options.announced
+    ? mount(
+        defineComponent({
+          setup() {
+            provideAnnouncer()
+            return () => h(VerdictEditSheet, props)
+          },
+        }),
+        mounting,
+      )
+    : mount(VerdictEditSheet, { props, ...mounting })
   // Past the moment the sheet rises: until then it takes no tap at all.
   clock += 1000
   await new Promise((resolve) => setTimeout(resolve, 5))
@@ -104,6 +120,37 @@ function button(view: VueWrapper, text: string) {
 }
 
 describe('VerdictEditSheet', () => {
+  // A review refused is heard (MOL-333): the focus stayed on the button, and nothing was said.
+  it('a review it cannot keep: the focus goes from the button to the review, already marked', async () => {
+    const { view } = await render({ ownScore: 3 })
+    const review = view.get('textarea').element as HTMLTextAreaElement
+    await view.get('textarea').setValue(`Как в ${String.fromCodePoint(0xf8ff)} Store`)
+    let marked: string | null = null
+    review.addEventListener('focus', () => (marked = review.getAttribute('aria-invalid')))
+    const save = button(view, 'Save the rating')
+    ;(save.element as HTMLButtonElement).focus()
+    await save.trigger('click')
+    await flushPromises()
+    expect(amendVerdict).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(review)
+    expect(marked).toBe('true')
+  })
+
+  it('a review refused with the focus in it: its error is said in the sheet', async () => {
+    const { view } = await render({ ownScore: 3, announced: true })
+    const review = view.get('textarea')
+    await review.setValue(`Как в ${String.fromCodePoint(0xf8ff)} Store`)
+    ;(review.element as HTMLTextAreaElement).focus()
+    await button(view, 'Save the rating').trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(amendVerdict).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(review.element)
+    expect(document.querySelector('dialog .region')?.textContent).toContain(
+      en.verdict.review_unsupported,
+    )
+  })
+
   it('offers one`s own score pre-chosen, and sends only what was changed', async () => {
     amendVerdict.mockResolvedValue(card({ review: 'Пахнет крахмалом' }))
     const { view } = await render({ ownScore: 1, ownReview: 'Пахнет крахмалом' })

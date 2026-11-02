@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet ref="sheet" :open="open" @update:open="$emit('update:open', $event)">
     <template #title>{{ t('trip.rate.sheet_title') }}</template>
     <template #meta>{{ t('trip.rate.sheet_meta') }}</template>
 
@@ -68,6 +68,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useTripStore } from '@/stores/trip'
 
 /**
@@ -112,6 +113,10 @@ export default defineComponent({
     const sending = ref(false)
     const failed = ref(false)
     const error = ref<ErrorCode | null>(null)
+    // «That is not a rate» is heard (MOL-235, MOL-333): the focus goes from «Сохраняем…» to the field —
+    // never into a sheet swept away while the answer was on its way.
+    const sheet = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
 
     // Mounted with the screen now, so the form is made afresh every time it comes up — otherwise
     // it would still hold the choice of the last opening, and the error under the field with it.
@@ -196,6 +201,9 @@ export default defineComponent({
         // where they can fix it. Anything else is the app's or the network's, and says so once.
         if (caught instanceof ApiError && caught.code === ERROR.INVALID_RATE) {
           error.value = ERROR.INVALID_RATE
+          if (props.open) {
+            void refuse(() => sheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
+          }
         } else {
           failed.value = true
         }
@@ -204,7 +212,7 @@ export default defineComponent({
       }
     }
 
-    return { t, choice, own, options, sign, error, failed, sending, submit }
+    return { t, sheet, choice, own, options, sign, error, failed, sending, submit }
   },
 })
 </script>

@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet v-model:open="open" :on-closed="onClosed">
+  <BottomSheet ref="sheet" v-model:open="open" :on-closed="onClosed">
     <template #title>{{ name }}</template>
     <template #meta>{{ own.mine ? t('advice.edit.meta') : t('advice.edit.meta_new') }}</template>
 
@@ -73,6 +73,7 @@ import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import RatingScale from '@/components/RatingScale.vue'
 import type { SavedVerdict, Score } from '@/components/rating'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { currentIdentity } from '@/stores/identity'
 import { landedHalf, outcomeOf, trackWrite, writeInFlight } from '@/stores/verdictWrites'
 import type { WriteOutcome } from '@/stores/verdictWrites'
@@ -214,6 +215,9 @@ export default defineComponent({
     }
     const failure = ref<WireCode | 'offline' | 'failed' | null>(null)
     const unsupported = ref(false)
+    // A review refused is heard (MOL-235, MOL-333): the field is the sheet's one.
+    const sheet = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
 
     // A score taken back is not a change the server can be asked for: a verdict without a
     // score does not exist, and the only way to have none is to withdraw it.
@@ -295,6 +299,7 @@ export default defineComponent({
       review.value = tidied.trim() ? tidied : ''
       if (review.value && !ratingSchema.shape.review.safeParse(review.value).success) {
         unsupported.value = true
+        void refuse(() => sheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
         return
       }
       const chosen = score.value
@@ -364,6 +369,7 @@ export default defineComponent({
     return {
       t,
       REVIEW_MAX,
+      sheet,
       open,
       score,
       review,
