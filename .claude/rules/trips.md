@@ -48,6 +48,18 @@ The detail behind the trip lines of `CLAUDE.md`.
   shelf with no signal still knows where a purchase goes — but **the memory is for when the
   server cannot be asked, not instead of asking**: the sheet asks every time it opens, and a
   trip answered finished stops being the current one.
+- **A purchase corrected after its `add` left reaches the server as an amendment** (MOL-22, held by MOL-325).
+  `POST …/expenses` with an id the server knows answers `200` with the row it has and writes nothing — the
+  promise that makes a resent queue safe — so a line still in the queue, opened and corrected while its first
+  `add` is in the air (it opens as itself, the same id), would be answered «yes» while the new numbers went
+  nowhere. Two guards close it: **`alreadyWritten`** — the answer to the first `add` is applied before the next
+  head is taken, so the correction, found already a row of a trip the phone knows, goes as `PATCH`; and
+  **`answeredAsSent`** — where the phone did not know (the answer lost), the repeated `POST` is read rather than
+  trusted, and numbers come back other than the ones sent put a `PATCH` with them behind it. A refusal of the old
+  body is no notice while the correction waits (`superseded`), and the correction goes under a key of its own,
+  which the old body's answer does not take out (В2-1). `tripQueue.test.ts` holds both against a fake of the
+  server that keeps the first body, `e2e/trip.spec.ts` the whole way against the real API with the answer held
+  back; each guard taken out turns its test red.
 - **A receipt has a queue of its own by these rules** (`receiptQueue`, MOL-127): the receipt, its
   parts, removal and «Вернуть», and «Записать» — which makes a finished trip under an id the phone
   names, so a repeat is the same trip. Its bytes are IndexedDB's, not a shelf's — `receipts.md`.
