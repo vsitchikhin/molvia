@@ -208,7 +208,7 @@ import { bankWords } from '@/components/spending'
 import { useAccountChoice } from '@/composables/useAccountChoice'
 import type { AmendOutcome } from '@/composables/useExchanges'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, purchaseDay } from '@/days'
+import { calendarDayOfAnyYear, dayOfAnyYear, localDay } from '@/days'
 import { newId } from '@/ids'
 import type { IncomeDraft } from '@/composables/useIncomes'
 import { incomesOf } from '@/composables/useIncomes'
@@ -440,10 +440,11 @@ export default defineComponent({
     /** «до 25 сент.: 99 615 ₽ · Зарплата · 15 сент. · Викаса» */
     function versionOf(version: IncomeView['history'][number]): string {
       const words = {
-        until: purchaseDay(version.replacedAt, locale.value, today.value),
+        // A version may be of another year — an amendment of last year's — and says it (adversarial Г2).
+        until: dayOfAnyYear(version.replacedAt, locale.value, today.value),
         amount: formatMoney(version.amount, locale.value),
         source: t(`income.source.${version.source}`),
-        date: calendarDay(version.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
+        date: calendarDayOfAnyYear(version.receivedOn, locale.value, today.value),
       }
       return version.note
         ? t('income.sheet.version_note', { ...words, note: version.note })
@@ -455,7 +456,7 @@ export default defineComponent({
       const details = [
         formatMoney(income.amount, locale.value),
         t(`income.source.${income.source}`),
-        calendarDay(income.receivedOn, locale.value, { day: 'numeric', month: 'short' }),
+        calendarDayOfAnyYear(income.receivedOn, locale.value, today.value),
         ...(income.heldBefore
           ? [
               t('income.sheet.current_held', {

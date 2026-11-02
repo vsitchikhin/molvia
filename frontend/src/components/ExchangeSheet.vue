@@ -222,7 +222,7 @@ import { useLocalDay } from '@/composables/useLocalDay'
 import { useOnline } from '@/composables/useOnline'
 import { useAccountsStore } from '@/stores/accounts'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, purchaseDay } from '@/days'
+import { calendarDayOfAnyYear, dayOfAnyYear, localDay } from '@/days'
 import { newId } from '@/ids'
 
 type Side = 'given' | 'received'
@@ -510,12 +510,13 @@ export default defineComponent({
     /** «до 25 сент.: 20 000 ₽ → 100 000 ֏ · 16 сент. · ВТБ банкомат» */
     function versionOf(version: ExchangeView['history'][number]): string {
       const words = {
-        until: purchaseDay(version.replacedAt, locale.value, today.value),
+        // A version may be of another year — an amendment of last year's — and says it (adversarial Г2).
+        until: dayOfAnyYear(version.replacedAt, locale.value, today.value),
         amounts: t('exchange.row_amounts', {
           given: formatMoney(version.given, locale.value),
           received: formatMoney(version.received, locale.value),
         }),
-        date: calendarDay(version.exchangedOn, locale.value, { day: 'numeric', month: 'short' }),
+        date: calendarDayOfAnyYear(version.exchangedOn, locale.value, today.value),
       }
       // The channel too: changed alone, it made a version that read as the one after it (review).
       const note = [
@@ -538,7 +539,7 @@ export default defineComponent({
           given: formatMoney(exchange.given, locale.value),
           received: formatMoney(exchange.received, locale.value),
         }),
-        calendarDay(exchange.exchangedOn, locale.value, { day: 'numeric', month: 'short' }),
+        calendarDayOfAnyYear(exchange.exchangedOn, locale.value, today.value),
         ...(exchange.heldBefore
           ? [
               t('exchange.sheet.current_held', {

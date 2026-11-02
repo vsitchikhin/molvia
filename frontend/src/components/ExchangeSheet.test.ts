@@ -638,6 +638,35 @@ describe('ExchangeSheet: a version after midnight (MOL-329)', () => {
     await flushPromises()
     expect(view.get('.versions li').text()).toMatch(/^until yesterday: /)
   })
+
+  // Adversarial Г2 of round 4: a version of last year says the year of «until» and of its day.
+  it('a version of last year says its year', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00.000Z'))
+    const [base] = overview().exchanges
+    if (!base) throw new Error('the fixture has an exchange')
+    const at = new Date('2025-09-25T09:00:00.000Z')
+    const old: ExchangeView = {
+      ...base,
+      exchangedOn: '2025-09-16',
+      revision: 2,
+      amendedAt: at,
+      history: [
+        {
+          given: base.given,
+          received: base.received,
+          exchangedOn: '2025-09-16',
+          heldBefore: null,
+          note: null,
+          channel: null,
+          replacedAt: at,
+        },
+      ],
+    }
+    const view = await render(overview({ exchanges: [old] }), old)
+    const line = view.get('.versions li').text().replaceAll('\u00a0', ' ')
+    expect(line).toMatch(/^until Sep 25, 2025: .* · Sep 16, 2025/)
+  })
 })
 
 // MOL-189, Ф-34, owner's В-1 «а»: removing is the amendment's, and only where the screen offers

@@ -324,6 +324,24 @@ describe('IncomeSheet: a version after midnight (MOL-329)', () => {
     await flushPromises()
     expect(view.get('.versions li').text()).toMatch(/^until yesterday: /)
   })
+
+  // Adversarial Г2 of round 4: a version of last year says the year of «until» and of its day.
+  it('a version of last year says its year', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00.000Z'))
+    const at = new Date('2025-09-25T09:00:00.000Z')
+    const [version] = amended.history
+    if (!version) throw new Error('the fixture has a version')
+    const old: IncomeView = {
+      ...amended,
+      receivedOn: '2025-09-15',
+      amendedAt: at,
+      history: [{ ...version, receivedOn: '2025-09-15', replacedAt: at }],
+    }
+    const view = await render(overview(), old)
+    const line = view.get('.versions li').text().replaceAll('\u00a0', ' ')
+    expect(line).toMatch(/^until Sep 25, 2025: .*Sep 15, 2025/)
+  })
 })
 
 describe('IncomeSheet: removing from the amendment (MOL-189)', () => {
