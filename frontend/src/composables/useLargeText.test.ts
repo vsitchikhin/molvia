@@ -1,3 +1,4 @@
+import { readFileSync, readdirSync } from 'node:fs'
 import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
@@ -53,5 +54,34 @@ describe('useLargeText (MOL-321)', () => {
     expect(document.documentElement.hasAttribute('data-large-text')).toBe(true)
     view.unmount()
     expect(document.documentElement.hasAttribute('data-large-text')).toBe(false)
+  })
+})
+
+/**
+ * The system's font size is the root's (MOL-334, owner's В-1 «а»): `<meta name="text-scale">` makes Chrome set
+ * 1rem by it — the very model `useLargeText` and every spec read — and Chrome takes it only while no stylesheet
+ * sets the root's `font-size` itself.
+ */
+describe('the system’s font size (MOL-334)', () => {
+  // Through a parameter: a literal `new URL(…, import.meta.url)` is rewritten by Vite into an asset URL.
+  const at = (path: string): URL => new URL(path, import.meta.url)
+  const read = (path: URL): string => readFileSync(path, 'utf8')
+  const src = at('../')
+
+  it('is asked of the browser in the page’s head', () => {
+    const html = read(at('../../index.html'))
+    const head = html.slice(0, html.indexOf('</head>'))
+    expect(head).toMatch(/<meta\s+name="text-scale"\s+content="scale"\s*\/?>/)
+  })
+
+  it('is never overridden: no stylesheet sets the root’s font-size', () => {
+    const sheets = readdirSync(src, { recursive: true, encoding: 'utf8' }).filter((path) =>
+      /\.(scss|vue)$/.test(path),
+    )
+    expect(sheets.length).toBeGreaterThan(50)
+    // A declaration of the rule itself, not of a rule nested in it: `html[data-large-text] { .x { … } }` is fine.
+    const root = /(?:^|[}\s;])(?:html|:root)\b[^{},;]*\{[^{}]*?\bfont-size\s*:/m
+    const offenders = sheets.filter((path) => root.test(read(new URL(path, src))))
+    expect(offenders).toEqual([])
   })
 })
