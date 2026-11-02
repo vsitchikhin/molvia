@@ -77,7 +77,13 @@ belongs to its currency (MOL-42, MOL-43 Р-2).
   removed, a receipt's sum typed, changed or taken off; under a receipt's sum a price is not the
   trip's money and takes nothing off (MOL-78, review 1): the figure was what left the account for the trip as it was, and kept, it counted a
   purchase it never covered the day a dollar one was added; the check names the trip until it is
-  entered anew. **A spending's is kept through a change of its amount** (MOL-123, by the letter of the
+  entered anew. **A purchase corrected while it is still the phone's keeps it** (MOL-325, owner's В-2 «а»): a line
+  the server has not answered yet — its `add` on its way, or its answer lost — opens as the same purchase, and its
+  correction is the same purchase too, landing before the account chosen after the `add` (`trips.md`); the server
+  sees the price change before «списано», and «списано» stays. **The price, named:** with the answer come, the same
+  taps take it off — the line is the server's row, and its correction a change after the account; which the person
+  gets depends on the connection, and a «списано» kept over prices it was not typed for is named by the check, as a
+  typo is. **A spending's is kept through a change of its amount** (MOL-123, by the letter of the
   requirement — only a change of account clears it): it stands under the sum in the same sheet, where
   a trip's is typed apart from the purchases. **The price, named:** 10 $ amended to 12 $ with the old
   «списано» left moves the account by the old figure, and the check does not name it. **Nothing
