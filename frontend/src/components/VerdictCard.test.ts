@@ -16,7 +16,7 @@ const milk: PendingVerdict = {
 
 function render(draft?: VerdictDraft, city: string | null = null) {
   return mount(VerdictCard, {
-    props: { card: milk, draft, city },
+    props: { card: milk, draft, city, today: '2026-09-20' },
     global: { plugins: [createAppI18n('en')] },
     attachTo: document.body,
   })
@@ -274,7 +274,7 @@ describe('VerdictCard', () => {
     quiet.unmount()
 
     const moved = mount(VerdictCard, {
-      props: { card: milk, focusOnMount: true },
+      props: { card: milk, focusOnMount: true, today: '2026-09-20' },
       global: { plugins: [createAppI18n('en')] },
       attachTo: document.body,
     })

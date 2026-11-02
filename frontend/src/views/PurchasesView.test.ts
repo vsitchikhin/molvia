@@ -21,7 +21,7 @@ import type {
 } from '@molvia/model'
 import { ApiError } from '@molvia/client'
 import ru from '@/i18n/ru.json'
-import { purchaseDay, timeOfDay } from '@/days'
+import { answeredAt, localDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
@@ -1196,9 +1196,7 @@ describe('PurchasesView (MOL-128)', () => {
       const strips = view.findAll('.strip')
       expect(strips).toHaveLength(1)
       expect(strips[0]?.text()).toContain(
-        ru.purchases.stale_error
-          .replace('{day}', purchaseDay(old, 'ru'))
-          .replace('{time}', timeOfDay(old, 'ru')),
+        ru.purchases.stale_error.replace('{when}', answeredAt(old, 'ru', localDay())),
       )
     })
 
@@ -1372,8 +1370,7 @@ describe('PurchasesView (MOL-128)', () => {
 
   describe('связь — одна полоса со временем (MOL-204, Ф-14)', () => {
     const AT = new Date(NOW.getTime() - 3 * 60 * 60 * 1000)
-    const said = (key: string) =>
-      key.replace('{day}', purchaseDay(AT, 'ru')).replace('{time}', timeOfDay(AT, 'ru'))
+    const said = (key: string) => key.replace('{when}', answeredAt(AT, 'ru', localDay()))
     const strips = (view: VueWrapper) => view.findAll('.strip')
     function offline() {
       tripHistory.mockRejectedValue(new Error('Failed to fetch'))
@@ -1484,9 +1481,7 @@ describe('PurchasesView (MOL-128)', () => {
           },
         })
         expect(strips(view)[0]?.text()).toBe(
-          ru.purchases.stale
-            .replace('{day}', purchaseDay(later, 'ru'))
-            .replace('{time}', timeOfDay(later, 'ru')),
+          ru.purchases.stale.replace('{when}', answeredAt(later, 'ru', localDay())),
         )
       })
     })
@@ -2046,6 +2041,83 @@ describe('PurchasesView (MOL-128)', () => {
       await flushPromises()
       expect(receipts.mock.calls.length).toBe(asked + 1)
       expect(receipts).toHaveBeenLastCalledWith({ shown: false })
+    })
+  })
+
+  // MOL-329: every day the screen says is counted from the screen's day, as the strip of «Настройки» (MOL-215 А1).
+  describe('дни экрана после полуночи (MOL-329)', () => {
+    const READ = new Date('2026-10-30T23:40:00.000Z')
+    const BEFORE = new Date('2026-10-30T23:50:00.000Z')
+    const AFTER = new Date('2026-10-31T00:10:00.000Z')
+    const row: TripHistoryEntry = {
+      ...trip(1),
+      startedAt: new Date('2026-10-30T23:00:00.000Z'),
+      finishedAt: new Date('2026-10-30T23:45:00.000Z'),
+    }
+    const reading = {
+      id: 'cccccccc-0000-4000-8000-000000000329',
+      status: 'reading',
+      failure: null,
+      parts: 1,
+      received: 1,
+      capturedAt: '2026-10-30T23:30:00.000Z',
+      country: 'AM',
+      language: 'ru',
+      header: null,
+      total: null,
+      balanced: false,
+      lineCount: 0,
+      unsettled: 0,
+      place: null,
+      tripId: null,
+    }
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    async function overnight(read = READ) {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(BEFORE)
+      vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+      tripHistory.mockRejectedValue(new Error('Failed to fetch'))
+      receipts.mockResolvedValue(receiptsResponseCodec.parse({ receipts: [reading] }))
+      pendingVerdicts.mockResolvedValue({
+        items: [card(1, 'Ереван Сити', new Date('2026-10-30T23:45:00.000Z'))],
+        total: 1,
+      })
+      return render({
+        before: () => {
+          remember([row])
+          localStorage.setItem(`molvia.trip-history-at.${ME}`, read.toISOString())
+        },
+      })
+    }
+
+    it('23:50 — «сегодня»; 00:10 и приложение снова на экране — «вчера», и полоса, и строки под ней', async () => {
+      const { view } = await overnight()
+      expect(view.get('.strip').text()).toBe('Без связи · покупки на сегодня, 23:40')
+      expect(rows(view)[0]?.text()).toContain('сегодня')
+      expect(view.text()).toContain('Чек от сегодня, 23:30')
+      expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити», последняя — сегодня')
+
+      // Nothing comes back to redraw the rows: every read fails offline, as at the shelf in the morning.
+      receipts.mockRejectedValue(new Error('Failed to fetch'))
+      pendingVerdicts.mockRejectedValue(new Error('Failed to fetch'))
+      vi.setSystemTime(AFTER)
+      document.dispatchEvent(new Event('visibilitychange'))
+      await flushPromises()
+      expect(view.get('.strip').text()).toBe('Без связи · покупки на вчера, 23:40')
+      expect(rows(view)[0]?.text()).toContain('вчера')
+      expect(rows(view)[0]?.text()).not.toContain('сегодня')
+      expect(view.text()).toContain('Чек от вчера, 23:30')
+      expect(view.get('.pending .meta').text()).toBe('Из «Ереван Сити», последняя — вчера')
+    })
+
+    // A shelf moves its moment only with an answer, and «на 30 окт.» of last year read as this one (MOL-215 Б2).
+    it('ответ другого года — полоса называет год', async () => {
+      const { view } = await overnight(new Date('2025-10-30T10:05:00.000Z'))
+      expect(view.get('.strip').text()).toContain('2025')
     })
   })
 })
