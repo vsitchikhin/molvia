@@ -140,9 +140,11 @@ describe('one exact word does not make the other right, with the meaning too (MO
   /**
    * The price of it, named (MOL-332, owner's В-3 «а»): the meaning makes a row near only where it also
    * places it, so a typo more may read near where the typo less does not — «кокосовое малако» (0 and 2
-   * edits) keeps «Молоко кокосовое» first and not near, «кокосовае малако» (1 and 2) near. On the seed
-   * the answer is near either way, by «Кокос»; the row is what moves — «проверьте» on a receipt's line,
-   * and none of «Что брать» past its twentieth.
+   * edits) keeps «Молоко кокосовое» first and not near, «кокосовае малако» (1 and 2) near — there the
+   * answer is near either way, by «Кокос», and the row is what moves: «проверьте» on a receipt's line,
+   * none of «Что брать» past its twentieth. Where nothing else is near the whole answer moves, as on 52
+   * of the seed's 711 typo ladders (adversarial Б1 of MOL-332): «шакалад белый» reads «не нашли» over
+   * «Шоколад белый», «шакалод белый» «нашли».
    */
   it('«кокосовое малако» — «Молоко кокосовое» first and not near; «кокосовае малако» — near', async () => {
     const milk = await idOf('Молоко кокосовое')
@@ -160,6 +162,13 @@ describe('one exact word does not make the other right, with the meaning too (MO
     )
     expect([fewer.items[0]?.id, fewer.nearIds.includes(milk)]).toEqual([milk, false])
     expect(more.nearIds).toContain(milk)
+  })
+
+  it('«шакалад белый» reads «не нашли» over «Шоколад белый», «шакалод белый» «нашли»', async () => {
+    const fewer = await search('шакалад белый')
+    const more = await search('шакалод белый')
+    expect([fewer.names[0], fewer.near]).toEqual(['Шоколад белый', false])
+    expect([more.names[0], more.near]).toEqual(['Шоколад белый', true])
   })
 })
 

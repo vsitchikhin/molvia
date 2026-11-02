@@ -594,17 +594,23 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   «а»): its place is the mean's, the letters' nearness the worst word's, and the meaning makes near
   only what it places, so a typo more may read near where the typo less does not. «кокосовое малако»
   (0 and 2 edits) keeps «Молоко кокосовое» first and not near, «кокосовае малако» (1 and 2) near. On
-  the seed the answer is near either way, by «Кокос»: the row is what differs — «проверьте» on a
-  receipt's line, none of «Что брать» past its twentieth — and «не нашли» stands over it only where
-  nothing else is near (the six names of adversarial А3 of MOL-47). **Near wherever found was tried
-  and taken back** (adversarial А1, А2 of MOL-332): one exact word lends the vector its sense as it
-  lent the mean its edits, so «мыло детское» read «нашли» over «Масло детское» — review А of MOL-46
-  undone by the model — and on the seed «вода без сахара» over «Кола без сахара». On the seed's typo
-  ladders and word swaps (`.scratch/tasks/status/MOL-332-review-probe-3.json`) it made 374 rows of
-  the thing meant near and 1 196 of another — three for one at any threshold of 0.40–0.60; the
-  letters deciding instead brought the dog food back to «не нашли» and fewer typos near than now. No
-  rule is better on both halves, and none is monotone, since the model is not: «агады» and «агади»,
-  one key, stand either side of 0.40. **A name found
+  the seed that answer is near either way, by «Кокос», and the row is what differs — «проверьте» on
+  a receipt's line, none of «Что брать» past its twentieth — but **where nothing else is near the
+  whole answer turns**: of the seed's 711 typo ladders (adversarial Б1 of MOL-332), 52 read «не
+  нашли» over the thing meant first at two typos and «нашли» at three — «малако соевое», «шакалад
+  белый», «вода мениральная». Beside it, the letters' own price of MOL-46: at two typos 247 of 704
+  answers read «не нашли» over the thing meant first. **Near wherever found was tried and taken
+  back** (adversarial А1, А2 of MOL-332): one exact word lends the vector its sense as it lent the
+  mean its edits, so «мыло детское» read «нашли» over «Масло детское» — review А of MOL-46 undone by
+  the model — and on the seed «вода без сахара» over «Кола без сахара». That decides it, and no
+  number does: on the seed's typo ladders and word swaps
+  (`.scratch/tasks/status/MOL-332-review-probe-3.json`) it made 374 rows of the thing meant near and
+  1 196 of another at 0.40, and more of another at every threshold to 0.60, but the swaps were made
+  by a generator — 328 of the 1 196 differ from their query by «для» alone — so the ratio is the
+  generators', not people's (adversarial Б2). The letters deciding instead brought the dog food back
+  to «не нашли» and fewer typos near than now. No rule is better on both halves, and none is
+  monotone, since the model is not: «агады» and «агади», one key, stand either side of 0.40. **A
+  name found
   both ways takes the nearer place**: «собачий корм» finds the dog food two edits away by its
   letters and close by its meaning, and left at two it stood under the treat the meaning alone
   found — so «собачий корм» and «корм собакам» are near now, MOL-46's price taken back. The person's
