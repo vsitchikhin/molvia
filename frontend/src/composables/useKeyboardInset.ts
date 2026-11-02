@@ -272,7 +272,7 @@ export function revealTypedIn(sheet: HTMLElement): void {
 }
 
 /** The error a field marked wrong names (`aria-errormessage`): the kit's, drawn under it. */
-function errorOf(field: HTMLElement): HTMLElement | null {
+export function errorOf(field: HTMLElement): HTMLElement | null {
   const id =
     field.getAttribute('aria-invalid') === 'true' && field.getAttribute('aria-errormessage')
   return id ? document.getElementById(id) : null
