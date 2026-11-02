@@ -1020,11 +1020,13 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   comes back into view and **at midnight with the screen in view** (a timer to the next local midnight, review 1,
   adversarial А4); a card takes it from its screen (`today`), a sheet holds its own `useLocalDay` — never
   `ref(localDay())`, which moved only as the sheet opened (А2, А3). **The functions of `days.ts` never read the clock**:
-  `purchaseDay`, `dayOfAnyYear`, `dateOfAnyYear`, `dayWords`, `calendarDayOfAnyYear`, `answeredAt` take that day as a
+  `purchaseDay`, `dayOfAnyYear`, `dateOfAnyYear`, `dayWords`, `calendarDayOfAnyYear`, `answeredAt` — and `shortDay` of
+  `accounts.ts`, a day of an account's operations in a check, «без счёта», a transfer (self-review Р3-2) — take that day as a
   required `today` — a place that leaves it out fails `npm run typecheck` — and **ESLint refuses the clock in the forms
   it can see** (`no-restricted-syntax`, `vue/no-restricted-syntax`, `eslint-days.test.ts`; self-review №2, Р2-4,
-  adversarial Б3): `localDay()` written inside a day word's call, a day held in `ref`, `shallowRef` or `computed` of
-  `localDay()`, and a default of `localDay()`, read once — a string from the clock passes any type. **The clock read into
+  adversarial Б3, В1): the clock — `localDay()` or `localDay(new Date())` written out — inside a day word's call, a day
+  held in `ref`, `shallowRef`, `computed` or `reactive` of it, and a default of it, read once — a string from the clock
+  passes any type; `localDay(moment)` is the day of a moment and passes. **The clock read into
   a name a line before, or handed down as a prop, is review's**: a selector cannot follow a name, and the test holds
   that boundary as it is. With the clock as the default every word counted its day
   where it was drawn: after a night «Покупки» said «вчера в 23:40» in the strip — the failed read on return happened to
@@ -1041,7 +1043,10 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   never «Сегодня». **The screen's month and year follow the same day, at midnight too** (self-review Р2-3): «Деньги»,
   «Графики» and «Бюджет» with no month in the address go on to the new month as midnight passes with the screen in
   view — the month before is no running month past it, and «к тому же дню» of it would lie — as they did on coming
-  back into view (adversarial З of MOL-121); offline, the new month has nothing kept and says so. **The prices, named:** a page put away is held by the browser, and its timer with it — coming back
+  back into view (adversarial З of MOL-121); «Деньги» and «Бюджет» are held by tests, «Графики» by the same
+  `useLocalDay` (self-review Р3-4). **A sheet that writes by the month keeps the month it opened on** (adversarial В2
+  of round 3): `BudgetPlanSheet` takes the month as it opens, so a September plan saved past midnight is September's,
+  never the month that moved under the thumb. **The prices, named:** a page put away is held by the browser, and its timer with it — coming back
   into view looks again; a screen's day ahead of a phone whose clock was set back stays ahead until the next look; and
   one test is green on master too, a guard of the rule — the search's strip of «Что брать» on return, redrawn there by
   the read the return makes (the strip of «Покупки» on return, the same, is an assertion inside a test red on master).
