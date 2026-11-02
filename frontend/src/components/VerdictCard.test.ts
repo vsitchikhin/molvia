@@ -43,6 +43,23 @@ describe('VerdictCard', () => {
     view.unmount()
   })
 
+  // «Оценки» keeps a purchase not rated for as long as it waits (MOL-329, adversarial Е1): «Oct 14» of last year read as this one.
+  it('MOL-329: a purchase of another year says its year; «yesterday» across New Year stays a word', () => {
+    const old = mount(VerdictCard, {
+      props: { card: { ...milk, boughtAt: new Date(2025, 9, 14, 17, 40) }, today: '2026-11-02' },
+      global: { plugins: [createAppI18n('en')] },
+    })
+    expect(old.get('.context').text()).toBe('Oct 14, 2025 · Ереван Сити')
+    old.unmount()
+
+    const eve = mount(VerdictCard, {
+      props: { card: { ...milk, boughtAt: new Date(2025, 11, 31, 22, 0) }, today: '2026-01-01' },
+      global: { plugins: [createAppI18n('en')] },
+    })
+    expect(eve.get('.context').text()).toBe('yesterday · Ереван Сити')
+    eve.unmount()
+  })
+
   it('MOL-120: names the city the queue gives it, in brackets when the dictionary has no case', () => {
     const known = render(undefined, 'Ереван')
     expect(known.get('.context').text()).toBe('Sep 12 · Ереван Сити in Yerevan')

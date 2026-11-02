@@ -2151,6 +2151,34 @@ describe('PurchasesView (MOL-128)', () => {
       expect(rows(view)[0]?.text()).toContain('вчера')
     })
 
+    // Review 5, Р5-1: after Д1 «Чек от» is a date, so only New Year moves it — by the screen's day, never the clock's.
+    // Adversarial Е1: a purchase still waiting for its rating may be of last year, and says so.
+    it('Новый год при открытом экране: «Чек от 31 дек.» берёт год; неоценённая покупка прошлого года — с годом', async () => {
+      vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+      vi.setSystemTime(new Date('2026-12-31T23:59:58.000Z'))
+      tripHistory.mockResolvedValue({ trips: [], nextCursor: null })
+      receipts.mockResolvedValue(
+        receiptsResponseCodec.parse({
+          receipts: [{ ...reading, capturedAt: '2026-12-31T23:30:00.000Z' }],
+        }),
+      )
+      pendingVerdicts.mockResolvedValue({
+        items: [card(1, 'Ереван Сити', new Date('2025-10-14T17:40:00.000Z'))],
+        total: 1,
+      })
+      const { view } = await render()
+      expect(view.text()).toContain('Чек от 31 дек., 23:30')
+      expect(view.get('.pending .meta').text()).toBe(
+        'Из «Ереван Сити», последняя — 14 окт. 2025 г.',
+      )
+
+      await vi.advanceTimersByTimeAsync(3_000)
+      expect(view.text()).toContain('Чек от 31 дек. 2026 г., 23:30')
+      expect(view.get('.pending .meta').text()).toBe(
+        'Из «Ереван Сити», последняя — 14 окт. 2025 г.',
+      )
+    })
+
     // A shelf moves its moment only with an answer, and «на 30 окт.» of last year read as this one (MOL-215 Б2).
     it('ответ другого года — полоса называет год', async () => {
       const { view } = await overnight(new Date('2025-10-30T10:05:00.000Z'))

@@ -23,7 +23,8 @@ export function purchaseDay(when: Date, locale: string, today: string): string {
 /**
  * The same day, with the year when it is not this one (MOL-57, self-review С-5): a session lives
  * for as long as it is used, so «вошли 12 сент.» may be a September of another year. Only where a
- * date can be that old — a purchase card is never older than its trip.
+ * date can be that old — a purchase card is never older than its trip, but one waiting for its rating may be
+ * (MOL-329, adversarial Е1).
  */
 export function dayOfAnyYear(when: Date, locale: string, today: string): string {
   // «Вчера» beats the year: 31 December seen on 1 January is yesterday, whatever the calendar.

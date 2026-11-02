@@ -5,7 +5,7 @@ import { cityWhereNameRepeats, placeNameIdentity } from '@molvia/model'
 import type { PendingVerdict } from '@molvia/model'
 import { placeLabel } from '@/components/placeLabel'
 import type { VerdictQueue } from '@/composables/useVerdictQueue'
-import { purchaseDay } from '@/days'
+import { dayOfAnyYear } from '@/days'
 
 const placeOfCard = (card: PendingVerdict) => ({ name: card.placeName, city: card.placeCity })
 
@@ -59,7 +59,7 @@ export function usePendingFrom(
         ? null
         : t('trip.home.pending.one_place', {
             place: a,
-            when: purchaseDay(latest.boughtAt, locale.value, today.value),
+            when: dayOfAnyYear(latest.boughtAt, locale.value, today.value),
           })
     }
     if (places.size > 2) return t('trip.home.pending.more_places', { a, b })
