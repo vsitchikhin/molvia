@@ -63,7 +63,11 @@ The detail behind the privacy lines of `CLAUDE.md`.
   on `actors` with `ACTOR_REFERENCES`, and another scans every table for the erased person's uuid
   and Telegram id. The journal of the merge of twins (MOL-106) joined this way: a pick moved names
   its person, so `catalogue_merge_moves.actor_id` goes with the person by the cascade and the copy
-  leaves the journal out, the pick itself being in it. **Its first lock is the account's, then the person's login requests, and only
+  leaves that move out, the pick itself being in it. **One's own verdict a twin's id wrote over after a
+  merge** (MOL-299, owner's В-10 «б») is kept there for the undo — its score and moments, never its text —
+  so it names its person too, is in the copy (`overwrittenVerdicts`, version 27), goes with the undo, and
+  has its row in the record of processing; `/privacy` says it under «Оценки» and «Копия ваших данных» (a
+  revision). **Its first lock is the account's, then the person's login requests, and only
   then the owner** (adversarial О-3, П-2): `for update` on an owner who does not exist yet locks
   nothing, and a login collected meanwhile created an owner the transaction had already decided
   was not there — «nobody to erase» over a live account. Collection locks its request row before

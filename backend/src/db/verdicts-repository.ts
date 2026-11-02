@@ -6,7 +6,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, rowLimit } from './rows'
 import { actors, items, verdicts } from './schema'
-import { liveItemId, noteTraceWrite, restampTraceWrite, verdictMoves } from './trace'
+import { liveItemId, noteTraceWrite, verdictWrittenByTrace } from './trace'
 
 export interface RatedVerdict {
   readonly verdict: Verdict
@@ -230,6 +230,14 @@ const INT4_MAX = 2 ** 31 - 1
 const FIRST_READABLE = Date.parse('0001-01-01T00:00:00Z')
 const PAST_READABLE = Date.parse('+010000-01-01T00:00:00Z')
 
+/** A row as it stood, for the journal of a merge it is written over in (MOL-299): never its text. */
+const BEFORE = {
+  score: verdicts.score,
+  ratedAt: sql<string>`${verdicts.ratedAt}::text`,
+  updatedAt: sql<string>`${verdicts.updatedAt}::text`,
+  deletedAt: sql<string | null>`${verdicts.deletedAt}::text`,
+}
+
 export function createVerdictRepository(db: Conn): VerdictRepository {
   return {
     async put(actorId, input, asked) {
@@ -260,7 +268,7 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
            * sees the row the first brought back.
            */
           const [prior] = await tx
-            .select({ deletedAt: verdicts.deletedAt })
+            .select(BEFORE)
             .from(verdicts)
             .where(
               and(
@@ -303,16 +311,19 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
         `)
           const [first] = rows
           // A first verdict by a trace's id goes home with an undo while nobody touched it since
-          // (MOL-299, А2, А3): the moment is held to the microsecond, which a `Date` loses. One a merge
-          // moved, rated again by the trace's id, goes home with its new word (В2).
+          // (MOL-299, А2, А3): the moment is held to the microsecond, which a `Date` loses. One rated
+          // again by it goes home with its new word, and the survivor's own gets its own back (В2, Г1).
           if (first !== undefined && asked !== undefined && asked.toLowerCase() !== first.itemId) {
-            if (first.inserted) {
+            if (first.inserted || prior === undefined) {
               await noteTraceWrite(tx, 'item', asked, 'verdict', {
                 id: first.id,
                 at: first.touched,
               })
             } else {
-              await restampTraceWrite(tx, 'item', asked, verdictMoves(first.id), first.touched)
+              await verdictWrittenByTrace(tx, asked, first, prior, {
+                withdrew: false,
+                reviewChanged: input.review !== undefined,
+              })
             }
           }
           return { row: first, withdrawn: prior !== undefined && prior.deletedAt !== null }
@@ -360,28 +371,31 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
       if (patch.score !== undefined) set.score = patch.score
       if (patch.review !== undefined) set.review = patch.review
 
+      const mine = and(
+        eq(verdicts.actorId, actorId),
+        // An id from before a merge reaches the survivor's verdict (MOL-106).
+        sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
+        // Products only until 0.3 — the path names an item, and a product has no place.
+        isNull(verdicts.placeId),
+        isNull(verdicts.deletedAt),
+      )
       return db.transaction(async (tx) => {
+        const [prior] = await tx.select(BEFORE).from(verdicts).where(mine).for('update')
         const [row] = await tx
           .update(verdicts)
           .set(set)
-          .where(
-            and(
-              eq(verdicts.actorId, actorId),
-              // An id from before a merge reaches the survivor's verdict (MOL-106).
-              sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
-              // Products only until 0.3 — the path names an item, and a product has no place.
-              isNull(verdicts.placeId),
-              isNull(verdicts.deletedAt),
-            ),
-          )
+          .where(mine)
           .returning({
             ...getTableColumns(verdicts),
             touched: sql<string>`${verdicts.updatedAt}::text`,
           })
         if (!row) return null
-        // amended by a trace's id: still the person's word about the trace (MOL-299, В2)
-        if (row.itemId !== itemId.toLowerCase()) {
-          await restampTraceWrite(tx, 'item', itemId, verdictMoves(row.id), row.touched)
+        // amended by a trace's id: still the person's word about the trace (MOL-299, В2, Г1)
+        if (prior !== undefined && row.itemId !== itemId.toLowerCase()) {
+          await verdictWrittenByTrace(tx, itemId, row, prior, {
+            withdrew: false,
+            reviewChanged: patch.review !== undefined,
+          })
         }
         return toVerdict(row)
       })
@@ -390,34 +404,38 @@ export function createVerdictRepository(db: Conn): VerdictRepository {
     async withdraw(actorId, itemId) {
       if (idOrNull(actorId) === null || idOrNull(itemId) === null) return false
 
+      const mine = and(
+        eq(verdicts.actorId, actorId),
+        // An id from before a merge reaches the survivor's verdict (MOL-106).
+        sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
+        isNull(verdicts.placeId),
+        // A second withdrawal finds nothing: the first one's time is the one that stands.
+        isNull(verdicts.deletedAt),
+      )
       return db.transaction(async (tx) => {
-        const withdrawn = await tx
+        const [prior] = await tx.select(BEFORE).from(verdicts).where(mine).for('update')
+        const [row] = await tx
           .update(verdicts)
           // The text is erased with the withdrawal: whoever deletes a review expects it gone,
           // and the gate needs only that the row existed and when. A CHECK holds the pair.
           .set({ deletedAt: sql`clock_timestamp()`, review: null })
-          .where(
-            and(
-              eq(verdicts.actorId, actorId),
-              // An id from before a merge reaches the survivor's verdict (MOL-106).
-              sql`${verdicts.itemId} = ${liveItemId(itemId)}`,
-              isNull(verdicts.placeId),
-              // A second withdrawal finds nothing: the first one's time is the one that stands.
-              isNull(verdicts.deletedAt),
-            ),
-          )
+          .where(mine)
           .returning({
             id: verdicts.id,
+            actorId: verdicts.actorId,
             itemId: verdicts.itemId,
             touched: sql<string>`${verdicts.updatedAt}::text`,
           })
-        // withdrawn by a trace's id: the trace's verdict, withdrawn (MOL-299, В2)
-        for (const row of withdrawn) {
-          if (row.itemId !== itemId.toLowerCase()) {
-            await restampTraceWrite(tx, 'item', itemId, verdictMoves(row.id), row.touched)
-          }
+        if (!row) return false
+        // withdrawn by a trace's id: the trace's verdict, withdrawn — never the survivor's own,
+        // which the undo gives back (MOL-299, В2, Г2)
+        if (prior !== undefined && row.itemId !== itemId.toLowerCase()) {
+          await verdictWrittenByTrace(tx, itemId, row, prior, {
+            withdrew: true,
+            reviewChanged: true,
+          })
         }
-        return withdrawn.length > 0
+        return true
       })
     },
 

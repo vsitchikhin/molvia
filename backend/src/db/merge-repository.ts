@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto'
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { ITEM_BARCODES_MAX } from '@molvia/model'
@@ -615,7 +616,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
             where l.id > ${id} and l.undone_at is null
               and (
                 (lm.what in ('verdict_swapped', 'verdict_withdrawn')
-                 and mm.what in ('verdict_swapped', 'verdict_withdrawn', 'verdict')
+                 and mm.what in ('verdict_swapped', 'verdict_withdrawn', 'verdict', 'verdict_overwritten')
                  and array[lm.key->>'kept', lm.key->>'trace', lm.key->>'id']
                      && array[mm.key->>'kept', mm.key->>'trace', mm.key->>'id'])
                 or (lm.what = 'pick_added' and mm.what in ('pick', 'pick_added')
@@ -637,13 +638,22 @@ export function createMergeRepository(db: Conn): MergeRepository {
             admits: boolean
             keptLastPickedAt?: string
             keptAdmits?: boolean
+            // of a verdict written over (MOL-299, Г1, Г2)
+            score: number
+            ratedAt: string
+            updatedAt: string
+            deletedAt: string | null
+            withdrew: boolean
+            reviewChanged: boolean
           } | null
           actor_id: string | null
         }>(sql`
           select what, key, before, actor_id from catalogue_merge_moves
           where merge_id = ${id}
           -- withdrawn before swapped back: the withdrawal was made on the row's swapped contents
-          order by case what when 'verdict_withdrawn' then 0 when 'verdict_swapped' then 1 else 2 end`)
+          -- a verdict written over last: the trace's own row is back by then, to take the person's word
+          order by case what when 'verdict_withdrawn' then 0 when 'verdict_swapped' then 1
+                             when 'verdict_overwritten' then 3 else 2 end`)
 
         // Every row goes back only from where this merge put it — the survivor, or what that was merged
         // into since. A row moved on by somebody's own act after the merge is theirs and stays: a code
@@ -784,6 +794,58 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 where receipt_id = ${key.receiptId} and position = ${key.position}
                   and item_id = ${now}`)
               break
+            case 'verdict_overwritten': {
+              // The survivor's own verdict, written over by the trace's id after the merge (Г1, Г2):
+              // still at that word, it gets its own back — never its text, which the journal keeps
+              // not — and the trace gets the word, a rating as a verdict of its own, a withdrawal as its
+              // own withdrawn. Touched by the survivor's id since, the person's word about it stands.
+              const before = move.before
+              if (!item || before === null) break
+              const [row] = await tx.execute<{
+                actor_id: string
+                item_kind: string
+                place_id: string | null
+                score: number
+                review: string | null
+              }>(sql`
+                select actor_id, item_kind, place_id, score, review from verdicts
+                where id = ${key.id} and updated_at = ${key.at}::timestamptz
+                for update`)
+              if (row === undefined) break
+              const gone = before.reviewChanged || before.deletedAt !== null
+              await tx.execute(sql`
+                update verdicts
+                set score = ${before.score}, rated_at = ${before.ratedAt}::timestamptz,
+                    updated_at = ${before.updatedAt}::timestamptz,
+                    deleted_at = ${before.deletedAt}::timestamptz,
+                    review = case when ${gone} then null else review end
+                where id = ${key.id}`)
+              const theirs = sql`actor_id = ${row.actor_id} and item_id = ${from}
+                                 and place_id is not distinct from ${row.place_id}::uuid`
+              if (before.withdrew) {
+                await tx.execute(sql`
+                  update verdicts set deleted_at = greatest(${key.at}::timestamptz, rated_at), review = null
+                  where ${theirs} and deleted_at is null`)
+                break
+              }
+              const said = before.reviewChanged ? row.review : null
+              const taken = await tx.execute(sql`
+                update verdicts
+                set score = ${row.score},
+                    review = case when ${before.reviewChanged} then ${said} else review end,
+                    updated_at = greatest(${key.at}::timestamptz, rated_at), deleted_at = null
+                where ${theirs}
+                returning id`)
+              if (taken.length === 0) {
+                await tx.execute(sql`
+                  insert into verdicts
+                    (id, actor_id, item_id, item_kind, place_id, score, review, rated_at, updated_at)
+                  values (${randomUUID()}, ${row.actor_id}, ${from}, ${row.item_kind},
+                          ${row.place_id}::uuid, ${row.score}, ${said},
+                          ${key.at}::timestamptz, ${key.at}::timestamptz)`)
+              }
+              break
+            }
             case 'trace':
               await tx.execute(
                 item
@@ -833,6 +895,10 @@ export function createMergeRepository(db: Conn): MergeRepository {
             ? sql`update items set merged_into = null where id = ${from}`
             : sql`update places set merged_into = null where id = ${from}`,
         )
+        // What a verdict said before its trace's id wrote over it is the person's, kept for this undo
+        // alone (MOL-299): done, it is not kept.
+        await tx.execute(sql`
+          delete from catalogue_merge_moves where merge_id = ${id} and what = 'verdict_overwritten'`)
         await tx.execute(
           sql`update catalogue_merges set undone_at = clock_timestamp() where id = ${id}`,
         )

@@ -34,11 +34,16 @@ export async function noteTraceWrite(
   what: MergeMove,
   key: Record<string, unknown>,
   actorId: string | null = null,
+  /** `before` of the move; `last`: under the merge into the survivor alone, not every step of the way. */
+  extra: { readonly before?: Record<string, unknown>; readonly last?: boolean } = {},
 ): Promise<void> {
   await conn.execute(sql`
     ${wayOf(subject, asked)}
-    insert into catalogue_merge_moves (merge_id, what, key, actor_id)
-    select id, ${what}, ${JSON.stringify(key)}::jsonb, ${actorId}::uuid from way`)
+    insert into catalogue_merge_moves (merge_id, what, key, before, actor_id)
+    select id, ${what}, ${JSON.stringify(key)}::jsonb,
+           ${extra.before === undefined ? null : JSON.stringify(extra.before)}::jsonb, ${actorId}::uuid
+    from way
+    where ${extra.last === true ? sql`depth = (select max(depth) from way)` : sql`true`}`)
 }
 
 /**
@@ -54,11 +59,21 @@ export async function restampTraceWrite(
   asked: string,
   refers: SQL,
   at: string,
-): Promise<void> {
-  await conn.execute(sql`
+  /** What the latest write did, for a verdict written over (Г1, Г2): withdrew it, changed its text. */
+  how: { readonly withdrew: boolean; readonly reviewChanged: boolean } | null = null,
+): Promise<number> {
+  const restamped = await conn.execute(sql`
     ${wayOf(subject, asked)}
-    update catalogue_merge_moves mv set key = jsonb_set(mv.key, '{at}', to_jsonb(${at}::text))
-    where mv.merge_id in (select id from way) and ${refers}`)
+    update catalogue_merge_moves mv
+    set key = jsonb_set(mv.key, '{at}', to_jsonb(${at}::text)),
+        before = case when mv.what = 'verdict_overwritten' and ${how !== null}
+                      then mv.before || jsonb_build_object(
+                             'withdrew', ${how?.withdrew ?? false},
+                             'reviewChanged', (mv.before->>'reviewChanged')::boolean or ${how?.reviewChanged ?? false})
+                      else mv.before end
+    where mv.merge_id in (select id from way) and ${refers}
+    returning 1`)
+  return restamped.length
 }
 
 /** Every merge still standing on the trace's way to its survivor, as the CTE `way`. */
@@ -66,17 +81,52 @@ function wayOf(subject: MergeSubject, asked: string): SQL {
   const from = sql.raw(subject === 'item' ? 'from_item' : 'from_place')
   const into = sql.raw(subject === 'item' ? 'into_item' : 'into_place')
   return sql`
-    with recursive way (id, next) as (
-      select m.id, m.${into} from catalogue_merges m
+    with recursive way (id, next, depth) as (
+      select m.id, m.${into}, 1 from catalogue_merges m
       where m.undone_at is null and m.${from} = ${asked}::uuid
       union all
-      select m.id, m.${into} from catalogue_merges m join way w on m.${from} = w.next
+      select m.id, m.${into}, w.depth + 1 from catalogue_merges m join way w on m.${from} = w.next
       where m.undone_at is null
     )`
 }
 
-/** The moves that name a verdict row: moved home whole, or the survivor's side of a swap. */
+/** The moves that name a verdict row: moved home whole, the survivor's side of a swap, written over. */
 export function verdictMoves(id: string): SQL {
-  return sql`((mv.what = 'verdict' and mv.key->>'id' = ${id}::text)
+  return sql`((mv.what in ('verdict', 'verdict_overwritten') and mv.key->>'id' = ${id}::text)
            or (mv.what = 'verdict_swapped' and mv.key->>'kept' = ${id}::text))`
+}
+
+/** A verdict row as it stood before a write by a trace's id, never its text (MOL-299, Г1, Г2). */
+export interface VerdictBefore {
+  readonly score: number
+  readonly ratedAt: string
+  readonly updatedAt: string
+  readonly deletedAt: string | null
+}
+
+/**
+ * A verdict a trace's id wrote again after its merge (MOL-299). A row a move of the way names — moved,
+ * swapped, written over before — takes the write's moment (В1, В2). Any other is the survivor's own from
+ * before, which the write just put the trace's word over (Г1, Г2): the merge into the survivor keeps what
+ * it held, and the undo puts it back and gives the trace the word. The person's id goes with it, so the
+ * move goes with the person, and the copy carries it.
+ */
+export async function verdictWrittenByTrace(
+  conn: Conn,
+  asked: string,
+  row: { readonly id: string; readonly actorId: string; readonly touched: string },
+  before: VerdictBefore,
+  how: { readonly withdrew: boolean; readonly reviewChanged: boolean },
+): Promise<void> {
+  const named = await restampTraceWrite(conn, 'item', asked, verdictMoves(row.id), row.touched, how)
+  if (named > 0) return
+  await noteTraceWrite(
+    conn,
+    'item',
+    asked,
+    'verdict_overwritten',
+    { id: row.id, at: row.touched },
+    row.actorId,
+    { before: { ...before, ...how }, last: true },
+  )
 }

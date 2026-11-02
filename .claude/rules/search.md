@@ -839,14 +839,23 @@ report.
   only a row still at it; a swap kept leaves the trace's row withdrawn. **Touched by the trace's id, the row
   is still the trace's** (adversarial В1, В2): a pick repeated from a phone's queue, a verdict given again,
   amended or withdrawn by a bot's button land on the survivor's row as any write by a trace's id, and they
-  move its moves' moment with them (`restampTraceWrite`), so it goes home — swapped back, for a swap. A row
-  no move of the way names, the survivor's own from before, keeps nothing and stays. **The prices, named:** the trace's
-  own score is lost where the person rated the survivor over it (the row was one), and the trace's row so
-  kept holds the survivor's old score with its `rated_at`, withdrawn — the gate, the reminder and the copy
-  read it (Б4: the journal keeps no score, since it outlives the person's erasure); an **item** written by a
+  move its moves' moment with them (`restampTraceWrite`), so it goes home — swapped back, for a swap.
+  **A verdict no move of the way names is the survivor's own from before** (adversarial Г1, Г2, owner's
+  В-10 «б»): the person has one row for one item, so a rating, an amendment or a withdrawal by the trace's
+  id lands on it and writes over their word about the survivor. The merge into the survivor keeps what it
+  said — its score and moments, never its text (`verdict_overwritten`, `before`, with the person's id) — and
+  the undo, last of its moves, gives it back while the row is still at the trace's word, and gives the trace
+  that word: a rating its own verdict, given at the moment of the write, a withdrawal its own withdrawn if
+  it has one. Later writes by the trace's id move the moment and keep the first `before`. What is kept is
+  the person's, in their copy (`overwrittenVerdicts`, version 27), gone with them by the cascade, and gone
+  with the undo; on a chain it is kept by the merge into the survivor, and the word goes to that merge's
+  younger. **The prices, named:** the trace's own score is lost where the person rated the survivor over it
+  by the survivor's id (the row was one: their own act), and the trace's row so kept holds the survivor's
+  old score with its `rated_at`, withdrawn — the gate, the reminder and the copy read it (Б4); a text the
+  trace's id wrote over is not given back; an **item** written by a
   trace's name — «Предложить товар», a receipt's new line — stays with the survivor, the name being the
-  survivor's second (В-7 «а»: the search shows the survivor, so it is rare); a row the trace's id changed
-  rather than wrote — a pick added to, a verdict amended — stays where it is; a write by a trace that an
+  survivor's second (В-7 «а»: the search shows the survivor, so it is rare); a pick of the survivor's own
+  from before that the trace's id added to stays where it is; a write by a trace that an
   `unmerge` commits between its row and its note stays with the survivor too (Б5, owner's В-8 «а»: the
   owner's hand once a morning against milliseconds); a word of the shop's memory settled again after a
   purchase removed (`settleWords`, MOL-240) takes another moment and stays with the survivor while its
