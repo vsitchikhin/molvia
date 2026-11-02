@@ -122,7 +122,6 @@
 </template>
 
 <script lang="ts">
-import { useLocalDay } from '@/composables/useLocalDay'
 import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -148,10 +147,11 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
-import { parseSigned, shortDay, signedAmount } from '@/components/accounts'
+import { parseSigned, signedAmount } from '@/components/accounts'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, shiftDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { calendarDay, calendarDayOfAnyYear, localDay, shiftDay } from '@/days'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
 
@@ -291,7 +291,9 @@ export default defineComponent({
       const account = current.value
       if (!account) return t('accounts.sheet.meta_add')
       return account.hasOperations
-        ? t('accounts.sheet.meta_has_ops', { date: shortDay(account.startOn, locale.value) })
+        ? t('accounts.sheet.meta_has_ops', {
+            date: calendarDayOfAnyYear(account.startOn, locale.value, today.value),
+          })
         : t('accounts.no_operations')
     })
 
@@ -332,7 +334,7 @@ export default defineComponent({
       return [
         held.name,
         signedAmount(held.start, locale.value),
-        shortDay(held.startOn, locale.value),
+        calendarDayOfAnyYear(held.startOn, locale.value, today.value),
       ].join(' · ')
     }
 

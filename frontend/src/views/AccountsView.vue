@@ -282,7 +282,7 @@
 
 <script lang="ts">
 import { useLocalDay } from '@/composables/useLocalDay'
-import { answeredAt, dateOfAnyYear } from '@/days'
+import { answeredAt, calendarDayOfAnyYear, dateOfAnyYear } from '@/days'
 import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -314,7 +314,7 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import TransferSheet from '@/components/TransferSheet.vue'
 import UnassignedSheet from '@/components/UnassignedSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { canTransfer, pageOrder, removedOf, shortDay, signedAmount } from '@/components/accounts'
+import { canTransfer, pageOrder, removedOf, signedAmount } from '@/components/accounts'
 import { bankWords, rateWords } from '@/components/spending'
 import { figureChars } from '@/components/figure'
 import { useAnnouncer } from '@/composables/useAnnouncer'
@@ -439,7 +439,8 @@ export default defineComponent({
      * broke it inside a word, «окт» over «.» (adversarial Б1).
      */
     const whole = (text: string) => text.replaceAll(' ', '\u00a0')
-    const day = (date: string) => whole(shortDay(date, locale.value))
+    // An account lives across years: its start and its check say a year of their own (adversarial Б2).
+    const day = (date: string) => whole(calendarDayOfAnyYear(date, locale.value, today.value))
 
     function liveLine(account: MoneyAccountView): string {
       const { currency, lastCheckedOn, startOn } = account

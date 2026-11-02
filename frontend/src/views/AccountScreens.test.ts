@@ -1314,6 +1314,46 @@ describe('the screen`s day (MOL-329)', () => {
     expect(stripText(view)).toBe('The server did not answer · balances as of yesterday, 11:40 PM')
   })
 
+  // Adversarial Б1 of round 2: in Russian a year ends with its own full stop, «2025 г.», and it closes the sentence.
+  it('Б1: put away last year, in Russian — one full stop after the year, never two', async () => {
+    const removed = cash({ archivedAt: new Date('2025-09-21T10:00:00Z') })
+    moneyAccounts.mockResolvedValue(page([removed]))
+    accountJournal.mockResolvedValue(journal(removed, []))
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push(`/money/accounts/${CASH}`)
+    const view = mount(AccountView as never, {
+      attachTo: document.body,
+      global: { plugins: [router, session(), createAppI18n('ru')] },
+    })
+    views.push(view)
+    await settle()
+    expect(view.get('.balance ~ .note').text()).toBe(
+      'Убран из выбора 21 сентября 2025 г. История и остаток сохранены',
+    )
+  })
+
+  // Adversarial Б2 of round 2: an account lives across years, its start, its check and its journal with it.
+  it('Б2: the start, the check and the journal of another year say the year', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
+    const old = cash({ startOn: '2025-09-16', lastCheckedOn: '2025-10-03' })
+    const lastYear = {
+      ...spendingRow(TAXI, '-500', CASH),
+      day: '2025-10-14',
+      at: new Date('2025-10-14T09:00:00Z'),
+    }
+    moneyAccounts.mockResolvedValue(page([old]))
+    const list = await open(AccountsView, '/money/accounts', session())
+    expect(list.text().replaceAll('\u00a0', ' ')).toContain('AMD · checked Oct 3, 2025')
+
+    accountJournal.mockResolvedValue(journal(old, [lastYear]))
+    const account = await open(AccountView, `/money/accounts/${CASH}`, session())
+    const text = account.text().replaceAll('\u00a0', ' ')
+    expect(text).toMatch(/on Sep 16, 2025 · checked Oct 3, 2025/)
+    // 14 October 2025 was a Tuesday; this year it is a Wednesday.
+    expect(text).toContain('Tue, October 14, 2025')
+  })
+
   it('А5: an account put away last year says the year, on its screen and in the list', async () => {
     const removed = cash({ archivedAt: new Date('2025-09-21T10:00:00Z') })
     moneyAccounts.mockResolvedValue(page([removed]))

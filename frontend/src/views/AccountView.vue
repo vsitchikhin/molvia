@@ -259,7 +259,7 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import TransferSheet from '@/components/TransferSheet.vue'
 import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import { canTransfer, operationRowProps, shortDay, signedAmount } from '@/components/accounts'
+import { canTransfer, operationRowProps, signedAmount } from '@/components/accounts'
 import type { Removed } from '@/components/spending'
 import { figureChars } from '@/components/figure'
 import { useAccountJournal } from '@/composables/useAccountJournal'
@@ -268,7 +268,7 @@ import { useLocalDay } from '@/composables/useLocalDay'
 import { useOwnCategories } from '@/composables/useOwnCategories'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTransferOutcome } from '@/composables/useTransferOutcome'
-import { answeredAt, calendarDay, dateOfAnyYear, shiftDay } from '@/days'
+import { answeredAt, calendarDay, calendarDayOfAnyYear, dateOfAnyYear, shiftDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -394,18 +394,21 @@ export default defineComponent({
       if (!value) return ''
       const started = t('accounts.account.started', {
         amount: money(value.start),
-        date: shortDay(value.startOn, locale.value),
+        date: calendarDayOfAnyYear(value.startOn, locale.value, today.value),
       })
+      // An account lives across years, and so do its start and its check (adversarial Б2).
       return value.lastCheckedOn
-        ? `${started} · ${t('accounts.account.checked', { date: shortDay(value.lastCheckedOn, locale.value) })}`
+        ? `${started} · ${t('accounts.account.checked', { date: calendarDayOfAnyYear(value.lastCheckedOn, locale.value, today.value) })}`
         : started
     })
     const archivedLine = computed(() => {
       const at = account.value?.archivedAt
       if (!at) return ''
-      // Whole: after «21 сент.» the full stop of the sentence doubled (handoff 03).
+      // Whole: after «21 сент.» the full stop of the sentence doubled (handoff 03). A year of its own ends with
+      // its full stop too — «21 сентября 2025 г.» — and closes the sentence with it: one, never two (adversarial Б1).
       const date = dateOfAnyYear(at, locale.value, today.value, 'long')
-      return t('accounts.account.archived', { date })
+      const line = t('accounts.account.archived', { date })
+      return date.endsWith('.') ? line.replace(`${date}.`, date) : line
     })
 
     /** Rows by day, as the server ordered them: newest first, and within a day newest first. */
@@ -427,10 +430,13 @@ export default defineComponent({
       const date = calendarDay(day, locale.value)
       if (day === today.value) return t('spending.day_today', { date })
       if (day === shiftDay(today.value, -1)) return t('spending.day_yesterday', { date })
+      // The journal goes back to the account's start, across years: a day of another year says its year, or
+      // its weekday read as this year's (adversarial Б2).
       const text = calendarDay(day, locale.value, {
         weekday: 'short',
         day: 'numeric',
         month: 'long',
+        ...(day.slice(0, 4) === today.value.slice(0, 4) ? {} : { year: 'numeric' }),
       })
       return text.charAt(0).toLocaleUpperCase(locale.value) + text.slice(1)
     }
