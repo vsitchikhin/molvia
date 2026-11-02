@@ -706,8 +706,10 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   place takes** (adversarial А2): «Выберите магазин» over a name typed was untrue, the name marked by nothing;
   it is marked «Здесь есть знаки, которые не сохранить» and takes the focus. **A shop is chosen by the place
   the button takes**, not by a key (Р3-А1): a recent one tapped and then gone from the server's list waits
-  for a shop again; **and «today» is asked as it opens and as a day is typed** (Р3-А2), or the phone's
-  today after midnight was refused at the tap as a day still to come; the action's word («Записать сумму») comes
+  for a shop again; **and «today» is asked as it opens, as a day is typed, at the tap and at the phone's
+  midnight while it is up** (Р3-А2, Р4-А1, Р5-А1), or the phone's today after midnight was refused at the tap as
+  a day still to come, and marked so before it; a phone asleep over the midnight is caught by the app back in
+  view (`useLocalDay`), not by the timer, which a sleeping phone holds; the action's word («Записать сумму») comes
   once a shop is named, as «Перевести» and a verdict's say what they wait for. **The price, named:** a card of
   «Оценки» back from the queue refused opens with the focus on its title (`focusOnMount`) and its error in the
   field — a queue's answer, not a refusal at a send. **The checkbox is
