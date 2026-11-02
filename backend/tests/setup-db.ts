@@ -32,7 +32,8 @@ export async function holdTestDatabases(
       select a.application_name as name from pg_locks l join pg_stat_activity a using (pid)
       where l.locktype = 'advisory' and l.granted and l.classid = hashtext('molvia tests')::oid
         and l.objid = hashtext(${database})::oid
-        and l.database = (select oid from pg_database where datname = current_database())`
+        and l.database = (select oid from pg_database where datname = current_database())
+      order by a.application_name`
     await holder.end()
     return { heldBy: others.map((other) => other.name).join(', ') || 'a run that has just ended' }
   }
