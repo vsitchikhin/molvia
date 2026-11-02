@@ -326,8 +326,14 @@ failure` give the same first row, `find` and `[...new Set()]` either way (round 
   uuid nor a moment is not judged); a moment before an identity is refused even where the test wrote the
   moments; a callback calling a pure method of a name of this file or of an import is refused. «A row picked as
   the one» and «what a loop or a `reduce` collects» were prices until round 14: 255 uses now go through `onlyRow`, 35 through `sorted` and `sum`. Those go to review. **Every answer of «free» or «not a read» the check
-  gives is written in its head, nothing else is let go; a form found outside these classes is a defect of the
-  check, fixed at the place it slipped through by the same rule of doubt — never a new list.**
+  gives is written in its head, nothing else is let go; a form an ordinary test writes, found outside these
+  classes, is a defect of the check, fixed at the place it slipped through by the same rule of doubt — never a new
+  list.** **What the check is** (owner's decision, 02.11.2026, after round 18 of review): a guard against a read
+  written the ordinary way, not against a form built to slip past it — the boundary of `check-clock-bounds.mjs`.
+  Parsing cannot prove what arbitrary code does with rows: rounds 15–17 found a write by a tag in a loop, a spy on
+  `console`, a snapshot in a loop, none of them in a test of the repository, and each closure was the next one's
+  surface. So a form found that hides an ordinary read — a `limit` with no `order by`, an `array_agg` (round 18) — is
+  a new line in the check; a form built only to slip past it is review's, and no defect of the check.
 - **How it was proved**: the read of «то же фото дважды» on master with its first word deleted and inserted
   again under the same id — the row then lies last in the heap and the index alike — gives CI's diff
   exactly, and with `orderBy` it is green. `update … set x = x` proves nothing: a HOT update leaves the row

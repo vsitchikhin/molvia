@@ -4976,6 +4976,8 @@ postgres.js в цикле писал строки в порядке их при�
 на строки ответа и не видят, **какие** строки взял `limit` без `order by` и в каком порядке `array_agg` без `order by`
 собрал значения внутри одной строки. Теперь это отказ на уровне самого запроса: `limit`/`offset`/`fetch first`/
 `distinct on` без `order by` своего уровня скобок, агрегат, хранящий порядок, и оконная функция места — без своего
-`order by`; в Drizzle — `limit`, `offset`, `selectDistinctOn`, `findFirst` без порядка вставки.
+`order by`; в Drizzle — `limit`, `offset`, `selectDistinctOn`, `findFirst` без порядка вставки. **Граница стража
+(решение владельца 02.11.2026)**: как у `check-clock-bounds` — держит обычное написание, а не форму, построенную, чтобы
+проскочить; такая форма — дело ревью, не дефект стража.
 Требования и план — `.scratch/tasks/{requirements,plans}/MOL-323.md`, артефакт — `.lavish/mol-323-plan.html`, атака и
 обход — `.scratch/tasks/{selftests,status}/MOL-323*`.

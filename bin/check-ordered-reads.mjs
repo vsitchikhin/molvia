@@ -69,6 +69,10 @@
 // `onlyRow`, `sorted`, `sum` — never a use the check does not know. **Every answer of «free» or «not a read»
 // the check gives is one written here**; nothing else is let go.
 //
+// **What the check is** (owner's decision, 02.11.2026): a guard against a read written the ordinary way, not against
+// a form built to slip past it, as `check-clock-bounds.mjs` is. A form found that hides an ordinary read is a new line
+// here; a form built only to slip past it is review's.
+//
 // **4. What a statement takes by the heap's order, however its rows are used** (round 18, Т1, Т2): the net reverses
 // the rows a statement gives and `onlyRow` counts them, but neither sees which rows they are or the order inside one.
 // So SQL text — a template of any tag, a fragment of Drizzle's `sql`, a string run by `unsafe`, `query`, `execute` or
