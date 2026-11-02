@@ -81,7 +81,8 @@
 // (`array_agg`, `string_agg`, `json_agg`, `jsonb_object_agg`, `array(select …)`) has no `order by` of its own; where a
 // window of a place (`row_number`, `lag`, `first_value` …) is over no order, or over one named elsewhere. And a query
 // of Drizzle taking a part of its rows — `limit`, `offset`, `selectDistinctOn`, `findFirst`, `findMany` of a `limit` —
-// by no order, or by an order of chance.
+// by no order, or by an order of chance, wherever the query began: a function of the file that returns it, carried on
+// by a `limit`, takes a part by an identity written in the chain or by none (round 20, У1).
 //
 // **The price, named, by class, and nothing outside these classes** — of rows with no order, what a form this
 // check does not follow hides: rows a helper of another file returns — the net reverses them, and values the
@@ -1526,6 +1527,21 @@ export function unorderedReads(
       follow(read)
     }
   }
+  /**
+   * The order of a query carried on from what the parse cannot read whole — a function of the file that returns it:
+   * an order of insertion only where its first column is an identity, every column of it one the schema names; in
+   * doubt, none (round 20, У1).
+   */
+  const continuedOrder = (node) => {
+    const given = queryOf(node)
+      .filter((call) => calledAs(call) === 'orderBy')
+      .flatMap((call) => [...call.arguments])
+    const columns = given.map((argument) => orderColumns(argument))
+    if (columns.some((column) => !column)) return 'none'
+    const [first] = columns.flat()
+    return first && named(first, identity) ? undefined : 'none'
+  }
+
   // what a statement picks or gathers by the heap's order, however its rows are used (review round 18, Т1, Т2)
   const picks = []
   const pick = (node, why) =>
@@ -1561,8 +1577,13 @@ export function unorderedReads(
     ) {
       const names = queryOf(node).map(calledAs)
       const part = names.some((name) => /^(limit|offset|selectDistinctOn)$/.test(name ?? ''))
-      if (part && names.includes('from')) {
-        const order = names.includes('orderBy') ? readOf(node) : 'none'
+      // wherever the query began — written whole, a `const`, a function of the file that returns it (round 20, У1)
+      if (part) {
+        const order = !names.includes('orderBy')
+          ? 'none'
+          : names.includes('from')
+            ? readOf(node)
+            : continuedOrder(node)
         if (order !== undefined && !/^(update|delete)$/.test(names.at(-2) ?? ''))
           pick(
             node,

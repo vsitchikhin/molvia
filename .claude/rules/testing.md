@@ -302,7 +302,8 @@ failure` give the same first row, `find` and `[...new Set()]` either way (round 
   `order by` gathered. So SQL text where, at any level of its parentheses, a `limit`, an `offset`, a `fetch first` or a
   `distinct on` stands with no `order by` of that level, an aggregate that keeps the order it is fed in or a window of
   a place has none of its own, is refused — and a query of Drizzle taking a part of its rows (`limit`, `offset`,
-  `selectDistinctOn`, `findFirst`) by no order of insertion. It works by parsing as the clock check does,
+  `selectDistinctOn`, `findFirst`) by no order of insertion, wherever the query began — carried on from a function
+  of the file that returns it, its order is the chain's own, an identity first, or none (round 20, У1). It works by parsing as the clock check does,
   names by TypeScript's binder, chance, identities and unique keys read from `schema.ts`. **It is closed at
   each of the three places it recognises something** (review of MOL-323, eleven rounds: a list of forms missed
   one more every round, so each place says what it knows and holds the rest in doubt, and **in doubt there is

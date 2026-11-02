@@ -1403,6 +1403,22 @@ describe('unorderedReads', () => {
       'const base = db.select().from(t)\nconst row = onlyRow(await base.limit(1))',
     ],
     [
+      'a limit of a query a function of the file returns',
+      'const notices = () => db.select().from(t)\nconst row = onlyRow(await notices().limit(1))',
+    ],
+    [
+      'a limit of a query a function returns, ordered by chance',
+      'const recent = () => db.select().from(sessions)\nconst row = onlyRow(await recent().orderBy(sessions.id).limit(1))',
+    ],
+    [
+      'a limit of a query a function returns, its order unread',
+      'const recent = () => db.select().from(t)\nconst row = onlyRow(await recent().orderBy(by).limit(1))',
+    ],
+    [
+      'an offset of a query a parameter holds',
+      'const page = async (q) => onlyRow(await q.offset(1))',
+    ],
+    [
       'selectDistinctOn with no order',
       'expect(await db.selectDistinctOn([t.kind]).from(t)).toHaveLength(2)',
     ],
@@ -1487,6 +1503,10 @@ describe('unorderedReads', () => {
     [
       'a limit of Drizzle by an identity',
       'const row = onlyRow(await db.select().from(t).orderBy(t.id).limit(1))',
+    ],
+    [
+      'a limit of a query a function returns, ordered by an identity',
+      'const notices = () => db.select().from(t)\nconst row = onlyRow(await notices().orderBy(t.id).limit(1))',
     ],
     ['findFirst with an order', 'const row = await db.query.t.findFirst({ orderBy: (x) => x.id })'],
     [
