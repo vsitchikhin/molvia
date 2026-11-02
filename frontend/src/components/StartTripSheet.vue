@@ -40,8 +40,8 @@
     />
 
     <template #footer>
-      <!-- Not now while a shop is missing, saying so (MOL-174, Ф-6), as «Где купили?» (MOL-354); a name no
-           place takes is refused at the tap and heard there: `disabled` left the focus order in silence. -->
+      <!-- Not now while a shop is missing, saying so (MOL-174, Ф-6, MOL-354), as «Где купили?» does (MOL-333);
+           a name no place takes is refused at the tap and heard there: `disabled` left the focus order in silence. -->
       <AppButton size="large" block :inactive="waitsFor !== null" @click="startTyped">
         {{ waitsFor === 'place' ? t('receipt.place.choose_place') : t('trip.none.action') }}
       </AppButton>

@@ -225,17 +225,21 @@ describe('StartTripSheet', () => {
   })
 
   // Why is said by the state over the field; «Выберите магазин» would be untrue over a name typed.
-  it('без настроек — не сейчас со словом действия, и касание ничего не начинает', async () => {
+  // The settings are waited for first (Р-3): with the name empty too, the word is still the action's —
+  // a mutant asking for the name first passed every test before (self-review №1, adversarial Б1).
+  it('без настроек — не сейчас со словом действия, пустое имя или нет, и касание ничего не начинает', async () => {
     const { view, queue } = await render({ settings: false })
-    await nameField(view).setValue('Рынок')
     expect(view.text()).toContain(ru.settings.context_missing)
-    const main = mainButton(view)
-    expect(main.text()).toBe(ru.trip.none.action)
-    expect(main.attributes('aria-disabled')).toBe('true')
-    expect(main.attributes('disabled')).toBeUndefined()
-    ;(main.element as HTMLButtonElement).click()
-    await flushPromises()
-    expect(queue.pending).toEqual([])
+    for (const typed of ['', '   ', '\u200b', 'Рынок']) {
+      await nameField(view).setValue(typed)
+      const main = mainButton(view)
+      expect(main.text(), JSON.stringify(typed)).toBe(ru.trip.none.action)
+      expect(main.attributes('aria-disabled'), JSON.stringify(typed)).toBe('true')
+      expect(main.attributes('disabled'), JSON.stringify(typed)).toBeUndefined()
+      ;(main.element as HTMLButtonElement).click()
+      await flushPromises()
+      expect(queue.pending, JSON.stringify(typed)).toEqual([])
+    }
   })
 
   it('невидимые знаки из буфера не делают второго магазина', async () => {
