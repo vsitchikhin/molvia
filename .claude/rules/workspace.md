@@ -152,3 +152,13 @@ copied from it on the worker's first file — the files of one worker still run 
 database, exactly as all of them did. Measured under the lock on 01.10.2026: 61 s against 164 s
 in turn, all 1686 green. The production bundle, which three files test, is built once in the global
 setup: built by each of them, it was rewritten under a neighbour reading it.
+
+**A copy's test databases are held by one run at a time** (MOL-351): the global setup takes an advisory lock
+of the session on their name and keeps it to the run's end, and a second run of the copy fails at its start,
+naming the first by the end of its path. A reviewer's worktree with the copy's `.env`, or a run typed past the
+lock above, shares `…_test_w<n>` with it, and nothing refused that. It is the one way found for MOL-351, never
+reproduced: `clearAll` of a file that writes no trip failed on a trip's key, a row written between its `DELETE` of
+`trips` and of `actors`. A run of vitest itself does not write past its file — the worker is stopped (a write left on a
+timer never reached the next file), and a write of a trip is a transaction a dead client cannot commit — so such a
+row comes from another run. **The price, named:** two runs of one copy cannot
+overlap at all, so a worktree that tests beside its copy needs a copy index of its own.
