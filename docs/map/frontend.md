@@ -5,7 +5,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 ## frontend · views
 
-- `frontend/src/views/KitView.vue` — Development-only kit page at `/_kit`: every kit component in its states, and a sheet in a real history for e2e — a short one and one taller than its share, its footer pinned.
+- `frontend/src/views/KitView.vue` — Development-only kit page at `/_kit`: every kit component in its states, and a sheet in a real history for e2e — a short one and one taller than its share, its footer pinned, its note refused at the tap (MOL-354).
 
 ## frontend · components
 
@@ -44,8 +44,8 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/composables/useBackLabel.ts` — Composable: which back label fits the row (parent's title, «Back», or the chevron alone), measured by a resize observer.
 - `frontend/src/composables/useCollapsed.ts` — Composable: whether the large title has scrolled past the pinned row (sentinel observer), and an element's live height.
 - `frontend/src/composables/useColorScheme.ts` — Composable: the scheme of this device (`molvia.scheme`) — kept, drawn on the root and in the status bar's theme colours, followed from other windows; the script in `index.html` reads it before the first paint (MOL-111).
-- `frontend/src/composables/useFieldRefusal.ts` — Composable: a field of the kit refused at a send is heard — focused once its error is drawn, or, holding the focus already, its error said in the region (MOL-235).
-- `frontend/src/composables/useKeyboardInset.ts` — Composable: lifts an open sheet above the iOS on-screen keyboard from the box it is pinned in and sizes it by the visual viewport (`--keyboard-inset`, `--viewport-height`), taking the height the keys left last time before they come (`molvia.keyboard`); scrolls the sheet to the field typed in when the sheet moves, its pinned footer grows or a field is focused under it, above the footer (`scroll-padding`); hides the page under the keys (`data-under-keys`).
+- `frontend/src/composables/useFieldRefusal.ts` — Composable: a field of the kit refused at a send is heard — focused once its error is drawn, or, holding the focus already, its error said in the region (MOL-235); in a sheet, the field brought into sight with its error once it has grown (MOL-354).
+- `frontend/src/composables/useKeyboardInset.ts` — Composable: lifts an open sheet above the iOS on-screen keyboard from the box it is pinned in and sizes it by the visual viewport (`--keyboard-inset`, `--viewport-height`), taking the height the keys left last time before they come (`molvia.keyboard`); scrolls the sheet to the field typed in — with its error (`revealTypedIn`, MOL-354) — when the sheet moves, its pinned footer grows or a field is focused under it, above the footer (`scroll-padding`); hides the page under the keys (`data-under-keys`).
 - `frontend/src/composables/useLargeText.ts` — Composable: marks the root `data-large-text` while a rem is over 17.6 px, read off a hidden box one rem wide by `ResizeObserver` — what turns a word's hyphen on (MOL-321).
 - `frontend/src/composables/useLocalDay.ts` — Composable: the phone's today as a screen holds it, asked again when the app comes back into view or online (MOL-121) and at midnight (MOL-329) — the one day every word of a screen is counted from.
 - `frontend/src/composables/useReconnect.ts` — Composable: calls a screen's retry when the connection may be back — `online` or the app coming into view.
