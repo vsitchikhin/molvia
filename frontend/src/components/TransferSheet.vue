@@ -171,7 +171,6 @@
 </template>
 
 <script lang="ts">
-import { useLocalDay } from '@/composables/useLocalDay'
 import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -206,6 +205,7 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import { pageOrder, shortDay } from '@/components/accounts'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { shown } from '@/composables/useItemDetails'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTransfers } from '@/composables/useTransfers'
 import { dateOfAnyYear, localDay } from '@/days'

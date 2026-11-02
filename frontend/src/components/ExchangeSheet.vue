@@ -178,7 +178,6 @@
 </template>
 
 <script lang="ts">
-import { useLocalDay } from '@/composables/useLocalDay'
 import { computed, defineComponent, reactive, ref, toRef, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -219,6 +218,7 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { useAccountChoice } from '@/composables/useAccountChoice'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useOnline } from '@/composables/useOnline'
 import { useAccountsStore } from '@/stores/accounts'
 import { shown } from '@/composables/useItemDetails'

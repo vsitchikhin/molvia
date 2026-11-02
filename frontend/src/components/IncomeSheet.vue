@@ -167,7 +167,6 @@
 </template>
 
 <script lang="ts">
-import { useLocalDay } from '@/composables/useLocalDay'
 import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -213,6 +212,7 @@ import { calendarDay, localDay, purchaseDay } from '@/days'
 import { newId } from '@/ids'
 import type { IncomeDraft } from '@/composables/useIncomes'
 import { incomesOf } from '@/composables/useIncomes'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useOnline } from '@/composables/useOnline'
 import { useAccountsStore } from '@/stores/accounts'
 

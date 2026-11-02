@@ -221,7 +221,6 @@
 </template>
 
 <script lang="ts">
-import { useLocalDay } from '@/composables/useLocalDay'
 import { computed, defineComponent, nextTick, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
@@ -287,6 +286,7 @@ import { afterStep, useNavigation } from '@/navigation'
 import { newId } from '@/ids'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import type { SpendingFields } from '@/stores/spendingQueue'
