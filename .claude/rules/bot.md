@@ -110,7 +110,9 @@ press — the only channel people are given, because there Telegram already says
   «Впустить это устройство в ваш аккаунт Molvia?», and the last line names what it costs to
   get it wrong. «Войти в Molvia?» over a button labelled «Войти» read as «log _me_ in» — the
   wrong way round for the one attack the button exists to stop, where a stranger's link makes
-  your tap let **their** browser into **your** account.
+  your tap let **their** browser into **your** account. **The words alone did not hold it before strangers** (MOL-287 Ф-3, reproduced:
+  the device is named by the stranger's own User-Agent, «iPhone · Safari»): MOL-361 makes the bot tell of every new
+  sign-in with «Это не я — завершить» (owner's В-9 «а», MOL-361).
 - **An outcome is written into the message; a refusal is only shown over it** (О-1). Both
   presses of a double tap leave before the first edit lands — the buttons are still on screen,
   which at a shelf on a slow connection is ordinary — so the second was refused by the API,

@@ -428,6 +428,19 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **«Выйти» erases this device's drawer after the server's `204`, never on the tap** (MOL-57); a
   lost `204` is settled by the server's next answer; offline there is no way out.
 
+### Security: quotas, outgoing requests, secrets, the edges — `.claude/rules/security.md`
+
+- **A write that grows what everybody shares, or what the server keeps on disk, has a quota per person**
+  (MOL-287, В-3 «а»: one request without a session or one account in a minute bringing the service down is a
+  blocker): the login per address (MOL-359), receipts (MOL-360), «Предложить товар» (MOL-362); a new write path
+  names its quota in its task. What answers without a session counts by the address Caddy names (`networkOf`).
+- **A host the server asks is the code's, never the request's**, with a timeout (SSRF).
+- **Every secret of production is a row of «Rotating the secrets» in `deploy/README.md`**, and a new one comes
+  with its row and its line in `.env.prod.example`; the database's password lives in its volume too. The images
+  are public on ghcr: nothing secret in a layer or the bundle.
+- **`/internal/*` is closed twice** — Caddy's 404 and `BOT_API_SECRET` in constant time; a bot's route goes in
+  that scope only. **A finding is a probe on a copy** (`.scratch/tasks/security/MOL-287/probes/`), never prod.
+
 ### Privacy: erasure, trackers, logs — `.claude/rules/privacy.md`
 
 - **Erasure is one function**, `ErasureRepository.erase`, behind two doors — `/delete` in the bot
