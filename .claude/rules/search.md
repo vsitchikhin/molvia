@@ -597,24 +597,26 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   the seed that answer is near either way, by «Кокос», and the row is what differs — «проверьте» on
   a receipt's line, none of «Что брать» past its twentieth — but **where nothing else is near the
   whole answer turns**: of the seed's 711 typo ladders (adversarial Б1 of MOL-332), 52 read «не
-  нашли» over the thing meant first at two typos and «нашли» at three — «малако соевое», «шакалад
-  белый», «вода мениральная». Beside it, the letters' own price of MOL-46: at two typos 247 of 704
-  answers read «не нашли» over the thing meant first. **Near wherever found was tried and taken
-  back** (adversarial А1, А2 of MOL-332): one exact word lends the vector its sense as it lent the
-  mean its edits, so «мыло детское» read «нашли» over «Масло детское» — review А of MOL-46 undone by
-  the model — and on the seed «вода без сахара» over «Кола без сахара». That decides it, and no
-  number does: on the seed's typo ladders and word swaps
-  (`.scratch/tasks/status/MOL-332-review-probe-3.json`) it made 370 rows of the thing meant near on
-  the ladders and 1 192 of another on the swaps at 0.40, and more of another at every threshold to
-  0.60, but the swaps were made by a generator — 328 of the 1 192 differ from their query by «для»
-  alone — so the ratio is the generators', not people's (adversarial Б2). The letters deciding
-  instead brought the dog food back to «не нашли» and fewer typos near than now. No rule is better
-  on both halves, and none is monotone, since the model is not: «агады» and «агади», one key, stand
-  either side of 0.40. **A name found both ways takes the nearer place**: «собачий корм» finds the
-  dog food two edits away by its letters and close by its meaning, and left at two it stood under
-  the treat the meaning alone found — so «собачий корм» and «корм собакам» are near now, MOL-46's
-  price taken back. The person's own word keeps its rank; a pick lifts a name found by meaning as
-  any found name (MOL-11) — and lets in none the meaning did not reach.
+  нашли» over the thing meant first at two typos and «нашли» at three — «малако соевое», «вода
+  мениральная», «масло слевачное 82,5%» — counted on a Mac: some stand within 0.006 of the
+  threshold, as «масло кюнжютное» on «Кунжут» at 0.0001, so x86, CI's and production's, may count
+  otherwise. Beside it, the letters' own price of MOL-46: at two typos 247 of 704 answers read «не
+  нашли» over the thing meant first. **Near wherever found was tried and taken back** (adversarial
+  А1, А2 of MOL-332): one exact word lends the vector its sense as it lent the mean its edits, so
+  «мыло детское» read «нашли» over «Масло детское» — review А of MOL-46 undone by the model — and on
+  the seed «вода без сахара» over «Кола без сахара». That decides it, and no number does: on the
+  seed's typo ladders and word swaps (`.scratch/tasks/status/MOL-332-review-probe-3.json`) it made
+  370 rows of the thing meant near on the ladders and 1 192 of another on the swaps at 0.40, and
+  more of another at every threshold to 0.60, but the swaps were made by a generator — 328 of the 1
+  192 differ from their query by «для» alone — so the ratio is the generators', not people's
+  (adversarial Б2). The letters deciding instead brought the dog food back to «не нашли» and fewer
+  typos near than now. No rule is better on both halves, and none is monotone, since the model is
+  not: «агады» and «агади», one key, stand either side of 0.40. **A name found both ways takes the
+  nearer place**: «собачий корм» finds the dog food two edits away by its letters and close by its
+  meaning, and left at two it stood under the treat the meaning alone found — so «собачий корм» and
+  «корм собакам» are near now, MOL-46's price taken back. The person's own word keeps its rank; a
+  pick lifts a name found by meaning as any found name (MOL-11) — and lets in none the meaning did
+  not reach.
 - **The thresholds were measured** on the seed's thirty shelves — 84 shelf words in Russian,
   Armenian, Georgian and Serbian, 25 things the seed does not carry, and every cut of a shelf word
   typed letter by letter. **Similarity 0.40**: 0.38 won seven points of first rows and lost to the
