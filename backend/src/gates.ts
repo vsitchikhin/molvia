@@ -4,6 +4,9 @@ import {
   GATE_RATINGS_WINDOW_HOURS,
   GATE_RETURN_STOP_PERCENT,
   LOGIN_SECOND_WAY_PERCENT,
+  PICKS_CONSENT_EDITION,
+  PICKS_MEASURE_MIN_PAIRS,
+  PICKS_MEASURE_PER_PERSON,
   RECEIPT_EDITS_STOP_PERCENT,
   yerevanDate,
   yerevanMidnight,
@@ -14,6 +17,7 @@ import type {
   GatesReport,
   GatesWindow,
   LoginsInWindow,
+  PicksMeasured,
   ReceiptsInWindow,
   RemindersInWindow,
   TaxReceiptsInWindow,
@@ -168,6 +172,25 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     ...receiptLines(report.modelReceipts, '0.2r', '· read by the model (MOL-272)'),
     '',
     ...taxReceiptLines(report.taxReceipts),
+    '',
+    ...picksLines(report.picks),
+  ]
+}
+
+/**
+ * The pairs the search's memory is measured on (MOL-330, owner's В-2 «а»): read with every reading of gate 0.2 and of
+ * its people — who appeared in the window — since the measure waits for them and closes with that gate if they never
+ * come. A trigger beside its `n`, no verdict; a person's own words apart, never in the line (review 1, Р-7).
+ */
+function picksLines({ pairs, people, words }: PicksMeasured): string[] {
+  return [
+    `0.2  ${'· pairs for the search memory (MOL-330)'.padEnd(47)}measured from ${String(PICKS_MEASURE_MIN_PAIRS)} pairs`,
+    row('pairs «query → item taken»', [
+      String(pairs),
+      `at most ${String(PICKS_MEASURE_PER_PERSON)} a person, edition ${String(PICKS_CONSENT_EDITION)}, statistics on`,
+    ]),
+    row('  people behind them', [String(people), '']),
+    row('own words', [String(words), 'not in the line']),
   ]
 }
 

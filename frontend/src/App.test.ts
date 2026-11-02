@@ -11,6 +11,7 @@ import en from '@/i18n/en.json'
 import { pwaUpdateKey } from '@/pwaUpdate'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
+import { dropIdentity } from '@/stores/identity'
 
 // Every other request stays in the air: the screens draw their skeletons, which is all this needs.
 const me = vi.fn()
@@ -107,5 +108,95 @@ describe('a door shut over the app', () => {
     expect(view.find('.login').exists()).toBe(false)
     expect(view.get('h1').element).toBe(heading)
     expect(document.activeElement).toBe(document.body)
+  })
+})
+
+/**
+ * The app at `path` with nothing on the drawer — the door shut while the server is asked — and an owner
+ * claimed here who accepted this edition: the server's answer opens the door.
+ */
+async function openedByTheServer(path: string) {
+  // Nothing on the drawer, in memory too: the tab's cache keeps the owner a test before laid there.
+  dropIdentity()
+  localStorage.setItem('molvia.login', JSON.stringify({ claimed: OWNER }))
+  localStorage.setItem(`molvia.consent.${OWNER}`, String(POLICY_VERSION))
+  let answer: (value: unknown) => void = () => undefined
+  me.mockReturnValue(
+    new Promise((resolve) => {
+      answer = resolve
+    }),
+  )
+  const pinia = createPinia()
+  setActivePinia(pinia)
+  const started = useActorStore().start()
+  window.history.replaceState(null, '', path)
+  const router = createRouter({ history: createWebHistory(), routes })
+  await router.push(path)
+  await router.isReady()
+  const view = mount(App, {
+    attachTo: document.body,
+    global: {
+      plugins: [pinia, router, createAppI18n('en')],
+      provide: {
+        [pwaUpdateKey as symbol]: {
+          phase: shallowRef('none'),
+          apply: vi.fn(),
+          serverVersion: vi.fn(),
+        },
+      },
+    },
+  })
+  onTestFinished(() => {
+    view.unmount()
+  })
+  await flushPromises()
+  return {
+    view,
+    open: async () => {
+      answer({
+        id: OWNER,
+        country: 'AM',
+        city: 'Гюмри',
+        spendCurrency: 'AMD',
+        incomeCurrency: 'RUB',
+        createdAt: new Date('2026-10-04T10:00:00.000Z'),
+        updatedAt: new Date('2026-10-04T10:00:00.000Z'),
+      })
+      await started
+      await flushPromises()
+    },
+  }
+}
+
+// MOL-330: the step of the terms grew taller than a phone, the person scrolled down to «Принимаю», and the
+// screen came in the door's place scrolled by as much — e2e's kit opened 29 px down.
+describe('a door opened onto the app', () => {
+  it('puts the screen that comes in its place at the top', async () => {
+    const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
+    onTestFinished(() => {
+      scroll.mockRestore()
+    })
+    const { view, open } = await openedByTheServer('/')
+    expect(view.find('.login').exists()).toBe(true)
+    scroll.mockClear()
+
+    await open()
+
+    expect(view.find('.login').exists()).toBe(false)
+    expect(scroll).toHaveBeenCalledWith(0, 0)
+  })
+
+  it('leaves a public screen where it was being read', async () => {
+    const scroll = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined)
+    onTestFinished(() => {
+      scroll.mockRestore()
+    })
+    const { view, open } = await openedByTheServer('/privacy')
+    expect(view.get('h1').text()).toBe(en.privacy.title)
+    scroll.mockClear()
+
+    await open()
+
+    expect(scroll).not.toHaveBeenCalled()
   })
 })

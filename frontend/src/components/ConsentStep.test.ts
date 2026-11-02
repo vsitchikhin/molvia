@@ -144,7 +144,7 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(view.find('.changes').exists()).toBe(false)
   })
 
-  it('whoever accepted edition 1 is told what changed in 2, 3, 4 and 5, and sees the statistics too', async () => {
+  it('whoever accepted edition 1 is told what changed in 2, 3, 4, 5 and 6, and sees the statistics too', async () => {
     consent.mockResolvedValue({ version: 1 })
     const { view } = await render()
     expect(view.text()).toContain(en.consent.updated.title)
@@ -153,6 +153,7 @@ describe('«Условия и приватность» (MOL-95)', () => {
       en.consent.changes['3'],
       en.consent.changes['4'],
       en.consent.changes['5'],
+      en.consent.changes['6'],
     ])
     // It is told what edition 1 told it wrong: the catalogue and a receipt's word have no threshold (Р3-А1).
     expect(en.consent.changes['2']).toMatch(/with no threshold/)
@@ -165,33 +166,38 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(acceptConsent).toHaveBeenCalledWith(POLICY_VERSION)
   })
 
-  it('whoever accepted edition 2 is told what changed in 3, 4 and 5: Anthropic, a new recipient (MOL-272)', async () => {
+  it('whoever accepted edition 2 is told what changed in 3, 4, 5 and 6: Anthropic, a new recipient (MOL-272)', async () => {
     consent.mockResolvedValue({ version: 2 })
     const { view } = await render()
     expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([
       en.consent.changes['3'],
       en.consent.changes['4'],
       en.consent.changes['5'],
+      en.consent.changes['6'],
     ])
     expect(en.consent.changes['3']).toMatch(/Anthropic/)
     expect(ru.consent.changes['3']).toMatch(/Anthropic/)
   })
 
-  it('whoever accepted edition 3 is told what changed in 4 and 5: a receipt kept for the review (MOL-309)', async () => {
+  it('whoever accepted edition 3 is told what changed in 4, 5 and 6: a receipt kept for the review (MOL-309)', async () => {
     consent.mockResolvedValue({ version: 3 })
     const { view } = await render()
     expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([
       en.consent.changes['4'],
       en.consent.changes['5'],
+      en.consent.changes['6'],
     ])
     expect(en.consent.changes['4']).toMatch(/21 days/)
     expect(ru.consent.changes['4']).toMatch(/21 дня/)
   })
 
-  it('whoever accepted edition 4 is told only what changed in 5: France, and Anthropic beyond the USA (MOL-319)', async () => {
+  it('whoever accepted edition 4 is told what changed in 5 and 6: France, and Anthropic beyond the USA (MOL-319)', async () => {
     consent.mockResolvedValue({ version: 4 })
     const { view } = await render()
-    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([en.consent.changes['5']])
+    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([
+      en.consent.changes['5'],
+      en.consent.changes['6'],
+    ])
     expect(ru.consent.changes['5']).toMatch(/во Франции, а не в Германии/)
     expect(ru.consent.changes['5']).toMatch(/в любой стране, где у неё есть мощности/)
     // the whole of the term, as the page says it: the one paragraph whoever accepted 4 reads (adversarial А3)
@@ -200,6 +206,24 @@ describe('«Условия и приватность» (MOL-95)', () => {
     )
     expect(en.consent.changes['5']).toMatch(/in France, not in Germany/)
     expect(en.consent.changes['5']).toMatch(/up to 30 days \(up to 2 years .*up to 7 years\)/)
+  })
+
+  it('whoever accepted edition 5 is told only what changed in 6: the search measured by their picks (MOL-330)', async () => {
+    consent.mockResolvedValue({ version: 5 })
+    const { view } = await render()
+    expect(view.findAll('.changes-text').map((p) => p.text())).toEqual([en.consent.changes['6']])
+    // A new purpose, said as one: by what was taken for a query, with no name, the export let go after it.
+    expect(ru.consent.changes['6']).toMatch(/^Новая цель: /)
+    expect(ru.consent.changes['6']).toMatch(/по тому, что вы взяли по какому запросу/)
+    expect(ru.consent.changes['6']).toMatch(/без имени и номера аккаунта/)
+    expect(ru.consent.changes['6']).toMatch(/выгрузку для замера удаляет после него/)
+    expect(ru.consent.changes['6']).toContain(`«${ru.settings.analytics.label}»`)
+    expect(en.consent.changes['6']).toMatch(/^A new purpose: /)
+    expect(en.consent.changes['6']).toContain(`«${en.settings.analytics.label}»`)
+    // And the card on the step names it beside the visits and the ratings.
+    expect(view.get('.statistics').text()).toContain(en.consent.statistics.text)
+    expect(ru.consent.statistics.text).toMatch(/меряем поиск по тому, что вы брали по запросу/)
+    expect(en.consent.statistics.text).toMatch(/measure the search by what you took for a query/)
   })
 
   it('sends nothing of the age: the edition alone is the answer', async () => {

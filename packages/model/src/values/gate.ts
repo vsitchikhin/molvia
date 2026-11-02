@@ -44,3 +44,19 @@ export const LOGIN_SECOND_WAY_PERCENT = 25
  * beside its `n` and with no verdict.
  */
 export const RECEIPT_EDITS_STOP_PERCENT = 33.3
+
+/**
+ * The measure of the search's memory (MOL-330, the threshold of MOL-47's В-1): `REMEMBERED_PREFIX` is measured
+ * again only once this many different pairs «query → item taken» stand among people who accepted
+ * `PICKS_CONSENT_EDITION` — fewer, and one person's habit decides the constant. A trigger, not a stop: printed
+ * beside its `n` under the gates, and not reached by the day gate 0.2 is decided, the task closes with «nothing to
+ * measure» (owner's В-2 «а»).
+ */
+export const PICKS_MEASURE_MIN_PAIRS = 70
+
+/**
+ * How many of one person's pairs count towards `PICKS_MEASURE_MIN_PAIRS` (MOL-330, owner's В-1 «а» of review 1): ten,
+ * so seventy means seven people at least — a contribution is a person, not a row, and sixty pairs of one newcomer and
+ * one each of nine others are nineteen, not sixty-nine.
+ */
+export const PICKS_MEASURE_PER_PERSON = 10

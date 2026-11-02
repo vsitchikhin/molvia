@@ -265,6 +265,22 @@ The detail behind the privacy lines of `CLAUDE.md`.
   the deletion at «Записать» is ours. `consent.changes.3` keeps «США»: it is what edition 3 said, and
   `changes.5`, shown after it, puts it right. **The model reads only for whoever accepted it**
   (`MODEL_CONSENT_EDITION` 5, below).
+- **Edition 6 names the measure of the search among the statistics** (MOL-330, owner's В-1 «а», 02.11.2026). What
+  a person took by which query (`search_picks`) was «Это видно только вам», kept to put their own item first; to
+  measure `REMEMBERED_PREFIX` on the picks of 0.2's people the developer reads them — a new purpose, so an edition,
+  as edition 4's review was, and set out before the release of 0.2, so newcomers accept it at the door. The
+  consent is the statistics' (`PICKS_CONSENT_EDITION` 6, never below `STATISTICS_CONSENT_EDITION`), held by the
+  same switch: the page says the pairs leave as keys as the search keeps them — no claim of an alphabet, a key keeps
+  «ц» and letters no table knows (review 1, №3) — with no name and no account's number — a number of the export
+  alone, so a pick is judged against its own person's queries — the export deleted after the measure; «Выбор в
+  поиске» says other people do not see the pairs. **Numbers and one kind of word go into the result** (owner's В-3
+  «а» of review 1): a query that found nothing, the item then taken by another word (`admits`), may join the shared
+  dictionary of synonyms — with no name, and only where at least three people said the same, the threshold of any
+  aggregate; the page names it among what other people see. **Back on, a person's pairs count again, those made
+  before the edition or while it was off too** (В-4 «а», as the ratings of gate 0.2): a pick keeps no moment of its
+  own, and `consented_at` is overwritten by every later edition; the page says both. Whoever accepted an older
+  edition, or keeps the statistics off, is never counted or exported (`make gates`, `advice.md`). No table, column or
+  recipient is new, so erasure and the copy do not change; the record of processing (12091393) names the purpose.
 - **The record of processing is a page in Confluence, written from the code** (MOL-97,
   «Реестр обработки персональных данных», 12091393): a row per processing — the data, the purpose, the
   basis by country, the term and the constant or timer that holds it, who sees it, erasure and the
