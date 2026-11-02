@@ -417,7 +417,22 @@ picked on «кол» while typing «колбаса» takes its first row through
 price of memory belonging to the query — one short word serving two items. 3 stays. Real picks
 were to measure it again, and a month of production gave one (MOL-47): the owner's purchases come
 by receipts, and a purchase from a receipt writes no pick — so it waits for the picks of 0.2's
-people (MOL-330). The corpus pins every answer whole — the shelf, those fifty words, Latin and
+people (MOL-330). **Those picks are read only with consent** (MOL-330, owner's В-1 «а»): the privacy page
+promised «Это видно только вам», and the measure is a new purpose, so edition 6 names it among the
+statistics — by key, with no name and no account's number, the export deleted after the measure — and
+only the pairs of whoever accepted it (`PICKS_CONSENT_EDITION`) and keeps «Учитывать меня в статистике»
+on are counted or exported. `make gates` prints the pairs of gate 0.2's people — who appeared since `FROM`, the
+release, so the owner's are not among them (review 1, Р-8) — beside `PICKS_MEASURE_MIN_PAIRS` (70, MOL-47's
+В-1), **counted as the measure reads them**: a person's own word is no pair (Р-7, printed apart), a key typed on the
+way to another key of the same item is that pair (owner's В-2 «а»), and no more than ten of one person's count
+(`PICKS_MEASURE_PER_PERSON`, В-1 «а»: seventy is seven people at least). **«On the way» is read by the key, as
+the memory reads it** (review 2, Р2-А1): a fold rewrites letters already typed — «дет» is `det`, «детское» `deцkoe`,
+«Nutric» `nutrik`, «Մածո» `maцo` — so such a cut is a pair of its own, the price named: 13 names of the seed's 605,
+nine of them «… детский»; the ten a person bounds it. The measure starts there, and not
+reached by the decision on gate 0.2 the task closes with «nothing to measure» and 3 stays (owner's В-2
+«а»). The stored key is no typed text: typing is simulated by the key's own prefixes, which is what the
+memory compares, and meaning (MOL-105) cannot be replayed — named. A person's own words are a list of candidates for
+the dictionary of synonyms only where three people said the same (В-3 «а»), else a number. The corpus pins every answer whole — the shelf, those fifty words, Latin and
 Cyrillic brand spellings, Armenian labels — so a change of either threshold shows what it moves.
 
 **Measured again on real input, and kept (MOL-47, 31.10.2026).** Receipts are the real input there
