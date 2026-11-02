@@ -439,8 +439,11 @@ export default defineComponent({
      * broke it inside a word, «окт» over «.» (adversarial Б1).
      */
     const whole = (text: string) => text.replaceAll(' ', '\u00a0')
-    // An account lives across years: its start and its check say a year of their own (adversarial Б2).
-    const day = (date: string) => whole(calendarDayOfAnyYear(date, locale.value, today.value))
+    // An account lives across years: its start and its check say a year of their own (adversarial Б2). The
+    // date stays whole, and the line may break before its year: «3 окт. 2025 г.» in one piece of fourteen
+    // signs stood beside the balance at a text of 200 % (self-review Р3-3).
+    const day = (date: string) =>
+      whole(calendarDayOfAnyYear(date, locale.value, today.value)).replace(/\u00a0(?=\d{4})/, ' ')
 
     function liveLine(account: MoneyAccountView): string {
       const { currency, lastCheckedOn, startOn } = account

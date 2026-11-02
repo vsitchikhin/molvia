@@ -236,6 +236,7 @@ import { figureChars } from '@/components/figure'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import type { IncomeDraft } from '@/composables/useIncomes'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useReconnect } from '@/composables/useReconnect'
 import { newId } from '@/ids'
 import { useAccountsStore } from '@/stores/accounts'
@@ -382,7 +383,9 @@ export default defineComponent({
     const currencyName = computed(() => t(`spending.currency_name.${props.account.currency}`))
     const money = (value: Money) => signedAmount(value, locale.value)
     const signed = (value: Money) => signedAmount(value, locale.value, { plus: true })
-    const shortDay = (day: string) => dayOf(day, locale.value)
+    // The screen's day: a check's window may begin last year, and its days say so (MOL-329, Р3-2).
+    const today = useLocalDay()
+    const shortDay = (day: string) => dayOf(day, locale.value, today.value)
     const matched = computed(() => result.value?.difference.minor === 0n)
     /** Offline, in words of what waits for the connection: the check, the write, or nothing. */
     const offlineLine = computed(() => {

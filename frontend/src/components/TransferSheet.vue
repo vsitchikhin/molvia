@@ -445,7 +445,9 @@ export default defineComponent({
 
     const dayWords = computed(() => {
       if (!isRateDay(day.value)) return null
-      return day.value === today.value ? t('transfer.today') : shortDay(day.value, locale.value)
+      return day.value === today.value
+        ? t('transfer.today')
+        : shortDay(day.value, locale.value, today.value)
     })
 
     /** «2 500 $ → «Доллары» · комиссия 20 $ · 8 окт. · заметка» — what is recorded now. */
@@ -456,7 +458,7 @@ export default defineComponent({
         ...(transfer.fee
           ? [t('transfer.current_fee', { amount: formatMoney(transfer.fee, locale.value) })]
           : []),
-        shortDay(transfer.transferredOn, locale.value),
+        shortDay(transfer.transferredOn, locale.value, today.value),
         ...(transfer.note ? [transfer.note] : []),
       ].join(' · ')
     }

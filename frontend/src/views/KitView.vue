@@ -921,6 +921,8 @@ export default defineComponent({
   },
   setup() {
     const { t, locale } = useI18n()
+    // The kit's page shows the words of a day, not a screen's living day.
+    const kitToday = localDay()
     const categories: SpendingCategoryView[] = (['groceries', 'cafe', 'transport'] as const).map(
       (preset, index) => ({
         id: `00000000-0000-4000-8000-00000000010${String(index)}`,
@@ -1289,7 +1291,7 @@ export default defineComponent({
         {
           ...logged({ kind: 'trip', place: 'SAS', items: 4, unpriced: 2 }),
           title: t('accounts.reconcile.cause_trip_unpriced', {
-            date: shortDay('2026-09-25', locale.value),
+            date: shortDay('2026-09-25', locale.value, kitToday),
           }),
           meta: t('accounts.reconcile.cause_trip_unpriced_meta', { place: 'SAS', n: 2 }, 2),
           amount: null,
@@ -1323,7 +1325,7 @@ export default defineComponent({
     }
     return {
       t,
-      today: localDay(),
+      today: kitToday,
       ERROR,
       levels: Object.values(VERDICT_LEVEL),
       iconPx: {

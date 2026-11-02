@@ -15,7 +15,7 @@ import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { spendingLook, tripIcon, tripTint, unbroken } from '@/components/spending'
 import type { OperationRowProps, Translate } from '@/components/spending'
-import { calendarDay } from '@/days'
+import { calendarDayOfAnyYear } from '@/days'
 
 /** The minus of a figure — U+2212, never the hyphen `Intl` prints (handoff 01, 08). */
 const MINUS = '\u2212'
@@ -51,9 +51,13 @@ export function parseSigned(text: string, currency: Currency): Money | null {
   }
 }
 
-/** «16 сент.» — a day of an account, its start or its check. */
-export function shortDay(day: string, locale: string): string {
-  return calendarDay(day, locale, { day: 'numeric', month: 'short' })
+/**
+ * «16 сент.», «3 окт. 2025 г.» — a day of an account's operations: a check's window, a row with no account, a
+ * transfer. An account lives across years, so a day not of the screen's year says it (MOL-329, self-review
+ * Р3-2); `today` is the screen's day (`useLocalDay`).
+ */
+export function shortDay(day: string, locale: string, today: string): string {
+  return calendarDayOfAnyYear(day, locale, today)
 }
 
 /**

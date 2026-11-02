@@ -413,6 +413,19 @@ describe('a check and the operations of its reasons', () => {
     expect(view.text()).toContain(en.accounts.reconcile.recounting)
   })
 
+  // MOL-329, self-review Р3-2: a check's window may begin with an even check of last year, and its day says so.
+  it('a window begun last year says the year of its day', async () => {
+    const view = await checkWith(session(), {
+      ...answer('10000', '11200', [
+        { kind: 'unassigned', operation: spendingRow(TAXI, '-1200', null) },
+      ]),
+      since: '2025-10-03',
+    })
+    expect(view.text().replaceAll('\u00a0', ' ')).toContain(
+      'What could explain it since Oct 3, 2025',
+    )
+  })
+
   it('a difference above zero opens the sheet of an income, filled — nothing written yet (В-5)', async () => {
     const pinia = session()
     incomes.mockResolvedValue({
@@ -1345,6 +1358,8 @@ describe('the screen`s day (MOL-329)', () => {
     moneyAccounts.mockResolvedValue(page([old]))
     const list = await open(AccountsView, '/money/accounts', session())
     expect(list.text().replaceAll('\u00a0', ' ')).toContain('AMD · checked Oct 3, 2025')
+    // Whole as a date, a line may break before its year (self-review Р3-3).
+    expect(list.text()).toContain('Oct\u00a03, 2025')
 
     accountJournal.mockResolvedValue(journal(old, [lastYear]))
     const account = await open(AccountView, `/money/accounts/${CASH}`, session())
