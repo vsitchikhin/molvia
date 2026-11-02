@@ -572,6 +572,10 @@ export default defineComponent({
           settleTarget()
         } else if (code === ERROR.TRANSFER_IN_FUTURE) {
           dayBad.value = true
+          // under the day, and heard there — never into a sheet swept away meanwhile (MOL-333, Р2-А2)
+          if (props.open) {
+            void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
+          }
         } else if (code === ERROR.CONFLICT && said) {
           // Amended on another phone meanwhile — or, for a new one, written already under this name
           // with other figures, its answer lost (review С-1, adversarial А5): what is recorded now is

@@ -3,7 +3,7 @@
     <template #title>{{
       category ? t('spending.new_category.edit_title') : t('spending.new_category.title')
     }}</template>
-    <form class="form" novalidate @submit.prevent="submit">
+    <form ref="form" class="form" novalidate @submit.prevent="submit">
       <AppField
         ref="field"
         v-model="name"
@@ -90,6 +90,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { OWN_ICONS } from '@/components/spending'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { newId } from '@/ids'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 
@@ -138,6 +139,12 @@ export default defineComponent({
     const colourChosen = ref(false)
     const problem = ref<string | null>(null)
     const field = ref<ComponentPublicInstance | null>(null)
+    const form = ref<HTMLFormElement | null>(null)
+    // A name refused is heard (MOL-235, MOL-333): the focus to the name, marked, or its error said.
+    const refuse = useFieldRefusal()
+    function refuseName(): void {
+      void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
+    }
 
     watch(
       () => props.open,
@@ -178,11 +185,13 @@ export default defineComponent({
     function submit(): void {
       if (!name.value.trim()) {
         problem.value = t('spending.new_category.bad_empty')
+        refuseName()
         return
       }
       const checked = spendingCategoryNameSchema.safeParse(name.value)
       if (!checked.success) {
         problem.value = t('spending.sheet.bad_text')
+        refuseName()
         return
       }
       const own = props.category
@@ -191,6 +200,7 @@ export default defineComponent({
       const kept = own?.name != null && nameIdentity(own.name) === nameIdentity(checked.data)
       if (!kept && taken(checked.data)) {
         problem.value = t('spending.new_category.bad_taken')
+        refuseName()
         return
       }
       const body = { name: checked.data, icon: icon.value, colour: colour.value }
@@ -234,6 +244,7 @@ export default defineComponent({
     return {
       t,
       sheet,
+      form,
       name,
       icon,
       colour,

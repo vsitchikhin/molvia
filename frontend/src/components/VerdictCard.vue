@@ -1,5 +1,5 @@
 <template>
-  <AppCard as="section" class="verdict" :aria-labelledby="titleId">
+  <AppCard ref="root" as="section" class="verdict" :aria-labelledby="titleId">
     <SectionCaption as="p" inset class="context">{{
       t('verdict.context', { when: day, place })
     }}</SectionCaption>
@@ -44,6 +44,7 @@ import { placeLabel } from '@/components/placeLabel'
 import { purchaseDay } from '@/days'
 import { SCORES } from '@/components/rating'
 import SectionCaption from '@/components/SectionCaption.vue'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import type { Score, VerdictDraft } from '@/stores/verdictDrafts'
 
 /** The review's own bound (`newVerdictSchema`), kept by the field so it cannot be passed. */
@@ -100,6 +101,9 @@ export default defineComponent({
     const { t, locale } = i18n
     const titleId = useId()
     const title = ref<HTMLElement | null>(null)
+    // A review refused is heard (MOL-235, MOL-333): on a screen, so in the app's region.
+    const root = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
 
     const score = ref<Score | null>(props.draft?.score ?? null)
     const review = ref(props.draft?.review ?? '')
@@ -139,6 +143,7 @@ export default defineComponent({
       review.value = tidied.trim() ? tidied : ''
       if (review.value && !ratingSchema.shape.review.safeParse(review.value).success) {
         unsupported.value = true
+        void refuse(() => root.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
         return
       }
       // One save per card: a double tap would otherwise hand the next card the second tap.
@@ -155,6 +160,7 @@ export default defineComponent({
       REVIEW_MAX,
       titleId,
       title,
+      root,
       score,
       review,
       error,

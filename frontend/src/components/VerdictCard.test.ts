@@ -1,8 +1,10 @@
-import { mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { defineComponent, h, type Ref } from 'vue'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { PendingVerdict } from '@molvia/model'
 import VerdictCard from '@/components/VerdictCard.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import type { VerdictDraft } from '@/stores/verdictDrafts'
@@ -266,6 +268,51 @@ describe('VerdictCard', () => {
     await view.get('textarea').setValue('Как в Store, только дешевле')
     expect(view.find('.error').exists()).toBe(false)
     view.unmount()
+  })
+
+  // A review refused is heard (MOL-333): the focus stayed on «Save», and nothing was said.
+  it('a review refused: the focus goes from «Save» to the review, already marked', async () => {
+    const view = render()
+    await key(view, 4).trigger('click')
+    const review = view.get('textarea')
+    await review.setValue(`Как в ${String.fromCodePoint(0xf8ff)} Store`)
+    let marked: string | null = null
+    review.element.addEventListener('focus', () => {
+      marked = review.element.getAttribute('aria-invalid')
+    })
+    const save = button(view, en.verdict.save)
+    save.element.focus()
+    await save.trigger('click')
+    await flushPromises()
+    expect(view.emitted('save')).toBeUndefined()
+    expect(document.activeElement).toBe(review.element)
+    expect(marked).toBe('true')
+    view.unmount()
+  })
+
+  // On a screen, not in a sheet: the words go to the app's region.
+  it('a review refused with the focus in it: its error is said in the app’s region', async () => {
+    const said: { app?: Ref<readonly { text: string }[]> } = {}
+    const host = mount(
+      defineComponent({
+        setup() {
+          said.app = provideAnnouncer()
+          return () => h(VerdictCard, { card: milk })
+        },
+      }),
+      { global: { plugins: [createAppI18n('en')] }, attachTo: document.body },
+    )
+    const view = host.findComponent(VerdictCard)
+    await key(view, 4).trigger('click')
+    const review = view.get('textarea')
+    await review.setValue(`Как в ${String.fromCodePoint(0xf8ff)} Store`)
+    review.element.focus()
+    await button(view, en.verdict.save).trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(document.activeElement).toBe(review.element)
+    expect(said.app?.value.map((one) => one.text)).toContain(en.verdict.review_unsupported)
+    host.unmount()
   })
 
   it('takes the focus on arrival only when asked', () => {
