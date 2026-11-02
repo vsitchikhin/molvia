@@ -19,6 +19,25 @@ const SELECT = [
     message: 'A select is AppField kind="select" or CurrencySelect (MOL-235).',
   },
 ]
+/**
+ * The screen's day (MOL-329, self-review №2): a day word is counted from `useLocalDay` or a `today` the
+ * screen hands down — `localDay()` read in its place is the clock where the words are drawn, which a
+ * required argument of `days.ts` takes as gladly; and a day held in `ref(localDay())` moves neither as the
+ * app comes back nor at midnight (adversarial А2, А3).
+ */
+const DAY_WORDS = 'purchaseDay|dayOfAnyYear|dateOfAnyYear|answeredAt|dayWords|calendarDayOfAnyYear'
+const DAY = [
+  {
+    selector: `CallExpression[callee.name=/^(${DAY_WORDS})$/] CallExpression[callee.name='localDay']`,
+    message:
+      "A day is said from the screen's day — useLocalDay or its today — never localDay() in place (MOL-329).",
+  },
+  {
+    selector: "CallExpression[callee.name='ref'] > CallExpression[callee.name='localDay']",
+    message:
+      "A screen's day is useLocalDay(): it moves as the app comes back and at midnight (MOL-329).",
+  },
+]
 
 /**
  * The attributes that make a field of the kit outside it (MOL-177, MOL-235), one list a field. HTML
@@ -264,11 +283,18 @@ export default defineConfigWithVueTs(
   // (adversarial Р2-А2) — so in this rule, one option list a file, the kit's two files keeping theirs.
   {
     files: ['src/**/*.vue'],
-    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...SELECT] },
+    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...SELECT, ...DAY] },
   },
   {
     files: ['src/components/AppField.vue', 'src/components/CurrencySelect.vue'],
-    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY] },
+    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...DAY] },
+  },
+  // The screen's day in the scripts (MOL-329): the rule above reads a template, this one the code. The
+  // tests compute what a screen should say from the clock they set, and `useLocalDay` is the one holder.
+  {
+    files: ['src/**/*.ts', 'src/**/*.vue'],
+    ignores: ['src/**/*.test.ts', 'src/composables/useLocalDay.ts'],
+    rules: { 'no-restricted-syntax': ['error', ...DAY] },
   },
   prettier,
 )
