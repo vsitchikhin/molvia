@@ -323,8 +323,8 @@ the phone's own defect** (`reportFailure`, MOL-144; review 7 №6). **The price,
 named** (review 6 №5): after that edit the form stands with no strip until the next read — the app or the connection
 back, the screen opened, «Сохранить» — while the server may still be silent. **The moment is said by `answeredAt` with the screen's day**
 (`useLocalDay`, MOL-187's А2): counted once, an app left overnight said «сегодня» of yesterday's answer the
-next morning (adversarial А1) — so «настройки на сегодня, 14:05», as the strips of «Деньги» say it, never by
-«Покупки»' `{day} в {time}`, which counts the day once. **A moment of another year says its year**
+next morning (adversarial А1) — so «настройки на сегодня, 14:05», as the strips of «Деньги» and, since MOL-329,
+of «Покупки» and «Что брать» say it. **A moment of another year says its year**
 (`answeredAt` by `dayOfAnyYear`, Б2 of round 2): the settings' moment moves only with an answer, and «на 30
 окт.» of last year read as this one — so do the strips of «Деньги», whose kept answers may be as old.
 **The time is when the server last said the settings to this phone**, by its clock (`readAt` in the
@@ -520,7 +520,11 @@ the history's answer is a key of its own** (`molvia.trip-history-at`), for the r
 field of the strict cache would be no cache to a window on the previous build, which would write its own over a
 finish made with no signal. Moved with the first page only, written with every page a window puts on the shelf
 — the page `apply` puts back is that window's last answer, and its moment comes with it (Б4) — and let go of
-where a shelf refused either, since that shelf keeps the page before (А5); a cache from before it has none, and the strip says no time. **The price,
+where a shelf refused either, since that shelf keeps the page before (А5); a cache from before it has none, and the strip says no time. **Every day on the screen is the screen's day's**
+(MOL-329, `frontend.md`): the strip's moment by `answeredAt` — «покупки на вчера, 23:40», with its year when another —
+and the rows of «Записаны», the receipts' titles, «последняя — вчера» of «ждут оценки» and «Раньше …» from the same
+`useLocalDay`; before it the strip came right after a night only because the failed read on return redrew it, and the
+rows under it, drawn in the cards' slots, stayed «сегодня». **The price,
 named:** a window on the previous build loads the history without moving it, so the strip may name a moment
 older than the list, never a newer one. **Offline, «Показать ещё» gives way to «Раньше {day} — со связью»** —
 the day of the last row shown, always as a date — so the list does not read as whole (П.5 of MOL-128). **The

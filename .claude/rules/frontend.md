@@ -1014,6 +1014,20 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   `sayAnswerWord` in the screen's own `setup` hears nothing, and a strip drawn in place — the receipt's
   «Без связи · чек из памяти» was a bare `<p>` with a cloud — stood under the notice, two clouds
   (adversarial А1); it is a `StatusStrip` now.
+- **Every day a screen says is counted from the screen's day** (MOL-329, owner's В-1 «б», В-2 «б»): «сегодня»,
+  «вчера», a date with its year or without — of a strip's moment, a row, a card, a sheet's version, a receipt, a
+  device. The day is `useLocalDay` of the screen, asked again as the app comes back into view, and a card or a sheet
+  takes it from its screen (`today`) or holds its own; the functions of `days.ts` take it **as a required argument** —
+  `purchaseDay`, `dayOfAnyYear`, `dateOfAnyYear` by `shownMidnight(today)`, `dayWords`, `calendarDayOfAnyYear` by
+  `today`, `answeredAt` by `today` — so a place that leaves it out fails `npm run typecheck`. With the clock as the
+  default every place counted the day once, where its words were drawn, and nothing redrew them after a night: «Покупки»
+  said «вчера в 23:40» in the strip — the failed read on return happened to redraw it — over a row and a receipt still
+  «сегодня»; «Что брать», «Оценки», the record typed by hand and the recorded one said «сегодня» of yesterday, and a
+  strip's moment of another year had no year. **A strip's moment is `answeredAt`, `{when}` in the screen's words** —
+  «покупки на сегодня, 23:40», «список на 30 окт. 2025 г., 10:05» — the form of «Настройки» and «Деньги». **The prices,
+  named:** a screen left in view across midnight with nothing redrawing it still says «сегодня» until something does —
+  no screen ticks (MOL-187, Б2); and two tests are green on master too, held as guards of the rule — the strip of
+  «Покупки» and the search's strip of «Что брать» on return, redrawn there by the read the return makes.
 - **A sheet has a live region of its own, and while it is up everything is said there** (MOL-181,
   owner's В-2 «а»). The app's region is outside the modal `<dialog>`, inert while it is open, and
   nothing said there is read (feedback С-10). `BottomSheet` gives its region to the app's announcer
