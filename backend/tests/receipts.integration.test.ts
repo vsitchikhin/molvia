@@ -6,6 +6,8 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { z } from 'zod'
 import {
   ERROR,
+  exactFigures,
+  formatInCurrency,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
   receiptDetailCodec,
@@ -968,11 +970,19 @@ describe('what lives how long (В-3)', () => {
 })
 
 /**
- * am-05 as no log may carry it (MOL-327): every Armenian word its lines print, its tax number — its fiscal
- * number holds it — and its total, in any spelling of the digits.
+ * am-05 as no log may carry it (MOL-327): every Armenian word of its lines from three letters, in any case,
+ * and every number of four digits and more it prints — its articles, prices, total, tax and fiscal numbers,
+ * the till's day — without its leading zeros.
  */
-const PRINTED_WORDS = [...new Set(am05.readings.join('\n').match(/\p{Script=Armenian}{3,}/gu))]
-const PRINTED_NUMBERS = /1234567|8676/g
+const PRINTED = am05.readings.join('\n')
+const PRINTED_WORDS = [...new Set(PRINTED.toLowerCase().match(/\p{Script=Armenian}{3,}/gu))]
+const PRINTED_NUMBERS = [
+  ...new Set(
+    (PRINTED.match(/\d{4,}/g) ?? [])
+      .map((number) => number.replace(/^0+/, ''))
+      .filter((number) => number.length >= 4),
+  ),
+]
 
 /**
  * What of am-05 a log carries, read without what a run puts in it by chance (MOL-327): pino's stamps and
@@ -990,10 +1000,12 @@ function receiptIn(lines: readonly string[], stamp: number, receiptId: string): 
         .replaceAll(receiptId, '<receipt>'),
     )
     .join('')
-  const digits = said.replace(/(?<=\d)[ ,.](?=\d)/g, '')
+  const lowered = said.toLowerCase()
+  // a group of thousands is any space — Intl's no-break and narrow ones as `formatInCurrency` prints them
+  const digits = said.replace(/(?<=\d)[\s,.](?=\d)/g, '')
   return [
-    ...PRINTED_WORDS.filter((word) => said.includes(word)),
-    ...(digits.match(PRINTED_NUMBERS) ?? []),
+    ...PRINTED_WORDS.filter((word) => lowered.includes(word)),
+    ...PRINTED_NUMBERS.filter((number) => digits.includes(number)),
   ]
 }
 
@@ -1048,6 +1060,7 @@ describe('the queue through the server', () => {
       expect(status).toBe('parsed')
       const log = lines.join('')
       expect(log).toContain(`"time":${String(stamp)},`)
+      expect(log).toContain(receipt.id)
       expect(log).toContain('"ms":0,')
       expect(log).toContain('receipt read')
       expect(receiptIn(lines, stamp, receipt.id)).toEqual([])
@@ -1086,6 +1099,10 @@ describe('the queue through the server', () => {
         tin: 1234567,
         total: '8,676.41',
         minor: 867641,
+        formatted: formatInCurrency('8676.41', 'AMD', 'ru', exactFigures(2)),
+        lowered: 'կաթ իգիթ',
+        article: '0401/1163909 23 м 740 370',
+        till: 'GY0000000001 01.10.2026 12:00:00',
       }
       for (const [field, leak] of Object.entries(leaks)) {
         lines.length = 0
