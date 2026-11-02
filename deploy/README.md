@@ -744,70 +744,106 @@ database password and `BOT_API_SECRET` are generated anew, BotFather shows the b
 
 ## Rotating the secrets (MOL-287)
 
-Every secret of production, where it lives and how it is changed. A leaked secret is changed first
-and investigated after; step 2 of the procedure on a leak (Confluence 12124161) points here. All of
-`.env.prod` is read at `up -d`, so a changed line reaches a container only when it is recreated —
-`docker compose … up -d <service>` recreates exactly the services whose environment changed.
+Every secret of production, where it lives and how it is changed — the full list, which step 2 of
+«Порядок при утечке» (Confluence 12124161) refers to. A leaked secret is changed first and
+investigated after. All of `.env.prod` is read at `up -d`, so a changed line reaches a container only
+when it is recreated, and compose recreates every service whose environment changed — **a service
+named on the command line takes the services it depends on with it** when theirs changed too.
 `$C` below is `docker compose -f docker-compose.prod.yml --env-file .env.prod`, run in `~/molvia`.
+**A secret never goes on a command line**: argv is read by every user of the machine in `ps`, and
+the shell's history keeps it on the disk of the very machine that leaked — a value is read from a
+prompt or kept in a shell variable, as `deploy/grafana/start.sh` passes its password by stdin.
 
-**Drilled on the production stack run locally** (MOL-287, the images of `sha-3e04137`); the rest
-are other services' consoles, written as their documentation has them and not drilled.
+**Drilled on the production stack run locally** (MOL-287, the images of `sha-3e04137`): the
+database's password, `BOT_API_SECRET`, Grafana's password. The rest are other services' consoles,
+written as their documentation has them and not drilled.
 
-| Secret                                 | Where                                              | Downtime                              |
-| -------------------------------------- | -------------------------------------------------- | ------------------------------------- |
-| `POSTGRES_PASSWORD`                    | `.env.prod`; **and the role in the volume**        | the API's restart                     |
-| `BOT_API_SECRET`                       | `.env.prod`                                        | the API's and the bot's restart       |
-| `GRAFANA_ADMIN_PASSWORD`               | `.env.prod`                                        | Grafana's restart                     |
-| `TELEGRAM_BOT_TOKEN`                   | `.env.prod`, BotFather                             | the bot's restart; no login meanwhile |
-| `ALERTS_BOT_TOKEN`                     | `.env.prod`, BotFather                             | Grafana's restart                     |
-| `CLAUDE_API_KEY`                       | `.env.prod`, Anthropic console                     | none — Tesseract reads meanwhile      |
-| `BOT_PULSE_URL`, `ALERTS_PULSE_URL`    | `.env.prod`, healthchecks.io                       | none                                  |
-| `HC_UP_URL`                            | the Worker's secret, healthchecks.io               | none                                  |
-| `HC_CERT_URL`                          | GitHub repository secret, healthchecks.io          | none                                  |
-| `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` | GitHub environment `production`, `authorized_keys` | none                                  |
-| `CLOUDFLARE_API_TOKEN`                 | GitHub environment `production`, Cloudflare        | none                                  |
-| R2 access key                          | `~/.config/rclone/rclone.conf`, Cloudflare         | none                                  |
-| the copies' age key                    | `backup.env` (`AGE_RECIPIENT`), the owner's Mac    | none                                  |
-| people's sessions                      | `sessions`                                         | everybody signs in again              |
+| Secret                                 | Where                                              | Stops meanwhile                              |
+| -------------------------------------- | -------------------------------------------------- | -------------------------------------------- |
+| `POSTGRES_PASSWORD`                    | `.env.prod`; **and the role in the volume**        | the database's and the API's restart         |
+| `BOT_API_SECRET`                       | `.env.prod`                                        | the API's and the bot's restart              |
+| `GRAFANA_ADMIN_PASSWORD`               | `.env.prod`                                        | Grafana's restart                            |
+| `TELEGRAM_BOT_TOKEN`                   | `.env.prod`, BotFather                             | the bot's restart; no login meanwhile        |
+| `ALERTS_BOT_TOKEN`                     | `.env.prod`, BotFather                             | Grafana's restart                            |
+| `CLAUDE_API_KEY`                       | `.env.prod`, Anthropic console                     | none — Tesseract reads a refused key's reads |
+| `BOT_PULSE_URL`, `ALERTS_PULSE_URL`    | `.env.prod`, healthchecks.io                       | none                                         |
+| `HC_URL` (the copies' ping)            | `backup.env`, healthchecks.io                      | none                                         |
+| `HC_UP_URL`                            | the Worker's secret, healthchecks.io               | none                                         |
+| `HC_CERT_URL`                          | GitHub repository secret, healthchecks.io          | none                                         |
+| `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` | GitHub environment `production`, `authorized_keys` | none                                         |
+| `CLOUDFLARE_API_TOKEN`                 | GitHub environment `production`, Cloudflare        | none                                         |
+| GHCR token                             | `~/.docker/config.json` of `deploy`, GitHub        | none — the images are public                 |
+| R2 access key                          | `~/.config/rclone/rclone.conf`, Cloudflare         | none                                         |
+| the copies' age key                    | `backup.env` (`AGE_RECIPIENT`), the owner's Mac    | none                                         |
+| people's sessions and logins           | `sessions`, `login_requests`                       | everybody signs in again                     |
 
 - **`POSTGRES_PASSWORD` lives in the database's volume, not only in `.env.prod`** (drilled): the
   variable sets the role's password when the volume is created and never again. Changing the line
-  alone leaves the API unable to connect — `password authentication failed` — on its next start. In
-  this order: `$C exec -T postgres psql -U molvia -d molvia -c "alter role molvia password '<new>'"`,
-  then the line in `.env.prod`, then `$C up -d backend postgres-exporter`. A connection already open
-  keeps working until then; the downtime is the API's restart.
+  alone leaves the API unable to connect — `password authentication failed` — on its next start.
+  **And it takes only what a URL takes bare**: compose puts it into the API's `DATABASE_URL` as it is,
+  and a «/» of base64 — in some four passwords of ten from `openssl rand -base64 24` — stops the API
+  with `Invalid URL`, the role already changed, so the old line does not help either. In this order:
+
+  ```bash
+  NEW="$(openssl rand -hex 24)"
+  printf '%s\n%s\n' "$NEW" "$NEW" | $C exec -T postgres sh -c \
+    'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\password $POSTGRES_USER"'
+  NEW="$NEW" perl -pi -e 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$ENV{NEW}/' .env.prod
+  $C up -d backend postgres-exporter
+  ```
+
+  `POSTGRES_PASSWORD` is in the database's own environment as well, so that `up -d` **recreates
+  Postgres too**: every open connection drops and the API is down for the database's start, its
+  healthcheck and the API's start — about a minute. Not near 04:00 Yerevan, when the nightly copy
+  runs. Then `curl https://molvia.net/api/health` says `ok`: the API is in with the new password.
+
 - **`BOT_API_SECRET`** (drilled): 43 characters of base64url — anything else and the API does not
-  start (`openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`). Change the line, then
-  `$C up -d backend bot` — both at once: the old secret is refused (`401`) the moment the API is back,
-  and a bot still on it cannot confirm a login or claim a reminder.
-- **`GRAFANA_ADMIN_PASSWORD`** (drilled): the line, then `$C up -d grafana`; the old password is
-  refused after it. Should it ever stay — Grafana keeps its admin in `grafana_data` — the reset is
-  `$C exec grafana grafana cli admin reset-admin-password '<new>'`.
+  start (`openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`, written into the line as above, by a
+  variable). Then `$C up -d backend bot` — both at once: the old secret is refused (`401`) the moment
+  the API is back, and a bot still on it cannot confirm a login or claim a reminder.
+- **`GRAFANA_ADMIN_PASSWORD`** (drilled): the line, then `$C up -d grafana` — `start.sh` sets the
+  admin's password from it at every start, and stops Grafana if it cannot. Then the old one is refused:
+  `curl -s -o /dev/null -w '%{http_code}' -u admin:<old> http://127.0.0.1:3000/api/user` answers
+  `401` (type the old one at a prompt: `read -rs OLD`, then `-u "admin:$OLD"`).
 - **`TELEGRAM_BOT_TOKEN`**: BotFather → `/revoke` for `@molvia_bot` — the old token dies there — the
   new one into `.env.prod`, `$C up -d bot`. Until the bot is back nobody can sign in; the bot exits on a
   revoked token (`401`) rather than retrying, so a restart loop says the line was not changed.
   **`ALERTS_BOT_TOKEN`** the same for the alarms' bot, then `$C up -d grafana`.
-- **`CLAUDE_API_KEY`**: a new key in the console's workspace, the line, `$C up -d backend`, then the
-  old key deleted in the console. Without a working key the model's receipts wait ten minutes and
-  Tesseract reads them (`receipts.md`).
+- **`CLAUDE_API_KEY`**: a new key in the console's workspace, the line, `$C up -d backend`, and only
+  then the old key deleted. **A key the API refuses is no wait**: a `401` is `ModelRejected`, and that
+  receipt goes to Tesseract at once, for good — never asked of the model again — each one a
+  `job:receipt-model` failure to the owner (`receipts.md`). The ten minutes of waiting are for the
+  model away (`429`, `5xx`, no connection), not for a wrong key.
 - **The ping URLs**: a check's URL cannot be changed, so a leaked one means a new check in
   healthchecks.io with the Telegram integration, its URL where the old one was — `.env.prod` and
-  `$C up -d bot` / `grafana`, the Worker's secret (Signals, «Where it is set»), `gh secret set
-HC_CERT_URL` — and the old check deleted. See the new one turn green before deleting the old.
+  `$C up -d bot` / `grafana`; `HC_URL` of `backup.env`, seen by
+  `sudo systemctl start molvia-backup.service`; the Worker's secret (Signals, «Where it is set»);
+  `gh secret set HC_CERT_URL` — and the old check deleted. See the new one turn green before
+  deleting the old. Whoever holds a ping URL can say «alive» while it is not, so a leaked server
+  changes all five.
 - **`DEPLOY_SSH_KEY`**: a new pair as in «Once: the deploy key», its line appended to
   `~/.ssh/authorized_keys` with the same `restrict,command=…` before the old one is removed, the
   environment's secret replaced, one rollout seen green, then the old line removed.
 - **`CLOUDFLARE_API_TOKEN`**: Cloudflare → My Profile → API Tokens → «Roll» on the token — the same
   permissions, «Workers Scripts: Edit» — and `gh secret set CLOUDFLARE_API_TOKEN --env production`.
-- **R2**: a new API token for the bucket in Cloudflare, `rclone config update r2
-access_key_id=… secret_access_key=…` on the machine, `sudo systemctl start molvia-backup.service`
-  seen green in healthchecks.io, then the old token deleted.
-- **The age key**: a new pair on the Mac (`age-keygen -o ~/.config/molvia/backup.key.new`), its
-  public half into `AGE_RECIPIENT` of `backup.env`. **The old private key is kept fourteen days** —
-  the copies already in R2 are encrypted to it and live that long — then deleted.
-- **People's sessions**, when a token may have leaked from the database: `$C exec -T postgres psql
--U molvia -d molvia -c 'delete from sessions'` — revoking is deleting the row (`auth.md`), so every
-  device gets `401` and the login screen on its next request.
+- **The GHCR token**: the packages are public — an image is pulled with no login (MOL-287) — so the
+  login of step 4 of «Once, on a new machine» guards nothing: `docker logout ghcr.io` on the machine
+  and the token deleted in GitHub, and there is nothing left to rotate.
+- **R2**: a new API token for the bucket in Cloudflare, `rclone config update r2 access_key_id=…
+secret_access_key=…` on the machine (typed at `rclone config`'s prompt, not as arguments),
+  `sudo systemctl start molvia-backup.service` seen green in healthchecks.io, then the old token deleted.
+- **The age key**: `restore.sh` reads one file, `~/.config/molvia/backup.key` (`AGE_KEY`), and age
+  tries every key in it. So the new key goes **into that file, beside the old one**:
+  `age-keygen >> ~/.config/molvia/backup.key` (it prints the public key), the public key into
+  `AGE_RECIPIENT` of `backup.env`, and `restore.sh --drill` the next morning reads the new copy.
+  **The old key stays in the file fourteen days** — the copies in R2 encrypted to it live that long —
+  then its three lines are removed. A new file in place of the old one leaves every copy before it
+  unreadable; a key beside it under another name is a key `restore.sh` never reads.
+- **People's sessions**, when a token may have leaked from the database:
+  `$C exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "delete from sessions; delete from login_requests"'`
+  — revoking is deleting the row (`auth.md`), so every device gets `401` and the login screen on its
+  next request; and a login confirmed but not yet collected (five minutes at most) is gone with it, or
+  it would hand out a session after the sweep.
 
 ## The Postgres image is part of the contract
 

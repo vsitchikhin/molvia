@@ -432,12 +432,14 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 - **A write that grows what everybody shares, or what the server keeps on disk, has a quota per person**
   (MOL-287, В-3 «а»: one request without a session or one account in a minute bringing the service down is a
-  blocker): the login per address (MOL-359), receipts (MOL-360), «Предложить товар» (MOL-362); a new write path
-  names its quota in its task. What answers without a session counts by the address Caddy names (`networkOf`).
+  blocker) — **not yet** for the login, whose quota is the whole database's (MOL-359), receipts (MOL-360) and
+  «Предложить товар» (MOL-362), each a blocker of `v0.2.0`; a new write path names its quota in its task. What
+  answers without a session counts by the address Caddy names (`networkOf`).
 - **A host the server asks is the code's, never the request's**, with a timeout (SSRF).
 - **Every secret of production is a row of «Rotating the secrets» in `deploy/README.md`**, and a new one comes
-  with its row and its line in `.env.prod.example`; the database's password lives in its volume too. The images
-  are public on ghcr: nothing secret in a layer or the bundle.
+  with its row and its line in `.env.prod.example`; the database's password lives in its volume too and takes only
+  what a URL takes bare. A secret never goes on a command line. The images are public on ghcr: nothing secret in a
+  layer or the bundle.
 - **`/internal/*` is closed twice** — Caddy's 404 and `BOT_API_SECRET` in constant time; a bot's route goes in
   that scope only. **A finding is a probe on a copy** (`.scratch/tasks/security/MOL-287/probes/`), never prod.
 

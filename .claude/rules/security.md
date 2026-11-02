@@ -12,6 +12,12 @@ paths:
   - 'backend/src/routes/{auth,client-errors,catalogue,receipts,internal-auth,feedback}.ts'
   - 'backend/src/{purs,open-food-facts,rates}/*.ts'
   - 'backend/src/usecases/{start-login,propose-item,receipts}.ts'
+  - 'backend/src/{env,secret,login-config}.ts'
+  - 'bot/src/env.ts'
+  - 'packages/model/src/entities/receipt-link.ts'
+  - 'deploy/deploy.sh'
+  - 'deploy/backup/*'
+  - 'deploy/watch/**'
 ---
 
 # Security: what a stranger must not get, and what holds it
@@ -25,13 +31,16 @@ file holds what belongs to no single area, and what the audit found missing.
 
 - **A write that grows what everybody shares, or what the server keeps on its disk, has a quota per person**
   (MOL-287, owner's В-3 «а»: a cheap way to bring the service down — one request without a session, or one
-  account within a minute — is a blocker of the release). The audit found three without one: the login's
-  quota was the whole database's, so one `curl` held the door shut for everyone (Ф-1, MOL-359: five a minute
-  an address, three hundred in all); a receipt's photos had none, and one account filled some 12 GB an hour
-  against 51 GB free (Ф-2, MOL-360: forty a day, twenty not recorded at once); «Предложить товар» had none,
-  and some nine thousand names an hour went into everybody's search (Ф-4, MOL-362: sixty a day). **A new write path
-  names its quota in its task**, or says why it needs none — a person's own rows of money are bounded by the
-  body and the person.
+  account within a minute — is a blocker of the release). **Three have none yet, each a blocker of
+  `v0.2.0`**: the login's quota is the whole database's, so one `curl` holds the door shut for everyone
+  (Ф-1, MOL-359: five a minute an address, three hundred in all); a receipt's photos have none, and one
+  account fills some 12 GB an hour against 51 GB free (Ф-2, MOL-360: forty a day, twenty not recorded at
+  once); «Предложить товар» has none, and some nine thousand names an hour go into everybody's search
+  (Ф-4, MOL-362: sixty a day). Each task, merged, rewrites its line here. **A new write path names its
+  quota in its task**, or says why it needs none. **A person's own rows of money have none either, and
+  that is a price, not a reason** (self-review №5): the bodies are small and bounded, but nothing bounds
+  their number, and how fast one account fills the disk with them was not measured — the disk alarm of
+  MOL-360 is what would say it first.
 - **What answers without a session is limited by the address Caddy names**, never by anything the client
   sends: the last `X-Forwarded-For` only from a peer inside, an IPv6 address by its `/48` (`networkOf`,
   `/client-errors`, MOL-144). A forged header changes nothing — the audit sent sixty under sixty addresses
@@ -53,7 +62,9 @@ file holds what belongs to no single area, and what the audit found missing.
 - **Every secret of production is a row of «Rotating the secrets» in `deploy/README.md`**: where it lives,
   how it is changed, and what stops meanwhile. A new secret comes with its row and its line in
   `.env.prod.example`, in the same pull request. **The database's password lives in its volume too**, so
-  changing the line alone breaks the API (drilled, MOL-287).
+  changing the line alone breaks the API, and it takes only what a URL takes bare — compose puts it into
+  `DATABASE_URL` as it is (drilled and attacked, MOL-287). **A secret never goes on a command line**: argv
+  is everybody's in `ps`, and the history keeps it on the machine that leaked.
 - **The images are public** (ghcr, pulled anonymously): nothing secret goes into a layer, a build argument
   or the PWA's bundle — the audit read all five images and the bundle. A secret reaches a container only
   through compose's environment from `.env.prod` on the machine.
@@ -62,7 +73,8 @@ file holds what belongs to no single area, and what the audit found missing.
   rotated, never rewritten out. gitleaks over the whole history found none (MOL-287); a guard in CI is
   MOL-369.
 - **CI's secrets stand in the environment `production`, which admits `master` alone**, and a job holding
-  one has `permissions: contents: read`. Actions are pinned by tag, not yet by sha (MOL-364).
+  one has `permissions: contents: read` — all but `HC_CERT_URL` of `watch.yml`, a repository secret to be
+  moved there (MOL-368). Actions are pinned by tag, not yet by sha (MOL-364).
 
 ## The edges
 
