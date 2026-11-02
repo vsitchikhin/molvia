@@ -194,6 +194,120 @@ async function aMonth(page: Page): Promise<{ card: string; savings: string; dina
   return { card, savings, dinars }
 }
 
+/**
+ * A record of yesterday at «Ереван Сити»: ground coffee by the kilogram, rated, so «Что брать» names its price —
+ * «12 800 ֏/кг» stood past the plate of «За единицу» at 150 % (MOL-334) — and ten kilos of it, «128 000 ֏», with a
+ * total of six figures, «131 143,50 ֏» took the record 102 px sideways at 200 %; milk and bread wait in «Оценки».
+ * Then a record by hand still open: «Продолжить» on «Покупки».
+ */
+async function aLife(page: Page): Promise<{ finished: string }> {
+  const headers = await asBrowser(page)
+  const context = settingsOf(
+    actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+  )
+  const item = async (name: string, defaultUnit: string): Promise<string> => {
+    const made = await page.request.post('/api/catalogue/items', {
+      headers,
+      data: { kind: 'product', name: `${name} ${randomUUID().slice(0, 4)}`, defaultUnit },
+    })
+    expect(made.status()).toBeLessThan(300)
+    const body = (await made.json()) as { id?: string; item?: { id: string } }
+    return (body.item?.id ?? body.id)!
+  }
+  const coffee = await item('Кофе «Ташир» молотый', 'kg')
+  const milk = await item('Молоко «Марианна» 3,2 %', 'l')
+  const bread = await item('Хлеб «Матнакаш»', 'piece')
+  const finished = randomUUID()
+  await post(page, '/api/trips', {
+    context,
+    id: finished,
+    place: { kind: 'store', name: 'Ереван Сити' },
+  })
+  for (const [itemId, value, unit, amount] of [
+    [coffee, '10', 'kg', '128000'],
+    [milk, '1', 'l', '2543.50'],
+    [bread, '2', 'piece', '600'],
+  ] as const)
+    await post(page, `/api/trips/${finished}/expenses`, {
+      id: randomUUID(),
+      itemId,
+      quantity: { value, unit },
+      amount: { amount, currency: 'AMD' },
+    })
+  await post(page, `/api/trips/${finished}/finish`, {})
+  const rated = await page.request.put(`/api/verdicts/${coffee}`, { headers, data: { score: 5 } })
+  expect(rated.status()).toBeLessThan(300)
+  const open = randomUUID()
+  await post(page, '/api/trips', { context, id: open, place: { kind: 'store', name: 'SAS' } })
+  await post(page, `/api/trips/${open}/expenses`, {
+    id: randomUUID(),
+    itemId: coffee,
+    quantity: { value: '0.25', unit: 'kg' },
+    amount: { amount: '3200', currency: 'AMD' },
+  })
+  return { finished }
+}
+
+/** Every word of a box on its lines: none cut by its box (`scrollWidth`) — «Написать разработч…» at 100 % on 320. */
+function cutWords(page: Page, selector: string): Promise<number> {
+  return page
+    .locator(selector)
+    .evaluateAll((all) => all.filter((one) => one.scrollWidth > one.clientWidth + 1).length)
+}
+
+/**
+ * A receipt photographed, read by the fake reader (am-05: thirteen lines, «Итог чека 8 676,41 ֏») and open for review —
+ * where «Итог чека» stood 71 px past its card at 150 % (MOL-334).
+ */
+async function aReceipt(page: Page, ru: boolean): Promise<void> {
+  const L = (one: string, other: string): string => (ru ? one : other)
+  await page.goto('/purchases')
+  await page
+    .getByRole('button', { name: L('Сфотографировать чек', 'Photograph a receipt') })
+    .click()
+  const encoded = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 900
+    canvas.height = 2400
+    const context = canvas.getContext('2d')!
+    context.fillStyle = '#f7f3ea'
+    context.fillRect(0, 0, 900, 2400)
+    context.fillStyle = '#222'
+    for (let y = 80; y < 2320; y += 60) context.fillRect(60, y, 780 - (y % 300), 18)
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.9)
+    })
+    let binary = ''
+    for (const byte of new Uint8Array(await blob!.arrayBuffer()))
+      binary += String.fromCharCode(byte)
+    return btoa(binary)
+  })
+  await page
+    .locator('dialog[open] input[type="file"]:not([capture])')
+    .first()
+    .setInputFiles({
+      name: 'part-1.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from(encoded, 'base64'),
+    })
+  const edges = page.locator('dialog[open]').filter({ hasText: L('Края чека', 'Receipt edges') })
+  await expect(edges).toBeVisible()
+  // Until it has risen a sheet takes no tap (MOL-69).
+  await page.waitForTimeout(400)
+  await edges.getByRole('button', { name: L('Готово', 'Done') }).click()
+  await expect(edges).toHaveCount(0)
+  await page.waitForTimeout(400)
+  await page.getByRole('button', { name: L('Отправить чек', 'Send receipt') }).click()
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
+  const parsed = async (): Promise<string | null> => {
+    const answer = await page.request.get('/api/receipts', { headers: await asBrowser(page) })
+    const { receipts } = (await answer.json()) as { receipts: { id: string; status: string }[] }
+    return receipts.find((one) => one.status === 'parsed')?.id ?? null
+  }
+  await expect.poll(parsed, { timeout: 30_000 }).not.toBeNull()
+  await page.goto(`/purchases/receipts/${(await parsed())!}`)
+}
+
 for (const size of ['150%', '200%'])
   test.describe(`the text at ${size} on a phone of 320`, () => {
     test.beforeEach(async ({ page }) => {
@@ -645,6 +759,116 @@ for (const size of ['150%', '200%'])
       ).toBeLessThanOrEqual(0)
     })
 
+    // Beyond «Деньги» (MOL-334): before it at 200 % the record went 102 px sideways, «Оценки» 23, «Данные и
+    // приватность» 33, the strip of a record by hand 7, the price of «Что брать» 13; a sum in a row read «25 403,50»
+    // for «125 403,50», and a key of the scale was 36 px at 150 %.
+    test('every screen beyond «Деньги» stands within the phone', async ({ page }) => {
+      test.setTimeout(90_000)
+      await signedIn(page)
+      const { finished } = await aLife(page)
+      const screens: [string, Locator][] = [
+        ['/', page.locator('.best .price')],
+        ['/purchases', page.locator('.open .list-row')],
+        ['/purchases/manual', page.locator('.list-row .tail')],
+        [`/purchases/${finished}`, page.locator('.total .sum')],
+        ['/verdicts', page.locator('.scale .key')],
+        ['/privacy', page.locator('dd')],
+        ['/terms', page.getByRole('heading', { level: 1 })],
+        ['/settings/devices', page.getByRole('heading', { level: 1 })],
+        ['/settings/bot', page.getByRole('heading', { level: 1 })],
+      ]
+      for (const [path, answer] of screens) {
+        await page.goto(path)
+        expect(await pageSideways(page, answer), path).toBe(0)
+      }
+      // The price of «Брали здесь» within its plate.
+      await page.goto('/')
+      await expect(page.locator('.best .price')).toBeVisible()
+      await facesIn(page)
+      expect(await pastCard(page, '.best .price', '.best')).toBeLessThanOrEqual(0.5)
+      // The record's total and every sum of its rows within the card.
+      await page.goto(`/purchases/${finished}`)
+      await expect(page.locator('.total .sum')).toBeVisible()
+      await facesIn(page)
+      expect(await pastCard(page, '.total .sum', '.total')).toBeLessThanOrEqual(0.5)
+      expect(await pastCard(page, '.list-row .amount', '.list-row')).toBeLessThanOrEqual(0.5)
+      // «Продолжить» whole in its card (А12 of MOL-321's review): its pill stands 8 into the row's padding by the
+      // kit's rule (MOL-191), so the card is the edge.
+      await page.goto('/purchases')
+      await expect(page.locator('.open .list-row')).toBeVisible()
+      await facesIn(page)
+      expect(await pastCard(page, '.open .list-row .tail .button', '.card')).toBeLessThanOrEqual(
+        0.5,
+      )
+      expect(await cutWords(page, '.open .list-row .tail .button')).toBe(0)
+      // The strip of a record by hand within the phone: its pills of a glyph and a word stood 7 px past it.
+      await page.goto('/purchases/manual')
+      await expect(page.locator('.dock button').first()).toBeVisible()
+      await facesIn(page)
+      for (const button of await page.locator('.dock button').all())
+        expect(
+          (await button.boundingBox())!.x + (await button.boundingBox())!.width,
+        ).toBeLessThanOrEqual(320.5)
+      // Five keys of the scale in one row, none under 44 px — a thumb's, whatever the text (owner's В-3 «а»).
+      await page.goto('/verdicts')
+      const keys = page.locator('.scale .key')
+      await expect(keys).toHaveCount(5)
+      await facesIn(page)
+      const boxes = await keys.evaluateAll((all) =>
+        all.map((key) => key.getBoundingClientRect().toJSON() as DOMRect),
+      )
+      for (const box of boxes) {
+        expect(box.width).toBeGreaterThanOrEqual(44)
+        expect(box.top).toBe(boxes[0]!.top)
+        expect(box.right).toBeLessThanOrEqual(320.5)
+      }
+      // Every word of a row and a screen's text with a hyphen from six letters (owner's В-2 «а»); CI's Chromium may
+      // have no dictionary, so the style is read.
+      await page.goto('/settings')
+      await expect(page.locator('.list-row .title').first()).toHaveCSS('hyphens', 'auto')
+      await page.goto('/privacy')
+      await expect(page.locator('dd').first()).toHaveCSS('hyphens', 'auto')
+    })
+
+    test('the sheets beyond «Деньги» stand within the phone', async ({ page }) => {
+      test.setTimeout(90_000)
+      await signedIn(page)
+      const { finished } = await aLife(page)
+      // A purchase of the record: «За единицу» over its price, the price within the plate.
+      await page.goto(`/purchases/${finished}`)
+      const coffee = page.locator('.list-row').filter({ hasText: 'Кофе' })
+      await expect(coffee).toBeVisible()
+      await coffee.click()
+      const sheet = page.locator('dialog[open]').last()
+      await expect(sheet.locator('.per-unit-value')).toBeVisible()
+      await expect
+        .poll(() => sheet.evaluate((dialog) => dialog.getAnimations({ subtree: true }).length))
+        .toBe(0)
+      await facesIn(page)
+      expect(await sheet.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)).toBe(0)
+      expect(await pastCard(page, 'dialog[open] .per-unit-value', '.per-unit')).toBeLessThanOrEqual(
+        0.5,
+      )
+      await page.keyboard.press('Escape')
+      await expect(page.locator('dialog[open]')).toHaveCount(0)
+      await page.goto('/purchases/manual')
+      expect(await sheetSideways(page, page.getByRole('button', { name: 'Закончить' }))).toBe(0)
+      await page.goto('/settings')
+      expect(
+        await sheetSideways(page, page.getByRole('button', { name: /Написать разработчику/ })),
+      ).toBe(0)
+    })
+
+    test('a receipt under review stands within the phone', async ({ page }) => {
+      test.setTimeout(90_000)
+      await signedIn(page)
+      await aReceipt(page, true)
+      expect(await pageSideways(page, page.locator('.total .amount'))).toBe(0)
+      expect(await pastCard(page, '.total .amount', '.total')).toBeLessThanOrEqual(0.5)
+      expect(await sheetSideways(page, page.locator('.total button.main'))).toBe(0)
+      expect(await sheetSideways(page, page.locator('button.receipt-line').first())).toBe(0)
+    })
+
     // In English a whole sum of drams is «֏125,403», wider for its count than Russian's «125 403 ֏» — a count at
     // 0.56 of the size let it 6 px past its card (adversarial В2, В3).
     test.describe('in English', () => {
@@ -662,5 +886,34 @@ for (const size of ['150%', '200%'])
         await facesIn(page)
         expect(await pastCard(page, '.chart-card .figure', '.chart-card')).toBeLessThanOrEqual(0.5)
       })
+
+      // «֏8,676.41» and «Receipt total»: 93 px past the card at 150 % (MOL-334).
+      test('a receipt under review stands within the phone', async ({ page }) => {
+        test.setTimeout(90_000)
+        await signedIn(page)
+        await aReceipt(page, false)
+        expect(await pageSideways(page, page.locator('.total .amount'))).toBe(0)
+        expect(await pastCard(page, '.total .amount', '.total')).toBeLessThanOrEqual(0.5)
+      })
     })
   })
+
+// At 100 % on 320 nothing of MOL-334 moves (the control): no figure shrinks, the scale keeps its gap of 8 and its
+// keys of 44, and no word is hyphenated — but «Написать разработчику», which read «Написать разработч…» (MOL-334).
+test('the text at 100 % on a phone of 320 keeps its look', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.setViewportSize({ width: 320, height: 720 })
+  await signedIn(page)
+  const { finished } = await aLife(page)
+  await page.goto(`/purchases/${finished}`)
+  await expect(page.locator('.total .sum')).toBeVisible()
+  await facesIn(page)
+  await expect(page.locator('.total .sum')).toHaveCSS('font-size', '28px')
+  await page.goto('/verdicts')
+  await expect(page.locator('.scale')).toHaveCSS('column-gap', '8px')
+  await expect(page.locator('.scale .key').first()).toHaveCSS('hyphens', 'manual')
+  await page.goto('/settings')
+  await expect(page.locator('.list-row .title').first()).toBeVisible()
+  await facesIn(page)
+  expect(await cutWords(page, '.list-row .title')).toBe(0)
+})
