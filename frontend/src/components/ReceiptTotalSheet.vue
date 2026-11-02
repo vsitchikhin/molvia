@@ -1,5 +1,5 @@
 <template>
-  <BottomSheet :open="open" @update:open="$emit('update:open', $event)">
+  <BottomSheet ref="sheet" :open="open" @update:open="$emit('update:open', $event)">
     <template #title>{{ t('receipt.review.total') }}</template>
     <p class="body">{{ t('trip.receipt.sheet.body') }}</p>
     <AppField
@@ -34,6 +34,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { receiptText, typedReceipt } from '@/components/receipt'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 
 /**
  * «Итог чека» put right on the review (Р-8): OCR misses the total on half the receipts, and the
@@ -60,6 +61,9 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const amount = ref('')
     const bad = ref(false)
+    // The sheet itself is the form: its one field, refused, is heard (MOL-235, MOL-333).
+    const sheet = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
     watch(
       () => props.open,
       (open) => {
@@ -73,11 +77,13 @@ export default defineComponent({
       t,
       amount,
       bad,
+      sheet,
       sign: computed(() => currencySign(props.currency, locale.value)),
       save: () => {
         const total = typedReceipt(amount.value, props.currency)
         if (!total) {
           bad.value = true
+          void refuse(() => sheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
           return
         }
         emit('saved', total)

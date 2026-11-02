@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
+import { defineComponent, h } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import BarcodeScannerSheet from '@/components/BarcodeScannerSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { PERMISSION_WAIT } from '@/composables/useCameraHint'
 import type * as ReaderModule from '@/scanner/barcodeReader'
 import type { ReaderWorker } from '@/scanner/barcodeReader'
@@ -115,6 +117,25 @@ async function render() {
   clock += 1000
   await settle()
   return wrapper
+}
+
+/** Under an announcer, as `App.vue` holds every sheet: what the sheet says lands in its region. */
+async function renderAnnounced(): Promise<VueWrapper> {
+  const router = createRouter({ history: createMemoryHistory(), routes })
+  await router.push('/_kit')
+  const host = mount(
+    defineComponent({
+      setup() {
+        provideAnnouncer()
+        return () => h(BarcodeScannerSheet, { open: true })
+      },
+    }),
+    { attachTo: document.body, global: { plugins: [router, createAppI18n('en')] } },
+  )
+  mounted.push(host)
+  clock += 1000
+  await settle()
+  return host.findComponent(BarcodeScannerSheet)
 }
 
 function button(sheet: VueWrapper, text: string) {
@@ -579,6 +600,39 @@ describe('BarcodeScannerSheet', () => {
       await sheet.get('input').setValue(`4850000000007${String.fromCodePoint(0x200b)}`)
       await button(sheet, en.scanner.done).trigger('click')
       expect(sheet.emitted('read')).toEqual([['4850000000007']])
+    })
+
+    // Digits refused are heard (MOL-333): «Done» kept the focus, and Enter in the field said nothing.
+    it('«Done» with digits that do not check: the focus goes to the field, already marked', async () => {
+      const { sheet } = await typing()
+      const input = sheet.get('input').element as HTMLInputElement
+      await sheet.get('input').setValue('4850000000003')
+      let marked: string | null = null
+      input.addEventListener('focus', () => (marked = input.getAttribute('aria-invalid')))
+      const done = button(sheet, en.scanner.done)
+      ;(done.element as HTMLButtonElement).focus()
+      await done.trigger('click')
+      await settle()
+      expect(document.activeElement).toBe(input)
+      expect(marked).toBe('true')
+    })
+
+    it('Enter in the field with a length no barcode has: the focus stays, the error is said', async () => {
+      getUserMedia.mockResolvedValue(fakeStream().stream)
+      const sheet = await renderAnnounced()
+      await button(sheet, en.scanner.manual).trigger('click')
+      await settle()
+      const input = sheet.get('input')
+      await input.setValue('12345')
+      ;(input.element as HTMLInputElement).focus()
+      await sheet.get('form').trigger('submit')
+      await new Promise((resolve) => setTimeout(resolve, 150))
+      await settle()
+      expect(sheet.emitted('read')).toBeUndefined()
+      expect(document.activeElement).toBe(input.element)
+      expect(document.querySelector('dialog .region')?.textContent).toContain(
+        en.error.barcode_shape,
+      )
     })
 
     it('forgets the error once the digits change', async () => {

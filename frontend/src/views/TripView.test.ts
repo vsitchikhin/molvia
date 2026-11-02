@@ -1393,6 +1393,26 @@ describe('TripView', () => {
       expect(memory()).toEqual({ AMD: { hand: cash.id } })
     })
 
+    // Отказ слышен (MOL-333): фокус оставался на «Закончить», и ошибку под полем не было слышно.
+    it('сумма по чеку не деньги: фокус уходит с «Закончить» в неё, уже отмеченную', async () => {
+      // покупка без цены: «Закончить» спрашивает сумму по чеку (MOL-78, В-4)
+      currentTrip.mockResolvedValue(trip([...handoff(), { id: BREAD, name: 'Хлеб' }]))
+      const { view, queue } = await render()
+      await askFinish(view)
+      await typeSum('сто')
+      const sum = openSheets()[0]?.querySelector<HTMLInputElement>('input[data-field="receipt"]')
+      if (!sum) throw new Error('нет поля суммы')
+      let marked: string | null = null
+      sum.addEventListener('focus', () => (marked = sum.getAttribute('aria-invalid')))
+      const finish = inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok)
+      finish.focus()
+      finish.click()
+      await flushPromises()
+      expect(queue.pending).toEqual([])
+      expect(document.activeElement).toBe(sum)
+      expect(marked).toBe('true')
+    })
+
     it('начинает со счёта, которым закончена прошлая запись, — не со счёта чеков', async () => {
       localStorage.setItem(
         `molvia.payment-accounts.${ME}`,
@@ -1412,10 +1432,15 @@ describe('TripView', () => {
       charged.value = '0'
       charged.dispatchEvent(new Event('input'))
       await flushPromises()
+      let marked: string | null = null
+      charged.addEventListener('focus', () => (marked = charged.getAttribute('aria-invalid')))
       inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
       await flushPromises()
       expect(queue.pending).toEqual([])
       expect(openSheets()[0]?.textContent).toContain(ru.spending.sheet.bad_amount)
+      // и слышен: фокус в «Списано», уже отмеченном (MOL-333)
+      expect(document.activeElement).toBe(charged)
+      expect(marked).toBe('true')
       charged.value = '1100,50'
       charged.dispatchEvent(new Event('input'))
       await flushPromises()

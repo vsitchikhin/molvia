@@ -574,7 +574,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The amount typed is `AppField size="entry"`, a currency beside it `CurrencySelect`, a checkbox
   `AppCheckbox`** (MOL-235): a static `inputmode="decimal"`, `type="checkbox"` or a `<select>` outside the kit
   fails ESLint, in any case; a field's classes are the kit's own words (`app-field…`), and every focus a
-  refusal puts in a field goes through `useFieldRefusal` — never a bare `focus()` (sheets that move none: MOL-333).
+  refusal puts in a field goes through `useFieldRefusal`, a server's under a field too — never a bare `focus()`,
+  never no focus at all (MOL-333).
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`. **Empty is one quiet
