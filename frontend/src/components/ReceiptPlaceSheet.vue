@@ -82,7 +82,8 @@ import type { ReceiptCountry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
-import { calendarDay, localDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { calendarDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useRecentPlacesStore } from '@/stores/recentPlaces'
 import { placeIdOf } from '@/stores/receiptDrafts'
@@ -138,10 +139,12 @@ export default defineComponent({
      * a phone west of it is dated by a day this phone has not reached (adversarial В1, as the
      * spending's sheet, adversarial Л). A day misread far ahead is still refused (review 18).
      */
-    const latest = computed(() => {
-      const today = localDay()
-      return props.day > today && props.day <= latestDay(new Date()) ? props.day : today
-    })
+    // The screen's day, which moves as the app comes back and at midnight (MOL-329): in a `computed` the clock
+    // was read once and the field's bound stood on yesterday after a night.
+    const today = useLocalDay()
+    const latest = computed(() =>
+      props.day > today.value && props.day <= latestDay(new Date()) ? props.day : today.value,
+    )
 
     /**
      * A receipt of the person's own country takes a shop of their city, as «Где вы?» does. One of

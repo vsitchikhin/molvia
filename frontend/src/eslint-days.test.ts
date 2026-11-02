@@ -14,6 +14,8 @@ const IN_PLACE =
   "A day is said from the screen's day — useLocalDay or its today — never localDay() in place (MOL-329)."
 const HELD =
   "A screen's day is useLocalDay(): it moves as the app comes back and at midnight (MOL-329)."
+const DEFAULT =
+  "A default of localDay() is read once: take the screen's day, useLocalDay or its today (MOL-329)."
 
 async function said(code: string, file: string): Promise<string[]> {
   const [result] = await eslint.lintText(code, { filePath: `${FRONTEND}src/${file}` })
@@ -28,7 +30,7 @@ async function said(code: string, file: string): Promise<string[]> {
     .map((message) => message.message)
 }
 
-const script = (body: string) => `import { ref } from 'vue'
+const script = (body: string) => `import { computed, ref, shallowRef } from 'vue'
 import { answeredAt, localDay, purchaseDay } from '@/days'
 
 export function probe(at: Date, today: string): string[] {
@@ -55,7 +57,7 @@ export default defineComponent({
 `
 
 // Each case is a lint of its own through the type-aware parser, the first one building its program:
-// seconds here, and a test of seconds takes its own timeout (MOL-243).
+// 7 060 ms on CI at worst, and every case takes twenty times that, so their order does not matter (MOL-243).
 
 describe('the screen`s day (MOL-329)', () => {
   it('refuses localDay() in place of the screen`s day, in a script', async () => {
@@ -68,25 +70,41 @@ describe('the screen`s day (MOL-329)', () => {
     ])
     // The screen's own day passes.
     expect(await said(script("return [answeredAt(at, 'ru', today)]"), file)).toEqual([])
-  }, 60_000)
+  }, 145_000)
 
-  it('refuses a day held in ref(localDay()) — a script of a component, a module', async () => {
+  it('refuses a day held in ref, shallowRef or computed of localDay() — a component, a module', async () => {
     expect(
       await said(view('{{ 1 }}', 'const today = ref(localDay())'), 'components/AccountSheet.vue'),
     ).toEqual([HELD])
-    expect(
-      await said(
-        script('const today = ref(localDay())\n  return [today.value]'),
-        'stores/accounts.ts',
-      ),
-    ).toEqual([HELD])
-  }, 60_000)
+    const held = (holder: string) => script(`const today = ${holder}\n  return [today.value]`)
+    expect(await said(held('ref(localDay())'), 'stores/accounts.ts')).toEqual([HELD])
+    expect(await said(held('shallowRef(localDay())'), 'stores/accounts.ts')).toEqual([HELD])
+    expect(await said(held('computed(() => localDay())'), 'stores/accounts.ts')).toEqual([HELD])
+  }, 145_000)
+
+  // Adversarial Б3а: a default argument is read once — the mechanism the task was opened against.
+  it('refuses a default of localDay()', async () => {
+    const code = `import { localDay, purchaseDay } from '@/days'
+
+export function wordsOf(at: Date, today = localDay()): string {
+  return purchaseDay(at, 'ru', today)
+}
+`
+    expect(await said(code, 'composables/usePendingFrom.ts')).toEqual([DEFAULT])
+  }, 145_000)
 
   it('refuses localDay() in place in a template', async () => {
     expect(
       await said(view("{{ answeredAt(at, 'ru', localDay()) }}", ''), 'views/AccountsView.vue'),
     ).toEqual([IN_PLACE])
-  }, 60_000)
+  }, 145_000)
+
+  // The boundary, named (adversarial Б3в, self-review Р2-4): the clock read a line before into a name is
+  // review's — a selector cannot follow a name. Held here so a change of the rule says what it reaches.
+  it('lets the clock read into a name a line before pass — the price, named', async () => {
+    const code = script("const day = localDay()\n  return [answeredAt(at, 'ru', day)]")
+    expect(await said(code, 'composables/usePendingFrom.ts')).toEqual([])
+  }, 145_000)
 
   it('leaves the tests and useLocalDay itself alone', async () => {
     expect(
@@ -101,5 +119,5 @@ describe('the screen`s day (MOL-329)', () => {
         'composables/useLocalDay.ts',
       ),
     ).toEqual([])
-  }, 60_000)
+  }, 145_000)
 })
