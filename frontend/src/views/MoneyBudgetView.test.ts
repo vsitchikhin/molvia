@@ -1410,3 +1410,35 @@ describe('MoneyBudgetView: review of MOL-192, round 7', () => {
     })
   }
 })
+
+// MOL-329, adversarial В2 of round 3: the screen's month moves at midnight with the screen in view, and the
+// sheet of a plan keeps the month it opened on — a September plan saved two seconds past midnight is
+// September's, never October's under the person's thumb.
+describe('MoneyBudgetView: a plan typed across midnight (MOL-329)', () => {
+  it('the screen goes on to October, the sheet of a September plan stays September’s', async () => {
+    vi.setSystemTime(new Date('2026-09-30T23:59:58Z'))
+    moneyBudget.mockImplementation((month) => Promise.resolve(budget({ month })))
+    const view = await render()
+    expect(moneyBudget).toHaveBeenLastCalledWith('2026-09')
+    await view.findAll('li .list-row')[2]?.trigger('click')
+    await flushPromises()
+    expect(document.querySelector('dialog[open]')?.textContent).toContain('From September on')
+    type('input[inputmode=decimal]', '270 000')
+
+    // Midnight passes with the sheet up, by the screen's own timer: the screen reads October.
+    await vi.waitFor(
+      () => {
+        expect(moneyBudget).toHaveBeenLastCalledWith('2026-10')
+      },
+      { timeout: 8_000, interval: 100 },
+    )
+    expect(document.querySelector('dialog[open]')?.textContent).toContain('From September on')
+    await pressUntil(en.budget.sheet.save, () => {
+      expect(setBudgetPlan).toHaveBeenCalledWith({
+        categoryId: RENT,
+        from: '2026-09',
+        plan: { kind: 'amount', amount: amd('270000') },
+      })
+    })
+  }, 30_000)
+})
