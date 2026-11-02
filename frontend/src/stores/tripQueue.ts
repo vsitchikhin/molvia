@@ -1070,11 +1070,14 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         console.warn(`[trip queue] ${head.write.kind} refused: ${refusal}`)
         rejected.value = [...rejected.value, { key: newKey(), write: head.write, code: refusal }]
       }
+      const place = kept.findIndex((item) => item.key === head.key)
       kept = kept.filter((item) => item.key !== head.key)
       // The server kept numbers other than the ones just sent: its row is what this purchase was
       // written as, and the correction the person has made since has to reach it as an amendment
       // (раунд 2, Г1). Queued after the re-read above, or storage would hand the queue back
-      // without it.
+      // without it — and in the place of the write it stands for, never at the end: the
+      // correction was made before whatever waits behind it, and an account with «списано» chosen
+      // after it was taken off by the price change landing later (MOL-325, adversarial А1).
       const write = head.write
       // …unless the purchase has been undone meanwhile: the amendment would reach a row that is
       // about to go and come back as «не принято» about a thing the person threw away (П-3).
@@ -1088,18 +1091,19 @@ export const useTripQueueStore = defineStore('tripQueue', () => {
         write.kind === 'add' &&
         !answeredAsSent(answered, write.body)
       ) {
-        kept = [
-          ...kept,
-          {
-            key: newKey(),
-            write: {
-              kind: 'update',
-              tripId: write.tripId,
-              expenseId: write.body.id,
-              patch: { quantity: write.body.quantity ?? null, amount: write.body.amount ?? null },
-            },
+        const amendment: Kept = {
+          key: newKey(),
+          write: {
+            kind: 'update',
+            tripId: write.tripId,
+            expenseId: write.body.id,
+            patch: { quantity: write.body.quantity ?? null, amount: write.body.amount ?? null },
           },
-        ]
+        }
+        kept =
+          place === -1
+            ? [...kept, amendment]
+            : [...kept.slice(0, place), amendment, ...kept.slice(place)]
       }
       // A start the server has taken answers the question about a trip open elsewhere: there is
       // nothing left to choose (раунд 2, Г3; Ч-1).
