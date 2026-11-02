@@ -874,8 +874,9 @@ export function unorderedReads(
    * Why the callback a method of rows is handed may tell their order: it takes the index of a row, or it is one
    * the parse cannot read — built by a call, a method, an import (review round 4, Г4) — and in doubt it does.
    */
-  const callbackDoubt = (call, method) => {
-    const [argument] = call.arguments
+  const callbackDoubt = (call, method) => callbackDoubtOf(call.arguments[0], method)
+  /** The same of a callback handed in any place: `Array.from`'s mapping is its second (review round 22, Х1). */
+  const callbackDoubtOf = (argument, method) => {
     if (!argument || NO_CALLBACK.has(method)) return undefined
     // the platform's casts take their first argument and nothing else (review round 5, №14)
     if (ts.isIdentifier(argument) && CASTS.has(argument.text) && !watched) return undefined
@@ -1339,6 +1340,9 @@ export function unorderedReads(
           continue
         }
         if (UNPACKS.has(callee.getText(sf))) {
+          // `Array.from`'s mapping is a callback of the rows, as `map`'s (review round 22, Х1)
+          const doubt = callbackDoubtOf(p.arguments[1], 'map')
+          if (doubt) return { why: `${callee.getText(sf)}(…, mapping) ${doubt}` }
           n = p
           continue
         }
@@ -1395,7 +1399,10 @@ export function unorderedReads(
       return { name: p.name }
     if ((ts.isCallExpression(p) || ts.isNewExpression(p)) && p.arguments?.includes(n)) {
       const callee = p.expression.getText(sf)
-      if (UNPACKS.has(callee)) return { unpacked: p }
+      if (UNPACKS.has(callee)) {
+        const doubt = callbackDoubtOf(p.arguments[1], 'map')
+        return doubt ? { why: `${callee}(…, mapping) ${doubt}` } : { unpacked: p }
+      }
       if (/^expect(\.soft)?$/.test(callee)) {
         const end = matched(p, order)
         // compared with another by `toEqual`, a Set tells no order; a Map and an object hold the last row of a key

@@ -283,7 +283,7 @@ failure` give the same first row, `find` and `[...new Set()]` either way (round 
   what holds; a `Set`, a `Map` and an object
   of `Object.fromEntries` keep the order they were filled in and are followed through, a `Set` compared whole with
   another tells no order, but a `Map` or an object compared whole reads the last row of a key repeated — its value by
-  its key, whole — and is refused (round 21, Ф1); and an `update` or a
+  its key, whole — and is refused (round 21, Ф1); `Array.from`'s mapping is a callback of the rows, read as `map`'s (round 22, Х1); and an `update` or a
   `delete` returning rows is a read with no order (round 13). **For one read with no order it holds too**
   (round 14, О1): the net cannot tell values the same reversed, so the first row, `find`, `reduce`, `sort`, a
   part by `slice`, a value by its key and a loop that collects or leaves at a row are refused, and the rows go

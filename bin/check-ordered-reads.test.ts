@@ -1555,6 +1555,38 @@ describe('unorderedReads', () => {
     expect(statement(body)).toEqual([])
   })
 
+  // review round 22, Х1: `Array.from`'s mapping is a callback of the rows, as `map`'s
+  it.each([
+    [
+      'a mapping by index',
+      'expect(new Set(Array.from(await db.select().from(t), (r, i) => (i === 0 ? r.kind : "")))).toEqual(new Set([a]))',
+    ],
+    [
+      'a mapping that changes outside',
+      'const seen = []\nArray.from(await db.select().from(t), (r) => seen.push(r.kind))',
+    ],
+    [
+      'a mapping of a Set by index',
+      'expect(new Set(Array.from(new Set((await db.select().from(t)).map((r) => r.kind)), (k, i) => i))).toEqual(new Set([0]))',
+    ],
+    [
+      'a mapping the check cannot read',
+      'expect(new Set(Array.from(await db.select().from(t), pick))).toEqual(new Set([a]))',
+    ],
+  ])('refuses %s (round 22)', (_, body) => {
+    expect(found(body)).not.toEqual([])
+  })
+
+  it.each([
+    [
+      'a mapping of the row alone',
+      'expect(new Set(Array.from(await db.select().from(t), (r) => r.kind))).toEqual(new Set([a]))',
+    ],
+    ['no mapping', 'expect(new Set(Array.from(await db.select().from(t))).size).toBe(2)'],
+  ])('leaves alone %s (round 22)', (_, body) => {
+    expect(found(body)).toEqual([])
+  })
+
   it('refuses onlyRow and sorted of the file itself, and one of the module under another use', () => {
     const local = (body: string): string[] =>
       unorderedReads(
