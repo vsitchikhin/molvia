@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { Readable } from 'node:stream'
 import { eq, sql } from 'drizzle-orm'
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import {
   ERROR,
@@ -967,7 +967,14 @@ describe('what lives how long (В-3)', () => {
 })
 
 describe('the queue through the server', () => {
+  afterEach(() => vi.useRealTimers())
+
   it('reads a receipt once its last part arrives, and logs neither its text nor its tax number', async () => {
+    // «8676», the receipt's total, once stood in pino's time (MOL-327): every run puts it in the time and
+    // in the receipt's id, and the log is read without the logger's stamps and that id.
+    const now = Date.now()
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(now - ((now - 8676) % 10_000))
     const lines: string[] = []
     const reading = buildServer({
       db,
@@ -977,7 +984,7 @@ describe('the queue through the server', () => {
     await reading.ready()
     try {
       const me = await owner()
-      const receipt = body()
+      const receipt = body({ id: '8676b45a-3f1c-4e2a-9d7b-6c0e5f3a2b17' })
       await reading.inject({
         method: 'POST',
         url: '/receipts',
@@ -1002,9 +1009,15 @@ describe('the queue through the server', () => {
           .receipt.status
       }
       expect(status).toBe('parsed')
-      const log = lines.join('')
-      expect(log).toContain('receipt read')
-      expect(log).not.toMatch(/01234567|Կաթ|Իգիթ|8676/)
+      expect(lines.join('')).toMatch(/"time":\d+8676[,}]/)
+      const stamps = new Set(['time', 'responseTime', 'pid', 'hostname'])
+      const said = lines
+        .map((line) => Object.entries(JSON.parse(line) as Record<string, unknown>))
+        .map((entry) => entry.filter(([key]) => !stamps.has(key)))
+        .map((entry) => JSON.stringify(entry).replaceAll(receipt.id, '<receipt>'))
+        .join('\n')
+      expect(said).toContain('receipt read')
+      expect(said).not.toMatch(/01234567|Կաթ|Իգիթ|8676/)
     } finally {
       await reading.close()
     }
