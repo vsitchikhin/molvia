@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
   MODEL_CONSENT_EDITION,
+  PICKS_CONSENT_EDITION,
   POLICY_VERSION,
   REVIEW_CONSENT_EDITION,
+  STATISTICS_CONSENT_EDITION,
   acceptConsentSchema,
   consentNeeded,
   consentSchema,
@@ -37,6 +39,14 @@ describe('the editions the model reads by (MOL-319)', () => {
 
   it('reads for nobody who has not accepted the review too, so a receipt it read may always be kept', () => {
     expect(MODEL_CONSENT_EDITION).toBeGreaterThanOrEqual(REVIEW_CONSENT_EDITION)
+  })
+})
+
+describe('the edition the measure of the search counts by (MOL-330)', () => {
+  it('counts only whoever accepted the text that names it, a part of the consent to the statistics', () => {
+    expect(PICKS_CONSENT_EDITION).toBe(6)
+    expect(PICKS_CONSENT_EDITION).toBeLessThanOrEqual(POLICY_VERSION)
+    expect(PICKS_CONSENT_EDITION).toBeGreaterThanOrEqual(STATISTICS_CONSENT_EDITION)
   })
 })
 

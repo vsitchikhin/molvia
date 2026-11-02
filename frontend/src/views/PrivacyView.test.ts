@@ -181,7 +181,7 @@ it('says the consent is kept — the edition and when — and nothing of the age
   expect(view.text()).toContain(ru.privacy.stored.consent.text)
   expect(ru.privacy.stored.consent.text).toMatch(/Возраст и дату рождения мы не храним/)
   // The subtitle is the revision written in code, not a sentence of the dictionary.
-  expect(view.text()).toContain('Редакция 5 от 1 ноября 2026')
+  expect(view.text()).toContain('Редакция 6 от 2 ноября 2026')
 })
 
 describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for (MOL-236)', () => {
@@ -224,7 +224,7 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     expect(ru.privacy.statistics.text).toMatch(/бот не спрашивает/)
     expect(ru.privacy.statistics.text).toMatch(/в счёт уже не идёт/)
     // Its paragraphs stand apart on the page, not run together.
-    expect(ru.privacy.statistics.text.split('\n')).toHaveLength(4)
+    expect(ru.privacy.statistics.text.split('\n')).toHaveLength(5)
     // The day counters with no one's id are named, and that the switch does not touch them
     // (adversarial Р2-А2, owner's 1-а): a press under a reminder is counted whatever the switch.
     expect(ru.privacy.statistics.text).toMatch(
@@ -240,6 +240,29 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     expect(en.privacy.statistics.text).toMatch(/by blocking the bot/)
     expect(ru.privacy.statistics.text).toMatch(/выключатель их не касается/)
     expect(ru.privacy.statistics.text).not.toMatch(/перестанут считаться\./)
+  })
+
+  // MOL-330, owner's В-1 «а»: the measure of the search is a new purpose of the statistics' consent, and the
+  // pairs stop being «видно только вам» — the page says what leaves, in what form, and when it goes.
+  it('names the measure of the search by the picks: the key, no name, the export deleted, the switch', () => {
+    const measure = ru.privacy.statistics.text.split('\n')[1] ?? ''
+    expect(measure).toMatch(/^Ещё он меряет поиск/)
+    expect(measure).toMatch(/по тому, что вы взяли по какому запросу/)
+    expect(measure).toMatch(/без имени и номера аккаунта/)
+    expect(measure).toMatch(/с запросом латинскими буквами, как его хранит поиск/)
+    expect(measure).toMatch(/удаляет выгрузку после замера; в итог идут только числа/)
+    expect(ru.privacy.statistics.text).toMatch(/ваши оценки и запросы перестанут считаться/)
+    expect(en.privacy.statistics.text.split('\n')[1]).toMatch(
+      /^He also measures the search.*without your name or account number.*deletes the export/,
+    )
+    expect(en.privacy.statistics.text).toMatch(/your ratings and queries stop being counted/)
+    // «Это видно только вам» would be untrue beside it: other people still see nothing, the developer does.
+    for (const { privacy } of [ru, en]) {
+      expect(privacy.stored.search.text).not.toMatch(/Это видно только вам|Only you see this/)
+    }
+    expect(ru.privacy.stored.search.text).toMatch(/Другим людям это не видно/)
+    expect(ru.privacy.stored.search.text).toContain(`«${ru.privacy.statistics.title}»`)
+    expect(en.privacy.stored.search.text).toContain(`«${en.privacy.statistics.title}»`)
   })
 
   it('lists every recipient, the Serbian tax office among them, and nobody else', async () => {
