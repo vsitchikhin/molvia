@@ -970,26 +970,35 @@ describe('what lives how long (В-3)', () => {
 })
 
 /**
- * am-05 as no log may carry it (MOL-327): every Armenian word of its lines from three letters, in any case,
- * and every number of four digits and more without its leading zeros — each figure it prints, its digits
- * joined across a point or a comma (never a space, which parts its columns), and each amount of its truth
- * in whole drams, as a till rounds them, and in hundredths, as the server keeps money.
+ * am-05 as no log may carry it (MOL-327): every Armenian word of its lines from three letters, in any case;
+ * the day of the purchase as the server keeps it; and every number of four digits and more without its
+ * leading zeros — each figure it prints, its digits joined across a point or a comma, or across a space only
+ * before a decimal comma (elsewhere a space parts its columns), and each amount — printed or of its truth — in
+ * whole drams, as a till rounds them, and in hundredths, as the server keeps money. A guard against the receipt
+ * written the ordinary way, not against a form built to slip past it.
  */
 const PRINTED = am05.readings.join('\n')
-const PRINTED_WORDS = [...new Set(PRINTED.toLowerCase().match(/\p{Script=Armenian}{3,}/gu))]
+const PRINTED_WORDS = [
+  ...new Set(PRINTED.toLowerCase().match(/\p{Script=Armenian}{3,}/gu)),
+  am05.expected.date,
+]
+const PRINTED_FIGURES = PRINTED.match(/\d{1,3}(?: \d{3})+,\d+|\d+(?:[.,]\d+)*/g) ?? []
 const PRINTED_AMOUNTS = [
   am05.expected.total,
   ...am05.expected.lines.flatMap((line) => [line.unit_price, line.sum]),
+  ...PRINTED_FIGURES.filter((figure) => /[.,]\d{2}$/.test(figure)).map((figure) =>
+    Number(figure.replaceAll(' ', '').replace(',', '.')),
+  ),
 ].filter((amount) => amount !== null)
 const PRINTED_NUMBERS = [
   ...new Set(
     [
-      ...(PRINTED.match(/\d+(?:[.,]\d+)*/g) ?? []),
+      ...PRINTED_FIGURES,
       ...PRINTED_AMOUNTS.flatMap((amount) =>
         [Math.round(amount), Math.round(amount * 100)].map(String),
       ),
     ]
-      .map((number) => number.replace(/[.,]/g, '').replace(/^0+/, ''))
+      .map((number) => number.replace(/[ .,]/g, '').replace(/^0+/, ''))
       .filter((number) => number.length >= 4),
   ),
 ]
@@ -1119,6 +1128,8 @@ describe('the queue through the server', () => {
         vat: formatInCurrency('1446.36', 'AMD', 'ru', exactFigures(2)),
         price: '1 260',
         sumMinor: 60885,
+        vatWhole: formatInCurrency('1446', 'AMD', 'ru', exactFigures(2)),
+        printedOn: '2026-10-01',
       }
       for (const [field, leak] of Object.entries(leaks)) {
         lines.length = 0
