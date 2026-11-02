@@ -119,6 +119,90 @@ describe('what the letters found does not move (owner’s decision В-3)', () =>
   })
 })
 
+describe('one exact word does not make the other right, with the meaning too (MOL-46, MOL-332)', () => {
+  /**
+   * A row the letters found within one edit by the mean with a word two off is near neither by its
+   * letters nor by its meaning: one exact word lends the vector its sense as it lent the mean its
+   * edits. Made near by its meaning wherever found, each of these read «нашли» over another thing,
+   * where the screen says «не нашли» and offers «Предложить товар» (adversarial А2 of MOL-332,
+   * owner's В-3 «а»). The first three are things people buy that the seed does not carry; the last
+   * two are swaps of seed words by a generator, taken for their margins — of the ten plausible ones
+   * only three stand clear both ways, and the guard holds the mechanism, not the words. Each stands
+   * clear of the threshold both ways (adversarial В2): «не нашли» is held by the nearest name the
+   * meaning alone would place — «Сахар», «Гель для бритья» at 0.375 and 0.382, the others below
+   * 0.35 — and the thing named first stands at 0.42–0.48, so near wherever found turns each red.
+   * «соус абрикосовый», «сода для посудомойки», «суп острый» stood 0.006–0.011 under it, on
+   * «Абрикосы», «Сода пищевая», «Суп быстрого приготовления»
+   * (`.scratch/tasks/status/MOL-332-review-5-guards.json`).
+   */
+  it.each([
+    ['вода без сахара', 'Кола без сахара'],
+    ['гель для мангала', 'Уголь для мангала'],
+    ['диски влажные', 'Диски ватные'],
+    ['бальзам для полов', 'Бальзам для волос'],
+    ['соус мультифруктовый', 'Сок мультифруктовый'],
+  ])('«%s» → «%s», far', async (query, name) => {
+    const { names, near } = await search(query)
+    expect([names[0], near]).toEqual([name, false])
+  })
+
+  /**
+   * The price of it, named (MOL-332, owner's В-3 «а»): the meaning makes a row near only where it also
+   * places it, so a typo more may read near where the typo less does not — «кокосовое малако» (0 and 2
+   * edits) keeps «Молоко кокосовое» first and not near, «кокосовае малако» (1 and 2) near — there the
+   * answer is near either way, by «Кокос», and the row is what moves: «проверьте» on a receipt's line,
+   * none of «Что брать» past its twentieth. Where nothing else is near the whole answer moves, as on 52
+   * of the seed's 711 typo ladders (adversarial Б1 of MOL-332). Pinned by the one of the 52 whose
+   * narrower side stands furthest from the threshold (adversarial Г1), so a shift of a vector shows as
+   * what it moves: «не нашли» over the butter is held by «Молоко 2,5%», nearest of what the meaning
+   * alone would place, at 0.322; «нашли» by «Масло сливочное 82,5%» itself at 0.585. What holds «не
+   * нашли» is that nearest stranger, not the thing meant: «шакалад белый» stood on «Капуста
+   * белокочанная» at 0.390 (adversarial В1).
+   */
+  it('«кокосовое малако» — «Молоко кокосовое» first and not near; «кокосовае малако» — near', async () => {
+    const milk = await idOf('Молоко кокосовое')
+    const fewer = await repo.search(
+      'кокосовое малако',
+      20,
+      nobody,
+      await queryMeaning(embedder, 'кокосовое малако'),
+    )
+    const more = await repo.search(
+      'кокосовае малако',
+      20,
+      nobody,
+      await queryMeaning(embedder, 'кокосовае малако'),
+    )
+    expect([fewer.items[0]?.id, fewer.nearIds.includes(milk)]).toEqual([milk, false])
+    expect(more.nearIds).toContain(milk)
+  })
+
+  it('«масло слевачное 82,5%» reads «не нашли» over the butter first, «масло слевачнае 82,5%» «нашли»', async () => {
+    const fewer = await search('масло слевачное 82,5%')
+    const more = await search('масло слевачнае 82,5%')
+    expect([fewer.names[0], fewer.near]).toEqual(['Масло сливочное 82,5%', false])
+    expect([more.names[0], more.near]).toEqual(['Масло сливочное 82,5%', true])
+  })
+})
+
+describe('a word on its way finds by its spelling (MOL-332, owner’s В-1 «а»)', () => {
+  /**
+   * The price of the meaning, as of the letters' «молоч» → «Мука»: a cut word is read by how it is
+   * spelt, and what it finds is near. «cheesecak» is cheese to the model (0.412), where right finds of
+   * a shelf stand as close — «алкоголь» → «Водка» 0.406, «кисломолочка» → «Молоко» 0.419 — so no
+   * threshold tells them apart (`.scratch/tasks/status/MOL-332-measure.json`). The seed carries no
+   * cheesecake; with one in the catalogue it stays below the threshold (0.35, 0.40) and the cheese stands
+   * alone. Pinned, so a change of the model or the threshold shows here.
+   */
+  it.each([
+    ['cheesecak', 'Сыр чечил'],
+    ['кроссо', 'Круассан'],
+  ])('«%s» → «%s», near', async (query, name) => {
+    const { names, near } = await search(query)
+    expect([names[0], near]).toEqual([name, true])
+  })
+})
+
 /**
  * Every shelf word of the corpus and every thing the seed does not carry (MOL-105), pinned whole:
  * the name seen first and whether the answer is near — the poor answers too, since a change of the

@@ -518,6 +518,11 @@ export function rankedCandidates(
 
   // Placed by its meaning: found by it and not within one edit by its letters — the row that takes
   // \`MEANING_DISTANCE\` and makes the answer near. Over the final select's \`r\` and \`mg\`.
+  //
+  // Near only where it is placed, a price (MOL-332, owner's В-3 «а»): a row within one edit by the mean
+  // with a word two off is not near, though a typo more would make it so. Near wherever found, the
+  // meaning called «Масло детское» found for «мыло детское» — one exact word lends the vector its
+  // sense as it lent the mean its edits, and review А of MOL-46 was undone.
   const byMeaning = sql`coalesce(mg.sim >= ${MEANING_THRESHOLD}
                                and not coalesce(r.distance <= ${NEAR_DISTANCE}, false), false)`
 
