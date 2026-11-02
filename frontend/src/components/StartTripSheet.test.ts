@@ -188,14 +188,14 @@ describe('StartTripSheet', () => {
     await nameField(view).setValue(`Ереван Сити${PRIVATE}`)
     nameField(view).element.focus()
     ;(mainButton(view).element as HTMLButtonElement).click()
-    // The announcer's words land a task and 100 ms later.
-    await new Promise((resolve) => setTimeout(resolve, 150))
-    await flushPromises()
+    // The announcer's words land a task and 100 ms later: waited for as they land, never by a time.
+    await vi.waitFor(() => {
+      expect(document.body.querySelector('dialog[open] .region')?.textContent).toContain(
+        ru.spending.sheet.bad_text,
+      )
+    })
     expect(queue.pending).toEqual([])
     expect(document.activeElement).toBe(nameField(view).element)
-    expect(document.body.querySelector('dialog[open] .region')?.textContent).toContain(
-      ru.spending.sheet.bad_text,
-    )
   })
 
   it('не должно сработать: открыта заново — имя, отказанное раньше, не отмечено', async () => {
