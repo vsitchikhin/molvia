@@ -1,5 +1,10 @@
 <template>
-  <BottomSheet :open="open" :on-closed="onClosed" @update:open="$emit('update:open', $event)">
+  <BottomSheet
+    ref="sheet"
+    :open="open"
+    :on-closed="onClosed"
+    @update:open="$emit('update:open', $event)"
+  >
     <template #title>{{ t('trip.receipt.sheet.title') }}</template>
     <p class="body">{{ t('trip.receipt.sheet.body') }}</p>
     <ReceiptField
@@ -28,6 +33,7 @@ import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ReceiptField from '@/components/ReceiptField.vue'
 import { receiptText, typedReceipt } from '@/components/receipt'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useTripQueueStore } from '@/stores/tripQueue'
 
 /**
@@ -67,6 +73,9 @@ export default defineComponent({
     const amount = ref('')
     const currency = ref<Currency>(props.tripCurrency)
     const bad = ref(false)
+    // The sheet itself is the form: its one field, refused, is heard (MOL-235, MOL-333).
+    const sheet = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
 
     watch(
       () => props.open,
@@ -89,13 +98,14 @@ export default defineComponent({
       const receipt = typedReceipt(amount.value, currency.value)
       bad.value = receipt === null
       if (receipt) write(receipt)
+      else void refuse(() => sheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
     }
 
     function clear(): void {
       write(null)
     }
 
-    return { t, amount, currency, bad, save, clear }
+    return { t, amount, currency, bad, sheet, save, clear }
   },
 })
 </script>

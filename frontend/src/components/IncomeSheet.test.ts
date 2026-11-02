@@ -3,10 +3,12 @@ import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { IncomeAmendBody, IncomeBody, IncomeView, IncomesResponse } from '@molvia/model'
 import IncomeSheet from './IncomeSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -72,14 +74,27 @@ afterEach(() => {
 async function render(
   state: IncomesResponse = overview(),
   editing: IncomeView | null = null,
+  announced = false,
 ): Promise<VueWrapper> {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/money/incomes')
-  const view = mount(IncomeSheet, {
-    props: { open: true, overview: state, record, amend, editing },
+  const props = { open: true, overview: state, record, amend, editing }
+  const mounting = {
     attachTo: document.body,
     global: { plugins: [router, createPinia(), createAppI18n('en')] },
-  })
+  }
+  // Under an announcer, as `App.vue` holds every sheet: what the sheet says lands in its region.
+  const view: VueWrapper = announced
+    ? mount(
+        defineComponent({
+          setup() {
+            provideAnnouncer()
+            return () => h(IncomeSheet, props)
+          },
+        }),
+        mounting,
+      )
+    : mount(IncomeSheet, { props, ...mounting })
   await flushPromises()
   clock += 1000
   await new Promise((resolve) => setTimeout(resolve, 5))
@@ -96,6 +111,22 @@ async function fill(view: VueWrapper, amount: string, currency = 'RUB', source =
   await field(view, en.income.sheet.amount).get('input').setValue(amount)
   await field(view, en.income.sheet.currency).get('select').setValue(currency)
   if (source) await field(view, en.income.sheet.source).get('select').setValue(source)
+}
+
+/** The control, and whether it was marked at the moment the focus came to it. */
+function watchFocus(view: VueWrapper, label: string, tag: 'input' | 'select' = 'input') {
+  const control = field(view, label).get(tag).element as HTMLElement
+  const at = { marked: null as string | null }
+  control.addEventListener('focus', () => {
+    at.marked = control.getAttribute('aria-invalid')
+  })
+  return { control, at }
+}
+
+function saveButton(view: VueWrapper): HTMLButtonElement {
+  const button = view.findAll('button').find((one) => one.text() === en.income.sheet.save)
+  if (!button) throw new Error('no «Save income»')
+  return button.element
 }
 
 async function save(view: VueWrapper, label = en.income.sheet.save): Promise<void> {
@@ -210,6 +241,75 @@ describe('IncomeSheet', () => {
     expect(view.text()).not.toContain(hint)
     await fill(view, '1', 'USD')
     expect(view.text()).toContain(hint)
+  })
+
+  // A field refused is heard (MOL-333): the focus went nowhere, and nothing was said.
+  it('no source chosen: the focus goes to «Source», already marked', async () => {
+    const view = await render()
+    await fill(view, '99615', 'RUB', '')
+    const source = watchFocus(view, en.income.sheet.source, 'select')
+    saveButton(view).focus()
+    await save(view)
+    expect(record).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(source.control)
+    expect(source.at.marked).toBe('true')
+  })
+
+  it('the first field marked in the form takes it: the sum before the source', async () => {
+    const view = await render()
+    await fill(view, 'abc', 'RUB', '')
+    const amount = watchFocus(view, en.income.sheet.amount)
+    saveButton(view).focus()
+    await save(view)
+    expect(field(view, en.income.sheet.source).get('select').attributes('aria-invalid')).toBe(
+      'true',
+    )
+    expect(document.activeElement).toBe(amount.control)
+    expect(amount.at.marked).toBe('true')
+  })
+
+  it('a note refused from inside it keeps the focus there and says its error', async () => {
+    const view = await render(overview(), null, true)
+    await fill(view, '99615')
+    const note = field(view, en.income.sheet.note).get('input')
+    await note.setValue(String.fromCharCode(7))
+    ;(note.element as HTMLInputElement).focus()
+    await view.get('form').trigger('submit')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(record).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(note.element)
+    expect(document.querySelector('dialog .region')?.textContent).toContain(
+      en.income.sheet.bad_note,
+    )
+  })
+
+  it('a day the server refuses takes the focus from the button to the day', async () => {
+    record.mockRejectedValue(new ApiError(ERROR.INCOME_IN_FUTURE))
+    const view = await render()
+    await fill(view, '1')
+    const day = watchFocus(view, en.income.sheet.day)
+    saveButton(view).focus()
+    await save(view)
+    await flushPromises()
+    expect(document.activeElement).toBe(day.control)
+    expect(day.at.marked).toBe('true')
+  })
+
+  it('must not fire: a refusal landing after the sheet was put away moves no focus into it', async () => {
+    let refuse: (error: unknown) => void = () => undefined
+    record.mockReturnValue(new Promise((_, reject) => (refuse = reject)))
+    const view = await render()
+    await fill(view, '1')
+    await save(view)
+    await view.setProps({ open: false })
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    outside.focus()
+    refuse(new ApiError(ERROR.INCOME_IN_FUTURE))
+    await flushPromises()
+    await flushPromises()
+    expect(document.activeElement).toBe(outside)
   })
 
   it('a day the server says has not come yet is said under the day', async () => {

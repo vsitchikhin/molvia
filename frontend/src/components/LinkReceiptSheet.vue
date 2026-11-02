@@ -156,6 +156,7 @@ import type { ReceiptLinkRefusal, ReceiptVia } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import BottomSheet, { DOUBLE_TAP } from '@/components/BottomSheet.vue'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useOnline } from '@/composables/useOnline'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
@@ -210,6 +211,9 @@ export default defineComponent({
     const queue = useReceiptQueueStore()
     const online = useOnline()
     const body = ref<HTMLElement | null>(null)
+    // A link refused is heard (MOL-235, MOL-333): Enter keeps the focus and says it, «Отправить» hands
+    // the focus to the field, marked.
+    const refuse = useFieldRefusal()
     const take = ref<HTMLInputElement | null>(null)
     const pick = ref<HTMLInputElement | null>(null)
     const pasting = ref(false)
@@ -356,7 +360,10 @@ export default defineComponent({
       if (sending.value) return
       tried.value = true
       const link = read.value
-      if (!link.ok) return
+      if (!link.ok) {
+        void refuse(() => body.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
+        return
+      }
       await queued(link.link, 'paste')
     }
 

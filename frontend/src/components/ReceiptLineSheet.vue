@@ -3,7 +3,7 @@
     <template #title>{{ t('receipt.line.title') }}</template>
     <template #meta>{{ meta }}</template>
 
-    <div class="form">
+    <div ref="form" class="form">
       <div v-if="skip" class="plate quiet">{{ t('receipt.line.skipped') }}</div>
 
       <div class="plate printed-box">
@@ -146,6 +146,7 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { formatRating, unitPriceText } from '@/components/adviceRow'
 import { useCheaperHint } from '@/composables/useCheaperHint'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useLineFigures } from '@/composables/useLineFigures'
 import { calendarDay } from '@/days'
 import type { ReviewLine } from '@/receipts/review'
@@ -212,6 +213,9 @@ export default defineComponent({
       perUnit,
     } = useLineFigures(start, () => props.currency)
     const skip = ref(start.skip)
+    const form = ref<HTMLElement | null>(null)
+    // A field refused at «Сохранить» is heard (MOL-235, MOL-333): the first one marked in the form.
+    const refuse = useFieldRefusal()
     const picking = ref(false)
     const nameBad = ref(false)
     /** «проверьте» holds until the person settles the item one way or another. */
@@ -381,7 +385,10 @@ export default defineComponent({
 
     function finish(skipped: boolean, figuresToo: boolean): void {
       const next = line(skipped, figuresToo)
-      if (!next) return
+      if (!next) {
+        void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
+        return
+      }
       // Nothing changed: no draft — the line goes on following the server and the shop's memory,
       // and «≠» and «проверьте» stay (review 16).
       if (!same(next)) emit('saved', next)
@@ -392,6 +399,7 @@ export default defineComponent({
       t,
       ERROR,
       NAME_MAX,
+      form,
       item,
       name,
       quantity,

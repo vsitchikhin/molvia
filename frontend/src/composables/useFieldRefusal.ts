@@ -12,7 +12,8 @@ import { useAnnouncer } from '@/composables/useAnnouncer'
  * `find` is asked after the render, so a screen names the first field that is wrong by its mark
  * (`[aria-invalid="true"]`) and is answered in the order of its form. The words are the field's own
  * error, the one its `aria-errormessage` names — `AppField`'s, a radio of `CategoryChips`' — no second
- * copy of them.
+ * copy of them; a control with no such mark, a button that is no field of the kit, by what describes it
+ * (`aria-describedby`, MOL-333): «Новая строка»'s item, focused already when its search was put away.
  */
 export function useFieldRefusal(): (find: () => HTMLElement | null | undefined) => Promise<void> {
   const say = useAnnouncer()
@@ -24,8 +25,13 @@ export function useFieldRefusal(): (find: () => HTMLElement | null | undefined) 
       field.focus()
       return
     }
-    const error = field.getAttribute('aria-errormessage')
-    const words = error ? document.getElementById(error)?.textContent.trim() : undefined
+    const ids =
+      field.getAttribute('aria-errormessage') ?? field.getAttribute('aria-describedby') ?? ''
+    const words = ids
+      .split(/\s+/u)
+      .map((id) => (id ? document.getElementById(id)?.textContent.trim() : undefined))
+      .filter(Boolean)
+      .join(' ')
     if (words) say?.(words)
   }
 }
