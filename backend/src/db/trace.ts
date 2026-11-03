@@ -203,8 +203,14 @@ export async function pickWrittenByTrace(
     return
   }
   const mine = sql`mv.actor_id = ${actorId}::uuid and mv.key->>'queryKey' = ${queryKey}`
-  if ((await restampTraceWrite(conn, 'item', asked, sql`mv.what = 'pick' and ${mine}`, at)) > 0)
+  if ((await restampTraceWrite(conn, 'item', asked, sql`mv.what = 'pick' and ${mine}`, at)) > 0) {
+    // the row its merge brought is the trace's own, so the shares standing on it keep this as such (Т1)
+    const [survivor] = await conn.execute<{ id: string }>(sql`
+      select coalesce(merged_into, id) as id from items where id = ${asked}::uuid`)
+    if (survivor !== undefined)
+      await pickWrittenBySurvivor(conn, survivor.id, actorId, queryKey, at, share.admits)
     return
+  }
   const added = await conn.execute(sql`
     ${wayOf('item', asked)}
     update catalogue_merge_moves mv
@@ -241,8 +247,9 @@ export async function pickWrittenByTrace(
 }
 
 /**
- * A pick by the survivor's own id of a row traces' shares stand on (MOL-299, М1, Н1): the row's own is that
- * one now, so every share of a merge into it keeps it as what the row goes back to once the share goes home.
+ * A pick by the survivor's own id of a row traces' shares stand on (MOL-299, М1, Н1) — or by the id of the trace
+ * whose row a merge brought there (Т1): the row's own is that one now, so every share of a merge into it keeps it
+ * as what the row goes back to once the share goes home.
  * Read from no moment of the row: in a fan, another trace's pick moves it as well.
  */
 export async function pickWrittenBySurvivor(

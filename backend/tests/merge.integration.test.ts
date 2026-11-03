@@ -1176,6 +1176,26 @@ describe("the undo takes home what a trace's id wrote after the merge (MOL-299, 
     },
   )
 
+  it("keeps the word a trace's id taught on the row its merge brought, a later merge added to it (Т1)", async () => {
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+      values (${owner}, 'maloko', ${younger}, 1, '2026-09-01T10:00:00Z'),
+             (${owner}, 'maloko', ${other}, 1, '2026-09-03T10:00:00Z')`)
+    const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const two = numbered(await merges.mergeItems(other, older, NIGHT))
+    // from a phone's queue, by the trace's id, onto the row its own merge brought
+    await createSearchPickRepository(db).learn(owner, 'малоко', younger)
+    await merges.unmerge(two)
+    await merges.unmerge(one)
+    expect(await picksOf('maloko')).toEqual(
+      sorted([
+        [younger, 2, true],
+        [other, 1, false],
+      ]),
+    )
+  })
+
   it.each(['later', 'earlier'])(
     "takes home each twin's picks of one row in a fan, the %s merge first (К1)",
     async (first) => {
