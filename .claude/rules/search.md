@@ -832,7 +832,8 @@ report.
   **are the trace's share** (`pick_written`, adversarial К1, owner's В-11 «б»): the merge into the survivor
   keeps how many, their last moment and «own word», and what the row held before them; the undo takes the
   share home, and the row is back at what it held — or, picked since by another trace's id — or added to by a later
-  merge, its `pick_added` (О1 of round 15) — the next share keeps that instead, and a row a merge brought goes home at what is left of it once every share standing is
+  merge, its `pick_added` (О1 of round 15) — the next share keeps that instead (and a `pick_added` undone
+  under a later share hands it the survivor's own the same way, П1 of round 16), and a row a merge brought goes home at what is left of it once every share standing is
   taken out, the rest that trace's first pick (as `above` for a verdict, any order, one merge alone too). A pick by the trace's
   id on a row its merge added the trace's own picks to (`pick_added`) grows that share instead: one snapshot of
   the row before the trace, never two that restore it against each other (Л1 of round 12). A pick by the survivor's own id
