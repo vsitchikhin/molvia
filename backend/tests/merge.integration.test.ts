@@ -1329,6 +1329,60 @@ describe('the undo leaves a verdict the person touched after the merge (MOL-299,
     },
   )
 
+  it('gives a false twin its word back while the true one stands, its trace written over (Ж1)', async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    await verdict(owner, stewed, { score: 3 })
+    await db.execute(sql`update verdicts set review = 'мягкое' where item_id = ${stewed}`)
+    const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    // by the true twin's id, over the row the false one brought
+    await rateBy(younger, 1)
+    expect(await merges.unmerge(wrong)).toMatchObject({ subject: 'item' })
+    expect([await scoreOn(stewed), await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 3, live: true },
+      { score: 1, live: true },
+      undefined,
+    ])
+    const reviews = await db.execute<{ item_id: string; review: string | null }>(
+      sql`select item_id, review from verdicts order by item_id = ${stewed}`,
+    )
+    expect(reviews).toEqual([
+      { item_id: older, review: null },
+      { item_id: stewed, review: 'мягкое' },
+    ])
+    // the true one undone after all: the word its trace wrote goes home
+    await merges.unmerge(right)
+    expect([await scoreOn(stewed), await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 3, live: true },
+      undefined,
+      { score: 1, live: true },
+    ])
+    expect(await overwritten()).toBe(0)
+  })
+
+  it("keeps the survivor's own for the true twin's undo, the false one undone alone (Ж1)", async () => {
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    await verdict(owner, older, { score: 5 })
+    const wrong = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const right = numbered(await merges.mergeItems(other, older, NIGHT))
+    await rateBy(younger, 1)
+    await rateBy(other, 2)
+    await merges.unmerge(wrong)
+    expect([await scoreOn(older), await scoreOn(younger), await scoreOn(other)]).toEqual([
+      { score: 2, live: true },
+      { score: 1, live: true },
+      undefined,
+    ])
+    expect(await overwritten()).toBe(1)
+    await merges.unmerge(right)
+    expect([await scoreOn(older), await scoreOn(younger), await scoreOn(other)]).toEqual([
+      { score: 5, live: true },
+      { score: 1, live: true },
+      { score: 2, live: true },
+    ])
+    expect(await overwritten()).toBe(0)
+  })
+
   it("gives it back withdrawn by the trace's id, and gives the trace no verdict (Г2)", async () => {
     await verdict(owner, older, { score: 5 })
     const id = numbered(await merges.mergeItems(younger, older, NIGHT))

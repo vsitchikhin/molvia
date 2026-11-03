@@ -850,12 +850,15 @@ report.
   the person's, in their copy (`overwrittenVerdicts`, version 27), gone with them by the cascade, and gone
   with the undo. It is kept by the merge into the survivor; on a chain the word goes to that merge's younger
   and is written there as the trace's id would write it, so the next undo carries it on and the whole chain
-  undone gives it to the trace (№11, Д1 of round 5). **In a fan any order undoes it** (№10, Д2, Е1 of round 6):
-  the earlier merge's trace may write over a row the later merge brought, or over a word another trace wrote,
-  so a verdict's move may find its row at another word. It does nothing then and waits in the journal; the undo
-  that gives the row back its word at that moment — the other merge's — does it on the spot (`resume`), and
-  the word of each twin lands on it whichever goes first. An order by the moment was tried first and refused
-  both undos for good where two people wrote each by the other's trace (adversarial Е1).
+  undone gives it to the trace (№11, Д1 of round 5). **In a fan any order undoes it, and one merge alone too** (№10, Д2, Е1 of
+  round 6, Ж1 of round 7): the earlier merge's trace may write over a row the later merge brought, or over a
+  word another trace wrote, so a verdict's move may find its row at another word. Then what the row said at
+  the move's moment is the `before` of the next word over it, held by a merge still standing: the undo hands
+  that word home — a row of its own for a row the merge brought, the trace's word for a word written over —
+  and leaves the row to the merge above, its `before` now what this move's was, or its move a first word of
+  its trace's (`above`). So the owner undoes the false twin and keeps the true one. An order by the moment
+  (round 5) refused both undos for good where two people wrote each by the other's trace (Е1), and a move
+  waiting for the other undo (round 6) waited for good where that one was the true twin (Ж1).
   **The prices, named:** the trace's own score is lost where the person rated the survivor over it by the
   survivor's id (the row was one: their own act), and the trace's row so kept holds the survivor's
   old score with its `rated_at`, withdrawn — the gate, the reminder and the copy read it (Б4); a text the
@@ -864,7 +867,10 @@ report.
   survivor's second (В-7 «а»: the search shows the survivor, so it is rare); a pick of the survivor's own
   from before that the trace's id added to stays where it is; a write by a trace that an
   `unmerge` commits between its row and its note stays with the survivor too (Б5, owner's В-8 «а»: the
-  owner's hand once a morning against milliseconds); in a fan, a trace's word written over by another
+  owner's hand once a morning against milliseconds); a swap of one person's two verdicts whose kept row
+  another trace's id wrote over waits for that merge's undo, and stays swapped while it stands (Ж1 of round 7:
+  a swap goes over two rows, and handing it on is not worth a case this rare); in a fan, a trace's word written
+  over by another
   trace's id and then by its own again is not given back — the later write takes the move's moment past the
   other's, so neither undo finds the row at it (№14 of the self-review, round 6); a word of the shop's memory
   settled again after a
