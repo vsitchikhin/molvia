@@ -67,7 +67,6 @@ describe('the system’s font size (MOL-334)', () => {
   // Through a parameter: a literal `new URL(…, import.meta.url)` is rewritten by Vite into an asset URL.
   const at = (path: string): URL => new URL(path, import.meta.url)
   const read = (path: URL): string => readFileSync(path, 'utf8')
-  const src = at('../')
 
   // Read as Sass writes it, not as typed (adversarial Г3): comments, `@media`, a mixin and nesting are gone by then,
   // so `html { &[data-large-text] { … } }` is the root's rule it becomes. The mixins are put in as Vite puts them.
@@ -206,16 +205,27 @@ describe('the system’s font size (MOL-334)', () => {
   })
 
   it('is never overridden: no stylesheet sets the root’s font-size', () => {
-    // Everything is SCSS (CLAUDE.md), and the guard reads it with the very Sass that builds it — of `src` and of
-    // `public/`, partials too, since a script may import one. Read as Sass, a plain sheet hid `//{}html{…}` the browser
-    // applies; read as it stands, its nesting (adversarial Г10, Г11): no reading is right for two languages, so any
-    // other sheet by a name Vite takes is simply not there. `100%` is no exception: Chrome takes the system's size only
-    // from a root nothing sizes.
+    // Everything is SCSS (CLAUDE.md), and the guard reads it with the very Sass that builds it — of the whole module,
+    // partials too, since a script may import one: Vite takes `/reset.scss` and `@/../reset.scss` from beside `src`
+    // (adversarial Г12), so only what npm and the builds put there is left out. Read as Sass, a plain sheet hid
+    // `//{}html{…}` the browser applies; read as it stands, its nesting (Г10, Г11): no reading is right for two
+    // languages, so any other sheet by a name Vite takes is simply not there. `100%` is no exception: Chrome takes the
+    // system's size only from a root nothing sizes.
+    const sheet = /\.(vue|css|scss|sass|pcss|postcss|sss|less|styl|stylus)$/
     const sheetsOf = (dir: URL): URL[] =>
       readdirSync(dir, { recursive: true, encoding: 'utf8' })
-        .filter((path) => /\.(vue|css|scss|sass|pcss|postcss|sss|less|styl|stylus)$/.test(path))
+        .filter((path) => sheet.test(path))
         .map((path) => new URL(path, dir))
-    const entries = [...sheetsOf(src), ...sheetsOf(at('../../public/'))]
+    const frontend = at('../../')
+    const entries = readdirSync(frontend, { withFileTypes: true })
+      .filter((entry) => !/^(node_modules|dist|dist-e2e|dev-dist|coverage)$/.test(entry.name))
+      .flatMap((entry) =>
+        entry.isDirectory()
+          ? sheetsOf(new URL(`${entry.name}/`, frontend))
+          : sheet.test(entry.name)
+            ? [new URL(entry.name, frontend)]
+            : [],
+      )
     expect(entries.length).toBeGreaterThan(50)
     const scss = (file: URL): boolean => /\.(vue|scss)$/.test(file.pathname)
     expect(entries.filter((file) => !scss(file)).map((file) => file.pathname)).toEqual([])
