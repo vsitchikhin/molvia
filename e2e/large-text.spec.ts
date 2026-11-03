@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
-import { setsRoot } from '@molvia/frontend/testing/root-font-size'
+import { setsRoot, zooms } from '@molvia/frontend/testing/root-font-size'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
@@ -1117,22 +1117,24 @@ test('the narrowest list cards at 100 % on a phone of 320 keep their rows', asyn
   }
 })
 
-// The system's font size is the root's whatever reaches the page (MOL-334, adversarial Г8, Г13): a sheet of `public/`
-// by a `<link>`, a `.css` or a partial a script imports, a nested rule of plain CSS, a package beside the module, a
-// link in it, a `<style>` a template renders — each ways past a guard that reads the sources by where they lie. So the
-// outcome is read here, by the rule `useLargeText.test.ts` reads the sources by: every sheet the build made, whatever
-// it imported, and every sheet of the page as the browser holds it — under a media query or a state the page is not
-// in too — and the browser's own size set apart from 16, the root's the same with every sheet and its `style` as with
-// none.
+// The system's font size is the root's, and reaches the eye, whatever reaches the page (MOL-334, adversarial Г8, Г13,
+// Г14, Г15): a sheet of `public/` by a `<link>`, a `.css` or a partial a script imports, a nested rule of plain CSS, a
+// package beside the module, a link in it, a `<style>` a template renders, a sheet it imports — each ways past a guard
+// that reads the sources by where they lie. So the outcome is read here, by the rule `useLargeText.test.ts` reads the
+// sources by: every sheet the build made, whatever it imported, and every sheet of the page as the browser holds it,
+// its imports opened — under a media query or a state the page is not in too — with no `zoom`, which draws large
+// text back at 100 % with the root untouched; and the browser's own size set apart from 16, the root's the same with
+// every sheet and its `style` as with none, and no element of the page drawn zoomed.
 test('the system’s font size is the root’s, whatever reaches the page', async ({ page }) => {
   test.setTimeout(60_000)
+  const holdsBack = (css: string): boolean => setsRoot(css) || zooms(css)
   // The build of this run, made before any test by the preview's server (`playwright.config.ts`).
   const built = new URL('../frontend/dist-e2e/', import.meta.url)
   const bundle = readdirSync(built, { recursive: true, encoding: 'utf8' }).filter((path) =>
     path.endsWith('.css'),
   )
   expect(bundle.length).toBeGreaterThan(0)
-  expect(bundle.filter((path) => setsRoot(readFileSync(new URL(path, built), 'utf8')))).toEqual([])
+  expect(bundle.filter((path) => holdsBack(readFileSync(new URL(path, built), 'utf8')))).toEqual([])
   const browser = await page.context().newCDPSession(page)
   await browser.send('Page.setFontSizes', { fontSizes: { standard: 20 } })
   await page.setViewportSize({ width: 320, height: 720 })
@@ -1146,26 +1148,47 @@ test('the system’s font size is the root’s, whatever reaches the page', asyn
       const authored = size()
       const style = html.getAttribute('style')
       const sheets = [...document.styleSheets].filter((sheet) => !sheet.disabled)
-      // A sheet whose rules the page may not read is one this test cannot vouch for: named, never passed.
-      const texts = sheets.map((sheet) => {
+      // A sheet whose rules the page may not read is one this test cannot vouch for: refused, never passed — an
+      // import is read through to its own sheet (Г14), whose `cssText` names only its address.
+      const refused = ':root { font-size: 0 }'
+      const textOf = (sheet: CSSStyleSheet): string => {
         try {
-          return [...sheet.cssRules].map((rule) => rule.cssText).join('\n')
+          return [...sheet.cssRules]
+            .map((rule) =>
+              rule instanceof CSSImportRule
+                ? rule.styleSheet
+                  ? textOf(rule.styleSheet)
+                  : refused
+                : rule.cssText,
+            )
+            .join('\n')
         } catch {
-          return `/* unreadable: ${sheet.href ?? 'a sheet'} */ :root { font-size: 0 }`
+          return refused
         }
-      })
+      }
+      const texts = sheets.map((sheet, at) => ({
+        where: sheet.href ?? `<style> ${String(at)}`,
+        css: textOf(sheet),
+      }))
+      const zoomed = [...document.querySelectorAll('*')]
+        .filter((element) => element.currentCSSZoom !== 1)
+        .map((element) => element.tagName)
       for (const sheet of sheets) sheet.disabled = true
       html.removeAttribute('style')
       const own = size()
       for (const sheet of sheets) sheet.disabled = false
       if (style !== null) html.setAttribute('style', style)
-      return { authored, own, texts }
+      return { authored, own, texts, zoomed }
     })
     expect(root.texts.length, path).toBeGreaterThan(0)
-    expect(root.texts.filter(setsRoot), path).toEqual([])
-    expect({ authored: root.authored, own: root.own }, path).toEqual({
+    expect(
+      root.texts.filter(({ css }) => holdsBack(css)).map(({ where }) => where),
+      path,
+    ).toEqual([])
+    expect({ authored: root.authored, own: root.own, zoomed: root.zoomed }, path).toEqual({
       authored: '20px',
       own: '20px',
+      zoomed: [],
     })
   }
 })
