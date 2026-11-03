@@ -627,7 +627,9 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     its figures do, not to the sign's share — 12 px beside 15 at 200 %. Twelve months of a chart narrower than
     14rem are named by every other month's letter over its own column and the empty one — at 200 % a label had
     9 px, a letter alone is 20 — and the chosen month by its own letter wherever it stands, its neighbours' giving it
-    room (adversarial К3). **The prices, named:** a name typed in a text field (an account's, a category's)
+    room (adversarial К3). **The prices, named:** at 200 % on 320 an amount of four figures and more typed in `AppField size="entry"` is
+    smaller than at 100 % — «42000» 29 px for 40 — since the sheet's and the well's edges and the sign beside it grow
+    with the text and leave the figures 92 px of 192; it is never cut (MOL-334, adversarial Г23, owner's В-9 «а»); a name typed in a text field (an account's, a category's)
     scrolls inside it as any field does; the pinned copy of a screen's title in the top bar ends in «…», as iOS's;
     at 200 % a word wider than its line breaks with a hyphen from six letters — since MOL-334 wherever words are, before it a screen's title alone (adversarial Л5: «Устройст|ва» at 150 %); Safari knows no limit and hyphenates any word at a line's end. **A word of another script in a Russian title** — «Telegram» of «Бот в Telegram», a bank «Raiffeisen», «Ամերիաբանկ» — has no dictionary of the document's language and still breaks without a hyphen at large text, as on master (adversarial М2, Н3): saying each word in its own `lang` was tried and taken back — it split a letter from its combining mark («Poš̌tanska», at 100 % on every screen) and a word's voice in two (Н1, Н2), and a hyphen in «Tele-gram» was never shown; at 100 % on 320 a
     month's label «июл» is 4 px wider than its column, as on master.
