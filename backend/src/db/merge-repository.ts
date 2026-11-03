@@ -1012,7 +1012,9 @@ export function createMergeRepository(db: Conn): MergeRepository {
                         ${before.lastPickedAt}::timestamptz, ${before.admits})
                 on conflict do nothing`)
               // Picked since by another trace, of a merge still standing (П1 of round 16): the share above
-              // keeps the row's moment right after this merge, and takes the survivor's own instead.
+              // keeps the row's moment right after this merge, and takes the survivor's own instead. Added
+              // picks are above only from a later merge: an earlier one's keep the same moment where the
+              // survivor's own pick was the last, and its «own word» is below this trace's (Р1 of round 17).
               if (keptLast !== null) {
                 await tx.execute(sql`
                   update catalogue_merge_moves o
@@ -1020,8 +1022,8 @@ export function createMergeRepository(db: Conn): MergeRepository {
                         'keptLastPickedAt', ${keptLast}::text, 'keptAdmits', ${keptAdmits})
                   from catalogue_merges l
                   where l.id = o.merge_id and l.undone_at is null and o.merge_id <> ${id}
-                    and o.what in ('pick_added', 'pick_written') and o.actor_id = ${move.actor_id}
-                    and o.key->>'queryKey' = ${key.queryKey}
+                    and (o.what = 'pick_written' or (o.what = 'pick_added' and o.merge_id > ${id}))
+                    and o.actor_id = ${move.actor_id} and o.key->>'queryKey' = ${key.queryKey}
                     and (o.before->>'keptLastPickedAt')::timestamptz
                         = greatest(${keptLast}::timestamptz, ${before.lastPickedAt}::timestamptz)`)
               }
