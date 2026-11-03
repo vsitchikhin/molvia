@@ -156,7 +156,7 @@ function rule(primary) {
       })
     }
 
-    if (root.source?.input.file?.endsWith('/styles/_tokens.scss')) {
+    if (root.source?.input.file === TOKENS) {
       root.walkAtRules('mixin', (mixin) => {
         if (!mixin.params.startsWith('dark-scheme')) return
         mixin.walkDecls((decl) => {
