@@ -1737,7 +1737,7 @@
       },
       "ratings": {
         "term": "Ratings and reviews",
-        "text": "Only you see your review. Others see a rating only inside an average of three people. A rating you withdrew stays with us as a row without its review — why is said under «Statistics — with your consent»."
+        "text": "Only you see your review. Others see a rating only inside an average of three people. A rating you withdrew stays with us as a row without its review — why is said under «Statistics — with your consent». If two item cards turned out to be one and were merged, and a rating given by the old card landed over your rating of the other, the earlier one — its score and dates, without the review — is kept while the merge can be undone: undoing it brings that rating back."
       },
       "reminders": {
         "term": "Rating reminders",
@@ -1837,7 +1837,7 @@
     },
     "copy": {
       "title": "A copy of your data",
-      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked, the receipts read — without their photos — and your messages to the developer — without their screenshots. A rating you withdrew is there too: without its review it stays with us — why is said under «Statistics — with your consent». What you removed and can still bring back is there as well, marked. The file holds no login keys."
+      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked, the receipts read — without their photos — your messages to the developer — without their screenshots — and the earlier ratings kept until a merge is undone. A rating you withdrew is there too: without its review it stays with us — why is said under «Statistics — with your consent». What you removed and can still bring back is there as well, marked. The file holds no login keys."
     },
     "erase": {
       "title": "Delete everything",

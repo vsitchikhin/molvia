@@ -80,7 +80,13 @@ export async function startTrip(
     const snapshot = await tripRateOn(repositories, actor, context, rateDay)
     const { trip, created } = await repositories.trips.start(
       actor.id,
-      { id: body.id, placeId: place.id, startedOn },
+      {
+        id: body.id,
+        placeId: place.id,
+        startedOn,
+        // a shop named by a trace's name, for the undo of its merge (MOL-299, Б3)
+        ...(place.trace === undefined ? {} : { placeAsked: place.trace }),
+      },
       context.spendCurrency,
       snapshot,
     )

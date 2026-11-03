@@ -11,6 +11,8 @@ import {
   accountTransfers,
   actors,
   budgetPlans,
+  catalogueMergeMoves,
+  catalogueMerges,
   events,
   exchangeRevisions,
   exchanges,
@@ -271,8 +273,9 @@ async function aFullLife(actorId: string, telegramUserId: number) {
   })
   const dish = await insertItem(db, { kind: 'dish', name: 'Хоровац', searchKey: 'horovac' })
   const venue = await insertPlace(db, { kind: 'venue', name: 'Кафе у рынка' })
+  const rated = randomUUID()
   await db.insert(verdicts).values([
-    { id: randomUUID(), actorId, itemId, itemKind: 'product', score: 4, review: 'Солёный' },
+    { id: rated, actorId, itemId, itemKind: 'product', score: 4, review: 'Солёный' },
     {
       id: randomUUID(),
       actorId,
@@ -286,6 +289,26 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     },
   ])
   await db.insert(searchPicks).values({ actorId, queryKey: 'sir', itemId, admits: true })
+  // Their own verdict written over by a twin's id after a merge, kept for the undo (MOL-299).
+  const twin = await insertItem(db, { name: 'Сыр Лори копчёны', searchKey: 'sir lori kopcheni' })
+  const [merge] = await db
+    .insert(catalogueMerges)
+    .values({ subject: 'item', fromItem: twin, intoItem: itemId, by: 'hand' })
+    .returning({ id: catalogueMerges.id })
+  await db.insert(catalogueMergeMoves).values({
+    mergeId: merge?.id ?? 0,
+    what: 'verdict_overwritten',
+    key: { id: rated, at: at(5).toISOString() },
+    before: {
+      score: 5,
+      ratedAt: at(0).toISOString(),
+      updatedAt: at(1).toISOString(),
+      deletedAt: at(2).toISOString(),
+      withdrew: false,
+      reviewChanged: false,
+    },
+    actorId,
+  })
   // One of every kind the log knows: a kind whose payload the file refuses fails here, not on
   // the person's copy (review 21).
   await db
@@ -547,6 +570,7 @@ describe('состав экспорта — один источник правд
       fromAccountId: accounts,
       toAccountId: accounts,
       transferId: ids(wire.transfers),
+      verdictId: ids(wire.verdicts),
     }
     const references = referencesIn(wire)
     expect(new Set(references.map(({ key }) => key))).toEqual(new Set(Object.keys(within)))

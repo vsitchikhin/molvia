@@ -17,7 +17,7 @@ import { kindAt } from './kind-word'
 import { idOrNull, rowLimit } from './rows'
 import { expenses, identityOf, items, placeIdentity, places, trips, verdicts } from './schema'
 import { forgetWordsOf } from './store-memory-repository'
-import { liveItemId } from './trace'
+import { liveItemId, noteTraceWrite } from './trace'
 
 /** An expense to add, named by the device that adds it (MOL-21, В-2). */
 export type ExpenseToAdd = NewExpense & { readonly id: string }
@@ -617,7 +617,13 @@ export function createExpenseRepository(db: Conn): ExpenseRepository {
             })
             .onConflictDoNothing({ target: expenses.id })
             .returning()
-          if (row) return { expense: toExpense(row), created: true }
+          if (row) {
+            // By a trace's id: its merge writes it down, and an undo takes it home (MOL-299, А2).
+            if (row.itemId !== input.itemId.toLowerCase()) {
+              await noteTraceWrite(tx, 'item', input.itemId, 'expense', { id: row.id })
+            }
+            return { expense: toExpense(row), created: true }
+          }
 
           // Nothing was written, so the identifier is taken. Read back under the owner's trip
           // rather than by the identifier alone: `DO NOTHING` says only that *some* row holds

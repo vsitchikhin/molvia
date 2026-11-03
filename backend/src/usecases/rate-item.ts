@@ -33,7 +33,8 @@ export async function rateItem(
   const item = await items.byId(itemId)
   if (!item) throw new DomainError(ERROR.NOT_FOUND)
 
-  // The item read, not the id asked: an id from before a merge rates the survivor (MOL-106).
+  // The item read, not the id asked: an id from before a merge rates the survivor (MOL-106), and the id
+  // asked goes along, for the undo to take a first verdict home (MOL-299, А2).
   const input = parseBody(newVerdictSchemaFor(item.kind), { ...rating, itemId: item.id })
-  return verdicts.put(actorId, input)
+  return verdicts.put(actorId, input, itemId)
 }

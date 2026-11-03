@@ -1,5 +1,8 @@
 import { sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
+import type { MergeSubject } from '@molvia/model'
+import type { Conn } from './index'
+import type { MergeMove } from './schema'
 
 /**
  * The item an id stands for now (MOL-106): the survivor of the merge it went into, else itself. An id a
@@ -14,4 +17,351 @@ export function liveItemId(id: string | SQL): SQL {
 /** The place an id stands for now — a trace's survivor, as an item's (MOL-106). */
 export function livePlaceId(id: string | SQL): SQL {
   return sql`coalesce((select merged_into from places where id = ${id}::uuid), ${id}::uuid)`
+}
+
+/**
+ * A row written by a trace's id after its merge — a purchase queued before the night, a bot's button —
+ * lands on the survivor by `liveItemId`, past the journal, and `unmerge` left it there for good (MOL-299,
+ * adversarial А2). So it is written down under every merge on the trace's way to the survivor, as the
+ * merge writes down what it moved: undone from the end, each step takes it one merge back, and the row
+ * goes home with the rest. Called only where the id asked for is not the row's now; an id of no trace has
+ * no way, and nothing is written.
+ */
+export async function noteTraceWrite(
+  conn: Conn,
+  subject: MergeSubject,
+  asked: string,
+  what: MergeMove,
+  key: Record<string, unknown>,
+  actorId: string | null = null,
+  /** `before` of the move; `into`: under the one merge of the way into that item, not every step. */
+  extra: { readonly before?: Record<string, unknown>; readonly into?: string } = {},
+): Promise<void> {
+  await conn.execute(sql`
+    ${wayOf(subject, asked)}
+    insert into catalogue_merge_moves (merge_id, what, key, before, actor_id)
+    select id, ${what}, ${JSON.stringify(key)}::jsonb,
+           ${extra.before === undefined ? null : JSON.stringify(extra.before)}::jsonb, ${actorId}::uuid
+    from way
+    where ${extra.into === undefined ? sql`true` : sql`next = ${extra.into}::uuid`}`)
+}
+
+/**
+ * A row a merge on the trace's way moved — or a trace's id wrote — written again by the trace's id: a pick
+ * repeated from a phone's queue, a verdict given again by a bot's button (MOL-299, adversarial В1, В2). It
+ * is still the person's word about the trace, so its moves take the row's new moment, and the undo takes
+ * it home; touched by the survivor's id it keeps the old one and stays. `refers` picks the moves out by
+ * `mv`; a row no move of the way names — the survivor's own from before — is left as it is.
+ */
+export async function restampTraceWrite(
+  conn: Conn,
+  subject: MergeSubject,
+  asked: string,
+  refers: SQL,
+  at: string,
+  /** What the latest write did, for a verdict written over (Г1, Г2): withdrew it, changed its text. */
+  how: WriteHow | null = null,
+): Promise<number> {
+  const restamped = await conn.execute(sql`
+    ${wayOf(subject, asked)}
+    update catalogue_merge_moves mv
+    set key = jsonb_set(mv.key, '{at}', to_jsonb(${at}::text)),
+        before = case when mv.what = 'verdict_overwritten' and ${how !== null}
+                      then mv.before || jsonb_build_object(
+                             'withdrew', ${how?.withdrew ?? false},
+                             'reviewChanged', (mv.before->>'reviewChanged')::boolean or ${how?.reviewChanged ?? false},
+                             'rated', coalesce((mv.before->>'rated')::boolean, false) or ${how !== null && ratedBy(how)})
+                      else mv.before end
+    where mv.merge_id in (select id from way) and ${refers}
+    returning 1`)
+  return restamped.length
+}
+
+/** Every merge still standing on the trace's way to its survivor, as the CTE `way`. */
+function wayOf(subject: MergeSubject, asked: string): SQL {
+  const from = sql.raw(subject === 'item' ? 'from_item' : 'from_place')
+  const into = sql.raw(subject === 'item' ? 'into_item' : 'into_place')
+  return sql`
+    with recursive way (id, next, depth) as (
+      select m.id, m.${into}, 1 from catalogue_merges m
+      where m.undone_at is null and m.${from} = ${asked}::uuid
+      union all
+      select m.id, m.${into}, w.depth + 1 from catalogue_merges m join way w on m.${from} = w.next
+      where m.undone_at is null
+    )`
+}
+
+/** The moves that name a verdict row: moved home whole, the survivor's side of a swap, written over. */
+export function verdictMoves(id: string): SQL {
+  return sql`((mv.what in ('verdict', 'verdict_overwritten') and mv.key->>'id' = ${id}::text)
+           or (mv.what = 'verdict_swapped' and mv.key->>'kept' = ${id}::text))`
+}
+
+/**
+ * What a trace's id did to a verdict written over: the latest write withdrew it, any changed its text, any
+ * rated it — rated and taken back is a withdrawn verdict of its own (MOL-27, И2 of round 9), a withdrawal
+ * alone none. `rated` absent: this write rated it unless it withdrew.
+ */
+export interface WriteHow {
+  readonly withdrew: boolean
+  readonly reviewChanged: boolean
+  readonly rated?: boolean
+}
+
+function ratedBy(how: WriteHow): boolean {
+  return how.rated ?? !how.withdrew
+}
+
+/** A verdict row as it stood before a write by a trace's id, never its text (MOL-299, Г1, Г2). */
+export interface VerdictBefore {
+  readonly score: number
+  readonly ratedAt: string
+  readonly updatedAt: string
+  readonly deletedAt: string | null
+}
+
+/**
+ * A verdict a trace's id wrote again after its merge (MOL-299). A row whose first move on the way came from
+ * the trace itself is the trace's: its moves take the write's moment and the undo takes it home (В1, В2).
+ * Any other holds a word about another item — the survivor's own from before, or one a merge of the way
+ * brought from the middle of a chain — which the write just put the trace's word over (Г1, Г2): its moves
+ * take the moment too, so they still carry it home, and the merge into the survivor keeps what it said.
+ * That undo puts it back and gives the word to its younger, and where that is not yet the trace, writes it
+ * there as the trace's id would, so the chain's next undo carries it on (№11, Д1 of round 5). The person's
+ * id goes with it, so the move goes with the person, and the copy carries it.
+ */
+export async function verdictWrittenByTrace(
+  conn: Conn,
+  asked: string,
+  row: { readonly id: string; readonly actorId: string; readonly touched: string },
+  before: VerdictBefore,
+  how: WriteHow,
+): Promise<void> {
+  const [first] = await conn.execute<{ what: string; home: string; merge: string }>(sql`
+    ${wayOf('item', asked)}
+    select mv.what, m.from_item as home, m.id::text as merge
+    from way w
+    join catalogue_merges m on m.id = w.id
+    join catalogue_merge_moves mv on mv.merge_id = w.id
+    where ${verdictMoves(row.id)}
+    -- a word written over already beside the move that brought the row, on the same step (№13)
+    order by w.depth, mv.what = 'verdict_overwritten' desc
+    limit 1`)
+  if (first?.what === 'verdict_overwritten') await liftOverwritten(conn, asked, row.id, before)
+  // its own row, which its merge brought, another trace's word over it since: this word goes on top (Ч1)
+  if (first?.what === 'verdict' && first.home === asked.toLowerCase()) {
+    const [over] = await conn.execute<{ one: number }>(sql`
+      ${wayOf('item', asked)}
+      select 1 as one from catalogue_merge_moves o
+      join catalogue_merges l on l.id = o.merge_id
+      where l.undone_at is null and o.merge_id not in (select id from way)
+        and o.what = 'verdict_overwritten' and o.key->>'id' = ${row.id}::text
+      limit 1`)
+    if (over !== undefined) {
+      await conn.execute(sql`
+        insert into catalogue_merge_moves (merge_id, what, key, before, actor_id)
+        values (${first.merge}::bigint, 'verdict_overwritten',
+                ${JSON.stringify({ id: row.id, at: row.touched, asked: asked.toLowerCase() })}::jsonb,
+                ${JSON.stringify({ ...before, ...how, rated: ratedBy(how) })}::jsonb, ${row.actorId}::uuid)`)
+      return
+    }
+  }
+  await restampTraceWrite(conn, 'item', asked, verdictMoves(row.id), row.touched, how)
+  // written over once already, its first `before` stands; or the trace's own
+  if (first?.what === 'verdict_overwritten' || first?.home === asked.toLowerCase()) return
+  const [survivor] = await conn.execute<{ id: string }>(sql`
+    select coalesce(merged_into, id) as id from items where id = ${asked}::uuid`)
+  await noteTraceWrite(
+    conn,
+    'item',
+    asked,
+    'verdict_overwritten',
+    { id: row.id, at: row.touched, asked: asked.toLowerCase() },
+    row.actorId,
+    { before: { ...before, ...how, rated: ratedBy(how) }, into: survivor?.id ?? asked },
+  )
+}
+
+/**
+ * What a person's row of `into` goes back to once every share standing on it goes home — its «own word» and
+ * its last pick, as those shares keep them; null with none (MOL-299, С1 of round 18, Х1 of round 22). Every
+ * share of a row keeps the same own, never the row's whole flag or moment: those hold the shares below, and
+ * the undo of one left them in the rest — or, a share grown since, found the row at no moment it waited for.
+ */
+const keptOf = (aggregate: SQL, into: SQL, actorId: SQL, queryKey: SQL): SQL => sql`(
+  select ${aggregate}
+  from catalogue_merge_moves mv
+  join catalogue_merges m on m.id = mv.merge_id
+  where m.undone_at is null and m.into_item = ${into} and mv.what in ('pick_added', 'pick_written')
+    and mv.actor_id = ${actorId} and mv.key->>'queryKey' = ${queryKey})`
+
+export const keptAdmitsOf = (into: SQL, actorId: SQL, queryKey: SQL): SQL =>
+  keptOf(sql`bool_and((mv.before->>'keptAdmits')::boolean)`, into, actorId, queryKey)
+
+export const keptLastOf = (into: SQL, actorId: SQL, queryKey: SQL): SQL =>
+  keptOf(sql`max((mv.before->>'keptLastPickedAt')::timestamptz)`, into, actorId, queryKey)
+
+/**
+ * A word written over by a trace's id again, another trace's word over its own since (MOL-299, Ц1 of round 23):
+ * the trace's move leaves the middle of the row's stack for its top, as the undo splices one out — the move over
+ * it takes what lay under it, and it takes what the row said before this write. Left where it was, its moment
+ * moved past the other's, and neither undo found the row at the word it waited for: the false twin's lost.
+ */
+async function liftOverwritten(
+  conn: Conn,
+  asked: string,
+  rowId: string,
+  before: VerdictBefore,
+): Promise<void> {
+  const said = sql`jsonb_build_object('score', l.was->'score', 'ratedAt', l.was->'ratedAt',
+                                      'updatedAt', l.was->'updatedAt', 'deletedAt', l.was->'deletedAt')`
+  await conn.execute(sql`
+    ${wayOf('item', asked)},
+    lifted as (
+      select mv.merge_id, mv.before as was, o.merge_id as above
+      from catalogue_merge_moves mv
+      join catalogue_merge_moves o on o.what = 'verdict_overwritten' and o.key->>'id' = mv.key->>'id'
+      join catalogue_merges l on l.id = o.merge_id
+      where mv.merge_id in (select id from way) and mv.what = 'verdict_overwritten'
+        and mv.key->>'id' = ${rowId}::text
+        and l.undone_at is null and o.merge_id not in (select id from way)
+        and (o.key->>'at')::timestamptz > (mv.key->>'at')::timestamptz
+        and (o.before->>'updatedAt')::timestamptz = (mv.key->>'at')::timestamptz
+    ),
+    handed as (
+      update catalogue_merge_moves o
+      set before = o.before || ${said}
+      from lifted l
+      where o.merge_id = l.above and o.what = 'verdict_overwritten' and o.key->>'id' = ${rowId}::text
+      returning 1
+    )
+    update catalogue_merge_moves mv
+    set before = mv.before || ${JSON.stringify(before)}::jsonb
+    from lifted l
+    where mv.merge_id = l.merge_id and mv.what = 'verdict_overwritten' and mv.key->>'id' = ${rowId}::text`)
+  // A trace's own word over the row its merge brought (Ч1), right on that row now: one word of the trace,
+  // never two — the merge's `verdict` takes its moment, and the move goes (Ш1 of round 25).
+  await conn.execute(sql`
+    with own as (
+      select o.merge_id, o.key->'at' as at
+      from catalogue_merge_moves o
+      join catalogue_merges l on l.id = o.merge_id
+      join catalogue_merge_moves v on v.merge_id = o.merge_id and v.what = 'verdict'
+                                   and v.key->>'id' = o.key->>'id'
+      where l.undone_at is null and o.what = 'verdict_overwritten' and o.key->>'id' = ${rowId}::text
+        and o.key->>'asked' = l.from_item::text
+        and (o.before->>'updatedAt')::timestamptz = (v.key->>'at')::timestamptz
+    ),
+    restamped as (
+      update catalogue_merge_moves v
+      set key = jsonb_set(v.key, '{at}', own.at)
+      from own
+      where v.merge_id = own.merge_id and v.what = 'verdict' and v.key->>'id' = ${rowId}::text
+      returning 1
+    )
+    delete from catalogue_merge_moves o
+    using own
+    where o.merge_id = own.merge_id and o.what = 'verdict_overwritten' and o.key->>'id' = ${rowId}::text`)
+}
+
+/** A pick row as it stood before a trace's id added to it (MOL-299, К1). */
+export interface PickBefore {
+  readonly lastPickedAt: string
+  readonly admits: boolean
+}
+
+/**
+ * A pick a trace's id wrote after its merge. A new row is the trace's, noted under every merge of its way
+ * (А2); one a move of the way names is the trace's too, and takes the moment (В1). Any other — the survivor's
+ * own from before, or one another merge brought into it — got the trace's picks added (К1, owner's В-11 «б»):
+ * the merge into the survivor keeps the trace's share and the row's own as every share of the row keeps it
+ * (Х1), the share growing with every later pick by that id, and the undo takes the share home. A row the merge added the trace's own picks
+ * to (`pick_added`) grows that share instead: one snapshot of the row before the trace, never two (Л1).
+ */
+export async function pickWrittenByTrace(
+  conn: Conn,
+  asked: string,
+  actorId: string,
+  queryKey: string,
+  at: string,
+  prior: PickBefore | null,
+  share: { readonly picks: number; readonly admits: boolean },
+): Promise<void> {
+  if (prior === null) {
+    await noteTraceWrite(conn, 'item', asked, 'pick', { queryKey, at }, actorId)
+    return
+  }
+  const mine = sql`mv.actor_id = ${actorId}::uuid and mv.key->>'queryKey' = ${queryKey}`
+  if ((await restampTraceWrite(conn, 'item', asked, sql`mv.what = 'pick' and ${mine}`, at)) > 0) {
+    // the row its merge brought is the trace's own, so the shares standing on it keep this as such (Т1)
+    const [survivor] = await conn.execute<{ id: string }>(sql`
+      select coalesce(merged_into, id) as id from items where id = ${asked}::uuid`)
+    if (survivor !== undefined)
+      await pickWrittenBySurvivor(conn, survivor.id, actorId, queryKey, at, share.admits)
+    return
+  }
+  const added = await conn.execute(sql`
+    ${wayOf('item', asked)}
+    update catalogue_merge_moves mv
+    set key = jsonb_set(mv.key, '{at}', to_jsonb(${at}::text)),
+        before = mv.before || jsonb_build_object(
+          'picks', (mv.before->>'picks')::int + ${share.picks},
+          'lastPickedAt', ${at}::text,
+          'admits', (mv.before->>'admits')::boolean or ${share.admits})
+    where mv.merge_id in (select id from way) and mv.what in ('pick_added', 'pick_written') and ${mine}
+    returning 1`)
+  if (added.length > 0) return
+  const [survivor] = await conn.execute<{
+    id: string
+    kept: boolean | null
+    keptLast: string | null
+  }>(sql`
+    select coalesce(i.merged_into, i.id) as id,
+           ${keptAdmitsOf(sql`coalesce(i.merged_into, i.id)`, sql`${actorId}::uuid`, sql`${queryKey}`)} as kept,
+           ${keptLastOf(sql`coalesce(i.merged_into, i.id)`, sql`${actorId}::uuid`, sql`${queryKey}`)}::text
+             as "keptLast"
+    from items i where i.id = ${asked}::uuid`)
+  await noteTraceWrite(
+    conn,
+    'item',
+    asked,
+    'pick_written',
+    { queryKey, at, asked: asked.toLowerCase() },
+    actorId,
+    {
+      before: {
+        picks: share.picks,
+        lastPickedAt: at,
+        admits: share.admits,
+        keptLastPickedAt: survivor?.keptLast ?? prior.lastPickedAt,
+        keptAdmits: survivor?.kept ?? prior.admits,
+      },
+      into: survivor?.id ?? asked,
+    },
+  )
+}
+
+/**
+ * A pick by the survivor's own id of a row traces' shares stand on (MOL-299, М1, Н1) — or by the id of the trace
+ * whose row a merge brought there (Т1): the row's own is that one now, so every share of a merge into it keeps it
+ * as what the row goes back to once the share goes home.
+ * Read from no moment of the row: in a fan, another trace's pick moves it as well.
+ */
+export async function pickWrittenBySurvivor(
+  conn: Conn,
+  itemId: string,
+  actorId: string,
+  queryKey: string,
+  at: string,
+  admits: boolean,
+): Promise<void> {
+  await conn.execute(sql`
+    update catalogue_merge_moves mv
+    set before = mv.before || jsonb_build_object(
+          'keptLastPickedAt', ${at}::text,
+          'keptAdmits', coalesce((mv.before->>'keptAdmits')::boolean, false) or ${admits})
+    from catalogue_merges m
+    where m.id = mv.merge_id and m.undone_at is null and m.into_item = ${itemId}::uuid
+      and mv.what in ('pick_added', 'pick_written') and mv.actor_id = ${actorId}::uuid
+      and mv.key->>'queryKey' = ${queryKey}`)
 }

@@ -7,6 +7,7 @@ import {
   accountTransfers,
   actors,
   budgetPlans,
+  catalogueMergeMoves,
   events,
   exchangeRevisions,
   exchanges,
@@ -586,14 +587,14 @@ export const EXPORT_COLUMNS: Readonly<
   // person wrote, to whichever item (MOL-100) — the second is theirs, as an item's author is.
   item_barcodes: { exported: ['code', 'item_id', 'added_at'], omitted: { added_by: OWNER } },
   // The journal of the merge of twins (MOL-106): a remembered pick that moved, kept only so that
-  // `make unmerge` can move it back — the pick itself is in `searchPicks`.
+  // `make unmerge` can move it back — the pick itself is in `searchPicks` — and one's own verdict a
+  // twin's id wrote over, kept for the undo (MOL-299): that one is the person's, in `overwrittenVerdicts`.
+  // `key` and `before` go into the file of that kind of row alone; of a pick they are its pick.
   catalogue_merge_moves: {
-    exported: [],
+    exported: ['key', 'before'],
     omitted: {
       merge_id: 'a number of the catalogue’s journal, about an item, not the person',
-      what: 'the kind of row the merge moved — the moved pick is in searchPicks',
-      key: 'the query the moved pick was remembered under — the pick is in searchPicks',
-      before: 'what the pick held before the merge, for the undo alone',
+      what: 'the kind of row: a verdict written over is in overwrittenVerdicts, a moved pick in searchPicks',
       actor_id: OWNER,
     },
   },
@@ -650,6 +651,23 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(verdicts)
             .where(eq(verdicts.actorId, actorId))
             .orderBy(asc(verdicts.ratedAt), asc(verdicts.id))
+          const journal = catalogueMergeMoves
+          const overwrittenRows = await tx
+            .select({
+              verdictId: sql<string>`${journal.key}->>'id'`,
+              score: sql<number>`(${journal.before}->>'score')::int`,
+              ratedAt: sql`(${journal.before}->>'ratedAt')::timestamptz`.mapWith(verdicts.ratedAt),
+              updatedAt: sql`(${journal.before}->>'updatedAt')::timestamptz`.mapWith(
+                verdicts.updatedAt,
+              ),
+              withdrawnAt: sql`(${journal.before}->>'deletedAt')::timestamptz`.mapWith(
+                verdicts.deletedAt,
+              ),
+              overwrittenAt: sql`(${journal.key}->>'at')::timestamptz`.mapWith(verdicts.updatedAt),
+            })
+            .from(journal)
+            .where(and(eq(journal.actorId, actorId), eq(journal.what, 'verdict_overwritten')))
+            .orderBy(asc(journal.mergeId), asc(sql`${journal.key}->>'id'`))
           const pickRows = await tx
             .select()
             .from(searchPicks)
@@ -1035,6 +1053,7 @@ export function createExportRepository(db: Db): ExportRepository {
               updatedAt: row.updatedAt,
               withdrawnAt: row.deletedAt,
             })),
+            overwrittenVerdicts: overwrittenRows,
             searchPicks: pickRows.map((row) => ({
               queryKey: row.queryKey,
               itemId: row.itemId,

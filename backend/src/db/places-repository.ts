@@ -8,8 +8,12 @@ import { identityOf, placeIdentity, places, trips } from './schema'
 import { livePlaceId } from './trace'
 
 export interface PlaceRepository {
-  /** The place that is already there, or a new one — never a second card for one shop. */
-  ensure(input: NewPlace): Promise<Place>
+  /**
+   * The place that is already there, or a new one — never a second card for one shop. A trace's name is
+   * its survivor, with the trace's id beside it (`trace`): what is written there goes home with an undo
+   * of the merge (MOL-299, Б3).
+   */
+  ensure(input: NewPlace): Promise<Place & { readonly trace?: string }>
   /** The place an id stands for: through the trace of a merge to its survivor (MOL-106). */
   byId(id: string): Promise<Place | null>
   byIds(ids: readonly string[]): Promise<Place[]>
@@ -74,7 +78,7 @@ export function createPlaceRepository(db: Conn): PlaceRepository {
         if (row.mergedInto === null) return toPlace(row)
         const [survivor] = await tx.select().from(places).where(eq(places.id, row.mergedInto))
         if (!survivor) throw new Error('a place merged into nothing')
-        return toPlace(survivor)
+        return { ...toPlace(survivor), trace: row.id }
       })
     },
 
