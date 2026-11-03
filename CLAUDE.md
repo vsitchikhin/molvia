@@ -637,7 +637,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   column of `auto` takes the least width of what stands in it, and a name is forty letters of one word.
 - **Nor does large text, anywhere in the app** (MOL-321, MOL-334): Android's 150 % and 200 % on 320 stand within the
   phone (`e2e/large-text.spec.ts`), and the system's font size is the root's (`<meta name="text-scale">`, Chrome 146+,
-  owner's В-1 «а»), so no stylesheet sets the root's `font-size`. A row of segments its words do not fit stands them
+  owner's В-1 «а»), so no stylesheet sets the root's `font-size`, nor draws the text back with `zoom`. A row of segments its words do not fit stands them
   one under another, the word whole; what stands beside something turns by `@container` in `rem`; a card's figure
   shrinks to its card by its length (`figure-fit`), and a sum never breaks; a line wraps only where the least widths do
   not fit; a word wider than its line breaks (`overflow-wrap: break-word` on `body`), and only while the text is large
