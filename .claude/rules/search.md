@@ -850,18 +850,24 @@ report.
   the person's, in their copy (`overwrittenVerdicts`, version 27), gone with them by the cascade, and gone
   with the undo. It is kept by the merge into the survivor; on a chain the word goes to that merge's younger
   and is written there as the trace's id would write it, so the next undo carries it on and the whole chain
-  undone gives it to the trace (№11, Д1 of round 5). **In a fan the moment orders the undo** (№10, Д2): a
-  merge waits while another one standing has a word written over a row this one names, later than this
-  one's last word about it (`chained`) — the earlier merge's trace may write over a row the later merge
-  brought, and undone the other way round the word of one twin stayed on the survivor for good. **The prices, named:** the trace's own score is lost where the person rated the survivor over it
-  by the survivor's id (the row was one: their own act), and the trace's row so kept holds the survivor's
+  undone gives it to the trace (№11, Д1 of round 5). **In a fan any order undoes it** (№10, Д2, Е1 of round 6):
+  the earlier merge's trace may write over a row the later merge brought, or over a word another trace wrote,
+  so a verdict's move may find its row at another word. It does nothing then and waits in the journal; the undo
+  that gives the row back its word at that moment — the other merge's — does it on the spot (`resume`), and
+  the word of each twin lands on it whichever goes first. An order by the moment was tried first and refused
+  both undos for good where two people wrote each by the other's trace (adversarial Е1).
+  **The prices, named:** the trace's own score is lost where the person rated the survivor over it by the
+  survivor's id (the row was one: their own act), and the trace's row so kept holds the survivor's
   old score with its `rated_at`, withdrawn — the gate, the reminder and the copy read it (Б4); a text the
   trace's id wrote over is not given back; an **item** written by a
   trace's name — «Предложить товар», a receipt's new line — stays with the survivor, the name being the
   survivor's second (В-7 «а»: the search shows the survivor, so it is rare); a pick of the survivor's own
   from before that the trace's id added to stays where it is; a write by a trace that an
   `unmerge` commits between its row and its note stays with the survivor too (Б5, owner's В-8 «а»: the
-  owner's hand once a morning against milliseconds); a word of the shop's memory settled again after a
+  owner's hand once a morning against milliseconds); in a fan, a trace's word written over by another
+  trace's id and then by its own again is not given back — the later write takes the move's moment past the
+  other's, so neither undo finds the row at it (№14 of the self-review, round 6); a word of the shop's memory
+  settled again after a
   purchase removed (`settleWords`, MOL-240) takes another moment and stays with the survivor while its
   purchase goes home — the memory says the survivor until the API's next start settles it whole (№9 of
   the self-review, owner's В-9 «а»); and a move written before MOL-299 has no moment and goes back as it

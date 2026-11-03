@@ -128,7 +128,8 @@ export async function verdictWrittenByTrace(
     join catalogue_merges m on m.id = w.id
     join catalogue_merge_moves mv on mv.merge_id = w.id
     where ${verdictMoves(row.id)}
-    order by w.depth
+    -- a word written over already beside the move that brought the row, on the same step (№13)
+    order by w.depth, mv.what = 'verdict_overwritten' desc
     limit 1`)
   await restampTraceWrite(conn, 'item', asked, verdictMoves(row.id), row.touched, how)
   // written over once already, its first `before` stands; or the trace's own
