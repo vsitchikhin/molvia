@@ -494,9 +494,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   **The system's font size is the rem** (owner's В-1 «а»): `<meta name="text-scale" content="scale">` in `index.html`
   makes Chrome 146+ set 1rem by Android's font size and turn its own page zoom and text autosizing off — the very model
   every spec measures by; without it a phone's Chrome ignores the system's size. It holds only while no stylesheet sets
-  the root's `font-size`, which `useLargeText.test.ts` holds — every rule's own declarations, its selectors split,
-  comments cut and `:is()`, `:where()` opened (adversarial Г1, Г2), the ordinary spelling and not a form built to slip
-  past it; Safari passes Dynamic Type to no page. Seven ways:
+  the root's `font-size`, which `useLargeText.test.ts` holds — every sheet read as Sass writes it, so a comment,
+  `@media`, a mixin and nesting hide nothing (adversarial Г1–Г3), each selector of a list whose subject, `:not()` taken
+  out, names `html` or `:root`, the `font` shorthand too; strict, a component's scoped `html` fails as well; Safari passes
+  Dynamic Type to no page. Seven ways:
   - **A row of segments its words do not fit stands them one under another** (`SegmentedControl`, В-1 «а»):
     the word stays whole — MOL-189 holds, and now a test holds it (`kit-rows`: every word of «Как меняли» on one
     line, in both engines and languages; m7, which broke the word, went green on 66 tests before). The row is
@@ -527,7 +528,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
     the layout, never by a size nobody reads; the category stays said by its name and its bar. The words take the circle's column
     with its gap, a removed category's empty tail stays in the chevron's (self-review 5), and the plan under the
     name stands whole (`whole`): two lines held «125 403 ֏ из» and hid the plan at 200 % (adversarial Д2). **Since round 9 that is every
-    row of the kit** (self-review of round 9): every list card is `row-tight` (`AppCard list`), and below `$row-tight` (17rem since MOL-334: some 106 % on 320 and up — at 15rem, some 120 %, a row at 110–115 % kept its sum beside words of 41–57 px, «Икр / а», and a price per unit of a million shrank to 4.9 px in them, adversarial С4; the narrowest list card at 100 % on 320 is 17.88rem and keeps the row; at 130 % a
+    row of the kit** (self-review of round 9): every list card is `row-tight` (`AppCard list`), and below `$row-tight` (17rem since MOL-334: some 106 % on 320 and up — at 15rem, some 120 %, a row at 110–115 % kept its sum beside words of 41–57 px, «Икр / а», and a price per unit of a million shrank to 4.9 px in them, adversarial С4; the narrowest list card at 100 % on 320 is 17.88rem — «Категории», «Бюджет», «Счета» — and keeps the row, which `e2e/large-text.spec.ts` holds, its circle shown and its tail beside the words (self-review №7); at 130 % a
     sum of a million in the words' column stood over the circle, self-review 10) a
     row's circle gives way, its words take the circle's column, the title and the line under it are whole — no
     «…» — and the tail stands under them across the row. At 200 % the rows of «Траты», an account's operations,
@@ -610,8 +611,9 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     its look; and `hyphens: auto` on `body` under `html[data-large-text]` (`main.scss`). **`hyphens: auto` cuts any word of the length
     at a line's end, wide or not** (adversarial Х1), so where the length starts is the whole choice: in a unit of one to
     three words — a heading (`h1`–`h3`, `main.scss`), and by `@include word-unit` in its own component a row's title
-    (`ListRow`), a link row's label (`NavRow`), a button (`AppButton`), the words of a switch row («Бот», the salary's
-    day, «Учитывать меня в статистике») and a device's name — from six letters, two a side as Russian print carries them (with three «Настройки» had no place for one and broke
+    (`ListRow`), a link row's label and value (`NavRow`), a button (`AppButton`), the words of a switch row («Бот», the
+    salary's day, «Учитывать меня в статистике»), a device's name, a kind of data of «Данные и приватность» (`dt`) and a
+    name of a ring's legend (`DonutChart`, adversarial Х4) — from six letters, two a side as Russian print carries them (with three «Настройки» had no place for one and broke
     «Настро|йки»; at 200 % «Написать разработчику» read «Написа|ть разраб|отчику»); in a paragraph and a row's meta
     from twelve, inherited from `body`: from six there, «Данные и приватность» cut 394 words that would have stood
     whole at 200 % and 192 already at 115 %, from twelve 21. Each unit includes the mixin itself, so a component knows
