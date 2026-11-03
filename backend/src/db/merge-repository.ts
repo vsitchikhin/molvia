@@ -708,8 +708,9 @@ export function createMergeRepository(db: Conn): MergeRepository {
             limit 1`)
           return next?.fits === true ? next : undefined
         }
-        // The picks another trace's id added to a person's row since a move's moment, by a merge still
-        // standing (MOL-299, К1): the row held then what that share keeps as before it.
+        // The picks another trace added to a person's row since a move's moment, by a merge still standing
+        // — by its id since its merge (К1), or by a later merge itself (`pick_added`, О1 of round 15): the
+        // row held then what that share keeps as before it.
         const pickAbove = async (actorId: string, queryKey: string, at: string | number) => {
           const [next] = await tx.execute<{
             merge_id: string
@@ -721,7 +722,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
                    o.before
             from catalogue_merge_moves o
             join catalogue_merges l on l.id = o.merge_id
-            where l.undone_at is null and o.what = 'pick_written' and o.actor_id = ${actorId}::uuid
+            where l.undone_at is null and o.what in ('pick_added', 'pick_written') and o.actor_id = ${actorId}::uuid
               and o.key->>'queryKey' = ${queryKey}
               and (o.before->>'keptLastPickedAt')::timestamptz = ${at}::timestamptz
             order by o.merge_id
@@ -732,7 +733,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
         const shares = (actorId: string, queryKey: string, intoItem: string) => sql`
           from catalogue_merge_moves o
           join catalogue_merges l on l.id = o.merge_id
-          where l.undone_at is null and o.what = 'pick_written' and o.actor_id = ${actorId}::uuid
+          where l.undone_at is null and o.what in ('pick_added', 'pick_written') and o.actor_id = ${actorId}::uuid
             and o.key->>'queryKey' = ${queryKey} and l.into_item = ${intoItem}::uuid`
         // A swap whose kept row another trace's id wrote over since waits in the journal, and the undo
         // that gives the row back its word at the swap's moment does it then (MOL-299, Е1 of round 6).
@@ -909,7 +910,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 where actor_id = ${actor} and query_key = ${queryKey} and item_id = ${now}`)
               await tx.execute(sql`
                 delete from catalogue_merge_moves
-                where merge_id = ${next.merge_id} and what = 'pick_written'
+                where merge_id = ${next.merge_id} and what in ('pick_added', 'pick_written')
                   and actor_id = ${actor} and key->>'queryKey' = ${queryKey}`)
               await noteTraceWrite(
                 tx,
@@ -957,7 +958,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
                   set before = before || jsonb_build_object(
                         'keptLastPickedAt', ${before.keptLastPickedAt ?? null}::text,
                         'keptAdmits', ${before.keptAdmits ?? false})
-                  where merge_id = ${next.merge_id} and what = 'pick_written'
+                  where merge_id = ${next.merge_id} and what in ('pick_added', 'pick_written')
                     and actor_id = ${actor} and key->>'queryKey' = ${queryKey}`)
               }
               const [prior] = await tx.execute<PickBefore & Record<string, unknown>>(sql`
