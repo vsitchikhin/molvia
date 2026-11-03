@@ -67,7 +67,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/components/ReceiptSheet.vue` — Sheet «Сумма по чеку»: typed at any time into a record open or finished, «Убрать сумму»; writes to the trip queue.
 - `frontend/src/components/receipt.ts` — What was typed as «Сумма по чеку» — money above zero or nothing — and a sum put back into the field.
 - `frontend/src/components/SettingsFields.vue` — The settings fields (country, city, two currencies) with «changed» marks; shared by «Настройки» and the trip-context sheet.
-- `frontend/src/components/StartTripSheet.vue` — Sheet «Где вы?»: recent shops and a field for a new one; queues the start of a record, finishing or removing the open one first when asked to.
+- `frontend/src/components/StartTripSheet.vue` — Sheet «Где вы?»: recent shops and a field for a new one; queues the start of a record, finishing or removing the open one first when asked to; «Начать запись» is not now saying what it waits for, a name no place takes refused at the tap (MOL-354).
 - `frontend/src/components/TripContextSheet.vue` — Sheet «Уточните город и валюты записи» for a trip the old app started, holding the queue until confirmed.
 - `frontend/src/components/TripNotices.vue` — What the queue says about any record — refusals, a record open elsewhere, unsent purchases, a city to name — on «Покупки» and on the record.
 - `frontend/src/components/TripRateNotes.vue` — Notes about the rate a trip counts by: it jumped, it is not the central bank's, or the bank has been silent.
