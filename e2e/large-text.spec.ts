@@ -470,6 +470,8 @@ for (const size of ['150%', '200%'])
         'hyphenate-limit-chars',
         '6 2 2',
       )
+      // So is a sector's name by the ring of «Куда ушли», a component of its own: «Развлеч / ения» (adversarial Х5).
+      await expect(page.locator('.sector-name').first()).toHaveCSS('hyphenate-limit-chars', '6 2 2')
       // The legend of «Графики» keeps its names: with the ring in the card they were narrowed to nothing;
       // and every sum stands within the card (adversarial А3).
       await page.goto('/money/charts')

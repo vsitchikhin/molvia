@@ -287,6 +287,8 @@ export default defineComponent({
 
 /* The whole name, on as many lines as it takes (Е-19): cut, «Аренда и комм…» read as another. */
 .sector-name {
+  @include word-unit;
+
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
   overflow-wrap: anywhere;
