@@ -174,7 +174,8 @@ export interface PickBefore {
  * (А2); one a move of the way names is the trace's too, and takes the moment (В1). Any other — the survivor's
  * own from before, or one another merge brought into it — got the trace's picks added (К1, owner's В-11 «б»):
  * the merge into the survivor keeps the trace's share and what the row held before it, the share growing with
- * every later pick by that id, and the undo takes the share home.
+ * every later pick by that id, and the undo takes the share home. A row the merge added the trace's own picks
+ * to (`pick_added`) grows that share instead: one snapshot of the row before the trace, never two (Л1).
  */
 export async function pickWrittenByTrace(
   conn: Conn,
@@ -200,7 +201,7 @@ export async function pickWrittenByTrace(
           'picks', (mv.before->>'picks')::int + ${share.picks},
           'lastPickedAt', ${at}::text,
           'admits', (mv.before->>'admits')::boolean or ${share.admits})
-    where mv.merge_id in (select id from way) and mv.what = 'pick_written' and ${mine}
+    where mv.merge_id in (select id from way) and mv.what in ('pick_added', 'pick_written') and ${mine}
     returning 1`)
   if (added.length > 0) return
   const [survivor] = await conn.execute<{ id: string }>(sql`

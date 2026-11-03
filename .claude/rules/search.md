@@ -833,7 +833,9 @@ report.
   keeps how many, their last moment and «own word», and what the row held before them; the undo takes the
   share home, and the row is back at what it held — or, picked since by another trace's id, the next share
   keeps that instead, and a row a merge brought goes home at what is left of it once every share standing is
-  taken out, the rest that trace's first pick (as `above` for a verdict, any order, one merge alone too).
+  taken out, the rest that trace's first pick (as `above` for a verdict, any order, one merge alone too). A pick by the trace's
+  id on a row its merge added the trace's own picks to (`pick_added`) grows that share instead: one snapshot of
+  the row before the trace, never two that restore it against each other (Л1 of round 12).
   **A verdict, a pick or a word the person touched since
   stays**
   (adversarial А3): rated, amended or withdrawn on the survivor, it is their word about the survivor, and
