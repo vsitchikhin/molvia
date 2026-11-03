@@ -104,16 +104,30 @@ describe('the system’s font size (MOL-334)', () => {
   // `*`, `:ROOT`, `:not(body)`, `:has(> body)`, `:scope` and `[data-large-text]` all reach the root without naming it.
   // Strict on purpose: a component's scoped `html` never reaches the root, and still fails here.
   const subjectOf = (selector: string): string => outside(selector.trim(), /[\s>+~]/).at(-1) ?? ''
-  const pseudo = (name: string): RegExp =>
-    new RegExp(`:(?:${name})\\(((?:[^()]|\\([^()]*\\))*)\\)`, 'gi')
+  // A compound's own text, and each of its functional pseudo-classes with the list in its brackets, however deep
+  // (adversarial Г5): `:is(.a, :is(:is(:root)))` gives its `.a` to no one but the `:is()` it stands in.
+  const parted = (compound: string): { bare: string; calls: { name: string; list: string }[] } => {
+    const calls: { name: string; list: string }[] = []
+    let bare = compound
+    for (let call = /:([-\w]+)\(/.exec(bare); call; call = /:([-\w]+)\(/.exec(bare)) {
+      const start = call.index + call[0].length
+      let end = start
+      for (let depth = 1; depth > 0 && end < bare.length; end++)
+        depth += Number(bare[end] === '(') - Number(bare[end] === ')')
+      calls.push({ name: (call[1] ?? '').toLowerCase(), list: bare.slice(start, end - 1) })
+      bare = bare.slice(0, call.index) + bare.slice(end)
+    }
+    return { bare: bare.replace(/\[[^\]]*\]/g, ''), calls }
+  }
   const neverRoot = (compound: string): boolean => {
-    const kept = compound.replace(pseudo('not'), '')
-    const bare = kept.replace(pseudo('[-\\w]+'), '').replace(/\[[^\]]*\]/g, '')
+    const { bare, calls } = parted(compound)
     if (/(^|[^-\w.#:])html(?![-\w])|:root(?![-\w])/i.test(bare)) return false
     return (
       /[.#][-\w]|::|^[a-z]/i.test(bare) ||
-      [...kept.matchAll(pseudo('is|where|deep|global|slotted'))].some(([, list = '']) =>
-        outside(list, /,/).every((one) => neverRoot(subjectOf(one))),
+      calls.some(
+        ({ name, list }) =>
+          /^(is|where|deep|global|slotted)$/.test(name) &&
+          outside(list, /,/).every((one) => neverRoot(subjectOf(one))),
       )
     )
   }
@@ -151,6 +165,11 @@ describe('the system’s font size (MOL-334)', () => {
     ['by what it holds', ':has(> body) { font-size: var(--text-body); }'],
     ['as a scope', '@scope (html) { :scope { font-size: var(--text-body); } }'],
     ['by its attribute alone', '[data-large-text] { font-size: var(--text-body); }'],
+    ['under a class nested deep', ':is(.a, :is(:is(:root))) { font-size: var(--text-body); }'],
+    [
+      'under a :not() nested deep',
+      ':not(:is(.x, :is(:is(body)))) { font-size: var(--text-body); }',
+    ],
   ])('is found setting the root %s', (_, scss) => {
     expect(setsRoot(compiled(scss, main))).toBe(true)
   })
@@ -164,6 +183,7 @@ describe('the system’s font size (MOL-334)', () => {
     ['a list of classes', ':is(.a, .b) { font-size: var(--text-body); }'],
     ['a pseudo-element', 'p::before { font-size: var(--text-body); }'],
     ['a deep class', '.a :deep(.b) { font-size: var(--text-body); }'],
+    ['classes nested deep', ':is(.a, :is(:is(.b))) { font-size: var(--text-body); }'],
   ])('must not fire on %s', (_, scss) => {
     expect(setsRoot(compiled(scss, main))).toBe(false)
   })
