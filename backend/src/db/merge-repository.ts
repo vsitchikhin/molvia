@@ -931,14 +931,22 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 delete from catalogue_merge_moves
                 where merge_id = ${next.merge_id} and what in ('pick_added', 'pick_written')
                   and actor_id = ${actor} and key->>'queryKey' = ${queryKey}`)
-              // the row is that trace's first pick now, and its word what the shares left go back to (С1)
+              // The row is that trace's first pick now, and its word what the shares left go back to (С1);
+              // they stand over it one on another by their picks' moments, so the undo of each finds the row at
+              // the moment it waits for (Ф1 of round 21).
               await tx.execute(sql`
                 update catalogue_merge_moves o
-                set before = o.before || jsonb_build_object('keptAdmits', ${next.before.admits})
-                from catalogue_merges l
-                where l.id = o.merge_id and l.undone_at is null and l.into_item = ${next.into_item}::uuid
-                  and o.what in ('pick_added', 'pick_written') and o.actor_id = ${actor}::uuid
-                  and o.key->>'queryKey' = ${queryKey}`)
+                set before = o.before || jsonb_build_object(
+                      'keptAdmits', ${next.before.admits}, 'keptLastPickedAt', c.kept::text)
+                from (
+                  select o.merge_id,
+                         greatest(${next.before.lastPickedAt}::timestamptz,
+                                  lag((o.before->>'lastPickedAt')::timestamptz)
+                                    over (order by (o.before->>'lastPickedAt')::timestamptz, o.merge_id)) as kept
+                  ${shares(actor, queryKey, next.into_item)}
+                ) c
+                where c.merge_id = o.merge_id and o.what in ('pick_added', 'pick_written')
+                  and o.actor_id = ${actor}::uuid and o.key->>'queryKey' = ${queryKey}`)
               await noteTraceWrite(
                 tx,
                 'item',
