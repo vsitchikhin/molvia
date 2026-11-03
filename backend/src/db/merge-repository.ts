@@ -786,12 +786,12 @@ export function createMergeRepository(db: Conn): MergeRepository {
             await undoMove(move, merge)
           }
         }
-        // The row a merge brought, its trace's word written again over another trace's (Ч1 of round 24):
-        // the trace's word is on top, its own move under this merge keeping the other's beneath it. The
-        // row goes home whole at the trace's word, and the other's stays here as a row of its own, noted as
-        // that trace's first, with the words of the merges between (as З1). Not on top — another word over
-        // it since — the undo goes as before.
-        const ownWordOnTop = async (
+        // The row a merge brought, its trace's word written again over another trace's (Ч1 of round 24): that
+        // word is the trace's one, kept by its own move under this merge, wherever it lies in the row's stack
+        // now (Щ1 of round 26). The row goes home whole at it — the row's own on top, else the `before` of the
+        // word over it, which then takes what lay under the trace's — and the rest of the stack stays here as a
+        // row of its own at its top word, noted as its lowest trace's first (as З1). No such move: as before.
+        const traceWordHome = async (
           rowId: string,
           mergeId: number | string,
           from: string,
@@ -806,42 +806,90 @@ export function createMergeRepository(db: Conn): MergeRepository {
             actor_id: string
             item_kind: string
             place_id: string | null
+            score: number
+            review: string | null
+            rated_at: string
+            updated_at: string
+            deleted_at: string | null
+            top: boolean
           }>(sql`
-            select actor_id, item_kind, place_id from verdicts v
-            where v.id = ${rowId} and v.item_id = ${now} and v.updated_at = ${own.at}::timestamptz
+            select actor_id, item_kind, place_id, score, review, rated_at::text, updated_at::text,
+                   deleted_at::text, updated_at = ${own.at}::timestamptz as top
+            from verdicts v
+            where v.id = ${rowId} and v.item_id = ${now}
               and not exists (select 1 from verdicts o
                               where o.actor_id = v.actor_id and o.item_id = ${from}
                                 and o.place_id is not distinct from v.place_id)
             for update`)
           if (row === undefined) return false
-          const [next] = await tx.execute<{ merge_id: string; asked: string; at: string }>(sql`
-            select o.merge_id, coalesce(o.key->>'asked', l.from_item::text) as asked, o.key->>'at' as at
+          const others = await tx.execute<{
+            merge_id: string
+            asked: string
+            at: string
+            before: VerdictBefore & { withdrew: boolean; rated?: boolean }
+            over: boolean
+          }>(sql`
+            select o.merge_id, coalesce(o.key->>'asked', l.from_item::text) as asked, o.key->>'at' as at,
+                   o.before, (o.before->>'updatedAt')::timestamptz = ${own.at}::timestamptz as over
             from catalogue_merge_moves o
             join catalogue_merges l on l.id = o.merge_id
             where l.undone_at is null and o.merge_id <> ${mergeId} and o.what = 'verdict_overwritten'
               and o.key->>'id' = ${rowId}::text
-            order by (o.key->>'at')::timestamptz, o.merge_id
-            limit 1`)
-          await tx.execute(sql`update verdicts set item_id = ${from} where id = ${rowId}`)
-          if (next === undefined) return true
+            order by (o.key->>'at')::timestamptz, o.merge_id`)
+          const over = row.top ? undefined : others.find((other) => other.over)
+          if (!row.top && over === undefined) return false
+          const word: VerdictBefore = over?.before ?? {
+            score: row.score,
+            ratedAt: row.rated_at,
+            updatedAt: row.updated_at,
+            deletedAt: row.deleted_at,
+          }
+          const left: VerdictBefore =
+            over === undefined
+              ? own.before
+              : {
+                  score: row.score,
+                  ratedAt: row.rated_at,
+                  updatedAt: row.updated_at,
+                  deletedAt: row.deleted_at,
+                }
+          if (over !== undefined) {
+            await tx.execute(sql`
+              update catalogue_merge_moves
+              set before = before || jsonb_build_object(
+                    'score', ${own.before.score}::int, 'ratedAt', ${own.before.ratedAt}::text,
+                    'updatedAt', ${own.before.updatedAt}::text, 'deletedAt', ${own.before.deletedAt}::text)
+              where merge_id = ${over.merge_id} and what = 'verdict_overwritten' and key->>'id' = ${rowId}::text`)
+          }
+          await tx.execute(sql`
+            update verdicts
+            set item_id = ${from}, score = ${word.score}, rated_at = ${word.ratedAt}::timestamptz,
+                updated_at = ${word.updatedAt}::timestamptz, deleted_at = ${word.deletedAt}::timestamptz,
+                review = case when ${row.top} and ${word.deletedAt}::timestamptz is null then review end
+            where id = ${rowId}`)
+          const [lowest] = others
+          if (lowest === undefined) return true
+          await tx.execute(sql`
+            delete from catalogue_merge_moves
+            where merge_id = ${lowest.merge_id} and what = 'verdict_overwritten' and key->>'id' = ${rowId}::text`)
+          // a withdrawal of nothing alone over the trace's word leaves no row (З1)
+          if (others.length === 1 && lowest.before.withdrew && lowest.before.rated !== true)
+            return true
           const stays = randomUUID()
-          const was = own.before
           await tx.execute(sql`
             insert into verdicts (id, actor_id, item_id, item_kind, place_id, score, review,
                                   rated_at, updated_at, deleted_at)
             values (${stays}, ${row.actor_id}, ${now}, ${row.item_kind}, ${row.place_id}::uuid,
-                    ${was.score}, null, ${was.ratedAt}::timestamptz, ${was.updatedAt}::timestamptz,
-                    ${was.deletedAt}::timestamptz)`)
+                    ${left.score}, ${over === undefined || left.deletedAt !== null ? null : row.review},
+                    ${left.ratedAt}::timestamptz, ${left.updatedAt}::timestamptz,
+                    ${left.deletedAt}::timestamptz)`)
           await tx.execute(sql`
             update catalogue_merge_moves mv
             set key = jsonb_set(mv.key, '{id}', to_jsonb(${stays}::text))
             from catalogue_merges l
             where l.id = mv.merge_id and l.undone_at is null and mv.merge_id <> ${mergeId}
               and mv.what = 'verdict_overwritten' and mv.key->>'id' = ${rowId}::text`)
-          await tx.execute(sql`
-            delete from catalogue_merge_moves
-            where merge_id = ${next.merge_id} and what = 'verdict_overwritten' and key->>'id' = ${stays}::text`)
-          await noteTraceWrite(tx, 'item', next.asked, 'verdict', { id: stays, at: next.at })
+          await noteTraceWrite(tx, 'item', lowest.asked, 'verdict', { id: stays, at: lowest.at })
           return true
         }
         // rows a `verdict` move took home with its trace's own word on top (Ч1): that word's move is done
@@ -861,7 +909,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 update trips set place_id = ${from} where id = ${key.id} and place_id = ${now}`)
               break
             case 'verdict': {
-              if (item && (await ownWordOnTop(String(key.id), id, from, now))) {
+              if (item && (await traceWordHome(String(key.id), id, from, now))) {
                 liftedHome.add(String(key.id))
                 break
               }
