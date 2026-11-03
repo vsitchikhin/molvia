@@ -886,6 +886,11 @@ export function createMergeRepository(db: Conn): MergeRepository {
                   and exists (select 1 from verdicts t where t.id = ${key.trace} and t.${column} = ${from})`)
               break
             case 'pick': {
+              // whole only while no other trace's share stands on it: its moment alone says nothing then (У1)
+              const alone =
+                move.actor_id === null
+                  ? sql`true`
+                  : sql`not exists (select 1 ${shares(move.actor_id, String(key.queryKey), now)})`
               const moved = await tx.execute(sql`
                 update search_picks set item_id = ${from}
                 where actor_id = ${move.actor_id} and query_key = ${key.queryKey}
@@ -893,6 +898,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
                   and not exists (select 1 from search_picks o
                                   where o.actor_id = ${move.actor_id}
                                     and o.query_key = ${key.queryKey} and o.item_id = ${from})
+                  and ${alone}
                 returning 1`)
               if (moved.length > 0 || key.at === undefined || move.actor_id === null) break
               // Picked since by another trace's id, of a merge still standing (К1): what this merge
@@ -916,6 +922,8 @@ export function createMergeRepository(db: Conn): MergeRepository {
               await tx.execute(sql`
                 update search_picks
                 set picks = picks - ${home.picks},
+                    last_picked_at = (select max((o.before->>'lastPickedAt')::timestamptz)
+                                      ${shares(actor, queryKey, next.into_item)}),
                     admits = exists (select 1 ${shares(actor, queryKey, next.into_item)}
                                      and (o.before->>'admits')::boolean)
                 where actor_id = ${actor} and query_key = ${queryKey} and item_id = ${now}`)
