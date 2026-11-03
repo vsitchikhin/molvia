@@ -1,7 +1,9 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
+import { setsRoot } from '@molvia/frontend/testing/root-font-size'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
+import { readFileSync, readdirSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { facesIn, stillIn } from './scroll'
@@ -1115,13 +1117,22 @@ test('the narrowest list cards at 100 % on a phone of 320 keep their rows', asyn
   }
 })
 
-// The system's font size is the root's whatever reaches the page (MOL-334, adversarial Г8): a sheet of `public/` by a
-// `<link>`, a `.css` or a partial a script imports, a nested rule of plain CSS — each ways past a guard that reads the
-// sources by their kind. So the outcome is read here: the browser's own size set apart from 16, and the root's size
-// with every sheet and its `style` the same as with none. `useLargeText.test.ts` holds the sources for the rules this
-// one cannot see — under a media query or a state the page is not in.
+// The system's font size is the root's whatever reaches the page (MOL-334, adversarial Г8, Г13): a sheet of `public/`
+// by a `<link>`, a `.css` or a partial a script imports, a nested rule of plain CSS, a package beside the module, a
+// link in it, a `<style>` a template renders — each ways past a guard that reads the sources by where they lie. So the
+// outcome is read here, by the rule `useLargeText.test.ts` reads the sources by: every sheet the build made, whatever
+// it imported, and every sheet of the page as the browser holds it — under a media query or a state the page is not
+// in too — and the browser's own size set apart from 16, the root's the same with every sheet and its `style` as with
+// none.
 test('the system’s font size is the root’s, whatever reaches the page', async ({ page }) => {
   test.setTimeout(60_000)
+  // The build of this run, made before any test by the preview's server (`playwright.config.ts`).
+  const built = new URL('../frontend/dist-e2e/', import.meta.url)
+  const bundle = readdirSync(built, { recursive: true, encoding: 'utf8' }).filter((path) =>
+    path.endsWith('.css'),
+  )
+  expect(bundle.length).toBeGreaterThan(0)
+  expect(bundle.filter((path) => setsRoot(readFileSync(new URL(path, built), 'utf8')))).toEqual([])
   const browser = await page.context().newCDPSession(page)
   await browser.send('Page.setFontSizes', { fontSizes: { standard: 20 } })
   await page.setViewportSize({ width: 320, height: 720 })
@@ -1135,14 +1146,26 @@ test('the system’s font size is the root’s, whatever reaches the page', asyn
       const authored = size()
       const style = html.getAttribute('style')
       const sheets = [...document.styleSheets].filter((sheet) => !sheet.disabled)
+      // A sheet whose rules the page may not read is one this test cannot vouch for: named, never passed.
+      const texts = sheets.map((sheet) => {
+        try {
+          return [...sheet.cssRules].map((rule) => rule.cssText).join('\n')
+        } catch {
+          return `/* unreadable: ${sheet.href ?? 'a sheet'} */ :root { font-size: 0 }`
+        }
+      })
       for (const sheet of sheets) sheet.disabled = true
       html.removeAttribute('style')
       const own = size()
       for (const sheet of sheets) sheet.disabled = false
       if (style !== null) html.setAttribute('style', style)
-      return { authored, own, sheets: sheets.length }
+      return { authored, own, texts }
     })
-    expect(root.sheets, path).toBeGreaterThan(0)
-    expect(root, path).toEqual({ authored: '20px', own: '20px', sheets: root.sheets })
+    expect(root.texts.length, path).toBeGreaterThan(0)
+    expect(root.texts.filter(setsRoot), path).toEqual([])
+    expect({ authored: root.authored, own: root.own }, path).toEqual({
+      authored: '20px',
+      own: '20px',
+    })
   }
 })
