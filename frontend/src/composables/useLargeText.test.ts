@@ -99,21 +99,30 @@ describe('the system’s font size (MOL-334)', () => {
     }
     return [...parts, part]
   }
-  // The subject — the last compound, `:not()` taken out — names the root: `:where(html:not([hidden]))` does,
-  // `html[data-large-text] body` is the body's. Strict on purpose: a component's scoped `html` never reaches the root,
-  // and still fails here.
-  const namesRoot = (selector: string): boolean =>
-    /(^|[^-\w])html(?![-\w])|:root\b/.test(
-      (outside(selector.trim(), /[\s>+~]/).at(-1) ?? '').replace(
-        /:not\((?:[^()]|\([^()]*\))*\)/g,
-        '',
-      ),
+  // Fail-closed (adversarial Г4): a rule is the root's unless its subject — the last compound — holds what no root
+  // has: a class, an id, a pseudo-element, an element of another name, or a `:is()` whose every selector is such.
+  // `*`, `:ROOT`, `:not(body)`, `:has(> body)`, `:scope` and `[data-large-text]` all reach the root without naming it.
+  // Strict on purpose: a component's scoped `html` never reaches the root, and still fails here.
+  const subjectOf = (selector: string): string => outside(selector.trim(), /[\s>+~]/).at(-1) ?? ''
+  const pseudo = (name: string): RegExp =>
+    new RegExp(`:(?:${name})\\(((?:[^()]|\\([^()]*\\))*)\\)`, 'gi')
+  const neverRoot = (compound: string): boolean => {
+    const kept = compound.replace(pseudo('not'), '')
+    const bare = kept.replace(pseudo('[-\\w]+'), '').replace(/\[[^\]]*\]/g, '')
+    if (/(^|[^-\w.#:])html(?![-\w])|:root(?![-\w])/i.test(bare)) return false
+    return (
+      /[.#][-\w]|::|^[a-z]/i.test(bare) ||
+      [...kept.matchAll(pseudo('is|where|deep|global|slotted'))].some(([, list = '']) =>
+        outside(list, /,/).every((one) => neverRoot(subjectOf(one))),
+      )
     )
+  }
   // Every block's own declarations, up to its first nested block, under each of its selectors.
   const setsRoot = (css: string): boolean =>
     [...css.matchAll(/([^{};]*)\{(?=([^{}]*))/g)].some(
       ([, selectors = '', declarations = '']) =>
-        /(^|;)\s*font(-size)?\s*:/.test(declarations) && outside(selectors, /,/).some(namesRoot),
+        /(^|;)\s*font(-size)?\s*:/.test(declarations) &&
+        outside(selectors, /,/).some((one) => !neverRoot(subjectOf(one))),
     )
   const main = at('../styles/main.scss')
 
@@ -136,6 +145,12 @@ describe('the system’s font size (MOL-334)', () => {
     ],
     ['one of a list, under a comment', '/* why */\n:root,\nbody { font-size: var(--text-body); }'],
     ['by the shorthand', 'html { font: 600 var(--text-body) / 1.4 var(--font); }'],
+    ['by any element', '* { font-size: var(--text-body); }'],
+    ['in capitals', ':ROOT { font-size: var(--text-body); }'],
+    ['by what it is not', ':not(body) { font-size: var(--text-body); }'],
+    ['by what it holds', ':has(> body) { font-size: var(--text-body); }'],
+    ['as a scope', '@scope (html) { :scope { font-size: var(--text-body); } }'],
+    ['by its attribute alone', '[data-large-text] { font-size: var(--text-body); }'],
   ])('is found setting the root %s', (_, scss) => {
     expect(setsRoot(compiled(scss, main))).toBe(true)
   })
@@ -145,6 +160,10 @@ describe('the system’s font size (MOL-334)', () => {
     ['a unit by the word-unit mixin', '.x { @include word-unit; font-size: var(--text-body); }'],
     ['anything but the root', ':where(body:not(html)) { font-size: var(--text-body); }'],
     ['the root’s other properties', 'html { font-family: var(--font); }'],
+    ['a class that is not the root', '.x:not(html) { font-size: var(--text-body); }'],
+    ['a list of classes', ':is(.a, .b) { font-size: var(--text-body); }'],
+    ['a pseudo-element', 'p::before { font-size: var(--text-body); }'],
+    ['a deep class', '.a :deep(.b) { font-size: var(--text-body); }'],
   ])('must not fire on %s', (_, scss) => {
     expect(setsRoot(compiled(scss, main))).toBe(false)
   })
