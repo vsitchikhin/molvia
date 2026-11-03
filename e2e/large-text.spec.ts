@@ -1172,7 +1172,12 @@ test('the system’s font size is the root’s, whatever reaches the page', asyn
       }))
       const zoomed = [...document.querySelectorAll('*')]
         .filter((element) => element.currentCSSZoom !== 1)
-        .map((element) => element.tagName)
+        .map(
+          (element) =>
+            element.tagName.toLowerCase() +
+            (element.id ? `#${element.id}` : '') +
+            [...element.classList].map((name) => `.${name}`).join(''),
+        )
       for (const sheet of sheets) sheet.disabled = true
       html.removeAttribute('style')
       const own = size()
@@ -1190,5 +1195,67 @@ test('the system’s font size is the root’s, whatever reaches the page', asyn
       own: '20px',
       zoomed: [],
     })
+  }
+})
+
+// Large text reaches the eye whatever holds it back, on a phone upright and on its side (MOL-334, adversarial
+// Г12–Г17): the rules above refuse what sets the root and what zooms, by name, and each round found one more way
+// to draw the text small with neither — `font-size-adjust`, the scale's tokens in px, a `transform` — under a media
+// query the window of 320 never meets. So the outcome: every step of the type scale, drawn deep in the screen, is
+// twice as wide at 200 % as at 100 %, in both windows. The scale is read where it is declared, in `rem`; `--text-tab`
+// stops at 13.75 px on purpose (В-3 «а») and is no step of it.
+const typeScale = [
+  ...readFileSync(new URL('../frontend/src/styles/_tokens.scss', import.meta.url), 'utf8').matchAll(
+    /^\s*(--text-[-\w]+):\s*[\d.]+rem\b/gm,
+  ),
+].map(([, step = '']) => step)
+
+test('large text is drawn twice as large at 200 %, on a phone upright and on its side', async ({
+  page,
+}) => {
+  test.setTimeout(120_000)
+  expect(typeScale.length).toBeGreaterThan(8)
+  const browser = await page.context().newCDPSession(page)
+  await signedIn(page)
+  const drawn = async (path: string, standard: number): Promise<Record<string, number>> => {
+    await browser.send('Page.setFontSizes', { fontSizes: { standard } })
+    await page.goto(path)
+    await expect(page.locator('h1').first(), path).toBeVisible()
+    if (standard > 16) await expect(page.locator('html')).toHaveAttribute('data-large-text')
+    else await expect(page.locator('html')).not.toHaveAttribute('data-large-text')
+    // In the screen's title, so whatever stands over it stands over the probe; out of its flow, on one line.
+    return page.evaluate(async (steps) => {
+      const title = document.querySelector('h1')
+      if (!title) return {}
+      const probes = steps.map((step) => {
+        const probe = document.createElement('span')
+        probe.style.cssText = `position: absolute; white-space: nowrap; font-size: var(${step})`
+        probe.textContent = 'ЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖ'
+        title.append(probe)
+        return probe
+      })
+      document.documentElement.getBoundingClientRect()
+      await document.fonts.ready
+      const widths = Object.fromEntries(
+        steps.map((step, at) => [step, probes[at]?.getBoundingClientRect().width ?? 0]),
+      )
+      for (const probe of probes) probe.remove()
+      return widths
+    }, typeScale)
+  }
+  for (const [width, height] of [
+    [320, 720],
+    [720, 320],
+  ] as const) {
+    await page.setViewportSize({ width, height })
+    for (const path of ['/', '/purchases', '/money', '/settings']) {
+      const usual = await drawn(path, 16)
+      const large = await drawn(path, 32)
+      const short = typeScale
+        .map((step) => ({ step, ratio: (large[step] ?? 0) / (usual[step] ?? 1) }))
+        .filter(({ ratio }) => !(ratio > 1.9 && ratio < 2.1))
+        .map(({ step, ratio }) => `${step} ×${ratio.toFixed(2)}`)
+      expect(short, `${path} at ${String(width)} × ${String(height)}`).toEqual([])
+    }
   }
 })
