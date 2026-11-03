@@ -877,7 +877,10 @@ report.
   what it said, so the moves that name it carry it on down a chain (№16 of review 8), and the other trace's
   word stays as a row of its own, noted as its first — a withdrawal of nothing as none, the row it took being
   the one gone home (З1 of round 8, as Г2), and rated when the trace's id wrote it (И1 of round 9). A word written over goes to its trace, and the move above keeps
-  what this one did. So the owner undoes the false twin and keeps the true one. An order by the moment
+  what this one did. **A trace's word written again over another's lifts its move to the top** (Ц1 of round 23,
+  once the price №14 of the self-review): the move over it takes what lay under it, and it takes what the row said
+  before the write (`liftOverwritten`) — left in the middle, its moment moved past the other's and neither undo
+  found the row at the word it waited for. So the owner undoes the false twin and keeps the true one. An order by the moment
   (round 5) refused both undos for good where two people wrote each by the other's trace (Е1), and a move
   waiting for the other undo (round 6) waited for good where that one was the true twin (Ж1).
   **The prices, named:** the trace's own score is lost where the person rated the survivor over it by the
@@ -889,10 +892,7 @@ report.
   `unmerge` commits between its row and its note stays with the survivor too (Б5, owner's В-8 «а»: the
   owner's hand once a morning against milliseconds); a swap of one person's two verdicts whose kept row
   another trace's id wrote over waits for that merge's undo, and stays swapped while it stands (Ж1 of round 7:
-  a swap goes over two rows, and handing it on is not worth a case this rare); in a fan, a trace's word written
-  over by another
-  trace's id and then by its own again is not given back — the later write takes the move's moment past the
-  other's, so neither undo finds the row at it (№14 of the self-review, round 6); the row the undo gives a trace is rated at the trace's id's **last** write, not its first
+  a swap goes over two rows, and handing it on is not worth a case this rare); the row the undo gives a trace is rated at the trace's id's **last** write, not its first
   rating (Й1 of round 10): the journal keeps one moment of the trace's word, which every write moves, so a rating
   amended or taken back later by that id stands later in gate 0.2 than it was given — against MOL-27's «re-rating
   cannot move anyone in the gate», on the side of «stop», and only for a second write by a trace's id between a

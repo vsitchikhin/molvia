@@ -1697,6 +1697,33 @@ describe('the undo leaves a verdict the person touched after the merge (MOL-299,
     expect(await overwritten()).toBe(0)
   })
 
+  it.each(['false', 'true'])(
+    "gives each trace its word home, the true one's written again over the false one's, the %s twin first (Ц1)",
+    async (first) => {
+      const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+      await verdict(owner, older, { score: 5 })
+      const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+      // from phones' queues, by each trace's id; the true twin's again, over the false one's word
+      await rateBy(younger, 4)
+      await rateBy(stewed, 2)
+      await rateBy(younger, 3)
+      await merges.unmerge(first === 'false' ? wrong : right)
+      expect([await scoreOn(older), await scoreOn(younger), await scoreOn(stewed)]).toEqual(
+        first === 'false'
+          ? [{ score: 3, live: true }, undefined, { score: 2, live: true }]
+          : [{ score: 2, live: true }, { score: 3, live: true }, undefined],
+      )
+      await merges.unmerge(first === 'false' ? right : wrong)
+      expect([await scoreOn(older), await scoreOn(younger), await scoreOn(stewed)]).toEqual([
+        { score: 5, live: true },
+        { score: 3, live: true },
+        { score: 2, live: true },
+      ])
+      expect(await overwritten()).toBe(0)
+    },
+  )
+
   it("leaves no row for a withdrawal by the true twin's id, the false one undone (З1)", async () => {
     const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
     await verdict(owner, stewed, { score: 3 })

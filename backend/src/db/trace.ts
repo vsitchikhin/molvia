@@ -147,6 +147,7 @@ export async function verdictWrittenByTrace(
     -- a word written over already beside the move that brought the row, on the same step (№13)
     order by w.depth, mv.what = 'verdict_overwritten' desc
     limit 1`)
+  if (first?.what === 'verdict_overwritten') await liftOverwritten(conn, asked, row.id, before)
   await restampTraceWrite(conn, 'item', asked, verdictMoves(row.id), row.touched, how)
   // written over once already, its first `before` stands; or the trace's own
   if (first?.what === 'verdict_overwritten' || first?.home === asked.toLowerCase()) return
@@ -181,6 +182,46 @@ export const keptAdmitsOf = (into: SQL, actorId: SQL, queryKey: SQL): SQL =>
 
 export const keptLastOf = (into: SQL, actorId: SQL, queryKey: SQL): SQL =>
   keptOf(sql`max((mv.before->>'keptLastPickedAt')::timestamptz)`, into, actorId, queryKey)
+
+/**
+ * A word written over by a trace's id again, another trace's word over its own since (MOL-299, Ц1 of round 23):
+ * the trace's move leaves the middle of the row's stack for its top, as the undo splices one out — the move over
+ * it takes what lay under it, and it takes what the row said before this write. Left where it was, its moment
+ * moved past the other's, and neither undo found the row at the word it waited for: the false twin's lost.
+ */
+async function liftOverwritten(
+  conn: Conn,
+  asked: string,
+  rowId: string,
+  before: VerdictBefore,
+): Promise<void> {
+  const said = sql`jsonb_build_object('score', l.was->'score', 'ratedAt', l.was->'ratedAt',
+                                      'updatedAt', l.was->'updatedAt', 'deletedAt', l.was->'deletedAt')`
+  await conn.execute(sql`
+    ${wayOf('item', asked)},
+    lifted as (
+      select mv.merge_id, mv.before as was, o.merge_id as above
+      from catalogue_merge_moves mv
+      join catalogue_merge_moves o on o.what = 'verdict_overwritten' and o.key->>'id' = mv.key->>'id'
+      join catalogue_merges l on l.id = o.merge_id
+      where mv.merge_id in (select id from way) and mv.what = 'verdict_overwritten'
+        and mv.key->>'id' = ${rowId}::text
+        and l.undone_at is null and o.merge_id not in (select id from way)
+        and (o.key->>'at')::timestamptz > (mv.key->>'at')::timestamptz
+        and (o.before->>'updatedAt')::timestamptz = (mv.key->>'at')::timestamptz
+    ),
+    handed as (
+      update catalogue_merge_moves o
+      set before = o.before || ${said}
+      from lifted l
+      where o.merge_id = l.above and o.what = 'verdict_overwritten' and o.key->>'id' = ${rowId}::text
+      returning 1
+    )
+    update catalogue_merge_moves mv
+    set before = mv.before || ${JSON.stringify(before)}::jsonb
+    from lifted l
+    where mv.merge_id = l.merge_id and mv.what = 'verdict_overwritten' and mv.key->>'id' = ${rowId}::text`)
+}
 
 /** A pick row as it stood before a trace's id added to it (MOL-299, К1). */
 export interface PickBefore {
