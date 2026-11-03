@@ -495,8 +495,10 @@ The detail behind the frontend lines of `CLAUDE.md`.
   makes Chrome 146+ set 1rem by Android's font size and turn its own page zoom and text autosizing off — the very model
   every spec measures by; without it a phone's Chrome ignores the system's size. It holds only while no stylesheet sets
   the root's `font-size`, which `useLargeText.test.ts` holds — every sheet read as Sass writes it, so a comment,
-  `@media`, a mixin and nesting hide nothing (adversarial Г1–Г3), each selector of a list whose subject, `:not()` taken
-  out, names `html` or `:root`, the `font` shorthand too; strict, a component's scoped `html` fails as well; Safari passes
+  `@media`, a mixin and nesting hide nothing (adversarial Г1–Г3), and a rule setting `font-size` or `font` is the root's
+  unless its subject holds what no root has — a class, an id, a pseudo-element, an element of another name — since `*`,
+  `:not(body)`, `:has(> body)` and `:scope` reach it unnamed (Г4); strict, a component's scoped `html` fails as well. A
+  script's `documentElement.style` is no sheet, and review's; Safari passes
   Dynamic Type to no page. Seven ways:
   - **A row of segments its words do not fit stands them one under another** (`SegmentedControl`, В-1 «а»):
     the word stays whole — MOL-189 holds, and now a test holds it (`kit-rows`: every word of «Как меняли» on one
@@ -613,7 +615,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     three words — a heading (`h1`–`h3`, `main.scss`), and by `@include word-unit` in its own component a row's title
     (`ListRow`), a link row's label and value (`NavRow`), a button (`AppButton`), the words of a switch row («Бот», the
     salary's day, «Учитывать меня в статистике»), a device's name, a kind of data of «Данные и приватность» (`dt`) and a
-    name of a ring's legend (`DonutChart`, adversarial Х4) — from six letters, two a side as Russian print carries them (with three «Настройки» had no place for one and broke
+    name by a ring (`DonutChart`, `CategoryDonutCard`; adversarial Х4, Х5) — from six letters, two a side as Russian print carries them (with three «Настройки» had no place for one and broke
     «Настро|йки»; at 200 % «Написать разработчику» read «Написа|ть разраб|отчику»); in a paragraph and a row's meta
     from twelve, inherited from `body`: from six there, «Данные и приватность» cut 394 words that would have stood
     whole at 200 % and 192 already at 115 %, from twelve 21. Each unit includes the mixin itself, so a component knows
