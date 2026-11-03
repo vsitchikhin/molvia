@@ -274,7 +274,8 @@ export async function recordReceipt(
     }
     if (body.purchasedOn > latestDay(now)) throw new DomainError(ERROR.RECEIPT_IN_FUTURE)
 
-    const place =
+    // `trace`: a trace's name answered with its survivor (MOL-299, Б3)
+    const place: Awaited<ReturnType<typeof places.ensure>> | null =
       'id' in body.place
         ? await places.byId(body.place.id)
         : geographyAllowed({ country: held.country, city: body.place.city }, actor)
@@ -346,6 +347,12 @@ export async function recordReceipt(
       {
         id: body.tripId,
         placeId: place.id,
+        // the trace named by its id or name, for the undo of a merge of places (MOL-299, А2, Б3)
+        ...('id' in body.place
+          ? { placeAsked: body.place.id }
+          : place.trace === undefined
+            ? {}
+            : { placeAsked: place.trace }),
         day: body.purchasedOn,
         deviceAt:
           held.printedOn === body.purchasedOn

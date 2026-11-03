@@ -14,8 +14,13 @@ import { createErasureRepository } from '@/db/erasure-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createMergeRepository } from '@/db/merge-repository'
 import type { MergeRepository } from '@/db/merge-repository'
+import { createExpenseRepository } from '@/db/expenses-repository'
+import { createPlaceRepository } from '@/db/places-repository'
+import { createSearchPickRepository } from '@/db/search-picks-repository'
 import { createStoreMemoryRepository } from '@/db/store-memory-repository'
+import { createTripRepository } from '@/db/trips-repository'
 import { createVerdictRepository } from '@/db/verdicts-repository'
+import { rateItem } from '@/usecases/rate-item'
 import { actors, catalogueMergeMoves, catalogueMerges, items, places } from '@/db/schema'
 import { connectDrizzle } from './db'
 import {
@@ -932,5 +937,1037 @@ describe('a tie of age (MOL-252)', () => {
     expect(report.candidatePairs.map((pair) => [pair.fromId, pair.intoId])).toEqual([[high, low]])
     const listed = await merges.openCandidates()
     expect(listed.map((pair) => [pair.fromId, pair.intoId])).toEqual([[high, low]])
+  })
+})
+
+describe("the undo takes home what a trace's id wrote after the merge (MOL-299, adversarial А2)", () => {
+  const purchase = async (itemId: string): Promise<string> => {
+    const placeId = await insertPlace(db, { name: `SAS ${randomUUID()}` })
+    const trip = await insertTrip(db, { actorId: owner, placeId })
+    const id = randomUUID()
+    await createExpenseRepository(db).add(owner, { id, tripId: trip, itemId })
+    return id
+  }
+  const pickOf = async (queryKey: string) =>
+    onlyRow(
+      await db.execute<{ item_id: string; picks: number }>(sql`
+        select item_id, picks from search_picks where actor_id = ${owner} and query_key = ${queryKey}`),
+    )
+
+  it("a purchase a phone queued by the trace's id — and not one of the survivor's own", async () => {
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const queued = await purchase(younger)
+    const own = await purchase(older)
+    expect(await itemOfExpense(queued)).toBe(older)
+    await merges.unmerge(id)
+    expect([await itemOfExpense(queued), await itemOfExpense(own)]).toEqual([younger, older])
+  })
+
+  it("a first verdict given by the trace's id, through the use case", async () => {
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const verdicts = createVerdictRepository(db)
+    const { verdict: given } = await rateItem(
+      { items: createItemRepository(db), verdicts },
+      owner,
+      younger,
+      { score: 2 },
+    )
+    expect(given.itemId).toBe(older)
+    await merges.unmerge(id)
+    const home = onlyRow(
+      await db.execute<{ item_id: string; score: number }>(
+        sql`select item_id, score from verdicts where id = ${given.id}`,
+      ),
+    )
+    expect(home).toEqual({ item_id: younger, score: 2 })
+  })
+
+  const picksOf = async (queryKey: string) =>
+    sorted(
+      (
+        await db.execute<{ item_id: string; picks: number; admits: boolean }>(sql`
+          select item_id, picks, admits from search_picks
+          where actor_id = ${owner} and query_key = ${queryKey}`)
+      ).map((row) => [row.item_id, row.picks, row.admits]),
+    )
+
+  it("a new pick by the trace's id, and its share of one added to the survivor's own (К1)", async () => {
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const picks = createSearchPickRepository(db)
+    await picks.remember(owner, 'малоко', younger)
+    await picks.remember(owner, 'молоко', older)
+    await picks.remember(owner, 'молоко', younger)
+    await picks.learn(owner, 'молоко', younger)
+    await merges.unmerge(id)
+    expect(await pickOf('maloko')).toEqual({ item_id: younger, picks: 1 })
+    expect(await picksOf('moloko')).toEqual(
+      sorted([
+        [older, 1, false],
+        [younger, 2, true],
+      ]),
+    )
+  })
+
+  it("adds a pick by the trace's id to its picks the merge added to the survivor's (Л1)", async () => {
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+      values (${owner}, 'maloko', ${older}, 1, '2026-09-01T10:00:00Z'),
+             (${owner}, 'maloko', ${younger}, 1, '2026-09-03T10:00:00Z')`)
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await createSearchPickRepository(db).remember(owner, 'малоко', younger)
+    await merges.unmerge(id)
+    const rows = await db.execute<{ item_id: string; picks: number; at: string }>(sql`
+      select item_id, picks,
+             case when last_picked_at = '2026-09-01T10:00:00Z' then 'its own'
+                  when last_picked_at > '2026-09-03T10:00:00Z' then 'the last' else 'another' end as at
+      from search_picks where actor_id = ${owner} and query_key = 'maloko'`)
+    expect(sorted(rows.map((row) => [row.item_id, row.picks, row.at]))).toEqual(
+      sorted([
+        [older, 1, 'its own'],
+        [younger, 2, 'the last'],
+      ]),
+    )
+  })
+
+  it("keeps the survivor's own pick since the merge under the trace's later one (М1)", async () => {
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+      values (${owner}, 'maloko', ${older}, 1, '2026-09-01T10:00:00Z'),
+             (${owner}, 'maloko', ${younger}, 1, '2026-09-03T10:00:00Z')`)
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const picks = createSearchPickRepository(db)
+    await picks.remember(owner, 'малоко', older)
+    const own = onlyRow(
+      await db.execute<{ at: string }>(sql`
+        select last_picked_at::text as at from search_picks where item_id = ${older}`),
+    )?.at
+    await picks.remember(owner, 'малоко', younger)
+    await merges.unmerge(id)
+    const rows = await db.execute<{ item_id: string; picks: number; own: boolean }>(sql`
+      select item_id, picks, last_picked_at = ${own ?? null}::timestamptz as own
+      from search_picks where actor_id = ${owner} and query_key = 'maloko'`)
+    expect(sorted(rows.map((row) => [row.item_id, row.picks, row.own]))).toEqual(
+      sorted([
+        [older, 2, true],
+        [younger, 2, false],
+      ]),
+    )
+  })
+
+  it('gives the survivor its own moment back in a fan of added picks, both picked again (Н1)', async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+      values (${owner}, 'maloko', ${older}, 1, '2026-09-01T10:00:00Z'),
+             (${owner}, 'maloko', ${younger}, 1, '2026-09-03T10:00:00Z'),
+             (${owner}, 'maloko', ${stewed}, 1, '2026-09-05T10:00:00Z')`)
+    const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const two = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    const picks = createSearchPickRepository(db)
+    // from phones' queues, by each trace's id: the row's moment is another trace's, never the survivor's
+    await picks.remember(owner, 'малоко', stewed)
+    await picks.remember(owner, 'малоко', younger)
+    await merges.unmerge(two)
+    await merges.unmerge(one)
+    const rows = await db.execute<{ item_id: string; picks: number; own: boolean }>(sql`
+      select item_id, picks, last_picked_at = '2026-09-01T10:00:00Z' as own
+      from search_picks where actor_id = ${owner} and query_key = 'maloko'`)
+    expect(sorted(rows.map((row) => [row.item_id, row.picks, row.own]))).toEqual(
+      sorted([
+        [older, 1, true],
+        [younger, 2, false],
+        [stewed, 2, false],
+      ]),
+    )
+  })
+
+  it("takes a trace's share home under the picks a later merge added to the row (О1)", async () => {
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    const picks = createSearchPickRepository(db)
+    await picks.remember(owner, 'малоко', older)
+    const wrong = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await picks.remember(owner, 'малоко', younger)
+    // the true twin still apart, picked; merged the next night
+    await picks.remember(owner, 'малоко', other)
+    await merges.mergeItems(other, older, NIGHT)
+    expect(await merges.unmerge(wrong)).toMatchObject({ subject: 'item' })
+    const rows = await db.execute<{ item_id: string; picks: number }>(sql`
+      select item_id, picks from search_picks where actor_id = ${owner} and query_key = 'maloko'`)
+    expect(sorted(rows.map((row) => [row.item_id, row.picks]))).toEqual(
+      sorted([
+        [older, 2],
+        [younger, 1],
+      ]),
+    )
+  })
+
+  it("gives the survivor its own moment back, the earlier merge's added picks undone first (П1)", async () => {
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+      values (${owner}, 'maloko', ${older}, 1, '2026-09-01T10:00:00Z'),
+             (${owner}, 'maloko', ${younger}, 1, '2026-09-05T10:00:00Z')`)
+    const wrong = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const right = numbered(await merges.mergeItems(other, older, NIGHT))
+    await createSearchPickRepository(db).remember(owner, 'малоко', other)
+    await merges.unmerge(wrong)
+    await merges.unmerge(right)
+    const rows = await db.execute<{ item_id: string; picks: number; own: boolean }>(sql`
+      select item_id, picks, last_picked_at = '2026-09-01T10:00:00Z' as own
+      from search_picks where actor_id = ${owner} and query_key = 'maloko'`)
+    expect(sorted(rows.map((row) => [row.item_id, row.picks, row.own]))).toEqual(
+      sorted([
+        [older, 1, true],
+        [younger, 1, false],
+        [other, 1, false],
+      ]),
+    )
+  })
+
+  it("keeps the survivor's own word off when the later merge's added picks are undone first (Р1)", async () => {
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at, admits)
+      values (${owner}, 'maloko', ${younger}, 1, '2026-09-01T10:00:00Z', true),
+             (${owner}, 'maloko', ${other}, 1, '2026-09-03T10:00:00Z', false),
+             (${owner}, 'maloko', ${older}, 1, '2026-09-05T10:00:00Z', false)`)
+    const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const two = numbered(await merges.mergeItems(other, older, NIGHT))
+    await merges.unmerge(two)
+    await merges.unmerge(one)
+    expect(await picksOf('maloko')).toEqual(
+      sorted([
+        [older, 1, false],
+        [younger, 1, true],
+        [other, 1, false],
+      ]),
+    )
+  })
+
+  it.each([
+    [false, 'earlier'],
+    [true, 'earlier'],
+    [true, 'later'],
+    [false, 'later'],
+  ])(
+    "takes the word a trace's id taught home in a fan, own pick %s, the %s merge first (С1)",
+    async (own, first) => {
+      const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+      await db.execute(sql`
+        insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+        values (${owner}, 'maloko', ${other}, 1, '2026-09-01T10:00:00Z'),
+               (${owner}, 'maloko', ${older}, 1, '2026-09-03T10:00:00Z')`)
+      const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const picks = createSearchPickRepository(db)
+      // from a phone's queue, by the trace's id: its word lands on the survivor's row
+      await picks.learn(owner, 'малоко', younger)
+      if (own) await picks.remember(owner, 'малоко', older)
+      const two = numbered(await merges.mergeItems(other, older, NIGHT))
+      for (const id of first === 'earlier' ? [one, two] : [two, one]) {
+        expect(await merges.unmerge(id)).toMatchObject({ subject: 'item' })
+      }
+      expect(await picksOf('maloko')).toEqual(
+        sorted([
+          [older, own ? 2 : 1, false],
+          [younger, 1, true],
+          [other, 1, false],
+        ]),
+      )
+    },
+  )
+
+  it("keeps the word a trace's id taught on the row its merge brought, a later merge added to it (Т1)", async () => {
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+      values (${owner}, 'maloko', ${younger}, 1, '2026-09-01T10:00:00Z'),
+             (${owner}, 'maloko', ${other}, 1, '2026-09-03T10:00:00Z')`)
+    const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const two = numbered(await merges.mergeItems(other, older, NIGHT))
+    // from a phone's queue, by the trace's id, onto the row its own merge brought
+    await createSearchPickRepository(db).learn(owner, 'малоко', younger)
+    await merges.unmerge(two)
+    await merges.unmerge(one)
+    expect(await picksOf('maloko')).toEqual(
+      sorted([
+        [younger, 2, true],
+        [other, 1, false],
+      ]),
+    )
+  })
+
+  it("leaves another trace's share on the row its merge brought, picked by its own id since (У1)", async () => {
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+      values (${owner}, 'maloko', ${younger}, 1, '2026-09-01T10:00:00Z')`)
+    const wrong = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const right = numbered(await merges.mergeItems(other, older, NIGHT))
+    const picks = createSearchPickRepository(db)
+    // from phones' queues: the true twin's id onto the row the false one brought, then the false one's
+    await picks.remember(owner, 'малоко', other)
+    await picks.remember(owner, 'малоко', younger)
+    await merges.unmerge(wrong)
+    expect(await picksOf('maloko')).toEqual(
+      sorted([
+        [younger, 2, false],
+        [older, 1, false],
+      ]),
+    )
+    await merges.unmerge(right)
+    expect(await picksOf('maloko')).toEqual(
+      sorted([
+        [younger, 2, false],
+        [other, 1, false],
+      ]),
+    )
+  })
+
+  it.each(['later', 'earlier'])(
+    "gives two traces' shares home after the merge that brought their row, the %s true one first (Ф1)",
+    async (first) => {
+      const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+      const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+      await db.execute(sql`
+        insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+        values (${owner}, 'maloko', ${younger}, 1, '2026-09-01T10:00:00Z')`)
+      const wrong = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const two = numbered(await merges.mergeItems(other, older, NIGHT))
+      const three = numbered(await merges.mergeItems(stewed, older, NIGHT))
+      const picks = createSearchPickRepository(db)
+      // from phones' queues, by each trace's id, onto the row the false one brought
+      await picks.remember(owner, 'малоко', other)
+      await picks.remember(owner, 'малоко', stewed)
+      await picks.remember(owner, 'малоко', younger)
+      await merges.unmerge(wrong)
+      for (const id of first === 'later' ? [three, two] : [two, three]) {
+        expect(await merges.unmerge(id)).toMatchObject({ subject: 'item' })
+      }
+      expect(await picksOf('maloko')).toEqual(
+        sorted([
+          [younger, 2, false],
+          [other, 1, false],
+          [stewed, 1, false],
+        ]),
+      )
+    },
+  )
+
+  it.each(['false', 'true'])(
+    "takes each trace's share home, one grown over the other, the %s twin first (Х1)",
+    async (first) => {
+      const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+      await db.execute(sql`
+        insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+        values (${owner}, 'maloko', ${older}, 1, '2026-09-01T10:00:00Z')`)
+      const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+      const picks = createSearchPickRepository(db)
+      // from phones' queues, by each trace's id; the true twin's share grows over the false one's
+      await picks.remember(owner, 'малоко', younger)
+      await picks.remember(owner, 'малоко', stewed)
+      await picks.remember(owner, 'малоко', younger)
+      if (first === 'false') {
+        await merges.unmerge(wrong)
+        expect(await picksOf('maloko')).toEqual(
+          sorted([
+            [older, 3, false],
+            [stewed, 1, false],
+          ]),
+        )
+      }
+      for (const id of first === 'false' ? [right] : [right, wrong]) {
+        expect(await merges.unmerge(id)).toMatchObject({ subject: 'item' })
+      }
+      const rows = await db.execute<{ item_id: string; picks: number; own: boolean }>(sql`
+        select item_id, picks, last_picked_at = '2026-09-01T10:00:00Z' as own
+        from search_picks where actor_id = ${owner} and query_key = 'maloko'`)
+      expect(sorted(rows.map((row) => [row.item_id, row.picks, row.own]))).toEqual(
+        sorted([
+          [older, 1, true],
+          [younger, 2, false],
+          [stewed, 1, false],
+        ]),
+      )
+    },
+  )
+
+  it.each(['later', 'earlier'])(
+    "takes home each twin's picks of one row in a fan, the %s merge first (К1)",
+    async (first) => {
+      const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+      const picks = createSearchPickRepository(db)
+      await picks.remember(owner, 'молоко', stewed)
+      const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+      // from a phone's queue, by the true twin's id, onto the row the false one brought
+      await picks.remember(owner, 'молоко', younger)
+      for (const id of first === 'later' ? [wrong, right] : [right, wrong]) {
+        expect(await merges.unmerge(id)).toMatchObject({ subject: 'item' })
+      }
+      expect(await picksOf('moloko')).toEqual(
+        sorted([
+          [stewed, 1, false],
+          [younger, 1, false],
+        ]),
+      )
+    },
+  )
+
+  it("takes the false twin's pick home while the true one stands (К1)", async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    const picks = createSearchPickRepository(db)
+    await picks.remember(owner, 'молоко', stewed)
+    await merges.mergeItems(younger, older, NIGHT)
+    const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    await picks.learn(owner, 'молоко', younger)
+    await merges.unmerge(wrong)
+    expect(await picksOf('moloko')).toEqual(
+      sorted([
+        [stewed, 1, false],
+        [older, 1, true],
+      ]),
+    )
+  })
+
+  it("a word of the shop's memory and a code by the trace's id", async () => {
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await createStoreMemoryRepository(db).remember(owner, '01282006', [
+      { kind: 'sku', key: '1163909', price: null, itemId: younger },
+    ])
+    await createItemRepository(db).attachBarcode(younger, '4600000000003', owner)
+    await merges.unmerge(id)
+    expect(await db.execute(sql`select item_id from store_memory`)).toEqual([{ item_id: younger }])
+    expect(await db.execute(sql`select item_id from item_barcodes`)).toEqual([{ item_id: younger }])
+  }, 10_000)
+
+  it("takes home a pick the merge moved, picked again by the trace's id (В1)", async () => {
+    const picks = createSearchPickRepository(db)
+    await picks.remember(owner, 'малоко', younger)
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    // the same pick from a phone's queue, by the trace's id
+    await picks.remember(owner, 'малоко', younger)
+    await merges.unmerge(id)
+    expect(await pickOf('maloko')).toEqual({ item_id: younger, picks: 2 })
+  })
+
+  it("leaves a word and a pick the survivor's id touched since (Б1, Б2)", async () => {
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const memory = createStoreMemoryRepository(db)
+    const word = { kind: 'sku', key: '1163909', price: null } as const
+    await memory.remember(owner, '01282006', [{ ...word, itemId: younger }])
+    // the next receipt of the shop says the survivor: the person's last word
+    await memory.remember(owner, '01282006', [{ ...word, itemId: older }])
+    const picks = createSearchPickRepository(db)
+    await picks.remember(owner, 'малоко', younger)
+    await picks.remember(owner, 'малоко', older)
+    await merges.unmerge(id)
+    expect(await db.execute(sql`select item_id from store_memory`)).toEqual([{ item_id: older }])
+    expect(await pickOf('maloko')).toEqual({ item_id: older, picks: 2 })
+  })
+
+  it('a purchase by the first of a chain, home step by step undone from the end', async () => {
+    const first = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const third = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    const second = numbered(await merges.mergeItems(older, third, NIGHT))
+    const queued = await purchase(younger)
+    expect(await itemOfExpense(queued)).toBe(third)
+    await merges.unmerge(second)
+    expect(await itemOfExpense(queued)).toBe(older)
+    await merges.unmerge(first)
+    expect(await itemOfExpense(queued)).toBe(younger)
+  })
+
+  it("a receipt's trip at a merged place named by its id", async () => {
+    const shop = await insertPlace(db, { name: 'Ереван Сити', createdAt: new Date('2026-09-01') })
+    const typo = await insertPlace(db, { name: 'Ереван Сит', createdAt: new Date('2026-09-02') })
+    const id = numbered(await merges.mergePlaces(typo, shop, NIGHT))
+    const tripId = randomUUID()
+    const trip = await createTripRepository(db).recordFinished(
+      owner,
+      {
+        id: tripId,
+        placeId: shop,
+        placeAsked: typo,
+        day: '2026-10-02',
+        deviceAt: null,
+        accountId: null,
+        debited: null,
+      },
+      'AMD',
+      null,
+      null,
+    )
+    expect(trip.placeId).toBe(shop)
+    await merges.unmerge(id)
+    const home = onlyRow(
+      await db.execute<{ place_id: string }>(sql`select place_id from trips where id = ${tripId}`),
+    )
+    expect(home?.place_id).toBe(typo)
+  })
+})
+
+describe("a trip at a place named by its trace's name (MOL-299, adversarial Б3)", () => {
+  it('goes home with the undo of the merge of places', async () => {
+    const shop = await insertPlace(db, { name: 'Ереван Сити', createdAt: new Date('2026-09-01') })
+    const typo = await insertPlace(db, { name: 'Ереван Сит', createdAt: new Date('2026-09-02') })
+    const id = numbered(await merges.mergePlaces(typo, shop, NIGHT))
+    const ensured = await createPlaceRepository(db).ensure({
+      kind: 'store',
+      name: 'ереван сит',
+      country: 'AM',
+      city: 'Гюмри',
+    })
+    expect([ensured.id, ensured.trace]).toEqual([shop, typo])
+    const { trip } = await createTripRepository(db).start(
+      owner,
+      { id: randomUUID(), placeId: ensured.id, placeAsked: ensured.trace ?? '' },
+      'AMD',
+      null,
+    )
+    expect(trip.placeId).toBe(shop)
+    await merges.unmerge(id)
+    const home = onlyRow(
+      await db.execute<{ place_id: string }>(sql`select place_id from trips where id = ${trip.id}`),
+    )
+    expect(home?.place_id).toBe(typo)
+  })
+
+  it('names no trace for a place of its own name', async () => {
+    const shop = await insertPlace(db, { name: 'Ереван Сити' })
+    const ensured = await createPlaceRepository(db).ensure({
+      kind: 'store',
+      name: 'Ереван Сити',
+      country: 'AM',
+      city: 'Гюмри',
+    })
+    expect([ensured.id, 'trace' in ensured]).toEqual([shop, false])
+  })
+})
+
+describe('the undo leaves a verdict the person touched after the merge (MOL-299, adversarial А3)', () => {
+  const verdicts = createVerdictRepository(db)
+  const scoreOf = async (actorId: string, itemId: string) =>
+    onlyRow(
+      await db.execute<{ score: number; live: boolean }>(sql`
+        select score, deleted_at is null as live from verdicts
+        where actor_id = ${actorId} and item_id = ${itemId}`),
+    )
+  const scoreOn = (itemId: string) => scoreOf(owner, itemId)
+  const overwritten = async () =>
+    onlyRow(
+      await db.execute<{ n: number }>(
+        sql`select count(*)::int as n from catalogue_merge_moves where what = 'verdict_overwritten'`,
+      ),
+    )?.n
+
+  it("keeps the score given the survivor after a swap, the trace's row withdrawn", async () => {
+    await verdict(owner, older, { score: 5, ratedAt: '2026-09-01T10:00:00Z' })
+    await verdict(owner, younger, { score: 2, ratedAt: '2026-09-02T10:00:00Z' })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    expect(await scoreOn(older)).toEqual({ score: 2, live: true })
+    await verdicts.put(owner, { itemId: older, score: 4 })
+    await merges.unmerge(id)
+    // never 5 back on the survivor and the 4 on the trace: their last word was about the survivor
+    expect(await scoreOn(older)).toEqual({ score: 4, live: true })
+    expect((await scoreOn(younger))?.live).toBe(false)
+  })
+
+  it('keeps a moved verdict rated again on the survivor', async () => {
+    await verdict(owner, younger, { score: 1 })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await verdicts.put(owner, { itemId: older, score: 5 })
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      undefined,
+    ])
+  })
+
+  it("takes home a verdict the merge moved, rated again by the trace's id (В2)", async () => {
+    await verdict(owner, younger, { score: 2 })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    // a bot's button for a purchase of before the night
+    await rateItem({ items: createItemRepository(db), verdicts }, owner, younger, { score: 1 })
+    await merges.unmerge(id)
+    expect([await scoreOn(younger), await scoreOn(older)]).toEqual([
+      { score: 1, live: true },
+      undefined,
+    ])
+  })
+
+  it("swaps back a swapped verdict amended by the trace's id, and one withdrawn by it (В2)", async () => {
+    await verdict(owner, older, { score: 5, ratedAt: '2026-09-01T10:00:00Z' })
+    await verdict(owner, younger, { score: 2, ratedAt: '2026-09-02T10:00:00Z' })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await verdicts.amend(owner, younger, { score: 3 })
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      { score: 3, live: true },
+    ])
+    const again = numbered(await merges.mergeItems(younger, older, { by: 'hand' }))
+    expect(await verdicts.withdraw(owner, younger)).toBe(true)
+    await merges.unmerge(again)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      { score: 3, live: false },
+    ])
+  })
+
+  it("gives the survivor's own verdict back, written over by the trace's id, and the trace its word (Г1)", async () => {
+    await verdict(owner, older, { score: 5 })
+    await db.execute(sql`update verdicts set review = 'нежная' where item_id = ${older}`)
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const rate = (score: number) =>
+      rateItem({ items: createItemRepository(db), verdicts }, owner, younger, { score })
+    await rate(1)
+    await rate(2)
+    // the second write moves the first one's moment and keeps what the survivor said, never a second
+    expect(await overwritten()).toBe(1)
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      { score: 2, live: true },
+    ])
+    // the survivor's text was never touched, and the trace's word has none
+    const reviews = await db.execute<{ item_id: string; review: string | null }>(
+      sql`select item_id, review from verdicts order by item_id = ${older}`,
+    )
+    expect(reviews).toEqual([
+      { item_id: younger, review: null },
+      { item_id: older, review: 'нежная' },
+    ])
+    // what it said is kept for the undo alone
+    expect(await overwritten()).toBe(0)
+  })
+
+  const rateBy = (itemId: string, score: number) =>
+    rateItem({ items: createItemRepository(db), verdicts }, owner, itemId, { score })
+
+  it('gives the word to its own trace down a chain, undone from the end (Д1)', async () => {
+    const third = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    await verdict(owner, third, { score: 5 })
+    const first = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const last = numbered(await merges.mergeItems(older, third, NIGHT))
+    await rateBy(younger, 1)
+    await merges.unmerge(last)
+    await merges.unmerge(first)
+    expect([await scoreOn(third), await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      undefined,
+      { score: 1, live: true },
+    ])
+  })
+
+  it("keeps the middle one's own, carried further down the chain (№11)", async () => {
+    const third = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    await verdict(owner, older, { score: 5 })
+    const first = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const last = numbered(await merges.mergeItems(older, third, NIGHT))
+    await rateBy(younger, 1)
+    await merges.unmerge(last)
+    await merges.unmerge(first)
+    expect([await scoreOn(third), await scoreOn(older), await scoreOn(younger)]).toEqual([
+      undefined,
+      { score: 5, live: true },
+      { score: 1, live: true },
+    ])
+  })
+
+  it("keeps one word written over on a chain, the trace's id writing twice (№13)", async () => {
+    const third = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    await verdict(owner, older, { score: 5 })
+    const first = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const last = numbered(await merges.mergeItems(older, third, NIGHT))
+    await rateBy(younger, 1)
+    await rateBy(younger, 2)
+    expect(await overwritten()).toBe(1)
+    await merges.unmerge(last)
+    await merges.unmerge(first)
+    expect([await scoreOn(third), await scoreOn(older), await scoreOn(younger)]).toEqual([
+      undefined,
+      { score: 5, live: true },
+      { score: 2, live: true },
+    ])
+  })
+
+  it.each(['later', 'earlier'])(
+    "undoes a fan whose traces both wrote over the survivor's own, the %s merge first (№10)",
+    async (first) => {
+      const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+      await verdict(owner, older, { score: 5 })
+      const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const two = numbered(await merges.mergeItems(other, older, NIGHT))
+      await rateBy(younger, 1)
+      await rateBy(other, 2)
+      for (const id of first === 'later' ? [two, one] : [one, two]) {
+        expect(await merges.unmerge(id)).toMatchObject({ subject: 'item' })
+      }
+      expect([await scoreOn(older), await scoreOn(younger), await scoreOn(other)]).toEqual([
+        { score: 5, live: true },
+        { score: 1, live: true },
+        { score: 2, live: true },
+      ])
+      expect(await overwritten()).toBe(0)
+    },
+  )
+
+  it.each(['later', 'earlier'])(
+    'undoes a fan whose trace wrote over a row the other brought, the %s merge first (Д2)',
+    async (first) => {
+      const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+      await verdict(owner, stewed, { score: 3 })
+      const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const two = numbered(await merges.mergeItems(stewed, older, NIGHT))
+      await rateBy(younger, 1)
+      for (const id of first === 'later' ? [two, one] : [one, two]) {
+        expect(await merges.unmerge(id)).toMatchObject({ subject: 'item' })
+      }
+      expect([await scoreOn(stewed), await scoreOn(older), await scoreOn(younger)]).toEqual([
+        { score: 3, live: true },
+        undefined,
+        { score: 1, live: true },
+      ])
+    },
+  )
+
+  it.each(['later', 'earlier'])(
+    "undoes a fan two people wrote over each by the other's trace, the %s merge first (Е1)",
+    async (first) => {
+      const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+      const other = await insertActor(db)
+      await verdict(owner, stewed, { score: 3 })
+      await verdict(other, younger, { score: 2 })
+      const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const two = numbered(await merges.mergeItems(stewed, older, NIGHT))
+      // each from a queue typed before the night, by the trace of the other's row
+      await rateItem({ items: createItemRepository(db), verdicts }, owner, younger, { score: 1 })
+      await rateItem({ items: createItemRepository(db), verdicts }, other, stewed, { score: 4 })
+      for (const id of first === 'later' ? [two, one] : [one, two]) {
+        expect(await merges.unmerge(id)).toMatchObject({ subject: 'item' })
+      }
+      expect([
+        await scoreOf(owner, stewed),
+        await scoreOf(owner, younger),
+        await scoreOf(other, younger),
+        await scoreOf(other, stewed),
+        await scoreOn(older),
+        await scoreOf(other, older),
+      ]).toEqual([
+        { score: 3, live: true },
+        { score: 1, live: true },
+        { score: 2, live: true },
+        { score: 4, live: true },
+        undefined,
+        undefined,
+      ])
+      expect(await overwritten()).toBe(0)
+    },
+  )
+
+  it('gives a false twin its word back while the true one stands, its trace written over (Ж1)', async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    await verdict(owner, stewed, { score: 3 })
+    await db.execute(sql`update verdicts set review = 'мягкое' where item_id = ${stewed}`)
+    const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    // by the true twin's id, over the row the false one brought
+    await rateBy(younger, 1)
+    expect(await merges.unmerge(wrong)).toMatchObject({ subject: 'item' })
+    expect([await scoreOn(stewed), await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 3, live: true },
+      { score: 1, live: true },
+      undefined,
+    ])
+    const reviews = await db.execute<{ item_id: string; review: string | null }>(
+      sql`select item_id, review from verdicts order by item_id = ${stewed}`,
+    )
+    expect(reviews).toEqual([
+      { item_id: older, review: null },
+      { item_id: stewed, review: 'мягкое' },
+    ])
+    // the true one undone after all: the word its trace wrote goes home
+    await merges.unmerge(right)
+    expect([await scoreOn(stewed), await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 3, live: true },
+      undefined,
+      { score: 1, live: true },
+    ])
+    expect(await overwritten()).toBe(0)
+  })
+
+  it.each(['false', 'true'])(
+    "gives each trace its word home, the true one's written again over the false one's, the %s twin first (Ц1)",
+    async (first) => {
+      const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+      await verdict(owner, older, { score: 5 })
+      const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+      // from phones' queues, by each trace's id; the true twin's again, over the false one's word
+      await rateBy(younger, 4)
+      await rateBy(stewed, 2)
+      await rateBy(younger, 3)
+      await merges.unmerge(first === 'false' ? wrong : right)
+      expect([await scoreOn(older), await scoreOn(younger), await scoreOn(stewed)]).toEqual(
+        first === 'false'
+          ? [{ score: 3, live: true }, undefined, { score: 2, live: true }]
+          : [{ score: 2, live: true }, { score: 3, live: true }, undefined],
+      )
+      await merges.unmerge(first === 'false' ? right : wrong)
+      expect([await scoreOn(older), await scoreOn(younger), await scoreOn(stewed)]).toEqual([
+        { score: 5, live: true },
+        { score: 3, live: true },
+        { score: 2, live: true },
+      ])
+      expect(await overwritten()).toBe(0)
+    },
+  )
+
+  it.each(['false', 'true'])(
+    "gives each trace its word home, the false one's own row written again over the true one's, the %s twin first (Ч1)",
+    async (first) => {
+      const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+      await verdict(owner, stewed, { score: 3 })
+      const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+      // from phones' queues, by each trace's id: the true twin's over the row the false one brought, then its own
+      await rateBy(younger, 1)
+      await rateBy(stewed, 4)
+      await merges.unmerge(first === 'false' ? wrong : right)
+      expect([await scoreOn(older), await scoreOn(younger), await scoreOn(stewed)]).toEqual(
+        first === 'false'
+          ? [{ score: 1, live: true }, undefined, { score: 4, live: true }]
+          : [{ score: 4, live: true }, { score: 1, live: true }, undefined],
+      )
+      await merges.unmerge(first === 'false' ? right : wrong)
+      expect([await scoreOn(older), await scoreOn(younger), await scoreOn(stewed)]).toEqual([
+        undefined,
+        { score: 1, live: true },
+        { score: 4, live: true },
+      ])
+      expect(await overwritten()).toBe(0)
+    },
+  )
+
+  it.each(['false', 'true'])(
+    "gives each trace its last word home, the true one's again over the false one's own row, the %s twin first (Ш1)",
+    async (first) => {
+      const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+      await verdict(owner, stewed, { score: 3 })
+      const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+      // from phones' queues, by each trace's id, each over the other's word
+      await rateBy(younger, 1)
+      await rateBy(stewed, 4)
+      await rateBy(younger, 5)
+      await merges.unmerge(first === 'false' ? wrong : right)
+      expect([await scoreOn(older), await scoreOn(younger), await scoreOn(stewed)]).toEqual(
+        first === 'false'
+          ? [{ score: 5, live: true }, undefined, { score: 4, live: true }]
+          : [{ score: 4, live: true }, { score: 5, live: true }, undefined],
+      )
+      await merges.unmerge(first === 'false' ? right : wrong)
+      expect([await scoreOn(older), await scoreOn(younger), await scoreOn(stewed)]).toEqual([
+        undefined,
+        { score: 5, live: true },
+        { score: 4, live: true },
+      ])
+      expect(await overwritten()).toBe(0)
+    },
+  )
+
+  it.each(['false', 'true'])(
+    "gives each trace its last word home, a third one's over the false one's own row, the %s twin first (Щ1)",
+    async (first) => {
+      const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+      const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+      await verdict(owner, stewed, { score: 3 })
+      const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+      await merges.mergeItems(other, older, NIGHT)
+      // from phones' queues, by each trace's id, each over the word before it
+      await rateBy(younger, 1)
+      await rateBy(stewed, 4)
+      await rateBy(other, 2)
+      for (const id of first === 'false' ? [wrong, right] : [right, wrong]) {
+        expect(await merges.unmerge(id)).toMatchObject({ subject: 'item' })
+      }
+      expect([
+        await scoreOn(older),
+        await scoreOn(younger),
+        await scoreOn(stewed),
+        await scoreOn(other),
+      ]).toEqual([
+        { score: 2, live: true },
+        { score: 1, live: true },
+        { score: 4, live: true },
+        undefined,
+      ])
+    },
+  )
+
+  it("leaves no row for a withdrawal by the true twin's id, the false one undone (З1)", async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    await verdict(owner, stewed, { score: 3 })
+    const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    // «Снять оценку» on a screen of the true twin opened before the night
+    expect(await verdicts.withdraw(owner, younger)).toBe(true)
+    await merges.unmerge(wrong)
+    const rows = async () =>
+      onlyRow(
+        await db.execute<{ n: number }>(
+          sql`select count(*)::int as n from verdicts where actor_id = ${owner}`,
+        ),
+      )?.n
+    expect([await scoreOn(stewed), await scoreOn(older), await rows()]).toEqual([
+      { score: 3, live: true },
+      undefined,
+      1,
+    ])
+    await merges.unmerge(right)
+    expect([await scoreOn(stewed), await scoreOn(younger), await rows()]).toEqual([
+      { score: 3, live: true },
+      undefined,
+      1,
+    ])
+    expect(await overwritten()).toBe(0)
+  })
+
+  it("rates the true twin's word left on the survivor when the trace's id wrote it (И1)", async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    await verdict(owner, stewed, { score: 3, ratedAt: '2026-09-01T10:00:00Z' })
+    await merges.mergeItems(younger, older, NIGHT)
+    const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    await rateBy(younger, 1)
+    await merges.unmerge(wrong)
+    const stays = onlyRow(
+      await db.execute<{ score: number; fresh: boolean; written: boolean }>(sql`
+        select score, rated_at > '2026-09-01T10:00:00Z' as fresh, rated_at = updated_at as written
+        from verdicts where actor_id = ${owner} and item_id = ${older}`),
+    )
+    expect(stays).toEqual({ score: 1, fresh: true, written: true })
+  })
+
+  it('gives the trace its rating withdrawn, rated and taken back by its id (И2)', async () => {
+    await verdict(owner, older, { score: 5 })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await rateBy(younger, 1)
+    expect(await verdicts.withdraw(owner, younger)).toBe(true)
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      { score: 1, live: false },
+    ])
+  })
+
+  it("keeps a rating taken back by the true twin's id as a withdrawn row, the false one undone (И2)", async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    await verdict(owner, stewed, { score: 3 })
+    await merges.mergeItems(younger, older, NIGHT)
+    const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    await rateBy(younger, 1)
+    expect(await verdicts.withdraw(owner, younger)).toBe(true)
+    await merges.unmerge(wrong)
+    expect([await scoreOn(stewed), await scoreOn(older)]).toEqual([
+      { score: 3, live: true },
+      { score: 1, live: false },
+    ])
+  })
+
+  it('carries a word written over by a fan down a chain to its own trace (№16)', async () => {
+    const third = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    await verdict(owner, younger, { score: 2 })
+    const first = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const last = numbered(await merges.mergeItems(older, third, NIGHT))
+    const fan = numbered(await merges.mergeItems(other, third, NIGHT))
+    await rateBy(other, 4)
+    await merges.unmerge(last)
+    await merges.unmerge(first)
+    expect([
+      await scoreOn(younger),
+      await scoreOn(older),
+      await scoreOn(third),
+      await scoreOn(other),
+    ]).toEqual([{ score: 2, live: true }, undefined, { score: 4, live: true }, undefined])
+    await merges.unmerge(fan)
+    expect([await scoreOn(younger), await scoreOn(third), await scoreOn(other)]).toEqual([
+      { score: 2, live: true },
+      undefined,
+      { score: 4, live: true },
+    ])
+  })
+
+  it("keeps the survivor's own for the true twin's undo, the false one undone alone (Ж1)", async () => {
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    await verdict(owner, older, { score: 5 })
+    const wrong = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const right = numbered(await merges.mergeItems(other, older, NIGHT))
+    await rateBy(younger, 1)
+    await rateBy(other, 2)
+    await merges.unmerge(wrong)
+    expect([await scoreOn(older), await scoreOn(younger), await scoreOn(other)]).toEqual([
+      { score: 2, live: true },
+      { score: 1, live: true },
+      undefined,
+    ])
+    expect(await overwritten()).toBe(1)
+    await merges.unmerge(right)
+    expect([await scoreOn(older), await scoreOn(younger), await scoreOn(other)]).toEqual([
+      { score: 5, live: true },
+      { score: 1, live: true },
+      { score: 2, live: true },
+    ])
+    expect(await overwritten()).toBe(0)
+  })
+
+  it("gives it back withdrawn by the trace's id, and gives the trace no verdict (Г2)", async () => {
+    await verdict(owner, older, { score: 5 })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    expect(await verdicts.withdraw(owner, younger)).toBe(true)
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      undefined,
+    ])
+  })
+
+  it("leaves it written over where the survivor's id touched it since", async () => {
+    await verdict(owner, older, { score: 5 })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await rateItem({ items: createItemRepository(db), verdicts }, owner, younger, { score: 1 })
+    await verdicts.put(owner, { itemId: older, score: 3 })
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 3, live: true },
+      undefined,
+    ])
+  })
+
+  it('goes back as before MOL-299 by a move written with no moment (№6)', async () => {
+    await verdict(owner, older, { score: 5, ratedAt: '2026-09-01T10:00:00Z' })
+    await verdict(owner, younger, { score: 2, ratedAt: '2026-09-02T10:00:00Z' })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    // the journal of production's merges from before: no moment on any move
+    await db.execute(sql`update catalogue_merge_moves set key = key - 'at'`)
+    await verdicts.put(owner, { itemId: older, score: 4 })
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      { score: 4, live: true },
+    ])
+  })
+
+  it("still swaps back a verdict nobody touched, and brings the trace's back", async () => {
+    await verdict(owner, older, { score: 5, ratedAt: '2026-09-01T10:00:00Z' })
+    await verdict(owner, younger, { score: 2, ratedAt: '2026-09-02T10:00:00Z' })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      { score: 2, live: true },
+    ])
   })
 })

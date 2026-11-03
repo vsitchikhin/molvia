@@ -103,6 +103,16 @@ const file: ExportFile = {
       withdrawnAt: at,
     },
   ],
+  overwrittenVerdicts: [
+    {
+      verdictId: id(10),
+      score: 5,
+      ratedAt: at,
+      updatedAt: at,
+      withdrawnAt: null,
+      overwrittenAt: at,
+    },
+  ],
   searchPicks: [{ queryKey: 'moloko', itemId: id(8), picks: 3, lastPickedAt: at, admits: false }],
   ratingReminders: [
     { step: 2, remindedOn: '2026-09-23', remindedAt: at, windowFrom: '2026-09-19' },
@@ -416,7 +426,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(26)
+    expect(wire.version).toBe(27)
     expect(wire.account.lastSeenAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.silenceWarning).toBe(7)
     expect(wire.account.silenceWarnedAt).toBe('2026-09-20T10:00:00.000Z')

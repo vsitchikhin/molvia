@@ -65,6 +65,8 @@ describe('dist/merge.js', () => {
       0,
       expect.stringContaining('dry run: nothing changed'),
     ])
+    // no number a merge will not get (MOL-299, adversarial А4)
+    expect(dry.stdout).not.toMatch(/#\d/)
     expect(await mergedInto(younger)).toBeNull()
 
     const done = merge('merge', younger, older, '--yes')

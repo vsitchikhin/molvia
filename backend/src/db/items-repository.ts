@@ -29,7 +29,7 @@ import { kindAt } from './kind-word'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { vectorLiteral } from './item-embeddings-repository'
 import { itemBarcodes, itemEmbeddings, items, searchPicks } from './schema'
-import { liveItemId } from './trace'
+import { liveItemId, noteTraceWrite } from './trace'
 
 export interface ItemRepository {
   /** `createdBy` is null for a seeded item — it belongs to nobody. */
@@ -1118,6 +1118,12 @@ export function createItemRepository(db: Conn): ItemRepository {
           const claimed = await claim(tx, [code], row.id)
           if ('taken' in claimed) return holder(tx, claimed.taken)
           await bind(tx, row.id, claimed.free, actorId)
+          // A code bound by a trace's id goes home with an undo (MOL-299, А2).
+          if (row.id !== itemId.toLowerCase()) {
+            for (const free of claimed.free) {
+              await noteTraceWrite(tx, 'item', itemId, 'barcode', { code: free })
+            }
+          }
           const [item] = await load([row.id], tx)
           return item ? { item, added: claimed.free.length > 0 } : null
         }),

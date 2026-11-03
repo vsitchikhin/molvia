@@ -818,6 +818,99 @@ report.
   «Молоко 3,2%», does not merge into what that went into (А5). The owner's `make merge` still may (В-2). A
   pick has no id, so its move names its person and **goes with the person by the cascade**
   (`ACTOR_REFERENCES`); the copy of a person's data leaves the journal out, the pick itself being in it.
+- **What a trace's id writes after its merge goes home with the undo** (MOL-299, adversarial А2): a
+  purchase a phone queued before the night, a first verdict by a bot's button, a new pick, a word of the
+  shop's memory, a code, a receipt's trip at a place named by its id — `liveItemId` lands each on the
+  survivor past the journal, and `unmerge` left it there for good. **A place by its trace's name too**
+  (adversarial Б3, owner's В-7 «а»): «Начать запись» and a receipt's new place find a shop by its name,
+  the main way a place is named, and `places.ensure` answers a trace's name with the survivor and the
+  trace beside it (`trace`), so the trip goes home as well. So the path that writes it notes the
+  row under every merge on the trace's way to the survivor (`noteTraceWrite`), where the id asked is not
+  the row's now, and the undo takes it a merge back as it takes what the merge moved — a chain step by
+  step, from its end. A verdict is noted only as a first one, a pick only as a new row. **Picks a trace's id adds
+  to a row no move of its way names** — the survivor's own from before, or one another merge brought —
+  **are the trace's share** (`pick_written`, adversarial К1, owner's В-11 «б»): the merge into the survivor
+  keeps how many, their last moment and «own word». **A row is its own and the shares standing on it** (Х1 of
+  round 22): every share of one row — `pick_added` and `pick_written`, of any merge into the survivor — keeps
+  the same own, the row's last pick and «own word» without the shares (`keptLastOf`, `keptAdmitsOf`), and the
+  undo of any takes its picks off and gives the row the later of its own moment and the other shares' last, and
+  its own word or another share's. Kept as a snapshot of the row before each share, it held the shares below,
+  and an undo out of their order or a share grown since found the row at no moment it waited for and left the
+  picks or the word behind (О1, П1, Р1, С1, Ф1, Х1 of rounds 15–22). A row a merge brought goes home at what is
+  left of it once every share standing is taken out — never whole while one stands, whatever its moment says
+  (У1 of round 20) — the rest that trace's first pick, and its own what the shares left go back to (as `above`
+  for a verdict, any order, one merge alone too). A pick by the trace's id on a row its merge added the trace's
+  own picks to (`pick_added`) grows that share instead: one share of the trace, never two (Л1 of round 12). A
+  pick by the survivor's own id writes its moment and word into every share standing on the row
+  (`pickWrittenBySurvivor`) — and so does a pick by the id of the trace whose row its merge brought there, the
+  row being that trace's own (Т1 of round 19) — so the undo gives the row back the person's own last pick of it,
+  never the one from before the merge (М1 of round 13, Н1 of round 14).
+  **A verdict, a pick or a word the person touched since
+  stays**
+  (adversarial А3): rated, amended or withdrawn on the survivor, it is their word about the survivor, and
+  taken home or swapped back it put that word on the trace, crossing the scores — «Курица вареная» 1
+  merged, the person gives «Курица жареная» 5, and the undo gave «вареная» the 5; a word of the shop's memory
+  said of the survivor by the next receipt, a pick of it under the same query, went to the trace whole (Б1,
+  Б2). Each verdict, pick and word a merge moves or swaps — or a trace's id writes — is written with its
+  moment to the microsecond (`updated_at`, `last_picked_at`, `written_at`), and the undo moves or swaps back
+  only a row still at it; a swap kept leaves the trace's row withdrawn. **Touched by the trace's id, the row
+  is still the trace's** (adversarial В1, В2): a pick repeated from a phone's queue, a verdict given again,
+  amended or withdrawn by a bot's button land on the survivor's row as any write by a trace's id, and they
+  move its moves' moment with them (`restampTraceWrite`), so it goes home — swapped back, for a swap.
+  **A verdict no move of the way names is the survivor's own from before** (adversarial Г1, Г2, owner's
+  В-10 «б»): the person has one row for one item, so a rating, an amendment or a withdrawal by the trace's
+  id lands on it and writes over their word about the survivor. The merge into the survivor keeps what it
+  said — its score and moments, never its text (`verdict_overwritten`, `before`, with the person's id) — and
+  the undo, last of its moves, gives it back while the row is still at the trace's word, and gives the trace
+  that word: a rating its own verdict, given at the moment of the write, a withdrawal its own withdrawn if
+  it has one. Later writes by the trace's id move the moment and keep the first `before`; rated and then
+  taken back by it, the trace gets its verdict withdrawn — a row, as MOL-27 counts one (И2 of round 9) — a
+  withdrawal alone nothing. What is kept is
+  the person's, in their copy (`overwrittenVerdicts`, version 27), gone with them by the cascade, and gone
+  with the undo. It is kept by the merge into the survivor; on a chain the word goes to that merge's younger
+  and is written there as the trace's id would write it, so the next undo carries it on and the whole chain
+  undone gives it to the trace (№11, Д1 of round 5). **In a fan any order undoes it, and one merge alone too** (№10, Д2, Е1 of
+  round 6, Ж1 of round 7): the earlier merge's trace may write over a row the later merge brought, or over a
+  word another trace wrote, so a verdict's move may find its row at another word. Then what the row said at
+  the move's moment is the `before` of the next word over it, held by a merge still standing: the undo hands
+  that word home and leaves the rest to the merge above (`above`). A row the merge brought goes home itself, at
+  what it said, so the moves that name it carry it on down a chain (№16 of review 8), and the other trace's
+  word stays as a row of its own, noted as its first — a withdrawal of nothing as none, the row it took being
+  the one gone home (З1 of round 8, as Г2), and rated when the trace's id wrote it (И1 of round 9). A word written over goes to its trace, and the move above keeps
+  what this one did. **A trace's word written again over another's lifts its move to the top** (Ц1 of round 23,
+  once the price №14 of the self-review): the move over it takes what lay under it, and it takes what the row said
+  before the write (`liftOverwritten`) — left in the middle, its moment moved past the other's and neither undo
+  found the row at the word it waited for. **And on the row its own merge brought, it goes on top as a move of that merge** (Ч1 of
+  round 24) — one word of a trace on a row, its last: lifted down onto that row by another's word lifted over it, it
+  goes into the merge's `verdict` (Ш1 of round 25). The undo takes the row home whole at that word wherever it lies in
+  the stack — the row's own on top, else the `before` of the word over it, which takes what lay under it — and the
+  rest of the stack stays here as a row of its own at its top word, noted as its lowest trace's first, as for the
+  picks (`traceWordHome`, Щ1 of round 26; З1, У1). So the owner undoes the false twin and keeps the true one. An order by the moment
+  (round 5) refused both undos for good where two people wrote each by the other's trace (Е1), and a move
+  waiting for the other undo (round 6) waited for good where that one was the true twin (Ж1).
+  **The prices, named:** the trace's own score is lost where the person rated the survivor over it by the
+  survivor's id (the row was one: their own act), and the trace's row so kept holds the survivor's
+  old score with its `rated_at`, withdrawn — the gate, the reminder and the copy read it (Б4); a text the
+  trace's id wrote over is not given back; an **item** written by a
+  trace's name — «Предложить товар», a receipt's new line — stays with the survivor, the name being the
+  survivor's second (В-7 «а»: the search shows the survivor, so it is rare); a write by a trace that an
+  `unmerge` commits between its row and its note stays with the survivor too (Б5, owner's В-8 «а»: the
+  owner's hand once a morning against milliseconds); a swap of one person's two verdicts whose kept row
+  another trace's id wrote over waits for that merge's undo, and stays swapped while it stands (Ж1 of round 7:
+  a swap goes over two rows, and handing it on is not worth a case this rare); the row the undo gives a trace is rated at the trace's id's **last** write, not its first
+  rating (Й1 of round 10): the journal keeps one moment of the trace's word, which every write moves, so a rating
+  amended or taken back later by that id stands later in gate 0.2 than it was given — against MOL-27's «re-rating
+  cannot move anyone in the gate», on the side of «stop», and only for a second write by a trace's id between a
+  merge and its undo; keeping the first too would be one more of the person's moments in the journal and the
+  copy; a withdrawal of nothing by one trace's id with a word of another written over it
+  later stays on the survivor as a withdrawn row with the brought row's score, for the gate to count (№19 of the
+  self-review, round 9: three twins, a withdrawal and a word more); a word of the shop's memory
+  settled again after a
+  purchase removed (`settleWords`, MOL-240) takes another moment and stays with the survivor while its
+  purchase goes home — the memory says the survivor until the API's next start settles it whole (№9 of
+  the self-review, owner's В-9 «а»); and a move written before MOL-299 has no moment and goes back as it
+  did. **A dry run of `make merge` prints no number** (adversarial А4): the identity it takes is
+  not rolled back, and «make unmerge ID=» of a dry run named a merge that would never be.
 - **The night** (`mergeTick`): a minute timer in the API, from 04:30 Yerevan — after the copy of the
   database at 04:00, so a copy before every merge exists — claimed by its day in
   `catalogue_merge_runs`, so two instances never run one night and a night slept through runs on waking;
@@ -838,7 +931,17 @@ report.
   is 0.64: never asked) — in `report`, where nothing merged, it is named as it is.
 - **`CATALOGUE_MERGE`**: `on` merges, `report` says what it would and merges nothing — it only sweeps
   what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `report` until
-  the owner says `on`** (В-3): the thresholds stand on a corpus, not yet on strangers' twins. A pair
+  MOL-358** (В-3; MOL-299): the thresholds stand on a corpus, not on live twins. **28 nights of `report`,
+  06.10…02.11, named none to merge** — not one false, nor one true, so the rule has met no live twin — and
+  the owner's rule for `on` (В-3 «а» of MOL-299: before the tag of 0.2, once no pair the night would merge
+  is false) let it in for one evening, 02.11. **The adversarial pass of MOL-299 found the false pair the
+  nights could not**: a way of cooking one letter apart merges by itself — «Курица вареная» into «Курица
+  жареная» at 0.929, «Грибы тушёные» into «Грибы сушёные» at 0.946, seven pairs of seven — since a word is
+  one edit and the model reads a name by its letters; the seed has no such pair, people's items do. So
+  production went back to `report` on 03.11, before a night merged anything, and MOL-358 mends the rule and
+  turns `on` as its last step. Of the 14 candidates of those nights 12 were the seed against itself, set
+  apart by hand, one a receipt's twin across two scripts merged by hand (#1), and one a place in Gyumri
+  left as it is. A pair
   only reported comes with its command **`make apart FROM= INTO=`** (review №7, owner's decision
   05.10.2026): the owner says two things are apart before `on` merges them. `catalogue_apart` holds the
   pair by its ids; the night reads it as a pair undone — by the live things its ends stand in now —
