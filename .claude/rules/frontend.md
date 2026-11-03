@@ -497,7 +497,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
   the root's `font-size`, which `useLargeText.test.ts` holds — every sheet read as Sass writes it, so a comment,
   `@media`, a mixin and nesting hide nothing (adversarial Г1–Г3), and a rule setting `font-size` or `font` is the root's
   unless its subject holds what no root has — a class, an id, a pseudo-element, an element of another name — since `*`,
-  `:not(body)`, `:has(> body)` and `:scope` reach it unnamed (Г4), brackets counted at any depth and never in a string (Г5, Г6); a plain `.css` of `src` and the `<style>` of `index.html` read as they stand (Г7), a library's sheet a dependency and discussed as one; strict, a component's scoped `html` fails as well. A
+  `:not(body)`, `:has(> body)` and `:scope` reach it unnamed (Г4), brackets counted at any depth and never in a string (Г5, Г6); a plain `.css` of `src` and the `<style>` of `index.html` read as they stand (Г7), a library's sheet a dependency and discussed as one; and what reaches the page whatever its way — `public/` by a `<link>`, a sheet a script imports, plain CSS nesting, the root's `style` — `e2e/large-text.spec.ts` reads as the outcome: the browser's own size set to 20 by CDP, the root's size the same with every sheet and its `style` as with none (Г8); strict, a component's scoped `html` fails as well. A
   script's `documentElement.style` is no sheet, and review's; Safari passes
   Dynamic Type to no page. Seven ways:
   - **A row of segments its words do not fit stands them one under another** (`SegmentedControl`, В-1 «а»):
