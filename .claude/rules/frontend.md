@@ -1649,7 +1649,10 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   pinned, and 12 px of a line of 38 stood in sight; now it goes with the content, as for a field with no room.
   A line of it, as of the field, and by its own line height, not its box, which grows as it comes; the footer is
   settled again as the content grows (`panelBox`), since a refusal changes neither the sheet's box nor the
-  footer's, and pinned again once the field is put right. **A refusal brings it into sight once it has grown** (`useFieldRefusal`, in a sheet, while the focus
+  footer's, and pinned again once the field is put right. **The price, named** (adversarial round 4): while
+  the field is marked the main button goes down with the content, under the error, and is scrolled to — at 200 %
+  in a window up to 340 (it was 290), 175 % up to 300, 150 % 260; at 330–340 half the line and more was in sight
+  before, and the rule asks for it whole. **A refusal brings it into sight once it has grown** (`useFieldRefusal`, in a sheet, while the focus
   is in the field): with the focus there already — Safari's tap — nothing else moved the sheet. `e2e/sheet`
   holds both on the kit's long sheet, whose note is refused so, in Chromium and WebKit — the large text at
   200 % on 320×360 (А2) and 360×320 (А3). **A footer is let go only when it leaves no room for the field typed in, in a sheet that scrolls**
