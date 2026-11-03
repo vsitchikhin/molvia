@@ -1285,6 +1285,54 @@ describe('the pinned footer', () => {
     expect(dialog().classList.contains('pinned')).toBe(false)
   })
 
+  // At 200 % in a window of 300–330 over the keys the field of 88 had 109 over a footer of 153, and its
+  // error none: pinned, the footer covered the reason, 12 px of a line of 38 in sight (MOL-354,
+  // adversarial А3). A field marked wrong asks room for the first line of its error too.
+  describe('a field marked wrong', () => {
+    async function refused(marked = true) {
+      const sheet = await laidOut({ sheet: 262, scrolls: 600, footer: 153, field: 88 })
+      // The content as the browser lays it out: the error, coming in under the field, makes it taller.
+      const panel = sheet.dialog().querySelector<HTMLElement>('.panel')
+      if (!panel) throw new Error('no panel in the sheet')
+      let content = 600
+      Object.defineProperty(panel, 'offsetHeight', { get: () => content })
+      sheet.field.focus()
+      await sheet.layout({})
+      expect(sheet.dialog().classList.contains('pinned')).toBe(true)
+      const error = document.createElement('p')
+      error.id = 'price-error'
+      error.style.lineHeight = '38px'
+      // Coming in: its box still short, 9 under the field.
+      error.getBoundingClientRect = () => DOMRect.fromRect({ y: 97, width: 300, height: 4 })
+      sheet.dialog().append(error)
+      sheet.field.setAttribute('aria-errormessage', error.id)
+      if (marked) sheet.field.setAttribute('aria-invalid', 'true')
+      content = 640
+      await sheet.layout({ scrolls: 640 })
+      return { ...sheet, grow: (to: number) => (content = to) }
+    }
+
+    it('lets the footer go when its error’s first line has no room, and pins it again once put right', async () => {
+      const { dialog, field, layout, grow } = await refused()
+      expect(dialog().classList.contains('pinned')).toBe(false)
+      field.removeAttribute('aria-invalid')
+      grow(600)
+      await layout({ scrolls: 600 })
+      expect(dialog().classList.contains('pinned')).toBe(true)
+    })
+
+    it('must not fire: words under a field not marked wrong', async () => {
+      const { dialog } = await refused(false)
+      expect(dialog().classList.contains('pinned')).toBe(true)
+    })
+
+    it('must not fire: room for the field and the first line of its error', async () => {
+      const { dialog, layout } = await refused()
+      await layout({ sheet: 288 })
+      expect(dialog().classList.contains('pinned')).toBe(true)
+    })
+  })
+
   // A sheet that does not scroll hides nothing under its footer, which keeps its shadow (С-11).
   it('must not fire: a sheet that does not scroll', async () => {
     const { dialog, field, layout } = await laidOut({

@@ -711,7 +711,11 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   a day still to come, and marked so before it — the midnight by `useLocalDay`'s own timer since MOL-329, the
   sheet keeping none of its own; a phone asleep over the midnight is caught by the app back in view, not by the
   timer, which a sleeping phone holds; the action's word («Записать сумму») comes
-  once a shop is named, as «Перевести» and a verdict's say what they wait for. **The price, named:** a card of
+  once a shop is named, as «Перевести» and a verdict's say what they wait for. **«Где вы?» is the same choice and
+  waits the same way** (MOL-354, owner's В-1 «а»): «Начать запись» is not now while the name draws nothing, saying
+  «Выберите магазин» — the words of «Где купили?», no second key — and a name no place takes is refused at the tap,
+  marked and focused; with no settings it is not now under the action's own word, since the state over the field
+  says why and «Выберите магазин» over a name typed would be untrue. **The price, named:** a card of
   «Оценки» back from the queue refused opens with the focus on its title (`focusOnMount`) and its error in the
   field — a queue's answer, not a refusal at a send. **The checkbox is
   `AppCheckbox`** (В-4 «а»), a native checkbox the kit draws, by the grammar of `AppSwitch`: off a square edged in
@@ -1633,7 +1637,25 @@ bottom: 0`), a sibling of the panel and as wide as the sheet — never a middle 
   the browser's own scroll is done, and a field it already showed is not moved; only with a footer —
   without one the browser's scroll is the whole answer (MOL-135, adversarial А). **A footer that grows over the field typed in** — an error,
   «Вернуть» — moves that edge up as a lower sheet would, and the field is brought back above it; only a
-  field typed in, only in an open sheet. **A footer is let go only when it leaves no room for the field typed in, in a sheet that scrolls**
+  field typed in, only in an open sheet. **A field is in sight with its error** (MOL-354, adversarial А1): the
+  error a refusal grows under the field (`aria-errormessage`, by `AppReveal`) is kept above the edge with it —
+  the field last over the footer stood on its edge, and its error grew under the footer: «Где вы?» with two
+  recent shops and the keys up, the name marked and its reason nowhere. **Taller with its error than the room,
+  the field's top stands at the edge and the error is seen as far as the room goes** (adversarial А2): at 200 %
+  on 320 over the keys a field of 88 and three lines of 113 had 191, and the field alone, the first rule, hid
+  every line; the label over the field is what goes. A field whose top is cut is brought down alone, as before.
+  **A field marked wrong asks the footer room for the first line of its error too** (`roomFor`, adversarial А3):
+  at 200 % in a window of 300–330 over the keys the field of 88 had 109 over a footer of 153, the footer stayed
+  pinned, and 12 px of a line of 38 stood in sight; now it goes with the content, as for a field with no room.
+  A line of it, as of the field, and by its own line height, not its box, which grows as it comes; the footer is
+  settled again as the content grows (`panelBox`), since a refusal changes neither the sheet's box nor the
+  footer's, and pinned again once the field is put right. **The price, named** (adversarial round 4): while
+  the field is marked the main button goes down with the content, under the error, and is scrolled to — at 200 %
+  in a window up to 340 (it was 290), 175 % up to 300, 150 % 260; at 330–340 half the line and more was in sight
+  before, and the rule asks for it whole. **A refusal brings it into sight once it has grown** (`useFieldRefusal`, in a sheet, while the focus
+  is in the field): with the focus there already — Safari's tap — nothing else moved the sheet. `e2e/sheet`
+  holds both on the kit's long sheet, whose note is refused so, in Chromium and WebKit — the large text at
+  200 % on 320×360 (А2) and 360×320 (А3). **A footer is let go only when it leaves no room for the field typed in, in a sheet that scrolls**
   (`loose`, adversarial А1, round 2): over the keys of a turned phone the sheet has some 107 px, and
   the edit of a spending a footer of 121 — pinned, it covered the whole sheet and the sum being typed
   with it; the kit's one button, 77, left 29 px of a field of 44. Let go, it goes with the content as

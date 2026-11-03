@@ -700,19 +700,25 @@
     </BottomSheet>
 
     <!-- Taller than its share: the footer pinned to its edge, the rows scrolling under it, a field at
-         the very end (MOL-182). -->
+         the very end (MOL-182), refused at the tap as a note no exchange takes, its error grown under it
+         and brought into sight with it (MOL-354). -->
     <AppButton block @click="longOpen = true">{{ t('dev.kit.open_long_sheet') }}</AppButton>
 
-    <BottomSheet v-model:open="longOpen">
+    <BottomSheet ref="longSheet" v-model:open="longOpen">
       <template #title>{{ t('dev.kit.long_sheet') }}</template>
       <div class="pair">
         <AppButton v-for="n in 15" :key="n" variant="secondary" block>
           {{ t('dev.kit.long_row', { n }) }}
         </AppButton>
       </div>
-      <AppField v-model="longNote" :label="t('income.sheet.note')" />
+      <AppField
+        v-model="longNote"
+        :label="t('income.sheet.note')"
+        :error-text="longNoteBad ? t('spending.sheet.bad_text') : null"
+        @update:model-value="longNoteBad = false"
+      />
       <template #footer>
-        <AppButton size="large" block @click="longOpen = false">{{ t('item.save') }}</AppButton>
+        <AppButton size="large" block @click="recordLong">{{ t('item.save') }}</AppButton>
       </template>
     </BottomSheet>
 
@@ -810,6 +816,7 @@ import {
   COUNTRY_CITIES,
   SPENDING_PRESETS,
   exchangeChannelSchema,
+  exchangeNoteSchema,
   tripViewCodec,
 } from '@molvia/model'
 import type {
@@ -871,6 +878,7 @@ import { budgetAmount, journalRowProps } from '@/components/spending'
 import type { JournalRow } from '@/components/spending'
 import VerdictBadge from '@/components/VerdictBadge.vue'
 import VerdictCard from '@/components/VerdictCard.vue'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { localDay } from '@/days'
 
 /**
@@ -1323,6 +1331,20 @@ export default defineComponent({
       statesFull.value = true
       statesOpen.value = true
     }
+    const longOpen = ref(false)
+    const longNote = ref('')
+    const longNoteBad = ref(false)
+    const longSheet = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
+    function recordLong(): void {
+      longNoteBad.value =
+        longNote.value !== '' && !exchangeNoteSchema.safeParse(longNote.value).success
+      if (longNoteBad.value) {
+        void refuse(() => longSheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
+        return
+      }
+      longOpen.value = false
+    }
     return {
       t,
       today: kitToday,
@@ -1436,8 +1458,11 @@ export default defineComponent({
       chipCategories,
       moreOpen: ref(false),
       sheetOpen: ref(false),
-      longOpen: ref(false),
-      longNote: ref(''),
+      longOpen,
+      longNote,
+      longNoteBad,
+      longSheet,
+      recordLong,
       wideOpen: ref(false),
       wideCategory: ref(wideOwn.id),
       wideCategories,

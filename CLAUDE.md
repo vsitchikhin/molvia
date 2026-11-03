@@ -646,7 +646,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   scrim only to a listener there (MOL-80). **Over the keyboard its height is a share of the visual
   viewport**, never of the window, and it scrolls itself to the field being typed in (MOL-135);
   **its footer is pinned to its edge, sticky in its own scroll, and what it brings into sight stops at
-  the footer's top** (`scroll-padding`, MOL-182);
+  the footer's top** (`scroll-padding`, MOL-182) — a field with its error (MOL-354);
   **the lift is the pinned box less the visible height**, never `100dvh` or `innerHeight`, and
   **before the keys come it takes the height they left last time** (MOL-151); **a field takes the focus
   at the opening only in the tap that opened it** (MOL-212), else × keeps it.
