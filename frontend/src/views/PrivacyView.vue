@@ -108,6 +108,8 @@ dl {
 }
 
 dt {
+  @include word-unit;
+
   font-weight: var(--weight-medium);
 }
 

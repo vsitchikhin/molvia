@@ -184,6 +184,8 @@ export default defineComponent({
 /* Never cut: on its own line it breaks between its words, never inside a figure, whose groups the
    formats keep together. */
 .value {
+  @include word-unit;
+
   flex: 0 1 auto;
   min-width: 0;
   margin-inline-start: auto;
