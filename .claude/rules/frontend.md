@@ -599,8 +599,11 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     **The price, named:** at 100 % on 320 a price per unit of seven figures beside a sum of seven shrinks to some 9 px,
     since the look of 100 % keeps the sum beside the words.
   - **The tab label stops growing at 125 %**: `--text-tab`, `min(var(--text-caption), 13.75px)`, as iOS keeps its
-    tab bar (В-3 «а»); a token, named one by one in Stylelint's list of sizes. The tab bar is fixed and in no width
-    of the page, so `large-text` reads every label within its column.
+    tab bar (В-3 «а»); named one by one in Stylelint's list of sizes, and declared in `TabBar.vue` alone, never in
+    the tokens: a size that stops growing is the tab bar's, and a caption of the same 11 that took it stood 13.75 px
+    at 200 % for 22 with every check green (adversarial Г20) — now `molvia/known-custom-property` refuses it in any
+    other file (`stylelint/config.test.ts`). The tab bar is fixed and in no width of the page, so `large-text` reads
+    every label within its column.
   - **What is typed and chosen stays seen** (adversarial З1, И1–И3, self-review of round 9): the amount of
     `AppField size="entry"` and its sign shrink together to the field, by «figure + 0.8 × sign» (`entryWidth`,
     32 to 40) — beside a sign of its own size «125403,50» was 12.9 px at 200 %; an amount of the body's size
