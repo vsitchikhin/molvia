@@ -513,16 +513,17 @@ The detail behind the frontend lines of `CLAUDE.md`.
   element, which draws large text back at 100 % with the root untouched (`zooms`, Г15), and no element of those screens
   is drawn zoomed (`currentCSSZoom`); and the browser's own size set to 20 by CDP, the root's size the same with every
   sheet and its `style` as with none (Г8); strict, a component's scoped `html` fails as well. **Whatever holds the text
-  back, the outcome is held too** (Г16–Г18): in a window of 320 × 720 and of 720 × 320, every step of the type scale,
+  back, the outcome is held too** (Г16–Г19): in a window of 320 × 720 and of 720 × 320, every step of the type scale,
   declared in `rem`, is twice as wide at 200 % as at 100 % in the root, where nothing stands over it, and as wide in
-  every element of the screen with words of its own as there — on four screens and a sheet: no place redefines a step,
-  so `font-size-adjust`, a token in px, a `transform` or a `zoom` over a title, a row or a sheet draws it otherwise with
-  no `font-size` of the root; `--text-tab` stops at 13.75 px on purpose and is no step of it. **The guard is against
-  what is written the ordinary way, not a form built to slip past it** (as `check-clock-bounds.mjs` and
-  `check-ordered-reads.mjs`, owner's decision of 02.11.2026): a property no rule names under a condition neither window
-  meets is review's. What a script sizes itself — `documentElement.style`, a sheet built from a string on a screen the
-  e2e does not open — is no file the guard reads: the e2e sees an absolute one, review the rest; Safari passes Dynamic
-  Type to no page. Seven ways:
+  every element of the screen with words of its own as there, and typed in every field, by a copy of it beside it (Г19)
+  — on four screens and a sheet with its sum: no place redefines a step, so `font-size-adjust`, a token in px, a
+  `transform` or a `zoom` over a title, a row or a sheet draws it otherwise with no `font-size` of the root;
+  `--text-tab` stops at 13.75 px on purpose and is no step of it. **The guard is against what is written the ordinary
+  way, not a form built to slip past it** — the boundary the owner set for `check-ordered-reads.mjs` on 02.11.2026,
+  carried over here by the implementer and put to the owner for this guard (В-8): a property no rule names under a
+  condition neither window meets, or a probe a selector recognises, is review's. What a script sizes itself —
+  `documentElement.style`, a sheet built from a string on a screen the e2e does not open — is no file the guard reads:
+  the e2e sees an absolute one, review the rest; Safari passes Dynamic Type to no page. Seven ways:
   - **A row of segments its words do not fit stands them one under another** (`SegmentedControl`, В-1 «а»):
     the word stays whole — MOL-189 holds, and now a test holds it (`kit-rows`: every word of «Как меняли» on one
     line, in both engines and languages; m7, which broke the word, went green on 66 tests before). The row is
