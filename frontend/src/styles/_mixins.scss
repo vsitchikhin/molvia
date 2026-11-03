@@ -48,9 +48,12 @@
 $row-narrow: 22rem;
 
 /// With large text, a row of the kit's list cards (`row-tight`) narrower than this lays its words over its whole width:
-/// the circle gives way, the tail stands under them (MOL-321). 15rem: some 120 % of the text on 320 and up — at 130 %
-/// a sum of a million in the words' column stood over the circle (self-review 10, №4); 18rem at 100 % keeps the row.
-$row-tight: 15rem;
+/// the circle gives way, the tail stands under them (MOL-321). 17rem: some 106 % of the text on 320 and up. At 15rem
+/// (some 120 %) a row at 110–115 % kept its sum beside words of 41–57 px — a name broke «Икр / а», and a price per unit
+/// of a million shrank to 4.9 px in them (MOL-334, adversarial С4: a width is closed by the layout, never by a size
+/// nobody reads); at 130 % a sum of a million in the words' column stood over the circle (self-review 10 of MOL-321,
+/// №4). The narrowest list card at 100 % on 320 is 17.88rem («Категории», «Счета»), and keeps the row.
+$row-tight: 17rem;
 
 /// A bar of a skeleton (Ф-13, MOL-178): `border-strong` at `--skeleton-rest`, which on a card's `surface`
 /// is `border`'s 1.42:1 in the light scheme and 1.47:1 in the dark, on the page's ground 1.31 and 1.53 —

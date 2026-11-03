@@ -135,11 +135,16 @@ export default defineComponent({
   font-variant-numeric: tabular-nums;
 }
 
-/* The price per unit in the meta whole, shrunk to the words' column where even that is narrower (`figure-fit`,
-   MOL-334, owner's В-6 «а»): at 200 % «125 403,50 ֏ за л» broke as «125 403, / 50 ֏» in a column of 126 px — the row
-   less its padding, the chevron and its gap. */
+/* The price per unit in the meta whole, shrunk to the column of the words where even that is narrower (`figure-fit`,
+   MOL-334, owner's В-6 «а»): at 200 % «125 403,50 ֏ за л» broke as «125 403, / 50 ֏». The column is the box — at 110–115 %
+   the row's sum still stands beside it and leaves the words some 57 px, where a card less its sides cut the price to
+   «1 2…» (adversarial С4); its width is the row's share, never its words'. */
+.row :deep(.words) {
+  container-type: inline-size;
+}
+
 .money {
-  @include figure-fit(1em, $less: calc(2 * var(--space-4) + var(--icon) + var(--space-3)));
+  @include figure-fit(1em);
 
   white-space: nowrap;
 }
