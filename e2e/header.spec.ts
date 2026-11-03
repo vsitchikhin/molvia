@@ -210,10 +210,14 @@ for (const [locale, words] of LANGUAGES) {
           await expect(page.locator('.back')).toBeVisible()
           // A short screen has nothing to scroll; room under it changes nothing in the row.
           await page.addStyleTag({ content: 'body { padding-bottom: 150vh; }' })
-          await page.evaluate(() => {
-            window.scrollTo(0, 400)
-          })
-          await expect(page.locator('.screen')).toHaveClass(/collapsed/)
+          // Scrolled again until it holds: once on CI one scroll left /money/categories open, «screen
+          // docked held» (run 41674793280), not reproduced — the state is waited for, not supposed.
+          await expect(async () => {
+            await page.evaluate(() => {
+              window.scrollTo(0, 400)
+            })
+            await expect(page.locator('.screen')).toHaveClass(/collapsed/, { timeout: 1000 })
+          }).toPass({ timeout: 10_000 })
           await settled(page)
 
           const { back, small, label, page: width } = await row(page)
