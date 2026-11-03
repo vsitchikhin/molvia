@@ -880,7 +880,9 @@ report.
   what this one did. **A trace's word written again over another's lifts its move to the top** (Ц1 of round 23,
   once the price №14 of the self-review): the move over it takes what lay under it, and it takes what the row said
   before the write (`liftOverwritten`) — left in the middle, its moment moved past the other's and neither undo
-  found the row at the word it waited for. So the owner undoes the false twin and keeps the true one. An order by the moment
+  found the row at the word it waited for. **And on the row its own merge brought, it goes on top as a move of that merge** (Ч1 of
+  round 24): the undo takes the row home whole at the trace's word, and the other trace's stays here as a row of its own,
+  noted as its first, the words between with it (`ownWordOnTop`), as for the picks (У1). So the owner undoes the false twin and keeps the true one. An order by the moment
   (round 5) refused both undos for good where two people wrote each by the other's trace (Е1), and a move
   waiting for the other undo (round 6) waited for good where that one was the true twin (Ж1).
   **The prices, named:** the trace's own score is lost where the person rated the survivor over it by the

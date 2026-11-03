@@ -137,9 +137,9 @@ export async function verdictWrittenByTrace(
   before: VerdictBefore,
   how: WriteHow,
 ): Promise<void> {
-  const [first] = await conn.execute<{ what: string; home: string }>(sql`
+  const [first] = await conn.execute<{ what: string; home: string; merge: string }>(sql`
     ${wayOf('item', asked)}
-    select mv.what, m.from_item as home
+    select mv.what, m.from_item as home, m.id::text as merge
     from way w
     join catalogue_merges m on m.id = w.id
     join catalogue_merge_moves mv on mv.merge_id = w.id
@@ -148,6 +148,24 @@ export async function verdictWrittenByTrace(
     order by w.depth, mv.what = 'verdict_overwritten' desc
     limit 1`)
   if (first?.what === 'verdict_overwritten') await liftOverwritten(conn, asked, row.id, before)
+  // its own row, which its merge brought, another trace's word over it since: this word goes on top (Ч1)
+  if (first?.what === 'verdict' && first.home === asked.toLowerCase()) {
+    const [over] = await conn.execute<{ one: number }>(sql`
+      ${wayOf('item', asked)}
+      select 1 as one from catalogue_merge_moves o
+      join catalogue_merges l on l.id = o.merge_id
+      where l.undone_at is null and o.merge_id not in (select id from way)
+        and o.what = 'verdict_overwritten' and o.key->>'id' = ${row.id}::text
+      limit 1`)
+    if (over !== undefined) {
+      await conn.execute(sql`
+        insert into catalogue_merge_moves (merge_id, what, key, before, actor_id)
+        values (${first.merge}::bigint, 'verdict_overwritten',
+                ${JSON.stringify({ id: row.id, at: row.touched, asked: asked.toLowerCase() })}::jsonb,
+                ${JSON.stringify({ ...before, ...how, rated: ratedBy(how) })}::jsonb, ${row.actorId}::uuid)`)
+      return
+    }
+  }
   await restampTraceWrite(conn, 'item', asked, verdictMoves(row.id), row.touched, how)
   // written over once already, its first `before` stands; or the trace's own
   if (first?.what === 'verdict_overwritten' || first?.home === asked.toLowerCase()) return

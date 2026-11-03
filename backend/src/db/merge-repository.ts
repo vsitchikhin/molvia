@@ -786,6 +786,66 @@ export function createMergeRepository(db: Conn): MergeRepository {
             await undoMove(move, merge)
           }
         }
+        // The row a merge brought, its trace's word written again over another trace's (Ч1 of round 24):
+        // the trace's word is on top, its own move under this merge keeping the other's beneath it. The
+        // row goes home whole at the trace's word, and the other's stays here as a row of its own, noted as
+        // that trace's first, with the words of the merges between (as З1). Not on top — another word over
+        // it since — the undo goes as before.
+        const ownWordOnTop = async (
+          rowId: string,
+          mergeId: number | string,
+          from: string,
+          now: SQL,
+        ): Promise<boolean> => {
+          const [own] = await tx.execute<{ at: string; before: VerdictBefore }>(sql`
+            select o.key->>'at' as at, o.before from catalogue_merge_moves o
+            where o.merge_id = ${mergeId} and o.what = 'verdict_overwritten' and o.key->>'id' = ${rowId}::text
+              and o.key->>'asked' = ${from}::text`)
+          if (own === undefined) return false
+          const [row] = await tx.execute<{
+            actor_id: string
+            item_kind: string
+            place_id: string | null
+          }>(sql`
+            select actor_id, item_kind, place_id from verdicts v
+            where v.id = ${rowId} and v.item_id = ${now} and v.updated_at = ${own.at}::timestamptz
+              and not exists (select 1 from verdicts o
+                              where o.actor_id = v.actor_id and o.item_id = ${from}
+                                and o.place_id is not distinct from v.place_id)
+            for update`)
+          if (row === undefined) return false
+          const [next] = await tx.execute<{ merge_id: string; asked: string; at: string }>(sql`
+            select o.merge_id, coalesce(o.key->>'asked', l.from_item::text) as asked, o.key->>'at' as at
+            from catalogue_merge_moves o
+            join catalogue_merges l on l.id = o.merge_id
+            where l.undone_at is null and o.merge_id <> ${mergeId} and o.what = 'verdict_overwritten'
+              and o.key->>'id' = ${rowId}::text
+            order by (o.key->>'at')::timestamptz, o.merge_id
+            limit 1`)
+          await tx.execute(sql`update verdicts set item_id = ${from} where id = ${rowId}`)
+          if (next === undefined) return true
+          const stays = randomUUID()
+          const was = own.before
+          await tx.execute(sql`
+            insert into verdicts (id, actor_id, item_id, item_kind, place_id, score, review,
+                                  rated_at, updated_at, deleted_at)
+            values (${stays}, ${row.actor_id}, ${now}, ${row.item_kind}, ${row.place_id}::uuid,
+                    ${was.score}, null, ${was.ratedAt}::timestamptz, ${was.updatedAt}::timestamptz,
+                    ${was.deletedAt}::timestamptz)`)
+          await tx.execute(sql`
+            update catalogue_merge_moves mv
+            set key = jsonb_set(mv.key, '{id}', to_jsonb(${stays}::text))
+            from catalogue_merges l
+            where l.id = mv.merge_id and l.undone_at is null and mv.merge_id <> ${mergeId}
+              and mv.what = 'verdict_overwritten' and mv.key->>'id' = ${rowId}::text`)
+          await tx.execute(sql`
+            delete from catalogue_merge_moves
+            where merge_id = ${next.merge_id} and what = 'verdict_overwritten' and key->>'id' = ${stays}::text`)
+          await noteTraceWrite(tx, 'item', next.asked, 'verdict', { id: stays, at: next.at })
+          return true
+        }
+        // rows a `verdict` move took home with its trace's own word on top (Ч1): that word's move is done
+        const liftedHome = new Set<string>()
         const undoMove = async (
           move: JournalMove,
           { id, from, now }: { id: number | string; from: string; now: SQL },
@@ -801,6 +861,10 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 update trips set place_id = ${from} where id = ${key.id} and place_id = ${now}`)
               break
             case 'verdict': {
+              if (item && (await ownWordOnTop(String(key.id), id, from, now))) {
+                liftedHome.add(String(key.id))
+                break
+              }
               // Skipped when the trace has got a verdict of the same person since: never two.
               const moved = await tx.execute(sql`
                 update verdicts v set ${column} = ${from}
@@ -1083,7 +1147,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
               // not — and the trace gets the word, a rating as a verdict of its own, a withdrawal as its
               // own withdrawn. Touched by the survivor's id since, the person's word about it stands.
               const before = move.before
-              if (!item || before === null) break
+              if (!item || before === null || liftedHome.has(String(key.id))) break
               let [row] = await tx.execute<{
                 actor_id: string
                 item_kind: string
