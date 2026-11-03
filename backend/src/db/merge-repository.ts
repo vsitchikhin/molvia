@@ -935,7 +935,9 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 set picks = picks - ${before.picks},
                     last_picked_at = ${before.keptLastPickedAt ?? null}::timestamptz,
                     admits = ${before.keptAdmits ?? false}
-                where ${row} and last_picked_at = ${key.at}::timestamptz and picks > ${before.picks}
+                where ${row} and picks > ${before.picks}
+                  and last_picked_at = greatest(${before.keptLastPickedAt ?? null}::timestamptz,
+                                                ${key.at}::timestamptz)
                 returning 1`)
               if (top.length === 0) {
                 const next =

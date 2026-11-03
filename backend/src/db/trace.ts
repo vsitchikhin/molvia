@@ -200,14 +200,7 @@ export async function pickWrittenByTrace(
         before = mv.before || jsonb_build_object(
           'picks', (mv.before->>'picks')::int + ${share.picks},
           'lastPickedAt', ${at}::text,
-          'admits', (mv.before->>'admits')::boolean or ${share.admits},
-          -- picked by the survivor's id since the share's last moment: the row's own is that one now (М1)
-          'keptLastPickedAt',
-            case when ${prior.lastPickedAt}::timestamptz
-                      > greatest((mv.before->>'keptLastPickedAt')::timestamptz,
-                                 (mv.before->>'lastPickedAt')::timestamptz)
-                 then to_jsonb(${prior.lastPickedAt}::text)
-                 else mv.before->'keptLastPickedAt' end)
+          'admits', (mv.before->>'admits')::boolean or ${share.admits})
     where mv.merge_id in (select id from way) and mv.what in ('pick_added', 'pick_written') and ${mine}
     returning 1`)
   if (added.length > 0) return
@@ -231,4 +224,28 @@ export async function pickWrittenByTrace(
       into: survivor?.id ?? asked,
     },
   )
+}
+
+/**
+ * A pick by the survivor's own id of a row traces' shares stand on (MOL-299, М1, Н1): the row's own is that
+ * one now, so every share of a merge into it keeps it as what the row goes back to once the share goes home.
+ * Read from no moment of the row: in a fan, another trace's pick moves it as well.
+ */
+export async function pickWrittenBySurvivor(
+  conn: Conn,
+  itemId: string,
+  actorId: string,
+  queryKey: string,
+  at: string,
+  admits: boolean,
+): Promise<void> {
+  await conn.execute(sql`
+    update catalogue_merge_moves mv
+    set before = mv.before || jsonb_build_object(
+          'keptLastPickedAt', ${at}::text,
+          'keptAdmits', coalesce((mv.before->>'keptAdmits')::boolean, false) or ${admits})
+    from catalogue_merges m
+    where m.id = mv.merge_id and m.undone_at is null and m.into_item = ${itemId}::uuid
+      and mv.what in ('pick_added', 'pick_written') and mv.actor_id = ${actorId}::uuid
+      and mv.key->>'queryKey' = ${queryKey}`)
 }

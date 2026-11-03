@@ -3,7 +3,7 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { searchQueryKey } from './items-repository'
 import { QUERY_KEY_MAX_OCTETS, searchPicks } from './schema'
-import { liveItemId, pickWrittenByTrace } from './trace'
+import { liveItemId, pickWrittenBySurvivor, pickWrittenByTrace } from './trace'
 import type { PickBefore } from './trace'
 
 export interface SearchPickRepository {
@@ -62,8 +62,11 @@ export function createSearchPickRepository(db: Conn): SearchPickRepository {
             inserted: sql<boolean>`xmax = 0`,
             at: sql<string>`${searchPicks.lastPickedAt}::text`,
           })
-        // A pick by a trace's id goes home with an undo (MOL-299, А2, В1, К1).
-        if (row !== undefined && row.itemId !== itemId.toLowerCase()) {
+        if (row === undefined) return
+        // A pick by the survivor's own id is the row's own moment under traces' shares (М1, Н1).
+        if (row.itemId === itemId.toLowerCase()) {
+          if (!row.inserted) await pickWrittenBySurvivor(tx, itemId, actorId, key, row.at, admits)
+        } else {
           await pickWrittenByTrace(
             tx,
             itemId,
