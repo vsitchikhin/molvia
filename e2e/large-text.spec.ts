@@ -465,6 +465,11 @@ for (const size of ['150%', '200%'])
           return new Set([...range.getClientRects()].map((line) => Math.round(line.top))).size
         }),
       ).toBe(1)
+      // A link row's value is a unit as its label is: «Наличны / е» of the kit broke (adversarial Х4).
+      await expect(page.locator('.nav-row .value').first()).toHaveCSS(
+        'hyphenate-limit-chars',
+        '6 2 2',
+      )
       // The legend of «Графики» keeps its names: with the ring in the card they were narrowed to nothing;
       // and every sum stands within the card (adversarial А3).
       await page.goto('/money/charts')
@@ -472,6 +477,11 @@ for (const size of ['150%', '200%'])
       await facesIn(page)
       for (const name of await page.locator('.legend .name').all())
         expect((await name.boundingBox())!.width).toBeGreaterThan(40)
+      // A name of the legend is a unit of words: a hyphen from six letters, never «Продук / ты» (adversarial Х4).
+      await expect(page.locator('.legend .name').first()).toHaveCSS(
+        'hyphenate-limit-chars',
+        '6 2 2',
+      )
       const amountsPast = await page.locator('.legend .amount').evaluateAll((amounts) =>
         amounts.map((amount) => {
           const card = amount.closest('.card')!
@@ -889,6 +899,8 @@ for (const size of ['150%', '200%'])
         '6 2 2',
       )
       await page.goto('/privacy')
+      // A kind of data is named in a unit, told in a paragraph: «Напоминан / ия об / оценке» broke (adversarial Х4).
+      await expect(page.locator('dt').first()).toHaveCSS('hyphenate-limit-chars', '6 2 2')
       await expect(page.locator('dd').first()).toHaveCSS('hyphens', 'auto')
       await expect(page.locator('dd').first()).toHaveCSS('hyphenate-limit-chars', '12 5 5')
     })
@@ -1064,4 +1076,41 @@ test('the text at 100 % on a phone of 320 keeps its look', async ({ page }) => {
   await expect(page.locator('.list-row .title').first()).toBeVisible()
   await facesIn(page)
   expect(await cutWords(page, '.list-row .title')).toBe(0)
+})
+
+// The narrowest list cards at 100 % on 320 — «Категории», «Бюджет», «Счета», some 17.88rem — stand 0.88rem over
+// `$row-tight` (MOL-334, self-review №7): a row of theirs keeps the look of 100 %, its circle shown and its tail beside
+// its words; the large text's look begins only at some 106 %. A category is told by its circle, an account by its
+// balance beside its name.
+test('the narrowest list cards at 100 % on a phone of 320 keep their rows', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.setViewportSize({ width: 320, height: 720 })
+  await signedIn(page)
+  await aMonth(page)
+  for (const [path, sign] of [
+    ['/money/categories', 'circle'],
+    ['/money/budget', 'circle'],
+    ['/money/accounts', 'tail'],
+  ] as const) {
+    await page.goto(path)
+    await expect(page.locator(`.list-row > .${sign}`).first(), path).toBeVisible()
+    await facesIn(page)
+    const rows = await page.locator('.list-row:visible').evaluateAll((all) =>
+      all.map((row) => {
+        const circle = row.querySelector(':scope > :is(.circle, .icon)')
+        const words = row.querySelector(':scope > .words')!.getBoundingClientRect()
+        const tail = row.querySelector(':scope > .tail')?.getBoundingClientRect()
+        return {
+          title: row.querySelector('.title')?.textContent,
+          circleGone: circle !== null && getComputedStyle(circle).display === 'none',
+          tailUnder:
+            tail !== undefined && (tail.top >= words.bottom || tail.left < words.right - 0.5),
+        }
+      }),
+    )
+    expect(
+      rows.filter(({ circleGone, tailUnder }) => circleGone || tailUnder),
+      path,
+    ).toEqual([])
+  }
 })
