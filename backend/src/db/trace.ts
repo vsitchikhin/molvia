@@ -239,6 +239,29 @@ async function liftOverwritten(
     set before = mv.before || ${JSON.stringify(before)}::jsonb
     from lifted l
     where mv.merge_id = l.merge_id and mv.what = 'verdict_overwritten' and mv.key->>'id' = ${rowId}::text`)
+  // A trace's own word over the row its merge brought (Ч1), right on that row now: one word of the trace,
+  // never two — the merge's `verdict` takes its moment, and the move goes (Ш1 of round 25).
+  await conn.execute(sql`
+    with own as (
+      select o.merge_id, o.key->'at' as at
+      from catalogue_merge_moves o
+      join catalogue_merges l on l.id = o.merge_id
+      join catalogue_merge_moves v on v.merge_id = o.merge_id and v.what = 'verdict'
+                                   and v.key->>'id' = o.key->>'id'
+      where l.undone_at is null and o.what = 'verdict_overwritten' and o.key->>'id' = ${rowId}::text
+        and o.key->>'asked' = l.from_item::text
+        and (o.before->>'updatedAt')::timestamptz = (v.key->>'at')::timestamptz
+    ),
+    restamped as (
+      update catalogue_merge_moves v
+      set key = jsonb_set(v.key, '{at}', own.at)
+      from own
+      where v.merge_id = own.merge_id and v.what = 'verdict' and v.key->>'id' = ${rowId}::text
+      returning 1
+    )
+    delete from catalogue_merge_moves o
+    using own
+    where o.merge_id = own.merge_id and o.what = 'verdict_overwritten' and o.key->>'id' = ${rowId}::text`)
 }
 
 /** A pick row as it stood before a trace's id added to it (MOL-299, К1). */
