@@ -854,15 +854,40 @@ for (const size of ['150%', '200%'])
         expect(box.top).toBe(boxes[0]!.top)
         expect(box.right).toBeLessThanOrEqual(320.5)
       }
-      // Every word of a row and a screen's text with a hyphen from six letters (owner's В-2 «а»); CI's Chromium may
-      // have no dictionary, so the style is read.
+      // The keys alone take the card's sides: the scale's ends keep its padding, as the question does (review №3, №6).
+      const sides = await page.locator('.verdict').evaluate((card) => {
+        const inner =
+          card.getBoundingClientRect().left + parseFloat(getComputedStyle(card).paddingLeft)
+        return {
+          ends: card.querySelector('.ends')!.getBoundingClientRect().left - inner,
+          scale: card.querySelector('.scale')!.getBoundingClientRect().left - inner,
+        }
+      })
+      expect(sides.ends).toBeGreaterThanOrEqual(-0.5)
+      expect(sides.scale).toBeLessThan(-1)
       // From six letters in a unit of words, from twelve in a paragraph, never in a segment (owner's В-5 «а»): from six
-      // in a paragraph «Данные и приватность» cut 394 words that would have stood whole (adversarial Х1).
+      // in a paragraph «Данные и приватность» cut 394 words that would have stood whole (adversarial Х1). Each unit
+      // includes `word-unit` itself — a row's title, a link row's label, a button, a switch row's words — and a
+      // screen's title is a heading (review №5, adversarial Х3). CI's Chromium may have no dictionary, so the style is
+      // read.
       await page.goto('/settings')
-      const title = page.locator('.list-row .title').first()
-      await expect(title).toHaveCSS('hyphens', 'auto')
-      await expect(title).toHaveCSS('hyphenate-limit-chars', '6 2 2')
+      await expect(page.locator('.list-row .title').first()).toBeVisible()
+      for (const unit of [
+        '.list-row .title',
+        '.nav-row .label',
+        '.button',
+        'h1',
+        'label.row .label',
+      ]) {
+        await expect(page.locator(unit).first(), unit).toHaveCSS('hyphens', 'auto')
+        await expect(page.locator(unit).first(), unit).toHaveCSS('hyphenate-limit-chars', '6 2 2')
+      }
       await expect(page.locator('.segment .word').first()).toHaveCSS('hyphens', 'manual')
+      await page.goto('/settings/bot')
+      await expect(page.locator('label.row .label').first()).toHaveCSS(
+        'hyphenate-limit-chars',
+        '6 2 2',
+      )
       await page.goto('/privacy')
       await expect(page.locator('dd').first()).toHaveCSS('hyphens', 'auto')
       await expect(page.locator('dd').first()).toHaveCSS('hyphenate-limit-chars', '12 5 5')
@@ -987,6 +1012,38 @@ for (const size of ['150%', '200%'])
         expect(await pastCard(page, '.total .amount', '.total')).toBeLessThanOrEqual(0.5)
       })
     })
+  })
+
+// A step or two over the browser's own size (MOL-334, adversarial С4): at 110–115 % a row of a record kept its sum
+// beside words of 41–57 px, and a price per unit of a million shrank to 4.9 px in them. Since `$row-tight` is 17rem the
+// sum goes under the words from some 106 % on 320, and the price stands whole, in its column, at the meta's own size.
+for (const size of ['110%', '115%'])
+  test(`a price per unit in a record's row stands whole at ${size} on 320`, async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.setViewportSize({ width: 320, height: 720 })
+    await page.addInitScript((value) => {
+      document.addEventListener('DOMContentLoaded', () => {
+        const style = document.createElement('style')
+        style.textContent = `html { font-size: ${value} }`
+        document.head.append(style)
+      })
+    }, size)
+    await signedIn(page)
+    const { finished } = await aLife(page)
+    await page.goto(`/purchases/${finished}`)
+    const money = page.locator('.list-row .quantity .money')
+    await expect(money.first()).toBeVisible()
+    await facesIn(page)
+    expect(await linesOf(page, '.list-row .quantity .money')).toBe(1)
+    expect(await pastCard(page, '.list-row .quantity .money', '.words')).toBeLessThanOrEqual(0.5)
+    for (const one of await money.all())
+      expect(
+        await one.evaluate(
+          (price) =>
+            getComputedStyle(price).fontSize === getComputedStyle(price.closest('.meta')!).fontSize,
+        ),
+        await one.innerText(),
+      ).toBe(true)
   })
 
 // At 100 % on 320 nothing of MOL-334 moves (the control): no figure shrinks, the scale keeps its gap of 8 and its
