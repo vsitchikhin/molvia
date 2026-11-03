@@ -10,7 +10,9 @@
       <template v-if="places.kind !== 'none'">
         <span class="best">
           <span class="where">{{ where }}</span>
-          <span class="price">{{ unitPrice(places.best) }}</span>
+          <span class="price" :style="figureChars(unitPrice(places.best), 'strong')">{{
+            unitPrice(places.best)
+          }}</span>
         </span>
         <span v-if="places.rest.length > 0" class="more">{{ also }}</span>
       </template>
@@ -27,6 +29,7 @@ import type { AdvicePlace, AdviceScope } from '@molvia/model'
 import AdviceRating from '@/components/AdviceRating.vue'
 import AppCard from '@/components/AppCard.vue'
 import { placesView, unitPriceText, whereKey } from '@/components/adviceRow'
+import { figureChars } from '@/components/figure'
 import { placeLabel } from '@/components/placeLabel'
 import type { TakeRow } from '@/components/adviceRow'
 
@@ -87,7 +90,7 @@ export default defineComponent({
       return t('advice.also_at', { places: rest.join(' · ') })
     })
 
-    return { t, places, where, also, unitPrice }
+    return { t, places, where, also, unitPrice, figureChars }
   },
 })
 </script>
@@ -142,6 +145,8 @@ export default defineComponent({
 .best {
   @include name-beside-figure(word);
 
+  /* The box the price measures itself against (MOL-334). */
+  container-type: inline-size;
   gap: var(--space-1) var(--space-2);
   margin-top: var(--space-3);
   padding: var(--space-2) var(--space-3);
@@ -155,10 +160,14 @@ export default defineComponent({
   font-weight: var(--weight-medium);
 }
 
+/* Never broken, and shrunk to the plate where even the whole of it is narrower (`figure-fit`, MOL-321): at 200 % a
+   price of six figures stood 13 px past the phone (MOL-334). */
 .price {
+  @include figure-fit(var(--text-callout));
+
   flex: none;
+  white-space: nowrap;
   color: var(--good-ink);
-  font-size: var(--text-callout);
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
 }

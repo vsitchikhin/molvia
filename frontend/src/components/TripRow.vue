@@ -11,7 +11,13 @@
       ><span class="name">{{ row.name }}</span></template
     >
     <template v-if="meta" #meta
-      ><span class="quantity">{{ meta }}</span></template
+      ><span class="quantity"
+        >{{ metaParts.before
+        }}<span class="money" :style="figureChars(metaParts.figure, 'text')">{{
+          metaParts.figure
+        }}</span
+        >{{ metaParts.after }}</span
+      ></template
     >
     <template v-if="row.mark || row.expense?.printed" #below>
       <AppTag v-if="row.mark" tone="warn">{{ t(`trip.queued.${row.mark}`) }}</AppTag>
@@ -19,7 +25,9 @@
       <span v-if="row.expense?.printed" class="printed">{{ row.expense.printed }}</span>
     </template>
     <template #tail
-      ><span class="amount">{{ amount ?? '—' }}</span></template
+      ><span class="amount" :style="figureChars(amount ?? '—', 'text')">{{
+        amount ?? '—'
+      }}</span></template
     >
   </ListRow>
 </template>
@@ -30,6 +38,7 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { formatMoney, formatQuantity, formatUnitPrice } from '@molvia/model'
 import AppTag from '@/components/AppTag.vue'
+import { aroundFigure, figureChars } from '@/components/figure'
 import ListRow from '@/components/ListRow.vue'
 import type { TripRowView } from './tripRow'
 
@@ -80,13 +89,13 @@ export default defineComponent({
       props.row.amount ? formatMoney(props.row.amount, locale.value) : null,
     )
 
+    const perUnitAmount = computed(() =>
+      props.row.unitPrice ? formatUnitPrice(props.row.unitPrice, locale.value) : '',
+    )
     const perUnit = computed(() => {
       const price = props.row.unitPrice
       return price
-        ? t('trip.unit_price', {
-            amount: formatUnitPrice(price, locale.value),
-            unit: t(`item.unit_${price.unit}`),
-          })
+        ? t('trip.unit_price', { amount: perUnitAmount.value, unit: t(`item.unit_${price.unit}`) })
         : null
     })
 
@@ -97,7 +106,12 @@ export default defineComponent({
         .join(' · '),
     )
 
-    return { t, open, meta, amount }
+    /** The price per unit a piece of its own in the meta, whole and shrunk to the row (MOL-334, В-6 «а»). */
+    const metaParts = computed(() =>
+      aroundFigure(meta.value, amount.value ? perUnitAmount.value : ''),
+    )
+
+    return { t, open, meta, metaParts, amount, figureChars }
   },
 })
 </script>
@@ -119,6 +133,29 @@ export default defineComponent({
 .quantity,
 .amount {
   font-variant-numeric: tabular-nums;
+}
+
+/* The price per unit in the meta whole, shrunk to the column of the words where even that is narrower (`figure-fit`,
+   MOL-334, owner's В-6 «а»): at 200 % «125 403,50 ֏ за л» broke as «125 403, / 50 ֏». The column is the box — at 110–115 %
+   the row's sum still stands beside it and leaves the words some 57 px, where a card less its sides cut the price to
+   «1 2…» (adversarial С4); its width is the row's share, never its words'. */
+.row :deep(.words) {
+  container-type: inline-size;
+}
+
+.money {
+  @include figure-fit(1em);
+
+  white-space: nowrap;
+}
+
+/* Never broken, and shrunk to the row less its padding where even the whole row is narrower, as an
+   operation's (MOL-321): at 200 % «125 403,50 ֏» stood past the card and read «25 403,50 ֏» (MOL-334). The
+   list card is the container (`AppCard list`). */
+.amount {
+  @include figure-fit(1em, $less: calc(2 * var(--space-4)));
+
+  white-space: nowrap;
 }
 
 .printed {

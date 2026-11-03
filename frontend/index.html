@@ -3,6 +3,11 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <!-- The system's font size is the root's (MOL-334, owner's В-1 «а»): Chrome 146+ sets 1rem by it and
+         turns its own page zoom and text autosizing off — the model every spec measures by. Without it a
+         phone's Chrome ignores the system's size. It holds only while no stylesheet sets the root's
+         `font-size`, which useLargeText.test.ts holds. -->
+    <meta name="text-scale" content="scale" />
     <!-- `interactive-widget`: Chrome on Android shrinks the page when the keyboard opens, so the
          sheet stays above it (MOL-18). Android only: Safari 27 began to honour it and shrank the
          window under the keyboard to the part left visible — the likeliest reason the tab bar

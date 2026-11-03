@@ -137,7 +137,8 @@
       </AppCard>
     </section>
     <!-- «Написать разработчику» (MOL-147): a sheet with fields, so the chevron of В-14 (Р-3 of
-         MOL-175). Offline it opens all the same: written now, sent once there is a connection. -->
+         MOL-175). Offline it opens all the same: written now, sent once there is a connection. Its title
+         wraps: at 100 % on 320 it read «Написать разработч…» (MOL-334). -->
     <section v-show="groupsShown" class="group">
       <SectionCaption>{{ t('settings.group_app') }}</SectionCaption>
       <AppCard as="ul" list>
@@ -147,6 +148,7 @@
             :title="t('settings.feedback.label')"
             :meta="t('settings.feedback.hint')"
             aria-haspopup="dialog"
+            wrap
             next
             @click="feedback.open({ from: 'settings' })"
           />

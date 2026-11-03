@@ -389,6 +389,8 @@ export default defineComponent({
 }
 
 .name {
+  @include word-unit;
+
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

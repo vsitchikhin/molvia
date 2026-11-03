@@ -341,15 +341,4 @@ export default defineComponent({
   color: var(--text-muted);
   font-size: var(--text-footnote);
 }
-
-/* With a hyphen, «Сфотогра-фируйте», only while the text is large (MOL-321, `useLargeText`): Safari knows
-   no `hyphenate-limit-chars`, and WebKit hyphenates any word at a line's end — «Запишите первые по-купки»
-   at a text of 100 %. */
-.intro-title,
-.ghost-title {
-  html[data-large-text] & {
-    hyphens: auto;
-    hyphenate-limit-chars: 12 5 5;
-  }
-}
 </style>

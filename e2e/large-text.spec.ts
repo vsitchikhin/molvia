@@ -1,10 +1,12 @@
 /// <reference lib="dom" />
 // DOM for the code inside page.evaluate, which runs in the browser.
+import { setsRoot, zooms } from '@molvia/frontend/testing/root-font-size'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
+import { readFileSync, readdirSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
-import { facesIn } from './scroll'
+import { facesIn, stillIn } from './scroll'
 import { asBrowser, signedIn } from './session'
 
 /**
@@ -194,6 +196,141 @@ async function aMonth(page: Page): Promise<{ card: string; savings: string; dina
   return { card, savings, dinars }
 }
 
+/**
+ * A record at «Ереван Сити»: ground coffee by the kilogram, rated, so «Что брать» names its price — «12 800 ֏/кг» stood
+ * past the plate of «За единицу» at 150 % (MOL-334) — here ten kilos at «125 403,50 ֏/кг», a price per unit of six
+ * figures; caviar for «1 234 567,89 ₽», a sum of another currency under the total and in a row's meta, which broke
+ * inside at 200 % (adversarial С1, С3); milk and bread wait in «Оценки». Then a record by hand still open, the coffee
+ * dearer there: «Продолжить» on «Покупки», and «Тут дешевле» naming the price of «Ереван Сити» (С2).
+ */
+async function aLife(page: Page): Promise<{ finished: string }> {
+  const headers = await asBrowser(page)
+  const context = settingsOf(
+    actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+  )
+  const item = async (name: string, defaultUnit: string): Promise<string> => {
+    const made = await page.request.post('/api/catalogue/items', {
+      headers,
+      data: { kind: 'product', name: `${name} ${randomUUID().slice(0, 4)}`, defaultUnit },
+    })
+    expect(made.status()).toBeLessThan(300)
+    const body = (await made.json()) as { id?: string; item?: { id: string } }
+    return (body.item?.id ?? body.id)!
+  }
+  const coffee = await item('Кофе «Ташир» молотый', 'kg')
+  const milk = await item('Молоко «Марианна» 3,2 %', 'l')
+  const bread = await item('Хлеб «Матнакаш»', 'piece')
+  const caviar = await item('Икра «Русское море»', 'piece')
+  const finished = randomUUID()
+  await post(page, '/api/trips', {
+    context,
+    id: finished,
+    place: { kind: 'store', name: 'Ереван Сити' },
+  })
+  for (const [itemId, value, unit, amount, currency] of [
+    [coffee, '10', 'kg', '1254035', 'AMD'],
+    [milk, '1', 'l', '2543.50', 'AMD'],
+    [bread, '2', 'piece', '600', 'AMD'],
+    [caviar, '1', 'piece', '1234567.89', 'RUB'],
+  ] as const)
+    await post(page, `/api/trips/${finished}/expenses`, {
+      id: randomUUID(),
+      itemId,
+      quantity: { value, unit },
+      amount: { amount, currency },
+    })
+  await post(page, `/api/trips/${finished}/finish`, {})
+  const rated = await page.request.put(`/api/verdicts/${coffee}`, { headers, data: { score: 5 } })
+  expect(rated.status()).toBeLessThan(300)
+  const open = randomUUID()
+  await post(page, '/api/trips', { context, id: open, place: { kind: 'store', name: 'SAS' } })
+  await post(page, `/api/trips/${open}/expenses`, {
+    id: randomUUID(),
+    itemId: coffee,
+    quantity: { value: '1', unit: 'kg' },
+    amount: { amount: '1300000', currency: 'AMD' },
+  })
+  return { finished }
+}
+
+/** How many lines each element's text stands on, at most: a sum is one (`frontend.md`, «A sum never breaks»). */
+function linesOf(page: Page, selector: string): Promise<number> {
+  return page.locator(selector).evaluateAll((all) =>
+    Math.max(
+      0,
+      ...all.map((one) => {
+        const range = document.createRange()
+        range.selectNodeContents(one)
+        return new Set([...range.getClientRects()].map((line) => Math.round(line.top))).size
+      }),
+    ),
+  )
+}
+
+/** Every word of a box on its lines: none cut by its box (`scrollWidth`) — «Написать разработч…» at 100 % on 320. */
+function cutWords(page: Page, selector: string): Promise<number> {
+  return page
+    .locator(selector)
+    .evaluateAll((all) => all.filter((one) => one.scrollWidth > one.clientWidth + 1).length)
+}
+
+/**
+ * A receipt photographed, read by the fake reader (am-05: thirteen lines, «Итог чека 8 676,41 ֏») and open for review —
+ * where «Итог чека» stood 71 px past its card at 150 % (MOL-334).
+ */
+async function aReceipt(page: Page, ru: boolean): Promise<void> {
+  const L = (one: string, other: string): string => (ru ? one : other)
+  await page.goto('/purchases')
+  await page
+    .getByRole('button', { name: L('Сфотографировать чек', 'Photograph a receipt') })
+    .click()
+  const encoded = await page.evaluate(async () => {
+    const canvas = document.createElement('canvas')
+    canvas.width = 900
+    canvas.height = 2400
+    const context = canvas.getContext('2d')!
+    context.fillStyle = '#f7f3ea'
+    context.fillRect(0, 0, 900, 2400)
+    context.fillStyle = '#222'
+    for (let y = 80; y < 2320; y += 60) context.fillRect(60, y, 780 - (y % 300), 18)
+    const blob = await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob(resolve, 'image/jpeg', 0.9)
+    })
+    let binary = ''
+    for (const byte of new Uint8Array(await blob!.arrayBuffer()))
+      binary += String.fromCharCode(byte)
+    return btoa(binary)
+  })
+  await page
+    .locator('dialog[open] input[type="file"]:not([capture])')
+    .first()
+    .setInputFiles({
+      name: 'part-1.jpg',
+      mimeType: 'image/jpeg',
+      buffer: Buffer.from(encoded, 'base64'),
+    })
+  const edges = page.locator('dialog[open]').filter({ hasText: L('Края чека', 'Receipt edges') })
+  await expect(edges).toBeVisible()
+  // Until it has risen a sheet takes no tap, and then for a double tap's floor (MOL-69), as `receipts.spec` waits.
+  const risen = async (sheet: Locator): Promise<void> => {
+    await stillIn(sheet)
+    await page.waitForTimeout(350)
+  }
+  await risen(edges)
+  await edges.getByRole('button', { name: L('Готово', 'Done') }).click()
+  await expect(edges).toHaveCount(0)
+  await risen(page.locator('dialog[open]').last())
+  await page.getByRole('button', { name: L('Отправить чек', 'Send receipt') }).click()
+  await expect(page.locator('dialog[open]')).toHaveCount(0)
+  const parsed = async (): Promise<string | null> => {
+    const answer = await page.request.get('/api/receipts', { headers: await asBrowser(page) })
+    const { receipts } = (await answer.json()) as { receipts: { id: string; status: string }[] }
+    return receipts.find((one) => one.status === 'parsed')?.id ?? null
+  }
+  await expect.poll(parsed, { timeout: 30_000 }).not.toBeNull()
+  await page.goto(`/purchases/receipts/${(await parsed())!}`)
+}
+
 for (const size of ['150%', '200%'])
   test.describe(`the text at ${size} on a phone of 320`, () => {
     test.beforeEach(async ({ page }) => {
@@ -330,6 +467,13 @@ for (const size of ['150%', '200%'])
           return new Set([...range.getClientRects()].map((line) => Math.round(line.top))).size
         }),
       ).toBe(1)
+      // A link row's value is a unit as its label is: «Наличны / е» of the kit broke (adversarial Х4).
+      await expect(page.locator('.nav-row .value').first()).toHaveCSS(
+        'hyphenate-limit-chars',
+        '6 2 2',
+      )
+      // So is a sector's name by the ring of «Куда ушли», a component of its own: «Развлеч / ения» (adversarial Х5).
+      await expect(page.locator('.sector-name').first()).toHaveCSS('hyphenate-limit-chars', '6 2 2')
       // The legend of «Графики» keeps its names: with the ring in the card they were narrowed to nothing;
       // and every sum stands within the card (adversarial А3).
       await page.goto('/money/charts')
@@ -337,6 +481,11 @@ for (const size of ['150%', '200%'])
       await facesIn(page)
       for (const name of await page.locator('.legend .name').all())
         expect((await name.boundingBox())!.width).toBeGreaterThan(40)
+      // A name of the legend is a unit of words: a hyphen from six letters, never «Продук / ты» (adversarial Х4).
+      await expect(page.locator('.legend .name').first()).toHaveCSS(
+        'hyphenate-limit-chars',
+        '6 2 2',
+      )
       const amountsPast = await page.locator('.legend .amount').evaluateAll((amounts) =>
         amounts.map((amount) => {
           const card = amount.closest('.card')!
@@ -408,6 +557,8 @@ for (const size of ['150%', '200%'])
       await facesIn(page)
       const sideways = () => sheet.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)
       expect(await sideways()).toBe(0)
+      // A sheet's title beside its «×» takes a hyphen from five letters (owner's В-7 «а», adversarial Х6).
+      await expect(sheet.locator('h2.title')).toHaveCSS('hyphenate-limit-chars', '5 2 2')
       release()
       await expect(sheet.locator('.item-name').first()).toBeVisible()
       await expect
@@ -645,6 +796,209 @@ for (const size of ['150%', '200%'])
       ).toBeLessThanOrEqual(0)
     })
 
+    // Beyond «Деньги» (MOL-334): before it at 200 % the record went 102 px sideways, «Оценки» 23, «Данные и
+    // приватность» 33, the strip of a record by hand 7, the price of «Что брать» 13; a sum in a row read «25 403,50»
+    // for «125 403,50», and a key of the scale was 36 px at 150 %.
+    test('every screen beyond «Деньги» stands within the phone', async ({ page }) => {
+      test.setTimeout(90_000)
+      await signedIn(page)
+      const { finished } = await aLife(page)
+      const screens: [string, Locator][] = [
+        ['/', page.locator('.best .price')],
+        ['/purchases', page.locator('.open .list-row')],
+        ['/purchases/manual', page.locator('.list-row .tail')],
+        [`/purchases/${finished}`, page.locator('.total .sum')],
+        ['/verdicts', page.locator('.scale .key')],
+        ['/privacy', page.locator('dd')],
+        ['/terms', page.getByRole('heading', { level: 1 })],
+        ['/settings/devices', page.getByRole('heading', { level: 1 })],
+        ['/settings/bot', page.getByRole('heading', { level: 1 })],
+      ]
+      for (const [path, answer] of screens) {
+        await page.goto(path)
+        expect(await pageSideways(page, answer), path).toBe(0)
+      }
+      // The price of «Брали здесь» within its plate.
+      await page.goto('/')
+      await expect(page.locator('.best .price')).toBeVisible()
+      await facesIn(page)
+      expect(await pastCard(page, '.best .price', '.best')).toBeLessThanOrEqual(0.5)
+      // The record's total and every sum of its rows within the card.
+      await page.goto(`/purchases/${finished}`)
+      await expect(page.locator('.total .sum')).toBeVisible()
+      await facesIn(page)
+      expect(await pastCard(page, '.total .sum', '.total')).toBeLessThanOrEqual(0.5)
+      expect(await pastCard(page, '.list-row .amount', '.list-row')).toBeLessThanOrEqual(0.5)
+      // A sum of another currency under the total and a price per unit in a row's meta, each whole and within: at 200 %
+      // «1 234 567,89 / ₽», «125 403, / 50 ֏» (adversarial С1, С3; owner's В-6 «а»).
+      for (const [money, box] of [
+        ['.total .money', '.total'],
+        ['.list-row .quantity .money', '.list-row'],
+      ] as const) {
+        expect(await linesOf(page, money), money).toBe(1)
+        expect(await pastCard(page, money, box), money).toBeLessThanOrEqual(0.5)
+      }
+      // «Продолжить» whole in its card (А12 of MOL-321's review): its pill stands 8 into the row's padding by the
+      // kit's rule (MOL-191), so the card is the edge.
+      await page.goto('/purchases')
+      await expect(page.locator('.open .list-row')).toBeVisible()
+      await facesIn(page)
+      expect(await pastCard(page, '.open .list-row .tail .button', '.card')).toBeLessThanOrEqual(
+        0.5,
+      )
+      expect(await cutWords(page, '.open .list-row .tail .button')).toBe(0)
+      // The strip of a record by hand within the phone: its pills of a glyph and a word stood 7 px past it.
+      await page.goto('/purchases/manual')
+      await expect(page.locator('.dock button').first()).toBeVisible()
+      await facesIn(page)
+      await stillIn(page.locator('.dock'))
+      for (const button of await page.locator('.dock button').all())
+        expect(
+          (await button.boundingBox())!.x + (await button.boundingBox())!.width,
+        ).toBeLessThanOrEqual(320.5)
+      // Five keys of the scale in one row, none under 44 px — a thumb's, whatever the text (owner's В-3 «а»).
+      await page.goto('/verdicts')
+      const keys = page.locator('.scale .key')
+      await expect(keys).toHaveCount(5)
+      await facesIn(page)
+      await stillIn(page.locator('.verdict'))
+      const boxes = await keys.evaluateAll((all) =>
+        all.map((key) => key.getBoundingClientRect().toJSON() as DOMRect),
+      )
+      for (const box of boxes) {
+        expect(box.width).toBeGreaterThanOrEqual(44)
+        expect(box.top).toBe(boxes[0]!.top)
+        expect(box.right).toBeLessThanOrEqual(320.5)
+      }
+      // The keys alone take the card's sides: the scale's ends keep its padding, as the question does (review №3, №6).
+      const sides = await page.locator('.verdict').evaluate((card) => {
+        const inner =
+          card.getBoundingClientRect().left + parseFloat(getComputedStyle(card).paddingLeft)
+        return {
+          ends: card.querySelector('.ends')!.getBoundingClientRect().left - inner,
+          scale: card.querySelector('.scale')!.getBoundingClientRect().left - inner,
+        }
+      })
+      expect(sides.ends).toBeGreaterThanOrEqual(-0.5)
+      expect(sides.scale).toBeLessThan(-1)
+      // From six letters in a unit of words, from twelve in a paragraph, never in a segment (owner's В-5 «а»): from six
+      // in a paragraph «Данные и приватность» cut 394 words that would have stood whole (adversarial Х1). Each unit
+      // includes `word-unit` itself — a row's title, a link row's label, a button, a switch row's words — and a
+      // screen's title is a heading (review №5, adversarial Х3). CI's Chromium may have no dictionary, so the style is
+      // read.
+      await page.goto('/settings')
+      await expect(page.locator('.list-row .title').first()).toBeVisible()
+      for (const unit of ['.list-row .title', '.nav-row .label', '.button', 'label.row .label']) {
+        await expect(page.locator(unit).first(), unit).toHaveCSS('hyphens', 'auto')
+        await expect(page.locator(unit).first(), unit).toHaveCSS('hyphenate-limit-chars', '6 2 2')
+      }
+      // A title from five (owner's В-7 «а»): «Нова / я трата» beside the sheet's «×» (adversarial Х6).
+      await expect(page.locator('h1').first()).toHaveCSS('hyphenate-limit-chars', '5 2 2')
+      await expect(page.locator('.segment .word').first()).toHaveCSS('hyphens', 'manual')
+      await page.goto('/settings/bot')
+      await expect(page.locator('label.row .label').first()).toHaveCSS(
+        'hyphenate-limit-chars',
+        '6 2 2',
+      )
+      await page.goto('/privacy')
+      // A kind of data is named in a unit, told in a paragraph: «Напоминан / ия об / оценке» broke (adversarial Х4).
+      await expect(page.locator('dt').first()).toHaveCSS('hyphenate-limit-chars', '6 2 2')
+      await expect(page.locator('dd').first()).toHaveCSS('hyphens', 'auto')
+      await expect(page.locator('dd').first()).toHaveCSS('hyphenate-limit-chars', '12 5 5')
+    })
+
+    test('the sheets beyond «Деньги» stand within the phone', async ({ page }) => {
+      test.setTimeout(90_000)
+      await signedIn(page)
+      const { finished } = await aLife(page)
+      // A purchase of the record: «За единицу» over its price, the price within the plate.
+      await page.goto(`/purchases/${finished}`)
+      const coffee = page.locator('.list-row').filter({ hasText: 'Кофе' })
+      await expect(coffee).toBeVisible()
+      await coffee.click()
+      const sheet = page.locator('dialog[open]').last()
+      await expect(sheet.locator('.per-unit-value')).toBeVisible()
+      await expect
+        .poll(() => sheet.evaluate((dialog) => dialog.getAnimations({ subtree: true }).length))
+        .toBe(0)
+      await facesIn(page)
+      expect(await sheet.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)).toBe(0)
+      expect(await pastCard(page, 'dialog[open] .per-unit-value', '.per-unit')).toBeLessThanOrEqual(
+        0.5,
+      )
+      await page.keyboard.press('Escape')
+      await expect(page.locator('dialog[open]')).toHaveCount(0)
+      // «Тут дешевле» names the cheaper price whole within its line: «125 403,50 / ֏/кг» at 200 % (adversarial С2).
+      await page.goto('/purchases/manual')
+      await page.locator('.list-row').filter({ hasText: 'Кофе' }).click()
+      const hint = page.locator('dialog[open] [data-hint="item"]')
+      await expect(hint).toBeVisible()
+      await stillIn(page.locator('dialog[open]').last())
+      await facesIn(page)
+      expect(await linesOf(page, 'dialog[open] .hint .money')).toBe(1)
+      expect(await pastCard(page, 'dialog[open] .hint .money', '.hint')).toBeLessThanOrEqual(0.5)
+      await page.keyboard.press('Escape')
+      await expect(page.locator('dialog[open]')).toHaveCount(0)
+      // The scale in the sheet of «Что брать»: its column is wide enough with no card's sides to take.
+      await page.goto('/')
+      const card = page.locator('button.tap').first()
+      await expect(card).toBeVisible()
+      // At 200 % the docked strip takes half the window, and a tap aimed by a script lands under it (MOL-321's price,
+      // `frontend.md`): the card is clicked as itself; the list may be answered again as it comes in, and a click on
+      // the card it replaced opens nothing.
+      await expect(async () => {
+        if ((await page.locator('dialog[open]').count()) === 0) await card.dispatchEvent('click')
+        await expect(page.locator('dialog[open]')).toHaveCount(1, { timeout: 1000 })
+      }).toPass()
+      const rating = page.locator('dialog[open]').last()
+      await expect(rating.locator('.scale .key')).toHaveCount(5)
+      await expect
+        .poll(() => rating.evaluate((dialog) => dialog.getAnimations({ subtree: true }).length))
+        .toBe(0)
+      await facesIn(page)
+      for (const key of await rating.locator('.scale .key').all())
+        expect((await key.boundingBox())!.width).toBeGreaterThanOrEqual(44)
+      expect(await rating.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)).toBe(0)
+      await page.keyboard.press('Escape')
+      await expect(page.locator('dialog[open]')).toHaveCount(0)
+      await page.goto('/purchases/manual')
+      expect(await sheetSideways(page, page.getByRole('button', { name: 'Закончить' }))).toBe(0)
+      await page.goto('/settings')
+      expect(
+        await sheetSideways(page, page.getByRole('button', { name: /Написать разработчику/ })),
+      ).toBe(0)
+    })
+
+    test('a receipt under review stands within the phone', async ({ page }) => {
+      test.setTimeout(90_000)
+      await signedIn(page)
+      await aReceipt(page, true)
+      expect(await pageSideways(page, page.locator('.total .amount'))).toBe(0)
+      expect(await pastCard(page, '.total .amount', '.total')).toBeLessThanOrEqual(0.5)
+      expect(await sheetSideways(page, page.locator('.total button.main'))).toBe(0)
+      expect(await sheetSideways(page, page.locator('button.receipt-line').first())).toBe(0)
+      // «За единицу» of a line of the receipt and of a line typed, a price per unit of six figures within its plate —
+      // the plate hides what stands past it, so no width of the sheet tells (review №2).
+      for (const opener of [
+        page.locator('button.receipt-line').first(),
+        page.getByRole('button', { name: /Добавить строку/ }),
+      ]) {
+        await opener.click()
+        const sheet = page.locator('dialog[open]').last()
+        await expect(sheet.locator('input[data-field="amount"]')).toBeVisible()
+        await stillIn(sheet)
+        await sheet.locator('input[data-field="quantity"]').fill('1')
+        await sheet.locator('input[data-field="amount"]').fill('125403,50')
+        await expect(sheet.locator('.per-unit-value')).toContainText('125')
+        await facesIn(page)
+        expect(
+          await pastCard(page, 'dialog[open] .per-unit-value', '.per-unit'),
+        ).toBeLessThanOrEqual(0.5)
+        await page.keyboard.press('Escape')
+        await expect(page.locator('dialog[open]')).toHaveCount(0)
+      }
+    })
+
     // In English a whole sum of drams is «֏125,403», wider for its count than Russian's «125 403 ֏» — a count at
     // 0.56 of the size let it 6 px past its card (adversarial В2, В3).
     test.describe('in English', () => {
@@ -662,5 +1016,332 @@ for (const size of ['150%', '200%'])
         await facesIn(page)
         expect(await pastCard(page, '.chart-card .figure', '.chart-card')).toBeLessThanOrEqual(0.5)
       })
+
+      // «֏8,676.41» and «Receipt total»: 93 px past the card at 150 % (MOL-334).
+      test('a receipt under review stands within the phone', async ({ page }) => {
+        test.setTimeout(90_000)
+        await signedIn(page)
+        await aReceipt(page, false)
+        expect(await pageSideways(page, page.locator('.total .amount'))).toBe(0)
+        expect(await pastCard(page, '.total .amount', '.total')).toBeLessThanOrEqual(0.5)
+      })
     })
   })
+
+// A step or two over the browser's own size (MOL-334, adversarial С4): at 110–115 % a row of a record kept its sum
+// beside words of 41–57 px, and a price per unit of a million shrank to 4.9 px in them. Since `$row-tight` is 17rem the
+// sum goes under the words from some 106 % on 320, and the price stands whole, in its column, at the meta's own size.
+for (const size of ['110%', '115%'])
+  test(`a price per unit in a record's row stands whole at ${size} on 320`, async ({ page }) => {
+    test.setTimeout(60_000)
+    await page.setViewportSize({ width: 320, height: 720 })
+    await page.addInitScript((value) => {
+      document.addEventListener('DOMContentLoaded', () => {
+        const style = document.createElement('style')
+        style.textContent = `html { font-size: ${value} }`
+        document.head.append(style)
+      })
+    }, size)
+    await signedIn(page)
+    const { finished } = await aLife(page)
+    await page.goto(`/purchases/${finished}`)
+    const money = page.locator('.list-row .quantity .money')
+    await expect(money.first()).toBeVisible()
+    await facesIn(page)
+    expect(await linesOf(page, '.list-row .quantity .money')).toBe(1)
+    expect(await pastCard(page, '.list-row .quantity .money', '.words')).toBeLessThanOrEqual(0.5)
+    for (const one of await money.all())
+      expect(
+        await one.evaluate(
+          (price) =>
+            getComputedStyle(price).fontSize === getComputedStyle(price.closest('.meta')!).fontSize,
+        ),
+        await one.innerText(),
+      ).toBe(true)
+  })
+
+// At 100 % on 320 nothing of MOL-334 moves (the control): no figure shrinks, the scale keeps its gap of 8 and its
+// keys of 44, and no word is hyphenated — but «Написать разработчику», which read «Написать разработч…» (MOL-334).
+test('the text at 100 % on a phone of 320 keeps its look', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.setViewportSize({ width: 320, height: 720 })
+  await signedIn(page)
+  const { finished } = await aLife(page)
+  await page.goto(`/purchases/${finished}`)
+  await expect(page.locator('.total .sum')).toBeVisible()
+  await facesIn(page)
+  await expect(page.locator('.total .sum')).toHaveCSS('font-size', '28px')
+  await page.goto('/verdicts')
+  await expect(page.locator('.scale')).toHaveCSS('column-gap', '8px')
+  await expect(page.locator('.scale .key').first()).toHaveCSS('hyphens', 'manual')
+  await page.goto('/settings')
+  await expect(page.locator('.list-row .title').first()).toBeVisible()
+  await facesIn(page)
+  expect(await cutWords(page, '.list-row .title')).toBe(0)
+})
+
+// The narrowest list cards at 100 % on 320 — «Категории», «Бюджет», «Счета», some 17.88rem — stand 0.88rem over
+// `$row-tight` (MOL-334, self-review №7): a row of theirs keeps the look of 100 %, its circle shown and its tail beside
+// its words; the large text's look begins only at some 106 %. A category is told by its circle, an account by its
+// balance beside its name.
+test('the narrowest list cards at 100 % on a phone of 320 keep their rows', async ({ page }) => {
+  test.setTimeout(60_000)
+  await page.setViewportSize({ width: 320, height: 720 })
+  await signedIn(page)
+  await aMonth(page)
+  for (const [path, sign] of [
+    ['/money/categories', 'circle'],
+    ['/money/budget', 'circle'],
+    ['/money/accounts', 'tail'],
+  ] as const) {
+    await page.goto(path)
+    await expect(page.locator(`.list-row > .${sign}`).first(), path).toBeVisible()
+    await facesIn(page)
+    const rows = await page.locator('.list-row:visible').evaluateAll((all) =>
+      all.map((row) => {
+        const circle = row.querySelector(':scope > :is(.circle, .icon)')
+        const words = row.querySelector(':scope > .words')!.getBoundingClientRect()
+        const tail = row.querySelector(':scope > .tail')?.getBoundingClientRect()
+        return {
+          title: row.querySelector('.title')?.textContent,
+          circleGone: circle !== null && getComputedStyle(circle).display === 'none',
+          tailUnder:
+            tail !== undefined && (tail.top >= words.bottom || tail.left < words.right - 0.5),
+        }
+      }),
+    )
+    expect(
+      rows.filter(({ circleGone, tailUnder }) => circleGone || tailUnder),
+      path,
+    ).toEqual([])
+  }
+})
+
+// The system's font size is the root's, and reaches the eye, whatever reaches the page (MOL-334, adversarial Г8, Г13,
+// Г14, Г15): a sheet of `public/` by a `<link>`, a `.css` or a partial a script imports, a nested rule of plain CSS, a
+// package beside the module, a link in it, a `<style>` a template renders, a sheet it imports — each ways past a guard
+// that reads the sources by where they lie. So the outcome is read here, by the rule `useLargeText.test.ts` reads the
+// sources by: every sheet the build made, whatever it imported, and every sheet of the page as the browser holds it,
+// its imports opened — under a media query or a state the page is not in too — with no `zoom`, which draws large
+// text back at 100 % with the root untouched; and the browser's own size set apart from 16, the root's the same with
+// every sheet and its `style` as with none, and no element of the page drawn zoomed.
+test('the system’s font size is the root’s, whatever reaches the page', async ({ page }) => {
+  test.setTimeout(60_000)
+  const holdsBack = (css: string): boolean => setsRoot(css) || zooms(css)
+  // The build of this run, made before any test by the preview's server (`playwright.config.ts`).
+  const built = new URL('../frontend/dist-e2e/', import.meta.url)
+  const bundle = readdirSync(built, { recursive: true, encoding: 'utf8' }).filter((path) =>
+    path.endsWith('.css'),
+  )
+  expect(bundle.length).toBeGreaterThan(0)
+  expect(bundle.filter((path) => holdsBack(readFileSync(new URL(path, built), 'utf8')))).toEqual([])
+  const browser = await page.context().newCDPSession(page)
+  await browser.send('Page.setFontSizes', { fontSizes: { standard: 20 } })
+  await page.setViewportSize({ width: 320, height: 720 })
+  await signedIn(page)
+  for (const path of ['/', '/purchases', '/money', '/settings']) {
+    await page.goto(path)
+    await expect(page.locator('h1').first(), path).toBeVisible()
+    const root = await page.evaluate(() => {
+      const html = document.documentElement
+      const size = () => getComputedStyle(html).fontSize
+      const authored = size()
+      const style = html.getAttribute('style')
+      const sheets = [...document.styleSheets].filter((sheet) => !sheet.disabled)
+      // A sheet whose rules the page may not read is one this test cannot vouch for: refused, never passed — an
+      // import is read through to its own sheet (Г14), whose `cssText` names only its address.
+      const refused = ':root { font-size: 0 }'
+      const textOf = (sheet: CSSStyleSheet): string => {
+        try {
+          return [...sheet.cssRules]
+            .map((rule) =>
+              rule instanceof CSSImportRule
+                ? rule.styleSheet
+                  ? textOf(rule.styleSheet)
+                  : refused
+                : rule.cssText,
+            )
+            .join('\n')
+        } catch {
+          return refused
+        }
+      }
+      const texts = sheets.map((sheet, at) => ({
+        where: sheet.href ?? `<style> ${String(at)}`,
+        css: textOf(sheet),
+      }))
+      const zoomed = [...document.querySelectorAll('*')]
+        .filter((element) => element.currentCSSZoom !== 1)
+        .map(
+          (element) =>
+            element.tagName.toLowerCase() +
+            (element.id ? `#${element.id}` : '') +
+            [...element.classList].map((name) => `.${name}`).join(''),
+        )
+      for (const sheet of sheets) sheet.disabled = true
+      html.removeAttribute('style')
+      const own = size()
+      for (const sheet of sheets) sheet.disabled = false
+      if (style !== null) html.setAttribute('style', style)
+      return { authored, own, texts, zoomed }
+    })
+    expect(root.texts.length, path).toBeGreaterThan(0)
+    expect(
+      root.texts.filter(({ css }) => holdsBack(css)).map(({ where }) => where),
+      path,
+    ).toEqual([])
+    expect({ authored: root.authored, own: root.own, zoomed: root.zoomed }, path).toEqual({
+      authored: '20px',
+      own: '20px',
+      zoomed: [],
+    })
+  }
+})
+
+// Large text reaches the eye whatever holds it back, on a phone upright and on its side (MOL-334, adversarial
+// Г12–Г18): the rules above refuse what sets the root and what zooms, by name, and each round found one more way
+// to draw the text small with neither — `font-size-adjust`, the scale's tokens in px, a `transform` — under a media
+// query the window of 320 never meets, or over a row or a sheet rather than the title. So the outcome, in both
+// windows: every step of the type scale is twice as wide at 200 % as at 100 % where nothing stands over it — in the
+// root, out of the body — and as wide in every element of the screen with words of its own as there, a sheet's
+// too. No place of the app redefines a step, so a place that draws one otherwise holds the text back. The probe
+// takes its face, weight and spacing for itself, since those are each place's own. The scale is read where it is
+// declared, in `rem`; `--text-tab` stops at 13.75 px on purpose (В-3 «а»), the tab bar's own, and is no step of it.
+const typeScale = [
+  ...readFileSync(new URL('../frontend/src/styles/_tokens.scss', import.meta.url), 'utf8').matchAll(
+    /^\s*(--text-[-\w]+):\s*[\d.]+rem\b/gm,
+  ),
+].map(([, step = '']) => step)
+
+test('large text is drawn twice as large at 200 %, everywhere, on a phone upright and on its side', async ({
+  page,
+}) => {
+  test.setTimeout(240_000)
+  expect(typeScale.length).toBeGreaterThan(8)
+  const browser = await page.context().newCDPSession(page)
+  await signedIn(page)
+  await aMonth(page)
+  const places = [
+    { path: '/' },
+    { path: '/purchases' },
+    { path: '/money' },
+    { path: '/settings' },
+    { path: '/money', sheet: 'Добавить трату' },
+  ]
+  const drawn = async (
+    place: { path: string; sheet?: string },
+    standard: number,
+  ): Promise<{
+    root: Record<string, number>
+    astray: string[]
+    places: number
+    fields: number
+  }> => {
+    await browser.send('Page.setFontSizes', { fontSizes: { standard } })
+    await page.goto(place.path)
+    await expect(page.locator('h1').first(), place.path).toBeVisible()
+    if (standard > 16) await expect(page.locator('html')).toHaveAttribute('data-large-text')
+    else await expect(page.locator('html')).not.toHaveAttribute('data-large-text')
+    if (place.sheet !== undefined) {
+      await page.getByRole('button', { name: place.sheet }).click()
+      const sheet = page.locator('dialog[open]').last()
+      await expect(sheet).toBeVisible()
+      await expect
+        .poll(() => sheet.evaluate((dialog) => dialog.getAnimations({ subtree: true }).length))
+        .toBe(0)
+    }
+    return page.evaluate(async (steps) => {
+      const text = 'ЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖ'
+      const look = (step: string): string =>
+        'position: absolute; inset: 0 auto auto 0; white-space: nowrap; font-family: var(--font); ' +
+        'font-weight: var(--weight-medium); font-style: normal; letter-spacing: normal; word-spacing: normal; ' +
+        `text-transform: none; font-size: var(${step})`
+      const probeIn = (host: Element, step: string): HTMLElement => {
+        const probe = document.createElement('span')
+        probe.style.cssText = look(step)
+        probe.textContent = text
+        host.append(probe)
+        return probe
+      }
+      // What is typed is a field's value, no node of its own (adversarial Г19): a copy of the field beside it, as
+      // wide as what it holds, takes the rules of its classes and its place, and holds the probe's words.
+      const typedBeside = (
+        field: HTMLInputElement | HTMLTextAreaElement,
+        step: string,
+      ): HTMLElement => {
+        const copy = field.cloneNode(false) as HTMLInputElement | HTMLTextAreaElement
+        copy.removeAttribute('id')
+        copy.removeAttribute('name')
+        copy.setAttribute('aria-hidden', 'true')
+        copy.tabIndex = -1
+        copy.style.cssText = `${look(step)}; field-sizing: content; box-sizing: content-box; padding: 0; border: 0; width: auto; min-width: 0; max-width: none`
+        copy.value = text
+        field.after(copy)
+        return copy
+      }
+      const nameOf = (element: Element): string =>
+        element.tagName.toLowerCase() + [...element.classList].map((name) => `.${name}`).join('')
+      const drawnNow = (element: Element): boolean => element.getClientRects().length > 0
+      // What draws words of its own and is drawn: a closed sheet, a field's inside and an icon hold none.
+      const hosts = [...document.body.querySelectorAll('*')].filter(
+        (element) =>
+          element instanceof HTMLElement &&
+          !/^(SCRIPT|STYLE|TEMPLATE|OPTION|SELECT|TEXTAREA)$/.test(element.tagName) &&
+          [...element.childNodes].some(
+            (node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim() !== '',
+          ) &&
+          drawnNow(element),
+      )
+      const fields = [...document.body.querySelectorAll('input, textarea')].filter(
+        (field): field is HTMLInputElement | HTMLTextAreaElement =>
+          (field instanceof HTMLTextAreaElement ||
+            (field instanceof HTMLInputElement &&
+              /^(text|search|tel|email|url)$/.test(field.type))) &&
+          drawnNow(field),
+      )
+      const root = steps.map((step) => probeIn(document.documentElement, step))
+      const placed = [
+        ...hosts.map((host) => ({ host, probes: steps.map((step) => probeIn(host, step)) })),
+        ...fields.map((host) => ({ host, probes: steps.map((step) => typedBeside(host, step)) })),
+      ]
+      document.documentElement.getBoundingClientRect()
+      await document.fonts.ready
+      const width = (probe: HTMLElement | undefined): number =>
+        probe?.getBoundingClientRect().width ?? 0
+      const astray = placed.flatMap(({ host, probes }) =>
+        steps
+          .map((step, index) => ({ step, ratio: width(probes[index]) / width(root[index]) }))
+          .filter(({ ratio }) => !(Math.abs(ratio - 1) < 0.01))
+          .map(({ step, ratio }) => `${nameOf(host)} ${step} ×${ratio.toFixed(2)}`),
+      )
+      const widths = Object.fromEntries(steps.map((step, index) => [step, width(root[index])]))
+      for (const probe of [...root, ...placed.flatMap(({ probes }) => probes)]) probe.remove()
+      return {
+        root: widths,
+        astray: astray.slice(0, 12),
+        places: hosts.length,
+        fields: fields.length,
+      }
+    }, typeScale)
+  }
+  for (const [width, height] of [
+    [320, 720],
+    [720, 320],
+  ] as const) {
+    await page.setViewportSize({ width, height })
+    for (const place of places) {
+      const where = `${place.path}${place.sheet === undefined ? '' : ` «${place.sheet}»`} at ${String(width)} × ${String(height)}`
+      const usual = await drawn(place, 16)
+      const large = await drawn(place, 32)
+      const short = typeScale
+        .map((step) => ({ step, ratio: (large.root[step] ?? 0) / (usual.root[step] ?? 1) }))
+        .filter(({ ratio }) => !(ratio > 1.9 && ratio < 2.1))
+        .map(({ step, ratio }) => `${step} ×${ratio.toFixed(2)}`)
+      expect(short, where).toEqual([])
+      expect(usual.places, where).toBeGreaterThan(3)
+      // The sheet is opened for its sum: a place with no field read would prove nothing of what is typed.
+      if (place.sheet !== undefined) expect(usual.fields, where).toBeGreaterThan(0)
+      expect({ usual: usual.astray, large: large.astray }, where).toEqual({ usual: [], large: [] })
+    }
+  }
+})

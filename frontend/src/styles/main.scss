@@ -12,6 +12,39 @@ body {
   color: var(--text);
   background: var(--sunken);
   -webkit-font-smoothing: antialiased;
+
+  // A word wider than its line breaks rather than stands past it (MOL-334): at 200 % «налогоплательщика» of
+  // «Данные и приватность» took the page 33 px sideways. Only where a word alone does not fit — least widths
+  // stay as they were, and at 100 % nothing changes.
+  overflow-wrap: break-word;
+}
+
+// With large text words break with a hyphen by the dictionary (MOL-334, owner's В-2 «а», В-5 «а»): `hyphens: auto`
+// cuts any word of the length at a line's end, wide or not, so where the length starts is the whole choice. In a
+// unit of one to three words — a row's words and a button by `@include word-unit`, a title below from five — from six letters,
+// two a side as Russian print carries them: at 200 % «Написать разработчику» read «Написа|ть разраб|отчику», and with three a side «Настройки»
+// broke «Настро|йки». In a paragraph and a row's meta from twelve: from six, «Данные и приватность» cut 394 words
+// that would have stood whole at 200 %, 192 already at 115 % (adversarial Х1); from twelve 21, and a word of seven
+// to eleven letters wider than its line breaks with none. A segment's word never breaks (MOL-189), nor does what is
+// typed. Only while the text is large (`useLargeText`): Safari knows no limit, and WebKit hyphenates any word at a
+// line's end — «Запишите первые по-купки» at 100 %.
+html[data-large-text] body {
+  hyphens: auto;
+  hyphenate-limit-chars: 12 5 5;
+}
+
+// A title from five (owner's В-7 «а»): beside the sheet's «×» at 200 % on 320 its line is 144 px and «Новая», five
+// letters, 149 — with none it read «Нова / я трата», «Новы / й счёт» (adversarial Х6).
+html[data-large-text] :is(h1, h2, h3) {
+  hyphenate-limit-chars: 5 2 2;
+}
+
+html[data-large-text] .segment .word {
+  hyphens: manual;
+}
+
+html[data-large-text] :is(input, textarea) {
+  hyphens: manual;
 }
 
 *,

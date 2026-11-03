@@ -131,6 +131,8 @@ export default defineComponent({
 /* The switch goes under the words only where the two do not fit (MOL-321): beside it at 200 % the words had some
    40 px, «Зар|пла|та». 6rem keeps the row at 100 % on 320 as it was. */
 .label {
+  @include word-unit;
+
   flex: 1 1 0;
   min-width: min(6rem, 100%);
   overflow-wrap: anywhere;

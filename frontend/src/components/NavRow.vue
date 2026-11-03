@@ -160,6 +160,8 @@ export default defineComponent({
    one of the app at 320 at a text of 100 % — large text is MOL-321; a note in the spending sheet's field may
    be long, and the sheet opens it whole. */
 .label {
+  @include word-unit;
+
   display: -webkit-box;
   flex: 1 1 auto;
   min-width: 0;
@@ -182,6 +184,8 @@ export default defineComponent({
 /* Never cut: on its own line it breaks between its words, never inside a figure, whose groups the
    formats keep together. */
 .value {
+  @include word-unit;
+
   flex: 0 1 auto;
   min-width: 0;
   margin-inline-start: auto;

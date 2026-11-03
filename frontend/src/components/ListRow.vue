@@ -289,6 +289,8 @@ export default defineComponent({
 }
 
 .title {
+  @include word-unit;
+
   overflow: hidden;
   font-weight: var(--weight-medium);
   text-overflow: ellipsis;

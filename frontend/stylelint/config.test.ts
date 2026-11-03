@@ -120,4 +120,17 @@ describe('frontend/.stylelintrc.json', () => {
       'declaration-property-value-disallowed-list',
     ])
   }, 10_000)
+
+  // A size that stops growing is the tab bar's alone (MOL-334, adversarial Г20, Г21): through the real config, a
+  // caption that took it — at 200 % 13.75 px for 22 — is refused, the tab bar is not.
+  it('keeps the tab label’s size to the tab bar', async () => {
+    const sfc = (css: string) =>
+      `<template><p /></template>\n\n<style scoped lang="scss">\n${css}</style>\n`
+    const caption = `${FRONTEND}src/components/SectionCaption.vue`
+    expect(await rules(sfc('.a {\n  font-size: var(--text-tab);\n}\n'), caption)).toEqual([
+      'molvia/known-custom-property',
+    ])
+    const tabs = `${FRONTEND}src/components/TabBar.vue`
+    expect(await rules(sfc('.a {\n  font-size: var(--text-tab);\n}\n'), tabs)).toEqual([])
+  })
 })

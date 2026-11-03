@@ -120,3 +120,17 @@ export function figureWidth(text: string, face: Face = 'display'): number {
 export function widthStyle(width: number): StyleValue {
   return { '--figure-width': String(Math.round(width * ROOM * 1000) / 1000) }
 }
+
+/**
+ * A phrase that holds a sum, cut around it, so the sum can stand as a piece of its own — whole, shrunk by
+ * `figure-fit` — in the words around it (MOL-334, В-6 «а»): «В Ереван Сити брали по 125 403,50 ֏/кг» broke inside
+ * the sum at 200 %. The first time the sum stands; a phrase without it is all words.
+ */
+export function aroundFigure(
+  phrase: string,
+  figure: string,
+): { before: string; figure: string; after: string } {
+  const at = figure === '' ? -1 : phrase.indexOf(figure)
+  if (at < 0) return { before: phrase, figure: '', after: '' }
+  return { before: phrase.slice(0, at), figure, after: phrase.slice(at + figure.length) }
+}

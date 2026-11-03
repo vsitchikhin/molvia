@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./testing/root-font-size": "./testing/root-font-size.ts"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
