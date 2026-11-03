@@ -27,17 +27,17 @@ const SELECT = [
  * in the script and bound under a name is review's, as `figureChars` is.
  */
 const BOUND_SIZE = '(font|font-?size|font-?size-?adjust|zoom)'
+const BOUND_SIZE_MESSAGE =
+  'A size of text is the stylesheet’s, never a :style binding — large text would stop at it (MOL-334).'
 const STYLE_BINDING = "VAttribute[directive=true][key.name.name='bind'][key.argument.name='style']"
 const SIZE = [
   {
     selector: `${STYLE_BINDING} Property:matches([key.name=/^${BOUND_SIZE}$/i], [key.value=/^${BOUND_SIZE}$/i])`,
-    message:
-      'A size of text is the stylesheet’s, never a :style binding — large text would stop at it (MOL-334).',
+    message: BOUND_SIZE_MESSAGE,
   },
   {
     selector: `${STYLE_BINDING} :matches(Literal[value=/(^|;)\\s*${BOUND_SIZE}\\s*:/i], TemplateElement[value.raw=/(^|;)\\s*${BOUND_SIZE}\\s*:/i])`,
-    message:
-      'A size of text is the stylesheet’s, never a :style binding — large text would stop at it (MOL-334).',
+    message: BOUND_SIZE_MESSAGE,
   },
 ]
 /**
