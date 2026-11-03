@@ -494,7 +494,9 @@ The detail behind the frontend lines of `CLAUDE.md`.
   **The system's font size is the rem** (owner's В-1 «а»): `<meta name="text-scale" content="scale">` in `index.html`
   makes Chrome 146+ set 1rem by Android's font size and turn its own page zoom and text autosizing off — the very model
   every spec measures by; without it a phone's Chrome ignores the system's size. It holds only while no stylesheet sets
-  the root's `font-size`, which `useLargeText.test.ts` holds; Safari passes Dynamic Type to no page. Seven ways:
+  the root's `font-size`, which `useLargeText.test.ts` holds — every rule's own declarations, its selectors split,
+  comments cut and `:is()`, `:where()` opened (adversarial Г1, Г2), the ordinary spelling and not a form built to slip
+  past it; Safari passes Dynamic Type to no page. Seven ways:
   - **A row of segments its words do not fit stands them one under another** (`SegmentedControl`, В-1 «а»):
     the word stays whole — MOL-189 holds, and now a test holds it (`kit-rows`: every word of «Как меняли» on one
     line, in both engines and languages; m7, which broke the word, went green on 66 tests before). The row is
@@ -525,7 +527,7 @@ The detail behind the frontend lines of `CLAUDE.md`.
     the layout, never by a size nobody reads; the category stays said by its name and its bar. The words take the circle's column
     with its gap, a removed category's empty tail stays in the chevron's (self-review 5), and the plan under the
     name stands whole (`whole`): two lines held «125 403 ֏ из» and hid the plan at 200 % (adversarial Д2). **Since round 9 that is every
-    row of the kit** (self-review of round 9): every list card is `row-tight` (`AppCard list`), and below `$row-tight` (15rem: some 120 % on 320 and up — at 130 % a
+    row of the kit** (self-review of round 9): every list card is `row-tight` (`AppCard list`), and below `$row-tight` (17rem since MOL-334: some 106 % on 320 and up — at 15rem, some 120 %, a row at 110–115 % kept its sum beside words of 41–57 px, «Икр / а», and a price per unit of a million shrank to 4.9 px in them, adversarial С4; the narrowest list card at 100 % on 320 is 17.88rem and keeps the row; at 130 % a
     sum of a million in the words' column stood over the circle, self-review 10) a
     row's circle gives way, its words take the circle's column, the title and the line under it are whole — no
     «…» — and the tail stands under them across the row. At 200 % the rows of «Траты», an account's operations,
@@ -565,7 +567,9 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     здесь» (`AdviceTakeCard`, `strong`), each sum of another currency under a record's total (its line breaks between
     them: at 200 % «1 234 567,89 / ₽», adversarial С1), and — owner's В-6 «а» — a price per unit in the words of a row's
     meta and of «Тут дешевле», a piece of the phrase of its own (`aroundFigure` of `figure.ts`): «125 403, / 50 ֏»,
-    «125 403,50 / ֏/кг» at 200 % (С2, С3).
+    «125 403,50 / ֏/кг» at 200 % (С2, С3) — in a row against the column of its words (`.words` the box, `TripRow`).
+    **The price, named:** at 100 % on 320 a price per unit of seven figures beside a sum of seven shrinks to some 9 px,
+    since the look of 100 % keeps the sum beside the words.
   - **The tab label stops growing at 125 %**: `--text-tab`, `min(var(--text-caption), 13.75px)`, as iOS keeps its
     tab bar (В-3 «а»); a token, named one by one in Stylelint's list of sizes. The tab bar is fixed and in no width
     of the page, so `large-text` reads every label within its column.
@@ -603,13 +607,16 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   - **A word wider than its line breaks, and with large text words take a hyphen by the dictionary, by where they
     stand** (MOL-321's В-2 «а»; MOL-334's В-2 «а», В-5 «а»): `overflow-wrap: break-word` on `body` at every size —
     «налогоплательщика» stood «Данные и приватность» 33 px sideways at 200 % — which moves no least width, so 100 % keeps
-    its look; and one rule of `main.scss` under `html[data-large-text]`. **`hyphens: auto` cuts any word of the length
+    its look; and `hyphens: auto` on `body` under `html[data-large-text]` (`main.scss`). **`hyphens: auto` cuts any word of the length
     at a line's end, wide or not** (adversarial Х1), so where the length starts is the whole choice: in a unit of one to
-    three words — a title (`h1`–`h3`), a row of the kit (`.list-row .title`, `.nav-row .label`), a button — from six
-    letters, two a side as Russian print carries them (with three «Настройки» had no place for one and broke
+    three words — a heading (`h1`–`h3`, `main.scss`), and by `@include word-unit` in its own component a row's title
+    (`ListRow`), a link row's label (`NavRow`), a button (`AppButton`), the words of a switch row («Бот», the salary's
+    day, «Учитывать меня в статистике») and a device's name — from six letters, two a side as Russian print carries them (with three «Настройки» had no place for one and broke
     «Настро|йки»; at 200 % «Написать разработчику» read «Написа|ть разраб|отчику»); in a paragraph and a row's meta
     from twelve, inherited from `body`: from six there, «Данные и приватность» cut 394 words that would have stood
-    whole at 200 % and 192 already at 115 %, from twelve 21. **A segment's word never takes one** (MOL-189): a hyphen
+    whole at 200 % and 192 already at 115 %, from twelve 21. Each unit includes the mixin itself, so a component knows
+    its words are one (review №5): a list of the kit's classes in `main.scss` let «Напоминат / ь об / оценке» of a switch
+    row break with none (adversarial Х3). **A segment's word never takes one** (MOL-189): a hyphen
     lowers its least width, and a row whose words no longer overflow would not stand one under another. What is typed
     never takes one either. It was three rules of three components before (a screen's title, a block button, the
     newcomer's heading). `data-large-text` is set by `useLargeText` from a box one rem wide while a rem is over 17.6 px
