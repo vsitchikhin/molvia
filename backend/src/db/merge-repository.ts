@@ -11,6 +11,7 @@ import {
   liveItemId,
   livePlaceId,
   keptAdmitsOf,
+  keptLastOf,
   noteTraceWrite,
   pickWrittenByTrace,
   verdictWrittenByTrace,
@@ -429,7 +430,9 @@ export function createMergeRepository(db: Conn): MergeRepository {
         returning t.actor_id, t.query_key, t.picks, t.last_picked_at, t.admits
       ),
       prior as (
-        select k.actor_id, k.query_key, k.last_picked_at as kept_last,
+        select k.actor_id, k.query_key,
+               coalesce(${keptLastOf(sql`${into}::uuid`, sql`k.actor_id`, sql`k.query_key`)}, k.last_picked_at)
+                 as kept_last,
                coalesce(${keptAdmitsOf(sql`${into}::uuid`, sql`k.actor_id`, sql`k.query_key`)}, k.admits)
                  as kept_admits
         from search_picks k
@@ -746,6 +749,14 @@ export function createMergeRepository(db: Conn): MergeRepository {
           mergeId: number | string,
         ) => sql`exists (select 1 ${shares(actorId, queryKey, intoItem)}
                          and o.merge_id <> ${mergeId} and (o.before->>'admits')::boolean)`
+        // the last pick of the shares of other merges still standing on the row (Х1)
+        const othersLast = (
+          actorId: string,
+          queryKey: string,
+          intoItem: string | SQL,
+          mergeId: number | string,
+        ) => sql`(select max((o.before->>'lastPickedAt')::timestamptz) ${shares(actorId, queryKey, intoItem)}
+                  and o.merge_id <> ${mergeId})`
         // A swap whose kept row another trace's id wrote over since waits in the journal, and the undo
         // that gives the row back its word at the swap's moment does it then (MOL-299, Е1 of round 6).
         const resume = async (rowId: string, at: string) => {
@@ -931,22 +942,16 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 delete from catalogue_merge_moves
                 where merge_id = ${next.merge_id} and what in ('pick_added', 'pick_written')
                   and actor_id = ${actor} and key->>'queryKey' = ${queryKey}`)
-              // The row is that trace's first pick now, and its word what the shares left go back to (С1);
-              // they stand over it one on another by their picks' moments, so the undo of each finds the row at
-              // the moment it waits for (Ф1 of round 21).
+              // the row is that trace's first pick now: its own, what the shares left go back to (С1, Ф1)
               await tx.execute(sql`
                 update catalogue_merge_moves o
                 set before = o.before || jsonb_build_object(
-                      'keptAdmits', ${next.before.admits}, 'keptLastPickedAt', c.kept::text)
-                from (
-                  select o.merge_id,
-                         greatest(${next.before.lastPickedAt}::timestamptz,
-                                  lag((o.before->>'lastPickedAt')::timestamptz)
-                                    over (order by (o.before->>'lastPickedAt')::timestamptz, o.merge_id)) as kept
-                  ${shares(actor, queryKey, next.into_item)}
-                ) c
-                where c.merge_id = o.merge_id and o.what in ('pick_added', 'pick_written')
-                  and o.actor_id = ${actor}::uuid and o.key->>'queryKey' = ${queryKey}`)
+                      'keptAdmits', ${next.before.admits},
+                      'keptLastPickedAt', ${next.before.lastPickedAt}::text)
+                from catalogue_merges l
+                where l.id = o.merge_id and l.undone_at is null and l.into_item = ${next.into_item}::uuid
+                  and o.what in ('pick_added', 'pick_written') and o.actor_id = ${actor}::uuid
+                  and o.key->>'queryKey' = ${queryKey}`)
               await noteTraceWrite(
                 tx,
                 'item',
@@ -959,42 +964,21 @@ export function createMergeRepository(db: Conn): MergeRepository {
             }
             case 'pick_written': {
               // The picks a trace's id added to a person's row of the survivor (К1, owner's В-11 «б»):
-              // its share goes home. Picked by nobody since, the row is back at what it held before it;
-              // picked since by another trace's id, the next share keeps that instead.
+              // its share goes home, and the row is back at its own and the shares still standing on it.
               const before = move.before
               if (before === null || move.actor_id === null) break
               const actor = move.actor_id
               const queryKey = String(key.queryKey)
-              const row = sql`actor_id = ${actor} and query_key = ${queryKey} and item_id = ${now}`
-              const top = await tx.execute(sql`
+              const taken = await tx.execute(sql`
                 update search_picks
                 set picks = picks - ${before.picks},
-                    last_picked_at = ${before.keptLastPickedAt ?? null}::timestamptz,
+                    last_picked_at = greatest(${before.keptLastPickedAt ?? null}::timestamptz,
+                                              ${othersLast(actor, queryKey, now, id)}),
                     admits = ${before.keptAdmits ?? false} or ${othersAdmit(actor, queryKey, now, id)}
-                where ${row} and picks > ${before.picks}
-                  and last_picked_at = greatest(${before.keptLastPickedAt ?? null}::timestamptz,
-                                                ${key.at}::timestamptz)
+                where actor_id = ${actor} and query_key = ${queryKey} and item_id = ${now}
+                  and picks > ${before.picks}
                 returning 1`)
-              if (top.length === 0) {
-                const next =
-                  key.at === undefined ? undefined : await pickAbove(actor, queryKey, key.at)
-                if (next === undefined) break
-                const taken = await tx.execute(sql`
-                  update search_picks
-                  set picks = picks - ${before.picks},
-                      admits = ${before.keptAdmits ?? false}
-                        or ${othersAdmit(actor, queryKey, next.into_item, id)}
-                  where ${row} and picks > ${before.picks}
-                  returning 1`)
-                if (taken.length === 0) break
-                await tx.execute(sql`
-                  update catalogue_merge_moves
-                  set before = before || jsonb_build_object(
-                        'keptLastPickedAt', ${before.keptLastPickedAt ?? null}::text,
-                        'keptAdmits', ${before.keptAdmits ?? false})
-                  where merge_id = ${next.merge_id} and what in ('pick_added', 'pick_written')
-                    and actor_id = ${actor} and key->>'queryKey' = ${queryKey}`)
-              }
+              if (taken.length === 0) break
               const [prior] = await tx.execute<PickBefore & Record<string, unknown>>(sql`
                 select last_picked_at::text as "lastPickedAt", admits from search_picks
                 where actor_id = ${actor} and query_key = ${queryKey} and item_id = ${from}
@@ -1023,22 +1007,20 @@ export function createMergeRepository(db: Conn): MergeRepository {
             case 'pick_added': {
               const before = move.before
               if (before === null || move.actor_id === null) break
-              // The survivor's own figures back: its «own word» unless it had one — or a share of another
-              // merge still standing brings one (С1) — its last pick unless the person picked it again
-              // since (А7).
+              // The survivor's own figures back, and those of the shares of other merges still standing on
+              // the row: its «own word» unless it had one (С1), its last pick (А7, Х1).
               const keptAdmits = before.keptAdmits ?? true
               const keptLast = before.keptLastPickedAt ?? null
+              const queryKey = String(key.queryKey)
               await tx.execute(sql`
                 with taken as (
                   update search_picks
                   set picks = picks - ${before.picks},
-                      admits = ${keptAdmits}
-                        or ${othersAdmit(move.actor_id, String(key.queryKey), now, id)},
+                      admits = ${keptAdmits} or ${othersAdmit(move.actor_id, queryKey, now, id)},
                       last_picked_at = case
-                        when ${keptLast}::timestamptz is not null
-                         and last_picked_at = greatest(${keptLast}::timestamptz, ${before.lastPickedAt}::timestamptz)
-                        then ${keptLast}::timestamptz
-                        else last_picked_at end
+                        when ${keptLast}::timestamptz is null then last_picked_at
+                        else greatest(${keptLast}::timestamptz,
+                                      ${othersLast(move.actor_id, queryKey, now, id)}) end
                   where actor_id = ${move.actor_id} and query_key = ${key.queryKey}
                     and item_id = ${now} and picks > ${before.picks}
                   returning 1
@@ -1047,22 +1029,6 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 values (${move.actor_id}, ${key.queryKey}, ${from}, ${before.picks},
                         ${before.lastPickedAt}::timestamptz, ${before.admits})
                 on conflict do nothing`)
-              // Picked since by another trace, of a merge still standing (П1 of round 16): the share above
-              // keeps the row's moment right after this merge, and takes the survivor's own instead. Added
-              // picks are above only from a later merge: an earlier one's keep the same moment where the
-              // survivor's own pick was the last, and its «own word» is below this trace's (Р1 of round 17).
-              if (keptLast !== null) {
-                await tx.execute(sql`
-                  update catalogue_merge_moves o
-                  set before = o.before || jsonb_build_object(
-                        'keptLastPickedAt', ${keptLast}::text, 'keptAdmits', ${keptAdmits})
-                  from catalogue_merges l
-                  where l.id = o.merge_id and l.undone_at is null and o.merge_id <> ${id}
-                    and (o.what = 'pick_written' or (o.what = 'pick_added' and o.merge_id > ${id}))
-                    and o.actor_id = ${move.actor_id} and o.key->>'queryKey' = ${key.queryKey}
-                    and (o.before->>'keptLastPickedAt')::timestamptz
-                        = greatest(${keptLast}::timestamptz, ${before.lastPickedAt}::timestamptz)`)
-              }
               break
             }
             case 'barcode':

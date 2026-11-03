@@ -164,16 +164,23 @@ export async function verdictWrittenByTrace(
 }
 
 /**
- * The «own word» a person's row of `into` goes back to once every share standing on it goes home, as those
- * shares keep it — null with none (MOL-299, С1 of round 18). Every share of a row keeps the same one, never
- * the row's whole flag: that holds the words of the shares below, and the undo of one left it in the rest.
+ * What a person's row of `into` goes back to once every share standing on it goes home — its «own word» and
+ * its last pick, as those shares keep them; null with none (MOL-299, С1 of round 18, Х1 of round 22). Every
+ * share of a row keeps the same own, never the row's whole flag or moment: those hold the shares below, and
+ * the undo of one left them in the rest — or, a share grown since, found the row at no moment it waited for.
  */
-export const keptAdmitsOf = (into: SQL, actorId: SQL, queryKey: SQL): SQL => sql`(
-  select bool_and((mv.before->>'keptAdmits')::boolean)
+const keptOf = (aggregate: SQL, into: SQL, actorId: SQL, queryKey: SQL): SQL => sql`(
+  select ${aggregate}
   from catalogue_merge_moves mv
   join catalogue_merges m on m.id = mv.merge_id
   where m.undone_at is null and m.into_item = ${into} and mv.what in ('pick_added', 'pick_written')
     and mv.actor_id = ${actorId} and mv.key->>'queryKey' = ${queryKey})`
+
+export const keptAdmitsOf = (into: SQL, actorId: SQL, queryKey: SQL): SQL =>
+  keptOf(sql`bool_and((mv.before->>'keptAdmits')::boolean)`, into, actorId, queryKey)
+
+export const keptLastOf = (into: SQL, actorId: SQL, queryKey: SQL): SQL =>
+  keptOf(sql`max((mv.before->>'keptLastPickedAt')::timestamptz)`, into, actorId, queryKey)
 
 /** A pick row as it stood before a trace's id added to it (MOL-299, К1). */
 export interface PickBefore {
@@ -185,8 +192,8 @@ export interface PickBefore {
  * A pick a trace's id wrote after its merge. A new row is the trace's, noted under every merge of its way
  * (А2); one a move of the way names is the trace's too, and takes the moment (В1). Any other — the survivor's
  * own from before, or one another merge brought into it — got the trace's picks added (К1, owner's В-11 «б»):
- * the merge into the survivor keeps the trace's share and what the row held before it, the share growing with
- * every later pick by that id, and the undo takes the share home. A row the merge added the trace's own picks
+ * the merge into the survivor keeps the trace's share and the row's own as every share of the row keeps it
+ * (Х1), the share growing with every later pick by that id, and the undo takes the share home. A row the merge added the trace's own picks
  * to (`pick_added`) grows that share instead: one snapshot of the row before the trace, never two (Л1).
  */
 export async function pickWrittenByTrace(
@@ -222,9 +229,15 @@ export async function pickWrittenByTrace(
     where mv.merge_id in (select id from way) and mv.what in ('pick_added', 'pick_written') and ${mine}
     returning 1`)
   if (added.length > 0) return
-  const [survivor] = await conn.execute<{ id: string; kept: boolean | null }>(sql`
+  const [survivor] = await conn.execute<{
+    id: string
+    kept: boolean | null
+    keptLast: string | null
+  }>(sql`
     select coalesce(i.merged_into, i.id) as id,
-           ${keptAdmitsOf(sql`coalesce(i.merged_into, i.id)`, sql`${actorId}::uuid`, sql`${queryKey}`)} as kept
+           ${keptAdmitsOf(sql`coalesce(i.merged_into, i.id)`, sql`${actorId}::uuid`, sql`${queryKey}`)} as kept,
+           ${keptLastOf(sql`coalesce(i.merged_into, i.id)`, sql`${actorId}::uuid`, sql`${queryKey}`)}::text
+             as "keptLast"
     from items i where i.id = ${asked}::uuid`)
   await noteTraceWrite(
     conn,
@@ -238,7 +251,7 @@ export async function pickWrittenByTrace(
         picks: share.picks,
         lastPickedAt: at,
         admits: share.admits,
-        keptLastPickedAt: prior.lastPickedAt,
+        keptLastPickedAt: survivor?.keptLast ?? prior.lastPickedAt,
         keptAdmits: survivor?.kept ?? prior.admits,
       },
       into: survivor?.id ?? asked,

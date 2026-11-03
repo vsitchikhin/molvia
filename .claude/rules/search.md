@@ -830,22 +830,21 @@ report.
   step, from its end. A verdict is noted only as a first one, a pick only as a new row. **Picks a trace's id adds
   to a row no move of its way names** — the survivor's own from before, or one another merge brought —
   **are the trace's share** (`pick_written`, adversarial К1, owner's В-11 «б»): the merge into the survivor
-  keeps how many, their last moment and «own word», and what the row held before them; the undo takes the
-  share home, and the row is back at what it held — or, picked since by another trace's id — or added to by a later
-  merge, its `pick_added` (О1 of round 15) — the next share keeps that instead (and a `pick_added` undone
-  under a later share hands it the survivor's own the same way, П1 of round 16 — never to an earlier merge's
-  `pick_added`, which is below it, Р1 of round 17). **Every share of one row keeps the same «own word»** — the
-  row's own, never its whole flag, which holds the words of the shares below — and an undo gives the row that or
-  the word of any share still standing (`keptAdmitsOf`, С1 of round 18): so a word a trace's id taught goes home
-  with its share in any order, and a row a merge brought goes home at what is left of it once every share standing is
-  taken out — never whole while one stands, whatever its moment says (У1 of round 20); the shares left stand over the trace's first pick one on another by their
-  picks' moments, so each undo finds the row at the moment it waits for (Ф1 of round 21), the rest that trace's first pick (as `above` for a verdict, any order, one merge alone too). A pick by the trace's
-  id on a row its merge added the trace's own picks to (`pick_added`) grows that share instead: one snapshot of
-  the row before the trace, never two that restore it against each other (Л1 of round 12). A pick by the survivor's own id
-  writes its moment into every share standing on the row (`pickWrittenBySurvivor`) — and so does a pick by the
-  id of the trace whose row its merge brought there, the row being that trace's own (Т1 of round 19), so the undo gives the row
-  back the person's own last pick of it, never the one from before the merge (М1 of round 13) — read from no
-  moment of the row, which another trace's pick moves as well in a fan (Н1 of round 14).
+  keeps how many, their last moment and «own word». **A row is its own and the shares standing on it** (Х1 of
+  round 22): every share of one row — `pick_added` and `pick_written`, of any merge into the survivor — keeps
+  the same own, the row's last pick and «own word» without the shares (`keptLastOf`, `keptAdmitsOf`), and the
+  undo of any takes its picks off and gives the row the later of its own moment and the other shares' last, and
+  its own word or another share's. Kept as a snapshot of the row before each share, it held the shares below,
+  and an undo out of their order or a share grown since found the row at no moment it waited for and left the
+  picks or the word behind (О1, П1, Р1, С1, Ф1, Х1 of rounds 15–22). A row a merge brought goes home at what is
+  left of it once every share standing is taken out — never whole while one stands, whatever its moment says
+  (У1 of round 20) — the rest that trace's first pick, and its own what the shares left go back to (as `above`
+  for a verdict, any order, one merge alone too). A pick by the trace's id on a row its merge added the trace's
+  own picks to (`pick_added`) grows that share instead: one share of the trace, never two (Л1 of round 12). A
+  pick by the survivor's own id writes its moment and word into every share standing on the row
+  (`pickWrittenBySurvivor`) — and so does a pick by the id of the trace whose row its merge brought there, the
+  row being that trace's own (Т1 of round 19) — so the undo gives the row back the person's own last pick of it,
+  never the one from before the merge (М1 of round 13, Н1 of round 14).
   **A verdict, a pick or a word the person touched since
   stays**
   (adversarial А3): rated, amended or withdrawn on the survivor, it is their word about the survivor, and
