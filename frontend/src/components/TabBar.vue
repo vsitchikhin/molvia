@@ -105,13 +105,6 @@ export default defineComponent({
   gap: var(--space-1);
   padding-top: var(--space-2);
   color: var(--text-muted);
-
-  /* The tab label: the caption, grown with the text to 125 % of it and no further (MOL-321, owner's
-     В-3 «а»), as iOS keeps its tab bar's labels — at 150 % on 320 «Настройки» stood past the phone.
-     Declared here and nowhere else, so no other place reads it (`molvia/known-custom-property`): a
-     size that stops growing is the tab bar's alone, and a caption of the same 11 took it (adversarial Г20). */
-  --text-tab: min(var(--text-caption), 13.75px); /* 11, at most 13.75 */
-
   font-size: var(--text-tab);
   font-weight: var(--weight-medium);
   text-decoration: none;
