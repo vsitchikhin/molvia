@@ -555,6 +555,8 @@ for (const size of ['150%', '200%'])
       await facesIn(page)
       const sideways = () => sheet.evaluate((dialog) => dialog.scrollWidth - dialog.clientWidth)
       expect(await sideways()).toBe(0)
+      // A sheet's title beside its «×» takes a hyphen from five letters (owner's В-7 «а», adversarial Х6).
+      await expect(sheet.locator('h2.title')).toHaveCSS('hyphenate-limit-chars', '5 2 2')
       release()
       await expect(sheet.locator('.item-name').first()).toBeVisible()
       await expect
@@ -884,16 +886,12 @@ for (const size of ['150%', '200%'])
       // read.
       await page.goto('/settings')
       await expect(page.locator('.list-row .title').first()).toBeVisible()
-      for (const unit of [
-        '.list-row .title',
-        '.nav-row .label',
-        '.button',
-        'h1',
-        'label.row .label',
-      ]) {
+      for (const unit of ['.list-row .title', '.nav-row .label', '.button', 'label.row .label']) {
         await expect(page.locator(unit).first(), unit).toHaveCSS('hyphens', 'auto')
         await expect(page.locator(unit).first(), unit).toHaveCSS('hyphenate-limit-chars', '6 2 2')
       }
+      // A title from five (owner's В-7 «а»): «Нова / я трата» beside the sheet's «×» (adversarial Х6).
+      await expect(page.locator('h1').first()).toHaveCSS('hyphenate-limit-chars', '5 2 2')
       await expect(page.locator('.segment .word').first()).toHaveCSS('hyphens', 'manual')
       await page.goto('/settings/bot')
       await expect(page.locator('label.row .label').first()).toHaveCSS(
