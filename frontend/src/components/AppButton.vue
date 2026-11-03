@@ -94,6 +94,7 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .button {
+  @include word-unit;
   @include touch-target;
 
   gap: var(--space-2);

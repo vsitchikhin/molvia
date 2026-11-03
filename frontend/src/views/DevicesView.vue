@@ -204,6 +204,8 @@ export default defineComponent({
 }
 
 .name {
+  @include word-unit;
+
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
 }

@@ -134,6 +134,15 @@ $row-tight: 15rem;
   }
 }
 
+/// A unit of one to three words — a row's words, a button: with large text a word takes a hyphen from six letters, two a
+/// side, where a paragraph's takes one from twelve (`main.scss`; MOL-334, owner's В-5 «а»). Each unit includes it
+/// itself, so a component knows its words are one (review №5).
+@mixin word-unit {
+  html[data-large-text] & {
+    hyphenate-limit-chars: 6 2 2;
+  }
+}
+
 /// Read by a screen reader, never drawn. For words the screen already says with a picture —
 /// the «Back» in front of the chevron's label.
 @mixin visually-hidden {
