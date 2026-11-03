@@ -3,7 +3,7 @@ import { mount } from '@vue/test-utils'
 import { initCompiler } from 'sass-embedded'
 import { afterAll, afterEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
-import { setsRoot } from '@molvia/frontend/testing/root-font-size'
+import { setsRoot, zooms } from '@molvia/frontend/testing/root-font-size'
 import { useLargeText } from '@/composables/useLargeText'
 
 describe('useLargeText (MOL-321)', () => {
@@ -145,6 +145,28 @@ describe('the system’s font size (MOL-334)', () => {
     expect(setsRoot('/* html { font-size: 62.5% } */\nbody {\n  font-size: 1rem;\n}\n')).toBe(false)
   })
 
+  it('reads a block’s declarations after a block nested in it, as the browser holds plain CSS (adversarial Г14)', () => {
+    expect(setsRoot('html {\n  & .x { color: red; }\n  font-size: 62.5%;\n}')).toBe(true)
+    expect(setsRoot('.a {\n  & .x { color: red; }\n  font-size: 62.5%;\n}')).toBe(false)
+  })
+
+  it.each([
+    ['on the app, under a media query', '@media (orientation: landscape) { #app { zoom: 0.5; } }'],
+    ['by a custom property', '.x { zoom: var(--z); }'],
+    ['by a share', 'html[data-large-text] .a { zoom: 50%; }'],
+  ])('finds a zoom %s (adversarial Г15)', (_, scss) => {
+    expect(zooms(compiled(scss, main))).toBe(true)
+  })
+
+  it('must not fire on a zoom that changes nothing, or on a word with zoom in it', () => {
+    expect(
+      zooms(compiled('.a { zoom: 1; }\n.b { zoom: normal; }\n.c { zoom: reset; }', main)),
+    ).toBe(false)
+    expect(zooms(compiled('.a { --zoom: 0.5; }\n.b::before { content: "zoom: 0.5"; }', main))).toBe(
+      false,
+    )
+  })
+
   it('is never overridden: no stylesheet sets the root’s font-size', () => {
     // Everything is SCSS (CLAUDE.md), and the guard reads it with the very Sass that builds it — of the whole module,
     // partials too, since a script may import one: Vite takes `/reset.scss` and `@/../reset.scss` from beside `src`
@@ -179,7 +201,9 @@ describe('the system’s font size (MOL-334)', () => {
         .join('')
     }
     const sheets = entries.map((file) => ({ path: file.pathname, css: css(file) }))
-    expect(sheets.filter((sheet) => setsRoot(sheet.css)).map((sheet) => sheet.path)).toEqual([])
+    expect(
+      sheets.filter((sheet) => setsRoot(sheet.css) || zooms(sheet.css)).map((sheet) => sheet.path),
+    ).toEqual([])
     // A sheet by an address, `data:` too, is one the guard never reads (Г11).
     expect(sheets.filter((sheet) => /@import/i.test(sheet.css)).map((sheet) => sheet.path)).toEqual(
       [],

@@ -1,12 +1,13 @@
 /**
- * Whether a stylesheet sets the root's `font-size` (MOL-334, owner's В-1 «а»): Chrome takes the system's font size
- * as 1rem only from a root nothing sizes. One reader of CSS as Sass writes it or as the browser holds it, for two
- * guards: `useLargeText.test.ts` over every sheet of the module, and `e2e/large-text.spec.ts` over what the build
- * made and what reached the page, wherever it came from (adversarial Г13).
+ * Whether a stylesheet keeps the system's font size from the eye (MOL-334, owner's В-1 «а»): Chrome takes it as 1rem
+ * only from a root nothing sizes, and `zoom` draws large text back at 100 % with the root untouched (adversarial
+ * Г15). One reader of CSS as Sass writes it or as the browser holds it, for two guards: `useLargeText.test.ts` over
+ * every sheet of the module, and `e2e/large-text.spec.ts` over what the build made and what reached the page,
+ * wherever it came from (adversarial Г13).
  */
 
 // Split where no bracket is open: a list of selectors at its commas, a selector at its combinators.
-function outside(text: string, separator: RegExp): string[] {
+const outside = (text: string, separator: RegExp): string[] => {
   const parts: string[] = []
   let part = ''
   let depth = 0
@@ -28,7 +29,7 @@ const subjectOf = (selector: string): string => outside(selector.trim(), /[\s>+~
 
 // A compound's own text, and each of its functional pseudo-classes with the list in its brackets, however deep
 // (adversarial Г5): `:is(.a, :is(:is(:root)))` gives its `.a` to no one but the `:is()` it stands in.
-function parted(compound: string): { bare: string; calls: { name: string; list: string }[] } {
+const parted = (compound: string): { bare: string; calls: { name: string; list: string }[] } => {
   const calls: { name: string; list: string }[] = []
   let bare = compound
   for (let call = /:([-\w]+)\(/.exec(bare); call; call = /:([-\w]+)\(/.exec(bare)) {
@@ -42,7 +43,7 @@ function parted(compound: string): { bare: string; calls: { name: string; list: 
   return { bare: bare.replace(/\[[^\]]*\]/g, ''), calls }
 }
 
-function neverRoot(compound: string): boolean {
+const neverRoot = (compound: string): boolean => {
   const { bare, calls } = parted(compound)
   if (/(^|[^-\w.#:])html(?![-\w])|:root(?![-\w])/i.test(bare)) return false
   return (
@@ -63,13 +64,40 @@ const plain = (css: string): string =>
     (found) => (found.startsWith('/*') ? '' : /^["']/.test(found) ? '""' : '_'),
   )
 
-/**
- * Every block's own declarations, up to its first nested block, under each of its selectors — whatever condition
- * the block stands under, since a media query or a state the page is not in now is one it may be in later.
- */
+// Every block with all its own declarations, before and after a block nested in it: the browser holds plain CSS
+// nesting as typed, `html { .x { … } font-size: 62.5%; }` (adversarial Г14). A block under a condition is read as
+// any other, since a media query or a state the page is not in now is one it may be in later.
+const blocksOf = (css: string): { selectors: string; declarations: string[] }[] => {
+  const done: { selectors: string; declarations: string[] }[] = []
+  const open = [{ selectors: '', declarations: [] as string[] }]
+  let text = ''
+  for (const char of plain(css)) {
+    if (char === '{') {
+      open.push({ selectors: text, declarations: [] })
+      text = ''
+    } else if (char === ';' || char === '}') {
+      open.at(-1)?.declarations.push(text)
+      text = ''
+      const block = char === '}' && open.length > 1 ? open.pop() : undefined
+      if (block) done.push(block)
+    } else text += char
+  }
+  return done
+}
+
+/** A rule setting `font-size` or `font` on what may be the root. */
 export const setsRoot = (css: string): boolean =>
-  [...plain(css).matchAll(/([^{};]*)\{(?=([^{}]*))/g)].some(
-    ([, selectors = '', declarations = '']) =>
-      /(^|;)\s*font(-size)?\s*:/.test(declarations) &&
+  blocksOf(css).some(
+    ({ selectors, declarations }) =>
+      declarations.some((declaration) => /^\s*font(-size)?\s*:/i.test(declaration)) &&
       outside(selectors, /,/).some((one) => !neverRoot(subjectOf(one))),
+  )
+
+/** A `zoom` on any element but one that changes nothing — large text drawn smaller with every size it measures. */
+export const zooms = (css: string): boolean =>
+  blocksOf(css).some(({ declarations }) =>
+    declarations.some((declaration) => {
+      const [, value] = /^\s*zoom\s*:([\s\S]*)$/i.exec(declaration) ?? []
+      return value !== undefined && !/^\s*(1|normal|reset)\s*$/i.test(value)
+    }),
   )
