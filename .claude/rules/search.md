@@ -834,7 +834,10 @@ report.
   share home, and the row is back at what it held — or, picked since by another trace's id — or added to by a later
   merge, its `pick_added` (О1 of round 15) — the next share keeps that instead (and a `pick_added` undone
   under a later share hands it the survivor's own the same way, П1 of round 16 — never to an earlier merge's
-  `pick_added`, which is below it, Р1 of round 17), and a row a merge brought goes home at what is left of it once every share standing is
+  `pick_added`, which is below it, Р1 of round 17). **Every share of one row keeps the same «own word»** — the
+  row's own, never its whole flag, which holds the words of the shares below — and an undo gives the row that or
+  the word of any share still standing (`keptAdmitsOf`, С1 of round 18): so a word a trace's id taught goes home
+  with its share in any order, and a row a merge brought goes home at what is left of it once every share standing is
   taken out, the rest that trace's first pick (as `above` for a verdict, any order, one merge alone too). A pick by the trace's
   id on a row its merge added the trace's own picks to (`pick_added`) grows that share instead: one snapshot of
   the row before the trace, never two that restore it against each other (Л1 of round 12). A pick by the survivor's own id

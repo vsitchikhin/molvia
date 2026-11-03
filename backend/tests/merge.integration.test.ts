@@ -1144,6 +1144,38 @@ describe("the undo takes home what a trace's id wrote after the merge (MOL-299, 
     )
   })
 
+  it.each([
+    [false, 'earlier'],
+    [true, 'earlier'],
+    [true, 'later'],
+    [false, 'later'],
+  ])(
+    "takes the word a trace's id taught home in a fan, own pick %s, the %s merge first (С1)",
+    async (own, first) => {
+      const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+      await db.execute(sql`
+        insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+        values (${owner}, 'maloko', ${other}, 1, '2026-09-01T10:00:00Z'),
+               (${owner}, 'maloko', ${older}, 1, '2026-09-03T10:00:00Z')`)
+      const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+      const picks = createSearchPickRepository(db)
+      // from a phone's queue, by the trace's id: its word lands on the survivor's row
+      await picks.learn(owner, 'малоко', younger)
+      if (own) await picks.remember(owner, 'малоко', older)
+      const two = numbered(await merges.mergeItems(other, older, NIGHT))
+      for (const id of first === 'earlier' ? [one, two] : [two, one]) {
+        expect(await merges.unmerge(id)).toMatchObject({ subject: 'item' })
+      }
+      expect(await picksOf('maloko')).toEqual(
+        sorted([
+          [older, own ? 2 : 1, false],
+          [younger, 1, true],
+          [other, 1, false],
+        ]),
+      )
+    },
+  )
+
   it.each(['later', 'earlier'])(
     "takes home each twin's picks of one row in a fan, the %s merge first (К1)",
     async (first) => {

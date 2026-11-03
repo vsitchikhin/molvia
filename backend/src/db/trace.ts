@@ -163,6 +163,18 @@ export async function verdictWrittenByTrace(
   )
 }
 
+/**
+ * The «own word» a person's row of `into` goes back to once every share standing on it goes home, as those
+ * shares keep it — null with none (MOL-299, С1 of round 18). Every share of a row keeps the same one, never
+ * the row's whole flag: that holds the words of the shares below, and the undo of one left it in the rest.
+ */
+export const keptAdmitsOf = (into: SQL, actorId: SQL, queryKey: SQL): SQL => sql`(
+  select bool_and((mv.before->>'keptAdmits')::boolean)
+  from catalogue_merge_moves mv
+  join catalogue_merges m on m.id = mv.merge_id
+  where m.undone_at is null and m.into_item = ${into} and mv.what in ('pick_added', 'pick_written')
+    and mv.actor_id = ${actorId} and mv.key->>'queryKey' = ${queryKey})`
+
 /** A pick row as it stood before a trace's id added to it (MOL-299, К1). */
 export interface PickBefore {
   readonly lastPickedAt: string
@@ -204,8 +216,10 @@ export async function pickWrittenByTrace(
     where mv.merge_id in (select id from way) and mv.what in ('pick_added', 'pick_written') and ${mine}
     returning 1`)
   if (added.length > 0) return
-  const [survivor] = await conn.execute<{ id: string }>(sql`
-    select coalesce(merged_into, id) as id from items where id = ${asked}::uuid`)
+  const [survivor] = await conn.execute<{ id: string; kept: boolean | null }>(sql`
+    select coalesce(i.merged_into, i.id) as id,
+           ${keptAdmitsOf(sql`coalesce(i.merged_into, i.id)`, sql`${actorId}::uuid`, sql`${queryKey}`)} as kept
+    from items i where i.id = ${asked}::uuid`)
   await noteTraceWrite(
     conn,
     'item',
@@ -219,7 +233,7 @@ export async function pickWrittenByTrace(
         lastPickedAt: at,
         admits: share.admits,
         keptLastPickedAt: prior.lastPickedAt,
-        keptAdmits: prior.admits,
+        keptAdmits: survivor?.kept ?? prior.admits,
       },
       into: survivor?.id ?? asked,
     },
