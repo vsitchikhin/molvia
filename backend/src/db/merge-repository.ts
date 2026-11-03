@@ -58,6 +58,7 @@ interface JournalMove extends Record<string, unknown> {
     readonly deletedAt: string | null
     readonly withdrew: boolean
     readonly reviewChanged: boolean
+    readonly rated?: boolean
   } | null
   readonly actor_id: string | null
 }
@@ -679,7 +680,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
             merge_id: string
             asked: string
             at: string
-            before: VerdictBefore & { withdrew: boolean; reviewChanged: boolean }
+            before: VerdictBefore & { withdrew: boolean; reviewChanged: boolean; rated?: boolean }
             fits: boolean
             text_changed: boolean
           }>(sql`
@@ -794,14 +795,15 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 delete from catalogue_merge_moves
                 where merge_id = ${next.merge_id} and what = 'verdict_overwritten'
                   and key->>'id' = ${key.id}::text`)
-              if (next.before.withdrew && row.top) break
+              if (next.before.withdrew && next.before.rated !== true && row.top) break
               const stays = randomUUID()
               await tx.execute(sql`
                 insert into verdicts (id, actor_id, item_id, item_kind, place_id, score, review,
                                       rated_at, updated_at, deleted_at)
                 values (${stays}, ${row.actor_id}, ${now}, ${row.item_kind}, ${row.place_id}::uuid,
                         ${row.score}, ${next.text_changed && row.deleted_at === null ? row.review : null},
-                        ${row.rated_at}::timestamptz, ${row.updated_at}::timestamptz,
+                        least(${next.at}::timestamptz, ${row.deleted_at}::timestamptz),
+                        ${row.updated_at}::timestamptz,
                         ${row.deleted_at}::timestamptz)`)
               // a word written over it later goes with it
               await tx.execute(sql`
@@ -809,7 +811,8 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 set key = jsonb_set(mv.key, '{id}', to_jsonb(${stays}::text))
                 from catalogue_merges l
                 where l.id = mv.merge_id and l.undone_at is null and mv.what = 'verdict_overwritten'
-                  and mv.key->>'id' = ${key.id}::text`)
+                  and mv.key->>'id' = ${key.id}::text
+                  and (mv.key->>'at')::timestamptz > ${next.at}::timestamptz`)
               await noteTraceWrite(tx, 'item', next.asked, 'verdict', { id: stays, at: next.at })
               break
             }
@@ -971,6 +974,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
                   deletedAt: before.deletedAt,
                   withdrew: next.before.withdrew,
                   reviewChanged: next.before.reviewChanged,
+                  rated: next.before.rated,
                 }
                 await tx.execute(sql`
                   update catalogue_merge_moves set before = ${JSON.stringify(under)}::jsonb
@@ -992,7 +996,11 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 select id, score, rated_at::text as "ratedAt", updated_at::text as "updatedAt",
                        deleted_at::text as "deletedAt"
                 from verdicts where ${theirs} for update`)
-              const how = { withdrew: before.withdrew, reviewChanged: before.reviewChanged }
+              const how = {
+                withdrew: before.withdrew,
+                reviewChanged: before.reviewChanged,
+                rated: before.rated === true,
+              }
               const further = (
                 written: { id: string; touched: string },
                 priorRow?: VerdictBefore,
@@ -1016,25 +1024,29 @@ export function createMergeRepository(db: Conn): MergeRepository {
                   where ${theirs} and deleted_at is null
                   returning id, updated_at::text as touched`)
                 if (withdrawn !== undefined && prior !== undefined) further(withdrawn, prior)
-                break
-              }
-              const [taken] = await tx.execute<{ id: string; touched: string }>(sql`
-                update verdicts
-                set score = ${row.score},
-                    review = case when ${before.reviewChanged} then ${said} else review end,
-                    updated_at = greatest(${key.at}::timestamptz, rated_at), deleted_at = null
-                where ${theirs}
-                returning id, updated_at::text as touched`)
-              if (taken !== undefined && prior !== undefined) {
-                further(taken, prior)
-                break
+                // rated and taken back by the trace's id, with no verdict of its own there: a withdrawn
+                // one of its own, as any verdict rated and withdrawn is (MOL-27, И2 of round 9)
+                if (prior !== undefined || before.rated !== true) break
+              } else {
+                const [taken] = await tx.execute<{ id: string; touched: string }>(sql`
+                  update verdicts
+                  set score = ${row.score},
+                      review = case when ${before.reviewChanged} then ${said} else review end,
+                      updated_at = greatest(${key.at}::timestamptz, rated_at), deleted_at = null
+                  where ${theirs}
+                  returning id, updated_at::text as touched`)
+                if (taken !== undefined && prior !== undefined) {
+                  further(taken, prior)
+                  break
+                }
               }
               const [made] = await tx.execute<{ id: string; touched: string }>(sql`
-                insert into verdicts
-                  (id, actor_id, item_id, item_kind, place_id, score, review, rated_at, updated_at)
+                insert into verdicts (id, actor_id, item_id, item_kind, place_id, score, review,
+                                      rated_at, updated_at, deleted_at)
                 values (${randomUUID()}, ${row.actor_id}, ${from}, ${row.item_kind},
-                        ${row.place_id}::uuid, ${row.score}, ${said},
-                        ${key.at}::timestamptz, ${key.at}::timestamptz)
+                        ${row.place_id}::uuid, ${row.score}, ${before.withdrew ? null : said},
+                        ${key.at}::timestamptz, ${key.at}::timestamptz,
+                        ${before.withdrew ? key.at : null}::timestamptz)
                 returning id, updated_at::text as touched`)
               if (made !== undefined) further(made)
               break

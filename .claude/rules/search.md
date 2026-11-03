@@ -846,7 +846,9 @@ report.
   said — its score and moments, never its text (`verdict_overwritten`, `before`, with the person's id) — and
   the undo, last of its moves, gives it back while the row is still at the trace's word, and gives the trace
   that word: a rating its own verdict, given at the moment of the write, a withdrawal its own withdrawn if
-  it has one. Later writes by the trace's id move the moment and keep the first `before`. What is kept is
+  it has one. Later writes by the trace's id move the moment and keep the first `before`; rated and then
+  taken back by it, the trace gets its verdict withdrawn — a row, as MOL-27 counts one (И2 of round 9) — a
+  withdrawal alone nothing. What is kept is
   the person's, in their copy (`overwrittenVerdicts`, version 27), gone with them by the cascade, and gone
   with the undo. It is kept by the merge into the survivor; on a chain the word goes to that merge's younger
   and is written there as the trace's id would write it, so the next undo carries it on and the whole chain
@@ -857,7 +859,7 @@ report.
   that word home and leaves the rest to the merge above (`above`). A row the merge brought goes home itself, at
   what it said, so the moves that name it carry it on down a chain (№16 of review 8), and the other trace's
   word stays as a row of its own, noted as its first — a withdrawal of nothing as none, the row it took being
-  the one gone home (З1 of round 8, as Г2). A word written over goes to its trace, and the move above keeps
+  the one gone home (З1 of round 8, as Г2), and rated when the trace's id wrote it (И1 of round 9). A word written over goes to its trace, and the move above keeps
   what this one did. So the owner undoes the false twin and keeps the true one. An order by the moment
   (round 5) refused both undos for good where two people wrote each by the other's trace (Е1), and a move
   waiting for the other undo (round 6) waited for good where that one was the true twin (Ж1).
@@ -874,7 +876,9 @@ report.
   a swap goes over two rows, and handing it on is not worth a case this rare); in a fan, a trace's word written
   over by another
   trace's id and then by its own again is not given back — the later write takes the move's moment past the
-  other's, so neither undo finds the row at it (№14 of the self-review, round 6); a word of the shop's memory
+  other's, so neither undo finds the row at it (№14 of the self-review, round 6); a withdrawal of nothing by one trace's id with a word of another written over it
+  later stays on the survivor as a withdrawn row with the brought row's score, for the gate to count (№19 of the
+  self-review, round 9: three twins, a withdrawal and a word more); a word of the shop's memory
   settled again after a
   purchase removed (`settleWords`, MOL-240) takes another moment and stays with the survivor while its
   purchase goes home — the memory says the survivor until the API's next start settles it whole (№9 of

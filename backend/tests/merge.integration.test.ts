@@ -1388,6 +1388,47 @@ describe('the undo leaves a verdict the person touched after the merge (MOL-299,
     expect(await overwritten()).toBe(0)
   })
 
+  it("rates the true twin's word left on the survivor when the trace's id wrote it (И1)", async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    await verdict(owner, stewed, { score: 3, ratedAt: '2026-09-01T10:00:00Z' })
+    await merges.mergeItems(younger, older, NIGHT)
+    const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    await rateBy(younger, 1)
+    await merges.unmerge(wrong)
+    const stays = onlyRow(
+      await db.execute<{ score: number; fresh: boolean; written: boolean }>(sql`
+        select score, rated_at > '2026-09-01T10:00:00Z' as fresh, rated_at = updated_at as written
+        from verdicts where actor_id = ${owner} and item_id = ${older}`),
+    )
+    expect(stays).toEqual({ score: 1, fresh: true, written: true })
+  })
+
+  it('gives the trace its rating withdrawn, rated and taken back by its id (И2)', async () => {
+    await verdict(owner, older, { score: 5 })
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    await rateBy(younger, 1)
+    expect(await verdicts.withdraw(owner, younger)).toBe(true)
+    await merges.unmerge(id)
+    expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 5, live: true },
+      { score: 1, live: false },
+    ])
+  })
+
+  it("keeps a rating taken back by the true twin's id as a withdrawn row, the false one undone (И2)", async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    await verdict(owner, stewed, { score: 3 })
+    await merges.mergeItems(younger, older, NIGHT)
+    const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    await rateBy(younger, 1)
+    expect(await verdicts.withdraw(owner, younger)).toBe(true)
+    await merges.unmerge(wrong)
+    expect([await scoreOn(stewed), await scoreOn(older)]).toEqual([
+      { score: 3, live: true },
+      { score: 1, live: false },
+    ])
+  })
+
   it('carries a word written over by a fan down a chain to its own trace (№16)', async () => {
     const third = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
     const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')

@@ -60,7 +60,7 @@ export async function restampTraceWrite(
   refers: SQL,
   at: string,
   /** What the latest write did, for a verdict written over (Г1, Г2): withdrew it, changed its text. */
-  how: { readonly withdrew: boolean; readonly reviewChanged: boolean } | null = null,
+  how: WriteHow | null = null,
 ): Promise<number> {
   const restamped = await conn.execute(sql`
     ${wayOf(subject, asked)}
@@ -69,7 +69,8 @@ export async function restampTraceWrite(
         before = case when mv.what = 'verdict_overwritten' and ${how !== null}
                       then mv.before || jsonb_build_object(
                              'withdrew', ${how?.withdrew ?? false},
-                             'reviewChanged', (mv.before->>'reviewChanged')::boolean or ${how?.reviewChanged ?? false})
+                             'reviewChanged', (mv.before->>'reviewChanged')::boolean or ${how?.reviewChanged ?? false},
+                             'rated', coalesce((mv.before->>'rated')::boolean, false) or ${how !== null && ratedBy(how)})
                       else mv.before end
     where mv.merge_id in (select id from way) and ${refers}
     returning 1`)
@@ -96,6 +97,21 @@ export function verdictMoves(id: string): SQL {
            or (mv.what = 'verdict_swapped' and mv.key->>'kept' = ${id}::text))`
 }
 
+/**
+ * What a trace's id did to a verdict written over: the latest write withdrew it, any changed its text, any
+ * rated it — rated and taken back is a withdrawn verdict of its own (MOL-27, И2 of round 9), a withdrawal
+ * alone none. `rated` absent: this write rated it unless it withdrew.
+ */
+export interface WriteHow {
+  readonly withdrew: boolean
+  readonly reviewChanged: boolean
+  readonly rated?: boolean
+}
+
+function ratedBy(how: WriteHow): boolean {
+  return how.rated ?? !how.withdrew
+}
+
 /** A verdict row as it stood before a write by a trace's id, never its text (MOL-299, Г1, Г2). */
 export interface VerdictBefore {
   readonly score: number
@@ -119,7 +135,7 @@ export async function verdictWrittenByTrace(
   asked: string,
   row: { readonly id: string; readonly actorId: string; readonly touched: string },
   before: VerdictBefore,
-  how: { readonly withdrew: boolean; readonly reviewChanged: boolean },
+  how: WriteHow,
 ): Promise<void> {
   const [first] = await conn.execute<{ what: string; home: string }>(sql`
     ${wayOf('item', asked)}
@@ -143,6 +159,6 @@ export async function verdictWrittenByTrace(
     'verdict_overwritten',
     { id: row.id, at: row.touched, asked: asked.toLowerCase() },
     row.actorId,
-    { before: { ...before, ...how }, into: survivor?.id ?? asked },
+    { before: { ...before, ...how, rated: ratedBy(how) }, into: survivor?.id ?? asked },
   )
 }
