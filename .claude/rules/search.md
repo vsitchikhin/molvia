@@ -835,7 +835,9 @@ report.
   keeps that instead, and a row a merge brought goes home at what is left of it once every share standing is
   taken out, the rest that trace's first pick (as `above` for a verdict, any order, one merge alone too). A pick by the trace's
   id on a row its merge added the trace's own picks to (`pick_added`) grows that share instead: one snapshot of
-  the row before the trace, never two that restore it against each other (Л1 of round 12).
+  the row before the trace, never two that restore it against each other (Л1 of round 12). A pick by the survivor's id
+  between the trace's picks becomes the row's own moment the share gives back, never the one from before the
+  merge (М1 of round 13).
   **A verdict, a pick or a word the person touched since
   stays**
   (adversarial А3): rated, amended or withdrawn on the survivor, it is their word about the survivor, and

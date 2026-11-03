@@ -200,7 +200,14 @@ export async function pickWrittenByTrace(
         before = mv.before || jsonb_build_object(
           'picks', (mv.before->>'picks')::int + ${share.picks},
           'lastPickedAt', ${at}::text,
-          'admits', (mv.before->>'admits')::boolean or ${share.admits})
+          'admits', (mv.before->>'admits')::boolean or ${share.admits},
+          -- picked by the survivor's id since the share's last moment: the row's own is that one now (М1)
+          'keptLastPickedAt',
+            case when ${prior.lastPickedAt}::timestamptz
+                      > greatest((mv.before->>'keptLastPickedAt')::timestamptz,
+                                 (mv.before->>'lastPickedAt')::timestamptz)
+                 then to_jsonb(${prior.lastPickedAt}::text)
+                 else mv.before->'keptLastPickedAt' end)
     where mv.merge_id in (select id from way) and mv.what in ('pick_added', 'pick_written') and ${mine}
     returning 1`)
   if (added.length > 0) return

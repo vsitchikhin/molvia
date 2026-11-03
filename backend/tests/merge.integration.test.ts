@@ -1029,6 +1029,31 @@ describe("the undo takes home what a trace's id wrote after the merge (MOL-299, 
     )
   })
 
+  it("keeps the survivor's own pick since the merge under the trace's later one (М1)", async () => {
+    await db.execute(sql`
+      insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at)
+      values (${owner}, 'maloko', ${older}, 1, '2026-09-01T10:00:00Z'),
+             (${owner}, 'maloko', ${younger}, 1, '2026-09-03T10:00:00Z')`)
+    const id = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const picks = createSearchPickRepository(db)
+    await picks.remember(owner, 'малоко', older)
+    const own = onlyRow(
+      await db.execute<{ at: string }>(sql`
+        select last_picked_at::text as at from search_picks where item_id = ${older}`),
+    )?.at
+    await picks.remember(owner, 'малоко', younger)
+    await merges.unmerge(id)
+    const rows = await db.execute<{ item_id: string; picks: number; own: boolean }>(sql`
+      select item_id, picks, last_picked_at = ${own ?? null}::timestamptz as own
+      from search_picks where actor_id = ${owner} and query_key = 'maloko'`)
+    expect(sorted(rows.map((row) => [row.item_id, row.picks, row.own]))).toEqual(
+      sorted([
+        [older, 2, true],
+        [younger, 2, false],
+      ]),
+    )
+  })
+
   it.each(['later', 'earlier'])(
     "takes home each twin's picks of one row in a fan, the %s merge first (К1)",
     async (first) => {
