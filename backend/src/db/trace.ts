@@ -34,8 +34,8 @@ export async function noteTraceWrite(
   what: MergeMove,
   key: Record<string, unknown>,
   actorId: string | null = null,
-  /** `before` of the move; `last`: under the merge into the survivor alone, not every step of the way. */
-  extra: { readonly before?: Record<string, unknown>; readonly last?: boolean } = {},
+  /** `before` of the move; `into`: under the one merge of the way into that item, not every step. */
+  extra: { readonly before?: Record<string, unknown>; readonly into?: string } = {},
 ): Promise<void> {
   await conn.execute(sql`
     ${wayOf(subject, asked)}
@@ -43,7 +43,7 @@ export async function noteTraceWrite(
     select id, ${what}, ${JSON.stringify(key)}::jsonb,
            ${extra.before === undefined ? null : JSON.stringify(extra.before)}::jsonb, ${actorId}::uuid
     from way
-    where ${extra.last === true ? sql`depth = (select max(depth) from way)` : sql`true`}`)
+    where ${extra.into === undefined ? sql`true` : sql`next = ${extra.into}::uuid`}`)
 }
 
 /**
@@ -105,11 +105,14 @@ export interface VerdictBefore {
 }
 
 /**
- * A verdict a trace's id wrote again after its merge (MOL-299). A row a move of the way names — moved,
- * swapped, written over before — takes the write's moment (В1, В2). Any other is the survivor's own from
- * before, which the write just put the trace's word over (Г1, Г2): the merge into the survivor keeps what
- * it held, and the undo puts it back and gives the trace the word. The person's id goes with it, so the
- * move goes with the person, and the copy carries it.
+ * A verdict a trace's id wrote again after its merge (MOL-299). A row whose first move on the way came from
+ * the trace itself is the trace's: its moves take the write's moment and the undo takes it home (В1, В2).
+ * Any other holds a word about another item — the survivor's own from before, or one a merge of the way
+ * brought from the middle of a chain — which the write just put the trace's word over (Г1, Г2): its moves
+ * take the moment too, so they still carry it home, and the merge into the survivor keeps what it said.
+ * That undo puts it back and gives the word to its younger, and where that is not yet the trace, writes it
+ * there as the trace's id would, so the chain's next undo carries it on (№11, Д1 of round 5). The person's
+ * id goes with it, so the move goes with the person, and the copy carries it.
  */
 export async function verdictWrittenByTrace(
   conn: Conn,
@@ -118,15 +121,27 @@ export async function verdictWrittenByTrace(
   before: VerdictBefore,
   how: { readonly withdrew: boolean; readonly reviewChanged: boolean },
 ): Promise<void> {
-  const named = await restampTraceWrite(conn, 'item', asked, verdictMoves(row.id), row.touched, how)
-  if (named > 0) return
+  const [first] = await conn.execute<{ what: string; home: string }>(sql`
+    ${wayOf('item', asked)}
+    select mv.what, m.from_item as home
+    from way w
+    join catalogue_merges m on m.id = w.id
+    join catalogue_merge_moves mv on mv.merge_id = w.id
+    where ${verdictMoves(row.id)}
+    order by w.depth
+    limit 1`)
+  await restampTraceWrite(conn, 'item', asked, verdictMoves(row.id), row.touched, how)
+  // written over once already, its first `before` stands; or the trace's own
+  if (first?.what === 'verdict_overwritten' || first?.home === asked.toLowerCase()) return
+  const [survivor] = await conn.execute<{ id: string }>(sql`
+    select coalesce(merged_into, id) as id from items where id = ${asked}::uuid`)
   await noteTraceWrite(
     conn,
     'item',
     asked,
     'verdict_overwritten',
-    { id: row.id, at: row.touched },
+    { id: row.id, at: row.touched, asked: asked.toLowerCase() },
     row.actorId,
-    { before: { ...before, ...how }, last: true },
+    { before: { ...before, ...how }, into: survivor?.id ?? asked },
   )
 }

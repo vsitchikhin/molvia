@@ -7,7 +7,8 @@ import type { CatalogueMergedNotice, MergedPair, MergeSubject } from '@molvia/mo
 import type { Conn } from './index'
 import { idOrNull } from './rows'
 import type { MergeBy, MergeMove } from './schema'
-import { liveItemId, livePlaceId } from './trace'
+import { liveItemId, livePlaceId, noteTraceWrite, verdictWrittenByTrace } from './trace'
+import type { VerdictBefore } from './trace'
 
 /** How a pair came to be merged, and the figures the night judged it by; none by hand. */
 export interface MergeHow {
@@ -621,6 +622,23 @@ export function createMergeRepository(db: Conn): MergeRepository {
                      && array[mm.key->>'kept', mm.key->>'trace', mm.key->>'id'])
                 or (lm.what = 'pick_added' and mm.what in ('pick', 'pick_added')
                     and lm.actor_id = mm.actor_id and lm.key->>'queryKey' = mm.key->>'queryKey'))
+            union
+            -- another merge still standing whose trace's id wrote over a verdict row this one names, after
+            -- the last word of this one's about it (MOL-299, №10, Д2): by the moment, not by the merge's
+            -- number — in a fan the earlier merge's trace may write over a row the later one brought. Undone
+            -- first, each puts back the word the other expects.
+            select o.merge_id from catalogue_merge_moves o
+            join catalogue_merges l on l.id = o.merge_id
+            join (
+              select unnest(array[mm.key->>'kept', mm.key->>'trace', mm.key->>'id']) as row_id,
+                     max(coalesce((mm.key->>'at')::timestamptz, '-infinity')) as at
+              from catalogue_merge_moves mm
+              where mm.merge_id = ${id}
+                and mm.what in ('verdict_swapped', 'verdict_withdrawn', 'verdict', 'verdict_overwritten')
+              group by 1
+            ) mine on mine.row_id = o.key->>'id'
+            where o.what = 'verdict_overwritten' and o.merge_id <> ${id} and l.undone_at is null
+              and (o.key->>'at')::timestamptz > mine.at
           ) touched
           order by id desc
           limit 1`)
@@ -629,6 +647,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
         const now = item ? liveItemId(into) : livePlaceId(into)
 
         const column = sql.raw(item ? 'item_id' : 'place_id')
+        const undoneThen: (() => Promise<void>)[] = []
         const moves = await tx.execute<{
           what: MergeMove
           key: Record<string, string | number>
@@ -822,28 +841,61 @@ export function createMergeRepository(db: Conn): MergeRepository {
                 where id = ${key.id}`)
               const theirs = sql`actor_id = ${row.actor_id} and item_id = ${from}
                                  and place_id is not distinct from ${row.place_id}::uuid`
+              // The word's own trace further down a chain (Д1 of round 5): given to this merge's younger,
+              // it is written again as that trace's id would write it, once this merge is undone.
+              const asked = typeof key.asked === 'string' ? key.asked : from
+              const [prior] = await tx.execute<
+                VerdictBefore & { id: string } & Record<string, unknown>
+              >(sql`
+                select id, score, rated_at::text as "ratedAt", updated_at::text as "updatedAt",
+                       deleted_at::text as "deletedAt"
+                from verdicts where ${theirs} for update`)
+              const how = { withdrew: before.withdrew, reviewChanged: before.reviewChanged }
+              const further = (
+                written: { id: string; touched: string },
+                priorRow?: VerdictBefore,
+              ) => {
+                if (asked === from) return
+                const wrote = { ...written, actorId: row.actor_id }
+                undoneThen.push(() =>
+                  priorRow === undefined
+                    ? noteTraceWrite(tx, 'item', asked, 'verdict', {
+                        id: written.id,
+                        at: written.touched,
+                      })
+                    : verdictWrittenByTrace(tx, asked, wrote, priorRow, how),
+                )
+              }
               if (before.withdrew) {
-                await tx.execute(sql`
-                  update verdicts set deleted_at = greatest(${key.at}::timestamptz, rated_at), review = null
-                  where ${theirs} and deleted_at is null`)
+                const [withdrawn] = await tx.execute<{ id: string; touched: string }>(sql`
+                  update verdicts
+                  set deleted_at = greatest(${key.at}::timestamptz, rated_at), review = null,
+                      updated_at = greatest(${key.at}::timestamptz, rated_at)
+                  where ${theirs} and deleted_at is null
+                  returning id, updated_at::text as touched`)
+                if (withdrawn !== undefined && prior !== undefined) further(withdrawn, prior)
                 break
               }
               const said = before.reviewChanged ? row.review : null
-              const taken = await tx.execute(sql`
+              const [taken] = await tx.execute<{ id: string; touched: string }>(sql`
                 update verdicts
                 set score = ${row.score},
                     review = case when ${before.reviewChanged} then ${said} else review end,
                     updated_at = greatest(${key.at}::timestamptz, rated_at), deleted_at = null
                 where ${theirs}
-                returning id`)
-              if (taken.length === 0) {
-                await tx.execute(sql`
-                  insert into verdicts
-                    (id, actor_id, item_id, item_kind, place_id, score, review, rated_at, updated_at)
-                  values (${randomUUID()}, ${row.actor_id}, ${from}, ${row.item_kind},
-                          ${row.place_id}::uuid, ${row.score}, ${said},
-                          ${key.at}::timestamptz, ${key.at}::timestamptz)`)
+                returning id, updated_at::text as touched`)
+              if (taken !== undefined && prior !== undefined) {
+                further(taken, prior)
+                break
               }
+              const [made] = await tx.execute<{ id: string; touched: string }>(sql`
+                insert into verdicts
+                  (id, actor_id, item_id, item_kind, place_id, score, review, rated_at, updated_at)
+                values (${randomUUID()}, ${row.actor_id}, ${from}, ${row.item_kind},
+                        ${row.place_id}::uuid, ${row.score}, ${said},
+                        ${key.at}::timestamptz, ${key.at}::timestamptz)
+                returning id, updated_at::text as touched`)
+              if (made !== undefined) further(made)
               break
             }
             case 'trace':
@@ -902,6 +954,8 @@ export function createMergeRepository(db: Conn): MergeRepository {
         await tx.execute(
           sql`update catalogue_merges set undone_at = clock_timestamp() where id = ${id}`,
         )
+        // the trace's word, journalled on the way still standing once this merge is out of it
+        for (const then of undoneThen) await then()
         return { subject: merge.subject, from, into }
       })
     },

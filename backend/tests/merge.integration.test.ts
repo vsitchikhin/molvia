@@ -1179,6 +1179,14 @@ describe('the undo leaves a verdict the person touched after the merge (MOL-299,
       rateItem({ items: createItemRepository(db), verdicts }, owner, younger, { score })
     await rate(1)
     await rate(2)
+    // the second write moves the first one's moment and keeps what the survivor said, never a second
+    const overwritten = async () =>
+      onlyRow(
+        await db.execute<{ n: number }>(
+          sql`select count(*)::int as n from catalogue_merge_moves where what = 'verdict_overwritten'`,
+        ),
+      )?.n
+    expect(await overwritten()).toBe(1)
     await merges.unmerge(id)
     expect([await scoreOn(older), await scoreOn(younger)]).toEqual([
       { score: 5, live: true },
@@ -1193,23 +1201,71 @@ describe('the undo leaves a verdict the person touched after the merge (MOL-299,
       { item_id: older, review: 'нежная' },
     ])
     // what it said is kept for the undo alone
-    const kept = onlyRow(
-      await db.execute<{ n: number }>(
-        sql`select count(*)::int as n from catalogue_merge_moves where what = 'verdict_overwritten'`,
-      ),
-    )
-    expect(kept?.n).toBe(0)
+    expect(await overwritten()).toBe(0)
   })
 
-  it('keeps it by the merge into the survivor on a chain, the word going to its younger', async () => {
+  const rateBy = (itemId: string, score: number) =>
+    rateItem({ items: createItemRepository(db), verdicts }, owner, itemId, { score })
+
+  it('gives the word to its own trace down a chain, undone from the end (Д1)', async () => {
     const third = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
     await verdict(owner, third, { score: 5 })
-    numbered(await merges.mergeItems(younger, older, NIGHT))
+    const first = numbered(await merges.mergeItems(younger, older, NIGHT))
     const last = numbered(await merges.mergeItems(older, third, NIGHT))
-    await rateItem({ items: createItemRepository(db), verdicts }, owner, younger, { score: 1 })
+    await rateBy(younger, 1)
     await merges.unmerge(last)
-    expect([await scoreOn(third), await scoreOn(older)]).toEqual([
+    await merges.unmerge(first)
+    expect([await scoreOn(third), await scoreOn(older), await scoreOn(younger)]).toEqual([
       { score: 5, live: true },
+      undefined,
+      { score: 1, live: true },
+    ])
+  })
+
+  it("keeps the middle one's own, carried further down the chain (№11)", async () => {
+    const third = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    await verdict(owner, older, { score: 5 })
+    const first = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const last = numbered(await merges.mergeItems(older, third, NIGHT))
+    await rateBy(younger, 1)
+    await merges.unmerge(last)
+    await merges.unmerge(first)
+    expect([await scoreOn(third), await scoreOn(older), await scoreOn(younger)]).toEqual([
+      undefined,
+      { score: 5, live: true },
+      { score: 1, live: true },
+    ])
+  })
+
+  it("undoes a fan by the moment each trace wrote over the survivor's own (№10)", async () => {
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    await verdict(owner, older, { score: 5 })
+    const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const two = numbered(await merges.mergeItems(other, older, NIGHT))
+    await rateBy(younger, 1)
+    await rateBy(other, 2)
+    expect(await merges.unmerge(one)).toEqual({ refused: 'chained', later: two })
+    await merges.unmerge(two)
+    await merges.unmerge(one)
+    expect([await scoreOn(older), await scoreOn(younger), await scoreOn(other)]).toEqual([
+      { score: 5, live: true },
+      { score: 1, live: true },
+      { score: 2, live: true },
+    ])
+  })
+
+  it('undoes first the merge whose trace wrote over a row the other brought (Д2)', async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    await verdict(owner, stewed, { score: 3 })
+    const one = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const two = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    await rateBy(younger, 1)
+    expect(await merges.unmerge(two)).toEqual({ refused: 'chained', later: one })
+    await merges.unmerge(one)
+    await merges.unmerge(two)
+    expect([await scoreOn(stewed), await scoreOn(older), await scoreOn(younger)]).toEqual([
+      { score: 3, live: true },
+      undefined,
       { score: 1, live: true },
     ])
   })

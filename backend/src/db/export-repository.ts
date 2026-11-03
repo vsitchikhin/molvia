@@ -589,6 +589,7 @@ export const EXPORT_COLUMNS: Readonly<
   // The journal of the merge of twins (MOL-106): a remembered pick that moved, kept only so that
   // `make unmerge` can move it back — the pick itself is in `searchPicks` — and one's own verdict a
   // twin's id wrote over, kept for the undo (MOL-299): that one is the person's, in `overwrittenVerdicts`.
+  // `key` and `before` go into the file of that kind of row alone; of a pick they are its pick.
   catalogue_merge_moves: {
     exported: ['key', 'before'],
     omitted: {

@@ -848,8 +848,12 @@ report.
   that word: a rating its own verdict, given at the moment of the write, a withdrawal its own withdrawn if
   it has one. Later writes by the trace's id move the moment and keep the first `before`. What is kept is
   the person's, in their copy (`overwrittenVerdicts`, version 27), gone with them by the cascade, and gone
-  with the undo; on a chain it is kept by the merge into the survivor, and the word goes to that merge's
-  younger. **The prices, named:** the trace's own score is lost where the person rated the survivor over it
+  with the undo. It is kept by the merge into the survivor; on a chain the word goes to that merge's younger
+  and is written there as the trace's id would write it, so the next undo carries it on and the whole chain
+  undone gives it to the trace (№11, Д1 of round 5). **In a fan the moment orders the undo** (№10, Д2): a
+  merge waits while another one standing has a word written over a row this one names, later than this
+  one's last word about it (`chained`) — the earlier merge's trace may write over a row the later merge
+  brought, and undone the other way round the word of one twin stayed on the survivor for good. **The prices, named:** the trace's own score is lost where the person rated the survivor over it
   by the survivor's id (the row was one: their own act), and the trace's row so kept holds the survivor's
   old score with its `rated_at`, withdrawn — the gate, the reminder and the copy read it (Б4); a text the
   trace's id wrote over is not given back; an **item** written by a
