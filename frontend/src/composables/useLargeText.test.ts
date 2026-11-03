@@ -81,12 +81,17 @@ describe('the system’s font size (MOL-334)', () => {
     expect(sheets.length).toBeGreaterThan(50)
     // Every rule's own declarations — up to its first nested rule — under a list of selectors one of which is the
     // root itself: `html, body { … }` counts, `html[data-large-text] body` is the body's and `html { .x { … } }` the
-    // nested rule's.
+    // nested rule's. Comments go first, since one stands over nearly every rule here and hid `html,` under it, and
+    // `:is()` and `:where()` are opened, `:where(html)` being the root (adversarial Г2).
+    const uncommented = (sheet: string): string =>
+      sheet.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/[^\n]*/g, '$1')
+    const opened = (selectors: string): string[] =>
+      selectors.replace(/:(?:is|where)\(([^()]*)\)/g, '$1').split(',')
     const setsRoot = (sheet: string): boolean =>
-      [...sheet.matchAll(/([^{};]*)\{([^{}]*)/g)].some(
+      [...uncommented(sheet).matchAll(/([^{};]*)\{([^{}]*)/g)].some(
         ([, selectors = '', declarations = '']) =>
           /\bfont-size\s*:/.test(declarations) &&
-          selectors.split(',').some((one) => /^\s*(?:html|:root)(?:[[:.][^\s>+~]*)?\s*$/.test(one)),
+          opened(selectors).some((one) => /^\s*(?:html|:root)(?:[[:.][^\s>+~]*)?\s*$/.test(one)),
       )
     const offenders = sheets.filter((path) => setsRoot(read(new URL(path, src))))
     expect(offenders).toEqual([])
