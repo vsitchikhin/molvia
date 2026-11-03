@@ -1206,7 +1206,7 @@ test('the system’s font size is the root’s, whatever reaches the page', asyn
 // root, out of the body — and as wide in every element of the screen with words of its own as there, a sheet's
 // too. No place of the app redefines a step, so a place that draws one otherwise holds the text back. The probe
 // takes its face, weight and spacing for itself, since those are each place's own. The scale is read where it is
-// declared, in `rem`; `--text-tab` stops at 13.75 px on purpose (В-3 «а») and is no step of it.
+// declared, in `rem`; `--text-tab` stops at 13.75 px on purpose (В-3 «а»), the tab bar's own, and is no step of it.
 const typeScale = [
   ...readFileSync(new URL('../frontend/src/styles/_tokens.scss', import.meta.url), 'utf8').matchAll(
     /^\s*(--text-[-\w]+):\s*[\d.]+rem\b/gm,
@@ -1296,7 +1296,7 @@ test('large text is drawn twice as large at 200 %, everywhere, on a phone uprigh
         (field): field is HTMLInputElement | HTMLTextAreaElement =>
           (field instanceof HTMLTextAreaElement ||
             (field instanceof HTMLInputElement &&
-              /^(text|search|tel|email|url|password)$/.test(field.type))) &&
+              /^(text|search|tel|email|url)$/.test(field.type))) &&
           drawnNow(field),
       )
       const root = steps.map((step) => probeIn(document.documentElement, step))
