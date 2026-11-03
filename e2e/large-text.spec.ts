@@ -1114,3 +1114,35 @@ test('the narrowest list cards at 100 % on a phone of 320 keep their rows', asyn
     ).toEqual([])
   }
 })
+
+// The system's font size is the root's whatever reaches the page (MOL-334, adversarial Г8): a sheet of `public/` by a
+// `<link>`, a `.css` or a partial a script imports, a nested rule of plain CSS — each ways past a guard that reads the
+// sources by their kind. So the outcome is read here: the browser's own size set apart from 16, and the root's size
+// with every sheet and its `style` the same as with none. `useLargeText.test.ts` holds the sources for the rules this
+// one cannot see — under a media query or a state the page is not in.
+test('the system’s font size is the root’s, whatever reaches the page', async ({ page }) => {
+  test.setTimeout(60_000)
+  const browser = await page.context().newCDPSession(page)
+  await browser.send('Page.setFontSizes', { fontSizes: { standard: 20 } })
+  await page.setViewportSize({ width: 320, height: 720 })
+  await signedIn(page)
+  for (const path of ['/', '/purchases', '/money', '/settings']) {
+    await page.goto(path)
+    await expect(page.locator('h1').first(), path).toBeVisible()
+    const root = await page.evaluate(() => {
+      const html = document.documentElement
+      const size = () => getComputedStyle(html).fontSize
+      const authored = size()
+      const style = html.getAttribute('style')
+      const sheets = [...document.styleSheets].filter((sheet) => !sheet.disabled)
+      for (const sheet of sheets) sheet.disabled = true
+      html.removeAttribute('style')
+      const own = size()
+      for (const sheet of sheets) sheet.disabled = false
+      if (style !== null) html.setAttribute('style', style)
+      return { authored, own, sheets: sheets.length }
+    })
+    expect(root.sheets, path).toBeGreaterThan(0)
+    expect(root, path).toEqual({ authored: '20px', own: '20px', sheets: root.sheets })
+  }
+})
