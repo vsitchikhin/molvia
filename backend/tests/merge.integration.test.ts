@@ -1360,6 +1360,58 @@ describe('the undo leaves a verdict the person touched after the merge (MOL-299,
     expect(await overwritten()).toBe(0)
   })
 
+  it("leaves no row for a withdrawal by the true twin's id, the false one undone (З1)", async () => {
+    const stewed = await made('Молоко топлёное', 'moloko toplenoe', '2026-10-03')
+    await verdict(owner, stewed, { score: 3 })
+    const right = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const wrong = numbered(await merges.mergeItems(stewed, older, NIGHT))
+    // «Снять оценку» on a screen of the true twin opened before the night
+    expect(await verdicts.withdraw(owner, younger)).toBe(true)
+    await merges.unmerge(wrong)
+    const rows = async () =>
+      onlyRow(
+        await db.execute<{ n: number }>(
+          sql`select count(*)::int as n from verdicts where actor_id = ${owner}`,
+        ),
+      )?.n
+    expect([await scoreOn(stewed), await scoreOn(older), await rows()]).toEqual([
+      { score: 3, live: true },
+      undefined,
+      1,
+    ])
+    await merges.unmerge(right)
+    expect([await scoreOn(stewed), await scoreOn(younger), await rows()]).toEqual([
+      { score: 3, live: true },
+      undefined,
+      1,
+    ])
+    expect(await overwritten()).toBe(0)
+  })
+
+  it('carries a word written over by a fan down a chain to its own trace (№16)', async () => {
+    const third = await made('Молоко 3.2%', 'moloko 3 2', '2026-09-01')
+    const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
+    await verdict(owner, younger, { score: 2 })
+    const first = numbered(await merges.mergeItems(younger, older, NIGHT))
+    const last = numbered(await merges.mergeItems(older, third, NIGHT))
+    const fan = numbered(await merges.mergeItems(other, third, NIGHT))
+    await rateBy(other, 4)
+    await merges.unmerge(last)
+    await merges.unmerge(first)
+    expect([
+      await scoreOn(younger),
+      await scoreOn(older),
+      await scoreOn(third),
+      await scoreOn(other),
+    ]).toEqual([{ score: 2, live: true }, undefined, { score: 4, live: true }, undefined])
+    await merges.unmerge(fan)
+    expect([await scoreOn(younger), await scoreOn(third), await scoreOn(other)]).toEqual([
+      { score: 2, live: true },
+      undefined,
+      { score: 4, live: true },
+    ])
+  })
+
   it("keeps the survivor's own for the true twin's undo, the false one undone alone (Ж1)", async () => {
     const other = await made('Молоко 3,2 %', 'moloko 3 2', '2026-10-02')
     await verdict(owner, older, { score: 5 })

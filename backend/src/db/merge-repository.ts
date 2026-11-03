@@ -756,34 +756,61 @@ export function createMergeRepository(db: Conn): MergeRepository {
                       and o.place_id is not distinct from ${item ? sql`v.place_id` : sql`${from}::uuid`})
                 returning v.id`)
               if (moved.length > 0 || !item || key.at === undefined) break
-              // Written over by another trace's id since (Ж1): what it brought goes home as a row of its
-              // own, and the row is that trace's first word here, noted as one.
+              // Written over by another trace's id since (Ж1): the row goes home at what it brought, so the
+              // moves that name it carry it on down a chain (№16 of review 8), and the other trace's word
+              // stays here as a row of its own, noted as its first — a withdrawal of nothing as none, the
+              // row it took being this one (З1 of round 8, as Г2).
               const next = await above(String(key.id), key.at)
               if (next === undefined) break
               const was = next.before
-              const [made] = await tx.execute<{ id: string }>(sql`
-                insert into verdicts (id, actor_id, item_id, item_kind, place_id, score, review,
-                                      rated_at, updated_at, deleted_at)
-                select ${randomUUID()}, v.actor_id, ${from}, v.item_kind, v.place_id, ${was.score},
-                       case when ${next.text_changed} or ${was.deletedAt}::timestamptz is not null
-                            then null else v.review end,
-                       ${was.ratedAt}::timestamptz, ${was.updatedAt}::timestamptz,
-                       ${was.deletedAt}::timestamptz
+              const [row] = await tx.execute<{
+                actor_id: string
+                item_kind: string
+                place_id: string | null
+                score: number
+                review: string | null
+                rated_at: string
+                updated_at: string
+                deleted_at: string | null
+                top: boolean
+              }>(sql`
+                select actor_id, item_kind, place_id, score, review, rated_at::text, updated_at::text,
+                       deleted_at::text, updated_at = ${next.at}::timestamptz as top
                 from verdicts v
                 where v.id = ${key.id} and v.item_id = ${now}
                   and not exists (select 1 from verdicts o
                                   where o.actor_id = v.actor_id and o.item_id = ${from}
                                     and o.place_id is not distinct from v.place_id)
-                returning id`)
-              if (made === undefined) break
-              if (!next.text_changed) {
-                await tx.execute(sql`update verdicts set review = null where id = ${key.id}`)
-              }
+                for update`)
+              if (row === undefined) break
+              await tx.execute(sql`
+                update verdicts
+                set item_id = ${from}, score = ${was.score}, rated_at = ${was.ratedAt}::timestamptz,
+                    updated_at = ${was.updatedAt}::timestamptz, deleted_at = ${was.deletedAt}::timestamptz,
+                    review = case when ${next.text_changed} or ${was.deletedAt}::timestamptz is not null
+                                  then null else review end
+                where id = ${key.id}`)
               await tx.execute(sql`
                 delete from catalogue_merge_moves
                 where merge_id = ${next.merge_id} and what = 'verdict_overwritten'
                   and key->>'id' = ${key.id}::text`)
-              await noteTraceWrite(tx, 'item', next.asked, 'verdict', { id: key.id, at: next.at })
+              if (next.before.withdrew && row.top) break
+              const stays = randomUUID()
+              await tx.execute(sql`
+                insert into verdicts (id, actor_id, item_id, item_kind, place_id, score, review,
+                                      rated_at, updated_at, deleted_at)
+                values (${stays}, ${row.actor_id}, ${now}, ${row.item_kind}, ${row.place_id}::uuid,
+                        ${row.score}, ${next.text_changed && row.deleted_at === null ? row.review : null},
+                        ${row.rated_at}::timestamptz, ${row.updated_at}::timestamptz,
+                        ${row.deleted_at}::timestamptz)`)
+              // a word written over it later goes with it
+              await tx.execute(sql`
+                update catalogue_merge_moves mv
+                set key = jsonb_set(mv.key, '{id}', to_jsonb(${stays}::text))
+                from catalogue_merges l
+                where l.id = mv.merge_id and l.undone_at is null and mv.what = 'verdict_overwritten'
+                  and mv.key->>'id' = ${key.id}::text`)
+              await noteTraceWrite(tx, 'item', next.asked, 'verdict', { id: stays, at: next.at })
               break
             }
             case 'verdict_withdrawn':

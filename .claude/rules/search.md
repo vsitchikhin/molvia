@@ -854,9 +854,11 @@ report.
   round 6, Ж1 of round 7): the earlier merge's trace may write over a row the later merge brought, or over a
   word another trace wrote, so a verdict's move may find its row at another word. Then what the row said at
   the move's moment is the `before` of the next word over it, held by a merge still standing: the undo hands
-  that word home — a row of its own for a row the merge brought, the trace's word for a word written over —
-  and leaves the row to the merge above, its `before` now what this move's was, or its move a first word of
-  its trace's (`above`). So the owner undoes the false twin and keeps the true one. An order by the moment
+  that word home and leaves the rest to the merge above (`above`). A row the merge brought goes home itself, at
+  what it said, so the moves that name it carry it on down a chain (№16 of review 8), and the other trace's
+  word stays as a row of its own, noted as its first — a withdrawal of nothing as none, the row it took being
+  the one gone home (З1 of round 8, as Г2). A word written over goes to its trace, and the move above keeps
+  what this one did. So the owner undoes the false twin and keeps the true one. An order by the moment
   (round 5) refused both undos for good where two people wrote each by the other's trace (Е1), and a move
   waiting for the other undo (round 6) waited for good where that one was the true twin (Ж1).
   **The prices, named:** the trace's own score is lost where the person rated the survivor over it by the
