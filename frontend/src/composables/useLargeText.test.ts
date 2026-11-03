@@ -199,20 +199,28 @@ describe('the system’s font size (MOL-334)', () => {
     expect(setsRoot(compiled(scss, main))).toBe(false)
   })
 
+  it('is found in a plain sheet read as it stands, comments and all', () => {
+    expect(setsRoot('/* A reset. */\nhtml {\n  font-size: 62.5%;\n}\n')).toBe(true)
+    expect(setsRoot('/* html { font-size: 62.5% } */\nbody {\n  font-size: 1rem;\n}\n')).toBe(false)
+  })
+
   it('is never overridden: no stylesheet sets the root’s font-size', () => {
     const entries = readdirSync(src, { recursive: true, encoding: 'utf8' }).filter((path) =>
-      /(^|\/)(?!_)[^/]*\.(scss|vue)$/.test(path),
+      /(^|\/)(?!_)[^/]*\.(scss|vue|css)$/.test(path),
     )
     expect(entries.length).toBeGreaterThan(50)
-    const sheets = (path: string): string[] => {
-      const text = read(at(`../${path}`))
-      return path.endsWith('.vue')
-        ? [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(([, style = '']) => style)
-        : [text]
+    // A plain `.css` the build takes as well, and the page's own `<style>`, are read as they stand (adversarial Г7).
+    const styles = (text: string): string[] =>
+      [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(([, style = '']) => style)
+    const setIn = (path: string): boolean => {
+      const file = at(`../${path}`)
+      const text = read(file)
+      if (path.endsWith('.css')) return setsRoot(text)
+      return (path.endsWith('.vue') ? styles(text) : [text]).some((scss) =>
+        setsRoot(compiled(scss, file)),
+      )
     }
-    const offenders = entries.filter((path) =>
-      sheets(path).some((scss) => setsRoot(compiled(scss, at(`../${path}`)))),
-    )
-    expect(offenders).toEqual([])
+    expect(entries.filter(setIn)).toEqual([])
+    expect(styles(read(at('../../index.html'))).filter(setsRoot)).toEqual([])
   }, 60_000)
 })
