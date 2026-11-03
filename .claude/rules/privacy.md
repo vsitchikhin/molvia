@@ -61,8 +61,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   **a dry run is the real run, rolled back**, so its count cannot disagree with what erasure does.
   **A new table that points at `actors` must join erasure** — a test compares every foreign key
   on `actors` with `ACTOR_REFERENCES`, and another scans every table for the erased person's uuid
-  and Telegram id. The journal of the merge of twins (MOL-106) joined this way: a pick moved names
-  its person, so `catalogue_merge_moves.actor_id` goes with the person by the cascade and the copy
+  and Telegram id. The journal of the merge of twins (MOL-106) joined this way: a pick moved — or a
+  share of picks a twin's id added to one (MOL-299, К1) — names its person, so `catalogue_merge_moves.actor_id` goes with the person by the cascade and the copy
   leaves that move out, the pick itself being in it. **One's own verdict a twin's id wrote over after a
   merge** (MOL-299, owner's В-10 «б») is kept there for the undo — its score and moments, never its text —
   so it names its person too, is in the copy (`overwrittenVerdicts`, version 27), goes with the undo, and

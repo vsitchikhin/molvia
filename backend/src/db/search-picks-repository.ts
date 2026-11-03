@@ -3,7 +3,8 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { searchQueryKey } from './items-repository'
 import { QUERY_KEY_MAX_OCTETS, searchPicks } from './schema'
-import { liveItemId, noteTraceWrite, restampTraceWrite } from './trace'
+import { liveItemId, pickWrittenByTrace } from './trace'
+import type { PickBefore } from './trace'
 
 export interface SearchPickRepository {
   /**
@@ -38,6 +39,11 @@ export function createSearchPickRepository(db: Conn): SearchPickRepository {
     // foreign-key refusal and reaches the caller like everywhere else.
     await translateFailures(() =>
       db.transaction(async (tx) => {
+        // what the row held before, for a pick by a trace's id added to a row not its own (К1)
+        const [prior] = await tx.execute<PickBefore & Record<string, unknown>>(sql`
+          select last_picked_at::text as "lastPickedAt", admits from search_picks
+          where actor_id = ${actorId}::uuid and query_key = ${key} and item_id = ${liveItemId(itemId)}
+          for update`)
         const [row] = await tx
           .insert(searchPicks)
           // A pick of an id from before a merge is the survivor's (MOL-106).
@@ -56,21 +62,20 @@ export function createSearchPickRepository(db: Conn): SearchPickRepository {
             inserted: sql<boolean>`xmax = 0`,
             at: sql<string>`${searchPicks.lastPickedAt}::text`,
           })
-        // A new pick by a trace's id goes home with an undo (MOL-299, А2), and so does one a merge
-        // moved, picked again by it (В1); one added to the survivor's own stays the survivor's, as it
-        // was before the merge — no move of the way names it.
+        // A pick by a trace's id goes home with an undo (MOL-299, А2, В1, К1).
         if (row !== undefined && row.itemId !== itemId.toLowerCase()) {
-          if (row.inserted) {
-            await noteTraceWrite(tx, 'item', itemId, 'pick', { queryKey: key, at: row.at }, actorId)
-          } else {
-            await restampTraceWrite(
-              tx,
-              'item',
-              itemId,
-              sql`mv.what = 'pick' and mv.actor_id = ${actorId}::uuid and mv.key->>'queryKey' = ${key}`,
-              row.at,
-            )
-          }
+          await pickWrittenByTrace(
+            tx,
+            itemId,
+            actorId,
+            key,
+            row.at,
+            row.inserted ? null : (prior ?? null),
+            {
+              picks: 1,
+              admits,
+            },
+          )
         }
       }),
     )

@@ -827,8 +827,14 @@ report.
   trace beside it (`trace`), so the trip goes home as well. So the path that writes it notes the
   row under every merge on the trace's way to the survivor (`noteTraceWrite`), where the id asked is not
   the row's now, and the undo takes it a merge back as it takes what the merge moved — a chain step by
-  step, from its end. A verdict is noted only as a first one, a pick only as a new row: one added to the
-  survivor's own was the survivor's before the merge. **A verdict, a pick or a word the person touched since
+  step, from its end. A verdict is noted only as a first one, a pick only as a new row. **Picks a trace's id adds
+  to a row no move of its way names** — the survivor's own from before, or one another merge brought —
+  **are the trace's share** (`pick_written`, adversarial К1, owner's В-11 «б»): the merge into the survivor
+  keeps how many, their last moment and «own word», and what the row held before them; the undo takes the
+  share home, and the row is back at what it held — or, picked since by another trace's id, the next share
+  keeps that instead, and a row a merge brought goes home at what is left of it once every share standing is
+  taken out, the rest that trace's first pick (as `above` for a verdict, any order, one merge alone too).
+  **A verdict, a pick or a word the person touched since
   stays**
   (adversarial А3): rated, amended or withdrawn on the survivor, it is their word about the survivor, and
   taken home or swapped back it put that word on the trace, crossing the scores — «Курица вареная» 1
@@ -868,8 +874,7 @@ report.
   old score with its `rated_at`, withdrawn — the gate, the reminder and the copy read it (Б4); a text the
   trace's id wrote over is not given back; an **item** written by a
   trace's name — «Предложить товар», a receipt's new line — stays with the survivor, the name being the
-  survivor's second (В-7 «а»: the search shows the survivor, so it is rare); a pick of the survivor's own
-  from before that the trace's id added to stays where it is; a write by a trace that an
+  survivor's second (В-7 «а»: the search shows the survivor, so it is rare); a write by a trace that an
   `unmerge` commits between its row and its note stays with the survivor too (Б5, owner's В-8 «а»: the
   owner's hand once a morning against milliseconds); a swap of one person's two verdicts whose kept row
   another trace's id wrote over waits for that merge's undo, and stays swapped while it stands (Ж1 of round 7:

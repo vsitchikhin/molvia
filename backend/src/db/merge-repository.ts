@@ -7,8 +7,14 @@ import type { CatalogueMergedNotice, MergedPair, MergeSubject } from '@molvia/mo
 import type { Conn } from './index'
 import { idOrNull } from './rows'
 import type { MergeBy, MergeMove } from './schema'
-import { liveItemId, livePlaceId, noteTraceWrite, verdictWrittenByTrace } from './trace'
-import type { VerdictBefore } from './trace'
+import {
+  liveItemId,
+  livePlaceId,
+  noteTraceWrite,
+  pickWrittenByTrace,
+  verdictWrittenByTrace,
+} from './trace'
+import type { PickBefore, VerdictBefore } from './trace'
 
 /** How a pair came to be merged, and the figures the night judged it by; none by hand. */
 export interface MergeHow {
@@ -702,6 +708,32 @@ export function createMergeRepository(db: Conn): MergeRepository {
             limit 1`)
           return next?.fits === true ? next : undefined
         }
+        // The picks another trace's id added to a person's row since a move's moment, by a merge still
+        // standing (MOL-299, К1): the row held then what that share keeps as before it.
+        const pickAbove = async (actorId: string, queryKey: string, at: string | number) => {
+          const [next] = await tx.execute<{
+            merge_id: string
+            into_item: string
+            asked: string
+            before: { picks: number; lastPickedAt: string; admits: boolean; keptAdmits: boolean }
+          }>(sql`
+            select o.merge_id, l.into_item, coalesce(o.key->>'asked', l.from_item::text) as asked,
+                   o.before
+            from catalogue_merge_moves o
+            join catalogue_merges l on l.id = o.merge_id
+            where l.undone_at is null and o.what = 'pick_written' and o.actor_id = ${actorId}::uuid
+              and o.key->>'queryKey' = ${queryKey}
+              and (o.before->>'keptLastPickedAt')::timestamptz = ${at}::timestamptz
+            order by o.merge_id
+            limit 1`)
+          return next
+        }
+        // what the picks of the shares still standing on a person's row add up to, and whether any admits
+        const shares = (actorId: string, queryKey: string, intoItem: string) => sql`
+          from catalogue_merge_moves o
+          join catalogue_merges l on l.id = o.merge_id
+          where l.undone_at is null and o.what = 'pick_written' and o.actor_id = ${actorId}::uuid
+            and o.key->>'queryKey' = ${queryKey} and l.into_item = ${intoItem}::uuid`
         // A swap whose kept row another trace's id wrote over since waits in the journal, and the undo
         // that gives the row back its word at the swap's moment does it then (MOL-299, Е1 of round 6).
         const resume = async (rowId: string, at: string) => {
@@ -841,15 +873,116 @@ export function createMergeRepository(db: Conn): MergeRepository {
                                 and ${untouched(sql`k.updated_at`, key.at)})
                   and exists (select 1 from verdicts t where t.id = ${key.trace} and t.${column} = ${from})`)
               break
-            case 'pick':
-              await tx.execute(sql`
+            case 'pick': {
+              const moved = await tx.execute(sql`
                 update search_picks set item_id = ${from}
                 where actor_id = ${move.actor_id} and query_key = ${key.queryKey}
                   and item_id = ${now} and ${untouched(sql`last_picked_at`, key.at)}
                   and not exists (select 1 from search_picks o
                                   where o.actor_id = ${move.actor_id}
-                                    and o.query_key = ${key.queryKey} and o.item_id = ${from})`)
+                                    and o.query_key = ${key.queryKey} and o.item_id = ${from})
+                returning 1`)
+              if (moved.length > 0 || key.at === undefined || move.actor_id === null) break
+              // Picked since by another trace's id, of a merge still standing (К1): what this merge
+              // brought goes home as a row of its own, and the rest is that trace's first pick here.
+              const actor = move.actor_id
+              const queryKey = String(key.queryKey)
+              const next = await pickAbove(actor, queryKey, key.at)
+              if (next === undefined) break
+              const [home] = await tx.execute<{ picks: number }>(sql`
+                insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at, admits)
+                select actor_id, query_key, ${from}, picks - (select sum((o.before->>'picks')::int)
+                                                               ${shares(actor, queryKey, next.into_item)}),
+                       ${key.at}::timestamptz, ${next.before.keptAdmits}
+                from search_picks
+                where actor_id = ${actor} and query_key = ${queryKey} and item_id = ${now}
+                  and picks > (select sum((o.before->>'picks')::int)
+                               ${shares(actor, queryKey, next.into_item)})
+                on conflict do nothing
+                returning picks`)
+              if (home === undefined) break
+              await tx.execute(sql`
+                update search_picks
+                set picks = picks - ${home.picks},
+                    admits = exists (select 1 ${shares(actor, queryKey, next.into_item)}
+                                     and (o.before->>'admits')::boolean)
+                where actor_id = ${actor} and query_key = ${queryKey} and item_id = ${now}`)
+              await tx.execute(sql`
+                delete from catalogue_merge_moves
+                where merge_id = ${next.merge_id} and what = 'pick_written'
+                  and actor_id = ${actor} and key->>'queryKey' = ${queryKey}`)
+              await noteTraceWrite(
+                tx,
+                'item',
+                next.asked,
+                'pick',
+                { queryKey, at: next.before.lastPickedAt },
+                actor,
+              )
               break
+            }
+            case 'pick_written': {
+              // The picks a trace's id added to a person's row of the survivor (К1, owner's В-11 «б»):
+              // its share goes home. Picked by nobody since, the row is back at what it held before it;
+              // picked since by another trace's id, the next share keeps that instead.
+              const before = move.before
+              if (before === null || move.actor_id === null) break
+              const actor = move.actor_id
+              const queryKey = String(key.queryKey)
+              const row = sql`actor_id = ${actor} and query_key = ${queryKey} and item_id = ${now}`
+              const top = await tx.execute(sql`
+                update search_picks
+                set picks = picks - ${before.picks},
+                    last_picked_at = ${before.keptLastPickedAt ?? null}::timestamptz,
+                    admits = ${before.keptAdmits ?? false}
+                where ${row} and last_picked_at = ${key.at}::timestamptz and picks > ${before.picks}
+                returning 1`)
+              if (top.length === 0) {
+                const next =
+                  key.at === undefined ? undefined : await pickAbove(actor, queryKey, key.at)
+                if (next === undefined) break
+                const taken = await tx.execute(sql`
+                  update search_picks
+                  set picks = picks - ${before.picks},
+                      admits = ${before.keptAdmits ?? false}
+                        or exists (select 1 ${shares(actor, queryKey, next.into_item)}
+                                   and o.merge_id <> ${id} and (o.before->>'admits')::boolean)
+                  where ${row} and picks > ${before.picks}
+                  returning 1`)
+                if (taken.length === 0) break
+                await tx.execute(sql`
+                  update catalogue_merge_moves
+                  set before = before || jsonb_build_object(
+                        'keptLastPickedAt', ${before.keptLastPickedAt ?? null}::text,
+                        'keptAdmits', ${before.keptAdmits ?? false})
+                  where merge_id = ${next.merge_id} and what = 'pick_written'
+                    and actor_id = ${actor} and key->>'queryKey' = ${queryKey}`)
+              }
+              const [prior] = await tx.execute<PickBefore & Record<string, unknown>>(sql`
+                select last_picked_at::text as "lastPickedAt", admits from search_picks
+                where actor_id = ${actor} and query_key = ${queryKey} and item_id = ${from}
+                for update`)
+              const [given] = await tx.execute<{ at: string }>(sql`
+                insert into search_picks (actor_id, query_key, item_id, picks, last_picked_at, admits)
+                values (${actor}, ${queryKey}, ${from}, ${before.picks},
+                        ${before.lastPickedAt}::timestamptz, ${before.admits})
+                on conflict (actor_id, query_key, item_id) do update
+                set picks = search_picks.picks + excluded.picks,
+                    last_picked_at = greatest(search_picks.last_picked_at, excluded.last_picked_at),
+                    admits = search_picks.admits or excluded.admits
+                returning last_picked_at::text as at`)
+              // the picks of the trace's id further down a chain, written there as that id would (Д1)
+              const asked = typeof key.asked === 'string' ? key.asked : from
+              if (given !== undefined && asked !== from) {
+                undoneThen.push(() =>
+                  pickWrittenByTrace(tx, asked, actor, queryKey, given.at, prior ?? null, {
+                    picks: before.picks,
+                    admits: before.admits,
+                  }),
+                )
+              }
+              break
+            }
             case 'pick_added': {
               const before = move.before
               if (before === null) break
@@ -1104,10 +1237,11 @@ export function createMergeRepository(db: Conn): MergeRepository {
         await tx.execute(
           sql`update catalogue_merges set undone_at = clock_timestamp() where id = ${id}`,
         )
-        // What a verdict said before its trace's id wrote over it is the person's, kept for this undo
-        // alone (MOL-299): done, it is not kept.
+        // What a verdict said before its trace's id wrote over it, and a trace's share of a person's
+        // picks, are the person's, kept for this undo alone (MOL-299): done, they are not kept.
         await tx.execute(sql`
-          delete from catalogue_merge_moves where merge_id = ${id} and what = 'verdict_overwritten'`)
+          delete from catalogue_merge_moves
+          where merge_id = ${id} and what in ('verdict_overwritten', 'pick_written')`)
         // the trace's word, journalled on the way still standing once this merge is out of it
         for (const then of undoneThen) await then()
         return { subject: merge.subject, from, into }

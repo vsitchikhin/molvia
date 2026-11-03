@@ -547,6 +547,13 @@
       "when": 1793657327961,
       "tag": "0077_merge_verdict_overwritten",
       "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1793706624479,
+      "tag": "0078_merge_pick_written",
+      "breakpoints": true
     }
   ]
 }

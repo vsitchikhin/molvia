@@ -1208,6 +1208,10 @@ export const MERGE_MOVES = [
   // queue, a bot's button (MOL-299, adversarial Г1, Г2): `before` holds its score and moments, never its
   // text, and the undo puts them back and gives the trace the person's word
   'verdict_overwritten',
+  // picks a trace's id added to a row of the survivor no move of its way names — its own from before, or
+  // one another merge brought (MOL-299, К1, owner's В-11 «б»): `before` holds the trace's share and what
+  // the row held before it, and the undo takes the share home
+  'pick_written',
 ] as const
 export type MergeMove = (typeof MERGE_MOVES)[number]
 
@@ -1233,7 +1237,7 @@ export const catalogueMergeMoves = pgTable(
     check('catalogue_merge_moves_what_known', oneOf(table.what, MERGE_MOVES)),
     check(
       'catalogue_merge_moves_pick_named',
-      sql`(${table.actorId} is not null) = (${oneOf(table.what, ['pick', 'pick_added', 'verdict_overwritten'])})`,
+      sql`(${table.actorId} is not null) = (${oneOf(table.what, ['pick', 'pick_added', 'verdict_overwritten', 'pick_written'])})`,
     ),
   ],
 )

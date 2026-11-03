@@ -162,3 +162,65 @@ export async function verdictWrittenByTrace(
     { before: { ...before, ...how, rated: ratedBy(how) }, into: survivor?.id ?? asked },
   )
 }
+
+/** A pick row as it stood before a trace's id added to it (MOL-299, К1). */
+export interface PickBefore {
+  readonly lastPickedAt: string
+  readonly admits: boolean
+}
+
+/**
+ * A pick a trace's id wrote after its merge. A new row is the trace's, noted under every merge of its way
+ * (А2); one a move of the way names is the trace's too, and takes the moment (В1). Any other — the survivor's
+ * own from before, or one another merge brought into it — got the trace's picks added (К1, owner's В-11 «б»):
+ * the merge into the survivor keeps the trace's share and what the row held before it, the share growing with
+ * every later pick by that id, and the undo takes the share home.
+ */
+export async function pickWrittenByTrace(
+  conn: Conn,
+  asked: string,
+  actorId: string,
+  queryKey: string,
+  at: string,
+  prior: PickBefore | null,
+  share: { readonly picks: number; readonly admits: boolean },
+): Promise<void> {
+  if (prior === null) {
+    await noteTraceWrite(conn, 'item', asked, 'pick', { queryKey, at }, actorId)
+    return
+  }
+  const mine = sql`mv.actor_id = ${actorId}::uuid and mv.key->>'queryKey' = ${queryKey}`
+  if ((await restampTraceWrite(conn, 'item', asked, sql`mv.what = 'pick' and ${mine}`, at)) > 0)
+    return
+  const added = await conn.execute(sql`
+    ${wayOf('item', asked)}
+    update catalogue_merge_moves mv
+    set key = jsonb_set(mv.key, '{at}', to_jsonb(${at}::text)),
+        before = mv.before || jsonb_build_object(
+          'picks', (mv.before->>'picks')::int + ${share.picks},
+          'lastPickedAt', ${at}::text,
+          'admits', (mv.before->>'admits')::boolean or ${share.admits})
+    where mv.merge_id in (select id from way) and mv.what = 'pick_written' and ${mine}
+    returning 1`)
+  if (added.length > 0) return
+  const [survivor] = await conn.execute<{ id: string }>(sql`
+    select coalesce(merged_into, id) as id from items where id = ${asked}::uuid`)
+  await noteTraceWrite(
+    conn,
+    'item',
+    asked,
+    'pick_written',
+    { queryKey, at, asked: asked.toLowerCase() },
+    actorId,
+    {
+      before: {
+        picks: share.picks,
+        lastPickedAt: at,
+        admits: share.admits,
+        keptLastPickedAt: prior.lastPickedAt,
+        keptAdmits: prior.admits,
+      },
+      into: survivor?.id ?? asked,
+    },
+  )
+}
