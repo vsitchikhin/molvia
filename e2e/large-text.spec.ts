@@ -1231,7 +1231,12 @@ test('large text is drawn twice as large at 200 %, everywhere, on a phone uprigh
   const drawn = async (
     place: { path: string; sheet?: string },
     standard: number,
-  ): Promise<{ root: Record<string, number>; astray: string[]; places: number }> => {
+  ): Promise<{
+    root: Record<string, number>
+    astray: string[]
+    places: number
+    fields: number
+  }> => {
     await browser.send('Page.setFontSizes', { fontSizes: { standard } })
     await page.goto(place.path)
     await expect(page.locator('h1').first(), place.path).toBeVisible()
@@ -1246,18 +1251,37 @@ test('large text is drawn twice as large at 200 %, everywhere, on a phone uprigh
         .toBe(0)
     }
     return page.evaluate(async (steps) => {
-      const probeIn = (host: Element, step: string): HTMLSpanElement => {
+      const text = 'ЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖ'
+      const look = (step: string): string =>
+        'position: absolute; inset: 0 auto auto 0; white-space: nowrap; font-family: var(--font); ' +
+        'font-weight: var(--weight-medium); font-style: normal; letter-spacing: normal; word-spacing: normal; ' +
+        `text-transform: none; font-size: var(${step})`
+      const probeIn = (host: Element, step: string): HTMLElement => {
         const probe = document.createElement('span')
-        probe.style.cssText =
-          'position: absolute; inset: 0 auto auto 0; white-space: nowrap; font-family: var(--font); ' +
-          'font-weight: var(--weight-medium); font-style: normal; letter-spacing: normal; word-spacing: normal; ' +
-          `text-transform: none; font-size: var(${step})`
-        probe.textContent = 'ЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖЖ'
+        probe.style.cssText = look(step)
+        probe.textContent = text
         host.append(probe)
         return probe
       }
+      // What is typed is a field's value, no node of its own (adversarial Г19): a copy of the field beside it, as
+      // wide as what it holds, takes the rules of its classes and its place, and holds the probe's words.
+      const typedBeside = (
+        field: HTMLInputElement | HTMLTextAreaElement,
+        step: string,
+      ): HTMLElement => {
+        const copy = field.cloneNode(false) as HTMLInputElement | HTMLTextAreaElement
+        copy.removeAttribute('id')
+        copy.removeAttribute('name')
+        copy.setAttribute('aria-hidden', 'true')
+        copy.tabIndex = -1
+        copy.style.cssText = `${look(step)}; field-sizing: content; box-sizing: content-box; padding: 0; border: 0; width: auto; min-width: 0; max-width: none`
+        copy.value = text
+        field.after(copy)
+        return copy
+      }
       const nameOf = (element: Element): string =>
         element.tagName.toLowerCase() + [...element.classList].map((name) => `.${name}`).join('')
+      const drawnNow = (element: Element): boolean => element.getClientRects().length > 0
       // What draws words of its own and is drawn: a closed sheet, a field's inside and an icon hold none.
       const hosts = [...document.body.querySelectorAll('*')].filter(
         (element) =>
@@ -1266,23 +1290,38 @@ test('large text is drawn twice as large at 200 %, everywhere, on a phone uprigh
           [...element.childNodes].some(
             (node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? '').trim() !== '',
           ) &&
-          element.getClientRects().length > 0,
+          drawnNow(element),
+      )
+      const fields = [...document.body.querySelectorAll('input, textarea')].filter(
+        (field): field is HTMLInputElement | HTMLTextAreaElement =>
+          (field instanceof HTMLTextAreaElement ||
+            (field instanceof HTMLInputElement &&
+              /^(text|search|tel|email|url|password)$/.test(field.type))) &&
+          drawnNow(field),
       )
       const root = steps.map((step) => probeIn(document.documentElement, step))
-      const placed = hosts.map((host) => steps.map((step) => probeIn(host, step)))
+      const placed = [
+        ...hosts.map((host) => ({ host, probes: steps.map((step) => probeIn(host, step)) })),
+        ...fields.map((host) => ({ host, probes: steps.map((step) => typedBeside(host, step)) })),
+      ]
       document.documentElement.getBoundingClientRect()
       await document.fonts.ready
-      const width = (probe: HTMLSpanElement | undefined): number =>
+      const width = (probe: HTMLElement | undefined): number =>
         probe?.getBoundingClientRect().width ?? 0
-      const astray = hosts.flatMap((host, at) =>
+      const astray = placed.flatMap(({ host, probes }) =>
         steps
-          .map((step, index) => ({ step, ratio: width(placed[at]?.[index]) / width(root[index]) }))
+          .map((step, index) => ({ step, ratio: width(probes[index]) / width(root[index]) }))
           .filter(({ ratio }) => !(Math.abs(ratio - 1) < 0.01))
           .map(({ step, ratio }) => `${nameOf(host)} ${step} ×${ratio.toFixed(2)}`),
       )
       const widths = Object.fromEntries(steps.map((step, index) => [step, width(root[index])]))
-      for (const probe of [...root, ...placed.flat()]) probe.remove()
-      return { root: widths, astray: astray.slice(0, 12), places: hosts.length }
+      for (const probe of [...root, ...placed.flatMap(({ probes }) => probes)]) probe.remove()
+      return {
+        root: widths,
+        astray: astray.slice(0, 12),
+        places: hosts.length,
+        fields: fields.length,
+      }
     }, typeScale)
   }
   for (const [width, height] of [
@@ -1300,6 +1339,8 @@ test('large text is drawn twice as large at 200 %, everywhere, on a phone uprigh
         .map(({ step, ratio }) => `${step} ×${ratio.toFixed(2)}`)
       expect(short, where).toEqual([])
       expect(usual.places, where).toBeGreaterThan(3)
+      // The sheet is opened for its sum: a place with no field read would prove nothing of what is typed.
+      if (place.sheet !== undefined) expect(usual.fields, where).toBeGreaterThan(0)
       expect({ usual: usual.astray, large: large.astray }, where).toEqual({ usual: [], large: [] })
     }
   }
