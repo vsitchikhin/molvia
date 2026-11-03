@@ -132,8 +132,15 @@ describe('the system’s font size (MOL-334)', () => {
     )
   }
   // Every block's own declarations, up to its first nested block, under each of its selectors.
+  // What brackets and braces stand in no count of them (adversarial Г6): a string emptied, an escape and a loud
+  // comment taken out — `:is(.b[data-x="("], [lang])` read the rest of the rule as the inside of its `:is(`.
+  const plain = (css: string): string =>
+    css.replace(
+      /\/\*[\s\S]*?\*\/|"(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\\[0-9a-f]{1,6}\s?|\\./gi,
+      (found) => (found.startsWith('/*') ? '' : /^["']/.test(found) ? '""' : '_'),
+    )
   const setsRoot = (css: string): boolean =>
-    [...css.matchAll(/([^{};]*)\{(?=([^{}]*))/g)].some(
+    [...plain(css).matchAll(/([^{};]*)\{(?=([^{}]*))/g)].some(
       ([, selectors = '', declarations = '']) =>
         /(^|;)\s*font(-size)?\s*:/.test(declarations) &&
         outside(selectors, /,/).some((one) => !neverRoot(subjectOf(one))),
@@ -170,6 +177,8 @@ describe('the system’s font size (MOL-334)', () => {
       'under a :not() nested deep',
       ':not(:is(.x, :is(:is(body)))) { font-size: var(--text-body); }',
     ],
+    ['past a bracket in a string', ':is(.b[data-x="("], [lang]) { font-size: var(--text-body); }'],
+    ['past a loud comment', '/*! ( */ :root { font-size: var(--text-body); }'],
   ])('is found setting the root %s', (_, scss) => {
     expect(setsRoot(compiled(scss, main))).toBe(true)
   })
@@ -184,6 +193,8 @@ describe('the system’s font size (MOL-334)', () => {
     ['a pseudo-element', 'p::before { font-size: var(--text-body); }'],
     ['a deep class', '.a :deep(.b) { font-size: var(--text-body); }'],
     ['classes nested deep', ':is(.a, :is(:is(.b))) { font-size: var(--text-body); }'],
+    ['a brace in its content', '.x::before { content: "{"; font-size: var(--text-body); }'],
+    ['a class with an escaped bracket', '.a\\(b { font-size: var(--text-body); }'],
   ])('must not fire on %s', (_, scss) => {
     expect(setsRoot(compiled(scss, main))).toBe(false)
   })
