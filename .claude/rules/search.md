@@ -876,7 +876,12 @@ report.
   a swap goes over two rows, and handing it on is not worth a case this rare); in a fan, a trace's word written
   over by another
   trace's id and then by its own again is not given back — the later write takes the move's moment past the
-  other's, so neither undo finds the row at it (№14 of the self-review, round 6); a withdrawal of nothing by one trace's id with a word of another written over it
+  other's, so neither undo finds the row at it (№14 of the self-review, round 6); the row the undo gives a trace is rated at the trace's id's **last** write, not its first
+  rating (Й1 of round 10): the journal keeps one moment of the trace's word, which every write moves, so a rating
+  amended or taken back later by that id stands later in gate 0.2 than it was given — against MOL-27's «re-rating
+  cannot move anyone in the gate», on the side of «stop», and only for a second write by a trace's id between a
+  merge and its undo; keeping the first too would be one more of the person's moments in the journal and the
+  copy; a withdrawal of nothing by one trace's id with a word of another written over it
   later stays on the survivor as a withdrawn row with the brought row's score, for the gate to count (№19 of the
   self-review, round 9: three twins, a withdrawal and a word more); a word of the shop's memory
   settled again after a
