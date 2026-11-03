@@ -78,12 +78,16 @@ describe('the system’s font size (MOL-334)', () => {
   const fromSrc = {
     findFileUrl: (url: string) => (url.startsWith('@/') ? at(`../${url.slice(2)}`) : null),
   }
+  // The mixins themselves take none: a module cannot use itself.
   const compiled = (scss: string, url: URL): string =>
-    compiler.compileString(`@use "@/styles/mixins" as *;\n${scss}`, {
-      url,
-      importers: [fromSrc],
-      style: 'compressed',
-    }).css
+    compiler.compileString(
+      url.pathname.endsWith('/_mixins.scss') ? scss : `@use "@/styles/mixins" as *;\n${scss}`,
+      {
+        url,
+        importers: [fromSrc],
+        style: 'compressed',
+      },
+    ).css
 
   // Split where no bracket is open: a list of selectors at its commas, a selector at its combinators.
   const outside = (text: string, separator: RegExp): string[] => {
@@ -179,6 +183,7 @@ describe('the system’s font size (MOL-334)', () => {
     ],
     ['past a bracket in a string', ':is(.b[data-x="("], [lang]) { font-size: var(--text-body); }'],
     ['past a loud comment', '/*! ( */ :root { font-size: var(--text-body); }'],
+    ['even at its own 100 %', 'html { font-size: 100%; }'],
   ])('is found setting the root %s', (_, scss) => {
     expect(setsRoot(compiled(scss, main))).toBe(true)
   })
@@ -205,22 +210,27 @@ describe('the system’s font size (MOL-334)', () => {
   })
 
   it('is never overridden: no stylesheet sets the root’s font-size', () => {
-    const entries = readdirSync(src, { recursive: true, encoding: 'utf8' }).filter((path) =>
-      /(^|\/)(?!_)[^/]*\.(scss|vue|css)$/.test(path),
-    )
+    // Every sheet the page can be given, whatever way it comes (adversarial Г7, Г9): of `src` and of `public/`, a
+    // partial too — a script may import one — a plain `.css` read as it stands, and the page's own `<style>` and its
+    // root's `style`. `100%` there is no exception: Chrome takes the system's size only from a root nothing sizes.
+    const sheetsOf = (dir: URL): URL[] =>
+      readdirSync(dir, { recursive: true, encoding: 'utf8' })
+        .filter((path) => /\.(scss|vue|css)$/.test(path))
+        .map((path) => new URL(path, dir))
+    const entries = [...sheetsOf(src), ...sheetsOf(at('../../public/'))]
     expect(entries.length).toBeGreaterThan(50)
-    // A plain `.css` the build takes as well, and the page's own `<style>`, are read as they stand (adversarial Г7).
     const styles = (text: string): string[] =>
       [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(([, style = '']) => style)
-    const setIn = (path: string): boolean => {
-      const file = at(`../${path}`)
+    const setIn = (file: URL): boolean => {
       const text = read(file)
-      if (path.endsWith('.css')) return setsRoot(text)
-      return (path.endsWith('.vue') ? styles(text) : [text]).some((scss) =>
+      if (file.pathname.endsWith('.css')) return setsRoot(text)
+      return (file.pathname.endsWith('.vue') ? styles(text) : [text]).some((scss) =>
         setsRoot(compiled(scss, file)),
       )
     }
-    expect(entries.filter(setIn)).toEqual([])
-    expect(styles(read(at('../../index.html'))).filter(setsRoot)).toEqual([])
+    expect(entries.filter(setIn).map((file) => file.pathname)).toEqual([])
+    const page = read(at('../../index.html'))
+    const rootStyle = /<html\b[^>]*\bstyle\s*=\s*(["'])([\s\S]*?)\1/i.exec(page)?.[2]
+    expect([...styles(page), `html{${rootStyle ?? ''}}`].filter(setsRoot)).toEqual([])
   }, 60_000)
 })
