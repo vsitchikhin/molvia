@@ -1,5 +1,10 @@
 <template>
-  <BottomSheet :open="open" :on-closed="onClosed" @update:open="$emit('update:open', $event)">
+  <BottomSheet
+    ref="sheet"
+    :open="open"
+    :on-closed="onClosed"
+    @update:open="$emit('update:open', $event)"
+  >
     <template #title>{{ t('trip.start.title') }}</template>
 
     <ScreenState
@@ -30,11 +35,15 @@
       :maxlength="NAME_MAX"
       autocapitalize="sentences"
       enterkeyhint="done"
+      :error-text="nameBad ? t('spending.sheet.bad_text') : null"
+      @update:model-value="nameBad = false"
     />
 
     <template #footer>
-      <AppButton size="large" block :disabled="!ready" @click="start(name)">
-        {{ t('trip.none.action') }}
+      <!-- Not now while a shop is missing, saying so (MOL-174, Ф-6, MOL-354), as «Где купили?» does (MOL-333);
+           a name no place takes is refused at the tap and heard there: `disabled` left the focus order in silence. -->
+      <AppButton size="large" block :inactive="waitsFor !== null" @click="startTyped">
+        {{ waitsFor === 'place' ? t('receipt.place.choose_place') : t('trip.none.action') }}
       </AppButton>
     </template>
   </BottomSheet>
@@ -49,6 +58,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { newId } from '@/ids'
 import { useActorStore } from '@/stores/actor'
 import ScreenState from '@/components/ScreenState.vue'
@@ -102,6 +112,8 @@ export default defineComponent({
     const places = useRecentPlacesStore()
 
     const name = ref('')
+    /** A shop named in what no place takes, refused at the tap (MOL-354), as «Где купили?» does. */
+    const nameBad = ref(false)
 
     // Whatever copying brought along is made the line it was meant to be, as «Предложить товар»
     // does it: a tab or a line break inside a shop's name would make a second shop of it.
@@ -116,6 +128,7 @@ export default defineComponent({
       (open) => {
         if (!open) return
         name.value = ''
+        nameBad.value = false
         // What the phone remembers is shown at once; the server only refreshes it, and a failure
         // leaves what is remembered.
         void places.refresh().catch(() => undefined)
@@ -125,12 +138,26 @@ export default defineComponent({
       { immediate: props.open },
     )
 
-    const ready = computed(
-      () =>
-        !!actor.settings &&
-        !drawsNothing(name.value) &&
-        newPlaceSchema.shape.name.safeParse(name.value).success,
+    /**
+     * What the button waits for (MOL-354): the settings — said by the state above the field, so the
+     * button keeps the word of its action — then a shop. A name that draws something is no wait: the
+     * tap takes it or refuses it, and «Выберите магазин» over a shop typed would be untrue.
+     */
+    const waitsFor = computed<'settings' | 'place' | null>(() =>
+      !actor.settings ? 'settings' : drawsNothing(name.value) ? 'place' : null,
     )
+    const sheet = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
+
+    function startTyped(): void {
+      // a shop named in what the server would not keep — a character no place takes
+      nameBad.value = !newPlaceSchema.shape.name.safeParse(name.value).success
+      if (nameBad.value) {
+        void refuse(() => sheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
+        return
+      }
+      start(name.value)
+    }
 
     function start(place: string): void {
       if (drawsNothing(place) || !actor.settings) return
@@ -154,7 +181,7 @@ export default defineComponent({
 
     // The store itself, not its list: an array unwrapped here would stop following the store,
     // and the places the server answers with would never reach the screen.
-    return { t, name, ready, NAME_MAX, places, start, actor }
+    return { t, name, nameBad, waitsFor, sheet, NAME_MAX, places, start, startTyped, actor }
   },
 })
 </script>

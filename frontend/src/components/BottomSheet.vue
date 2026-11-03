@@ -12,7 +12,7 @@
     @focusin="settleFooter"
     @focusout="focusLeft"
   >
-    <div class="panel" :class="{ footed: $slots.footer || stateHeld }">
+    <div ref="panel" class="panel" :class="{ footed: $slots.footer || stateHeld }">
       <header class="head" :class="{ over: back }">
         <AppButton v-if="back" variant="icon" :label="t('nav.back_label')" @click="close()">
           <IconBack />
@@ -62,7 +62,7 @@ import IconClose from '~icons/mdi/close'
 import AppButton from '@/components/AppButton.vue'
 import { provideSheetAnnouncer } from '@/composables/useAnnouncer'
 import { useHeight } from '@/composables/useCollapsed'
-import { typedIn, useKeyboardInset } from '@/composables/useKeyboardInset'
+import { errorOf, typedIn, useKeyboardInset } from '@/composables/useKeyboardInset'
 import { useSheetDrag } from '@/composables/useSheetDrag'
 import { withoutAnswerWord } from '@/composables/useAnswerWord'
 import { provideStateStrip, WithoutStateStrip } from '@/composables/useStateStrip'
@@ -94,6 +94,23 @@ function lineOf(field: HTMLElement): number {
     .map((value) => Number.parseFloat(value))
     .reduce((sum, value) => sum + (Number.isFinite(value) ? value : Number.NaN), 0)
   return Number.isFinite(line) ? Math.min(height, line) : height
+}
+
+/**
+ * The room a field typed in asks above a pinned footer: a line of it (`lineOf`), and of a field marked
+ * wrong the first line of its error under it too (MOL-354, adversarial А3) — at 200 % in a window of
+ * 300–330 over the keys the field of 88 had 109 and its error none: the footer stayed pinned, the field
+ * stood at the edge and its reason under the footer, 12 px of a line of 38 in sight. A line, not all of
+ * it, as for the field; its height by its own line, not its box, which grows as it comes in.
+ */
+function roomFor(field: HTMLElement): number {
+  const line = lineOf(field)
+  const error = errorOf(field)
+  if (!error) return line
+  const box = error.getBoundingClientRect()
+  const first = Number.parseFloat(getComputedStyle(error).lineHeight)
+  const gap = Math.max(0, box.top - field.getBoundingClientRect().bottom)
+  return line + gap + (Number.isFinite(first) ? first : box.height)
 }
 
 /**
@@ -150,6 +167,7 @@ export default defineComponent({
   setup(props, { emit, expose }) {
     const { t } = useI18n()
     const dialog = ref<HTMLDialogElement | null>(null)
+    const panel = ref<HTMLElement | null>(null)
     const footer = ref<HTMLElement | null>(null)
     // The footer is the strip of a state in the sheet (MOL-211): its buttons stand pinned under the
     // thumb. A strip of the sheet's own, so the strip of the screen under it stays the screen's.
@@ -179,8 +197,10 @@ export default defineComponent({
     // asked to stand whole (147 px) it let go the footer of a failure to send on an iPhone SE, the
     // failure and «Повторить» out of sight (round 3, Р3-А1). Read where they lie, on every resize of
     // either and every focus: the observer of the footer is not told of a padding the keys took off
-    // (С-8).
+    // (С-8). And of the content, which an error a refusal grows under the field makes taller, and the
+    // room the field asks with it (`roomFor`, MOL-354).
     const sheetBox = useHeight(dialog)
+    const panelBox = useHeight(panel)
     const loose = ref(false)
     function settleFooter(): void {
       const sheet = dialog.value
@@ -191,10 +211,10 @@ export default defineComponent({
         element &&
         field &&
         sheet.scrollHeight > sheet.clientHeight &&
-        sheet.clientHeight - element.offsetHeight < lineOf(field),
+        sheet.clientHeight - element.offsetHeight < roomFor(field),
       )
     }
-    watch([sheetBox, footerBox], settleFooter, { flush: 'post' })
+    watch([sheetBox, footerBox, panelBox], settleFooter, { flush: 'post' })
     // A focus moving from one field of the sheet to the next is settled once, by the field it lands on.
     function focusLeft(event: FocusEvent): void {
       const next = event.relatedTarget
@@ -435,6 +455,7 @@ export default defineComponent({
       t,
       announcements,
       dialog,
+      panel,
       footer,
       footerHeight,
       stateHeld: strip.held,
