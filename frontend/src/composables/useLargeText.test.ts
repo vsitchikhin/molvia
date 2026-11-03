@@ -78,18 +78,12 @@ describe('the system’s font size (MOL-334)', () => {
   const fromSrc = {
     findFileUrl: (url: string) => (url.startsWith('@/') ? at(`../${url.slice(2)}`) : null),
   }
-  // The mixins themselves take none: a module cannot use itself. Plain CSS is read as SCSS, its superset, so its own
-  // nesting comes out flat as Sass's does (adversarial Г10); the indented syntax as itself.
-  const compiled = (sheet: string, url: URL): string => {
-    const indented = url.pathname.endsWith('.sass')
-    const mixins = `@use "@/styles/mixins" as *${indented ? '' : ';'}\n`
-    return compiler.compileString(url.pathname.endsWith('/_mixins.scss') ? sheet : mixins + sheet, {
-      url,
-      importers: [fromSrc],
-      style: 'compressed',
-      syntax: indented ? 'indented' : 'scss',
-    }).css
-  }
+  // The mixins themselves take none: a module cannot use itself.
+  const compiled = (scss: string, url: URL): string =>
+    compiler.compileString(
+      url.pathname.endsWith('/_mixins.scss') ? scss : `@use "@/styles/mixins" as *;\n${scss}`,
+      { url, importers: [fromSrc], style: 'compressed' },
+    ).css
 
   // Split where no bracket is open: a list of selectors at its commas, a selector at its combinators.
   const outside = (text: string, separator: RegExp): string[] => {
@@ -152,11 +146,6 @@ describe('the system’s font size (MOL-334)', () => {
         outside(selectors, /,/).some((one) => !neverRoot(subjectOf(one))),
     )
   const main = at('../styles/main.scss')
-  // The page's root's own `style`, its value quoted or not, as HTML allows (adversarial Г10).
-  const rootStyleOf = (html: string): string => {
-    const root = /<html\b[^>]*?\sstyle\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(html)
-    return root?.[1] ?? root?.[2] ?? root?.[3] ?? ''
-  }
 
   it('is asked of the browser in the page’s head', () => {
     const html = read(at('../../index.html'))
@@ -211,52 +200,43 @@ describe('the system’s font size (MOL-334)', () => {
     expect(setsRoot(compiled(scss, main))).toBe(false)
   })
 
-  it('is found in the indented syntax, in plain CSS nesting and in the root’s own style', () => {
-    const sass = at('../styles/_reset.sass')
-    expect(
-      setsRoot(compiled('@media (width >= 40rem)\n  html\n    font-size: 112.5%\n', sass)),
-    ).toBe(true)
-    const nested = 'html { &[data-outdated] { color: var(--text); } font-size: 100%; }'
-    expect(setsRoot(compiled(nested, at('../../public/before.css')))).toBe(true)
-    expect(rootStyleOf('<html lang="ru" style=font-size:100%>')).toBe('font-size:100%')
-    expect(rootStyleOf('<html lang="ru" style="font-size: 100%">')).toBe('font-size: 100%')
-    expect(rootStyleOf('<html lang="ru" data-style="x">')).toBe('')
-  })
-
-  it('is found in a plain sheet read as it stands, comments and all', () => {
+  it('reads past comments as typed', () => {
     expect(setsRoot('/* A reset. */\nhtml {\n  font-size: 62.5%;\n}\n')).toBe(true)
     expect(setsRoot('/* html { font-size: 62.5% } */\nbody {\n  font-size: 1rem;\n}\n')).toBe(false)
   })
 
   it('is never overridden: no stylesheet sets the root’s font-size', () => {
-    // Every sheet the page can be given, whatever way it comes (adversarial Г7, Г9, Г10): of `src` and of `public/`,
-    // by every name Vite takes as a sheet, a partial too — a script may import one — and the page's own `<style>` and
-    // its root's `style`, quoted or not. `100%` there is no exception: Chrome takes the system's size only from a root
-    // nothing sizes.
+    // Everything is SCSS (CLAUDE.md), and the guard reads it with the very Sass that builds it — of `src` and of
+    // `public/`, partials too, since a script may import one. Read as Sass, a plain sheet hid `//{}html{…}` the browser
+    // applies; read as it stands, its nesting (adversarial Г10, Г11): no reading is right for two languages, so any
+    // other sheet by a name Vite takes is simply not there. `100%` is no exception: Chrome takes the system's size only
+    // from a root nothing sizes.
     const sheetsOf = (dir: URL): URL[] =>
       readdirSync(dir, { recursive: true, encoding: 'utf8' })
         .filter((path) => /\.(vue|css|scss|sass|pcss|postcss|sss|less|styl|stylus)$/.test(path))
         .map((path) => new URL(path, dir))
     const entries = [...sheetsOf(src), ...sheetsOf(at('../../public/'))]
     expect(entries.length).toBeGreaterThan(50)
-    // A sheet nothing here reads: the build has no preprocessor for it, and the guard no parser.
-    const unread = (file: URL): boolean => /\.(sss|less|styl|stylus)$/.test(file.pathname)
-    expect(entries.filter(unread).map((file) => file.pathname)).toEqual([])
+    const scss = (file: URL): boolean => /\.(vue|scss)$/.test(file.pathname)
+    expect(entries.filter((file) => !scss(file)).map((file) => file.pathname)).toEqual([])
     const styles = (text: string): string[] =>
       [...text.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map(([, style = '']) => style)
-    const setIn = (file: URL): boolean => {
+    const css = (file: URL): string => {
       const text = read(file)
-      return (file.pathname.endsWith('.vue') ? styles(text) : [text]).some((sheet) =>
-        setsRoot(compiled(sheet, file)),
-      )
+      return (file.pathname.endsWith('.vue') ? styles(text) : [text])
+        .map((sheet) => compiled(sheet, file))
+        .join('')
     }
-    expect(entries.filter(setIn).map((file) => file.pathname)).toEqual([])
-    const page = at('../../index.html')
-    const html = read(page)
-    expect(
-      [...styles(html), `html{${rootStyleOf(html)}}`].filter((sheet) =>
-        setsRoot(compiled(sheet, page)),
-      ),
-    ).toEqual([])
+    const sheets = entries.map((file) => ({ path: file.pathname, css: css(file) }))
+    expect(sheets.filter((sheet) => setsRoot(sheet.css)).map((sheet) => sheet.path)).toEqual([])
+    // A sheet by an address, `data:` too, is one the guard never reads (Г11).
+    expect(sheets.filter((sheet) => /@import/i.test(sheet.css)).map((sheet) => sheet.path)).toEqual(
+      [],
+    )
+    // Nor is the page's own: no `<style>`, no sheet by a `<link>`, no `style` on its root, however it is spelled.
+    const page = read(at('../../index.html'))
+    expect(page).not.toMatch(/<style\b/i)
+    expect(page).not.toMatch(/<link\b[^>]*stylesheet/i)
+    expect(page).not.toMatch(/<html\b[^>]*style\s*=/i)
   }, 60_000)
 })
