@@ -522,9 +522,12 @@ The detail behind the frontend lines of `CLAUDE.md`.
   way, not a form built to slip past it** (owner's В-8 «а», 03.11.2026 — the boundary of `check-ordered-reads.mjs` of
   02.11.2026, after nineteen findings, Г1–Г19): a form found in ordinary code is a defect of the guard; a form built
   only to slip past it — a property no rule names under a condition neither window meets, a screen the test does not
-  open, a probe a selector recognises — is a price named and review's, never a new round of the guard. What a script
-  sizes itself — `documentElement.style`, a sheet built from a string on a screen the e2e does not open — is no file the
-  guard reads: the e2e sees an absolute one, review the rest; Safari passes Dynamic Type to no page. Seven ways:
+  open, a probe a selector recognises — is a price named and review's, never a new round of the guard. **Nor is a size
+  bound by `:style`** (adversarial Г22): no stylesheet reader sees a binding, so ESLint refuses a size, the shorthand,
+  `font-size-adjust` or `zoom` there, as a key or in a string (`vue/no-restricted-syntax`, `eslint-style-size.test.ts`).
+  What a script sizes itself — `documentElement.style`, a sheet built from a string on a screen the e2e does not open —
+  is no file the guard reads: the e2e sees an absolute one, review the rest; Safari passes Dynamic Type to no page.
+  Seven ways:
   - **A row of segments its words do not fit stands them one under another** (`SegmentedControl`, В-1 «а»):
     the word stays whole — MOL-189 holds, and now a test holds it (`kit-rows`: every word of «Как меняли» on one
     line, in both engines and languages; m7, which broke the word, went green on 66 tests before). The row is
