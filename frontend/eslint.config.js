@@ -20,6 +20,27 @@ const SELECT = [
   },
 ]
 /**
+ * Text drawn smaller than the system's size, by a binding no stylesheet reader sees (MOL-334, adversarial Г22):
+ * Stylelint reads a `<style>` and a static `style`, never the script of `:style`, so a size, the shorthand, an
+ * adjustment of the size or a zoom bound there — `{ fontSize: 'var(--text-tab)' }`, `'font-size: 11px'` — would
+ * keep large text at 100 % with every check green. Sizes are the stylesheet's, held by the tokens. A size computed
+ * in the script and bound under a name is review's, as `figureChars` is.
+ */
+const BOUND_SIZE = '(font|font-?size|font-?size-?adjust|zoom)'
+const STYLE_BINDING = "VAttribute[directive=true][key.name.name='bind'][key.argument.name='style']"
+const SIZE = [
+  {
+    selector: `${STYLE_BINDING} Property:matches([key.name=/^${BOUND_SIZE}$/i], [key.value=/^${BOUND_SIZE}$/i])`,
+    message:
+      'A size of text is the stylesheet’s, never a :style binding — large text would stop at it (MOL-334).',
+  },
+  {
+    selector: `${STYLE_BINDING} :matches(Literal[value=/(^|;)\\s*${BOUND_SIZE}\\s*:/i], TemplateElement[value.raw=/(^|;)\\s*${BOUND_SIZE}\\s*:/i])`,
+    message:
+      'A size of text is the stylesheet’s, never a :style binding — large text would stop at it (MOL-334).',
+  },
+]
+/**
  * The screen's day (MOL-329, self-review №2): a day word is counted from `useLocalDay` or a `today` the
  * screen hands down — the clock read in its place, `localDay()` or `localDay(new Date())` written out
  * (adversarial В1), is the clock where the words are drawn, which a required argument of `days.ts` takes as
@@ -296,11 +317,11 @@ export default defineConfigWithVueTs(
   // (adversarial Р2-А2) — so in this rule, one option list a file, the kit's two files keeping theirs.
   {
     files: ['src/**/*.vue'],
-    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...SELECT, ...DAY] },
+    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...SELECT, ...DAY, ...SIZE] },
   },
   {
     files: ['src/components/AppField.vue', 'src/components/CurrencySelect.vue'],
-    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...DAY] },
+    rules: { 'vue/no-restricted-syntax': ['error', ...BUSY, ...DAY, ...SIZE] },
   },
   // The screen's day in the scripts (MOL-329): the rule above reads a template, this one the code. The
   // tests compute what a screen should say from the clock they set, and `useLocalDay` is the one holder.
