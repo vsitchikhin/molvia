@@ -641,7 +641,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   one under another, the word whole; what stands beside something turns by `@container` in `rem`; a card's figure
   shrinks to its card by its length (`figure-fit`), and a sum never breaks; a line wraps only where the least widths do
   not fit; a word wider than its line breaks (`overflow-wrap: break-word` on `body`), and only while the text is large
-  (`data-large-text`) words take a hyphen — from six letters in a title, a row of the kit and a button, from twelve in
+  (`data-large-text`) words take a hyphen — from five letters in a title, six in a row of the kit and a button, twelve in
   a paragraph, never in a segment — so 100 % keeps its look; a key of the 1–5 scale is never under 44 px.
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
   history, and puts the page back — and focus, wherever the platform gave it — by what it was

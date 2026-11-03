@@ -612,11 +612,11 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     «налогоплательщика» stood «Данные и приватность» 33 px sideways at 200 % — which moves no least width, so 100 % keeps
     its look; and `hyphens: auto` on `body` under `html[data-large-text]` (`main.scss`). **`hyphens: auto` cuts any word of the length
     at a line's end, wide or not** (adversarial Х1), so where the length starts is the whole choice: in a unit of one to
-    three words — a heading (`h1`–`h3`, `main.scss`), and by `@include word-unit` in its own component a row's title
+    three words — by `@include word-unit` in its own component a row's title
     (`ListRow`), a link row's label and value (`NavRow`), a button (`AppButton`), the words of a switch row («Бот», the
     salary's day, «Учитывать меня в статистике»), a device's name, a kind of data of «Данные и приватность» (`dt`) and a
-    name by a ring (`DonutChart`, `CategoryDonutCard`; adversarial Х4, Х5) — from six letters, two a side as Russian print carries them (with three «Настройки» had no place for one and broke
-    «Настро|йки»; at 200 % «Написать разработчику» read «Написа|ть разраб|отчику»); in a paragraph and a row's meta
+    name by a ring (`DonutChart`, `CategoryDonutCard`; adversarial Х4, Х5) — from six letters, and a heading (`h1`–`h3`, `main.scss`) from five, two a side as Russian print carries them (with three «Настройки» had no place for one and broke
+    «Настро|йки»; at 200 % «Написать разработчику» read «Написа|ть разраб|отчику»; a heading from six left «Нова / я трата» beside a sheet's «×» of 144 px at 200 % on 320, owner's В-7 «а», adversarial Х6); in a paragraph and a row's meta
     from twelve, inherited from `body`: from six there, «Данные и приватность» cut 394 words that would have stood
     whole at 200 % and 192 already at 115 %, from twelve 21. Each unit includes the mixin itself, so a component knows
     its words are one (review №5): a list of the kit's classes in `main.scss` let «Напоминат / ь об / оценке» of a switch
