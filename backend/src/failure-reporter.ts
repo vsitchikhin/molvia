@@ -153,10 +153,10 @@ export interface ApiFailureReporter extends FailureReporter {
    */
   tellHeld(at: Date): Promise<void>
   /**
-   * Lets go of the phones' senders with nothing in the hour before `at` (MOL-241): a minute timer of
+   * Lets go of the phones' senders with nothing in the hour before now (MOL-241): a minute timer of
    * its own calls it, so the memory waits neither for the database nor for an owner.
    */
-  forget(at: Date): void
+  forget(): void
 }
 
 /**
@@ -192,12 +192,12 @@ export function apiFailureReporter(
     ...reporter,
     async tellHeld(at) {
       if (owner === null) return
-      const held = phoneNotices.held(at)
+      const held = phoneNotices.held()
       if (held !== null) await createOwnerNoticeRepository(db()).queue(held, at)
     },
-    forget(at) {
-      phoneNotices.forget(at)
-      phoneRows.forget(at)
+    forget() {
+      phoneNotices.forget()
+      phoneRows.forget()
     },
   }
 }

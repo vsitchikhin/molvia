@@ -403,3 +403,6 @@ The detail behind the privacy lines of `CLAUDE.md`.
   `App.vue` draws past the login screen (MOL-56), linked from that screen and from the settings: a change to either is a change to both — and it says only what they keep: other
   people's prices are shown in the shared mode (MOL-31), so «shown to nobody» is said of the list
   of purchases, and an address can reach Caddy's error log, so «no address» is said of requests.
+  **An address the API keeps in memory is named there too** (MOL-359): a phone's failure's for its hour
+  (MOL-144, MOL-241) and a login's start's for its minute — a limit's key, in no table and no line of the
+  log, «на пару минут» in «Логи сервера», a revision.

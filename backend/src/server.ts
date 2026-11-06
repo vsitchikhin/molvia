@@ -10,6 +10,8 @@ import {
   DomainError,
   ERROR,
   ISSUE,
+  LOGIN_ADDRESS_LIMIT,
+  LOGIN_WINDOW_LIMIT,
   VERSION_HEADER,
   errorResponseSchema,
   isWireCode,
@@ -187,6 +189,7 @@ import { consentRoutes } from '@/routes/consent'
 import { startTrip } from '@/usecases/start-trip'
 import { removeTrip, restoreTrip } from '@/usecases/remove-trip'
 import { startLogin } from '@/usecases/start-login'
+import { addressMinute } from '@/usecases/address-minute'
 import {
   addExpense,
   finishTrip,
@@ -639,6 +642,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopSenderForget: (() => Promise<void>) | undefined
     // The route's minute of the phone's reports (MOL-144), let go by the timer below too (MOL-241).
     const phoneLimit = phoneReportLimit()
+    // An address's minute of the login's starts (MOL-359), let go by the same timer. Its three
+    // hundred are the bound of its own map, and in one process the first to refuse; the database's
+    // are the ceiling that survives a restart (`startLogin`).
+    const loginLimit = addressMinute(LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT)
     let stopMergeTwins: (() => Promise<void>) | undefined
     let stopSilence: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
@@ -721,9 +728,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // keep them as long.
       stopSenderForget = startLoginCleanup(
         () => {
-          const now = new Date()
-          failures.forget(now)
-          phoneLimit.forget(now.getTime())
+          failures.forget()
+          phoneLimit.forget()
+          loginLimit.forget()
           return Promise.resolve()
         },
         (error) => {
@@ -1040,9 +1047,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     healthRoutes(instance, { databaseIsReachable })
     const login = options.login === undefined ? loginConfig : options.login
     authRoutes(instance, {
-      start: (name, again) => {
+      start: (name, again, address) => {
         if (!login) throw new DomainError(ERROR.LOGIN_DISABLED)
-        return startLogin(loginRequests, login.username, name, again)
+        return startLogin(
+          loginRequests,
+          { limit: loginLimit, address },
+          login.username,
+          name,
+          again,
+        )
       },
       poll: (id, secret, zone) => completeLogin(authTransactOn(db), id, secret, zone),
       logout: (token) => logout(sessions, token),
@@ -1130,7 +1143,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         },
         body,
         address,
-        Date.now(),
       )
     })
 
