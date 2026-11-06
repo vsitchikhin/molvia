@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test'
+import { expect, test } from './csp'
 import type { Request } from '@playwright/test'
 
 // MOL-144, the built app (`pwa` project): the page names its build by its own script, and its frames

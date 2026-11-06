@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './csp'
 import type { Page, Request } from '@playwright/test'
 
 // MOL-231, the built app (`pwa` project): the line a browser below the floor sees is put in by the

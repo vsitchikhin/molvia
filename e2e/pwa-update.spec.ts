@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { expect, test } from '@playwright/test'
+import { expect, test } from './csp'
 
 // MOL-132. The one spec with a real worker: it runs in the `pwa` project, against the built app
 // (`frontend/dist-e2e`), since the dev server builds none. It comes in by `page.goto` on
