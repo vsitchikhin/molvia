@@ -1,6 +1,6 @@
 // MOL-106 — when two names in the catalogue are one thing written twice. The nightly merge rests on
-// this: a pair merges by itself only if every size is the same and the words are near by spelling and
-// by meaning; anything less is a candidate the owner looks at. A false merge pours the ratings of two
+// this: a pair merges by itself only if every size is the same, the words are one spelling (MOL-358)
+// and near by meaning; anything less is a candidate the owner looks at. A false merge pours the ratings of two
 // things into one — «Milo» and «Мыло», «Молоко 1 л» and «Молоко 2 л» — and is worse than a missed one.
 
 import { levenshtein } from '#model/support/edits'
@@ -67,11 +67,24 @@ export interface NameParts {
   /** The scripts the name's letters are written in, sorted: `cyrillic`, `latin latin`… once each. */
   readonly scripts: readonly string[]
   /**
-   * The name as it is written, only case, spacing, punctuation and «ё» aside — not the search key,
-   * which folds a double letter, «й» and a soft sign: «Римма» and «Рима» are one key and two shops
-   * (adversarial З1). What a proper name is compared by.
+   * The name as it is written, in its order, only case, «ё» and the signs of `WORD_SEPARATORS` aside
+   * (MOL-358: «Магнит+» is not «Магнит», adversarial Д3) — not the search key, which folds a double letter,
+   * «й» and a soft sign: «Римма» and «Рима» are one key and two shops (adversarial З1). What a proper name
+   * is compared by.
    */
   readonly letters: string
+  /**
+   * The name as written, word by word (`writtenOf`) — what an item is one spelling by (MOL-358). Only
+   * case, «ё» and the signs of `WORD_SEPARATORS` are nothing; every other sign stays in its word, so «мед.»
+   * is not «мёд» and «шок.» not the brand «Шок» (adversarial Г1, Г2). Its words in any order only where no
+   * word has a digit; a name with a number is read in its order, so «D3 K2» is not «D2 K3» and «AA 4 шт AAA
+   * 2 шт» not «AAA 4 шт AA 2 шт» (Д1). A size is its number and its unit as printed, glued or apart one, a
+   * comma and a point one but before three digits: «05 л» is not «5 л», «1.000 м» not «1 м» nor «1,000 м»,
+   * «25 пак» not «25 уп» (Г3, Г4, Д2) — `sizes` reads those by their value and its unit, for a candidate.
+   * Never the key, which folds «ы» into «и», a soft sign, «щ» into «ш» and a double letter, and made
+   * «Игрушка мышка» one key with «Игрушка мишка» (adversarial В1).
+   */
+  readonly written: readonly string[]
 }
 
 const SCRIPTS: readonly (readonly [string, RegExp])[] = [
@@ -110,16 +123,53 @@ export function nameParts(name: string): NameParts {
     words: key === '' ? [] : key.split(' ').filter((word) => !/^\d+$/u.test(word)),
     // Of the words: a unit after a number, «1 l», is no script of the name.
     scripts: scriptsOf(rest),
-    // Armenian «և», «եւ» and «եվ» are one spelling (the owner, MOL-12), as `nameIdentity` holds.
-    letters: name
-      .normalize('NFC')
-      .toLowerCase()
-      .replaceAll('ё', 'е')
-      .replaceAll('և', 'եվ')
-      .replaceAll('եւ', 'եվ')
-      .replace(/[^\p{L}\p{N}]+/gu, ' ')
-      .trim(),
+    letters: wordsAsWritten(name).join(' '),
+    written: writtenOf(name),
   }
+}
+
+/**
+ * `NameParts.written`: the words as written, sorted only where none has a digit — a name with a number
+ * is read in its order, so «Витамин D3 K2» is not «Витамин D2 K3» (adversarial round 3) and «AA 4 шт AAA
+ * 2 шт» not «AAA 4 шт AA 2 шт» (Д1). A size's number and its unit are one word, glued or apart, a comma in
+ * it a point but before three digits (Д2).
+ */
+function writtenOf(name: string): string[] {
+  const glued = name.replace(SIZE, (whole, digits: string, _gap: string, after?: string) => {
+    // Three digits after the sign may be a thousand: «1.000 м» and «1,000 м» are two (adversarial Д2).
+    const asPrinted = /[.,]\d{3}/u.test(digits) ? digits : digits.replace(',', '.')
+    if (after === '%' || (after !== undefined && UNIT_OF.has(after.toLowerCase()))) {
+      return ` ${asPrinted}${after} `
+    }
+    return whole.replace(digits, asPrinted)
+  })
+  const words = wordsAsWritten(glued)
+  // A name with a number in it is read in its order: «AA 4 шт AAA 2 шт» is not «AAA 4 шт AA 2 шт», where
+  // each number stood by another word (adversarial Д1).
+  return words.some((word) => /\p{N}/u.test(word)) ? words : words.sort()
+}
+
+/**
+ * The signs that only part the words of a name: spacing, quotes, a comma, a hyphen or a dash, brackets.
+ * A closed list (MOL-358): any other sign — a point, a slash, a plus, one no table names — is part of its
+ * word, since a sign left out of the list can only make two spellings, never merge them.
+ */
+const WORD_SEPARATORS = /[\s«»"„“”'‘’‚,()[\]\-\u2010-\u2015\u2212]+/u
+
+/**
+ * The words of a text as written, case and «ё» aside, parted by `WORD_SEPARATORS` only — one reading for
+ * a place's `letters` and an item's `written` (MOL-358).
+ */
+function wordsAsWritten(text: string): string[] {
+  // Armenian «և», «եւ» and «եվ» are one spelling (the owner, MOL-12), as `nameIdentity` holds.
+  return text
+    .normalize('NFC')
+    .toLowerCase()
+    .replaceAll('ё', 'е')
+    .replaceAll('և', 'եվ')
+    .replaceAll('եւ', 'եվ')
+    .split(WORD_SEPARATORS)
+    .filter((word) => word !== '')
 }
 
 /** Every size the same, with its unit: «Молоко 1 л» and «Молоко 2 л» never are one thing. */
@@ -136,11 +186,19 @@ export interface Spelling {
   /**
    * Whether the two are written in the same scripts. One key in two scripts is never merged, whatever
    * the model says: it reads a transliteration by its letters, and «Bulochki dlya burgerov» stood at
-   * 0.902 to «Булочки для бургеров» where «Milo» stands at 0.48 to «Мыло» (review №6).
+   * 0.902 to «Булочки для бургеров» where «Milo» stands at 0.48 to «Мыло» (review №6). Since MOL-358 a
+   * merge asks for `sameWords` or `sameLetters`, which hold it already — the same letters are the same
+   * scripts. It stays in the merge's condition as a guard of its own: should «one spelling» ever be
+   * loosened again, two scripts still never merge.
    */
   readonly sameScripts: boolean
-  /** Whether the two are one spelling, case, spacing, punctuation and «ё» aside (`NameParts.letters`). */
+  /** Whether the two are one spelling in one order (`NameParts.letters`): a place's. */
   readonly sameLetters: boolean
+  /**
+   * Whether the two are the same words as written — of letters in any order, with a number in their
+   * order (`NameParts.written`): one item's spelling.
+   */
+  readonly sameWords: boolean
 }
 
 /**
@@ -188,7 +246,13 @@ export function twinSpelling(a: NameParts, b: NameParts): Spelling | null {
   if (found === undefined) return null
   const sameScripts =
     a.scripts.length === b.scripts.length && a.scripts.every((script, i) => script === b.scripts[i])
-  return { ...found, sameScripts, sameLetters: a.letters === b.letters }
+  return {
+    ...found,
+    sameScripts,
+    sameLetters: a.letters === b.letters,
+    sameWords:
+      a.written.length === b.written.length && a.written.every((word, i) => word === b.written[i]),
+  }
 }
 
 function bitCount(mask: number): number {
@@ -198,15 +262,22 @@ function bitCount(mask: number): number {
 }
 
 /**
- * Merged by itself: one edit a word, two a name, and a meaning at least this close. Measured on the
- * seed (MOL-106, `.scratch/tasks/status/MOL-106-measure.md`): of its 178 000 pairs not one merges, the
- * nearest one edit apart being «Курица» and «Корица» at 0.856; two edits a word let in «Хлеб» and
- * «Хлебцы» at 0.937. What it takes: a fat with a comma or a point, «ё», the order of words, half of
- * the typos. **A name in another script is not taken**: the model reads a transliteration by its
+ * Merged by itself: one spelling — the same words and sizes as written, in any order, only case, «ё»
+ * and a sign that parts words aside (`sameWords`; a place's in their order, `sameLetters`) — and a
+ * meaning at least this close (MOL-358, owner's В-2 «в»). What it takes: a fat with a comma or a point,
+ * «ё», case, quotes, the order of words, a unit glued to its number. A unit spelt another way, a number
+ * written another way, a point of an abbreviation are a candidate (adversarial Г1–Г4). **Not by the search key**, which folds «ы» into «и», a soft
+ * sign, «щ» into «ш» and a double letter: «Игрушка мышка» merged into «Игрушка мишка» at 0.961, «Пенька» into
+ * «Пенка» at 0.947 (adversarial В1, В2 of MOL-358). **Not a letter**: one edit a word merged «Курица
+ * вареная» into «Курица жареная» at 0.929 (adversarial А1 of MOL-299), and every rule that tried to tell
+ * a way of cooking from a typo by its spelling — an adjective's ending — was passed by another spelling:
+ * a case, a comma, a soft hyphen, Latin letters, «варён.» (adversarial Б1–Б5 of MOL-358), and «Мойва» by
+ * «Мойка» at 0.910 is two nouns. A letter apart is a candidate the owner merges by hand: every one of the
+ * bench's 250 typos that merged. **A name in another script is not taken**: the model reads a transliteration by its
  * letters, «Moloko» against «Молоко» is 0.69 at the median — as far as «Milo» from «Мыло», 0.48 — so
  * one key in two scripts is always a candidate, never a merge.
  */
-export const TWIN_MERGE = Object.freeze({ worst: 1, edits: 2, meaning: 0.9 })
+export const TWIN_MERGE = Object.freeze({ meaning: 0.9 })
 
 /**
  * Named to the owner: one edit a word, and a meaning this close or one key in two scripts. Two edits a
@@ -229,7 +300,7 @@ export interface TwinPair {
    * A proper name — a place's. One letter apart is two shops there, and the model reads a proper name
    * by its letters: «Маркет Ширак» and «Маркет Шираз» at 0.942, «Магнит» and «Магнат» at 0.919
    * (adversarial Ж1). So a proper name merges by itself only as one spelling — a double space, a
-   * hyphen, «ё» — and one letter apart is a candidate, by the letters as written, never by the key, which
+   * hyphen, «ё», never a sign the separators do not name — and one letter apart is a candidate, by the letters as written, never by the key, which
    * folds «Римма» into «Рима» (adversarial З1).
    */
   readonly properName?: boolean
@@ -241,8 +312,7 @@ export function twinVerdict({ spelling, sameUnit, meaning, properName }: TwinPai
     sameUnit &&
     spelling.sameScripts &&
     meaning !== null &&
-    spelling.worst <= TWIN_MERGE.worst &&
-    (properName === true ? spelling.sameLetters : spelling.edits <= TWIN_MERGE.edits) &&
+    (properName === true ? spelling.sameLetters : spelling.sameWords) &&
     meaning >= TWIN_MERGE.meaning
   ) {
     return 'merge'

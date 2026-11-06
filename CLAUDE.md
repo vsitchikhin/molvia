@@ -196,18 +196,22 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The catalogue grows by «Предложить товар» and the seed** (MOL-112): the seed only adds, is
   not a migration, never stays in `_test` or `_e2e`, and holds no brands.
 - **Twins are merged by the night, and a false merge is worse than a missed one** (MOL-106): every
-  size with its unit (by its spelling, never the search key), one edit a word, two a name, the meaning
-  at 0.90 — measured on the seed; two scripts and a brand's extra word never merge, by the code. Places
+  size with its unit (by its spelling, never the search key), the same words as one spelling — as written, only
+  case, «ё» and a closed list of separators aside, the words in any order only where none has a digit,
+  never by the search key (MOL-358: a letter cannot tell «вареная» from «жареная», the key «мышка» from
+  «мишка», a point «мед.» from «мёд»), the meaning at 0.90 — measured on the seed; a letter apart, two scripts and a brand's extra word
+  never merge, by the code. Places
   by the same rule, one city each, and only as one spelling — as written, not by the key: a shop's
   name is a proper name.
 - **A merged item or place stays a trace** (`merged_into`): its name is the survivor's second name,
   every write by an id goes through `liveItemId` / `livePlaceId`, the search answers the survivor once;
-  one person's two verdicts stay two rows, so the gate does not move. **Production runs
-  `CATALOGUE_MERGE=report` until MOL-358** (MOL-299: 28 nights named no pair to merge, so the rule has met
-  no live twin; it merges «Курица вареная» into «Курица жареная» by itself); `make unmerge ID=` takes a
-  merge back, a chain from its end, with what a trace's id or a shop's trace's name wrote since — never a
-  verdict, pick or word the survivor's id touched since — and gives back the survivor's own verdict a trace's
-  id wrote over (kept for it, in the person's copy).
+  one person's two verdicts stay two rows, so the gate does not move. **Production's `.env.prod`
+  says `CATALOGUE_MERGE=on` from MOL-358, set by the owner's word after its merge** (`report` before
+  it — MOL-299: 28 nights named no pair to merge, and one edit a word merged «Курица вареная» into
+  «Курица жареная» by itself until MOL-358); `make unmerge ID=` takes a merge back, a chain from its
+  end, with what a trace's id or a shop's trace's name wrote since — never a verdict, pick or word the
+  survivor's id touched since — and gives back the survivor's own verdict a trace's id wrote over (kept
+  for it, in the person's copy).
 
 - **«Брали здесь в прошлый раз» is the server's, the phone keeps it per place** (MOL-209): the last
   finished trip with a purchase at the trip's place before it, less what this trip holds — the server's
