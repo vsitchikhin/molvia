@@ -1282,6 +1282,12 @@ test('large text is drawn twice as large at 200 %, everywhere, on a phone uprigh
       const nameOf = (element: Element): string =>
         element.tagName.toLowerCase() + [...element.classList].map((name) => `.${name}`).join('')
       const drawnNow = (element: Element): boolean => element.getClientRects().length > 0
+      // The probes' face comes first, by the root's probes alone: a wait with the probes in the screen let it redraw
+      // a place under them — a name of «Деньги» answered again took its probe out of the page, 0 px (master, run
+      // 41731048482). Then the places are found, probed and measured in one task, with nothing to redraw between.
+      const root = steps.map((step) => probeIn(document.documentElement, step))
+      document.documentElement.getBoundingClientRect()
+      await document.fonts.ready
       // What draws words of its own and is drawn: a closed sheet, a field's inside and an icon hold none.
       const hosts = [...document.body.querySelectorAll('*')].filter(
         (element) =>
@@ -1299,13 +1305,10 @@ test('large text is drawn twice as large at 200 %, everywhere, on a phone uprigh
               /^(text|search|tel|email|url)$/.test(field.type))) &&
           drawnNow(field),
       )
-      const root = steps.map((step) => probeIn(document.documentElement, step))
       const placed = [
         ...hosts.map((host) => ({ host, probes: steps.map((step) => probeIn(host, step)) })),
         ...fields.map((host) => ({ host, probes: steps.map((step) => typedBeside(host, step)) })),
       ]
-      document.documentElement.getBoundingClientRect()
-      await document.fonts.ready
       const width = (probe: HTMLElement | undefined): number =>
         probe?.getBoundingClientRect().width ?? 0
       const astray = placed.flatMap(({ host, probes }) =>
