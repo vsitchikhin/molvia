@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   checkedPaths,
+  imageTakers,
   dependabotProblems,
   dockerfileProblems,
   pinProblems,
@@ -62,10 +63,14 @@ describe('workflowProblems', () => {
     ).toHaveLength(1)
   })
 
-  it('refuses a docker:// image as an action not pinned by its sha', () => {
-    expect(
-      workflowProblems(WORKFLOW, steps(`      - uses: docker://alpine:3.22@${DIGEST}`)),
-    ).toEqual([unpinned(`${WORKFLOW}:4`, `docker://alpine:3.22@${DIGEST}`)])
+  it('reads a docker:// step as an image, pinned by its tag and digest', () => {
+    const text = steps(
+      `      - uses: docker://alpine:3.24.4@${DIGEST}`,
+      '      - uses: docker://alpine:3.24',
+    )
+    expect(workflowProblems(WORKFLOW, text)).toEqual([
+      `${WORKFLOW}:5: alpine:3.24 — pin it by an exact tag and its digest, image:1.2.3@sha256:…`,
+    ])
   })
 
   it('leaves a local action and a commented-out line alone', () => {
@@ -185,6 +190,19 @@ describe('dockerfileProblems', () => {
     ])
   })
 
+  it('never takes a comment for an instruction, nor goes on with one, a backslash at its end or not', () => {
+    const text = [
+      `FROM node:22.23.4-alpine@${DIGEST}`,
+      '# RUN apt-get update && \\',
+      '#     apt-get install -y curl',
+      '',
+      'FROM busybox AS tools',
+      '# copied from C:\\',
+      'COPY --from=busybox:latest /bin/busybox /bb',
+    ].join('\n')
+    expect(dockerfileProblems(FILE, text)).toEqual([told(5, 'busybox'), told(7, 'busybox:latest')])
+  })
+
   it('keeps an instruction whole across a blank line inside it, as BuildKit does', () => {
     const text = [
       `FROM node:22.23.4-alpine@${DIGEST}`,
@@ -274,6 +292,9 @@ describe('pinProblems', () => {
       'x/dockerfile',
       'x/prod.dockerfile',
       'x/containerfile',
+      'x/Dockerfile-prod',
+      'x/Dockerfile_prod',
+      'x/prod-Dockerfile',
     ]
     const yamls = [
       '.github/workflows/ci.yml',
@@ -281,17 +302,30 @@ describe('pinProblems', () => {
       'action.yml',
       'tools/setup/action.yaml',
     ]
-    const left = [
-      'README.md',
-      'Dockerfiles/notes.md',
-      'x/Dockerfile.dockerignore',
-      '.github/workflows/sub/x.yml',
-      'x/my-action.yml',
-    ]
+    const left = ['README.md', '.github/workflows/sub/x.yml', 'x/my-action.yml']
     expect(checkedPaths([...dockerfiles, ...yamls, ...left])).toEqual([...dockerfiles, ...yamls])
+    // A note or an ignore file so named is read like Dependabot reads it, and has nothing to refuse.
+    expect(checkedPaths(['docs/Dockerfile.md', 'x/Dockerfile.dockerignore'])).toHaveLength(2)
+    expect(
+      pinProblems([{ path: 'docs/Dockerfile.md', text: '# How the image is built\n' }]),
+    ).toEqual([])
     for (const path of dockerfiles) {
       expect(pinProblems([{ path, text: 'FROM node:22' }])).toHaveLength(1)
     }
+  })
+})
+
+describe('imageTakers', () => {
+  it('names the Dockerfiles that take an image, never a note or an ignore file so named', () => {
+    expect(
+      imageTakers([
+        { path: 'x/Dockerfile', text: `# base\r\nFROM node:22.23.4-alpine@${DIGEST}\r\n` },
+        { path: 'docs/Dockerfile.md', text: '# How the image is built\n\nSee `x/Dockerfile`.\n' },
+        { path: 'x/Dockerfile.dockerignore', text: 'node_modules\n' },
+        { path: 'y/Dockerfile', text: '# FROM node:22\n' },
+        { path: '.github/workflows/ci.yml', text: 'from: x\n' },
+      ]),
+    ).toEqual(['x/Dockerfile'])
   })
 })
 

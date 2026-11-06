@@ -31,14 +31,10 @@ import process from 'node:process'
 // What is read, by its path — one rule, for `npm run lint` and the test alike.
 const isWorkflow = (path) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path)
 const isAction = (path) => /^action\.ya?ml$/.test(path.split('/').pop() ?? '')
-// A Dockerfile by its name in any case, as Docker and Dependabot read it — never its ignore file.
-const isDockerfile = (path) => {
-  const name = path.split('/').pop() ?? ''
-  return (
-    /^(?:dockerfile|containerfile)(?:\..+)?$|\.(?:dockerfile|containerfile)$/i.test(name) &&
-    !/\.dockerignore$/i.test(name)
-  )
-}
+// A Dockerfile by its name as Dependabot reads it, the word anywhere in any case. A file so named
+// that takes no image — a note, an ignore file — has nothing to refuse, and Dependabot need not
+// watch it.
+const isDockerfile = (path) => /dockerfile|containerfile/i.test(path.split('/').pop() ?? '')
 
 /** The paths of those given that the check reads. */
 export const checkedPaths = (paths) =>
@@ -99,6 +95,12 @@ export function workflowProblems(path, text) {
     // A workflow or an action of this repository is this commit's own code, and its file is read
     // here.
     if (reference.startsWith('./')) return
+    // An image as a step is an image, pinned as any other.
+    if (reference.startsWith('docker://')) {
+      const problem = imageProblem(reference.slice('docker://'.length))
+      if (problem) problems.push(`${where}: ${problem}`)
+      return
+    }
     if (!SHA.test(reference)) {
       problems.push(
         `${where}: ${reference} — pin it by the full commit sha, its release in a comment`,
@@ -115,8 +117,9 @@ function instructionsOf(text) {
   const instructions = []
   let parts = null
   text.split(/\r?\n/).forEach((line, index) => {
-    // A comment or a blank line inside an instruction is no part of it, as BuildKit reads it.
-    if (parts && /^[\t ]*(?:#|$)/.test(line)) return
+    // A comment is never an instruction, nor goes on with one, whatever it ends with; a blank line
+    // inside an instruction is no part of it — as BuildKit reads them.
+    if (/^[\t ]*#/.test(line) || (parts && /^[\t ]*$/.test(line))) return
     const continued = /\\[\t ]*$/.test(line)
     const part = continued ? line.replace(/\\[\t ]*$/, '') : line
     if (parts) parts.text += ` ${part}`
@@ -226,14 +229,25 @@ export function pinProblems(files) {
   )
 }
 
+/** The Dockerfiles of those given that take an image — the ones Dependabot has a pin to move in. */
+export const imageTakers = (files) =>
+  files
+    .filter(
+      ({ path, text }) =>
+        isDockerfile(path) &&
+        instructionsOf(text).some(({ text: line }) => /^[\t ]*from[\t ]/i.test(line)),
+    )
+    .map(({ path }) => path)
+
 /** Every problem of the repository as git tracks it — what `npm run lint` runs. */
 export function repositoryProblems() {
   const paths = checkedPaths(
     execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean),
   )
+  const files = paths.map((path) => ({ path, text: readFileSync(path, 'utf8') }))
   return [
-    ...pinProblems(paths.map((path) => ({ path, text: readFileSync(path, 'utf8') }))),
-    ...dependabotProblems(paths.filter(isDockerfile), readFileSync(DEPENDABOT, 'utf8')),
+    ...pinProblems(files),
+    ...dependabotProblems(imageTakers(files), readFileSync(DEPENDABOT, 'utf8')),
   ]
 }
 
