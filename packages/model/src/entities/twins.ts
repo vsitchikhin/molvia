@@ -72,6 +72,13 @@ export interface NameParts {
    * (adversarial З1). What a proper name is compared by.
    */
   readonly letters: string
+  /**
+   * The words with every size taken out, as written — case, punctuation and «ё» aside, as `letters` —
+   * sorted, so the order of a label does not matter. Never the key, which folds «ы» into «и», a soft
+   * sign, «щ» into «ш» and a double letter, and made «Игрушка мышка» one key with «Игрушка мишка»
+   * (adversarial В1 of MOL-358). What an item is one spelling by.
+   */
+  readonly written: readonly string[]
 }
 
 const SCRIPTS: readonly (readonly [string, RegExp])[] = [
@@ -110,16 +117,25 @@ export function nameParts(name: string): NameParts {
     words: key === '' ? [] : key.split(' ').filter((word) => !/^\d+$/u.test(word)),
     // Of the words: a unit after a number, «1 l», is no script of the name.
     scripts: scriptsOf(rest),
-    // Armenian «և», «եւ» and «եվ» are one spelling (the owner, MOL-12), as `nameIdentity` holds.
-    letters: name
-      .normalize('NFC')
-      .toLowerCase()
-      .replaceAll('ё', 'е')
-      .replaceAll('և', 'եվ')
-      .replaceAll('եւ', 'եվ')
-      .replace(/[^\p{L}\p{N}]+/gu, ' ')
-      .trim(),
+    letters: asWritten(name),
+    written: asWritten(rest)
+      .split(' ')
+      .filter((word) => word !== '')
+      .sort(),
   }
+}
+
+/** Case, spacing, punctuation and «ё» aside, and nothing else. */
+function asWritten(text: string): string {
+  // Armenian «և», «եւ» and «եվ» are one spelling (the owner, MOL-12), as `nameIdentity` holds.
+  return text
+    .normalize('NFC')
+    .toLowerCase()
+    .replaceAll('ё', 'е')
+    .replaceAll('և', 'եվ')
+    .replaceAll('եւ', 'եվ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
 }
 
 /** Every size the same, with its unit: «Молоко 1 л» and «Молоко 2 л» never are one thing. */
@@ -141,6 +157,8 @@ export interface Spelling {
   readonly sameScripts: boolean
   /** Whether the two are one spelling, case, spacing, punctuation and «ё» aside (`NameParts.letters`). */
   readonly sameLetters: boolean
+  /** Whether the two are the same words as written, in any order (`NameParts.written`): one item's spelling. */
+  readonly sameWords: boolean
 }
 
 /**
@@ -188,7 +206,13 @@ export function twinSpelling(a: NameParts, b: NameParts): Spelling | null {
   if (found === undefined) return null
   const sameScripts =
     a.scripts.length === b.scripts.length && a.scripts.every((script, i) => script === b.scripts[i])
-  return { ...found, sameScripts, sameLetters: a.letters === b.letters }
+  return {
+    ...found,
+    sameScripts,
+    sameLetters: a.letters === b.letters,
+    sameWords:
+      a.written.length === b.written.length && a.written.every((word, i) => word === b.written[i]),
+  }
 }
 
 function bitCount(mask: number): number {
@@ -198,18 +222,21 @@ function bitCount(mask: number): number {
 }
 
 /**
- * Merged by itself: one spelling — the same search key word for word, in any order, no edit at all —
- * and a meaning at least this close (MOL-358, owner's В-2 «в»). What it takes: a fat with a comma or a
- * point, «ё», a double letter, the order of words. **Not a letter**: one edit a word merged «Курица
+ * Merged by itself: one spelling — the same words as written, in any order, case, punctuation and «ё»
+ * aside (`sameWords`; a place's in their order, `sameLetters`) — every size the same, and a meaning at
+ * least this close (MOL-358, owner's В-2 «в»). What it takes: a fat with a comma or a point, «ё», the
+ * order of words, a unit spelt another way. **Not by the search key**, which folds «ы» into «и», a soft
+ * sign, «щ» into «ш» and a double letter: «Игрушка мышка» merged into «Игрушка мишка» at 0.961, «Пенька» into
+ * «Пенка» at 0.947 (adversarial В1, В2 of MOL-358). **Not a letter**: one edit a word merged «Курица
  * вареная» into «Курица жареная» at 0.929 (adversarial А1 of MOL-299), and every rule that tried to tell
  * a way of cooking from a typo by its spelling — an adjective's ending — was passed by another spelling:
  * a case, a comma, a soft hyphen, Latin letters, «варён.» (adversarial Б1–Б5 of MOL-358), and «Мойва» by
- * «Мойка» at 0.910 is two nouns. A letter apart is a candidate the owner merges by hand: 237 of the
- * bench's 250 typos. **A name in another script is not taken**: the model reads a transliteration by its
+ * «Мойка» at 0.910 is two nouns. A letter apart is a candidate the owner merges by hand: every one of the
+ * bench's 250 typos that merged. **A name in another script is not taken**: the model reads a transliteration by its
  * letters, «Moloko» against «Молоко» is 0.69 at the median — as far as «Milo» from «Мыло», 0.48 — so
  * one key in two scripts is always a candidate, never a merge.
  */
-export const TWIN_MERGE = Object.freeze({ worst: 0, edits: 0, meaning: 0.9 })
+export const TWIN_MERGE = Object.freeze({ meaning: 0.9 })
 
 /**
  * Named to the owner: one edit a word, and a meaning this close or one key in two scripts. Two edits a
@@ -244,8 +271,7 @@ export function twinVerdict({ spelling, sameUnit, meaning, properName }: TwinPai
     sameUnit &&
     spelling.sameScripts &&
     meaning !== null &&
-    spelling.worst <= TWIN_MERGE.worst &&
-    (properName === true ? spelling.sameLetters : spelling.edits <= TWIN_MERGE.edits) &&
+    (properName === true ? spelling.sameLetters : spelling.sameWords) &&
     meaning >= TWIN_MERGE.meaning
   ) {
     return 'merge'

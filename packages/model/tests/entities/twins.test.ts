@@ -191,10 +191,25 @@ describe('twinVerdict', () => {
     expect(pair(a, b, 0.99)).toBe('candidate')
   })
 
-  it('merges one spelling by itself: «ё», a double letter, the order of words', () => {
+  it('merges one spelling by itself: «ё», case, a sign, the order of words, a unit spelt another way', () => {
     expect(pair('Молоко топлёное', 'Молоко топленое', 0.95)).toBe('merge')
-    expect(pair('Сыр плавленый', 'Сыр плавленный', 0.95)).toBe('merge')
     expect(pair('Молоко топлёное', 'Топленое молоко', 0.95)).toBe('merge')
+    expect(pair('Сыр «Чанах»', 'сыр чанах', 0.95)).toBe('merge')
+    expect(pair('Молоко 1л', 'Молоко 1 l', 0.95)).toBe('merge')
+  })
+
+  // One search key is not one spelling (adversarial В1, В2 of round 2): the key folds «ы» into «и», a
+  // soft sign, «щ» into «ш», «й» and a double letter, so a pair of it is named, never merged.
+  it.each([
+    ['Игрушка мишка плюшевая', 'Игрушка мышка плюшевая'],
+    ['Мармелад мишки', 'Мармелад мышки'],
+    ['Пенка', 'Пенька'],
+    ['Масло ши', 'Масло щи'],
+    ['Сыр плавленый', 'Сыр плавленный'],
+    ['Сок Майя', 'Сок Мая'],
+  ])('never merges «%s» and «%s», one key but two spellings — only names it', (a, b) => {
+    expect(spelling(a, b)).toMatchObject({ edits: 0, sameWords: false })
+    expect(pair(a, b, 0.99)).toBe('candidate')
   })
 
   it('leaves what is far by meaning, and what differs in size or a short word', () => {
@@ -324,9 +339,12 @@ describe('a proper name by its letters, not its key (adversarial З1)', () => {
     expect(nameParts('Гранд-Кенди, ЁЛКИ').letters).toBe('гранд кенди елки')
   })
 
-  it("leaves the items' rule to the key: «Майя» and «Мая» of a product may merge", () => {
+  it('reads an item as written too, in any order (MOL-358): «Майя» and «Мая» of a product are named', () => {
     expect(
       twinVerdict({ spelling: spelling('Сок Майя', 'Сок Мая'), sameUnit: true, meaning: 0.95 }),
+    ).toBe('candidate')
+    expect(
+      twinVerdict({ spelling: spelling('Сок Майя', 'Майя сок'), sameUnit: true, meaning: 0.95 }),
     ).toBe('merge')
   })
 })
