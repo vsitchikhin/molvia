@@ -104,7 +104,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/styles/tokens.test.ts` — Test: in both schemes any two steps of different colour roles and every category against a role stand 0.08 apart in OKLab, marks and categories reach 3:1 on the surface, text 4.5:1 on its grounds, and every such colour is declared in the dark scheme; a sheet's `::backdrop` gets the scrim of each scheme itself (MOL-231).
 - `frontend/src/styles/theme-color.test.ts` — Test: the status-bar and manifest colours in `index.html` and `vite.config.ts` match the tokens of each scheme.
 - `frontend/src/transitions.ts` — Screen moves: push, pop or tab direction for view transitions, focus moved to the new screen's heading, and the page held as tall as the window while only the query changes.
-- `frontend/vite.config.ts` — Vite config: Vue, MDI icons, PWA manifest and precache, mixins injected into SCSS, the copy's ports and the `/api` proxy; the floor of the browsers (`BROWSER_FLOOR`, `build.target`) and the locales' line put into the script of `index.html` (MOL-231). What only a worker imports is optimized at the dev server's start (`optimizeDeps.include`, MOL-217).
+- `frontend/vite.config.ts` — Vite config: Vue, MDI icons, PWA manifest and precache, mixins injected into SCSS, the copy's ports and the `/api` proxy; the floor of the browsers (`BROWSER_FLOOR`, `build.target`) and the locales' line put into the script of `index.html` (MOL-231); the page's Content Security Policy, a meta the build puts first in `index.html` with the hashes of its scripts (MOL-363). What only a worker imports is optimized at the dev server's start (`optimizeDeps.include`, MOL-217).
 
 ## repository
 

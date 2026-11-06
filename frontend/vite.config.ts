@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -64,6 +65,65 @@ function outdatedLines(): Plugin {
   }
 }
 
+// The Content Security Policy of the page (MOL-363), the one statement of it. A meta of the built
+// `index.html` rather than a header of Caddy: the installed app is answered by its worker's copy of
+// `index.html` with the headers of the day it was cached, which changes only with the file, so a
+// policy in a header changed alone would never reach it — inside the file, it comes with the version.
+// What a meta cannot say, `frame-ancestors`, is Caddy's. No `'unsafe-inline'` and no `'unsafe-eval'`:
+// the scripts of `index.html` go by their hashes, counted by the build; the scanner's wasm needs
+// `'wasm-unsafe-eval'`; a receipt's photo and the picture sent to the developer are `blob:`.
+const CONTENT_SECURITY_POLICY: Record<string, string[]> = {
+  'default-src': ["'self'"],
+  'script-src': ["'self'", "'wasm-unsafe-eval'"],
+  'style-src': ["'self'"],
+  'img-src': ["'self'", 'blob:'],
+  'font-src': ["'self'"],
+  'connect-src': ["'self'"],
+  'worker-src': ["'self'"],
+  'object-src': ["'none'"],
+  'base-uri': ["'none'"],
+  'form-action': ["'self'"],
+}
+
+const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/g
+
+function contentSecurityPolicy(): Plugin {
+  return {
+    name: 'molvia-content-security-policy',
+    // The build only: the dev server puts styles in by `<style>` and talks over a websocket, so its
+    // policy would be another one and prove nothing of production's.
+    apply: 'build',
+    transformIndexHtml: {
+      // After every other plugin, so the hash is of the script as shipped — `outdatedLines` writes
+      // into one of them.
+      order: 'post',
+      handler(html) {
+        const hashes = [...html.matchAll(INLINE_SCRIPT)].map(
+          ([, body]) =>
+            `'sha256-${createHash('sha256')
+              .update(body ?? '')
+              .digest('base64')}'`,
+        )
+        if (hashes.length === 0) throw new Error('index.html has no inline script to hash')
+        const policy = Object.entries({
+          ...CONTENT_SECURITY_POLICY,
+          'script-src': [...(CONTENT_SECURITY_POLICY['script-src'] ?? []), ...hashes],
+        })
+          .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
+          .join('; ')
+        // First after the charset: a script before the meta would run under no policy at all.
+        const charset = '<meta charset="utf-8" />'
+        const at = html.indexOf(charset)
+        if (at < 0 || html.slice(0, at).includes('<script')) {
+          throw new Error('index.html has no charset before its first script for the policy')
+        }
+        const meta = `\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />`
+        return html.slice(0, at + charset.length) + meta + html.slice(at + charset.length)
+      },
+    },
+  }
+}
+
 // Ports come from the working copy's .env, so two copies never fight over one port.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, repoRoot, '')
@@ -72,6 +132,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       vue(),
       outdatedLines(),
+      contentSecurityPolicy(),
       // MDI through Iconify: icons are inlined as components at build time, so only the
       // ones actually used ship, no icon font is downloaded, and colour comes from
       // currentColor — which means they obey the tokens like any other element.
