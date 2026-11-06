@@ -1,19 +1,21 @@
 // Refuses what CI runs or builds on by a pointer someone else can move (MOL-364): every `uses:` of a
 // workflow or of an action of this repository is a full commit sha with the release it is in a comment —
-// Dependabot moves the two together — and every image a Dockerfile takes from a registry, by `FROM`,
-// `COPY --from` or `RUN --mount=…,from=`, carries its digest beside an exact tag. A tag of an action or an
-// image is moved by whoever publishes it, and the next run takes what it points at then: the way secrets
-// of CI leaked through `tj-actions` in 2025. GitHub refuses an action by tag itself once «Require actions
-// to be pinned» is on, but that is a setting outside git, and nothing there holds a Dockerfile. And a
-// directory with a Dockerfile is one Dependabot watches: a digest nobody moves is frozen for good.
+// Dependabot moves the two together — and every image taken from a registry carries its digest beside an
+// exact tag: a Dockerfile's `# syntax=`, `FROM`, `COPY --from` and `RUN --mount=…,from=`, an action's
+// `image: docker://…`. A tag of an action or an image is moved by whoever publishes it, and the next run
+// takes what it points at then: the way secrets of CI leaked through `tj-actions` in 2025. GitHub refuses
+// an action by tag itself once «Require actions to be pinned» is on, but that is a setting outside git,
+// and nothing there holds a Dockerfile. And a directory with a Dockerfile is one Dependabot watches: a
+// digest nobody moves is frozen for good.
 //
 // Whether the tag is the digest's is the registry's to know, never this check's: Docker pulls the digest
 // and never reads the tag, so a tag changed by hand without its digest changes nothing that runs. Nor
 // can it know that a sha is a commit of the action's own repository rather than of a fork.
 //
-// It holds the ordinary spelling, not a form built to slip past it: `uses:` as the key at the start of
-// its line or after `- `, with its value on that line; an instruction's flags on its first line. Another
-// spelling of YAML is past it, and GitHub's own setting refuses such an action at the run.
+// It holds the ordinary spelling, not a form built to slip past it: `uses:` and `image:` as the key at the
+// start of their line or after `- `, with the value on that line; a Dockerfile's lines joined at `\`, the
+// default escape; the directories of Dependabot written out. Another spelling of YAML is past it, and
+// GitHub's own setting refuses such an action at the run.
 //
 //   node bin/check-pins.mjs
 
@@ -24,31 +26,68 @@ import process from 'node:process'
 const FILES = [
   '.github/workflows/*.yml',
   '.github/workflows/*.yaml',
-  '.github/actions/*/action.yml',
-  '.github/actions/*/action.yaml',
+  'action.yml',
+  'action.yaml',
+  '**/action.yml',
+  '**/action.yaml',
   'Dockerfile',
+  'Dockerfile.*',
+  'Containerfile',
   '**/Dockerfile',
+  '**/Dockerfile.*',
+  '**/*.Dockerfile',
+  '**/Containerfile',
 ]
 const DEPENDABOT = '.github/dependabot.yml'
 
-// A step's or a job's `uses:` and its value, quoted or not, with what follows it on the line.
-const USES = /^[\t ]*(?:-[\t ]+)?uses:[\t ]*(['"]?)([^'"\s#]+)\1[\t ]*(.*)$/
+// The key of a step, a job or an action and its value, quoted or not, with what follows it on the line.
+const keyOf = (key) =>
+  new RegExp(`^[\\t ]*(?:-[\\t ]+)?${key}:[\\t ]*(['"]?)([^'"\\s#]+)\\1[\\t ]*(.*)$`)
+const USES = keyOf('uses')
+const IMAGE = keyOf('image')
 const SHA = /^[^@\s]+@[0-9a-f]{40}$/
 // A release, never a major alone: `# v7` beside a sha says no more than the tag did.
 const VERSION_COMMENT = /^#[\t ]*v?\d+(?:\.\d+)+\b/
 const DIGEST = /@sha256:[0-9a-f]{64}$/
-// A tag that is a major alone, `22`, `2-alpine`, `v1` — a pointer each release moves. A codename such as
-// `trixie-slim` passes: which tag is exact past this is review's.
-const MAJOR_ONLY = /^v?\d+(?:[-_]|$)/
+// An exact tag, by a closed rule rather than a list of the floating ones: a version of three numbers at
+// its start (`22.23.4-alpine`, `v1.153.0`), or the day of a snapshot (`trixie-20261104-slim`). Anything
+// else — `latest`, `22`, `2.11-alpine`, `lts-alpine`, `trixie-slim` — is moved by the next release.
+const EXACT_TAG = /^v?\d+\.\d+\.\d+(?:[-_.+]|$)|(?:^|[-_.])\d{8}(?:[-_.]|$)/
+const DIRECTIVE = /^#[\t ]*([a-z]+)[\t ]*=[\t ]*(\S+)[\t ]*$/i
 
-/** What is wrong with the `uses:` of one workflow or action, in sentences. */
+/** Why an image taken from a registry is not pinned, or null; a stage of the file is no image. */
+function imageProblem(image, stages = new Set()) {
+  if (!image || image === 'scratch' || stages.has(image.toLowerCase()) || /^\d+$/.test(image)) {
+    return null
+  }
+  if (image.includes('$')) {
+    return `${image} — an image named by an argument cannot be checked; write it out`
+  }
+  const name = image.split('@')[0]
+  const colon = name.lastIndexOf(':')
+  const tag = colon > name.lastIndexOf('/') ? name.slice(colon + 1) : ''
+  if (!EXACT_TAG.test(tag) || !DIGEST.test(image)) {
+    return `${image} — pin it by an exact tag and its digest, image:1.2.3@sha256:…`
+  }
+  return null
+}
+
+/** What is wrong with the `uses:` of one workflow or action, and the image of an action, in sentences. */
 export function workflowProblems(path, text) {
   const problems = []
+  const action = !path.startsWith('.github/workflows/')
   text.split('\n').forEach((line, index) => {
+    const where = `${path}:${String(index + 1)}`
+    // The image a Docker action runs. A workflow's `image:` is a container or a service's, not watched here.
+    const image = action ? IMAGE.exec(line)?.[2] : undefined
+    if (image?.startsWith('docker://')) {
+      const problem = imageProblem(image.slice('docker://'.length))
+      if (problem) problems.push(`${where}: ${problem}`)
+      return
+    }
     const match = USES.exec(line)
     if (!match) return
     const [, , reference, rest] = match
-    const where = `${path}:${String(index + 1)}`
     // A workflow or an action of this repository is this commit's own code, and its file is read here.
     if (reference.startsWith('./')) return
     if (!SHA.test(reference)) {
@@ -62,24 +101,27 @@ export function workflowProblems(path, text) {
   return problems
 }
 
-/** Why an image taken from a registry is not pinned, or null; a stage of the file is no image. */
-function imageProblem(image, stages) {
-  if (!image || image === 'scratch' || stages.has(image.toLowerCase()) || /^\d+$/.test(image)) {
-    return null
-  }
-  if (image.includes('$')) {
-    return `${image} — an image named by an argument cannot be checked; write it out`
-  }
-  const name = image.split('@')[0]
-  const colon = name.lastIndexOf(':')
-  const tag = colon > name.lastIndexOf('/') ? name.slice(colon + 1) : ''
-  if (!tag || tag === 'latest' || MAJOR_ONLY.test(tag) || !DIGEST.test(image)) {
-    return `${image} — pin it by an exact tag and its digest, image:tag@sha256:…`
-  }
-  return null
+/** The instructions of a Dockerfile, each its lines joined at `\` and the number of its first line. */
+function instructionsOf(text) {
+  const instructions = []
+  let parts = null
+  text.split('\n').forEach((line, index) => {
+    // A comment inside an instruction is no part of it.
+    if (parts && /^[\t ]*#/.test(line)) return
+    const continued = /\\[\t ]*$/.test(line)
+    const part = continued ? line.replace(/\\[\t ]*$/, '') : line
+    if (parts) parts.text += ` ${part}`
+    else parts = { text: part, number: index + 1 }
+    if (!continued) {
+      instructions.push(parts)
+      parts = null
+    }
+  })
+  if (parts) instructions.push(parts)
+  return instructions
 }
 
-/** The images one line of a Dockerfile takes from elsewhere: `COPY --from`, `RUN --mount=…,from=`. */
+/** The images one instruction takes from elsewhere: `COPY --from`, `RUN --mount=…,from=`. */
 function sourcesOf(instruction, flags) {
   if (instruction === 'COPY') {
     return flags.filter((flag) => flag.startsWith('--from=')).map((flag) => flag.slice(7))
@@ -98,26 +140,32 @@ function sourcesOf(instruction, flags) {
 export function dockerfileProblems(path, text) {
   const problems = []
   const stages = new Set()
-  text.split('\n').forEach((line, index) => {
-    const words = line.trim().split(/\s+/)
-    const instruction = words[0]?.toUpperCase()
-    const where = `${path}:${String(index + 1)}`
-    const flags = words.slice(1).filter((word) => word.startsWith('--'))
-    const images =
-      instruction === 'FROM'
-        ? [words.slice(1).find((word) => !word.startsWith('--'))]
-        : sourcesOf(instruction, flags)
+  const lines = text.split('\n')
+  // Parser directives stand first, before any other comment, blank line or instruction; `syntax` names the
+  // image BuildKit hands the whole file to.
+  for (const [index, line] of lines.entries()) {
+    const directive = DIRECTIVE.exec(line)
+    if (!directive) break
+    const problem = directive[1].toLowerCase() === 'syntax' ? imageProblem(directive[2]) : null
+    if (problem) problems.push(`${path}:${String(index + 1)}: ${problem}`)
+  }
+  for (const { text: line, number } of instructionsOf(text)) {
+    const [word, ...rest] = line.trim().split(/\s+/)
+    const instruction = word?.toUpperCase()
+    const flags = rest.filter((part) => part.startsWith('--'))
+    const args = rest.filter((part) => !part.startsWith('--'))
+    const images = instruction === 'FROM' ? [args[0]] : sourcesOf(instruction, flags)
     for (const image of images) {
       const problem = imageProblem(image, stages)
-      if (problem) problems.push(`${where}: ${problem}`)
+      if (problem) problems.push(`${path}:${String(number)}: ${problem}`)
     }
     // A stage is named only after its own line: it cannot be its own base, and Docker takes that one
     // from the registry.
-    if (instruction === 'FROM') {
-      const [, as, stage] = words.slice(1).filter((word) => !word.startsWith('--'))
-      if (as?.toUpperCase() === 'AS' && stage) stages.add(stage.toLowerCase())
+    const [, as, stage] = args
+    if (instruction === 'FROM' && as?.toUpperCase() === 'AS' && stage) {
+      stages.add(stage.toLowerCase())
     }
-  })
+  }
   return problems
 }
 
@@ -141,16 +189,24 @@ function watchedDirectories(text) {
 export function dependabotProblems(dockerfiles, text) {
   const watched = watchedDirectories(text)
   if (!watched) return [`${DEPENDABOT}: no docker entry — Dependabot moves no base image`]
-  return dockerfiles
+  const patterns = [...watched]
+    .filter((directory) => /[*?[{]/.test(directory))
+    .map(
+      (directory) =>
+        `${DEPENDABOT}: ${directory} — a pattern this check cannot read; list the directories it means`,
+    )
+  const missing = dockerfiles
     .map((path) => `/${path.split('/').slice(0, -1).join('/')}`)
-    .filter((directory) => !watched.has(directory))
+    .filter((directory, index, all) => all.indexOf(directory) === index && !watched.has(directory))
     .map(
       (directory) =>
         `${DEPENDABOT}: ${directory} has a Dockerfile Dependabot does not watch — add it to the docker entry's directories`,
     )
+  return [...patterns, ...missing]
 }
 
-const isDockerfile = (path) => path.split('/').pop() === 'Dockerfile'
+const isDockerfile = (path) =>
+  /^(?:Dockerfile|Containerfile)(?:\..+)?$|\.Dockerfile$/.test(path.split('/').pop() ?? '')
 
 /** Every problem of the files given, each a path and its text. */
 export function pinProblems(files) {

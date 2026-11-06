@@ -79,14 +79,14 @@ describe('workflowProblems', () => {
 describe('dockerfileProblems', () => {
   const FILE = 'frontend/Dockerfile'
   const told = (line: number, image: string): string =>
-    `${FILE}:${String(line)}: ${image} — pin it by an exact tag and its digest, image:tag@sha256:…`
+    `${FILE}:${String(line)}: ${image} — pin it by an exact tag and its digest, image:1.2.3@sha256:…`
 
   it('is quiet on a tag with its digest, a stage of the file, scratch and a platform flag', () => {
     const text = [
       `FROM node:22.23.4-alpine@${DIGEST} AS build`,
       'RUN true',
       `from --platform=linux/amd64 ghcr.io/google/cadvisor:v0.60.6@${DIGEST} as Tools`,
-      `FROM debian:trixie-slim@${DIGEST}`,
+      `FROM debian:trixie-20261104-slim@${DIGEST}`,
       'FROM build AS again',
       'FROM tools',
       'FROM scratch',
@@ -111,12 +111,17 @@ describe('dockerfileProblems', () => {
     ])
   })
 
-  it('refuses latest and a major alone even beside their digest', () => {
+  it('refuses every tag but a version of three numbers or the day of a snapshot, even beside its digest', () => {
     const images = [
       `node:latest@${DIGEST}`,
       `node:22@${DIGEST}`,
       `caddy:2-alpine@${DIGEST}`,
       `x/y:v1@${DIGEST}`,
+      `caddy:2.11-alpine@${DIGEST}`,
+      `node:lts-alpine@${DIGEST}`,
+      `node:alpine@${DIGEST}`,
+      `debian:trixie-slim@${DIGEST}`,
+      `debian:2026110-slim@${DIGEST}`,
     ]
     expect(dockerfileProblems(FILE, images.map((image) => `FROM ${image}`).join('\n'))).toEqual(
       images.map((image, index) => told(index + 1, image)),
@@ -150,6 +155,36 @@ describe('dockerfileProblems', () => {
     expect(dockerfileProblems(FILE, text)).toEqual([told(5, 'busybox:latest'), told(6, 'busybox')])
   })
 
+  it('joins the lines of an instruction at the backslash, a comment inside left out, and names its first line', () => {
+    const text = [
+      `FROM node:22.23.4-alpine@${DIGEST} AS build`,
+      'RUN --mount=type=cache,target=/var/cache \\',
+      '    # the binary the build needs',
+      '    --mount=type=bind,from=busybox:latest,target=/m \\',
+      '    ls /m/bin/busybox',
+      'COPY --from=build /a /b',
+    ].join('\n')
+    expect(dockerfileProblems(FILE, text)).toEqual([told(2, 'busybox:latest')])
+  })
+
+  it('reads the image a syntax directive hands the file to, only where directives stand', () => {
+    const pinned = `docker/dockerfile:1.17.1@${DIGEST}`
+    expect(dockerfileProblems(FILE, `# syntax=${pinned}\n# escape=\\\nFROM scratch`)).toEqual([])
+    expect(dockerfileProblems(FILE, '#syntax=docker/dockerfile:1\nFROM scratch')).toEqual([
+      told(1, 'docker/dockerfile:1'),
+    ])
+    expect(
+      dockerfileProblems(
+        FILE,
+        '# check=error=true\n# SYNTAX = docker/dockerfile:1.7-labs\nFROM scratch',
+      ),
+    ).toEqual([told(2, 'docker/dockerfile:1.7-labs')])
+    // After a comment it is a comment: BuildKit reads no directive there.
+    expect(
+      dockerfileProblems(FILE, '# a note\n# syntax=docker/dockerfile:1\nFROM scratch'),
+    ).toEqual([])
+  })
+
   it('refuses an image named by an argument, which it cannot read', () => {
     expect(dockerfileProblems(FILE, 'ARG BASE=node:22\nFROM ${BASE}')).toEqual([
       `${FILE}:2: \${BASE} — an image named by an argument cannot be checked; write it out`,
@@ -158,11 +193,38 @@ describe('dockerfileProblems', () => {
 })
 
 describe('pinProblems', () => {
-  it('reads an action of the repository as a workflow', () => {
+  it('reads an action of the repository as a workflow, wherever it lives', () => {
     const action = 'runs:\n  using: composite\n  steps:\n    - uses: actions/checkout@v7\n'
-    expect(pinProblems([{ path: '.github/actions/setup/action.yml', text: action }])).toEqual([
-      unpinned('.github/actions/setup/action.yml:4', 'actions/checkout@v7'),
+    expect(pinProblems([{ path: 'tools/setup/action.yml', text: action }])).toEqual([
+      unpinned('tools/setup/action.yml:4', 'actions/checkout@v7'),
     ])
+  })
+
+  it('reads the image of a Docker action, its own Dockerfile apart', () => {
+    const action = (image: string): string => `runs:\n  using: docker\n  image: ${image}\n`
+    const path = '.github/actions/scan/action.yml'
+    expect(pinProblems([{ path, text: action("'docker://alpine:latest'") }])).toEqual([
+      `${path}:3: alpine:latest — pin it by an exact tag and its digest, image:1.2.3@sha256:…`,
+    ])
+    expect(pinProblems([{ path, text: action(`docker://alpine:3.24.4@${DIGEST}`) }])).toEqual([])
+    expect(pinProblems([{ path, text: action('Dockerfile') }])).toEqual([])
+  })
+
+  it('leaves the image of a container or a service of a workflow alone — not watched here', () => {
+    const text =
+      'jobs:\n  e2e:\n    container:\n      image: mcr.microsoft.com/playwright:v1.64.1-noble\n'
+    expect(pinProblems([{ path: WORKFLOW, text }])).toEqual([])
+  })
+
+  it('reads a Dockerfile by any of its names', () => {
+    for (const path of [
+      'x/Dockerfile.prod',
+      'x/prod.Dockerfile',
+      'x/Containerfile',
+      'Dockerfile',
+    ]) {
+      expect(pinProblems([{ path, text: 'FROM node:22' }])).toHaveLength(1)
+    }
   })
 })
 
@@ -199,6 +261,14 @@ describe('dependabotProblems', () => {
     ).toEqual([
       ".github/dependabot.yml: /deploy/loki has a Dockerfile Dependabot does not watch — add it to the docker entry's directories",
       ".github/dependabot.yml: /backend has a Dockerfile Dependabot does not watch — add it to the docker entry's directories",
+    ])
+  })
+
+  it('refuses a pattern of directories it cannot read, rather than guess what it means', () => {
+    expect(
+      dependabotProblems(['deploy/grafana/Dockerfile'], entry("'/deploy/*'", '/deploy/grafana')),
+    ).toEqual([
+      '.github/dependabot.yml: /deploy/* — a pattern this check cannot read; list the directories it means',
     ])
   })
 
