@@ -741,7 +741,9 @@ report.
   case are still nothing — the twins people make most, «топленое ~ топлёное» (32 of 33) — and so «Маска мед ~
   мёд», «Лампа лед ~ лёд», «Конфеты шок ~ Шок» merge where no point marks the abbreviation (adversarial
   round 5: which thing such a name is, nobody can say); «Молоко 1 л ~ 1 l», «3,2% ~ 3,20%», «0,750 л ~
-  0.750 л» and a name with numbers in another order are named, not merged. **And the names' vectors at least 0.90 apart by
+  0.750 л» and a name with numbers in another order are named, not merged; and the words of a name with no
+  digit are read in any order, so a turn round a noun that does not decline merges — «Филе индейки с пюре ~
+  Пюре с филе индейки» at 0.956 — where no two things were found so (adversarial round 6). **And the names' vectors at least 0.90 apart by
   cosine**. A word more is a brand, never a twin: «Сыр чанах Ашхар», «Молоко Марианна» (MOL-112, В-1) —
   not even a candidate, or every brand would stand in the list beside its kind.
 - **Not a letter, since a letter cannot be told** (MOL-358). Until it one edit a word, two a name merged
