@@ -949,16 +949,17 @@ report.
   survivor is near the other side too («Сыр чанох» merged into «Сыр чанах», whose pair with «Сыр чунух»
   is 0.64: never asked) — in `report`, where nothing merged, it is named as it is.
 - **`CATALOGUE_MERGE`**: `on` merges, `report` says what it would and merges nothing — it only sweeps
-  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `report` until
-  MOL-358** (В-3; MOL-299): the thresholds stand on a corpus, not on live twins. **28 nights of `report`,
+  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `on` from MOL-358**
+  (В-6 «а» of MOL-299), set in `.env.prod` — the compose file's default stays `report`; until then it ran
+  `report` (В-3; MOL-299): the thresholds stand on a corpus, not on live twins. **28 nights of `report`,
   06.10…02.11, named none to merge** — not one false, nor one true, so the rule has met no live twin — and
   the owner's rule for `on` (В-3 «а» of MOL-299: before the tag of 0.2, once no pair the night would merge
   is false) let it in for one evening, 02.11. **The adversarial pass of MOL-299 found the false pair the
   nights could not**: a way of cooking one letter apart merges by itself — «Курица вареная» into «Курица
   жареная» at 0.929, «Грибы тушёные» into «Грибы сушёные» at 0.946, seven pairs of seven — since a word is
   one edit and the model reads a name by its letters; the seed has no such pair, people's items do. So
-  production went back to `report` on 03.11, before a night merged anything, and MOL-358 mends the rule and
-  turns `on` as its last step. Of the 14 candidates of those nights 12 were the seed against itself, set
+  production went back to `report` on 03.11, before a night merged anything, and MOL-358 mended the rule
+  (`describedApart`, above) and turned `on` as its last step. Of the 14 candidates of those nights 12 were the seed against itself, set
   apart by hand, one a receipt's twin across two scripts merged by hand (#1), and one a place in Gyumri
   left as it is. A pair
   only reported comes with its command **`make apart FROM= INTO=`** (review №7, owner's decision
