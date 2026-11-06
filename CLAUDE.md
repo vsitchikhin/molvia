@@ -197,8 +197,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   not a migration, never stays in `_test` or `_e2e`, and holds no brands.
 - **Twins are merged by the night, and a false merge is worse than a missed one** (MOL-106): every
   size with its unit (by its spelling, never the search key), the same words as one spelling — as written, only
-  case, «ё» and a closed list of separators aside, words of letters in any order, a number in its word and
-  turn, never by the search key (MOL-358: a letter cannot tell «вареная» from «жареная», the key «мышка» from
+  case, «ё» and a closed list of separators aside, the words in any order only where none has a digit,
+  never by the search key (MOL-358: a letter cannot tell «вареная» from «жареная», the key «мышка» from
   «мишка», a point «мед.» from «мёд»), the meaning at 0.90 — measured on the seed; a letter apart, two scripts and a brand's extra word
   never merge, by the code. Places
   by the same rule, one city each, and only as one spelling — as written, not by the key: a shop's
