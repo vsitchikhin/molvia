@@ -32,7 +32,7 @@ The shape worth knowing here:
   native library cannot be bundled, so `bin/bundle.mjs` leaves `onnxruntime-node` out and the image
   copies it — its JavaScript, `onnxruntime-common`, and the native build of the image's machine
   only, 45 MB of 288 — into `node_modules`; the model, fetched and checked by sha256 in the build,
-  into `model/`. The runtime is `node:22-bookworm-slim`, since that build is for glibc. The image is
+  into `model/`. The runtime is Node's `bookworm-slim` (an exact tag and its digest, MOL-364), since that build is for glibc. The image is
   some 520 MB, the API's memory some 460 MB with the model loaded.
   **Names survive the bundle** (`keepNames`, MOL-142): node-fetch under grammY takes a signal only
   from a constructor called `AbortSignal`, and the bot's first use of the global one had esbuild

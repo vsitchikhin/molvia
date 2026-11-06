@@ -89,13 +89,27 @@ file holds what belongs to no single area, and what the audit found missing.
   takes what it points at then — the way secrets of CI leaked through `tj-actions` in 2025; `release.yml`
   holds the deploy key and Cloudflare's token beside its actions. A floating image tag, besides, built
   something nobody saw: under `caddy:2-alpine` the audit found 2.11.7, three days later it was 2.11.9.
-  `bin/check-pins.mjs` in `npm run lint` refuses either form left out; a stage of the file, `scratch` and
-  a local action are not pinned. **The digest is what runs**: Docker pulls it and never reads the tag, so
-  a tag changed by hand without its digest changes nothing, and which tag a digest is only the registry
-  knows — the check holds the form, Dependabot the pair.
+  `bin/check-pins.mjs` in `npm run lint` refuses either form left out — in a workflow and in an action of
+  the repository (`.github/actions/*/action.yml`), in a Dockerfile's `FROM`, `COPY --from` and
+  `RUN --mount=…,from=` — and a comment naming a major alone (`# v7`), `latest` and a tag that is a major
+  alone (`22`, `2-alpine`); a stage of the file — named only after its own line, so `FROM caddy AS caddy` is
+  an image — `scratch` and a local action are not pinned. **The digest is what runs**: Docker pulls it and
+  never reads the tag, so a tag changed by hand without its digest changes nothing, and which tag a digest is
+  only the registry knows — the check holds the form, Dependabot the pair. **What the check is**: a guard
+  against the ordinary spelling, not a form built to slip past it — the boundary of `check-clock-bounds.mjs`:
+  `uses:` as the key at the start of its line or after `- `, its value on that line, and an instruction's
+  flags on its first line. **The price, named:** another spelling of YAML (a value on the next line, a flow
+  mapping, a quoted key) is past it, and only GitHub's `sha_pinning_required` refuses such an action, at the
+  run (adversarial Б1); a codename tag (`trixie-slim`) passes, which tag is exact past `latest` and a major is
+  review's; and **a sha is trusted as the action's own** — GitHub serves a commit of any fork under the
+  action's name (adversarial Г2, «imposter commits»), which neither the check, the setting nor Dependabot
+  tells from a release: a sha written by hand rather than by Dependabot is review's to check against
+  `gh api repos/<action>/commits/<tag>`.
 - **Dependabot moves the pins**: actions monthly, the base images weekly in one group (`images`), the sha
   or the digest with its tag or comment; a major of Node never, since it is `.nvmrc`'s, which CI runs on
-  too. A security update of npm comes in one pull request (`security`, `applies-to: security-updates`).
+  too. **Every directory with a Dockerfile is in the docker entry's `directories`** — the check refuses one
+  left out, since a digest nobody moves is frozen for good (adversarial В1). A security update of npm comes in
+  one pull request (`security`, `applies-to: security-updates`), Playwright's apart, as its version updates.
   **The price**: a patch of Alpine under the same tag no longer comes with any build — only with the
   bot's pull request, a week late at most and merged by the owner. **Not watched**: the images of compose
   (`pgvector` — a contract of ICU and glibc that a migration moves, `deploy.md`; the exporters and cAdvisor
