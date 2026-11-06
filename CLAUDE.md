@@ -196,9 +196,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The catalogue grows by «Предложить товар» and the seed** (MOL-112): the seed only adds, is
   not a migration, never stays in `_test` or `_e2e`, and holds no brands.
 - **Twins are merged by the night, and a false merge is worse than a missed one** (MOL-106): every
-  size with its unit (by its spelling, never the search key), the same words as one spelling — the search
-  key, no edit (MOL-358: a letter cannot tell «вареная» from «жареная»), the meaning at 0.90 — measured on
-  the seed; a letter apart, two scripts and a brand's extra word never merge, by the code. Places
+  size with its unit (by its spelling, never the search key), the same words as one spelling — as written, in any
+  order, never by the search key (MOL-358: a letter cannot tell «вареная» from «жареная», the key «мышка» from
+  «мишка»), the meaning at 0.90 — measured on the seed; a letter apart, two scripts and a brand's extra word
+  never merge, by the code. Places
   by the same rule, one city each, and only as one spelling — as written, not by the key: a shop's
   name is a proper name.
 - **A merged item or place stays a trace** (`merged_into`): its name is the survivor's second name,
