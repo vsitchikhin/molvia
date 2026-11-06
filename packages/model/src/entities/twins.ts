@@ -152,7 +152,10 @@ export interface Spelling {
   /**
    * Whether the two are written in the same scripts. One key in two scripts is never merged, whatever
    * the model says: it reads a transliteration by its letters, and «Bulochki dlya burgerov» stood at
-   * 0.902 to «Булочки для бургеров» where «Milo» stands at 0.48 to «Мыло» (review №6).
+   * 0.902 to «Булочки для бургеров» where «Milo» stands at 0.48 to «Мыло» (review №6). Since MOL-358 a
+   * merge asks for `sameWords` or `sameLetters`, which hold it already — the same letters are the same
+   * scripts. It stays in the merge's condition as a guard of its own: should «one spelling» ever be
+   * loosened again, two scripts still never merge.
    */
   readonly sameScripts: boolean
   /** Whether the two are one spelling, case, spacing, punctuation and «ё» aside (`NameParts.letters`). */
