@@ -729,13 +729,32 @@ report.
   «Сыр чанах»; a word under four letters must be the same — «SAS» and «SOS» are two shops), **and the
   names' vectors at least 0.90 apart by cosine**. A word more is a brand, never a twin: «Сыр чанах
   Ашхар», «Молоко Марианна» (MOL-112, В-1) — not even a candidate, or every brand would stand in the list
-  beside its kind.
+  beside its kind. **A word one name has and the other has not that describes is never merged by itself,
+  only named** (`describedApart`, MOL-358, adversarial А1 of MOL-299; owner's В-1 «а»): «Курица вареная» and
+  «Курица жареная» at 0.929, «Грибы тушёные» and «Грибы сушёные» at 0.946 are two ways of cooking one letter
+  apart, not a typo, and the model reads them by their letters. «Describes» is the kind's own rule
+  (`describes` of `synonyms.ts`, as `kindKey` skips it): an adjective's ending, but for the nouns that wear one
+  («мороженое», «пирожное»), read off the word as written — a hyphen by its last part, quotes aside — never
+  off the key, which splits «варёно-копчёная» in two. A typo of the kind beside it, the order of words, «ё»
+  and a double letter still merge. **The price, named:** a typo inside an adjective — «Сыр рассийский»,
+  «Творог обизжиренный» — is a candidate too, 112 of the bench's 250 typos that merged, merged by hand; a
+  typo of a noun on that list reads as an adjective («Мароженое»); a noun one letter from another noun still
+  merges at 0.90, and the seed has none (the nearest, «Курица ~ Корица», 0.856); an adjective is known by its
+  Russian ending, so «boiled ~ broiled» and Armenian participles are judged as before. A closed list of ways of
+  cooking (244 typos kept) and a dictionary of the seed's and the tills' adjectives (all 250) were measured and
+  set aside: each leaves an adjective it does not know — «Варенье малиновое ~ калиновое», 0.889 — to merge by
+  itself once the model's digits move.
 - **Measured on the seed** (`.scratch/tasks/status/MOL-106-measure.md`, the bench beside it): of its
   178 000 pairs none merges; the nearest one edit apart is «Курица» and «Корица» at 0.856; two edits in a
   word let in «Хлеб» and «Хлебцы» at 0.937, so a word takes one. Taken: a fat with a comma or a point
   (7 of 7), «ё» (32 of 33), the order of words (207 of 222), half of the typos. 0.88 also had no false
   merge, but «Курица» stood 0.024 from it. `merge-corpus.integration.test.ts` pins it end to end on the
   real model, with pairs well clear of the threshold — the model's last digits differ on x86 (MOL-105).
+  **The seed has no two ways of cooking one letter apart**, so the bench missed them (MOL-358): its list
+  `DESCRIBED_NOT` holds the probe's seven and fourteen relatives, fifteen of which merged at 0.900–0.946; with
+  `describedApart` none does, the typos that merge by themselves fall from 250 to 138 and nothing else moves
+  (the same run, the rule before and after on its numbers). `merge-corpus.integration.test.ts` names
+  seventeen of them, never merges them.
 - **The model does not read across scripts.** «Moloko» against «Молоко» is 0.69 at the median, «Mylo»
   against «Мыло» 0.47 — as far as «Milo» from «Мыло», 0.48: a transliteration and a homograph look alike
   to it — and its highest, «Bulochki dlya burgerov», stands at 0.902, past the threshold. So **a pair

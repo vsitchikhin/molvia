@@ -197,7 +197,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   not a migration, never stays in `_test` or `_e2e`, and holds no brands.
 - **Twins are merged by the night, and a false merge is worse than a missed one** (MOL-106): every
   size with its unit (by its spelling, never the search key), one edit a word, two a name, the meaning
-  at 0.90 — measured on the seed; two scripts and a brand's extra word never merge, by the code. Places
+  at 0.90 — measured on the seed; two scripts, a brand's extra word and a word that describes one letter
+  apart («вареная ~ жареная», `describedApart`, MOL-358) never merge, by the code. Places
   by the same rule, one city each, and only as one spelling — as written, not by the key: a shop's
   name is a proper name.
 - **A merged item or place stays a trace** (`merged_into`): its name is the survivor's second name,
