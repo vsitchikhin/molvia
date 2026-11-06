@@ -1,3 +1,4 @@
+import { randomInt } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { POLICY_VERSION, SESSION_COOKIE } from '@molvia/model'
 import type { Page, Request, Response, Route } from '@playwright/test'
@@ -150,6 +151,18 @@ export async function open(page: Page, path = '/'): Promise<void> {
 }
 
 /** «Мне 16 лет или больше» и «Принимаю» на шаге согласия (MOL-95). */
+/**
+ * Свой адрес стартам входа этой страницы (MOL-359): квота — пять стартов в минуту на адрес, а весь
+ * прогон идёт с `127.0.0.1` через прокси Vite, так что решали бы число и порядок стартов в прогоне.
+ * Прокси передаёт `X-Forwarded-For` как есть, и API верит ему от внутреннего пира — как от Caddy.
+ * Сеть `/48` из документационной `2001:db8::/32`: 65 536 сетей, двум тестам одна не выпадет.
+ */
+export async function ownAddress(page: Page): Promise<void> {
+  await page.setExtraHTTPHeaders({
+    'x-forwarded-for': `2001:db8:${randomInt(0x10000).toString(16)}::1`,
+  })
+}
+
 export async function acceptTerms(page: Page): Promise<void> {
   await page.getByRole('checkbox', { name: AGE }).check()
   await page.getByRole('button', { name: ACCEPT }).click()
