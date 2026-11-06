@@ -642,7 +642,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopSenderForget: (() => Promise<void>) | undefined
     // The route's minute of the phone's reports (MOL-144), let go by the timer below too (MOL-241).
     const phoneLimit = phoneReportLimit()
-    // An address's minute of the login's starts (MOL-359), let go by the same timer.
+    // An address's minute of the login's starts (MOL-359), let go by the same timer. Its three
+    // hundred are the bound of its own map, and in one process the first to refuse; the database's
+    // are the ceiling that survives a restart (`startLogin`).
     const loginLimit = addressMinute(LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT)
     let stopMergeTwins: (() => Promise<void>) | undefined
     let stopSilence: (() => Promise<void>) | undefined
@@ -728,8 +730,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         () => {
           const now = new Date()
           failures.forget(now)
-          phoneLimit.forget(now.getTime())
-          loginLimit.forget(now.getTime())
+          phoneLimit.forget()
+          loginLimit.forget()
           return Promise.resolve()
         },
         (error) => {
@@ -1050,7 +1052,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         if (!login) throw new DomainError(ERROR.LOGIN_DISABLED)
         return startLogin(
           loginRequests,
-          { limit: loginLimit, address, now: Date.now() },
+          { limit: loginLimit, address },
           login.username,
           name,
           again,
@@ -1142,7 +1144,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         },
         body,
         address,
-        Date.now(),
       )
     })
 

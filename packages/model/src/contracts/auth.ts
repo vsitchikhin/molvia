@@ -12,7 +12,10 @@ export const LOGIN_WINDOW_SECONDS = 60
  * to hold the door shut for everybody. Counted in the API's memory by the address Caddy names.
  */
 export const LOGIN_ADDRESS_LIMIT = 5
-/** Starts everybody together may make in a rolling minute, counted in the database: a botnet's ceiling. */
+/**
+ * Starts everybody together may make in a rolling minute: a botnet's ceiling. The database's count is the
+ * one that survives a restart; the API's memory holds the same number as the bound of its map.
+ */
 export const LOGIN_WINDOW_LIMIT = 300
 
 /**

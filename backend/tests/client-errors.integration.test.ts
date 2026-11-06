@@ -361,9 +361,10 @@ describe('поток выдуманных сбоев не топит канал 
     const spy = vi.spyOn(Map.prototype, 'set')
     const kept = (sender: string) =>
       (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(sender))
-    // Only the intervals and the clock: the server's timers tick when the test moves them, and the
-    // budgets read the moment of the fake clock (`new Date()`), the route `Date.now()`.
-    vi.useFakeTimers({ toFake: ['setInterval', 'Date'] })
+    // Only the intervals and the clocks: the server's timers tick when the test moves them, the
+    // budgets read the moment of the fake clock (`new Date()`), the route's minute the fake
+    // `performance.now()` — a clock that never steps back (MOL-359).
+    vi.useFakeTimers({ toFake: ['setInterval', 'Date', 'performance'] })
     const served = buildServer({
       db,
       owner: null,
@@ -399,9 +400,9 @@ describe('поток выдуманных сбоев не топит канал 
     const spy = vi.spyOn(Map.prototype, 'set')
     const kept = (address: string) =>
       (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(address))
-    // Only the intervals and the clock: the server's timers tick when the test moves them, and the
-    // route reads the moment of the fake clock.
-    vi.useFakeTimers({ toFake: ['setInterval', 'Date'] })
+    // Only the intervals and the monotonic clock the minute reads: the server's timers tick when the
+    // test moves them, and the minute moves with them.
+    vi.useFakeTimers({ toFake: ['setInterval', 'Date', 'performance'] })
     const served = buildServer({
       db,
       owner: null,
@@ -417,8 +418,7 @@ describe('поток выдуманных сбоев не топит канал 
       })
       expect(response.statusCode).toBe(201)
       expect(kept('203.0.113.8')).toBe(true)
-      // A minute and more on, one tick: nothing of the address is left.
-      vi.setSystemTime(Date.now() + 61_000)
+      // A minute on, one tick: nothing of the address is left.
       await vi.advanceTimersByTimeAsync(60_000)
       expect(kept('203.0.113.8')).toBe(false)
     } finally {

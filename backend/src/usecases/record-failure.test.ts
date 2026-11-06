@@ -209,27 +209,24 @@ describe('phoneFailure — сбой телефона (MOL-144)', () => {
   })
 })
 
-describe('phoneReportLimit — предел в памяти (MOL-144, Р-6)', () => {
+describe('phoneReportLimit — предел в памяти (MOL-144, Р-6); сам счётчик — address-minute.test.ts', () => {
   it(`с адреса — ${String(PHONE_REPORTS_PER_ADDRESS)} в минуту, ровно и на один больше`, () => {
     const limit = phoneReportLimit()
-    expect(limit('a', PHONE_REPORTS_PER_ADDRESS - 1, 0)).toBe(true)
-    expect(limit('a', 1, 1)).toBe(true)
-    expect(limit('a', 1, 2)).toBe(false)
-    expect(limit('b', 1, 2)).toBe(true)
-    expect(limit('a', 1, 60_000)).toBe(true)
+    expect(limit('a', PHONE_REPORTS_PER_ADDRESS - 1)).toBe(true)
+    expect(limit('a', 1)).toBe(true)
+    expect(limit('a', 1)).toBe(false)
+    expect(limit('b', 1)).toBe(true)
   })
 
   it(`со всех — ${String(PHONE_REPORTS_PER_MINUTE)} в минуту`, () => {
-    const limit = phoneReportLimit(PHONE_REPORTS_PER_ADDRESS, 30)
-    expect(limit('a', 20, 0)).toBe(true)
-    expect(limit('b', 10, 0)).toBe(true)
-    expect(limit('c', 1, 0)).toBe(false)
-  })
-
-  it('отказ не считается', () => {
-    const limit = phoneReportLimit(5, 100)
-    expect(limit('a', 6, 0)).toBe(false)
-    expect(limit('a', 5, 0)).toBe(true)
+    const limit = phoneReportLimit()
+    const addresses = PHONE_REPORTS_PER_MINUTE / PHONE_REPORTS_PER_ADDRESS
+    for (let host = 0; host < Math.floor(addresses); host += 1) {
+      expect(limit(`198.51.100.${String(host)}`, PHONE_REPORTS_PER_ADDRESS)).toBe(true)
+    }
+    const left = PHONE_REPORTS_PER_MINUTE % PHONE_REPORTS_PER_ADDRESS
+    expect(limit('203.0.113.1', left)).toBe(true)
+    expect(limit('203.0.113.2', 1)).toBe(false)
   })
 })
 
@@ -243,7 +240,6 @@ describe('takePhoneFailures', () => {
       },
       { reports: [REPORT, { ...REPORT, catcher: 'vue', build: 'index-OldBuild1' }] },
       'a',
-      0,
     )
     expect(taken).toEqual(['screen:advice index-BTCsHrpw', 'vue:advice index-OldBuild1'])
   })
@@ -255,7 +251,6 @@ describe('takePhoneFailures', () => {
         { limit: () => false, take: (...args) => taken.push(args) },
         { reports: [REPORT] },
         'a',
-        0,
       )
     }).toThrow(expect.objectContaining({ code: ERROR.CLIENT_ERRORS_RATE_LIMITED }))
     expect(taken).toEqual([])
@@ -583,33 +578,6 @@ describe('forget — адрес телефона уходит из памяти 
       ).rejects.toThrow('connection refused')
       rows.forget(t0)
       expect(kept.moments('one')).toBeUndefined()
-    })
-  })
-
-  describe('phoneReportLimit — минута маршрута (адверсариальный А1)', () => {
-    it('адрес через минуту ушёл без чужого отчёта, адрес внутри минуты остался', () => {
-      const kept = memory()
-      const limit = phoneReportLimit()
-      expect(limit('old', 1, 0)).toBe(true)
-      expect(limit('young', 1, 1)).toBe(true)
-      limit.forget(60_000)
-      expect(kept.moments('old')).toBeUndefined()
-      expect(kept.moments('young')).toEqual([{ at: 1, count: 1 }])
-    })
-
-    it('уборка не возвращает отчётов раньше минуты', () => {
-      const limit = phoneReportLimit()
-      expect(limit('a', PHONE_REPORTS_PER_ADDRESS, 0)).toBe(true)
-      limit.forget(30_000)
-      expect(limit('a', 1, 30_000)).toBe(false)
-      expect(limit('b', 1, 30_000)).toBe(true)
-    })
-
-    it('отказ не оставляет адреса', () => {
-      const kept = memory()
-      const limit = phoneReportLimit()
-      expect(limit('greedy', PHONE_REPORTS_PER_ADDRESS + 1, 0)).toBe(false)
-      expect(kept.moments('greedy')).toBeUndefined()
     })
   })
 

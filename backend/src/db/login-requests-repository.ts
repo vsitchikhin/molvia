@@ -249,7 +249,7 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
     async createLimited(id, code, secret, deviceName, again = false) {
       const started = await db.transaction(async (tx) => {
         // Everybody's quota, one for this database, including concurrent starts and process restarts;
-        // an address's minute was the use case's before it (MOL-359).
+        // the address's minute is the use case's, checked before this (MOL-359).
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended('molvia:login-quota', 0))`,
         )

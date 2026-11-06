@@ -35,7 +35,6 @@ describe('login quota and lifetime', () => {
       {
         limit: addressMinute(LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT),
         address: '198.51.100.1',
-        now: Date.now(),
       },
       'molvia_bot',
       null,

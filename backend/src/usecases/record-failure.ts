@@ -439,12 +439,10 @@ export const PHONE_REPORTS_PER_ADDRESS = 60
 /** The phone's reports everybody together may send in a minute. */
 export const PHONE_REPORTS_PER_MINUTE = 200
 /** The route's minute of the phone's reports (MOL-144, Р-6): the shared counter, by these numbers. */
-export type PhoneReportLimit = AddressMinute
-
 export function phoneReportLimit(
   perAddress = PHONE_REPORTS_PER_ADDRESS,
   perMinute = PHONE_REPORTS_PER_MINUTE,
-): PhoneReportLimit {
+): AddressMinute {
   return addressMinute(perAddress, perMinute)
 }
 
@@ -457,7 +455,7 @@ export function takePhoneFailures(
     limit,
     take,
   }: {
-    readonly limit: (address: string, count: number, now: number) => boolean
+    readonly limit: (address: string, count: number) => boolean
     readonly take: (
       summary: FailureSummary,
       place: FailurePlace,
@@ -467,9 +465,8 @@ export function takePhoneFailures(
   },
   { reports }: ClientErrors,
   address: string,
-  now: number,
 ): void {
-  if (!limit(address, reports.length, now)) throw new DomainError(ERROR.CLIENT_ERRORS_RATE_LIMITED)
+  if (!limit(address, reports.length)) throw new DomainError(ERROR.CLIENT_ERRORS_RATE_LIMITED)
   for (const report of reports) {
     const { summary, place, build } = phoneFailure(report)
     take(summary, place, build, address)

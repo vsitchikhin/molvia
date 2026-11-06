@@ -193,11 +193,11 @@ describe('login_days: the funnel is counted where each step happens (MOL-68)', (
       address: '203.0.113.5',
     }
     for (let i = 0; i < LOGIN_ADDRESS_LIMIT; i += 1) {
-      await startLogin(requests, { ...quota, now: Date.now() }, 'molvia_bot', null)
+      await startLogin(requests, quota, 'molvia_bot', null)
     }
-    await expect(
-      startLogin(requests, { ...quota, now: Date.now() }, 'molvia_bot', null, true),
-    ).rejects.toMatchObject({ code: ERROR.LOGIN_RATE_LIMITED })
+    await expect(startLogin(requests, quota, 'molvia_bot', null, true)).rejects.toMatchObject({
+      code: ERROR.LOGIN_RATE_LIMITED,
+    })
     expect(await first.db.select().from(loginRequests)).toHaveLength(LOGIN_ADDRESS_LIMIT)
     expect((await days())[await today()]).toEqual({
       ...NOTHING,
