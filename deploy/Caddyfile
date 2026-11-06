@@ -34,5 +34,15 @@
 		X-Content-Type-Options nosniff
 		# The scanner needs the camera; nothing else here needs any of it.
 		Permissions-Policy "camera=(self), geolocation=(), microphone=()"
+		# The page's own policy is a meta of the built index.html (MOL-363, vite.config.ts); a meta
+		# cannot say who may frame the page, so that one is here: nobody — «Удалить мои данные» in
+		# somebody else's frame is a click taken.
+		Content-Security-Policy "frame-ancestors 'none'"
 	}
+
+	# A year of https only (MOL-363), with no preload and no subdomains, each a decision of its own.
+	# Never for localhost: HSTS holds by the host's name, not its port, and the production stack tried
+	# on a laptop would turn every dev server of that browser on localhost to https for a year.
+	@public not host localhost
+	header @public Strict-Transport-Security "max-age=31536000"
 }
