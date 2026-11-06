@@ -1,11 +1,10 @@
 // MOL-106 — when two names in the catalogue are one thing written twice. The nightly merge rests on
-// this: a pair merges by itself only if every size is the same and the words are near by spelling and
-// by meaning; anything less is a candidate the owner looks at. A false merge pours the ratings of two
+// this: a pair merges by itself only if every size is the same, the words are one spelling (MOL-358)
+// and near by meaning; anything less is a candidate the owner looks at. A false merge pours the ratings of two
 // things into one — «Milo» and «Мыло», «Молоко 1 л» and «Молоко 2 л» — and is worse than a missed one.
 
 import { levenshtein } from '#model/support/edits'
 import { toSearchKey } from '#model/support/search-key'
-import { describes } from '#model/support/synonyms'
 import { yerevanDate } from '#model/values/rates'
 
 /**
@@ -65,12 +64,6 @@ export interface NameParts {
   readonly sizes: readonly string[]
   /** The words with every size taken out, as `toSearchKey` spells them. */
   readonly words: readonly string[]
-  /**
-   * Those of `words` whose word as written describes rather than names (`describes`): «жареная»,
-   * «варёно-копчёная» by its last part, «"Российский"» without its quotes. Read off the name, not the
-   * key, as `kindKey` reads it (MOL-358).
-   */
-  readonly describing: readonly string[]
   /** The scripts the name's letters are written in, sorted: `cyrillic`, `latin latin`… once each. */
   readonly scripts: readonly string[]
   /**
@@ -115,10 +108,6 @@ export function nameParts(name: string): NameParts {
   return {
     sizes: sizes.sort(),
     words: key === '' ? [] : key.split(' ').filter((word) => !/^\d+$/u.test(word)),
-    describing: rest.split(/\s+/u).flatMap((word) => {
-      const last = word.match(/\p{L}+/gu)?.at(-1)
-      return last !== undefined && describes(last) ? toSearchKey(word).split(' ') : []
-    }),
     // Of the words: a unit after a number, «1 l», is no script of the name.
     scripts: scriptsOf(rest),
     // Armenian «և», «եւ» and «եվ» are one spelling (the owner, MOL-12), as `nameIdentity` holds.
@@ -152,12 +141,6 @@ export interface Spelling {
   readonly sameScripts: boolean
   /** Whether the two are one spelling, case, spacing, punctuation and «ё» aside (`NameParts.letters`). */
   readonly sameLetters: boolean
-  /**
-   * Whether a word one name has and the other has not describes: «Курица вареная» and «Курица жареная»
-   * are two ways of cooking one letter apart, not a typo — the model reads them by their letters and put
-   * them at 0.929 (MOL-358, adversarial А1 of MOL-299). Never merged by itself, at most a candidate.
-   */
-  readonly describedApart: boolean
 }
 
 /**
@@ -205,25 +188,7 @@ export function twinSpelling(a: NameParts, b: NameParts): Spelling | null {
   if (found === undefined) return null
   const sameScripts =
     a.scripts.length === b.scripts.length && a.scripts.every((script, i) => script === b.scripts[i])
-  return {
-    ...found,
-    sameScripts,
-    sameLetters: a.letters === b.letters,
-    describedApart:
-      unshared(a.words, b.words).some((word) => a.describing.includes(word)) ||
-      unshared(b.words, a.words).some((word) => b.describing.includes(word)),
-  }
-}
-
-/** The words of `these` left once each word of `those` has taken one of its own. */
-function unshared(these: readonly string[], those: readonly string[]): string[] {
-  const left = [...those]
-  return these.filter((word) => {
-    const at = left.indexOf(word)
-    if (at === -1) return true
-    left.splice(at, 1)
-    return false
-  })
+  return { ...found, sameScripts, sameLetters: a.letters === b.letters }
 }
 
 function bitCount(mask: number): number {
@@ -233,18 +198,18 @@ function bitCount(mask: number): number {
 }
 
 /**
- * Merged by itself: one edit a word, two a name, and a meaning at least this close. Measured on the
- * seed (MOL-106, `.scratch/tasks/status/MOL-106-measure.md`): of its 178 000 pairs not one merges, the
- * nearest one edit apart being «Курица» and «Корица» at 0.856; two edits a word let in «Хлеб» and
- * «Хлебцы» at 0.937. What it takes: a fat with a comma or a point, «ё», the order of words, half of
- * the typos. **A name in another script is not taken**: the model reads a transliteration by its
+ * Merged by itself: one spelling — the same search key word for word, in any order, no edit at all —
+ * and a meaning at least this close (MOL-358, owner's В-2 «в»). What it takes: a fat with a comma or a
+ * point, «ё», a double letter, the order of words. **Not a letter**: one edit a word merged «Курица
+ * вареная» into «Курица жареная» at 0.929 (adversarial А1 of MOL-299), and every rule that tried to tell
+ * a way of cooking from a typo by its spelling — an adjective's ending — was passed by another spelling:
+ * a case, a comma, a soft hyphen, Latin letters, «варён.» (adversarial Б1–Б5 of MOL-358), and «Мойва» by
+ * «Мойка» at 0.910 is two nouns. A letter apart is a candidate the owner merges by hand: 237 of the
+ * bench's 250 typos. **A name in another script is not taken**: the model reads a transliteration by its
  * letters, «Moloko» against «Молоко» is 0.69 at the median — as far as «Milo» from «Мыло», 0.48 — so
- * one key in two scripts is always a candidate, never a merge. **Nor a word that describes, one letter
- * apart** (MOL-358): «Курица вареная» and «Курица жареная» at 0.929, «Грибы тушёные» and «Грибы сушёные»
- * at 0.946 — the seed had no such pair, people's items do. The price: a typo inside an adjective, «Сыр
- * рассийский», is a candidate too — 112 of the bench's 250 typos that merged.
+ * one key in two scripts is always a candidate, never a merge.
  */
-export const TWIN_MERGE = Object.freeze({ worst: 1, edits: 2, meaning: 0.9 })
+export const TWIN_MERGE = Object.freeze({ worst: 0, edits: 0, meaning: 0.9 })
 
 /**
  * Named to the owner: one edit a word, and a meaning this close or one key in two scripts. Two edits a
@@ -278,7 +243,6 @@ export function twinVerdict({ spelling, sameUnit, meaning, properName }: TwinPai
   if (
     sameUnit &&
     spelling.sameScripts &&
-    !spelling.describedApart &&
     meaning !== null &&
     spelling.worst <= TWIN_MERGE.worst &&
     (properName === true ? spelling.sameLetters : spelling.edits <= TWIN_MERGE.edits) &&
