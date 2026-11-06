@@ -333,6 +333,9 @@ describe('поток выдуманных сбоев не топит канал 
     const spy = vi.spyOn(Map.prototype, 'set')
     const kept = (sender: string) =>
       (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(sender))
+    // The hour is the budgets' monotonic clock (MOL-359, Б1), moved by the test alone — faked before
+    // the failure is taken, so its moment is on the same scale.
+    vi.useFakeTimers({ toFake: ['performance'] })
     try {
       const reporter = apiFailureReporter(
         () => db,
@@ -347,12 +350,14 @@ describe('поток выдуманных сбоев не топит канал 
         '203.0.113.7',
       )
       await recorded()
-      const now = Date.now()
-      reporter.forget(new Date(now + 30 * 60 * 1000))
+      vi.advanceTimersByTime(30 * 60 * 1000)
+      reporter.forget()
       expect(kept('203.0.113.7')).toBe(true)
-      reporter.forget(new Date(now + 61 * 60 * 1000))
+      vi.advanceTimersByTime(31 * 60 * 1000)
+      reporter.forget()
       expect(kept('203.0.113.7')).toBe(false)
     } finally {
+      vi.useRealTimers()
       spy.mockRestore()
     }
   })
@@ -361,10 +366,10 @@ describe('поток выдуманных сбоев не топит канал 
     const spy = vi.spyOn(Map.prototype, 'set')
     const kept = (sender: string) =>
       (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(sender))
-    // Only the intervals and the clocks: the server's timers tick when the test moves them, the
-    // budgets read the moment of the fake clock (`new Date()`), the route's minute the fake
-    // `performance.now()` — a clock that never steps back (MOL-359).
-    vi.useFakeTimers({ toFake: ['setInterval', 'Date', 'performance'] })
+    // Only the intervals and the monotonic clock: the server's timers tick when the test moves them,
+    // and the route's minute and the budgets' hour read `performance.now()` — a clock that never
+    // steps back (MOL-359, adversarial А1, Б1).
+    vi.useFakeTimers({ toFake: ['setInterval', 'performance'] })
     const served = buildServer({
       db,
       owner: null,
@@ -381,13 +386,11 @@ describe('поток выдуманных сбоев не топит канал 
       })
       expect(response.statusCode).toBe(204)
       await recorded()
-      // Half an hour on, one tick: the route's minute is gone, the hour of the budgets is not.
-      vi.setSystemTime(Date.now() + 30 * 60_000)
-      await vi.advanceTimersByTimeAsync(60_000)
+      // Half an hour on: the route's minute is gone, the hour of the budgets is not.
+      await vi.advanceTimersByTimeAsync(30 * 60_000)
       expect(kept('203.0.113.7')).toBe(true)
-      // An hour and more on, one tick: nothing of the address is left.
-      vi.setSystemTime(Date.now() + 30 * 60_000)
-      await vi.advanceTimersByTimeAsync(60_000)
+      // An hour and more on: nothing of the address is left.
+      await vi.advanceTimersByTimeAsync(31 * 60_000)
       expect(kept('203.0.113.7')).toBe(false)
     } finally {
       await served.close()

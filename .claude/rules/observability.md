@@ -284,7 +284,11 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   the new rows of every phone behind the same address — telling phones apart would need a mark of the
   device, which is tracking. The nightly copy keeps the table: what is in it is bounded.
 - **A sender is let go an hour after its last failure, by both budgets — and the route's minute after
-  its minute** (MOL-241, owner's В-1 «а»): `forget`, on a minute timer of its own — the failures' cleanup waits on the database, and a query
+  its minute** (MOL-241, owner's В-1 «а»), **the hour and the minute by a clock that never steps back**
+  (`monotonic`, MOL-359, adversarial Б1, owner's В-3 «а»): by the wall clock a step of NTP back by ten
+  minutes kept an address seventy against the page's «час», and a step forward gave a sender sixty more
+  rows; a place given back is the very one taken (`claim`, `ask` hand back how), never a neighbour's.
+  The summary «скрыто» keeps its hour by the same clock. Let go by `forget`, on a minute timer of its own — the failures' cleanup waits on the database, and a query
   hung there would hold the next tick as long, since the pool has no timeout — whether or not an
   owner is set. `claim` is asked of every failure of a phone, a known fingerprint
   too, and the row budget let go of nobody: every address that ever sent a failure stayed in memory,

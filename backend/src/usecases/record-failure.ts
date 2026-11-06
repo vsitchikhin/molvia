@@ -18,7 +18,7 @@ import type {
   TelegramUserId,
 } from '@molvia/model'
 import type { FailureCount, FailureOccurrence, FailureRepository } from '@/db/failures-repository'
-import { addressMinute } from './address-minute'
+import { addressMinute, monotonic } from './address-minute'
 import type { AddressMinute } from './address-minute'
 
 /** Where a failure happened: who reports it, and the route, handler or job it was in. */
@@ -146,12 +146,12 @@ export async function recordFailure(
   const phone = occurrence.source === 'phone'
   // Taken before the write, given back if the row was there: four writes run at once, and each
   // asking first and taking after let the hour's rows run past by three.
-  const claimed = phone && phoneRows !== undefined
-  const fresh = !claimed || phoneRows.claim(at, sender)
+  const place = phone && phoneRows !== undefined ? phoneRows.claim(sender) : undefined
+  const fresh = place !== null
   let count: FailureCount | null
   // What of the hour's notices this write took, and how many it held back: the budget is asked
   // inside its transaction, and the held ones are counted only once it has committed.
-  let told = 0
+  let giveBackNotices: () => void = () => undefined
   let held = 0
   try {
     count = await failures.record(
@@ -161,8 +161,8 @@ export async function recordFailure(
       (written) => {
         const notices = noticesFor(occurrence, written, times, owner)
         if (!phone || phoneNotices === undefined) return notices
-        const asked = phoneNotices.ask(notices, at, sender)
-        told = asked.told.length
+        const asked = phoneNotices.ask(notices, sender)
+        giveBackNotices = asked.giveBack
         held = asked.held
         return asked.told
       },
@@ -173,15 +173,15 @@ export async function recordFailure(
     // of the outage held one for the hour (review №9) — and so do the notices it took, if the
     // transaction failed after the budget gave them (round 5). The ones it held back were never
     // counted: «скрыто» is of failures in the table (adversarial Е1 of round 6, Ж1 of round 7).
-    if (claimed && fresh) phoneRows.refund(at, sender)
-    if (told > 0) phoneNotices?.refund(told, at, sender)
+    place?.()
+    giveBackNotices()
     throw error
   }
   // Held back, and written: now it is «скрыто». Counted after the commit, so the minute timer
   // never tells of a write still in flight that then fails (adversarial Ж1).
   if (held > 0) phoneNotices?.hold(held)
   // Not a new row after all — its count is more than what was written now: the place goes back.
-  if (phone && fresh && count !== null && count.count !== times) phoneRows?.refund(at, sender)
+  if (count !== null && count.count !== times) place?.()
   // A new fingerprint past the hour's rows: not in the table, so the summary says so (round 3, В1).
   if (count === null) phoneNotices?.unwritten()
   return count !== null
@@ -192,29 +192,33 @@ export const PHONE_NOTICES_PER_HOUR = 20
 /** And how many of them one sender's reports may bring (adversarial Б1 of round 2). */
 export const PHONE_NOTICES_PER_SENDER = 3
 const HOUR_MS = 60 * 60 * 1000
+/** A place in an hour, by the clock that never steps back; given back as itself (MOL-359, Б1). */
+interface Moment {
+  readonly at: number
+}
+const withinHour = (moments: readonly Moment[], now: number) =>
+  moments.filter((moment) => now - moment.at < HOUR_MS)
 
 export interface PhoneNoticeBudget {
   /**
    * What of the phone's notices fits the hour — the sender's and everybody's — and how many did not:
-   * those are not counted yet (`hold`).
+   * those are not counted yet (`hold`). `giveBack` returns exactly the places these took, for a write
+   * that then failed (MOL-359, Б1).
    */
   ask(
     notices: readonly OwnerNotice[],
-    at: Date,
     sender?: string,
-  ): { readonly told: OwnerNotice[]; readonly held: number }
+  ): { readonly told: OwnerNotice[]; readonly held: number; readonly giveBack: () => void }
   /** Counts `count` notices held back of a failure written: «скрыто». */
   hold(count: number): void
   /** `ask` and `hold` at once, for a failure already in the table. */
-  take(notices: readonly OwnerNotice[], at: Date, sender?: string): OwnerNotice[]
-  /** A write that then failed: gives back the `told` notices it took at `at`. */
-  refund(told: number, at: Date, sender?: string): void
+  take(notices: readonly OwnerNotice[], sender?: string): OwnerNotice[]
   /** A new fingerprint of the phone the hour's rows had no room for: not in the table at all. */
   unwritten(): void
-  /** Lets go of every sender with nothing in the hour before `at` (MOL-241). */
-  forget(at: Date): void
+  /** Lets go of every sender with nothing in the hour before now (MOL-241). */
+  forget(): void
   /** How many were held back and how many not written, at most once an hour. */
-  held(at: Date): OwnerNotice | null
+  held(): OwnerNotice | null
 }
 
 /**
@@ -244,64 +248,66 @@ export function phoneNoticeBudget(
     count,
     ...(unwritten > 0 ? { unwritten } : {}),
   }),
+  clock: () => number = monotonic,
 ): PhoneNoticeBudget {
-  let told: number[] = []
-  const bySender = new Map<string, number[]>()
+  let told: Moment[] = []
+  const bySender = new Map<string, Moment[]>()
   let muted = 0
   let lost = 0
   let lastHeld: number | undefined
-  const recent = (moments: readonly number[], now: number) =>
-    moments.filter((moment) => now - moment < HOUR_MS)
 
   return {
-    ask(notices, at, sender) {
-      const now = at.getTime()
-      told = recent(told, now)
-      const theirs = sender === undefined ? [] : recent(bySender.get(sender) ?? [], now)
+    ask(notices, sender) {
+      const now = clock()
+      told = withinHour(told, now)
+      const theirs = sender === undefined ? [] : withinHour(bySender.get(sender) ?? [], now)
       const out: OwnerNotice[] = []
+      const taken: Moment[] = []
       let kept = 0
       for (const notice of notices) {
         if (told.length >= perHour || theirs.length >= perSender) {
           kept += 1
           continue
         }
-        told.push(now)
-        theirs.push(now)
+        const moment = { at: now }
+        told.push(moment)
+        theirs.push(moment)
+        taken.push(moment)
         out.push(notice)
       }
       if (sender !== undefined) bySender.set(sender, theirs)
-      return { told: out, held: kept }
+      const giveBack = () => {
+        told = told.filter((moment) => !taken.includes(moment))
+        const mine = sender === undefined ? undefined : bySender.get(sender)
+        if (sender !== undefined && mine !== undefined) {
+          bySender.set(
+            sender,
+            mine.filter((moment) => !taken.includes(moment)),
+          )
+        }
+      }
+      return { told: out, held: kept, giveBack }
     },
     hold(count) {
       muted += count
     },
-    take(notices, at, sender) {
-      const asked = this.ask(notices, at, sender)
+    take(notices, sender) {
+      const asked = this.ask(notices, sender)
       this.hold(asked.held)
       return asked.told
-    },
-    refund(given, at, sender) {
-      const now = at.getTime()
-      for (let index = 0; index < given; index += 1) {
-        const mine = told.lastIndexOf(now)
-        if (mine >= 0) told.splice(mine, 1)
-        const theirs = sender === undefined ? undefined : bySender.get(sender)
-        const position = theirs?.lastIndexOf(now) ?? -1
-        if (position >= 0) theirs?.splice(position, 1)
-      }
     },
     unwritten() {
       lost += 1
     },
-    forget(at) {
-      const now = at.getTime()
-      told = recent(told, now)
+    forget() {
+      const now = clock()
+      told = withinHour(told, now)
       for (const [sender, moments] of bySender) {
-        if (recent(moments, now).length === 0) bySender.delete(sender)
+        if (withinHour(moments, now).length === 0) bySender.delete(sender)
       }
     },
-    held(at) {
-      const now = at.getTime()
+    held() {
+      const now = clock()
       if (muted === 0 && lost === 0) return null
       if (lastHeld !== undefined && now - lastHeld < HOUR_MS) return null
       lastHeld = now
@@ -323,12 +329,13 @@ export const PHONE_ROWS_PER_HOUR = 1000
 export const PHONE_ROWS_PER_SENDER = 60
 
 export interface PhoneRowBudget {
-  /** Takes a place for a new row, if the hour has one for the sender and for everybody. */
-  claim(at: Date, sender?: string): boolean
-  /** Gives back a place taken at `at` for a row that was there already. */
-  refund(at: Date, sender?: string): void
-  /** Lets go of every sender with nothing in the hour before `at` (MOL-241). */
-  forget(at: Date): void
+  /**
+   * Takes a place for a new row, if the hour has one for the sender and for everybody, and hands back
+   * how to give exactly it back (MOL-359, Б1) — for a row that was there already, or a write that failed.
+   */
+  claim(sender?: string): (() => void) | null
+  /** Lets go of every sender with nothing in the hour before now (MOL-241). */
+  forget(): void
 }
 
 /**
@@ -349,38 +356,38 @@ export interface PhoneRowBudget {
 export function phoneRowBudget(
   perHour = PHONE_ROWS_PER_HOUR,
   perSender = PHONE_ROWS_PER_SENDER,
+  clock: () => number = monotonic,
 ): PhoneRowBudget {
-  let added: number[] = []
-  const bySender = new Map<string, number[]>()
-  const recent = (moments: readonly number[], now: number) =>
-    moments.filter((moment) => now - moment < HOUR_MS)
-  const without = (moments: readonly number[], moment: number) => {
-    const index = moments.lastIndexOf(moment)
-    return index < 0 ? [...moments] : [...moments.slice(0, index), ...moments.slice(index + 1)]
-  }
+  let added: Moment[] = []
+  const bySender = new Map<string, Moment[]>()
   return {
-    claim(at, sender) {
-      const now = at.getTime()
-      added = recent(added, now)
-      const theirs = sender === undefined ? [] : recent(bySender.get(sender) ?? [], now)
+    claim(sender) {
+      const now = clock()
+      added = withinHour(added, now)
+      const theirs = sender === undefined ? [] : withinHour(bySender.get(sender) ?? [], now)
       if (added.length >= perHour || theirs.length >= perSender) {
         if (sender !== undefined) bySender.set(sender, theirs)
-        return false
+        return null
       }
-      added.push(now)
-      if (sender !== undefined) bySender.set(sender, [...theirs, now])
-      return true
+      const moment = { at: now }
+      added.push(moment)
+      if (sender !== undefined) bySender.set(sender, [...theirs, moment])
+      return () => {
+        added = added.filter((kept) => kept !== moment)
+        const mine = sender === undefined ? undefined : bySender.get(sender)
+        if (sender !== undefined && mine !== undefined) {
+          bySender.set(
+            sender,
+            mine.filter((kept) => kept !== moment),
+          )
+        }
+      }
     },
-    refund(at, sender) {
-      const now = at.getTime()
-      added = without(added, now)
-      if (sender !== undefined) bySender.set(sender, without(bySender.get(sender) ?? [], now))
-    },
-    forget(at) {
-      const now = at.getTime()
-      added = recent(added, now)
+    forget() {
+      const now = clock()
+      added = withinHour(added, now)
       for (const [sender, moments] of bySender) {
-        if (recent(moments, now).length === 0) bySender.delete(sender)
+        if (withinHour(moments, now).length === 0) bySender.delete(sender)
       }
     },
   }

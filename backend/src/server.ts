@@ -728,8 +728,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // keep them as long.
       stopSenderForget = startLoginCleanup(
         () => {
-          const now = new Date()
-          failures.forget(now)
+          failures.forget()
           phoneLimit.forget()
           loginLimit.forget()
           return Promise.resolve()
