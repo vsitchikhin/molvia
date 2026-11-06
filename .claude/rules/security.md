@@ -102,8 +102,11 @@ file holds what belongs to no single area, and what the audit found missing.
   only the registry knows — the check holds the form, Dependabot the pair. **What the check is**: a guard
   against the ordinary spelling, not a form built to slip past it — the boundary of `check-clock-bounds.mjs`:
   `uses:` and `image:` as the key at the start of their line or after `- `, the value on that line; a
-  Dockerfile's lines joined at `\`, the default escape; Dependabot's directories written out — a pattern
-  there is refused rather than guessed at. **The price, named:** another spelling of YAML (a value on the next
+  Dockerfile's lines joined at `\`, the default escape, a blank or a comment line inside dropped and CRLF
+  read as LF, as BuildKit reads them; Dependabot's directories written out — a pattern there is refused
+  rather than guessed at. **It holds actions and images, nothing else a build fetches**: a file `ADD` takes
+  by a URL or from git, and whatever `RUN` downloads, are review's, and their pinned forms
+  (`ADD --checksum=sha256:…`, `#<full sha>`) with them (adversarial Р3-А3) — no Dockerfile here has either. **The price, named:** another spelling of YAML (a value on the next
   line, a flow mapping, a quoted key) is past it, and only GitHub's `sha_pinning_required` refuses such an
   action, at the run (adversarial Б1); the `image:` of a workflow's container or service is not read (below);
   and **a sha is trusted as the action's own** — GitHub serves a commit of any fork under the
