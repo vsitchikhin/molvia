@@ -949,6 +949,12 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   worker serves**: a browser below the floor that reached the app before this (`1415bf` did) gets the
   old `index.html` from its precache until the new version is let in the quiet way, and reports as
   before meanwhile — a passing price.
+- **A script of `index.html` runs under the page's policy by its hash, and the build counts it** (MOL-363,
+  `security.md`): the meta goes first after the charset, so a script put above it fails the build, and one added
+  or changed below needs no hand. Nothing of the app builds a `<style>`, a `style=""` in markup, an `eval` or a
+  source of another origin; one that would is a change of the policy, made in `vite.config.ts` with its reason,
+  and the built app's e2e is what says it was needed. Zod is told `jitless` first in `main.ts`, or its question
+  «may I compile?» is reported as a violation.
 - **The scrim is declared on `::backdrop` too** (MOL-231, adversarial А3): a backdrop inherits from
   its dialog only since Chrome 122, Firefox 120 and Safari 17.4, and on the floor below that
   `var(--scrim)` there was undefined — every sheet rose over a page not dimmed, every iPhone 8 and X

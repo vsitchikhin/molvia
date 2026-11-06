@@ -431,7 +431,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **«Выйти» erases this device's drawer after the server's `204`, never on the tap** (MOL-57); a
   lost `204` is settled by the server's next answer; offline there is no way out.
 
-### Security: quotas, outgoing requests, secrets, the edges — `.claude/rules/security.md`
+### Security: quotas, outgoing requests, secrets, the edges, the headers — `.claude/rules/security.md`
 
 - **A write that grows what everybody shares, or what the server keeps on disk, has a quota per person**
   (MOL-287, В-3 «а»: one request without a session or one account in a minute bringing the service down is a
@@ -445,6 +445,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   layer or the bundle.
 - **`/internal/*` is closed twice** — Caddy's 404 and `BOT_API_SECRET` in constant time; a bot's route goes in
   that scope only. **A finding is a probe on a copy** (`.scratch/tasks/security/MOL-287/probes/`), never prod.
+- **The page's CSP is a meta the build puts first in `index.html`, never Caddy's header** (MOL-363): the worker
+  answers every address with the `index.html` it cached, headers and all, so only a policy inside the file comes
+  with a new version. No `'unsafe-inline'` or `'unsafe-eval'` — the inline scripts by hashes the build counts, Zod
+  told `jitless`; Caddy says `frame-ancestors 'none'` and HSTS (a year, never `localhost`); the built app's e2e
+  fails on any violation.
 
 ### Privacy: erasure, trackers, logs — `.claude/rules/privacy.md`
 
