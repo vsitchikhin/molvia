@@ -24,6 +24,15 @@ const { db, close } = connectDrizzle()
 const botSecret = randomBytes(32).toString('base64url')
 const botHeaders = { authorization: `Bearer ${botSecret}` }
 const browserHeaders = { [LOGIN_HEADER]: '1' }
+let sent = 0
+/**
+ * A start from an address of its own (MOL-359): the file starts more than an address's five a minute
+ * on one server, and the quota by address is `login-quota`'s to test, not this file's.
+ */
+function fromAnywhere(): Record<string, string> {
+  sent += 1
+  return { 'x-forwarded-for': `198.51.100.${String((sent % 250) + 1)}` }
+}
 const app = buildServer({ db, login: { username: 'molvia_bot', botSecret } })
 const requests = createLoginRequestRepository(db)
 beforeAll(() => app.ready())
@@ -40,6 +49,7 @@ async function start() {
     url: '/auth/login',
     headers: {
       ...browserHeaders,
+      ...fromAnywhere(),
       'user-agent': 'Mozilla/5.0 (iPhone) Version/18.0 Mobile Safari/604.1',
     },
   })
@@ -324,9 +334,15 @@ describe('Telegram login over HTTP', () => {
 
   it('counts a start with again=1 as a repeat of the same device, and one without as a beginning', async () => {
     for (const url of ['/auth/login', '/auth/login?again=1']) {
-      expect((await app.inject({ method: 'POST', url, headers: browserHeaders })).statusCode).toBe(
-        201,
-      )
+      expect(
+        (
+          await app.inject({
+            method: 'POST',
+            url,
+            headers: { ...browserHeaders, ...fromAnywhere() },
+          })
+        ).statusCode,
+      ).toBe(201)
     }
     const day = onlyRow(await db.select().from(loginDays))
     expect(day).toMatchObject({ started: 2, again: 1 })
@@ -436,7 +452,7 @@ describe('the term of a login is the database clock alone', () => {
       const response = await app.inject({
         method: 'POST',
         url: '/auth/login',
-        headers: browserHeaders,
+        headers: { ...browserHeaders, ...fromAnywhere() },
       })
       expect(response.statusCode).toBe(201)
       expect(String(response.headers['set-cookie'])).toContain(

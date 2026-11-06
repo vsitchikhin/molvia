@@ -18,6 +18,7 @@ import { deviceName } from '@/device-name'
 import { parseQuery } from '@/parse'
 import type { CompletedLogin } from '@/usecases/complete-login'
 import type { StartedLogin } from '@/usecases/start-login'
+import { addressOf } from './address'
 import { refuseAnyBody } from './empty-body'
 
 function browserOnly(request: FastifyRequest): Promise<void> {
@@ -34,7 +35,7 @@ function browserOnly(request: FastifyRequest): Promise<void> {
 export function authRoutes(
   app: FastifyInstance,
   api: {
-    start(deviceName: string | null, again: boolean): Promise<StartedLogin>
+    start(deviceName: string | null, again: boolean, address: string): Promise<StartedLogin>
     poll(id: string, secret: string, zone: string | undefined): Promise<CompletedLogin>
     logout(token: string): Promise<void>
   },
@@ -51,6 +52,7 @@ export function authRoutes(
       const { view, secret } = await api.start(
         deviceName(request.headers['user-agent']),
         again !== undefined,
+        addressOf(request),
       )
       setLoginCookie(reply, secret)
       return reply.code(201).send(z.encode(loginStartedCodec, view))

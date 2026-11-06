@@ -3,7 +3,7 @@ import { randomInt } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { SESSION_COOKIE } from '@molvia/model'
 import type { APIRequestContext, Page } from '@playwright/test'
-import { acceptTerms } from './session'
+import { acceptTerms, ownAddress } from './session'
 
 /**
  * Круг «вход начат в приложении → подтверждён в Telegram → приложение узнало человека», через
@@ -29,6 +29,7 @@ async function withoutTelegram(page: Page): Promise<void> {
 
 /** Нажимает «Войти через Telegram» и отдаёт код из ссылки, которую выдал сервер. */
 async function start(page: Page): Promise<string> {
+  await ownAddress(page)
   const started = page.waitForResponse(
     (response) =>
       response.url().includes('/api/auth/login') && response.request().method() === 'POST',
