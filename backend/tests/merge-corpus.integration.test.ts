@@ -90,6 +90,10 @@ const TWO_SPELLINGS: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[
   ['Кабель 1 м', 'Кабель 1.000 м', 'piece'],
   ['Чай 25 уп', 'Чай 25 пак', 'piece'],
   ['Витамин D3 K2', 'Витамин D2 K3', 'piece'],
+  // a number by another word (adversarial Д1), three digits after the sign (Д2) — 0.988 to 0.997
+  ['Батарейки AA 4 шт AAA 2 шт', 'Батарейки AAA 4 шт AA 2 шт', 'piece'],
+  ['Йогурт клубника 3 шт черника 1 шт', 'Йогурт черника 3 шт клубника 1 шт', 'piece'],
+  ['Провод 1,000 м', 'Провод 1.000 м', 'piece'],
 ]
 
 /** Two sizes the search key folds into one, and the model puts past 0.93 (adversarial А2). */
@@ -177,13 +181,14 @@ describe('the night on the seed', () => {
     expect(report.merged).toBe(TWINS.length + SAME_PLACE.length)
   })
 
-  // Four nights with the real model: 1.6–7.7 s on CI on the same code (09–14.10.2026); its own
-  // 90 s is over ten times the worst, as the rule asks (MOL-243).
+  // Five nights with the real model: four ran 1.6–7.7 s on CI on the same code (09–14.10.2026), and
+  // MOL-358's candidates need a fifth — some 9.6 s at that worst; its own 120 s is over ten times it,
+  // as the rule asks (MOL-243).
   it('names what the model cannot judge, ten a morning, and merges none of it', async () => {
     // Ten a morning, the rest on the mornings after (review №2): read them all, as the owner would.
     const merges = createMergeRepository(db)
     const named = [...report.candidatePairs]
-    for (const day of ['2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10']) {
+    for (const day of ['2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11']) {
       const next = (await mergeNight({ merges, embedder, failed: () => undefined }, 'on', day))
         .report
       expect(next.merged).toBe(0)
@@ -202,7 +207,7 @@ describe('the night on the seed', () => {
     ]) {
       expect(pairs).not.toContain(pair.sort().join(' ~ '))
     }
-  }, 90_000)
+  }, 120_000)
 
   it('never merges two sizes the search key would fold into one', async () => {
     const merged = await db.execute<{ name: string }>(sql`
