@@ -242,6 +242,13 @@ describe('dockerfileProblems', () => {
         '#!/usr/bin/env -S docker build -f\n# syntax=docker/dockerfile:1\nFROM scratch',
       ),
     ).toEqual([told(2, 'docker/dockerfile:1')])
+    // The value's first word ends at any space, a tab before a comment too.
+    expect(dockerfileProblems(FILE, `# syntax=${pinned}\t# the frontend\nFROM scratch`)).toEqual([])
+    // A byte order mark is taken off once, for the instructions too: a comment there goes on with nothing.
+    const commented =
+      '\uFEFF# RUN apt-get update && \\\n#     apt-get install -y curl\n\nFROM busybox AS tools'
+    expect(dockerfileProblems(FILE, commented)).toEqual([told(4, 'busybox')])
+    expect(imageTakers([{ path: FILE, text: commented }])).toEqual([FILE])
     // A key BuildKit does not know ends the directives, as does a comment: no directive after either.
     expect(
       dockerfileProblems(FILE, '# foo1=bar\n# syntax=docker/dockerfile:1\nFROM scratch'),

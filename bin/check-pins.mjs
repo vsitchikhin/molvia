@@ -123,11 +123,15 @@ export function workflowProblems(path, text) {
   return problems
 }
 
+/** The lines of a Dockerfile, LF or CRLF, with a byte order mark taken off the first — once, before
+ * the directives and the instructions alike, as BuildKit takes it off. */
+const linesOf = (text) => text.replace(/^\uFEFF/, '').split(/\r?\n/)
+
 /** The instructions of a Dockerfile, each its lines joined at `\` and the number of its first line. */
 function instructionsOf(text) {
   const instructions = []
   let parts = null
-  text.split(/\r?\n/).forEach((line, index) => {
+  linesOf(text).forEach((line, index) => {
     // A comment is never an instruction, nor goes on with one, whatever it ends with; a blank line
     // inside an instruction is no part of it — as BuildKit reads them.
     if (/^[\t ]*#/.test(line) || (parts && /^[\t ]*$/.test(line))) return
@@ -178,16 +182,14 @@ function sourcesOf(instruction, flags) {
 export function dockerfileProblems(path, text) {
   const problems = []
   const stages = new Set()
-  const lines = text.split(/\r?\n/)
   // Parser directives stand first, before any other comment, blank line or instruction; `syntax`
   // names the image BuildKit hands the whole file to — the first word of its value. As BuildKit
-  // reads them: a byte order mark taken off, a first line of `#!` passed over.
-  for (const [index, line] of lines.entries()) {
-    const bare = index === 0 ? line.replace(/^\uFEFF/, '') : line
-    if (index === 0 && bare.startsWith('#!')) continue
-    const directive = DIRECTIVE.exec(bare)
+  // reads them: a first line of `#!` passed over.
+  for (const [index, line] of linesOf(text).entries()) {
+    if (index === 0 && line.startsWith('#!')) continue
+    const directive = DIRECTIVE.exec(line)
     if (!directive || !DIRECTIVE_KEYS.has(directive[1].toLowerCase())) break
-    const image = directive[2].split(' ')[0]
+    const image = directive[2].split(/\s+/)[0]
     const problem = directive[1].toLowerCase() === 'syntax' ? imageProblem(image) : null
     if (problem) problems.push(`${path}:${String(index + 1)}: ${problem}`)
   }
