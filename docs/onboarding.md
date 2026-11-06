@@ -5332,3 +5332,17 @@ MOL-321 научила держать крупный текст «Деньги»
 (`traceWordHome`) и оставляет остаток стопки на выжившей своей строкой.
 Требования и план — `.scratch/tasks/{requirements,plans}/MOL-299.md`, вывод прода — `.scratch/tasks/status/MOL-299-prod-pairs.txt`,
 артефакты — `.lavish/mol-299-{plan,pairs,review-1}.html`.
+
+## Что запускает CI — закреплено (MOL-364)
+
+Находки Ф-7 и Ф-5 аудита MOL-287. 16 `uses:` в `ci.yml` и `release.yml` — по полному sha коммита, на который
+мажорный тег указывал 06.11.2026, с выпуском в комментарии; восемь `FROM` шести Dockerfile — по точному тегу и
+digest индекса (В-1 «а»): node 22.23.4, Caddy 2.11.9 (под `caddy:2-alpine` в аудите 03.11 был 2.11.7 — плавающий
+тег собирал невидимое), `debian:trixie-slim`, Grafana 13.0.2, Victoria v1.153.0. Dependabot — `docker` за шестью
+каталогами одной недельной группой, мажор node — только через `.nvmrc`; у npm группа `security` для security updates.
+`bin/check-pins.mjs` в `npm run lint` держит обе формы (В-5 «а»). Настройки вне git — secret scanning, push
+protection, Dependabot alerts и security updates, `sha_pinning_required`, actions только GitHub и `docker/*` (В-3
+«а») — включаются через `gh api` по слову владельца, партия до слияния и партия после (В-2 «а»), список — в `security.md`. Образы в CI pull request'а
+не собираются (В-4, по умолчанию «а»): держат релиз и откат. Образы compose не отслеживаются — названо в
+`security.md`. Требования и план — `.scratch/tasks/{requirements,plans}/MOL-364.md`, артефакт —
+`.lavish/mol-364-plan.html`.

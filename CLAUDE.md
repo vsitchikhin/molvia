@@ -443,6 +443,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   with its row and its line in `.env.prod.example`; the database's password lives in its volume too and takes only
   what a URL takes bare. A secret never goes on a command line. The images are public on ghcr: nothing secret in a
   layer or the bundle.
+- **What CI runs is pinned** (MOL-364): a `uses:` by its full sha with its release in a comment, a base image by an
+  exact tag and its digest — `bin/check-pins.mjs` in `npm run lint`; Dependabot moves both, a major of Node never.
 - **`/internal/*` is closed twice** — Caddy's 404 and `BOT_API_SECRET` in constant time; a bot's route goes in
   that scope only. **A finding is a probe on a copy** (`.scratch/tasks/security/MOL-287/probes/`), never prod.
 

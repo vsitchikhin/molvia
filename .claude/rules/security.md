@@ -6,6 +6,7 @@ paths:
   - '.env.prod.example'
   - '.github/workflows/*.yml'
   - '.github/dependabot.yml'
+  - 'bin/check-pins*'
   - '*/Dockerfile'
   - 'services/*/Dockerfile'
   - 'deploy/*/Dockerfile'
@@ -78,7 +79,33 @@ file holds what belongs to no single area, and what the audit found missing.
   MOL-369.
 - **CI's secrets stand in the environment `production`, which admits `master` alone**, and a job holding
   one has `permissions: contents: read` — all but `HC_CERT_URL` of `watch.yml`, a repository secret to be
-  moved there (MOL-368). Actions are pinned by tag, not yet by sha (MOL-364).
+  moved there (MOL-368).
+
+## What CI runs is pinned
+
+- **Every `uses:` is a full commit sha with its release in a comment, every base image an exact tag and
+  its digest** (MOL-364, owner's В-1 «а»): `actions/checkout@3d3c…90b1 # v7.0.1`,
+  `FROM caddy:2.11.9-alpine@sha256:…`. A tag is a pointer whoever publishes it can move, and the next run
+  takes what it points at then — the way secrets of CI leaked through `tj-actions` in 2025; `release.yml`
+  holds the deploy key and Cloudflare's token beside its actions. A floating image tag, besides, built
+  something nobody saw: under `caddy:2-alpine` the audit found 2.11.7, three days later it was 2.11.9.
+  `bin/check-pins.mjs` in `npm run lint` refuses either form left out; a stage of the file, `scratch` and
+  a local action are not pinned. **The digest is what runs**: Docker pulls it and never reads the tag, so
+  a tag changed by hand without its digest changes nothing, and which tag a digest is only the registry
+  knows — the check holds the form, Dependabot the pair.
+- **Dependabot moves the pins**: actions monthly, the base images weekly in one group (`images`), the sha
+  or the digest with its tag or comment; a major of Node never, since it is `.nvmrc`'s, which CI runs on
+  too. A security update of npm comes in one pull request (`security`, `applies-to: security-updates`).
+  **The price**: a patch of Alpine under the same tag no longer comes with any build — only with the
+  bot's pull request, a week late at most and merged by the owner. **Not watched**: the images of compose
+  (`pgvector` — a contract of ICU and glibc that a migration moves, `deploy.md`; the exporters and cAdvisor
+  on `metrics`, which has no way out — each move of `docker-compose.prod.yml` a copy by hand to the
+  machine) and `services:`/`container:` of `ci.yml`, the Playwright image held by its own check (`e2e.md`).
+- **Settings outside git, written here since nothing else holds them** (MOL-364): secret scanning and push
+  protection, Dependabot alerts and security updates on; Actions only GitHub's own and `docker/*`
+  (`allowed_actions: selected`, owner's В-3 «а») and only by a full sha (`sha_pinning_required`). A new
+  action of another author is a dependency to discuss, then a pattern in that list. Checked by
+  `gh api repos/vsitchikhin/molvia --jq .security_and_analysis` and `…/actions/permissions`.
 
 ## The edges
 
