@@ -2,6 +2,7 @@
 // DOM for the evaluated functions, which run in the browser.
 import { createHash } from 'node:crypto'
 import type { Page } from '@playwright/test'
+import { SESSION_COOKIE } from '@molvia/model'
 import { BARCODE } from './barcode-video'
 import { expect, test } from './csp'
 import { AGE, ACCEPT } from './session'
@@ -88,18 +89,30 @@ test('a stranger’s screens run under it: the door and «Data and privacy», wi
 /**
  * Signed in by the development seam, which the build has no button for and the run's API carries. On
  * Chromium the page asks it itself and the browser keeps the cookie; WebKit keeps no `Secure` cookie on
- * the loopback, so there the test asks it and lays the cookie on every request of the page to the API
- * (adversarial А1 of review 1) — the page itself untouched. A session the device never claimed is asked
- * about first (MOL-56), then the terms.
+ * the loopback, so there the test asks it and puts the session in the jar itself (adversarial А1 of
+ * review 1) — the page untouched. A session the device never claimed is asked about first (MOL-56),
+ * then the terms.
  */
 async function signIn(page: Page, browserName: string): Promise<void> {
   if (browserName === 'webkit') {
     const answer = await page.request.post('/api/dev/login')
     expect(answer.status()).toBe(201)
-    const cookie = (answer.headers()['set-cookie'] ?? '').split(';')[0] ?? ''
-    await page.route('**/api/**', (route) =>
-      route.continue({ headers: { ...route.request().headers(), cookie } }),
-    )
+    // The session's, by its name: the seam sets the account it remembers first (CI, run 42209616807).
+    const value = answer
+      .headersArray()
+      .filter(({ name }) => name.toLowerCase() === 'set-cookie')
+      .map(({ value: line }) => line.split(';')[0] ?? '')
+      .find((pair) => pair.startsWith(`${SESSION_COOKIE}=`))
+      ?.slice(SESSION_COOKIE.length + 1)
+    expect(value, 'the seam set no session').toBeTruthy()
+    // Laid in the jar by the address, so not `Secure` on the loopback's http, which WebKit then keeps
+    // and sends; a header laid by `route.continue` WebKit never sends — its `Cookie` is its own.
+    await page.context().clearCookies()
+    await page
+      .context()
+      .addCookies([
+        { name: SESSION_COOKIE, value: value ?? '', url: new URL('/', answer.url()).href },
+      ])
   } else {
     await page.goto('/')
     const status = await page.evaluate(

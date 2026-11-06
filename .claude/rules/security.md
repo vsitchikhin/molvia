@@ -133,8 +133,8 @@ localhost`): HSTS holds by the host's name, not its port, and the production sta
 - **The proof is the built app's end-to-end, with no violation** (owner's В-2 «а», `e2e.md`): every spec of a
   build comes through `e2e/csp.ts`, which fails it on any; `csp-built.spec` holds the meta and its hashes and walks
   what a directive decides. **Production reports nothing** (В-3 «а»): a policy that blocks the bundle leaves nobody
-  to report, and the walk covers the rest, signed in on both engines — WebKit by the seam's cookie laid on the
-  page's requests (adversarial А1). **WebKit refuses its own inline style of every `<select>`** (`style-src-attr`,
+  to report, and the walk covers the rest, signed in on both engines — WebKit by the seam's session put in the
+  context's jar (adversarial А1, `e2e.md`). **WebKit refuses its own inline style of every `<select>`** (`style-src-attr`,
   an empty `sample` — a bare `createElement('select')` too), on six screens signed in, with nothing seen to change
   on the screen; `e2e/csp.ts` lets go exactly that report and one line of its console for each, and the policy
   stays strict (owner's В-4 «а»). Whether Safari on a phone reports it too was not tried. **The prices, named:** an
