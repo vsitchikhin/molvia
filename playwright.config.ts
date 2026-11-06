@@ -117,7 +117,7 @@ export default defineConfig({
     {
       name: 'phone',
       use: { ...devices['Pixel 7'] },
-      testIgnore: /(pwa-update|client-errors-built|outdated-built|scanner)\.spec\.ts$/,
+      testIgnore: /(pwa-update|client-errors-built|outdated-built|csp-built|scanner)\.spec\.ts$/,
     },
     {
       name: 'camera',
@@ -128,6 +128,25 @@ export default defineConfig({
       name: 'pwa',
       use: { ...devices['Pixel 7'], baseURL: `http://127.0.0.1:${previewPort}` },
       testMatch: /(pwa-update|client-errors-built|outdated-built)\.spec\.ts$/,
+    },
+    // The policy is the build's (MOL-363): a walk under it signed in, with the camera the scanner needs,
+    // and the screens of a stranger on an iPhone's engine too — Safari runs the hashes and the bundle by
+    // rules of its own, and only the walk signed in is Chromium's (WebKit keeps no `Secure` cookie on
+    // the loopback).
+    {
+      name: 'pwa-camera',
+      use: {
+        ...devices['Pixel 7'],
+        baseURL: `http://127.0.0.1:${previewPort}`,
+        channel: 'chromium',
+        launchOptions: { args: FAKE_CAMERA },
+      },
+      testMatch: /csp-built\.spec\.ts$/,
+    },
+    {
+      name: 'pwa-iphone',
+      use: { ...devices['iPhone 14'], baseURL: `http://127.0.0.1:${previewPort}` },
+      testMatch: /csp-built\.spec\.ts$/,
     },
     {
       name: 'iphone',

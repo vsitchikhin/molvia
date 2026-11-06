@@ -1,6 +1,9 @@
 ---
 paths:
   - 'deploy/Caddyfile'
+  - 'frontend/vite.config.ts'
+  - 'frontend/src/zodJitless.ts'
+  - 'e2e/csp*.ts'
   - 'deploy/README.md'
   - 'docker-compose.prod.yml'
   - '.env.prod.example'
@@ -143,8 +146,64 @@ file holds what belongs to no single area, and what the audit found missing.
   `BOT_API_SECRET` — 43 characters, compared in constant time — of every route in its scope. A new route
   of the bot goes into that scope, never beside it. The audit's seventeen spellings of the path (`//`,
   `/./`, `..`, `%69`, the case, `%2F`, `;`, `%00`) all ended in a 404.
-- **Caddy sends no CSP, HSTS or `frame-ancestors` yet** (MOL-363); until then nothing on a page may build
-  HTML from a person's text — no `v-html`, no `innerHTML`, the bot with no `parse_mode` — as is the case.
+- **Nothing on a page builds HTML from a person's text** — no `v-html`, no `innerHTML`, the bot with no
+  `parse_mode` — as is the case (MOL-287); the policy below is the second line, never a licence for the first.
+
+## The page's headers (MOL-363)
+
+- **The page's Content Security Policy is a meta of the built `index.html`, never a header** (owner's В-1 «а»):
+  the installed app is answered for every address by its worker's copy of `index.html` — `createHandlerBoundToURL`
+  — with the headers of the day it was cached, and that copy changes only with the file. A policy in Caddy's
+  header, made looser after something broke on a phone, would never reach the phones that had it: `index.html`
+  the same, the worker keeps the old answer. In the file, the policy comes with the version. **One statement,
+  `CONTENT_SECURITY_POLICY` in `frontend/vite.config.ts`**, put first after the charset by the build alone
+  (`apply: 'build'`) — a script before it would run under no policy, and the build fails if one stands there.
+  The dev server has none: it puts styles in by `<style>` and talks over a websocket, a policy of its own that
+  would prove nothing of production's.
+- **No `'unsafe-inline'`, no `'unsafe-eval'`**: `default-src 'self'`; the three scripts of `index.html` by their
+  `sha256`, counted by the build from the HTML as shipped — the last plugin, after `outdatedLines` writes into one
+  and after the PWA's — every `<script>` without `src`, with attributes or in capitals, none inside a comment
+  (review 1, №1, adversarial Г1), so a script added or changed needs no hand; `style-src 'self'`
+  (no `<style>` from a script, no `style=""` in the bundle — `el.style` is the CSSOM, which no policy holds);
+  `img-src 'self' blob:` (a receipt's photo, a picture to the developer — `data:` is in no build); `font-src`,
+  `connect-src`, `worker-src 'self'`; `object-src 'none'`, `base-uri 'none'`, `form-action 'self'`. A source let
+  in is let in by name, with its reason here, never `'unsafe-*'` to quiet a violation.
+- **`'wasm-unsafe-eval'` stands for an engine whose worker takes its page's policy** (owner's В-5 «а» of review 1):
+  zxing compiles its wasm in the scanner's and the QR's workers alone, and in the Chromium and WebKit of the run a
+  worker has no policy from the meta — taken out, the scanner read its code there all the same (adversarial А2).
+  Whether an engine of the floor (Safari 16.4, Chrome 111, Firefox 125) gives a worker its page's policy was not
+  tried, and there the scanner at the shelf would refuse to read. **The price, named:** on the engines of the run it
+  lets the page alone compile wasm, which no line of its bundle does — a script injected could, a little past what
+  it can do already.
+- **Zod is told it may not compile** (`frontend/src/zodJitless.ts`, the first import of `main.ts`): Zod 4 asks
+  `Function('')` in a `try` as it builds an object schema — the model's are built as its modules load, and
+  `@/catchers` pulls them in first, so the config stands before it, not merely before the first parse — and under
+  a policy with no `eval` the browser reports the question itself as a violation. The answer is the same; the
+  report went away.
+- **What a meta cannot say is Caddy's**: `Content-Security-Policy "frame-ancestors 'none'"` — «Удалить мои
+  данные» in another site's frame is a click taken — and `Strict-Transport-Security "max-age=31536000"`, with no
+  `preload` and no `includeSubDomains`, each a decision of its own. **Never for `localhost`** (`@public not host
+localhost`): HSTS holds by the host's name, not its port, and the production stack tried on a laptop would turn
+  every dev server of that browser on `localhost` to https for a year. No `X-Frame-Options`: every engine of the
+  floor of the build knows `frame-ancestors`. `backend/tests/caddyfile.integration.test.ts` holds the file as
+  text, the three headers before it too.
+- **The proof is the built app's end-to-end, with no violation** (owner's В-2 «а», `e2e.md`): every spec of a
+  build comes through `e2e/csp.ts`, which fails it on any; `csp-built.spec` holds the meta and its hashes and walks
+  what a directive decides. **Production reports nothing** (В-3 «а»): a policy that blocks the bundle leaves nobody
+  to report, and the walk covers the rest, signed in on both engines — WebKit by the test making the page's requests to
+  the API with the seam's session (adversarial А1, `e2e.md`), with no worker there. **WebKit refuses its own inline style of every `<select>`** (`style-src-attr` —
+  a bare `createElement('select')` too), on six screens signed in, with nothing seen to change on the screen;
+  `e2e/csp.ts` lets go every `style-src-attr` report at a `<select>` on WebKit and one line of its console for each,
+  and the policy stays strict (owner's В-4 «а»). No field of a report tells the engine's style from ours — `sample` is
+  empty for both, the policy asking none (adversarial Б1 of review 2). Whether Safari on a phone reports it too was not
+  tried. **The prices, named:** an inline style of ours on a `<select>` is let go on WebKit — Chromium, walking the
+  same screens, fails on it, and no screen has a branch of iOS alone that could set one; Firefox never ran under the
+  policy — Playwright's Firefox does not start in the sandbox of the sessions — so which engine of the floor gives a
+  worker its page's policy rests on none tried; the
+  scanner is walked on Chromium alone (WebKit has no fake camera), and the QR's worker of a Serbian receipt on
+  neither, sharing the scanner's sources; a worker has no policy of its own
+  — a meta binds its document, a worker's script comes with Caddy's headers alone — and runs only our code over
+  frames, never a person's text; a `report-uri` cannot be said in a meta.
 
 ## Checking it again
 
