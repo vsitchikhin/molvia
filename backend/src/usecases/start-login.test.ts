@@ -37,26 +37,42 @@ function repository(answer: { current: 'ok' | 'down' | 'full' }) {
   return { requests: requests as LoginRequestRepository, counted }
 }
 
-describe('startLogin — a start that made no request gives its place back (MOL-359, adversarial А2)', () => {
-  it.each(['down', 'full'] as const)(
-    'five starts the database answered %s leave the address all five',
-    async (state) => {
-      const answer: { current: 'ok' | 'down' | 'full' } = { current: state }
-      const { requests, counted } = repository(answer)
-      const quota = {
-        limit: addressMinute(LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT),
-        address: ADDRESS,
-      }
-      for (let i = 0; i < LOGIN_ADDRESS_LIMIT; i += 1) {
-        await expect(startLogin(requests, quota, 'molvia_bot', null)).rejects.toThrow()
-      }
-      answer.current = 'ok'
-      for (let i = 0; i < LOGIN_ADDRESS_LIMIT; i += 1) {
-        await expect(startLogin(requests, quota, 'molvia_bot', null)).resolves.toBeTruthy()
-      }
-      expect(counted).toEqual({ refused: 0, created: LOGIN_ADDRESS_LIMIT })
-    },
-  )
+describe('startLogin — the place of a start in the minute of its address (MOL-359)', () => {
+  it('five starts the database failed leave the address all five (adversarial А2)', async () => {
+    const answer: { current: 'ok' | 'down' | 'full' } = { current: 'down' }
+    const { requests, counted } = repository(answer)
+    const quota = {
+      limit: addressMinute(LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT),
+      address: ADDRESS,
+    }
+    for (let i = 0; i < LOGIN_ADDRESS_LIMIT; i += 1) {
+      await expect(startLogin(requests, quota, 'molvia_bot', null)).rejects.toThrow('ECONNREFUSED')
+    }
+    answer.current = 'ok'
+    for (let i = 0; i < LOGIN_ADDRESS_LIMIT; i += 1) {
+      await expect(startLogin(requests, quota, 'molvia_bot', null)).resolves.toBeTruthy()
+    }
+    expect(counted).toEqual({ refused: 0, created: LOGIN_ADDRESS_LIMIT })
+  })
+
+  it('five starts refused by everybody keep their places: the sixth is refused by the address (review №5)', async () => {
+    const answer: { current: 'ok' | 'down' | 'full' } = { current: 'full' }
+    const { requests, counted } = repository(answer)
+    const quota = {
+      limit: addressMinute(LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT),
+      address: ADDRESS,
+    }
+    for (let i = 0; i < LOGIN_ADDRESS_LIMIT; i += 1) {
+      await expect(startLogin(requests, quota, 'molvia_bot', null)).rejects.toMatchObject({
+        code: ERROR.LOGIN_RATE_LIMITED,
+      })
+    }
+    answer.current = 'ok'
+    await expect(startLogin(requests, quota, 'molvia_bot', null)).rejects.toMatchObject({
+      code: ERROR.LOGIN_RATE_LIMITED,
+    })
+    expect(counted).toEqual({ refused: 1, created: 0 })
+  })
 
   it('a start that made one keeps its place: the sixth is refused by the address, and counted', async () => {
     const { requests, counted } = repository({ current: 'ok' })

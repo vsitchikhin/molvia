@@ -402,7 +402,7 @@ describe('поток выдуманных сбоев не топит канал 
       (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(address))
     // Only the intervals and the monotonic clock the minute reads: the server's timers tick when the
     // test moves them, and the minute moves with them.
-    vi.useFakeTimers({ toFake: ['setInterval', 'Date', 'performance'] })
+    vi.useFakeTimers({ toFake: ['setInterval', 'performance'] })
     const served = buildServer({
       db,
       owner: null,

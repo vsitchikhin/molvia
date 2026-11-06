@@ -20,9 +20,10 @@ export interface LoginQuota {
  * takes no lock and writes no request, only its count — then everybody's, in the database under its
  * lock. The memory's minute holds the same three hundred as the bound of its own map, so in one
  * process it is the one that refuses the three hundred and first; the database's is the ceiling that
- * survives a restart and counts every process. **A start that made no request gives its place back**
- * (adversarial А2): refused by everybody's quota, or the database failing — five answers of 500 were
- * a 429 at the sixth tap, with not one link given.
+ * survives a restart and counts every process. **A start the database failed gives its own place
+ * back** (adversarial А2, Б2): five answers of 500 were a 429 at the sixth tap, with not one link
+ * given. A start everybody's quota refused keeps it (review №5): given back, one address looping while
+ * the window is full and the memory is not — after a restart — queued on the lock without end.
  */
 export async function startLogin(
   requests: LoginRequestRepository,
@@ -31,7 +32,8 @@ export async function startLogin(
   deviceName: string | null,
   again = false,
 ): Promise<StartedLogin> {
-  if (!limit(address, 1)) {
+  const giveBack = limit.take(address, 1)
+  if (giveBack === null) {
     await requests.refuse()
     throw new DomainError(ERROR.LOGIN_RATE_LIMITED)
   }
@@ -41,7 +43,7 @@ export async function startLogin(
   try {
     request = await requests.createLimited(randomUUID(), code, secret, deviceName, again)
   } catch (error) {
-    limit.giveBack(address, 1)
+    if (!(error instanceof DomainError && error.code === ERROR.LOGIN_RATE_LIMITED)) giveBack()
     throw error
   }
   return {

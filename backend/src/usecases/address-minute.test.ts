@@ -92,18 +92,39 @@ describe('addressMinute — a rolling minute per address and for everybody (MOL-
     expect(limit('b', 1)).toBe(true)
   })
 
-  it('giveBack frees the latest place the address took, and an address with none left goes (А2)', () => {
+  it('a place taken is given back as itself, and an address with none left goes (А2)', () => {
     const kept = memory()
-    const { clock, limit } = onClock()
-    expect(limit('a', 1)).toBe(true)
-    clock.at = 10_000
+    const { limit } = onClock()
+    const giveBack = limit.take('a', 1)
+    expect(giveBack).not.toBeNull()
     expect(letIn(limit, 'a')).toBe(LOGIN_ADDRESS_LIMIT - 1)
-    limit.giveBack('a', 1)
+    giveBack?.()
     expect(limit('a', 1)).toBe(true)
-    limit.giveBack('b', 1)
-    expect(limit('b', 1)).toBe(true)
-    limit.giveBack('b', 1)
+    const lone = limit.take('b', 1)
+    lone?.()
     expect(kept.of('b')).toBeUndefined()
+    expect(limit.take('a', 1)).toBeNull()
+  })
+
+  it('a place the minute let go is given back as nothing: the newer starts keep theirs (Б2)', () => {
+    const { clock, limit } = onClock()
+    const late = limit.take('a', 1)
+    clock.at = 61_000
+    expect(letIn(limit, 'a')).toBe(LOGIN_ADDRESS_LIMIT)
+    clock.at = 62_000
+    late?.()
+    expect(limit('a', 1)).toBe(false)
+  })
+
+  it('the place given back is the old one, not a newer neighbour: no sixth start in a minute (Б2)', () => {
+    const { clock, limit } = onClock()
+    const early = limit.take('a', 1)
+    clock.at = 50_000
+    expect(letIn(limit, 'a')).toBe(LOGIN_ADDRESS_LIMIT - 1)
+    early?.()
+    expect(letIn(limit, 'a')).toBe(1)
+    clock.at = 60_000
+    expect(limit('a', 1)).toBe(false)
   })
 
   it('the minute is a clock that never steps back: a wall clock stepped either way changes nothing (А1)', () => {

@@ -20,10 +20,11 @@ const monotonic = (): number => performance.now()
 export interface AddressMinute {
   (address: string, count: number): boolean
   /**
-   * Gives back the latest `count` the address took (MOL-359, adversarial А2): a login's start that made
-   * no request — the database refused it or failed — is no start of the address's.
+   * The same, and what was taken handed back as a way to give back exactly it (MOL-359, adversarial
+   * А2, Б2): a login's start the database failed made no request and is no start of the address's. It
+   * gives back its own place, never a newer start's, and nothing once the minute has let it go.
    */
-  giveBack(address: string, count: number): void
+  take(address: string, count: number): (() => void) | null
   /** Lets go of every address with nothing in the minute before now (MOL-241). */
   forget(): void
 }
@@ -44,21 +45,19 @@ export function addressMinute(
       else taken.set(address, recent)
     }
   }
-  const giveBack = (address: string, count: number) => {
-    const entries = taken.get(address) ?? []
-    const last = entries.findLastIndex((entry) => entry.count === count)
-    if (last === -1) return
-    const rest = entries.filter((_, index) => index !== last)
-    if (rest.length === 0) taken.delete(address)
-    else taken.set(address, rest)
-  }
-  const limit = (address: string, count: number) => {
+  const take = (address: string, count: number) => {
     forget()
     const mine = sum(taken.get(address) ?? [])
     const all = [...taken.values()].reduce((total, entries) => total + sum(entries), 0)
-    if (mine + count > perAddress || all + count > perMinute) return false
-    taken.set(address, [...(taken.get(address) ?? []), { at: clock(), count }])
-    return true
+    if (mine + count > perAddress || all + count > perMinute) return null
+    const entry = { at: clock(), count }
+    taken.set(address, [...(taken.get(address) ?? []), entry])
+    return () => {
+      const rest = (taken.get(address) ?? []).filter((kept) => kept !== entry)
+      if (rest.length === 0) taken.delete(address)
+      else taken.set(address, rest)
+    }
   }
-  return Object.assign(limit, { giveBack, forget })
+  const limit = (address: string, count: number) => take(address, count) !== null
+  return Object.assign(limit, { take, forget })
 }

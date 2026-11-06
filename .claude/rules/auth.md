@@ -74,9 +74,11 @@ is in `bot.md`.
   `login_days`, and takes no place in the minute. **Everybody's three hundred stay the database's**,
   including consumed requests, serialized with an advisory lock, so they hold across restarts and
   processes; the memory holds the same three hundred as the bound of its map, and in one process it is
-  the one that refuses the three hundred and first. **A start that made no request gives its place
-  back** (`giveBack`, adversarial А2): refused by everybody's quota, or the database failing — five
-  answers of 500 were a 429 at the sixth tap. **The prices, named:** a restart — every merge —
+  the one that refuses the three hundred and first. **A start the database failed gives its own
+  place back** (`take`, adversarial А2, Б2): five answers of 500 were a 429 at the sixth tap; the place is
+  the start's own, never a newer one's, and none once the minute let it go. **A start everybody's quota
+  refused keeps its place** (review №5): given back, one address looping after a restart — the window
+  full, the memory empty — queued on the lock without end. **The prices, named:** a restart — every merge —
   starts every address's minute over, five more starts an attempt; an operator's CGNAT puts thousands
   behind one address and its five, rare among the people of 0.2, and the refusal says «через минуту»;
   sixty addresses, or sixty `/48`, take everybody's three hundred — the botnet's price the owner
