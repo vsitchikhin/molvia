@@ -62,10 +62,22 @@ is in `bot.md`.
   All auth replies are `no-store`, including refusals and what Fastify answers itself under
   those paths — no route, a path that does not decode. The bot uses a separate `BOT_API_SECRET`,
   never the Telegram token; Caddy additionally blocks its internal paths from outside.
-  **Thirty starts in a rolling minute, across the database**, including consumed requests:
-  the quota is serialized with an advisory lock. Its shared denial-of-service price was accepted while only
-  the owner was on production; the audit before 0.2 reopened it — one `curl` holds the door shut for everyone —
-  and a quota per address is to replace it before `v0.2.0` (MOL-287 Ф-1, MOL-359, `security.md`).
+  **Five starts in a rolling minute from an address, three hundred from everybody** (MOL-359, owner's В-7
+  «а» of the audit MOL-287: thirty across the database let one `curl` hold the door shut for everyone, a
+  price accepted while only the owner was on production). **The address is `addressOf`'s**, the rule of
+  `/client-errors` — the last `X-Forwarded-For` only from a peer inside, an IPv6 one by its `/48` — and
+  **its minute is the API's memory** (`addressMinute`, owner's В-1 «а»): no column, no line of the log,
+  let go by the minute timer within two minutes of its last start. It goes first: a start it turns away
+  takes no lock and writes no request, only `refused` in `login_days`, and takes no place in the minute.
+  **Everybody's three hundred stay the database's**, including consumed requests, serialized with an
+  advisory lock, so they hold across restarts and processes; a start that passed its address and was
+  refused there keeps its place in the address's minute. **The prices, named:** a restart — every merge —
+  starts every address's minute over, five more starts an attempt; an operator's CGNAT puts thousands
+  behind one address and its five, rare among the people of 0.2, and the refusal says «через минуту»;
+  sixty addresses, or sixty `/48`, take everybody's three hundred — the botnet's price the owner
+  accepted; a refusal still writes the day's row of `login_days`, now outside the lock; two processes of
+  the API would each keep a minute of their own, and production runs one. The privacy page names the
+  address's minutes in «Логи сервера» (a revision, В-2 «а»).
   Expired requests are removed at start, at boot and every minute; no login writes `events`.
 - **What became of every login is counted as it happens, into `login_days` (MOL-68).** Nothing is
   left to count afterwards: «Это не я» and a collected session only put a request out, and the
@@ -235,11 +247,11 @@ the round trip through Telegram, and ask whose account this turned out to be.
   caught it was an end-to-end test rather than an eye. **The screen keeps all four of its own
   states behind the door**: an unanswered question with no connection is «нет связи», not a
   skeleton that loads nothing (А2).
-- **One tap is one request, and nothing starts a login by itself.** The quota is thirty starts a
-  minute **across the whole database**, so an app that started one every time the screen appeared
-  would close the door for everybody. «Открыть Telegram» reopens the same link; only «Начать
-  заново» asks for another, because a new start replaces the secret in `__Host-molvia_login` and
-  makes the previous request uncollectable.
+- **One tap is one request, and nothing starts a login by itself.** The quota is five starts a
+  minute **from an address**, so an app that started one every time the screen appeared would close
+  the door for its own address — and for everybody behind an operator's. «Открыть Telegram» reopens
+  the same link; only «Начать заново» asks for another, because a new start replaces the secret in
+  `__Host-molvia_login` and makes the previous request uncollectable.
 - **The device remembers the request and never the secret.** `{id, url}` under `molvia.login`,
   because iOS unloads the PWA while the person is in Telegram and the confirmation they gave
   would otherwise have nowhere to arrive. The secret stays in the `HttpOnly` cookie; putting it
@@ -256,7 +268,7 @@ the round trip through Telegram, and ask whose account this turned out to be.
 - **«Повторить» repeats whatever did not work.** The screen's error state covers two failures at
   once — the login would not start, and the server would not say who we are — and a button that
   always began a login took a person who needed only an answer into Telegram instead, with a
-  fresh request against a quota shared by everybody (adversarial Б2).
+  fresh request against the quota of its address (adversarial Б2).
 - **The poll fires on the three ways a person comes back**: a three-second timer, the app
   returning into view — on iOS a frozen PWA gets nothing else — and `online`. A hidden tab polls
   nothing. Every refusal but a dead link keeps the request: the next poll is seconds away, and a
