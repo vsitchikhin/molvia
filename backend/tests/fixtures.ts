@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomInt, randomUUID } from 'node:crypto'
 import type { ActorSettings } from '@molvia/model'
-import { eq } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import {
   actorSettingsSchema,
   AGGREGATE_MIN_CONTRIBUTIONS,
@@ -204,6 +204,23 @@ export async function insertLoginRequest(
     ...patch,
   })
   return id
+}
+
+/**
+ * `count` starts of this minute written straight into the table, as a start writes them, with no
+ * quota and no count in `login_days` — everybody's window of `LOGIN_WINDOW_LIMIT` filled without
+ * three hundred transactions (MOL-359).
+ */
+export async function fillLoginWindow(db: Db, count: number): Promise<void> {
+  await db.insert(loginRequests).values(
+    Array.from({ length: count }, () => ({
+      id: randomUUID(),
+      code: randomBytes(32).toString('base64url'),
+      secretHash: randomBytes(32).toString('hex'),
+      createdAt: sql`clock_timestamp()`,
+      expiresAt: sql`clock_timestamp() + interval '5 minutes'`,
+    })),
+  )
 }
 
 /** Deleted child-first: every table here points at the one below it. */

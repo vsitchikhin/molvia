@@ -9,8 +9,10 @@ import {
   loginPollCodec,
 } from '@molvia/model'
 import type { Page, APIRequestContext } from '@playwright/test'
+import { ownAddress } from './session'
 
 async function start(page: Page) {
+  await ownAddress(page)
   // No app bootstrap: MOL-56 owns the screen; the development shell would auto-login.
   await page.goto('/api/health')
   const body: unknown = await page.evaluate(async (header) => {

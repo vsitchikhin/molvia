@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { networkOf } from './client-errors'
+import { networkOf } from './address'
 
 describe('networkOf — чья минута (MOL-144, ревью №2, адверсариальные Б4, В2)', () => {
   it('IPv6 — по /48: бесплатная /48 туннеля — один отправитель (раунд 3, В2)', () => {
