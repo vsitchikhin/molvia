@@ -70,9 +70,11 @@ function outdatedLines(): Plugin {
 // `index.html` with the headers of the day it was cached, which changes only with the file, so a
 // policy in a header changed alone would never reach it — inside the file, it comes with the version.
 // What a meta cannot say, `frame-ancestors`, is Caddy's. No `'unsafe-inline'` and no `'unsafe-eval'`:
-// the scripts of `index.html` go by their hashes, counted by the build; the scanner's wasm needs
-// `'wasm-unsafe-eval'`; a receipt's photo and the picture sent to the developer are `blob:`.
-const CONTENT_SECURITY_POLICY: Record<string, string[]> = {
+// the scripts of `index.html` go by their hashes, counted by the build; `'wasm-unsafe-eval'` is for an
+// engine whose worker takes its page's policy — zxing compiles in the scanner's workers, and the engines
+// tried give a worker none from the meta (`security.md`); a receipt's photo and the picture sent to the
+// developer are `blob:`.
+const CONTENT_SECURITY_POLICY = {
   'default-src': ["'self'"],
   'script-src': ["'self'", "'wasm-unsafe-eval'"],
   'style-src': ["'self'"],
@@ -83,9 +85,13 @@ const CONTENT_SECURITY_POLICY: Record<string, string[]> = {
   'object-src': ["'none'"],
   'base-uri': ["'none'"],
   'form-action': ["'self'"],
-}
+} satisfies Record<string, string[]>
 
-const INLINE_SCRIPT = /<script>([\s\S]*?)<\/script>/g
+// A script is what the browser runs as one: any case, any attributes, never inside a comment — a
+// comment of this file may well name `<script>`. One with `src` is the bundle's, `'self'` already.
+const HTML_COMMENT = /<!--[\s\S]*?-->/g
+const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi
+const WITH_SRC = /\bsrc\s*=/i
 
 function contentSecurityPolicy(): Plugin {
   return {
@@ -93,28 +99,32 @@ function contentSecurityPolicy(): Plugin {
     // The build only: the dev server puts styles in by `<style>` and talks over a websocket, so its
     // policy would be another one and prove nothing of production's.
     apply: 'build',
+    // Last of every plugin, the PWA's own `post` included (it stands before this one in the list), so
+    // the hashes are of the scripts as shipped — `outdatedLines` writes into one of them.
+    enforce: 'post',
     transformIndexHtml: {
-      // After every other plugin, so the hash is of the script as shipped — `outdatedLines` writes
-      // into one of them.
       order: 'post',
       handler(html) {
-        const hashes = [...html.matchAll(INLINE_SCRIPT)].map(
-          ([, body]) =>
-            `'sha256-${createHash('sha256')
-              .update(body ?? '')
-              .digest('base64')}'`,
-        )
+        const parsed = html.replace(HTML_COMMENT, '')
+        const hashes = [...parsed.matchAll(SCRIPT)]
+          .filter(([, attributes]) => !WITH_SRC.test(attributes ?? ''))
+          .map(
+            ([, , body]) =>
+              `'sha256-${createHash('sha256')
+                .update(body ?? '')
+                .digest('base64')}'`,
+          )
         if (hashes.length === 0) throw new Error('index.html has no inline script to hash')
         const policy = Object.entries({
           ...CONTENT_SECURITY_POLICY,
-          'script-src': [...(CONTENT_SECURITY_POLICY['script-src'] ?? []), ...hashes],
+          'script-src': [...CONTENT_SECURITY_POLICY['script-src'], ...hashes],
         })
           .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
           .join('; ')
         // First after the charset: a script before the meta would run under no policy at all.
         const charset = '<meta charset="utf-8" />'
         const at = html.indexOf(charset)
-        if (at < 0 || html.slice(0, at).includes('<script')) {
+        if (at < 0 || /<script\b/i.test(html.slice(0, at).replace(HTML_COMMENT, ''))) {
           throw new Error('index.html has no charset before its first script for the policy')
         }
         const meta = `\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />`
@@ -132,7 +142,6 @@ export default defineConfig(({ mode }) => {
     plugins: [
       vue(),
       outdatedLines(),
-      contentSecurityPolicy(),
       // MDI through Iconify: icons are inlined as components at build time, so only the
       // ones actually used ship, no icon font is downloaded, and colour comes from
       // currentColor — which means they obey the tokens like any other element.
@@ -175,6 +184,7 @@ export default defineConfig(({ mode }) => {
           ],
         },
       }),
+      contentSecurityPolicy(),
     ],
     // The maps lie beside the build, for `make failures` to read a phone's frames (MOL-144, Р-7 of
     // MOL-149): the repository is public, so they disclose nothing. Not precached — `globPatterns`
