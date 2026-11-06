@@ -134,11 +134,15 @@ localhost`): HSTS holds by the host's name, not its port, and the production sta
   build comes through `e2e/csp.ts`, which fails it on any; `csp-built.spec` holds the meta and its hashes and walks
   what a directive decides. **Production reports nothing** (В-3 «а»): a policy that blocks the bundle leaves nobody
   to report, and the walk covers the rest, signed in on both engines — WebKit by the seam's session put in the
-  context's jar (adversarial А1, `e2e.md`). **WebKit refuses its own inline style of every `<select>`** (`style-src-attr`,
-  an empty `sample` — a bare `createElement('select')` too), on six screens signed in, with nothing seen to change
-  on the screen; `e2e/csp.ts` lets go exactly that report and one line of its console for each, and the policy
-  stays strict (owner's В-4 «а»). Whether Safari on a phone reports it too was not tried. **The prices, named:** an
-  inline style of ours on a `<select>` is let go on WebKit — Chromium, walking the same screens, fails on it; the
+  context's jar (adversarial А1, `e2e.md`). **WebKit refuses its own inline style of every `<select>`** (`style-src-attr` —
+  a bare `createElement('select')` too), on six screens signed in, with nothing seen to change on the screen;
+  `e2e/csp.ts` lets go every `style-src-attr` report at a `<select>` on WebKit and one line of its console for each,
+  and the policy stays strict (owner's В-4 «а»). No field of a report tells the engine's style from ours — `sample` is
+  empty for both, the policy asking none (adversarial Б1 of review 2). Whether Safari on a phone reports it too was not
+  tried. **The prices, named:** an inline style of ours on a `<select>` is let go on WebKit — Chromium, walking the
+  same screens, fails on it, and no screen has a branch of iOS alone that could set one; Firefox never ran under the
+  policy — Playwright's Firefox does not start in the sandbox of the sessions — so which engine of the floor gives a
+  worker its page's policy rests on none tried; the
   scanner is walked on Chromium alone (WebKit has no fake camera), and the QR's worker of a Serbian receipt on
   neither, sharing the scanner's sources; a worker has no policy of its own
   — a meta binds its document, a worker's script comes with Caddy's headers alone — and runs only our code over

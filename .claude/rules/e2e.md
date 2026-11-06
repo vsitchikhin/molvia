@@ -146,8 +146,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   never sends a `Cookie` of the route's, and a Mac's WebKit hid it by keeping the seam's own (CI, run 42209616807); the
   jar is emptied first, so every machine signs in one way. The session is taken by its name — the seam sets the
   account it remembers first. The device then asks «Is this your account?» (MOL-56) and the terms, as a person
-  answers them. **WebKit's own report of a `<select>`** (`style-src-attr`, empty `sample`) is the one `csp.ts` lets
-  go, with one line of its console for each (owner's В-4 «а», `security.md`). The fixture listens on the context, so a
+  answers them. **WebKit's own report of a `<select>`** is the one `csp.ts` lets go — any `style-src-attr` report at a
+  `<select>` on WebKit, with one line of its console for each (owner's В-4 «а», `security.md`): no field tells the
+  engine's style from ours, and Chromium on the same screens fails on ours. The fixture listens on the context, so a
   second window of a test is heard too (review 1, №4). A version `pwa-update.spec` puts out meanwhile only adds its
   strip over the tab bar.
 - **The camera needs the full Chromium, so the scanner's specs run in one project** (MOL-98): `camera`
