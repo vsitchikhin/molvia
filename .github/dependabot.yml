@@ -19,10 +19,12 @@ updates:
         update-types: [minor, patch]
         exclude-patterns: ['@playwright/test', 'playwright', 'playwright-core']
       # A fix of a known vulnerability, whatever its size, in one pull request (MOL-364): ungrouped,
-      # security updates open one per advisory.
+      # security updates open one per advisory. Playwright apart here too — its pull request is red
+      # until the image's tag is moved, and the week's fixes would wait in it.
       security:
         applies-to: security-updates
         patterns: ['*']
+        exclude-patterns: ['@playwright/test', 'playwright', 'playwright-core']
     commit-message:
       prefix: 'chore(deps)'
 
