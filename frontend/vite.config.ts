@@ -94,8 +94,14 @@ const CONTENT_SECURITY_POLICY = {
 // The charset the meta follows is found in the same pass, so one a comment quotes is no place for it.
 // What this cannot read the end-to-end reads by the browser's own parser (`csp-built.spec`).
 const CHARSET = '<meta charset="utf-8" />'
-const COMMENT_SCRIPT_OR_CHARSET =
-  /<!--[\s\S]*?-->|<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script\s*>|<meta charset="utf-8" \/>/gi
+const COMMENT_SCRIPT_OR_CHARSET = new RegExp(
+  [
+    /<!--[\s\S]*?-->/.source,
+    /<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script\s*>/.source,
+    CHARSET.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+  ].join('|'),
+  'gi',
+)
 const QUOTED = /"[^"]*"|'[^']*'/g
 const WITH_SRC = /(?:^|\s)src\s*=/i
 
@@ -113,7 +119,7 @@ function contentSecurityPolicy(): Plugin {
       handler(html) {
         const tokens = [...html.matchAll(COMMENT_SCRIPT_OR_CHARSET)]
         const scripts = tokens.filter(([token]) => /^<script/i.test(token))
-        const at = tokens.find(([token]) => token === CHARSET)?.index ?? -1
+        const at = tokens.find(([token]) => token.toLowerCase() === CHARSET)?.index ?? -1
         const hashes = scripts
           .filter(([, attributes]) => !WITH_SRC.test((attributes ?? '').replace(QUOTED, '""')))
           .map(
