@@ -724,37 +724,35 @@ report.
   lower case — **never by `toSearchKey`**, which folds «мм» into «м», «км» into «см» and «pc» into a
   pack, and let «Лента 50 мм» merge into «Лента 50 м» at 0.957, adversarial А2; a test holds that no
   spelling stands for two units, and a unit missing is a word, so the pair is a candidate, never a
-  merge) — **the same scripts** (review №6: held by the code, not by the model), **the same number of words,
-  each within one edit, two in the name** (`twinSpelling`: matched one to one in any order, «Чанах сыр» is
-  «Сыр чанах»; a word under four letters must be the same — «SAS» and «SOS» are two shops), **and the
-  names' vectors at least 0.90 apart by cosine**. A word more is a brand, never a twin: «Сыр чанах
-  Ашхар», «Молоко Марианна» (MOL-112, В-1) — not even a candidate, or every brand would stand in the list
-  beside its kind. **A word one name has and the other has not that describes is never merged by itself,
-  only named** (`describedApart`, MOL-358, adversarial А1 of MOL-299; owner's В-1 «а»): «Курица вареная» and
-  «Курица жареная» at 0.929, «Грибы тушёные» and «Грибы сушёные» at 0.946 are two ways of cooking one letter
-  apart, not a typo, and the model reads them by their letters. «Describes» is the kind's own rule
-  (`describes` of `synonyms.ts`, as `kindKey` skips it): an adjective's ending, but for the nouns that wear one
-  («мороженое», «пирожное»), read off the word as written — a hyphen by its last part, quotes aside — never
-  off the key, which splits «варёно-копчёная» in two. A typo of the kind beside it, the order of words, «ё»
-  and a double letter still merge. **The price, named:** a typo inside an adjective — «Сыр рассийский»,
-  «Творог обизжиренный» — is a candidate too, 112 of the bench's 250 typos that merged, merged by hand; a
-  typo of a noun on that list reads as an adjective («Мароженое»); a noun one letter from another noun still
-  merges at 0.90, and the seed has none (the nearest, «Курица ~ Корица», 0.856); an adjective is known by its
-  Russian ending, so «boiled ~ broiled» and Armenian participles are judged as before. A closed list of ways of
-  cooking (244 typos kept) and a dictionary of the seed's and the tills' adjectives (all 250) were measured and
-  set aside: each leaves an adjective it does not know — «Варенье малиновое ~ калиновое», 0.889 — to merge by
-  itself once the model's digits move.
+  merge) — **the same scripts** (review №6: held by the code, not by the model), **the same words, one
+  spelling** (`twinSpelling`: matched one to one in any order, «Чанах сыр» is «Сыр чанах»; **no edit at all**
+  between them — the same search key, so «ё», a double letter, «й» and a soft sign are one spelling, and a
+  letter apart is a candidate, MOL-358, owner's В-2 «в»), **and the names' vectors at least 0.90 apart by
+  cosine**. A word more is a brand, never a twin: «Сыр чанах Ашхар», «Молоко Марианна» (MOL-112, В-1) —
+  not even a candidate, or every brand would stand in the list beside its kind.
+- **Not a letter, since a letter cannot be told** (MOL-358). Until it one edit a word, two a name merged
+  by themselves, and the adversarial pass of MOL-299 (А1) found two ways of cooking one letter apart merged
+  so — «Курица вареная» into «Курица жареная» at 0.929, «Грибы тушёные» into «Грибы сушёные» at 0.946: the
+  model reads a name by its letters. A rule that told a word that describes by an adjective's ending
+  (owner's В-1 «а») was passed the first round by five spellings of the same pair (adversarial Б1–Б5 of
+  MOL-358): another case («Пельмени с жареным луком», 0.972), a sign without a space («тушёная,ГОСТ»), a
+  soft hyphen or an accent the key drops, Latin letters («Kurica zharenaya»), «варён.» — and two nouns merged
+  past it, «Мойва» by «Мойка» at 0.910 (Б6). Every such rule is a list of what describes, with everything
+  else a typo to merge; so a letter is never merged by itself, whatever the word (В-2 «в»), as a shop's name
+  already was. **The price, named:** every typo is a candidate the owner merges by hand — «Малоко»,
+  «Смитана 20%», «Творог обизжиренный» — 237 of the bench's 250 that merged, ten a morning; the search finds
+  either side meanwhile. A typo of the kind alone (108 of 250) was measured as the middle way and set aside:
+  it left two nouns and an adjective in front the kind does not know («Zharenaya kurica») to merge by
+  themselves.
 - **Measured on the seed** (`.scratch/tasks/status/MOL-106-measure.md`, the bench beside it): of its
-  178 000 pairs none merges; the nearest one edit apart is «Курица» and «Корица» at 0.856; two edits in a
-  word let in «Хлеб» and «Хлебцы» at 0.937, so a word takes one. Taken: a fat with a comma or a point
-  (7 of 7), «ё» (32 of 33), the order of words (207 of 222), half of the typos. 0.88 also had no false
-  merge, but «Курица» stood 0.024 from it. `merge-corpus.integration.test.ts` pins it end to end on the
-  real model, with pairs well clear of the threshold — the model's last digits differ on x86 (MOL-105).
-  **The seed has no two ways of cooking one letter apart**, so the bench missed them (MOL-358): its list
-  `DESCRIBED_NOT` holds the probe's seven and fourteen relatives, fifteen of which merged at 0.900–0.946; with
-  `describedApart` none does, the typos that merge by themselves fall from 250 to 138 and nothing else moves
-  (the same run, the rule before and after on its numbers). `merge-corpus.integration.test.ts` names
-  seventeen of them, never merges them.
+  178 000 pairs none merges, by any rule measured; the nearest one edit apart is «Курица» and «Корица» at
+  0.856. Taken by itself now: a fat with a comma or a point (7 of 7), «ё» (32 of 33), the order of words (207
+  of 222), 13 of the 250 typos that merged before — those the key folds. **The seed has no two ways of cooking
+  one letter apart**, so the bench missed them: its list `DESCRIBED_NOT` (MOL-358) holds the probe's seven and
+  fourteen relatives, fifteen of which merged at 0.900–0.946, and none does now (the same run, the rules on its
+  numbers). `merge-corpus.integration.test.ts` pins it end to end on the real model — the seed's twins merge,
+  the probe's pairs and the attacks' are only named — with pairs well clear of the threshold: the model's last
+  digits differ on x86 (MOL-105).
 - **The model does not read across scripts.** «Moloko» against «Молоко» is 0.69 at the median, «Mylo»
   against «Мыло» 0.47 — as far as «Milo» from «Мыло», 0.48: a transliteration and a homograph look alike
   to it — and its highest, «Bulochki dlya burgerov», stands at 0.902, past the threshold. So **a pair
@@ -949,8 +947,9 @@ report.
   survivor is near the other side too («Сыр чанох» merged into «Сыр чанах», whose pair with «Сыр чунух»
   is 0.64: never asked) — in `report`, where nothing merged, it is named as it is.
 - **`CATALOGUE_MERGE`**: `on` merges, `report` says what it would and merges nothing — it only sweeps
-  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `on` from MOL-358**
-  (В-6 «а» of MOL-299), set in `.env.prod` — the compose file's default stays `report`; until then it ran
+  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production's `.env.prod` says `on` from
+  MOL-358, set by the owner's word after its merge** (В-6 «а» of MOL-299) — the compose file's default stays
+  `report`; until then it ran
   `report` (В-3; MOL-299): the thresholds stand on a corpus, not on live twins. **28 nights of `report`,
   06.10…02.11, named none to merge** — not one false, nor one true, so the rule has met no live twin — and
   the owner's rule for `on` (В-3 «а» of MOL-299: before the tag of 0.2, once no pair the night would merge
@@ -958,8 +957,8 @@ report.
   nights could not**: a way of cooking one letter apart merges by itself — «Курица вареная» into «Курица
   жареная» at 0.929, «Грибы тушёные» into «Грибы сушёные» at 0.946, seven pairs of seven — since a word is
   one edit and the model reads a name by its letters; the seed has no such pair, people's items do. So
-  production went back to `report` on 03.11, before a night merged anything, and MOL-358 mended the rule
-  (`describedApart`, above) and turned `on` as its last step. Of the 14 candidates of those nights 12 were the seed against itself, set
+  production went back to `report` on 03.11, before a night merged anything, and MOL-358 mends the rule
+  and turns `on` once the owner says so after its merge. Of the 14 candidates of those nights 12 were the seed against itself, set
   apart by hand, one a receipt's twin across two scripts merged by hand (#1), and one a place in Gyumri
   left as it is. A pair
   only reported comes with its command **`make apart FROM= INTO=`** (review №7, owner's decision
