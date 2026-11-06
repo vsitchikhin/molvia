@@ -87,11 +87,15 @@ const CONTENT_SECURITY_POLICY = {
   'form-action': ["'self'"],
 } satisfies Record<string, string[]>
 
-// A script is what the browser runs as one: any case, any attributes, never inside a comment — a
-// comment of this file may well name `<script>`. One with `src` is the bundle's, `'self'` already.
-const HTML_COMMENT = /<!--[\s\S]*?-->/g
-const SCRIPT = /<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi
-const WITH_SRC = /\bsrc\s*=/i
+// A script is what the browser runs as one, read in one pass left to right as the parser reads it: a
+// comment outside a script hides what it holds — a comment of this file may well name `<script>` — and a
+// `<!--` inside a script is the script's own text; any case, a `>` inside a quoted value ends no tag.
+// One with a `src` attribute of its own — `data-src` is another — is the bundle's, `'self'` already.
+// What this cannot read the end-to-end reads by the browser's own parser (`csp-built.spec`).
+const COMMENT_OR_SCRIPT =
+  /<!--[\s\S]*?-->|<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script\s*>/gi
+const QUOTED = /"[^"]*"|'[^']*'/g
+const WITH_SRC = /(?:^|\s)src\s*=/i
 
 function contentSecurityPolicy(): Plugin {
   return {
@@ -105,9 +109,11 @@ function contentSecurityPolicy(): Plugin {
     transformIndexHtml: {
       order: 'post',
       handler(html) {
-        const parsed = html.replace(HTML_COMMENT, '')
-        const hashes = [...parsed.matchAll(SCRIPT)]
-          .filter(([, attributes]) => !WITH_SRC.test(attributes ?? ''))
+        const scripts = [...html.matchAll(COMMENT_OR_SCRIPT)].filter(([token]) =>
+          /^<script/i.test(token),
+        )
+        const hashes = scripts
+          .filter(([, attributes]) => !WITH_SRC.test((attributes ?? '').replace(QUOTED, '""')))
           .map(
             ([, , body]) =>
               `'sha256-${createHash('sha256')
@@ -124,7 +130,7 @@ function contentSecurityPolicy(): Plugin {
         // First after the charset: a script before the meta would run under no policy at all.
         const charset = '<meta charset="utf-8" />'
         const at = html.indexOf(charset)
-        if (at < 0 || /<script\b/i.test(html.slice(0, at).replace(HTML_COMMENT, ''))) {
+        if (at < 0 || scripts.some((script) => script.index < at)) {
           throw new Error('index.html has no charset before its first script for the policy')
         }
         const meta = `\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />`
