@@ -1,13 +1,21 @@
-import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { dockerfileProblems, pinProblems, workflowProblems } from './check-pins.mjs'
+import {
+  dependabotProblems,
+  dockerfileProblems,
+  pinProblems,
+  repositoryProblems,
+  workflowProblems,
+} from './check-pins.mjs'
 
 const SHA = '3d3c42e5aac5ba805825da76410c181273ba90b1'
 const DIGEST = `sha256:${'0e17'.repeat(16)}`
 const WORKFLOW = '.github/workflows/ci.yml'
 
 const steps = (...lines: string[]): string => `jobs:\n  check:\n    steps:\n${lines.join('\n')}\n`
+const unpinned = (where: string, reference: string): string =>
+  `${where}: ${reference} — pin it by the full commit sha, its release in a comment`
+const unnamed = (where: string, reference: string): string =>
+  `${where}: ${reference} — name its release in a comment after it, # vX.Y.Z`
 
 describe('workflowProblems', () => {
   it('is quiet on a full sha with its release in a comment, quoted or not, a job or a step', () => {
@@ -15,7 +23,7 @@ describe('workflowProblems', () => {
       steps(
         `      - uses: actions/checkout@${SHA} # v7.0.1`,
         `      - name: cache`,
-        `        uses: 'actions/cache@${SHA}' #v6`,
+        `        uses: 'actions/cache@${SHA}' #v6.1`,
       ),
       `  reuse:\n    uses: owner/repo/.github/workflows/x.yml@${SHA} # 1.2.0\n`,
     ].join('')
@@ -29,27 +37,34 @@ describe('workflowProblems', () => {
       `      - uses: actions/cache@${SHA.slice(0, 7)} # v6.1.0`,
     )
     expect(workflowProblems(WORKFLOW, text)).toEqual([
-      `${WORKFLOW}:4: actions/checkout@v7 — pin it by the full commit sha, its release in a comment`,
-      `${WORKFLOW}:5: docker/login-action@master — pin it by the full commit sha, its release in a comment`,
-      `${WORKFLOW}:6: actions/cache@${SHA.slice(0, 7)} — pin it by the full commit sha, its release in a comment`,
+      unpinned(`${WORKFLOW}:4`, 'actions/checkout@v7'),
+      unpinned(`${WORKFLOW}:5`, 'docker/login-action@master'),
+      unpinned(`${WORKFLOW}:6`, `actions/cache@${SHA.slice(0, 7)}`),
     ])
   })
 
-  it('refuses a sha without its release named, or a comment that names none', () => {
+  it('refuses a sha with no release named, a word for one, or a major alone', () => {
     const text = steps(
       `      - uses: actions/checkout@${SHA}`,
       `      - uses: actions/checkout@${SHA} # checkout`,
+      `      - uses: actions/checkout@${SHA} # v7`,
+      `      - uses: actions/checkout@${SHA} #v6`,
     )
-    expect(workflowProblems(WORKFLOW, text)).toEqual([
-      `${WORKFLOW}:4: actions/checkout@${SHA} — name its release in a comment after it, # vX.Y.Z`,
-      `${WORKFLOW}:5: actions/checkout@${SHA} — name its release in a comment after it, # vX.Y.Z`,
-    ])
+    expect(workflowProblems(WORKFLOW, text)).toEqual(
+      [4, 5, 6, 7].map((line) => unnamed(`${WORKFLOW}:${String(line)}`, `actions/checkout@${SHA}`)),
+    )
   })
 
   it('refuses a sha in capitals: it takes only the form Dependabot writes', () => {
     expect(
-      workflowProblems(WORKFLOW, steps(`      - uses: a/b@${SHA.toUpperCase()} # v1`)),
+      workflowProblems(WORKFLOW, steps(`      - uses: a/b@${SHA.toUpperCase()} # v1.0`)),
     ).toHaveLength(1)
+  })
+
+  it('refuses a docker:// image as an action not pinned by its sha', () => {
+    expect(
+      workflowProblems(WORKFLOW, steps(`      - uses: docker://alpine:3.22@${DIGEST}`)),
+    ).toEqual([unpinned(`${WORKFLOW}:4`, `docker://alpine:3.22@${DIGEST}`)])
   })
 
   it('leaves a local action and a commented-out line alone', () => {
@@ -58,16 +73,6 @@ describe('workflowProblems', () => {
       '      # - uses: actions/checkout@v7',
     )
     expect(workflowProblems(WORKFLOW, text)).toEqual([])
-  })
-
-  it('takes a docker:// image only by its digest', () => {
-    const text = steps(
-      `      - uses: docker://alpine:3.22@${DIGEST}`,
-      '      - uses: docker://alpine:3.22',
-    )
-    expect(workflowProblems(WORKFLOW, text)).toEqual([
-      `${WORKFLOW}:5: docker://alpine:3.22 — pin the image by its digest`,
-    ])
   })
 })
 
@@ -81,6 +86,7 @@ describe('dockerfileProblems', () => {
       `FROM node:22.23.4-alpine@${DIGEST} AS build`,
       'RUN true',
       `from --platform=linux/amd64 ghcr.io/google/cadvisor:v0.60.6@${DIGEST} as Tools`,
+      `FROM debian:trixie-slim@${DIGEST}`,
       'FROM build AS again',
       'FROM tools',
       'FROM scratch',
@@ -105,39 +111,106 @@ describe('dockerfileProblems', () => {
     ])
   })
 
-  it('takes a stage only after the file named it — a later stage of the name is still an image', () => {
-    const text = ['FROM runtime', `FROM node:22.23.4-alpine@${DIGEST} AS runtime`].join('\n')
-    expect(dockerfileProblems(FILE, text)).toEqual([told(1, 'runtime')])
+  it('refuses latest and a major alone even beside their digest', () => {
+    const images = [
+      `node:latest@${DIGEST}`,
+      `node:22@${DIGEST}`,
+      `caddy:2-alpine@${DIGEST}`,
+      `x/y:v1@${DIGEST}`,
+    ]
+    expect(dockerfileProblems(FILE, images.map((image) => `FROM ${image}`).join('\n'))).toEqual(
+      images.map((image, index) => told(index + 1, image)),
+    )
   })
 
-  it('refuses a base image named by an argument, which it cannot read', () => {
+  it('takes a stage only after its own line — a stage named as its image, or below, is still an image', () => {
+    const text = [
+      'FROM runtime',
+      'FROM caddy AS caddy',
+      'FROM node AS Node',
+      `FROM node:22.23.4-alpine@${DIGEST} AS runtime`,
+    ]
+    expect(dockerfileProblems(FILE, text.join('\n'))).toEqual([
+      told(1, 'runtime'),
+      told(2, 'caddy'),
+      told(3, 'node'),
+    ])
+  })
+
+  it('reads the images COPY --from and RUN --mount take, and leaves the stages they name alone', () => {
+    const text = [
+      `FROM node:22.23.4-alpine@${DIGEST} AS build`,
+      'COPY --from=build /repo/dist /srv',
+      'COPY --from=0 /a /b',
+      `COPY --chown=1:1 --from=busybox:1.37.0@${DIGEST} /bin/busybox /bb`,
+      'COPY --from=busybox:latest /bin/busybox /bb',
+      'RUN --mount=type=bind,from=busybox,target=/m ls /m',
+      'RUN --mount=type=cache,target=/root/.npm --mount=type=bind,from=build,target=/b npm ci',
+    ].join('\n')
+    expect(dockerfileProblems(FILE, text)).toEqual([told(5, 'busybox:latest'), told(6, 'busybox')])
+  })
+
+  it('refuses an image named by an argument, which it cannot read', () => {
     expect(dockerfileProblems(FILE, 'ARG BASE=node:22\nFROM ${BASE}')).toEqual([
-      `${FILE}:2: \${BASE} — a base image named by an argument cannot be checked; write it out`,
+      `${FILE}:2: \${BASE} — an image named by an argument cannot be checked; write it out`,
     ])
   })
 })
 
+describe('pinProblems', () => {
+  it('reads an action of the repository as a workflow', () => {
+    const action = 'runs:\n  using: composite\n  steps:\n    - uses: actions/checkout@v7\n'
+    expect(pinProblems([{ path: '.github/actions/setup/action.yml', text: action }])).toEqual([
+      unpinned('.github/actions/setup/action.yml:4', 'actions/checkout@v7'),
+    ])
+  })
+})
+
+describe('dependabotProblems', () => {
+  const entry = (...directories: string[]): string =>
+    [
+      'updates:',
+      '  - package-ecosystem: npm',
+      '    directory: /backend',
+      '  - package-ecosystem: docker',
+      '    directories:',
+      ...directories.map((directory) => `      - ${directory}`),
+      '    schedule:',
+      '      interval: weekly',
+      '  - package-ecosystem: github-actions',
+      '    directory: /deploy/loki',
+    ].join('\n')
+
+  it('is quiet when every directory with a Dockerfile is watched, a trailing slash or quotes aside', () => {
+    expect(
+      dependabotProblems(
+        ['Dockerfile', 'frontend/Dockerfile', 'deploy/grafana/Dockerfile'],
+        entry('/', '/frontend/', "'/deploy/grafana'"),
+      ),
+    ).toEqual([])
+  })
+
+  it('names a directory with a Dockerfile the docker entry does not watch — another entry does not count', () => {
+    expect(
+      dependabotProblems(
+        ['frontend/Dockerfile', 'deploy/loki/Dockerfile', 'backend/Dockerfile'],
+        entry('/frontend'),
+      ),
+    ).toEqual([
+      ".github/dependabot.yml: /deploy/loki has a Dockerfile Dependabot does not watch — add it to the docker entry's directories",
+      ".github/dependabot.yml: /backend has a Dockerfile Dependabot does not watch — add it to the docker entry's directories",
+    ])
+  })
+
+  it('refuses a file with no docker entry', () => {
+    expect(
+      dependabotProblems(['frontend/Dockerfile'], 'updates:\n  - package-ecosystem: npm\n'),
+    ).toEqual(['.github/dependabot.yml: no docker entry — Dependabot moves no base image'])
+  })
+})
+
 describe('the repository', () => {
-  it('pins every action and every base image', () => {
-    const paths = execFileSync(
-      'git',
-      [
-        'ls-files',
-        '-z',
-        '--',
-        '.github/workflows/*.yml',
-        '.github/workflows/*.yaml',
-        'Dockerfile',
-        '**/Dockerfile',
-      ],
-      { encoding: 'utf8' },
-    )
-      .split('\0')
-      .filter(Boolean)
-    expect(paths).toContain('.github/workflows/release.yml')
-    expect(paths).toContain('services/receipt-reader/Dockerfile')
-    expect(pinProblems(paths.map((path) => ({ path, text: readFileSync(path, 'utf8') })))).toEqual(
-      [],
-    )
+  it('pins every action and every image, and Dependabot watches every Dockerfile', () => {
+    expect(repositoryProblems()).toEqual([])
   })
 })
