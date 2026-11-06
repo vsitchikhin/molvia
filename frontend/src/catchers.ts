@@ -5,12 +5,12 @@ import type { FailureReports } from '@/failures'
 import { platformLine } from '@/platform'
 
 /**
- * The phone's catchers (MOL-144), imported by the first line of `main.ts`: modules are evaluated in
+ * The phone's catchers (MOL-144), imported by `main.ts` first after `@/zodJitless`: modules are evaluated in
  * the order they are imported, so the window's listeners stand before the router, the screens, i18n
  * and everything they pull in is evaluated — a module of the app that throws as it loads is heard
  * (adversarial Б3 of round 2). **The price, named:** what throws before this module runs — the
- * bundle failing to parse, and the few modules this one imports: the client, the model, storage —
- * reaches nobody.
+ * bundle failing to parse, `zodJitless` (zod alone), and the few modules this one imports: the client,
+ * the model, storage — reaches nobody.
  *
  * The screen is told by `main.ts` once the app is there (`placeFailures`); until then it is `start`.
  */
