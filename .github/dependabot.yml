@@ -18,6 +18,11 @@ updates:
       minor-and-patch:
         update-types: [minor, patch]
         exclude-patterns: ['@playwright/test', 'playwright', 'playwright-core']
+      # A fix of a known vulnerability, whatever its size, in one pull request (MOL-364): ungrouped,
+      # security updates open one per advisory.
+      security:
+        applies-to: security-updates
+        patterns: ['*']
     commit-message:
       prefix: 'chore(deps)'
 
@@ -30,3 +35,26 @@ updates:
         patterns: ['*']
     commit-message:
       prefix: 'ci(deps)'
+
+  # The base images (MOL-364): pinned by an exact tag and its digest, which Dependabot moves together —
+  # a floating tag it never moves, and a release of Caddy would go unseen.
+  - package-ecosystem: docker
+    directories:
+      - /frontend
+      - /backend
+      - /bot
+      - /services/receipt-reader
+      - /deploy/grafana
+      - /deploy/victoria
+    schedule:
+      interval: weekly
+      day: monday
+    ignore:
+      # Node's major is `.nvmrc`'s, which CI runs on too: moved by a commit of ours, never by the bot.
+      - dependency-name: node
+        update-types: [version-update:semver-major]
+    groups:
+      images:
+        patterns: ['*']
+    commit-message:
+      prefix: 'build(deps)'
