@@ -48,7 +48,8 @@ const NAMED: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
  * the adversarial probe of MOL-299 (А1) and its relatives: the first fourteen stood past 0.90, from 0.900
  * to 0.946, the rest from 0.871, and the night merged those fourteen. Then the ways the rule of an
  * adjective's ending was passed (adversarial Б1, Б2, Б4–Б6 of MOL-358): a case, a sign, Latin letters,
- * «варён.», two nouns — 0.907 to 0.972. A seed line is typed beside, not again.
+ * «варён.», two nouns — 0.907 to 0.972 — and one key spelt two ways. A seed line is typed beside, not
+ * again.
  */
 const ONE_LETTER: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
   ['Курица жареная', 'Курица вареная', 'kg'],
@@ -76,6 +77,11 @@ const ONE_LETTER: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] =
   ['Kurica zharenaya', 'Kurica varenaya', 'kg'],
   ['Яйца варён.', 'Яйца жарен.', 'piece'],
   ['Мойва', 'Мойка', 'kg'],
+  // One search key, two things — the key folds «ы» into «и» and a soft sign (adversarial В1, В2 of
+  // round 2), 0.922 to 0.961: one key is not one spelling.
+  ['Игрушка мишка плюшевая', 'Игрушка мышка плюшевая', 'piece'],
+  ['Мармелад мишки', 'Мармелад мышки', 'kg'],
+  ['Пенка', 'Пенька', 'piece'],
 ]
 
 /** Two sizes the search key folds into one, and the model puts past 0.93 (adversarial А2). */
