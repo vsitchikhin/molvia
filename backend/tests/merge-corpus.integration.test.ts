@@ -29,7 +29,6 @@ const embedder = startEmbedder(env.EMBEDDINGS_DIR, quiet, { queryWaitMs: 60_000 
 const TWINS: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
   ['Молоко 3.2%', 'Молоко 3,2%', 'l'],
   ['Масло топленое', 'Масло топлёное', 'kg'],
-  ['Творог обизжиренный', 'Творог обезжиренный', 'kg'],
   ['Безлактозное молоко', 'Молоко безлактозное', 'l'],
 ]
 
@@ -37,9 +36,37 @@ const TWINS: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
 const NAMED: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
   ['Moloko', 'Молоко', 'l'],
   ['Кифир', 'Кефир', 'l'],
+  // a typo inside a word that describes, 0.947: the price of MOL-358 — the owner merges it by hand
+  ['Творог обизжиренный', 'Творог обезжиренный', 'kg'],
   ['Milo', 'Мыло', 'piece'],
   // the closest by meaning of the seed's own transliterations, 0.902: past the threshold (review №6)
   ['Bulochki dlya burgerov', 'Булочки для бургеров', 'piece'],
+]
+
+/**
+ * Two ways of cooking, or two things a word describes, one letter apart — the adversarial probe of
+ * MOL-299 (А1) and its relatives (MOL-358): the model put the first fifteen past 0.90, from 0.900 to
+ * 0.946, and the night merged them by itself. Named, never merged. A seed line is typed beside, not
+ * again.
+ */
+const DESCRIBED: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
+  ['Курица жареная', 'Курица вареная', 'kg'],
+  ['Картофель жареный', 'Картофель вареный', 'kg'],
+  ['Колбаса жареная', 'Колбаса варёная', 'kg'],
+  ['Грибы сушёные', 'Грибы тушёные', 'kg'],
+  ['Овощи сушёные', 'Овощи тушёные', 'kg'],
+  ['Яйца варёные', 'Яйца жареные', 'piece'],
+  ['Свёкла варёная', 'Свёкла жареная', 'kg'],
+  ['Мясо тушёное', 'Мясо сушёное', 'kg'],
+  ['Картофель тушёный', 'Картофель сушёный', 'kg'],
+  ['Свинина тушёная', 'Свинина сушёная', 'kg'],
+  ['Капуста тушёная', 'Капуста сушёная', 'kg'],
+  ['Говядина тушёная', 'Говядина сушёная', 'kg'],
+  ['Морковь варёная', 'Морковь жареная', 'kg'],
+  ['Рыба жареная', 'Рыба вареная', 'kg'],
+  ['Хлеб целый', 'Хлеб белый', 'piece'],
+  ['Варенье малиновое', 'Варенье калиновое', 'kg'],
+  ['Перец сладкий', 'Перец гладкий', 'kg'],
 ]
 
 /** Two sizes the search key folds into one, and the model puts past 0.93 (adversarial А2). */
@@ -81,6 +108,12 @@ beforeAll(async () => {
   }
   for (const [i, name] of [...SAME_PLACE, ...LETTER_APART].flat().entries()) {
     await insertPlace(db, { name, city: 'Гюмри', createdAt: new Date(Date.UTC(2026, 8, 1, 0, i)) })
+  }
+  const seed = new Set(CATALOGUE_SEED.map(([name]) => name))
+  for (const [a, b, unit] of DESCRIBED) {
+    for (const name of [a, b].filter((one) => !seed.has(one))) {
+      await items.create(newItemSchema.parse({ kind: 'product', name, defaultUnit: unit }), person)
+    }
   }
   for (const name of APART.flat()) {
     await items.create(newItemSchema.parse({ kind: 'product', name, defaultUnit: 'piece' }), person)
@@ -135,7 +168,9 @@ describe('the night on the seed', () => {
     }
     expect(named).toHaveLength(report.candidates)
     const pairs = named.map((pair) => [pair.from, pair.into].sort().join(' ~ '))
-    for (const [from, into] of NAMED) expect(pairs).toContain([from, into].sort().join(' ~ '))
+    for (const [from, into] of [...NAMED, ...DESCRIBED]) {
+      expect(pairs).toContain([from, into].sort().join(' ~ '))
+    }
     // Two edits a word are two things of the shelf, never named (the owner, 06.10.2026).
     for (const pair of [
       ['Хлеб', 'Хлебцы'],
