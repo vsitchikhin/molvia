@@ -1,7 +1,7 @@
 # The receipt reader (MOL-125): Tesseract 5 with the language files MOL-114 measured — Debian's,
 # `tessdata_fast` — and a small HTTP server of Python's own library. Debian trixie, as the bench:
 # another release moves Tesseract and its files, and the measured figures with them.
-FROM debian:trixie-slim
+FROM debian:trixie-20261104-slim@sha256:a72b4433de1cf7d6bae0c4cee74d0547f58601a643b3375f070c51600d63b6b2
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \

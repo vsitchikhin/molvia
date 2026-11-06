@@ -1,4 +1,4 @@
-FROM node:22-alpine AS build
+FROM node:22.23.4-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202 AS build
 WORKDIR /repo
 
 COPY package.json package-lock.json ./
@@ -12,7 +12,7 @@ RUN npm ci --ignore-scripts
 COPY . .
 RUN node bin/bundle.mjs bot
 
-FROM node:22-alpine AS runtime
+FROM node:22.23.4-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202 AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /repo/bot/dist ./dist
