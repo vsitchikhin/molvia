@@ -1,13 +1,15 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { ERROR, LOGIN_WINDOW_LIMIT } from '@molvia/model'
+import { ERROR, LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT } from '@molvia/model'
 import { authRepositories, authTransactOn } from '@/db/auth-unit-of-work'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { loginDays, loginRequests, sessions } from '@/db/schema'
+import { addressMinute } from '@/usecases/address-minute'
 import { completeLogin } from '@/usecases/complete-login'
+import { startLogin } from '@/usecases/start-login'
 import { connectDrizzle } from './db'
-import { clearAll, telegramId } from './fixtures'
+import { clearAll, fillLoginWindow, telegramId } from './fixtures'
 
 // The 4 tests here past half a second on CI carry a timeout of 10 s: the slowest took 716 ms there
 // (MOL-266). Ten times that, rounded up to 5 s, so the time reporter names one only on a run slower
@@ -178,14 +180,29 @@ describe('login_days: the funnel is counted where each step happens (MOL-68)', (
   })
 
   it('counts a start the quota turned away on the day of the refusal, and makes no request', async () => {
-    for (let i = 0; i < LOGIN_WINDOW_LIMIT; i += 1) await started()
+    await fillLoginWindow(first.db, LOGIN_WINDOW_LIMIT)
     await expect(started()).rejects.toMatchObject({ code: ERROR.LOGIN_RATE_LIMITED })
     await expect(started(true)).rejects.toMatchObject({ code: ERROR.LOGIN_RATE_LIMITED })
     expect(await first.db.select().from(loginRequests)).toHaveLength(LOGIN_WINDOW_LIMIT)
+    expect((await days())[await today()]).toEqual({ ...NOTHING, refused: 2 })
+  }, 10_000)
+
+  it('counts a start the minute of its address turned away the same way, and makes no request (MOL-359)', async () => {
+    const quota = {
+      limit: addressMinute(LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT),
+      address: '203.0.113.5',
+    }
+    for (let i = 0; i < LOGIN_ADDRESS_LIMIT; i += 1) {
+      await startLogin(requests, { ...quota, now: Date.now() }, 'molvia_bot', null)
+    }
+    await expect(
+      startLogin(requests, { ...quota, now: Date.now() }, 'molvia_bot', null, true),
+    ).rejects.toMatchObject({ code: ERROR.LOGIN_RATE_LIMITED })
+    expect(await first.db.select().from(loginRequests)).toHaveLength(LOGIN_ADDRESS_LIMIT)
     expect((await days())[await today()]).toEqual({
       ...NOTHING,
-      started: LOGIN_WINDOW_LIMIT,
-      refused: 2,
+      started: LOGIN_ADDRESS_LIMIT,
+      refused: 1,
     })
   }, 10_000)
 

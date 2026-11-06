@@ -1,12 +1,14 @@
 /**
  * The phone's failures into the table (MOL-144) through a real server: taken with no session, by
  * the page's own build and platform, refused past the schema and past the limit, and the address
- * the limit counts by is written nowhere.
+ * the limit counts by is written nowhere — and let go by the minute timer, a login's start's too.
  */
+import { randomBytes } from 'node:crypto'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import {
   ERROR,
+  LOGIN_HEADER,
   OWNER_NOTICES_PER_CLAIM,
   PHONE_FAILURES_KEPT,
   ownerNoticesSchema,
@@ -392,6 +394,39 @@ describe('поток выдуманных сбоев не топит канал 
       spy.mockRestore()
     }
   })
+
+  it('тот же таймер отпускает адрес старта входа через минуту (MOL-359)', async () => {
+    const spy = vi.spyOn(Map.prototype, 'set')
+    const kept = (address: string) =>
+      (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(address))
+    // Only the intervals and the clock: the server's timers tick when the test moves them, and the
+    // route reads the moment of the fake clock.
+    vi.useFakeTimers({ toFake: ['setInterval', 'Date'] })
+    const served = buildServer({
+      db,
+      owner: null,
+      login: { username: 'molvia_bot', botSecret: randomBytes(32).toString('base64url') },
+      logStream: { write: () => true },
+    })
+    try {
+      await served.ready()
+      const response = await served.inject({
+        method: 'POST',
+        url: '/auth/login',
+        headers: { [LOGIN_HEADER]: '1', 'x-forwarded-for': '203.0.113.8' },
+      })
+      expect(response.statusCode).toBe(201)
+      expect(kept('203.0.113.8')).toBe(true)
+      // A minute and more on, one tick: nothing of the address is left.
+      vi.setSystemTime(Date.now() + 61_000)
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(kept('203.0.113.8')).toBe(false)
+    } finally {
+      await served.close()
+      vi.useRealTimers()
+      spy.mockRestore()
+    }
+  }, 10_000)
 
   it('сбой API после потока — в первой выдаче бота, раньше телефона', async () => {
     for (let host = 1; host <= 10; host += 1) {
