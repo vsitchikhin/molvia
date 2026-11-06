@@ -140,12 +140,16 @@ const WITH_A_SELECT = [
 ] as const
 
 test.describe('signed in', () => {
-  // No worker: once it controls the page, WebKit's requests to the API go through it and past the route
-  // that carries the session (`signIn`). Pages a worker serves are the stranger's test's and
-  // pwa-update.spec's; the policy is the same meta in either answer.
-  test.use({ serviceWorkers: 'block' })
+  // No worker on WebKit alone: once it controls the page, its requests to the API go through it and past
+  // the route that carries the session there (`signIn`). Chromium keeps the session in its own jar and
+  // walks the pages its worker serves, as a phone does.
+  test.use({
+    serviceWorkers: async ({ browserName }, use) => {
+      await use(browserName === 'webkit' ? 'block' : 'allow')
+    },
+  })
 
-  test('signed in: a receipt’s photo and its edges, a picture to the developer, the screens with a select', async ({
+  test('a receipt’s photo and its edges, a picture to the developer, the screens with a select', async ({
     page,
     browserName,
   }) => {
@@ -185,7 +189,7 @@ test.describe('signed in', () => {
     }
   })
 
-  test('signed in: the scanner’s worker from the app’s origin compiles the wasm and reads the code filmed', async ({
+  test('the scanner’s worker from the app’s origin compiles the wasm and reads the code filmed', async ({
     page,
     context,
     browserName,

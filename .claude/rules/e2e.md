@@ -145,8 +145,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   answer handed back by `route.fulfill` (adversarial А1 of review 1). **The browser carries no cookie of it, by either
   way tried**: a `Cookie` laid by `route.continue` WebKit never sends (CI, run 42209616807), nor a `__Host-` cookie put
   in the jar without `Secure` (run 42213747061) — and a Mac's WebKit hid the first by keeping the seam's own, so the
-  jar is emptied first and every machine signs in one way. **The walk signed in has no worker**
-  (`serviceWorkers: 'block'`): once it controls the page, the requests go through it and past the route. The session
+  jar is emptied first and every machine signs in one way. **On WebKit the walk signed in has no worker**
+  (`serviceWorkers: 'block'` there alone): once it controls the page, the requests go through it and past the route;
+  Chromium keeps the session in its jar and walks the pages its worker serves (review 3, №9). The session
   is taken by its name — the seam sets the account it remembers first. The device then asks «Is this your account?» (MOL-56) and the terms, as a person
   answers them. **WebKit's own report of a `<select>`** is the one `csp.ts` lets go — any `style-src-attr` report at a
   `<select>` on WebKit, with one line of its console for each (owner's В-4 «а», `security.md`): no field tells the

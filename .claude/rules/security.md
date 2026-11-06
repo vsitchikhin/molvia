@@ -134,7 +134,7 @@ localhost`): HSTS holds by the host's name, not its port, and the production sta
   build comes through `e2e/csp.ts`, which fails it on any; `csp-built.spec` holds the meta and its hashes and walks
   what a directive decides. **Production reports nothing** (В-3 «а»): a policy that blocks the bundle leaves nobody
   to report, and the walk covers the rest, signed in on both engines — WebKit by the test making the page's requests to
-  the API with the seam's session (adversarial А1, `e2e.md`), with no worker. **WebKit refuses its own inline style of every `<select>`** (`style-src-attr` —
+  the API with the seam's session (adversarial А1, `e2e.md`), with no worker there. **WebKit refuses its own inline style of every `<select>`** (`style-src-attr` —
   a bare `createElement('select')` too), on six screens signed in, with nothing seen to change on the screen;
   `e2e/csp.ts` lets go every `style-src-attr` report at a `<select>` on WebKit and one line of its console for each,
   and the policy stays strict (owner's В-4 «а»). No field of a report tells the engine's style from ours — `sample` is
