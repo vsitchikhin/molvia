@@ -31,13 +31,13 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 - `backend/src/usecases/create-actor.ts` — Use case: a new owner for a Telegram id, with the first settings the server names (country, city, currencies).
 - `backend/src/usecases/sessions.ts` — Use cases of «Устройства» and «Выйти»: list the owner's live sessions, end one of them, log out by token.
 - `backend/src/usecases/sign-in.ts` — Use case: find or create the owner of a Telegram id, mint a new session token for them and mark the account's visit (MOL-238).
-- `backend/src/usecases/start-login.ts` — Use case: start a login — code, secret and the `t.me` link, under the database-wide quota. Tests: `backend/tests/login-quota.integration.test.ts`.
+- `backend/src/usecases/start-login.ts` — Use case: start a login — code, secret and the `t.me` link, under the minute of its address in memory, then everybody's quota in the database; a start that made no request gives its place back (MOL-359). Tests: `backend/tests/login-quota.integration.test.ts`.
 
 ## backend · db
 
 - `backend/src/db/actors-repository.ts` — Repository of owners: create under the account lock, find by id or Telegram id, update the settings, lock an account, mark the account's visit once a day (MOL-238).
 - `backend/src/db/auth-unit-of-work.ts` — Unit of work of the login: the owner, session and login-request repositories built on one transaction.
-- `backend/src/db/login-requests-repository.ts` — Repository of login requests: quota-limited create, confirm, decline, lock, consume, expired cleanup; secrets kept only as hashes; every step counted into `login_days` in its own transaction. Tests: `backend/tests/login-requests.integration.test.ts`, `backend/tests/login-days.integration.test.ts`.
+- `backend/src/db/login-requests-repository.ts` — Repository of login requests: quota-limited create, a refusal by the address counted (`refuse`), confirm, decline, lock, consume, expired cleanup; secrets kept only as hashes; every step counted into `login_days` in its own transaction. Tests: `backend/tests/login-requests.integration.test.ts`, `backend/tests/login-days.integration.test.ts`.
 - `backend/src/db/sessions-repository.ts` — Repository of sessions: create by token hash, live lookup with its owner, daily touch, list and remove for «Устройства», expired cleanup. Tests: `backend/tests/sessions.integration.test.ts`.
 - `backend/src/db/telegram-lock.ts` — SQL of the advisory lock on one Telegram account, taken first by login confirmation, owner creation and erasure. Tests: `backend/tests/erasure.integration.test.ts`.
 
@@ -58,7 +58,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 - `backend/tests/last-seen.integration.test.ts` — Integration test: the account's last visit (MOL-238) — the first request of a day marks it and the rest do not, on any device; a login always does, the bot never; `updated_at` stays.
 - `backend/tests/login-days.integration.test.ts` — Integration test: the login funnel in `login_days` — each step counted once on the day the login began, a repeated «Войти» and a rolled-back collection not at all, what ran out split by confirmed, the quota's refusals.
 - `backend/tests/login-log.integration.test.ts` — Integration test: a login or bot erasure failing in the database logs the error's kind, never the Telegram id, the query or its parameters.
-- `backend/tests/login-quota.integration.test.ts` — Integration test: login starts get independent secrets and five minutes, the quota holds across instances, expired rows are removed.
+- `backend/tests/login-quota.integration.test.ts` — Integration test: login starts get independent secrets and five minutes, the quota holds across instances, expired rows are removed; an address's five a minute through HTTP — a forged header from outside not believed, IPv6 by its `/48` — everybody's three hundred, the address in neither a table nor the log (MOL-359).
 - `backend/tests/login-requests.integration.test.ts` — Integration test: login requests keep the secret only hashed, expired, spent and unknown are one null, confirming twice is a success, collection happens once.
 - `backend/tests/login-transaction.integration.test.ts` — Integration test: collection, confirm and decline racing each other end in exactly one session or one refusal, and a failure rolls back.
 - `backend/tests/login.integration.test.ts` — Integration test: the Telegram login over HTTP — guards, refusals that answer alike, cookie handling, `no-store` on every auth path.

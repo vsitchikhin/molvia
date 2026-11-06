@@ -34,9 +34,9 @@ file holds what belongs to no single area, and what the audit found missing.
 
 - **A write that grows what everybody shares, or what the server keeps on its disk, has a quota per person**
   (MOL-287, owner's В-3 «а»: a cheap way to bring the service down — one request without a session, or one
-  account within a minute — is a blocker of the release). **Three have none yet, each a blocker of
-  `v0.2.0`**: the login's quota is the whole database's, so one `curl` holds the door shut for everyone
-  (Ф-1, MOL-359: five a minute an address, three hundred in all); a receipt's photos have none, and one
+  account within a minute — is a blocker of the release). **The login's is an address's** (Ф-1,
+  MOL-359): five starts a minute from an address, three hundred from everybody — `auth.md`. **Two have
+  none yet, each a blocker of `v0.2.0`**: a receipt's photos have none, and one
   account fills some 12 GB an hour against 51 GB free (Ф-2, MOL-360: forty a day, twenty not recorded at
   once); «Предложить товар» has none, and some nine thousand names an hour go into everybody's search
   (Ф-4, MOL-362: sixty a day). Each task, merged, rewrites its line here. **A new write path names its
@@ -45,8 +45,9 @@ file holds what belongs to no single area, and what the audit found missing.
   their number, and how fast one account fills the disk with them was not measured — the disk alarm of
   MOL-360 is what would say it first.
 - **What answers without a session is limited by the address Caddy names**, never by anything the client
-  sends: the last `X-Forwarded-For` only from a peer inside, an IPv6 address by its `/48` (`networkOf`,
-  `/client-errors`, MOL-144). A forged header changes nothing — the audit sent sixty under sixty addresses
+  sends: the last `X-Forwarded-For` only from a peer inside, an IPv6 address by its `/48` (`addressOf`,
+  `/client-errors`, MOL-144, and the login's start, MOL-359), counted in the API's memory
+  (`addressMinute`). A forged header changes nothing — the audit sent sixty under sixty addresses
   and was refused at the sixty-first. **The address is a key of a count, never a column or a line of the
   log** (`privacy.md`).
 - **The money of the owner is the model's alone, and only a column the owner writes opens it**:

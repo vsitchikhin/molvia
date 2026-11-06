@@ -469,11 +469,11 @@ async function tell(
     // nothing here would open it (self-review №3); the day of `keep_until` as written, in Yerevan (№13)
     ...(keptUntil === null ? {} : { receipt: claimed.id.slice(0, 8), keptUntil: dayIn(keptUntil) }),
   }
-  const given = told.budget.ask([notice], at, claimed.actorId)
+  const given = told.budget.ask([notice], claimed.actorId)
   try {
     for (const one of given.told) await told.notices.queue(one, at)
   } catch (error) {
-    told.budget.refund(given.told.length, at, claimed.actorId)
+    given.giveBack()
     deps.report({ kind: 'error', error })
     return
   }
@@ -484,8 +484,8 @@ async function tell(
 async function tellHeld(deps: ReadReceiptsDeps, at: Date): Promise<void> {
   const { told } = deps
   if (!told) return
-  told.budget.forget(at)
-  const held = told.budget.held(at)
+  told.budget.forget()
+  const held = told.budget.held()
   if (held === null) return
   try {
     await told.notices.queue(held, at)
