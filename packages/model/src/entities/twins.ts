@@ -129,10 +129,10 @@ export function nameParts(name: string): NameParts {
 }
 
 /**
- * `NameParts.written`: the words of letters alone sorted, then every word with a digit in it in its
- * place — a number stays with its word and its turn, so «Витамин D3 K2» is not «Витамин D2 K3», «Подгузники
- * 3 4-9 кг» not «4 3-9 кг» (adversarial round 3). A size's number and its unit are one word, glued or apart,
- * a comma in it a point.
+ * `NameParts.written`: the words as written, sorted only where none has a digit — a name with a number
+ * is read in its order, so «Витамин D3 K2» is not «Витамин D2 K3» (adversarial round 3) and «AA 4 шт AAA
+ * 2 шт» not «AAA 4 шт AA 2 шт» (Д1). A size's number and its unit are one word, glued or apart, a comma in
+ * it a point but before three digits (Д2).
  */
 function writtenOf(name: string): string[] {
   const glued = name.replace(SIZE, (whole, digits: string, _gap: string, after?: string) => {
