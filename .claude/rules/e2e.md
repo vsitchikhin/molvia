@@ -141,11 +141,13 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   a `<select>`, on both engines; the scanner reading the code filmed on Chromium alone, WebKit having no fake camera.
   **The seam is asked without the button the build has not got**: on Chromium `fetch('/api/dev/login')` from the
   page sets the cookie as the button would; WebKit keeps no `Secure` cookie on the loopback (below), so there the
-  test asks the seam and puts the session in the context's jar by `addCookies`, by the address — so not `Secure` on
-  http, which WebKit keeps and sends (adversarial А1 of review 1). **Not a header laid by `route.continue`**: WebKit
-  never sends a `Cookie` of the route's, and a Mac's WebKit hid it by keeping the seam's own (CI, run 42209616807); the
-  jar is emptied first, so every machine signs in one way. The session is taken by its name — the seam sets the
-  account it remembers first. The device then asks «Is this your account?» (MOL-56) and the terms, as a person
+  test asks the seam and makes every request of the page to the API itself, with the session, by `route.fetch`, the
+  answer handed back by `route.fulfill` (adversarial А1 of review 1). **The browser carries no cookie of it, by either
+  way tried**: a `Cookie` laid by `route.continue` WebKit never sends (CI, run 42209616807), nor a `__Host-` cookie put
+  in the jar without `Secure` (run 42213747061) — and a Mac's WebKit hid the first by keeping the seam's own, so the
+  jar is emptied first and every machine signs in one way. **The walk signed in has no worker**
+  (`serviceWorkers: 'block'`): once it controls the page, the requests go through it and past the route. The session
+  is taken by its name — the seam sets the account it remembers first. The device then asks «Is this your account?» (MOL-56) and the terms, as a person
   answers them. **WebKit's own report of a `<select>`** is the one `csp.ts` lets go — any `style-src-attr` report at a
   `<select>` on WebKit, with one line of its console for each (owner's В-4 «а», `security.md`): no field tells the
   engine's style from ours, and Chromium on the same screens fails on ours. The fixture listens on the context, so a

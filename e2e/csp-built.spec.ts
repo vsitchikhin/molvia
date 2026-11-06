@@ -89,8 +89,8 @@ test('a stranger’s screens run under it: the door and «Data and privacy», wi
 /**
  * Signed in by the development seam, which the build has no button for and the run's API carries. On
  * Chromium the page asks it itself and the browser keeps the cookie; WebKit keeps no `Secure` cookie on
- * the loopback, so there the test asks it and puts the session in the jar itself (adversarial А1 of
- * review 1) — the page untouched. A session the device never claimed is asked about first (MOL-56),
+ * the loopback, so there the test asks it and makes the page's requests to the API itself, with the
+ * session (adversarial А1 of review 1) — the page untouched. A session the device never claimed is asked about first (MOL-56),
  * then the terms.
  */
 async function signIn(page: Page, browserName: string): Promise<void> {
@@ -105,14 +105,17 @@ async function signIn(page: Page, browserName: string): Promise<void> {
       .find((pair) => pair.startsWith(`${SESSION_COOKIE}=`))
       ?.slice(SESSION_COOKIE.length + 1)
     expect(value, 'the seam set no session').toBeTruthy()
-    // Laid in the jar by the address, so not `Secure` on the loopback's http, which WebKit then keeps
-    // and sends; a header laid by `route.continue` WebKit never sends — its `Cookie` is its own.
+    // Every request of the page to the API is made by the test with the session and its answer handed
+    // back: WebKit sends neither a `Cookie` a route lays nor a `__Host-` cookie that is not `Secure`,
+    // which is all the loopback's http can hold (CI, runs 42209616807 and 42213747061). The jar is
+    // emptied, so a Mac's WebKit, which kept the seam's own, signs in the same way.
     await page.context().clearCookies()
-    await page
-      .context()
-      .addCookies([
-        { name: SESSION_COOKIE, value: value ?? '', url: new URL('/', answer.url()).href },
-      ])
+    await page.route('**/api/**', async (route) => {
+      const response = await route.fetch({
+        headers: { ...route.request().headers(), cookie: `${SESSION_COOKIE}=${value ?? ''}` },
+      })
+      await route.fulfill({ response })
+    })
   } else {
     await page.goto('/')
     const status = await page.evaluate(
@@ -136,62 +139,69 @@ const WITH_A_SELECT = [
   ['/settings', 'Settings'],
 ] as const
 
-test('signed in: a receipt’s photo and its edges, a picture to the developer, the screens with a select', async ({
-  page,
-  browserName,
-}) => {
-  test.setTimeout(60_000)
-  await signIn(page, browserName)
-  await facesCame(page)
+test.describe('signed in', () => {
+  // No worker: once it controls the page, WebKit's requests to the API go through it and past the route
+  // that carries the session (`signIn`). Pages a worker serves are the stranger's test's and
+  // pwa-update.spec's; the policy is the same meta in either answer.
+  test.use({ serviceWorkers: 'block' })
 
-  // A receipt's photo: a `blob:` in the sheet, cut out at «Receipt edges» by the warp's worker.
-  await page.getByRole('button', { name: 'Photograph a receipt' }).click()
-  await risen(page)
-  await page
-    .locator('dialog[open] input[type="file"]:not([capture])')
-    .first()
-    .setInputFiles({ name: 'part-1.jpg', mimeType: 'image/jpeg', buffer: await aPhoto(page) })
-  const edges = page.locator('dialog[open]').filter({ hasText: 'Receipt edges' })
-  await expect(edges).toBeVisible()
-  await risen(page)
-  await edges.getByRole('button', { name: 'Done' }).click()
-  await expect(edges).toHaveCount(0)
-  await drawn(page.locator('dialog[open] img.photo').first())
+  test('signed in: a receipt’s photo and its edges, a picture to the developer, the screens with a select', async ({
+    page,
+    browserName,
+  }) => {
+    test.setTimeout(60_000)
+    await signIn(page, browserName)
+    await facesCame(page)
 
-  // A picture from the gallery, drawn anew by the phone and shown before sending, as `blob:`.
-  await page.goto('/settings')
-  await page.getByRole('button', { name: 'Write to the developer' }).click()
-  await risen(page)
-  const sheet = page.getByRole('dialog')
-  await sheet.getByText('Broken', { exact: true }).click()
-  await sheet
-    .locator('input[type="file"]')
-    .setInputFiles({ name: 'screen.jpg', mimeType: 'image/jpeg', buffer: await aPhoto(page) })
-  await drawn(sheet.getByRole('img', { name: 'Picture 1' }))
+    // A receipt's photo: a `blob:` in the sheet, cut out at «Receipt edges» by the warp's worker.
+    await page.getByRole('button', { name: 'Photograph a receipt' }).click()
+    await risen(page)
+    await page
+      .locator('dialog[open] input[type="file"]:not([capture])')
+      .first()
+      .setInputFiles({ name: 'part-1.jpg', mimeType: 'image/jpeg', buffer: await aPhoto(page) })
+    const edges = page.locator('dialog[open]').filter({ hasText: 'Receipt edges' })
+    await expect(edges).toBeVisible()
+    await risen(page)
+    await edges.getByRole('button', { name: 'Done' }).click()
+    await expect(edges).toHaveCount(0)
+    await drawn(page.locator('dialog[open] img.photo').first())
 
-  for (const [path, title] of WITH_A_SELECT) {
-    await page.goto(path)
-    await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
-    await expect(page.locator('select').first()).toBeAttached()
-  }
-})
+    // A picture from the gallery, drawn anew by the phone and shown before sending, as `blob:`.
+    await page.goto('/settings')
+    await page.getByRole('button', { name: 'Write to the developer' }).click()
+    await risen(page)
+    const sheet = page.getByRole('dialog')
+    await sheet.getByText('Broken', { exact: true }).click()
+    await sheet
+      .locator('input[type="file"]')
+      .setInputFiles({ name: 'screen.jpg', mimeType: 'image/jpeg', buffer: await aPhoto(page) })
+    await drawn(sheet.getByRole('img', { name: 'Picture 1' }))
 
-test('signed in: the scanner’s worker from the app’s origin compiles the wasm and reads the code filmed', async ({
-  page,
-  context,
-  browserName,
-}) => {
-  test.skip(browserName === 'webkit', 'WebKit has no fake camera to film the code')
-  test.setTimeout(READ * 2)
-  await context.grantPermissions(['camera'])
-  await signIn(page, browserName)
-  await page.goto('/purchases/manual/add')
-  await page.getByRole('button', { name: 'Scan a barcode' }).click()
-  await expect(
-    page.locator('.code-card').getByText(`The catalogue does not know the code ${BARCODE}`, {
-      exact: true,
-    }),
-  ).toBeVisible({ timeout: READ })
+    for (const [path, title] of WITH_A_SELECT) {
+      await page.goto(path)
+      await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible()
+      await expect(page.locator('select').first()).toBeAttached()
+    }
+  })
+
+  test('signed in: the scanner’s worker from the app’s origin compiles the wasm and reads the code filmed', async ({
+    page,
+    context,
+    browserName,
+  }) => {
+    test.skip(browserName === 'webkit', 'WebKit has no fake camera to film the code')
+    test.setTimeout(READ * 2)
+    await context.grantPermissions(['camera'])
+    await signIn(page, browserName)
+    await page.goto('/purchases/manual/add')
+    await page.getByRole('button', { name: 'Scan a barcode' }).click()
+    await expect(
+      page.locator('.code-card').getByText(`The catalogue does not know the code ${BARCODE}`, {
+        exact: true,
+      }),
+    ).toBeVisible({ timeout: READ })
+  })
 })
 
 /** A photo the browser itself draws and encodes: a sheet of paper with rows on it. */
