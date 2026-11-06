@@ -215,6 +215,11 @@ describe('twinVerdict', () => {
     ['Телефон A12 64', 'Телефон A64 12'],
     ['Подгузники 3 4-9 кг', 'Подгузники 4 3-9 кг'],
     ['Кофе 3в1', 'Кофе 1в3'],
+    // a name with a number is read in its order (adversarial Д1), and three digits after the sign may be
+    // a thousand (Д2)
+    ['Батарейки AA 4 шт AAA 2 шт', 'Батарейки AAA 4 шт AA 2 шт'],
+    ['Нитки белые 2 шт чёрные 3 шт', 'Нитки чёрные 2 шт белые 3 шт'],
+    ['Кабель 1.000 м', 'Кабель 1,000 м'],
   ])('never merges «%s» and «%s», two spellings — only names it', (a, b) => {
     expect(spelling(a, b)).toMatchObject({ edits: 0, sameWords: false })
     expect(pair(a, b, 0.99)).toBe('candidate')
@@ -320,7 +325,10 @@ describe("a proper name, a place's (adversarial Ж1)", () => {
     ['Маркет Ширак', 'Маркет Шираз', 0.942],
     ['Магнит', 'Магнат', 0.919],
     ['Аптека Альфа', 'Аптека Альта', 0.91],
-  ])('never merges «%s» and «%s», a letter apart (%s)', (a, b, meaning) => {
+    // a sign the separators do not name is part of the name (MOL-358, adversarial Д3)
+    ['Магнит', 'Магнит+', 0.926],
+    ['Ереван Сити', 'Ереван Сити+', 0.923],
+  ])('never merges «%s» and «%s», a letter or a sign apart (%s)', (a, b, meaning) => {
     expect(place(a, b, meaning)).toBe('candidate')
   })
 
@@ -328,6 +336,7 @@ describe("a proper name, a place's (adversarial Ж1)", () => {
     ['Ереван  Сити', 'Ереван Сити', 0.98],
     ['Ереван-Сити', 'Ереван Сити', 0.981],
     ['Перекрёсток', 'Перекресток', 0.954],
+    ['Ереван Сити', '«Ереван Сити»', 0.97],
   ])('merges «%s» and «%s», no edit apart (%s)', (a, b, meaning) => {
     expect(place(a, b, meaning)).toBe('merge')
   })

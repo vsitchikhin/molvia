@@ -67,19 +67,22 @@ export interface NameParts {
   /** The scripts the name's letters are written in, sorted: `cyrillic`, `latin latin`… once each. */
   readonly scripts: readonly string[]
   /**
-   * The name as it is written, only case, spacing, punctuation and «ё» aside — not the search key,
-   * which folds a double letter, «й» and a soft sign: «Римма» and «Рима» are one key and two shops
-   * (adversarial З1). What a proper name is compared by.
+   * The name as it is written, in its order, only case, «ё» and the signs of `WORD_SEPARATORS` aside
+   * (MOL-358: «Магнит+» is not «Магнит», adversarial Д3) — not the search key, which folds a double letter,
+   * «й» and a soft sign: «Римма» and «Рима» are one key and two shops (adversarial З1). What a proper name
+   * is compared by.
    */
   readonly letters: string
   /**
-   * The name as written, word by word — its words of letters in any order, those with a digit in theirs
-   * (`writtenOf`) — what an item is one spelling by (MOL-358). Only case, «ё» and the signs of `WORD_SEPARATORS` are nothing; every
-   * other sign stays in its word, so «мед.» is not «мёд» and «шок.» not the brand «Шок» (adversarial Г1,
-   * Г2). A size is its number and its unit as printed, a comma and a point one, glued or apart one: «05 л»
-   * is not «5 л», «1.000 м» not «1 м», «25 пак» not «25 уп» (Г3, Г4) — `sizes` reads those by their value
-   * and its unit, for a candidate. Never the key, which folds «ы» into «и», a soft sign, «щ» into «ш» and a
-   * double letter, and made «Игрушка мышка» one key with «Игрушка мишка» (adversarial В1).
+   * The name as written, word by word (`writtenOf`) — what an item is one spelling by (MOL-358). Only
+   * case, «ё» and the signs of `WORD_SEPARATORS` are nothing; every other sign stays in its word, so «мед.»
+   * is not «мёд» and «шок.» not the brand «Шок» (adversarial Г1, Г2). Its words in any order only where no
+   * word has a digit; a name with a number is read in its order, so «D3 K2» is not «D2 K3» and «AA 4 шт AAA
+   * 2 шт» not «AAA 4 шт AA 2 шт» (Д1). A size is its number and its unit as printed, glued or apart one, a
+   * comma and a point one but before three digits: «05 л» is not «5 л», «1.000 м» not «1 м» nor «1,000 м»,
+   * «25 пак» not «25 уп» (Г3, Г4, Д2) — `sizes` reads those by their value and its unit, for a candidate.
+   * Never the key, which folds «ы» into «и», a soft sign, «щ» into «ш» and a double letter, and made
+   * «Игрушка мышка» one key with «Игрушка мишка» (adversarial В1).
    */
   readonly written: readonly string[]
 }
@@ -120,7 +123,7 @@ export function nameParts(name: string): NameParts {
     words: key === '' ? [] : key.split(' ').filter((word) => !/^\d+$/u.test(word)),
     // Of the words: a unit after a number, «1 l», is no script of the name.
     scripts: scriptsOf(rest),
-    letters: asWritten(name),
+    letters: wordsAsWritten(name).join(' '),
     written: writtenOf(name),
   }
 }
@@ -132,20 +135,18 @@ export function nameParts(name: string): NameParts {
  * a comma in it a point.
  */
 function writtenOf(name: string): string[] {
-  const glued = name
-    .normalize('NFC')
-    .replace(SIZE, (whole, digits: string, _gap: string, after?: string) => {
-      const asPrinted = digits.replace(',', '.')
-      if (after === '%' || (after !== undefined && UNIT_OF.has(after.toLowerCase()))) {
-        return ` ${asPrinted}${after} `
-      }
-      return whole.replace(digits, asPrinted)
-    })
+  const glued = name.replace(SIZE, (whole, digits: string, _gap: string, after?: string) => {
+    // Three digits after the sign may be a thousand: «1.000 м» and «1,000 м» are two (adversarial Д2).
+    const asPrinted = /[.,]\d{3}/u.test(digits) ? digits : digits.replace(',', '.')
+    if (after === '%' || (after !== undefined && UNIT_OF.has(after.toLowerCase()))) {
+      return ` ${asPrinted}${after} `
+    }
+    return whole.replace(digits, asPrinted)
+  })
   const words = wordsAsWritten(glued)
-  return [
-    ...words.filter((word) => !/\p{N}/u.test(word)).sort(),
-    ...words.filter((word) => /\p{N}/u.test(word)),
-  ]
+  // A name with a number in it is read in its order: «AA 4 шт AAA 2 шт» is not «AAA 4 шт AA 2 шт», where
+  // each number stood by another word (adversarial Д1).
+  return words.some((word) => /\p{N}/u.test(word)) ? words : words.sort()
 }
 
 /**
@@ -155,7 +156,12 @@ function writtenOf(name: string): string[] {
  */
 const WORD_SEPARATORS = /[\s«»"„“”'‘’‚,()[\]\-\u2010-\u2015\u2212]+/u
 
+/**
+ * The words of a text as written, case and «ё» aside, parted by `WORD_SEPARATORS` only — one reading for
+ * a place's `letters` and an item's `written` (MOL-358).
+ */
 function wordsAsWritten(text: string): string[] {
+  // Armenian «և», «եւ» and «եվ» are one spelling (the owner, MOL-12), as `nameIdentity` holds.
   return text
     .normalize('NFC')
     .toLowerCase()
@@ -164,19 +170,6 @@ function wordsAsWritten(text: string): string[] {
     .replaceAll('եւ', 'եվ')
     .split(WORD_SEPARATORS)
     .filter((word) => word !== '')
-}
-
-/** Case, spacing, punctuation and «ё» aside, and nothing else. */
-function asWritten(text: string): string {
-  // Armenian «և», «եւ» and «եվ» are one spelling (the owner, MOL-12), as `nameIdentity` holds.
-  return text
-    .normalize('NFC')
-    .toLowerCase()
-    .replaceAll('ё', 'е')
-    .replaceAll('և', 'եվ')
-    .replaceAll('եւ', 'եվ')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
 }
 
 /** Every size the same, with its unit: «Молоко 1 л» and «Молоко 2 л» never are one thing. */
@@ -199,9 +192,12 @@ export interface Spelling {
    * loosened again, two scripts still never merge.
    */
   readonly sameScripts: boolean
-  /** Whether the two are one spelling, case, spacing, punctuation and «ё» aside (`NameParts.letters`). */
+  /** Whether the two are one spelling in one order (`NameParts.letters`): a place's. */
   readonly sameLetters: boolean
-  /** Whether the two are the same words as written, in any order (`NameParts.written`): one item's spelling. */
+  /**
+   * Whether the two are the same words as written — of letters in any order, with a number in their
+   * order (`NameParts.written`): one item's spelling.
+   */
   readonly sameWords: boolean
 }
 
@@ -304,7 +300,7 @@ export interface TwinPair {
    * A proper name — a place's. One letter apart is two shops there, and the model reads a proper name
    * by its letters: «Маркет Ширак» and «Маркет Шираз» at 0.942, «Магнит» and «Магнат» at 0.919
    * (adversarial Ж1). So a proper name merges by itself only as one spelling — a double space, a
-   * hyphen, «ё» — and one letter apart is a candidate, by the letters as written, never by the key, which
+   * hyphen, «ё», never a sign the separators do not name — and one letter apart is a candidate, by the letters as written, never by the key, which
    * folds «Римма» into «Рима» (adversarial З1).
    */
   readonly properName?: boolean
