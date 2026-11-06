@@ -29,7 +29,6 @@ const embedder = startEmbedder(env.EMBEDDINGS_DIR, quiet, { queryWaitMs: 60_000 
 const TWINS: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
   ['Молоко 3.2%', 'Молоко 3,2%', 'l'],
   ['Масло топленое', 'Масло топлёное', 'kg'],
-  ['Творог обизжиренный', 'Творог обезжиренный', 'kg'],
   ['Безлактозное молоко', 'Молоко безлактозное', 'l'],
 ]
 
@@ -37,9 +36,64 @@ const TWINS: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
 const NAMED: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
   ['Moloko', 'Молоко', 'l'],
   ['Кифир', 'Кефир', 'l'],
+  // a typo inside a word that describes, 0.947: the price of MOL-358 — the owner merges it by hand
+  ['Творог обизжиренный', 'Творог обезжиренный', 'kg'],
   ['Milo', 'Мыло', 'piece'],
   // the closest by meaning of the seed's own transliterations, 0.902: past the threshold (review №6)
   ['Bulochki dlya burgerov', 'Булочки для бургеров', 'piece'],
+]
+
+/**
+ * Two spellings, never merged by itself — only named (MOL-358, owner's В-2 «в»). Two ways of cooking,
+ * the adversarial probe of MOL-299 (А1) and its relatives: the first fourteen stood past 0.90, from 0.900
+ * to 0.946, the rest from 0.871, and the night merged those fourteen. Then the ways the rule of an
+ * adjective's ending was passed (adversarial Б1, Б2, Б4–Б6 of MOL-358): a case, a sign, Latin letters,
+ * «варён.», two nouns — 0.907 to 0.972 — one key spelt two ways, and two spellings of one set of
+ * letters. A seed line is typed beside, not again.
+ */
+const TWO_SPELLINGS: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
+  ['Курица жареная', 'Курица вареная', 'kg'],
+  ['Картофель жареный', 'Картофель вареный', 'kg'],
+  ['Колбаса жареная', 'Колбаса варёная', 'kg'],
+  ['Грибы сушёные', 'Грибы тушёные', 'kg'],
+  ['Овощи сушёные', 'Овощи тушёные', 'kg'],
+  ['Яйца варёные', 'Яйца жареные', 'piece'],
+  ['Свёкла варёная', 'Свёкла жареная', 'kg'],
+  ['Мясо тушёное', 'Мясо сушёное', 'kg'],
+  ['Картофель тушёный', 'Картофель сушёный', 'kg'],
+  ['Свинина тушёная', 'Свинина сушёная', 'kg'],
+  ['Капуста тушёная', 'Капуста сушёная', 'kg'],
+  ['Говядина тушёная', 'Говядина сушёная', 'kg'],
+  ['Морковь варёная', 'Морковь жареная', 'kg'],
+  ['Рыба жареная', 'Рыба вареная', 'kg'],
+  ['Хлеб целый', 'Хлеб белый', 'piece'],
+  ['Варенье малиновое', 'Варенье калиновое', 'kg'],
+  ['Перец сладкий', 'Перец гладкий', 'kg'],
+  ['Пельмени с жареным луком', 'Пельмени с вареным луком', 'kg'],
+  ['Гречка с тушёным мясом', 'Гречка с сушёным мясом', 'kg'],
+  ['Суп из сушёных грибов', 'Суп из тушёных грибов', 'kg'],
+  ['Свинина тушёная,ГОСТ', 'Свинина сушёная,ГОСТ', 'kg'],
+  ['Курица жареная-гриль', 'Курица вареная-гриль', 'kg'],
+  ['Kurica zharenaya', 'Kurica varenaya', 'kg'],
+  ['Яйца варён.', 'Яйца жарен.', 'piece'],
+  ['Мойва', 'Мойка', 'kg'],
+  // One search key, two things — the key folds «ы» into «и» and a soft sign (adversarial В1, В2 of
+  // round 2), 0.922 to 0.961: one key is not one spelling.
+  ['Игрушка мишка плюшевая', 'Игрушка мышка плюшевая', 'piece'],
+  ['Мармелад мишки', 'Мармелад мышки', 'kg'],
+  ['Пенка', 'Пенька', 'piece'],
+  // Two spellings with one set of letters (adversarial round 3): a point of an abbreviation, a number
+  // written another way, a unit spelt another way, numbers in another turn — 0.928 to 0.970.
+  ['Маска мёд', 'Маска мед.', 'piece'],
+  ['Конфеты Шок', 'Конфеты шок.', 'kg'],
+  ['Пиво 5 л', 'Пиво 05 л', 'l'],
+  ['Кабель 1 м', 'Кабель 1.000 м', 'piece'],
+  ['Чай 25 уп', 'Чай 25 пак', 'piece'],
+  ['Витамин D3 K2', 'Витамин D2 K3', 'piece'],
+  // a number by another word (adversarial Д1), three digits after the sign (Д2) — 0.988 to 0.997
+  ['Батарейки AA 4 шт AAA 2 шт', 'Батарейки AAA 4 шт AA 2 шт', 'piece'],
+  ['Йогурт клубника 3 шт черника 1 шт', 'Йогурт черника 3 шт клубника 1 шт', 'piece'],
+  ['Провод 1,000 м', 'Провод 1.000 м', 'piece'],
 ]
 
 /** Two sizes the search key folds into one, and the model puts past 0.93 (adversarial А2). */
@@ -82,6 +136,12 @@ beforeAll(async () => {
   for (const [i, name] of [...SAME_PLACE, ...LETTER_APART].flat().entries()) {
     await insertPlace(db, { name, city: 'Гюмри', createdAt: new Date(Date.UTC(2026, 8, 1, 0, i)) })
   }
+  const seed = new Set(CATALOGUE_SEED.map(([name]) => name))
+  for (const [a, b, unit] of TWO_SPELLINGS) {
+    for (const name of [a, b].filter((one) => !seed.has(one))) {
+      await items.create(newItemSchema.parse({ kind: 'product', name, defaultUnit: unit }), person)
+    }
+  }
   for (const name of APART.flat()) {
     await items.create(newItemSchema.parse({ kind: 'product', name, defaultUnit: 'piece' }), person)
   }
@@ -121,13 +181,14 @@ describe('the night on the seed', () => {
     expect(report.merged).toBe(TWINS.length + SAME_PLACE.length)
   })
 
-  // Four nights with the real model: 1.6–7.7 s on CI on the same code (09–14.10.2026); its own
-  // 90 s is over ten times the worst, as the rule asks (MOL-243).
+  // Five nights with the real model: four ran 1.6–7.7 s on CI on the same code (09–14.10.2026), and
+  // MOL-358's candidates need a fifth — some 9.6 s at that worst; its own 120 s is over ten times it,
+  // as the rule asks (MOL-243).
   it('names what the model cannot judge, ten a morning, and merges none of it', async () => {
     // Ten a morning, the rest on the mornings after (review №2): read them all, as the owner would.
     const merges = createMergeRepository(db)
     const named = [...report.candidatePairs]
-    for (const day of ['2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10']) {
+    for (const day of ['2026-10-07', '2026-10-08', '2026-10-09', '2026-10-10', '2026-10-11']) {
       const next = (await mergeNight({ merges, embedder, failed: () => undefined }, 'on', day))
         .report
       expect(next.merged).toBe(0)
@@ -135,7 +196,9 @@ describe('the night on the seed', () => {
     }
     expect(named).toHaveLength(report.candidates)
     const pairs = named.map((pair) => [pair.from, pair.into].sort().join(' ~ '))
-    for (const [from, into] of NAMED) expect(pairs).toContain([from, into].sort().join(' ~ '))
+    for (const [from, into] of [...NAMED, ...TWO_SPELLINGS]) {
+      expect(pairs).toContain([from, into].sort().join(' ~ '))
+    }
     // Two edits a word are two things of the shelf, never named (the owner, 06.10.2026).
     for (const pair of [
       ['Хлеб', 'Хлебцы'],
@@ -144,7 +207,7 @@ describe('the night on the seed', () => {
     ]) {
       expect(pairs).not.toContain(pair.sort().join(' ~ '))
     }
-  }, 90_000)
+  }, 120_000)
 
   it('never merges two sizes the search key would fold into one', async () => {
     const merged = await db.execute<{ name: string }>(sql`

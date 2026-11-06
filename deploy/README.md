@@ -371,8 +371,9 @@ In a working copy the same thing is `make gates FROM=2026-10-05 [TO=2026-10-31]`
 Every night from 04:30 Yerevan, half an hour after the copy of the database, the API merges what is
 one thing written twice — «Молоко 3.2%» beside «Молоко 3,2%» — and at 09:00 the bot tells the owner
 what it merged and which new pairs it only names. `CATALOGUE_MERGE` in `.env.prod` says how: `report`
-(the default, owner's decision В-3, production's until MOL-358 — MOL-299) says what it would merge and merges nothing — it only sweeps onto
-the survivor what reached the trace of a merge made by hand — `on` merges, `off` does not look.
+(the compose file's default, owner's decision В-3, production's until MOL-358 — MOL-299) says what it would merge and merges nothing — it only sweeps onto
+the survivor what reached the trace of a merge made by hand — `on` merges, production's from MOL-358, set by the owner's word after its merge (В-6 «а» of
+MOL-299: a copy of the database by hand first, then the line in `.env.prod` and `up -d backend`), `off` does not look.
 
 A candidate the report names is merged by hand with the two ids the message prints, and a merge is
 taken back by its number — both a dry run without `--yes`:
