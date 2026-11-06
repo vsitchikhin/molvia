@@ -121,6 +121,45 @@ describe('twinSpelling', () => {
     })
   })
 
+  it('tells a word that describes apart from a typo of a word that names (MOL-358)', () => {
+    expect(spelling('Курица жареная', 'Курица вареная')).toMatchObject({
+      edits: 1,
+      describedApart: true,
+    })
+    expect(spelling('Малоко топлёное', 'Молоко топлёное')).toMatchObject({
+      edits: 1,
+      describedApart: false,
+    })
+    // the words one name has and the other has not, whatever the order
+    expect(spelling('Топлёное молоко', 'Молоко топленое')).toMatchObject({
+      edits: 0,
+      describedApart: false,
+    })
+  })
+
+  it('reads a word that describes as written: a hyphen by its last part, quotes aside', () => {
+    expect(spelling('Колбаса варёно-копчёная', 'Колбаса жарено-копчёная')).toMatchObject({
+      edits: 1,
+      describedApart: true,
+    })
+    expect(spelling('Сыр «Российский»', 'Сыр «Рассийский»')).toMatchObject({
+      edits: 1,
+      describedApart: true,
+    })
+  })
+
+  it("reads a noun with an adjective's ending as a noun, as the kind does", () => {
+    expect(spelling('Пирожное шоколадное', 'Пирожные шоколадное')).toMatchObject({
+      edits: 1,
+      describedApart: false,
+    })
+    // The price, named: a typo of such a noun is not on its list, and reads as a word that describes.
+    expect(spelling('Мороженое пломбир', 'Мароженое пломбир')).toMatchObject({
+      edits: 1,
+      describedApart: true,
+    })
+  })
+
   it('is no pair for names of sizes alone', () => {
     expect(spelling('500 г', '500 г')).toBeNull()
   })
@@ -160,6 +199,30 @@ describe('twinVerdict', () => {
   it('names one edit in a word the model doubts: a typo, or a neighbour on the shelf', () => {
     expect(pair('Кифир', 'Кефир', 0.855)).toBe('candidate')
     expect(pair('Курица', 'Корица', 0.856)).toBe('candidate')
+  })
+
+  it('never merges a way of cooking one letter apart, only names it (MOL-358)', () => {
+    for (const [a, b] of [
+      ['Курица жареная', 'Курица вареная'],
+      ['Картофель жареный', 'Картофель вареный'],
+      ['Колбаса вареная', 'Колбаса жареная'],
+      ['Грибы сушёные', 'Грибы тушёные'],
+      ['Овощи сушёные', 'Овощи тушёные'],
+      ['Яйца варёные', 'Яйца жареные'],
+      ['Свёкла варёная', 'Свёкла жареная'],
+    ] as const) {
+      expect(pair(a, b, 0.99), `${a} ~ ${b}`).toBe('candidate')
+    }
+  })
+
+  it('names a typo inside a word that describes — the price, named', () => {
+    expect(pair('Творог обезжиренный', 'Творог обизжиренный', 0.947)).toBe('candidate')
+  })
+
+  it('still merges a typo of the kind beside a word that describes, the order and «ё»', () => {
+    expect(pair('Молоко топлёное', 'Малоко топлёное', 0.95)).toBe('merge')
+    expect(pair('Молоко топлёное', 'Топленое молоко', 0.95)).toBe('merge')
+    expect(pair('Сыр плавленый', 'Сыр плавленный', 0.95)).toBe('merge')
   })
 
   it('leaves what is far by meaning, and what differs in size or a short word', () => {

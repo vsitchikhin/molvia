@@ -179,8 +179,11 @@ export const NOUN_WORD = `^(${NOT_ADJECTIVES.map((word) =>
 
 const NOUN = new RegExp(NOUN_WORD, 'u')
 
-/** Whether a word of a name describes rather than names — by `ADJECTIVE_WORD` and `NOUN_WORD`. */
-function describes(word: string): boolean {
+/**
+ * Whether a word of a name describes rather than names — by `ADJECTIVE_WORD` and `NOUN_WORD`. The
+ * kind skips it (`kindKey`), and the merge of twins never takes a pair it tells apart (MOL-358).
+ */
+export function describes(word: string): boolean {
   return ADJECTIVE.test(word) && !NOUN.test(word)
 }
 
