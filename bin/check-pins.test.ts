@@ -264,6 +264,18 @@ describe('pinProblems', () => {
     ])
   })
 
+  it('reads a workflow or an action as one, whatever word its name holds', () => {
+    const text = steps('      - uses: actions/checkout@v7')
+    for (const path of [
+      '.github/workflows/lint-dockerfiles.yml',
+      '.github/workflows/Dockerfile.yml',
+      '.github/workflows/containerfile-build.yaml',
+    ]) {
+      expect(checkedPaths([path])).toEqual([path])
+      expect(pinProblems([{ path, text }])).toEqual([unpinned(`${path}:4`, 'actions/checkout@v7')])
+    }
+  })
+
   it('reads the image of a Docker action, its own Dockerfile apart', () => {
     const action = (image: string): string => `runs:\n  using: docker\n  image: ${image}\n`
     const path = '.github/actions/scan/action.yml'
@@ -304,10 +316,16 @@ describe('pinProblems', () => {
     ]
     const left = ['README.md', '.github/workflows/sub/x.yml', 'x/my-action.yml']
     expect(checkedPaths([...dockerfiles, ...yamls, ...left])).toEqual([...dockerfiles, ...yamls])
-    // A note or an ignore file so named is read like Dependabot reads it, and has nothing to refuse.
-    expect(checkedPaths(['docs/Dockerfile.md', 'x/Dockerfile.dockerignore'])).toHaveLength(2)
+    // A file of another kind by its extension, or the word only inside another word, is no Dockerfile.
     expect(
-      pinProblems([{ path: 'docs/Dockerfile.md', text: '# How the image is built\n' }]),
+      checkedPaths([
+        'docs/Dockerfile.md',
+        'docs/dockerfile-guide.md',
+        'x/Dockerfile.dockerignore',
+        'services/receipt-reader/test_dockerfile.py',
+        'bin/check-dockerfile.mjs',
+        'x/mydockerfiles',
+      ]),
     ).toEqual([])
     for (const path of dockerfiles) {
       expect(pinProblems([{ path, text: 'FROM node:22' }])).toHaveLength(1)
@@ -324,6 +342,8 @@ describe('imageTakers', () => {
         { path: 'x/Dockerfile.dockerignore', text: 'node_modules\n' },
         { path: 'y/Dockerfile', text: '# FROM node:22\n' },
         { path: '.github/workflows/ci.yml', text: 'from: x\n' },
+        { path: '.github/workflows/dockerfile-lint.yml', text: 'FROM node:22\n' },
+        { path: 'docs/dockerfile-guide.md', text: '```dockerfile\nFROM node:22\n```\n' },
       ]),
     ).toEqual(['x/Dockerfile'])
   })

@@ -31,14 +31,21 @@ import process from 'node:process'
 // What is read, by its path — one rule, for `npm run lint` and the test alike.
 const isWorkflow = (path) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path)
 const isAction = (path) => /^action\.ya?ml$/.test(path.split('/').pop() ?? '')
-// A Dockerfile by its name as Dependabot reads it, the word anywhere in any case. A file so named
-// that takes no image — a note, an ignore file — has nothing to refuse, and Dependabot need not
-// watch it.
-const isDockerfile = (path) => /dockerfile|containerfile/i.test(path.split('/').pop() ?? '')
+// A Dockerfile by its name, by a closed rule: Dependabot's word — `dockerfile` or `containerfile`,
+// in any case — as a part of the name, bounded by its ends, `.`, `-` or `_` (`Dockerfile.prod`,
+// `prod-Dockerfile`), and never a file of another kind by its extension (`test_dockerfile.py`, a
+// note `.md`). Dependabot reads only the directories it is given; this reads the whole repository.
+const OTHER_KIND =
+  /\.(?:md|markdown|txt|rst|adoc|py|[cm]?[jt]sx?|sh|bash|zsh|json|ya?ml|toml|ini|cfg|conf|html?|s?css|dockerignore)$/i
+const isDockerfile = (path) => {
+  const name = path.split('/').pop() ?? ''
+  return /(?:^|[._-])(?:dockerfile|containerfile)(?:[._-]|$)/i.test(name) && !OTHER_KIND.test(name)
+}
+// A workflow or an action is read as one first, whatever word its name holds.
+const isYaml = (path) => isWorkflow(path) || isAction(path)
 
 /** The paths of those given that the check reads. */
-export const checkedPaths = (paths) =>
-  paths.filter((path) => isWorkflow(path) || isAction(path) || isDockerfile(path))
+export const checkedPaths = (paths) => paths.filter((path) => isYaml(path) || isDockerfile(path))
 const DEPENDABOT = '.github/dependabot.yml'
 
 // The key of a step, a job or an action and its value, quoted or not, with what follows it on the
@@ -136,6 +143,16 @@ function instructionsOf(text) {
 /** A value with the quotes BuildKit takes off it taken off. */
 const unquoted = (value) => value.replace(/^(['"])(.*)\1$/, '$2')
 
+/** An instruction's word, in capitals, its flags and the rest of its words. */
+function wordsOf(line) {
+  const [word, ...rest] = line.trim().split(/\s+/)
+  return {
+    instruction: word?.toUpperCase(),
+    flags: rest.filter((part) => part.startsWith('--')),
+    args: rest.filter((part) => !part.startsWith('--')),
+  }
+}
+
 /** The images one instruction takes from elsewhere: `COPY --from`, `RUN --mount=…,from=`. */
 function sourcesOf(instruction, flags) {
   if (instruction === 'COPY') {
@@ -167,10 +184,7 @@ export function dockerfileProblems(path, text) {
     if (problem) problems.push(`${path}:${String(index + 1)}: ${problem}`)
   }
   for (const { text: line, number } of instructionsOf(text)) {
-    const [word, ...rest] = line.trim().split(/\s+/)
-    const instruction = word?.toUpperCase()
-    const flags = rest.filter((part) => part.startsWith('--'))
-    const args = rest.filter((part) => !part.startsWith('--'))
+    const { instruction, flags, args } = wordsOf(line)
     const images = instruction === 'FROM' ? [args[0]] : sourcesOf(instruction, flags)
     for (const image of images) {
       const problem = imageProblem(image, stages)
@@ -225,7 +239,7 @@ export function dependabotProblems(dockerfiles, text) {
 /** Every problem of the files given, each a path and its text. */
 export function pinProblems(files) {
   return files.flatMap(({ path, text }) =>
-    isDockerfile(path) ? dockerfileProblems(path, text) : workflowProblems(path, text),
+    isYaml(path) ? workflowProblems(path, text) : dockerfileProblems(path, text),
   )
 }
 
@@ -234,8 +248,9 @@ export const imageTakers = (files) =>
   files
     .filter(
       ({ path, text }) =>
+        !isYaml(path) &&
         isDockerfile(path) &&
-        instructionsOf(text).some(({ text: line }) => /^[\t ]*from[\t ]/i.test(line)),
+        instructionsOf(text).some(({ text: line }) => wordsOf(line).instruction === 'FROM'),
     )
     .map(({ path }) => path)
 
