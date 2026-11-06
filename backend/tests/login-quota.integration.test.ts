@@ -1,9 +1,10 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { ERROR, LOGIN_WINDOW_LIMIT } from '@molvia/model'
+import { ERROR, LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT } from '@molvia/model'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { loginRequests } from '@/db/schema'
+import { addressMinute } from '@/usecases/address-minute'
 import { startLogin } from '@/usecases/start-login'
 import { connectDrizzle } from './db'
 import { clearAll } from './fixtures'
@@ -27,7 +28,16 @@ afterAll(async () => {
 
 describe('login quota and lifetime', () => {
   it('starts with independent secrets and five minutes, without calling Telegram', async () => {
-    const { view, secret } = await startLogin(requests, 'molvia_bot', null)
+    const { view, secret } = await startLogin(
+      requests,
+      {
+        limit: addressMinute(LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT),
+        address: '198.51.100.1',
+        now: Date.now(),
+      },
+      'molvia_bot',
+      null,
+    )
     const code = new URL(view.url).searchParams.get('start')
     expect(code).toMatch(/^[A-Za-z0-9_-]{43}$/)
     expect(secret).not.toBe(code)

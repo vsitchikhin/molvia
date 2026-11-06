@@ -36,6 +36,11 @@ export interface LoginRequestRepository {
     deviceName: string | null,
     again?: boolean,
   ): Promise<LoginRequest>
+  /**
+   * A start the address's minute turned away (MOL-359): it makes no request and takes no quota lock,
+   * so only its count in `login_days`, on the day it was refused — as a refusal by the quota counts.
+   */
+  refuse(): Promise<void>
   /** Deletes what ran out, and counts in `login_days` those that ran out with no outcome. */
   removeExpired(): Promise<void>
 
@@ -205,6 +210,10 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
   const live = sql`${loginRequests.consumedAt} is null and ${loginRequests.expiresAt} > clock_timestamp()`
 
   return {
+    async refuse() {
+      await tally(db, ['refused'], yerevanDay(sql`clock_timestamp()`))
+    },
+
     async removeExpired() {
       // `skip locked`: a row somebody holds is left for the next pass (MOL-58, adversarial Р-3).
       // Erasure holds every request of the person it erases, expired ones too, and this runs
@@ -239,7 +248,8 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
 
     async createLimited(id, code, secret, deviceName, again = false) {
       const started = await db.transaction(async (tx) => {
-        // One quota for this database, including concurrent starts and process restarts.
+        // Everybody's quota, one for this database, including concurrent starts and process restarts;
+        // an address's minute was the use case's before it (MOL-359).
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended('molvia:login-quota', 0))`,
         )

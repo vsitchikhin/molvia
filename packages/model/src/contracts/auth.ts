@@ -7,7 +7,13 @@ export const LOGIN_COOKIE = '__Host-molvia_login'
 export const LOGIN_HEADER = 'X-Molvia-Login'
 export const LOGIN_LIFETIME_SECONDS = 5 * 60
 export const LOGIN_WINDOW_SECONDS = 60
-export const LOGIN_WINDOW_LIMIT = 30
+/**
+ * Starts an address may make in a rolling minute (MOL-359, owner's В-7 «а» of MOL-287): one `curl` used
+ * to hold the door shut for everybody. Counted in the API's memory by the address Caddy names.
+ */
+export const LOGIN_ADDRESS_LIMIT = 5
+/** Starts everybody together may make in a rolling minute, counted in the database: a botnet's ceiling. */
+export const LOGIN_WINDOW_LIMIT = 300
 
 /**
  * What the internal channel's secret looks like: 32 random bytes in base64url (MOL-54, Р-5).
