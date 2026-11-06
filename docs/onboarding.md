@@ -5346,3 +5346,9 @@ protection, Dependabot alerts и security updates, `sha_pinning_required`, actio
 не собираются (В-4, по умолчанию «а»): держат релиз и откат. Образы compose не отслеживаются — названо в
 `security.md`. Требования и план — `.scratch/tasks/{requirements,plans}/MOL-364.md`, артефакт —
 `.lavish/mol-364-plan.html`.
+**Ревью 1–2** (селфревью №1–8, адверсариальные А1…Г2 и Р2-А1…А7): проверка держит обычную запись шире — стадия только
+после своей строки (`FROM caddy AS caddy` — образ), образы `COPY --from`, `RUN --mount=…,from=` и `# syntax=`, строки
+Dockerfile склеены по `\`, `action.yml` в любом каталоге с его `image: docker://…`, Dockerfile под любым именем, каталог
+с Dockerfile — в docker-записи `dependabot.yml`; точный тег — закрытое правило (три числа или день снимка), поэтому
+Tesseract теперь `debian:trixie-20261104-slim` с тем же digest; `security` у npm — без Playwright. Граница — обычная
+запись: другие формы YAML держит только `sha_pinning_required` (Б1), коммит форка под именем action — ревью (Г2).

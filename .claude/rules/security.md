@@ -90,18 +90,23 @@ file holds what belongs to no single area, and what the audit found missing.
   holds the deploy key and Cloudflare's token beside its actions. A floating image tag, besides, built
   something nobody saw: under `caddy:2-alpine` the audit found 2.11.7, three days later it was 2.11.9.
   `bin/check-pins.mjs` in `npm run lint` refuses either form left out — in a workflow and in an action of
-  the repository (`.github/actions/*/action.yml`), in a Dockerfile's `FROM`, `COPY --from` and
-  `RUN --mount=…,from=` — and a comment naming a major alone (`# v7`), `latest` and a tag that is a major
-  alone (`22`, `2-alpine`); a stage of the file — named only after its own line, so `FROM caddy AS caddy` is
-  an image — `scratch` and a local action are not pinned. **The digest is what runs**: Docker pulls it and
+  the repository wherever it lives (`action.yml`, its `image: docker://…` too), in a Dockerfile under any of
+  its names (`Dockerfile.*`, `*.Dockerfile`, `Containerfile`): its `# syntax=` — the image BuildKit hands
+  the whole file to — `FROM`, `COPY --from` and `RUN --mount=…,from=`, an instruction's lines joined at `\` —
+  and a comment naming a major alone (`# v7`). **An exact tag is a closed rule**, not a list of floating
+  ones: a version of three numbers at its start (`2.11.9-alpine`, `v1.153.0`) or the day of a snapshot
+  (`trixie-20261104-slim`); `latest`, `22`, `2.11-alpine`, `lts-alpine`, `trixie-slim` are refused. A stage
+  of the file — named only after its own line, so `FROM caddy AS caddy` is an image — `scratch` and a local
+  action are not pinned. **The digest is what runs**: Docker pulls it and
   never reads the tag, so a tag changed by hand without its digest changes nothing, and which tag a digest is
   only the registry knows — the check holds the form, Dependabot the pair. **What the check is**: a guard
   against the ordinary spelling, not a form built to slip past it — the boundary of `check-clock-bounds.mjs`:
-  `uses:` as the key at the start of its line or after `- `, its value on that line, and an instruction's
-  flags on its first line. **The price, named:** another spelling of YAML (a value on the next line, a flow
-  mapping, a quoted key) is past it, and only GitHub's `sha_pinning_required` refuses such an action, at the
-  run (adversarial Б1); a codename tag (`trixie-slim`) passes, which tag is exact past `latest` and a major is
-  review's; and **a sha is trusted as the action's own** — GitHub serves a commit of any fork under the
+  `uses:` and `image:` as the key at the start of their line or after `- `, the value on that line; a
+  Dockerfile's lines joined at `\`, the default escape; Dependabot's directories written out — a pattern
+  there is refused rather than guessed at. **The price, named:** another spelling of YAML (a value on the next
+  line, a flow mapping, a quoted key) is past it, and only GitHub's `sha_pinning_required` refuses such an
+  action, at the run (adversarial Б1); the `image:` of a workflow's container or service is not read (below);
+  and **a sha is trusted as the action's own** — GitHub serves a commit of any fork under the
   action's name (adversarial Г2, «imposter commits»), which neither the check, the setting nor Dependabot
   tells from a release: a sha written by hand rather than by Dependabot is review's to check against
   `gh api repos/<action>/commits/<tag>`.
