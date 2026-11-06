@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { existsSync, readFileSync } from 'node:fs'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -64,6 +65,87 @@ function outdatedLines(): Plugin {
   }
 }
 
+// The Content Security Policy of the page (MOL-363), the one statement of it. A meta of the built
+// `index.html` rather than a header of Caddy: the installed app is answered by its worker's copy of
+// `index.html` with the headers of the day it was cached, which changes only with the file, so a
+// policy in a header changed alone would never reach it — inside the file, it comes with the version.
+// What a meta cannot say, `frame-ancestors`, is Caddy's. No `'unsafe-inline'` and no `'unsafe-eval'`:
+// the scripts of `index.html` go by their hashes, counted by the build; `'wasm-unsafe-eval'` is for an
+// engine whose worker takes its page's policy — zxing compiles in the scanner's workers, and the engines
+// tried give a worker none from the meta (`security.md`); a receipt's photo and the picture sent to the
+// developer are `blob:`.
+const CONTENT_SECURITY_POLICY = {
+  'default-src': ["'self'"],
+  'script-src': ["'self'", "'wasm-unsafe-eval'"],
+  'style-src': ["'self'"],
+  'img-src': ["'self'", 'blob:'],
+  'font-src': ["'self'"],
+  'connect-src': ["'self'"],
+  'worker-src': ["'self'"],
+  'object-src': ["'none'"],
+  'base-uri': ["'none'"],
+  'form-action': ["'self'"],
+} satisfies Record<string, string[]>
+
+// A script is what the browser runs as one, read in one pass left to right as the parser reads it: a
+// comment outside a script hides what it holds — a comment of this file may well name `<script>` — and a
+// `<!--` inside a script is the script's own text; any case, a `>` inside a quoted value ends no tag.
+// One with a `src` attribute of its own — `data-src` is another — is the bundle's, `'self'` already.
+// The charset the meta follows is found in the same pass, so one a comment quotes is no place for it.
+// What this cannot read the end-to-end reads by the browser's own parser (`csp-built.spec`).
+const CHARSET = '<meta charset="utf-8" />'
+const COMMENT_SCRIPT_OR_CHARSET = new RegExp(
+  [
+    /<!--[\s\S]*?-->/.source,
+    /<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script\s*>/.source,
+    CHARSET.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+  ].join('|'),
+  'gi',
+)
+const QUOTED = /"[^"]*"|'[^']*'/g
+const WITH_SRC = /(?:^|\s)src\s*=/i
+
+function contentSecurityPolicy(): Plugin {
+  return {
+    name: 'molvia-content-security-policy',
+    // The build only: the dev server puts styles in by `<style>` and talks over a websocket, so its
+    // policy would be another one and prove nothing of production's.
+    apply: 'build',
+    // Last of every plugin, the PWA's own `post` included (it stands before this one in the list), so
+    // the hashes are of the scripts as shipped — `outdatedLines` writes into one of them.
+    enforce: 'post',
+    transformIndexHtml: {
+      order: 'post',
+      handler(html) {
+        const tokens = [...html.matchAll(COMMENT_SCRIPT_OR_CHARSET)]
+        const scripts = tokens.filter(([token]) => /^<script/i.test(token))
+        const at = tokens.find(([token]) => token.toLowerCase() === CHARSET)?.index ?? -1
+        const hashes = scripts
+          .filter(([, attributes]) => !WITH_SRC.test((attributes ?? '').replace(QUOTED, '""')))
+          .map(
+            ([, , body]) =>
+              `'sha256-${createHash('sha256')
+                .update(body ?? '')
+                .digest('base64')}'`,
+          )
+        if (hashes.length === 0) throw new Error('index.html has no inline script to hash')
+        const policy = Object.entries({
+          ...CONTENT_SECURITY_POLICY,
+          'script-src': [...CONTENT_SECURITY_POLICY['script-src'], ...hashes],
+        })
+          .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
+          .join('; ')
+        // First after the charset: a script before the meta would run under no policy at all.
+        if (at < 0 || scripts.some((script) => script.index < at)) {
+          throw new Error('index.html has no charset before its first script for the policy')
+        }
+        const meta = `\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />`
+        return html.slice(0, at + CHARSET.length) + meta + html.slice(at + CHARSET.length)
+      },
+    },
+  }
+}
+
 // Ports come from the working copy's .env, so two copies never fight over one port.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, repoRoot, '')
@@ -114,6 +196,7 @@ export default defineConfig(({ mode }) => {
           ],
         },
       }),
+      contentSecurityPolicy(),
     ],
     // The maps lie beside the build, for `make failures` to read a phone's frames (MOL-144, Р-7 of
     // MOL-149): the repository is public, so they disclose nothing. Not precached — `globPatterns`

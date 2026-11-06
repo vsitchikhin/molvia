@@ -123,13 +123,37 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   window of the app, where it does wait (Е1). Beside it `client-errors-built.spec.ts` (MOL-144) and
   `outdated-built.spec.ts` (MOL-231): the line of a browser below the floor is put in by the build,
   and a start that stayed silent is proved where a worker could have registered. `phone` ignores
-  them. The build is a web server of the run, so every `make e2e`
+  them; all three run under the page's policy (below). The build is a web server of the run, so every `make e2e`
   pays for it — some twenty seconds. The spec comes in by `page.goto('/privacy')`, **the one spec
   not through `open()`**: the development seam is not in a build, and that page is open without a
   session. A new version is a byte appended to the built `sw.js`, put back after the spec; `preview`
   keeps plain http even in a copy with certificates (`PWA_PLAIN_HTTP`), since the loopback is a
   secure context anyway. Chromium only: Safari's worker lives by rules of its own, and that is
   checked on a phone.
+- **The page's policy is the build's, so its proof is too** (MOL-363, `security.md`): every spec of a build
+  takes `test` from `e2e/csp.ts`, which fails it on any violation of the Content Security Policy — the document's
+  `securitypolicyviolation` through a binding and an init script, which the page's policy does not reach, and the
+  console of the page and of its workers, where a worker's refusal is said and no event comes. `csp-built.spec.ts`
+  runs in two projects of its own against the same build: **`pwa-camera`**, the full Chromium with the fake camera,
+  and **`pwa-iphone`**, WebKit; `phone` ignores it. It holds the meta first in `index.html` with exactly its scripts'
+  hashes — parsed by the browser's `DOMParser`, never by the build's pattern (adversarial Г1) — a stranger's screens
+  and their faces, and signed in a receipt's photo and its edges, a picture to the developer and the six screens with
+  a `<select>`, on both engines; the scanner reading the code filmed on Chromium alone, WebKit having no fake camera.
+  **The seam is asked without the button the build has not got**: on Chromium `fetch('/api/dev/login')` from the
+  page sets the cookie as the button would; WebKit keeps no `Secure` cookie on the loopback (below), so there the
+  test asks the seam and makes every request of the page to the API itself, with the session, by `route.fetch`, the
+  answer handed back by `route.fulfill` (adversarial А1 of review 1). **The browser carries no cookie of it, by either
+  way tried**: a `Cookie` laid by `route.continue` WebKit never sends (CI, run 42209616807), nor a `__Host-` cookie put
+  in the jar without `Secure` (run 42213747061) — and a Mac's WebKit hid the first by keeping the seam's own, so the
+  jar is emptied first and every machine signs in one way. **On WebKit the walk signed in has no worker**
+  (`serviceWorkers: 'block'` there alone): once it controls the page, the requests go through it and past the route;
+  Chromium keeps the session in its jar and walks the pages its worker serves (review 3, №9). The session
+  is taken by its name — the seam sets the account it remembers first. The device then asks «Is this your account?» (MOL-56) and the terms, as a person
+  answers them. **WebKit's own report of a `<select>`** is the one `csp.ts` lets go — any `style-src-attr` report at a
+  `<select>` on WebKit, with one line of its console for each (owner's В-4 «а», `security.md`): no field tells the
+  engine's style from ours, and Chromium on the same screens fails on ours. The fixture listens on the context, so a
+  second window of a test is heard too (review 1, №4). A version `pwa-update.spec` puts out meanwhile only adds its
+  strip over the tab bar.
 - **The camera needs the full Chromium, so the scanner's specs run in one project** (MOL-98): `camera`
   is the same phone with `channel: 'chromium'` and a fake camera filming a barcode drawn by
   `globalSetup` (`e2e/barcode-video.ts`); `phone` ignores `scanner.spec.ts`. The headless shell every

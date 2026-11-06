@@ -216,6 +216,19 @@ well; Grafana is then at `http://127.0.0.1:3000`. On Docker Desktop node_exporte
 `rslave` — an override with `/:/host:ro` tries it there — and the disk's panels stay empty: the
 virtual machine has no `/` of the kind a server has.
 
+## The page's headers (MOL-363)
+
+The page's Content Security Policy is a meta of the built `index.html` (`frontend/vite.config.ts`); Caddy adds
+`frame-ancestors 'none'` and, for any host but `localhost`, HSTS for a year. After a rollout that touched either:
+
+```bash
+curl -sI https://molvia.net/ | grep -iE 'content-security-policy|strict-transport-security'
+curl -s https://molvia.net/ | grep -o '<meta http-equiv="Content-Security-Policy"[^>]*>'
+```
+
+An installed app takes a new policy with the version that carries it, as any change of `index.html`. HSTS cannot be
+taken back sooner than its year from a browser that saw it: `max-age=0` reaches only those that come again.
+
 ## Erasing a person by hand (MOL-58)
 
 People erase themselves: `/delete` in the bot, one confirmation, done in one transaction. This
