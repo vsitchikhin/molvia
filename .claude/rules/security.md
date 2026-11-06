@@ -104,15 +104,25 @@ file holds what belongs to no single area, and what the audit found missing.
   The dev server has none: it puts styles in by `<style>` and talks over a websocket, a policy of its own that
   would prove nothing of production's.
 - **No `'unsafe-inline'`, no `'unsafe-eval'`**: `default-src 'self'`; the three scripts of `index.html` by their
-  `sha256`, counted by the build from the HTML as shipped — after `outdatedLines` writes into one — so a script
-  added or changed needs no hand; `'wasm-unsafe-eval'` for the scanner's and the QR's zxing; `style-src 'self'`
+  `sha256`, counted by the build from the HTML as shipped — the last plugin, after `outdatedLines` writes into one
+  and after the PWA's — every `<script>` without `src`, with attributes or in capitals, none inside a comment
+  (review 1, №1, adversarial Г1), so a script added or changed needs no hand; `style-src 'self'`
   (no `<style>` from a script, no `style=""` in the bundle — `el.style` is the CSSOM, which no policy holds);
   `img-src 'self' blob:` (a receipt's photo, a picture to the developer — `data:` is in no build); `font-src`,
   `connect-src`, `worker-src 'self'`; `object-src 'none'`, `base-uri 'none'`, `form-action 'self'`. A source let
   in is let in by name, with its reason here, never `'unsafe-*'` to quiet a violation.
+- **`'wasm-unsafe-eval'` stands for an engine whose worker takes its page's policy** (owner's В-5 «а» of review 1):
+  zxing compiles its wasm in the scanner's and the QR's workers alone, and in the Chromium and WebKit of the run a
+  worker has no policy from the meta — taken out, the scanner read its code there all the same (adversarial А2).
+  Whether an engine of the floor (Safari 16.4, Chrome 111, Firefox 125) gives a worker its page's policy was not
+  tried, and there the scanner at the shelf would refuse to read. **The price, named:** on the engines of the run it
+  lets the page alone compile wasm, which no line of its bundle does — a script injected could, a little past what
+  it can do already.
 - **Zod is told it may not compile** (`frontend/src/zodJitless.ts`, the first import of `main.ts`): Zod 4 asks
-  `Function('')` in a `try` at its first parse, and under a policy with no `eval` the browser reports the
-  question itself as a violation. The answer is the same; the report went away.
+  `Function('')` in a `try` as it builds an object schema — the model's are built as its modules load, and
+  `@/catchers` pulls them in first, so the config stands before it, not merely before the first parse — and under
+  a policy with no `eval` the browser reports the question itself as a violation. The answer is the same; the
+  report went away.
 - **What a meta cannot say is Caddy's**: `Content-Security-Policy "frame-ancestors 'none'"` — «Удалить мои
   данные» in another site's frame is a click taken — and `Strict-Transport-Security "max-age=31536000"`, with no
   `preload` and no `includeSubDomains`, each a decision of its own. **Never for `localhost`** (`@public not host
@@ -123,9 +133,14 @@ localhost`): HSTS holds by the host's name, not its port, and the production sta
 - **The proof is the built app's end-to-end, with no violation** (owner's В-2 «а», `e2e.md`): every spec of a
   build comes through `e2e/csp.ts`, which fails it on any; `csp-built.spec` holds the meta and its hashes and walks
   what a directive decides. **Production reports nothing** (В-3 «а»): a policy that blocks the bundle leaves nobody
-  to report, and the walk covers the rest — signed in on Chromium, a stranger's screens on WebKit too. **The
-  prices, named:** a screen signed in is never run under the policy on WebKit (no `Secure` cookie on the
-  loopback), nor the QR's worker of a Serbian receipt, which shares the scanner's sources; a worker has no policy of its own
+  to report, and the walk covers the rest, signed in on both engines — WebKit by the seam's cookie laid on the
+  page's requests (adversarial А1). **WebKit refuses its own inline style of every `<select>`** (`style-src-attr`,
+  an empty `sample` — a bare `createElement('select')` too), on six screens signed in, with nothing seen to change
+  on the screen; `e2e/csp.ts` lets go exactly that report and one line of its console for each, and the policy
+  stays strict (owner's В-4 «а»). Whether Safari on a phone reports it too was not tried. **The prices, named:** an
+  inline style of ours on a `<select>` is let go on WebKit — Chromium, walking the same screens, fails on it; the
+  scanner is walked on Chromium alone (WebKit has no fake camera), and the QR's worker of a Serbian receipt on
+  neither, sharing the scanner's sources; a worker has no policy of its own
   — a meta binds its document, a worker's script comes with Caddy's headers alone — and runs only our code over
   frames, never a person's text; a `report-uri` cannot be said in a meta.
 

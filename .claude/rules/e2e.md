@@ -136,12 +136,17 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   console of the page and of its workers, where a worker's refusal is said and no event comes. `csp-built.spec.ts`
   runs in two projects of its own against the same build: **`pwa-camera`**, the full Chromium with the fake camera,
   and **`pwa-iphone`**, WebKit; `phone` ignores it. It holds the meta first in `index.html` with exactly its scripts'
-  hashes, a stranger's screens and their faces on both engines, and, signed in on Chromium only, a receipt's photo
-  and its edges, the scanner reading the code filmed, a picture to the developer. **The seam is asked by the page
-  itself**: the build has no button for it, the run's API carries it, and `fetch('/api/dev/login')` from the page
-  sets the cookie as the button would; the device then asks «Is this your account?» (MOL-56) and the terms, as a
-  person answers them. WebKit cannot keep the session past a load (below), so the walk signed in is skipped there,
-  saying why. A version `pwa-update.spec` puts out meanwhile only adds its strip over the tab bar.
+  hashes — parsed by the browser's `DOMParser`, never by the build's pattern (adversarial Г1) — a stranger's screens
+  and their faces, and signed in a receipt's photo and its edges, a picture to the developer and the six screens with
+  a `<select>`, on both engines; the scanner reading the code filmed on Chromium alone, WebKit having no fake camera.
+  **The seam is asked without the button the build has not got**: on Chromium `fetch('/api/dev/login')` from the
+  page sets the cookie as the button would; WebKit keeps no `Secure` cookie on the loopback (below), so there the
+  test asks the seam and lays the cookie on every request of the page to the API by `page.route` (adversarial А1 of
+  review 1) — the page untouched. The device then asks «Is this your account?» (MOL-56) and the terms, as a person
+  answers them. **WebKit's own report of a `<select>`** (`style-src-attr`, empty `sample`) is the one `csp.ts` lets
+  go, with one line of its console for each (owner's В-4 «а», `security.md`). The fixture listens on the context, so a
+  second window of a test is heard too (review 1, №4). A version `pwa-update.spec` puts out meanwhile only adds its
+  strip over the tab bar.
 - **The camera needs the full Chromium, so the scanner's specs run in one project** (MOL-98): `camera`
   is the same phone with `channel: 'chromium'` and a fake camera filming a barcode drawn by
   `globalSetup` (`e2e/barcode-video.ts`); `phone` ignores `scanner.spec.ts`. The headless shell every
