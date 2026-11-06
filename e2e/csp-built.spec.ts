@@ -5,7 +5,7 @@ import type { Page } from '@playwright/test'
 import { SESSION_COOKIE } from '@molvia/model'
 import { BARCODE } from './barcode-video'
 import { expect, test } from './csp'
-import { AGE, ACCEPT } from './session'
+import { acceptTerms } from './session'
 
 // MOL-363, the built app (`pwa-camera` and `pwa-iphone`): the policy is a meta only the build puts in,
 // so this is the one place the app runs under it. Every step goes where a directive decides — the
@@ -122,8 +122,7 @@ async function signIn(page: Page, browserName: string): Promise<void> {
   }
   await page.goto('/purchases')
   await page.getByRole('button', { name: 'Yes, that is me' }).click()
-  await page.getByRole('checkbox', { name: AGE }).check()
-  await page.getByRole('button', { name: ACCEPT }).click()
+  await acceptTerms(page)
   await expect(page.getByRole('heading', { level: 1, name: 'Purchases' })).toBeVisible()
 }
 

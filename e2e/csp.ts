@@ -7,20 +7,20 @@ import type { Page } from '@playwright/test'
 interface Report {
   directive: string
   blocked: string
-  sample: string
   /** The tag of the element the event was raised at, or nothing when it was the document's. */
   target: string | null
 }
 
 /**
- * The one report let go (owner's В-4 «а» of review 1): WebKit refuses its own inline style of every
- * `<select>` it makes — a bare `createElement('select')` too, `sample` empty, nothing of ours in it — and
- * nothing was seen to change on the screen. Exactly that report, and one line of its console for each:
- * an inline style on a `<select>` that is ours is let go on WebKit alone, and Chromium, walking the same
- * screens, still fails on it.
+ * The one kind of report let go (owner's В-4 «а» of review 1): WebKit refuses its own inline style of
+ * every `<select>` it makes — a bare `createElement('select')` too — and nothing was seen to change on the
+ * screen. Let go is any `style-src-attr` report at a `<select>` on WebKit, and one line of its console for
+ * each: no field of a report tells the engine's style from ours (`sample` is empty for both, the policy
+ * asking none), so an inline style of ours on a `<select>` passes on WebKit alone — Chromium, walking the
+ * same screens, fails on it (adversarial Б1 of review 2).
  */
 const isWebKitSelect = (report: Report) =>
-  report.directive === 'style-src-attr' && report.sample === '' && report.target === 'SELECT'
+  report.directive === 'style-src-attr' && report.target === 'SELECT'
 const WEBKIT_SELECT_LINE =
   "Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive"
 
@@ -47,7 +47,6 @@ export const test = base.extend<{ cspViolations: undefined }>({
           void report({
             directive: event.effectiveDirective,
             blocked: event.blockedURI || 'inline',
-            sample: event.sample,
             target: event.target instanceof Element ? event.target.tagName : null,
           })
         })
