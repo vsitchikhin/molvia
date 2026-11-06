@@ -226,7 +226,26 @@ describe('dockerfileProblems', () => {
         '# check=error=true\n# SYNTAX = docker/dockerfile:1.7-labs\nFROM scratch',
       ),
     ).toEqual([told(2, 'docker/dockerfile:1.7-labs')])
-    // After a comment it is a comment: BuildKit reads no directive there.
+    // As BuildKit reads them: a comment after the value, a byte order mark, a first line of `#!`.
+    expect(
+      dockerfileProblems(
+        FILE,
+        '# syntax=docker/dockerfile:1  # the frontend, for heredocs\nFROM scratch',
+      ),
+    ).toEqual([told(1, 'docker/dockerfile:1')])
+    expect(dockerfileProblems(FILE, '\uFEFF# syntax=docker/dockerfile:1\nFROM scratch')).toEqual([
+      told(1, 'docker/dockerfile:1'),
+    ])
+    expect(
+      dockerfileProblems(
+        FILE,
+        '#!/usr/bin/env -S docker build -f\n# syntax=docker/dockerfile:1\nFROM scratch',
+      ),
+    ).toEqual([told(2, 'docker/dockerfile:1')])
+    // A key BuildKit does not know ends the directives, as does a comment: no directive after either.
+    expect(
+      dockerfileProblems(FILE, '# foo1=bar\n# syntax=docker/dockerfile:1\nFROM scratch'),
+    ).toEqual([])
     expect(
       dockerfileProblems(FILE, '# a note\n# syntax=docker/dockerfile:1\nFROM scratch'),
     ).toEqual([])

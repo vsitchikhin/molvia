@@ -31,10 +31,11 @@ import process from 'node:process'
 // What is read, by its path — one rule, for `npm run lint` and the test alike.
 const isWorkflow = (path) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path)
 const isAction = (path) => /^action\.ya?ml$/.test(path.split('/').pop() ?? '')
-// A Dockerfile by its name, by a closed rule: Dependabot's word — `dockerfile` or `containerfile`,
-// in any case — as a part of the name, bounded by its ends, `.`, `-` or `_` (`Dockerfile.prod`,
-// `prod-Dockerfile`), and never a file of another kind by its extension (`test_dockerfile.py`, a
-// note `.md`). Dependabot reads only the directories it is given; this reads the whole repository.
+// A Dockerfile by its name: Dependabot's word — `dockerfile` or `containerfile`, in any case —
+// bounded by the name's ends, `.`, `-` or `_` (`Dockerfile.prod`, `prod-Dockerfile`); a file of a
+// kind `OTHER_KIND` lists by its extension is not one (`test_dockerfile.py`, a note `.md`), and a
+// kind it does not list is read. Dependabot reads only the directories it is given; this reads the
+// whole repository.
 const OTHER_KIND =
   /\.(?:md|markdown|txt|rst|adoc|py|[cm]?[jt]sx?|sh|bash|zsh|json|ya?ml|toml|ini|cfg|conf|html?|s?css|dockerignore)$/i
 const isDockerfile = (path) => {
@@ -63,7 +64,10 @@ const DIGEST = /@sha256:[0-9a-f]{64}$/
 // (`trixie-20261104-slim`). Anything else — `latest`, `22`, `2.11-alpine`, `lts-alpine`,
 // `trixie-slim` — is moved by the next release.
 const EXACT_TAG = /^v?\d+\.\d+\.\d+(?:[-_.+]|$)|(?:^|[-_.])\d{8}(?:[-_.]|$)/
-const DIRECTIVE = /^#[\t ]*([a-z]+)[\t ]*=[\t ]*(\S+)[\t ]*$/i
+// BuildKit's own (`frontend/dockerfile/parser/directives.go`): the value runs to the end of the
+// line, and a key it does not know ends the directives.
+const DIRECTIVE = /^#\s*([a-zA-Z][a-zA-Z0-9]*)\s*=\s*(.+?)\s*$/
+const DIRECTIVE_KEYS = new Set(['syntax', 'escape', 'check'])
 
 /** Why an image taken from a registry is not pinned, or null; a stage of the file is no image. */
 function imageProblem(image, stages = new Set()) {
@@ -176,11 +180,15 @@ export function dockerfileProblems(path, text) {
   const stages = new Set()
   const lines = text.split(/\r?\n/)
   // Parser directives stand first, before any other comment, blank line or instruction; `syntax`
-  // names the image BuildKit hands the whole file to.
+  // names the image BuildKit hands the whole file to — the first word of its value. As BuildKit
+  // reads them: a byte order mark taken off, a first line of `#!` passed over.
   for (const [index, line] of lines.entries()) {
-    const directive = DIRECTIVE.exec(line)
-    if (!directive) break
-    const problem = directive[1].toLowerCase() === 'syntax' ? imageProblem(directive[2]) : null
+    const bare = index === 0 ? line.replace(/^\uFEFF/, '') : line
+    if (index === 0 && bare.startsWith('#!')) continue
+    const directive = DIRECTIVE.exec(bare)
+    if (!directive || !DIRECTIVE_KEYS.has(directive[1].toLowerCase())) break
+    const image = directive[2].split(' ')[0]
+    const problem = directive[1].toLowerCase() === 'syntax' ? imageProblem(image) : null
     if (problem) problems.push(`${path}:${String(index + 1)}: ${problem}`)
   }
   for (const { text: line, number } of instructionsOf(text)) {
@@ -248,7 +256,6 @@ export const imageTakers = (files) =>
   files
     .filter(
       ({ path, text }) =>
-        !isYaml(path) &&
         isDockerfile(path) &&
         instructionsOf(text).some(({ text: line }) => wordsOf(line).instruction === 'FROM'),
     )
