@@ -119,11 +119,12 @@ file holds what belongs to no single area, and what the audit found missing.
   — the word inside another, an extension of another kind — is not read, and the name of a new one is
   review's, as `release.yml` names each it builds (adversarial Р5-А2, Р6-А2, review №12); another spelling of
   YAML (a value on the next line, a flow mapping, a quoted key) is past it, and only GitHub's
-  `sha_pinning_required` refuses such an action, at the run (adversarial Б1); the `image:` of a workflow's
-  container or service is not read (below); and **a sha is trusted as the action's own** — GitHub serves a
-  commit of any fork under the action's name (adversarial Г2, «imposter commits»), which neither the check,
-  the setting nor Dependabot tells from a release: a sha written by hand rather than by Dependabot is review's
-  to check against `gh api repos/<action>/commits/<tag>`.
+  `sha_pinning_required` refuses such an action, at the run (adversarial Б1); a value as BuildKit's pass of
+  shell words rewrites it — quotes or `\` inside a word, `"from"=…` — is past it (adversarial Р10-Г1); the
+  `image:` of a workflow's container or service is not read (below); and **a sha is trusted as the action's
+  own** — GitHub serves a commit of any fork under the action's name (adversarial Г2, «imposter commits»),
+  which neither the check, the setting nor Dependabot tells from a release: a sha written by hand rather than
+  by Dependabot is review's to check against `gh api repos/<action>/commits/<tag>`.
 - **Dependabot moves the pins**: actions monthly, the base images weekly in one group (`images`), the sha or
   the digest with its tag or comment; a major of Node never, since it is `.nvmrc`'s, which CI runs on too.
   **Every directory with a Dockerfile that takes an image is in the docker entry's `directories`**: the check
