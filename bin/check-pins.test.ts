@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  checkedPaths,
   dependabotProblems,
   dockerfileProblems,
   pinProblems,
@@ -167,6 +168,34 @@ describe('dockerfileProblems', () => {
     expect(dockerfileProblems(FILE, text)).toEqual([told(2, 'busybox:latest')])
   })
 
+  it('reads a file of CRLF as one of LF', () => {
+    const text = [
+      '# syntax=docker/dockerfile:1',
+      `FROM node:22.23.4-alpine@${DIGEST}`,
+      'RUN --mount=type=cache,target=/c \\',
+      '    --mount=type=bind,from=busybox:latest,target=/m \\',
+      '    ls /m',
+    ].join('\n')
+    expect(dockerfileProblems(FILE, text.replaceAll('\n', '\r\n'))).toEqual(
+      dockerfileProblems(FILE, text),
+    )
+    expect(dockerfileProblems(FILE, text)).toEqual([
+      told(1, 'docker/dockerfile:1'),
+      told(3, 'busybox:latest'),
+    ])
+  })
+
+  it('keeps an instruction whole across a blank line inside it, as BuildKit does', () => {
+    const text = [
+      `FROM node:22.23.4-alpine@${DIGEST}`,
+      'RUN --mount=type=cache,target=/c \\',
+      '',
+      '    --mount=type=bind,from=busybox:latest,target=/m \\',
+      '    ls /m',
+    ].join('\n')
+    expect(dockerfileProblems(FILE, text)).toEqual([told(2, 'busybox:latest')])
+  })
+
   it('reads the image a syntax directive hands the file to, only where directives stand', () => {
     const pinned = `docker/dockerfile:1.17.1@${DIGEST}`
     expect(dockerfileProblems(FILE, `# syntax=${pinned}\n# escape=\\\nFROM scratch`)).toEqual([])
@@ -216,13 +245,28 @@ describe('pinProblems', () => {
     expect(pinProblems([{ path: WORKFLOW, text }])).toEqual([])
   })
 
-  it('reads a Dockerfile by any of its names', () => {
-    for (const path of [
+  it('reads a Dockerfile by any of its names, a workflow and an action — the paths lint reads', () => {
+    const read = [
+      'Dockerfile',
+      'prod.Dockerfile',
+      'Containerfile.prod',
+      'a/Containerfile.prod',
       'x/Dockerfile.prod',
       'x/prod.Dockerfile',
       'x/Containerfile',
-      'Dockerfile',
-    ]) {
+      '.github/workflows/ci.yml',
+      '.github/workflows/watch.yaml',
+      'action.yml',
+      'tools/setup/action.yaml',
+    ]
+    const left = [
+      'README.md',
+      'Dockerfiles/notes.md',
+      '.github/workflows/sub/x.yml',
+      'x/my-action.yml',
+    ]
+    expect(checkedPaths([...read, ...left])).toEqual(read)
+    for (const path of read.filter((path) => !path.endsWith('ml'))) {
       expect(pinProblems([{ path, text: 'FROM node:22' }])).toHaveLength(1)
     }
   })

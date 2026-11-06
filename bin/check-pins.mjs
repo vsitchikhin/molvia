@@ -1,4 +1,4 @@
-// Refuses what CI runs or builds on by a pointer someone else can move (MOL-364): every `uses:` of a
+// Refuses an action or an image CI runs or builds on by a pointer someone else can move (MOL-364): every `uses:` of a
 // workflow or of an action of this repository is a full commit sha with the release it is in a comment —
 // Dependabot moves the two together — and every image taken from a registry carries its digest beside an
 // exact tag: a Dockerfile's `# syntax=`, `FROM`, `COPY --from` and `RUN --mount=…,from=`, an action's
@@ -14,8 +14,10 @@
 //
 // It holds the ordinary spelling, not a form built to slip past it: `uses:` and `image:` as the key at the
 // start of their line or after `- `, with the value on that line; a Dockerfile's lines joined at `\`, the
-// default escape; the directories of Dependabot written out. Another spelling of YAML is past it, and
-// GitHub's own setting refuses such an action at the run.
+// default escape, a blank or a comment line inside dropped, the ends of lines LF or CRLF; the directories of
+// Dependabot written out. Another spelling of YAML is past it, and GitHub's own setting refuses such an action
+// at the run. A file `ADD` fetches by a URL or from git, and whatever `RUN` downloads, is no image and is not
+// read here: its pinned forms (`ADD --checksum=…`, `#<sha>`) are review's.
 //
 //   node bin/check-pins.mjs
 
@@ -23,21 +25,17 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import process from 'node:process'
 
-const FILES = [
-  '.github/workflows/*.yml',
-  '.github/workflows/*.yaml',
-  'action.yml',
-  'action.yaml',
-  '**/action.yml',
-  '**/action.yaml',
-  'Dockerfile',
-  'Dockerfile.*',
-  'Containerfile',
-  '**/Dockerfile',
-  '**/Dockerfile.*',
-  '**/*.Dockerfile',
-  '**/Containerfile',
-]
+// What is read, by its path — one rule, for `npm run lint` and the test alike.
+const isWorkflow = (path) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path)
+const isAction = (path) => /^action\.ya?ml$/.test(path.split('/').pop() ?? '')
+const isDockerfile = (path) =>
+  /^(?:Dockerfile|Containerfile)(?:\..+)?$|\.(?:Dockerfile|Containerfile)$/.test(
+    path.split('/').pop() ?? '',
+  )
+
+/** The paths of those given that the check reads. */
+export const checkedPaths = (paths) =>
+  paths.filter((path) => isWorkflow(path) || isAction(path) || isDockerfile(path))
 const DEPENDABOT = '.github/dependabot.yml'
 
 // The key of a step, a job or an action and its value, quoted or not, with what follows it on the line.
@@ -75,8 +73,8 @@ function imageProblem(image, stages = new Set()) {
 /** What is wrong with the `uses:` of one workflow or action, and the image of an action, in sentences. */
 export function workflowProblems(path, text) {
   const problems = []
-  const action = !path.startsWith('.github/workflows/')
-  text.split('\n').forEach((line, index) => {
+  const action = !isWorkflow(path)
+  text.split(/\r?\n/).forEach((line, index) => {
     const where = `${path}:${String(index + 1)}`
     // The image a Docker action runs. A workflow's `image:` is a container or a service's, not watched here.
     const image = action ? IMAGE.exec(line)?.[2] : undefined
@@ -105,9 +103,9 @@ export function workflowProblems(path, text) {
 function instructionsOf(text) {
   const instructions = []
   let parts = null
-  text.split('\n').forEach((line, index) => {
-    // A comment inside an instruction is no part of it.
-    if (parts && /^[\t ]*#/.test(line)) return
+  text.split(/\r?\n/).forEach((line, index) => {
+    // A comment or a blank line inside an instruction is no part of it, as BuildKit reads it.
+    if (parts && /^[\t ]*(?:#|$)/.test(line)) return
     const continued = /\\[\t ]*$/.test(line)
     const part = continued ? line.replace(/\\[\t ]*$/, '') : line
     if (parts) parts.text += ` ${part}`
@@ -140,7 +138,7 @@ function sourcesOf(instruction, flags) {
 export function dockerfileProblems(path, text) {
   const problems = []
   const stages = new Set()
-  const lines = text.split('\n')
+  const lines = text.split(/\r?\n/)
   // Parser directives stand first, before any other comment, blank line or instruction; `syntax` names the
   // image BuildKit hands the whole file to.
   for (const [index, line] of lines.entries()) {
@@ -171,7 +169,7 @@ export function dockerfileProblems(path, text) {
 
 /** The directories the docker entry of `dependabot.yml` names, as it is written there. */
 function watchedDirectories(text) {
-  const lines = text.split('\n')
+  const lines = text.split(/\r?\n/)
   const start = lines.findIndex((line) =>
     /^[\t ]*-[\t ]+package-ecosystem:[\t ]*['"]?docker['"]?[\t ]*(?:#.*)?$/.test(line),
   )
@@ -205,9 +203,6 @@ export function dependabotProblems(dockerfiles, text) {
   return [...patterns, ...missing]
 }
 
-const isDockerfile = (path) =>
-  /^(?:Dockerfile|Containerfile)(?:\..+)?$|\.Dockerfile$/.test(path.split('/').pop() ?? '')
-
 /** Every problem of the files given, each a path and its text. */
 export function pinProblems(files) {
   return files.flatMap(({ path, text }) =>
@@ -217,9 +212,9 @@ export function pinProblems(files) {
 
 /** Every problem of the repository as git tracks it — what `npm run lint` runs. */
 export function repositoryProblems() {
-  const paths = execFileSync('git', ['ls-files', '-z', '--', ...FILES], { encoding: 'utf8' })
-    .split('\0')
-    .filter(Boolean)
+  const paths = checkedPaths(
+    execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' }).split('\0').filter(Boolean),
+  )
   return [
     ...pinProblems(paths.map((path) => ({ path, text: readFileSync(path, 'utf8') }))),
     ...dependabotProblems(paths.filter(isDockerfile), readFileSync(DEPENDABOT, 'utf8')),
