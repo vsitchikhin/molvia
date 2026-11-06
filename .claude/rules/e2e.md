@@ -123,13 +123,25 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   window of the app, where it does wait (Е1). Beside it `client-errors-built.spec.ts` (MOL-144) and
   `outdated-built.spec.ts` (MOL-231): the line of a browser below the floor is put in by the build,
   and a start that stayed silent is proved where a worker could have registered. `phone` ignores
-  them. The build is a web server of the run, so every `make e2e`
+  them; all three run under the page's policy (below). The build is a web server of the run, so every `make e2e`
   pays for it — some twenty seconds. The spec comes in by `page.goto('/privacy')`, **the one spec
   not through `open()`**: the development seam is not in a build, and that page is open without a
   session. A new version is a byte appended to the built `sw.js`, put back after the spec; `preview`
   keeps plain http even in a copy with certificates (`PWA_PLAIN_HTTP`), since the loopback is a
   secure context anyway. Chromium only: Safari's worker lives by rules of its own, and that is
   checked on a phone.
+- **The page's policy is the build's, so its proof is too** (MOL-363, `security.md`): every spec of a build
+  takes `test` from `e2e/csp.ts`, which fails it on any violation of the Content Security Policy — the document's
+  `securitypolicyviolation` through a binding and an init script, which the page's policy does not reach, and the
+  console of the page and of its workers, where a worker's refusal is said and no event comes. `csp-built.spec.ts`
+  runs in two projects of its own against the same build: **`pwa-camera`**, the full Chromium with the fake camera,
+  and **`pwa-iphone`**, WebKit; `phone` ignores it. It holds the meta first in `index.html` with exactly its scripts'
+  hashes, a stranger's screens and their faces on both engines, and, signed in on Chromium only, a receipt's photo
+  and its edges, the scanner reading the code filmed, a picture to the developer. **The seam is asked by the page
+  itself**: the build has no button for it, the run's API carries it, and `fetch('/api/dev/login')` from the page
+  sets the cookie as the button would; the device then asks «Is this your account?» (MOL-56) and the terms, as a
+  person answers them. WebKit cannot keep the session past a load (below), so the walk signed in is skipped there,
+  saying why. A version `pwa-update.spec` puts out meanwhile only adds its strip over the tab bar.
 - **The camera needs the full Chromium, so the scanner's specs run in one project** (MOL-98): `camera`
   is the same phone with `channel: 'chromium'` and a fake camera filming a barcode drawn by
   `globalSetup` (`e2e/barcode-video.ts`); `phone` ignores `scanner.spec.ts`. The headless shell every
