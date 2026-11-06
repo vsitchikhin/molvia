@@ -655,8 +655,7 @@ describe('forget — адрес телефона уходит из памяти 
       const kept = memory()
       const rows = phoneRowBudget()
       rows.claim('known')?.()
-      expect(kept.moments('known')).toEqual([])
-      rows.forget()
+      // Given back, the sender has none left and goes at once, as an address from its minute (review №8).
       expect(kept.moments('known')).toBeUndefined()
     })
 
@@ -698,6 +697,14 @@ describe('forget — адрес телефона уходит из памяти 
       notices.forget()
       expect(kept.moments('old')).toBeUndefined()
       expect(kept.moments('young')).toEqual([{ at: HOUR_MS / 2 }])
+    })
+
+    it('отправитель, вернувший свои уведомления, уходит сразу (ревью №8)', () => {
+      const kept = memory()
+      const notices = phoneNoticeBudget()
+      notices.ask([notice], 'lone').giveBack()
+      expect(kept.moments('lone')).toBeUndefined()
+      expect(notices.take([notice], 'other')).toEqual([notice])
     })
 
     it('адрес без единого уведомления — владельца нет — уходит тоже', () => {

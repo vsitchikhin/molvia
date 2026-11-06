@@ -18,7 +18,8 @@ import type {
   TelegramUserId,
 } from '@molvia/model'
 import type { FailureCount, FailureOccurrence, FailureRepository } from '@/db/failures-repository'
-import { addressMinute, monotonic } from './address-minute'
+import { monotonic } from '@/clock'
+import { addressMinute } from './address-minute'
 import type { AddressMinute } from './address-minute'
 
 /** Where a failure happened: who reports it, and the route, handler or job it was in. */
@@ -198,6 +199,24 @@ interface Moment {
 }
 const withinHour = (moments: readonly Moment[], now: number) =>
   moments.filter((moment) => now - moment.at < HOUR_MS)
+/**
+ * Everybody's moments without `taken`, which are taken out of the sender's too; a sender with none
+ * left goes, as an address does from its minute (review №8).
+ */
+function givenBack(
+  everybody: readonly Moment[],
+  bySender: Map<string, Moment[]>,
+  sender: string | undefined,
+  taken: readonly Moment[],
+): Moment[] {
+  const kept = (moments: readonly Moment[]) => moments.filter((moment) => !taken.includes(moment))
+  if (sender !== undefined) {
+    const rest = kept(bySender.get(sender) ?? [])
+    if (rest.length === 0) bySender.delete(sender)
+    else bySender.set(sender, rest)
+  }
+  return kept(everybody)
+}
 
 export interface PhoneNoticeBudget {
   /**
@@ -277,14 +296,7 @@ export function phoneNoticeBudget(
       }
       if (sender !== undefined) bySender.set(sender, theirs)
       const giveBack = () => {
-        told = told.filter((moment) => !taken.includes(moment))
-        const mine = sender === undefined ? undefined : bySender.get(sender)
-        if (sender !== undefined && mine !== undefined) {
-          bySender.set(
-            sender,
-            mine.filter((moment) => !taken.includes(moment)),
-          )
-        }
+        told = givenBack(told, bySender, sender, taken)
       }
       return { told: out, held: kept, giveBack }
     },
@@ -373,14 +385,7 @@ export function phoneRowBudget(
       added.push(moment)
       if (sender !== undefined) bySender.set(sender, [...theirs, moment])
       return () => {
-        added = added.filter((kept) => kept !== moment)
-        const mine = sender === undefined ? undefined : bySender.get(sender)
-        if (sender !== undefined && mine !== undefined) {
-          bySender.set(
-            sender,
-            mine.filter((kept) => kept !== moment),
-          )
-        }
+        added = givenBack(added, bySender, sender, [moment])
       }
     },
     forget() {
