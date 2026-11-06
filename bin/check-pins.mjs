@@ -1,23 +1,26 @@
-// Refuses an action or an image CI runs or builds on by a pointer someone else can move (MOL-364): every `uses:` of a
-// workflow or of an action of this repository is a full commit sha with the release it is in a comment —
-// Dependabot moves the two together — and every image taken from a registry carries its digest beside an
-// exact tag: a Dockerfile's `# syntax=`, `FROM`, `COPY --from` and `RUN --mount=…,from=`, an action's
-// `image: docker://…`. A tag of an action or an image is moved by whoever publishes it, and the next run
-// takes what it points at then: the way secrets of CI leaked through `tj-actions` in 2025. GitHub refuses
-// an action by tag itself once «Require actions to be pinned» is on, but that is a setting outside git,
-// and nothing there holds a Dockerfile. And a directory with a Dockerfile is one Dependabot watches: a
-// digest nobody moves is frozen for good.
+// Refuses an action or an image CI runs or builds on by a pointer someone else can move (MOL-364):
+// every `uses:` of a workflow or of an action of this repository is a full commit sha with the
+// release it is in a comment — Dependabot moves the two together — and every image taken from a
+// registry carries its digest beside an exact tag: a Dockerfile's `# syntax=`, `FROM`,
+// `COPY --from` and `RUN --mount=…,from=`, an action's `image: docker://…`. A tag of an action or
+// an image is moved by whoever publishes it, and the next run takes what it points at then: the way
+// secrets of CI leaked through `tj-actions` in 2025. GitHub refuses an action by tag itself once
+// «Require actions to be pinned» is on, but that is a setting outside git, and nothing there holds
+// a Dockerfile. And a directory with a Dockerfile is one Dependabot watches: a digest nobody moves
+// is frozen for good.
 //
-// Whether the tag is the digest's is the registry's to know, never this check's: Docker pulls the digest
-// and never reads the tag, so a tag changed by hand without its digest changes nothing that runs. Nor
-// can it know that a sha is a commit of the action's own repository rather than of a fork.
+// Whether the tag is the digest's is the registry's to know, never this check's: Docker pulls the
+// digest and never reads the tag, so a tag changed by hand without its digest changes nothing that
+// runs. Nor can it know that a sha is a commit of the action's own repository rather than of a
+// fork.
 //
-// It holds the ordinary spelling, not a form built to slip past it: `uses:` and `image:` as the key at the
-// start of their line or after `- `, with the value on that line; a Dockerfile's lines joined at `\`, the
-// default escape, a blank or a comment line inside dropped, the ends of lines LF or CRLF; the directories of
-// Dependabot written out. Another spelling of YAML is past it, and GitHub's own setting refuses such an action
-// at the run. A file `ADD` fetches by a URL or from git, and whatever `RUN` downloads, is no image and is not
-// read here: its pinned forms (`ADD --checksum=…`, `#<sha>`) are review's.
+// It holds the ordinary spelling, not a form built to slip past it: `uses:` and `image:` as the key
+// at the start of their line or after `- `, with the value on that line; a Dockerfile's lines
+// joined at `\`, the default escape, a blank or a comment line inside dropped, the ends of lines LF
+// or CRLF; the directories of Dependabot written out. Another spelling of YAML is past it, and
+// GitHub's own setting refuses such an action at the run. A file `ADD` fetches by a URL or from
+// git, and whatever `RUN` downloads, is no image and is not read here: its pinned forms
+// (`ADD --checksum=…`, `#<sha>`) are review's.
 //
 //   node bin/check-pins.mjs
 
@@ -28,17 +31,22 @@ import process from 'node:process'
 // What is read, by its path — one rule, for `npm run lint` and the test alike.
 const isWorkflow = (path) => /^\.github\/workflows\/[^/]+\.ya?ml$/.test(path)
 const isAction = (path) => /^action\.ya?ml$/.test(path.split('/').pop() ?? '')
-const isDockerfile = (path) =>
-  /^(?:Dockerfile|Containerfile)(?:\..+)?$|\.(?:Dockerfile|Containerfile)$/.test(
-    path.split('/').pop() ?? '',
+// A Dockerfile by its name in any case, as Docker and Dependabot read it — never its ignore file.
+const isDockerfile = (path) => {
+  const name = path.split('/').pop() ?? ''
+  return (
+    /^(?:dockerfile|containerfile)(?:\..+)?$|\.(?:dockerfile|containerfile)$/i.test(name) &&
+    !/\.dockerignore$/i.test(name)
   )
+}
 
 /** The paths of those given that the check reads. */
 export const checkedPaths = (paths) =>
   paths.filter((path) => isWorkflow(path) || isAction(path) || isDockerfile(path))
 const DEPENDABOT = '.github/dependabot.yml'
 
-// The key of a step, a job or an action and its value, quoted or not, with what follows it on the line.
+// The key of a step, a job or an action and its value, quoted or not, with what follows it on the
+// line.
 const keyOf = (key) =>
   new RegExp(`^[\\t ]*(?:-[\\t ]+)?${key}:[\\t ]*(['"]?)([^'"\\s#]+)\\1[\\t ]*(.*)$`)
 const USES = keyOf('uses')
@@ -47,9 +55,10 @@ const SHA = /^[^@\s]+@[0-9a-f]{40}$/
 // A release, never a major alone: `# v7` beside a sha says no more than the tag did.
 const VERSION_COMMENT = /^#[\t ]*v?\d+(?:\.\d+)+\b/
 const DIGEST = /@sha256:[0-9a-f]{64}$/
-// An exact tag, by a closed rule rather than a list of the floating ones: a version of three numbers at
-// its start (`22.23.4-alpine`, `v1.153.0`), or the day of a snapshot (`trixie-20261104-slim`). Anything
-// else — `latest`, `22`, `2.11-alpine`, `lts-alpine`, `trixie-slim` — is moved by the next release.
+// An exact tag, by a closed rule rather than a list of the floating ones: a version of three
+// numbers at its start (`22.23.4-alpine`, `v1.153.0`), or the day of a snapshot
+// (`trixie-20261104-slim`). Anything else — `latest`, `22`, `2.11-alpine`, `lts-alpine`,
+// `trixie-slim` — is moved by the next release.
 const EXACT_TAG = /^v?\d+\.\d+\.\d+(?:[-_.+]|$)|(?:^|[-_.])\d{8}(?:[-_.]|$)/
 const DIRECTIVE = /^#[\t ]*([a-z]+)[\t ]*=[\t ]*(\S+)[\t ]*$/i
 
@@ -76,7 +85,8 @@ export function workflowProblems(path, text) {
   const action = !isWorkflow(path)
   text.split(/\r?\n/).forEach((line, index) => {
     const where = `${path}:${String(index + 1)}`
-    // The image a Docker action runs. A workflow's `image:` is a container or a service's, not watched here.
+    // The image a Docker action runs. A workflow's `image:` is a container or a service's, not
+    // watched here.
     const image = action ? IMAGE.exec(line)?.[2] : undefined
     if (image?.startsWith('docker://')) {
       const problem = imageProblem(image.slice('docker://'.length))
@@ -86,7 +96,8 @@ export function workflowProblems(path, text) {
     const match = USES.exec(line)
     if (!match) return
     const [, , reference, rest] = match
-    // A workflow or an action of this repository is this commit's own code, and its file is read here.
+    // A workflow or an action of this repository is this commit's own code, and its file is read
+    // here.
     if (reference.startsWith('./')) return
     if (!SHA.test(reference)) {
       problems.push(
@@ -119,17 +130,22 @@ function instructionsOf(text) {
   return instructions
 }
 
+/** A value with the quotes BuildKit takes off it taken off. */
+const unquoted = (value) => value.replace(/^(['"])(.*)\1$/, '$2')
+
 /** The images one instruction takes from elsewhere: `COPY --from`, `RUN --mount=…,from=`. */
 function sourcesOf(instruction, flags) {
   if (instruction === 'COPY') {
-    return flags.filter((flag) => flag.startsWith('--from=')).map((flag) => flag.slice(7))
+    return flags.filter((flag) => flag.startsWith('--from=')).map((flag) => unquoted(flag.slice(7)))
   }
   if (instruction === 'RUN') {
+    // A mount is a line of CSV whose keys BuildKit reads in any case.
     return flags
       .filter((flag) => flag.startsWith('--mount='))
       .flatMap((flag) => flag.slice(8).split(','))
-      .filter((pair) => pair.startsWith('from='))
-      .map((pair) => pair.slice(5))
+      .map(unquoted)
+      .filter((pair) => pair.toLowerCase().startsWith('from='))
+      .map((pair) => unquoted(pair.slice(5)))
   }
   return []
 }
@@ -139,8 +155,8 @@ export function dockerfileProblems(path, text) {
   const problems = []
   const stages = new Set()
   const lines = text.split(/\r?\n/)
-  // Parser directives stand first, before any other comment, blank line or instruction; `syntax` names the
-  // image BuildKit hands the whole file to.
+  // Parser directives stand first, before any other comment, blank line or instruction; `syntax`
+  // names the image BuildKit hands the whole file to.
   for (const [index, line] of lines.entries()) {
     const directive = DIRECTIVE.exec(line)
     if (!directive) break
@@ -157,8 +173,8 @@ export function dockerfileProblems(path, text) {
       const problem = imageProblem(image, stages)
       if (problem) problems.push(`${path}:${String(number)}: ${problem}`)
     }
-    // A stage is named only after its own line: it cannot be its own base, and Docker takes that one
-    // from the registry.
+    // A stage is named only after its own line: it cannot be its own base, and Docker takes that
+    // one from the registry.
     const [, as, stage] = args
     if (instruction === 'FROM' && as?.toUpperCase() === 'AS' && stage) {
       stages.add(stage.toLowerCase())

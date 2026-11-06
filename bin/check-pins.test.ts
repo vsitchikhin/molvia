@@ -214,6 +214,23 @@ describe('dockerfileProblems', () => {
     ).toEqual([])
   })
 
+  it('takes off the quotes BuildKit takes off, and reads the key of a mount in any case', () => {
+    const pinned = `busybox:1.37.0@${DIGEST}`
+    const text = [
+      `FROM node:22.23.4-alpine@${DIGEST}`,
+      `COPY --from="${pinned}" /bin/busybox /bb`,
+      `RUN --mount=type=bind,"from=${pinned}",target=/m ls /m`,
+      'RUN --mount=type=bind,FROM=busybox:latest,target=/m ls /m',
+      'RUN --mount=type=bind,"from=busybox:latest",target=/m ls /m',
+      "COPY --from='busybox:latest' /bin/busybox /bb",
+    ].join('\n')
+    expect(dockerfileProblems(FILE, text)).toEqual([
+      told(4, 'busybox:latest'),
+      told(5, 'busybox:latest'),
+      told(6, 'busybox:latest'),
+    ])
+  })
+
   it('refuses an image named by an argument, which it cannot read', () => {
     expect(dockerfileProblems(FILE, 'ARG BASE=node:22\nFROM ${BASE}')).toEqual([
       `${FILE}:2: \${BASE} — an image named by an argument cannot be checked; write it out`,
@@ -246,7 +263,7 @@ describe('pinProblems', () => {
   })
 
   it('reads a Dockerfile by any of its names, a workflow and an action — the paths lint reads', () => {
-    const read = [
+    const dockerfiles = [
       'Dockerfile',
       'prod.Dockerfile',
       'Containerfile.prod',
@@ -254,6 +271,11 @@ describe('pinProblems', () => {
       'x/Dockerfile.prod',
       'x/prod.Dockerfile',
       'x/Containerfile',
+      'x/dockerfile',
+      'x/prod.dockerfile',
+      'x/containerfile',
+    ]
+    const yamls = [
       '.github/workflows/ci.yml',
       '.github/workflows/watch.yaml',
       'action.yml',
@@ -262,11 +284,12 @@ describe('pinProblems', () => {
     const left = [
       'README.md',
       'Dockerfiles/notes.md',
+      'x/Dockerfile.dockerignore',
       '.github/workflows/sub/x.yml',
       'x/my-action.yml',
     ]
-    expect(checkedPaths([...read, ...left])).toEqual(read)
-    for (const path of read.filter((path) => !path.endsWith('ml'))) {
+    expect(checkedPaths([...dockerfiles, ...yamls, ...left])).toEqual([...dockerfiles, ...yamls])
+    for (const path of dockerfiles) {
       expect(pinProblems([{ path, text: 'FROM node:22' }])).toHaveLength(1)
     }
   })
