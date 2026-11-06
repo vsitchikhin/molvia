@@ -44,12 +44,13 @@ const NAMED: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
 ]
 
 /**
- * Two ways of cooking, or two things a word describes, one letter apart — the adversarial probe of
- * MOL-299 (А1) and its relatives (MOL-358): the model put the first fifteen past 0.90, from 0.900 to
- * 0.946, and the night merged them by itself. Named, never merged. A seed line is typed beside, not
- * again.
+ * One letter apart, never merged by itself — only named (MOL-358, owner's В-2 «в»). Two ways of cooking,
+ * the adversarial probe of MOL-299 (А1) and its relatives: the first fourteen stood past 0.90, from 0.900
+ * to 0.946, the rest from 0.871, and the night merged those fourteen. Then the ways the rule of an
+ * adjective's ending was passed (adversarial Б1, Б2, Б4–Б6 of MOL-358): a case, a sign, Latin letters,
+ * «варён.», two nouns — 0.907 to 0.972. A seed line is typed beside, not again.
  */
-const DESCRIBED: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
+const ONE_LETTER: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = [
   ['Курица жареная', 'Курица вареная', 'kg'],
   ['Картофель жареный', 'Картофель вареный', 'kg'],
   ['Колбаса жареная', 'Колбаса варёная', 'kg'],
@@ -67,6 +68,14 @@ const DESCRIBED: readonly (readonly [string, string, 'l' | 'kg' | 'piece'])[] = 
   ['Хлеб целый', 'Хлеб белый', 'piece'],
   ['Варенье малиновое', 'Варенье калиновое', 'kg'],
   ['Перец сладкий', 'Перец гладкий', 'kg'],
+  ['Пельмени с жареным луком', 'Пельмени с вареным луком', 'kg'],
+  ['Гречка с тушёным мясом', 'Гречка с сушёным мясом', 'kg'],
+  ['Суп из сушёных грибов', 'Суп из тушёных грибов', 'kg'],
+  ['Свинина тушёная,ГОСТ', 'Свинина сушёная,ГОСТ', 'kg'],
+  ['Курица жареная-гриль', 'Курица вареная-гриль', 'kg'],
+  ['Kurica zharenaya', 'Kurica varenaya', 'kg'],
+  ['Яйца варён.', 'Яйца жарен.', 'piece'],
+  ['Мойва', 'Мойка', 'kg'],
 ]
 
 /** Two sizes the search key folds into one, and the model puts past 0.93 (adversarial А2). */
@@ -110,7 +119,7 @@ beforeAll(async () => {
     await insertPlace(db, { name, city: 'Гюмри', createdAt: new Date(Date.UTC(2026, 8, 1, 0, i)) })
   }
   const seed = new Set(CATALOGUE_SEED.map(([name]) => name))
-  for (const [a, b, unit] of DESCRIBED) {
+  for (const [a, b, unit] of ONE_LETTER) {
     for (const name of [a, b].filter((one) => !seed.has(one))) {
       await items.create(newItemSchema.parse({ kind: 'product', name, defaultUnit: unit }), person)
     }
@@ -168,7 +177,7 @@ describe('the night on the seed', () => {
     }
     expect(named).toHaveLength(report.candidates)
     const pairs = named.map((pair) => [pair.from, pair.into].sort().join(' ~ '))
-    for (const [from, into] of [...NAMED, ...DESCRIBED]) {
+    for (const [from, into] of [...NAMED, ...ONE_LETTER]) {
       expect(pairs).toContain([from, into].sort().join(' ~ '))
     }
     // Two edits a word are two things of the shelf, never named (the owner, 06.10.2026).
