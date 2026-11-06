@@ -725,11 +725,19 @@ report.
   pack, and let «Лента 50 мм» merge into «Лента 50 м» at 0.957, adversarial А2; a test holds that no
   spelling stands for two units, and a unit missing is a word, so the pair is a candidate, never a
   merge) — **the same scripts** (review №6: held by the code, not by the model), **the same words, one
-  spelling** (`sameWords`: the words with the sizes taken out, **as written** — case, punctuation and «ё»
-  aside, «Сыр «Чанах»» is «сыр чанах» — in any order, «Чанах сыр» is «Сыр чанах»; a letter apart is a
-  candidate, MOL-358, owner's В-2 «в»; **never by the search key**, which folds «ы» into «и», a soft sign,
-  «щ» into «ш», «й» and a double letter: «Игрушка мышка» merged into «Игрушка мишка» at 0.961, «Пенька» into
-  «Пенка» at 0.947, adversarial В1, В2 — a narrowing of В-2 «в», decided by the implementer), **and the names' vectors at least 0.90 apart by
+  spelling** (`sameWords`, MOL-358, owner's В-2 «в», narrowed by the implementer in two rounds): the name
+  **as written**, word by word — only case, «ё» and the signs of `WORD_SEPARATORS` (spacing, quotes, a
+  comma, a hyphen or a dash, brackets) are nothing, «Сыр «Чанах»» is «сыр чанах»; the words of letters in
+  any order, «Чанах сыр» is «Сыр чанах»; a word with a digit in its place, so «Витамин D3 K2» is not «D2 K3»;
+  a size its number and unit as printed, glued or apart, a comma a point — «Молоко 1л» is «Молоко 1 л». A
+  letter apart is a candidate. **A closed list**: any other sign stays in its word, since one left out can
+  only make two spellings — the point of «мед.» is not «мёд» at 0.947, «шок.» not the brand «Шок» at 0.945; a
+  number written another way, «05 л» or «1.000 м», and a unit spelt another way, «25 пак» against «25 уп»,
+  are a candidate (adversarial Г1–Г4) — `sizes` reads them by value for that. **Never by the search key**,
+  which folds «ы» into «и», a soft sign, «щ» into «ш», «й» and a double letter: «Игрушка мышка» merged into
+  «Игрушка мишка» at 0.961, «Пенька» into «Пенка» at 0.947 (adversarial В1, В2). **The price, named:** «ё» is
+  still nothing, and tells «берет» from «берёт» — no product found; «Молоко 1 л ~ 1 l», «3,2% ~ 3,20%» and a
+  label's sizes in another turn are named, not merged. **And the names' vectors at least 0.90 apart by
   cosine**. A word more is a brand, never a twin: «Сыр чанах Ашхар», «Молоко Марианна» (MOL-112, В-1) —
   not even a candidate, or every brand would stand in the list beside its kind.
 - **Not a letter, since a letter cannot be told** (MOL-358). Until it one edit a word, two a name merged
