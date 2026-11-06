@@ -93,6 +93,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/i18n/plural-ru.ts` — The Russian plural rule for vue-i18n: form by the last two digits, fractions and unknown counts included.
 - `frontend/src/ids.ts` — `newId`: a lower-case uuid for rows the device names, with a fallback outside a secure context.
 - `frontend/src/main.ts` — The PWA's entry: router, i18n, the update worker and the `401` seam installed, the app mounted, the identity started — none of it below the floor of the build (MOL-231).
+- `frontend/src/zodJitless.ts` — Zod told it may not compile, imported first by `main.ts`: its question «may I?» is an `eval` the page's policy refuses and reports (MOL-363).
 - `frontend/src/navigation.ts` — Navigation rules: how a tab tap is written into history (home — «Что брать»), where the back chevron leads — behind the login a public screen's leads to the door (MOL-216) — up to the parent, cold-start parent laying, guarded step back and `afterStep`.
 - `frontend/src/optimizeDeps.test.ts` — Test: every package a worker imports, through the modules of `src` it loads, stands in `optimizeDeps.include` of `vite.config.ts`, so the dev server never optimizes one in the middle of an end-to-end run (MOL-217).
 - `frontend/src/pwaUpdate.ts` — Service-worker registration and update: quietly while hidden with no sheet, or by «Обновить»; looks every 15 min and on a new server build; `phase` for the app, `build` — the first build the API named to the page (MOL-147).

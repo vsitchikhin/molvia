@@ -1,4 +1,6 @@
-// First, before any other module of the app is evaluated: the phone's catchers (MOL-144, Б3).
+// Zod told it may not compile, before anything parses (MOL-363); then the phone's catchers, before any
+// other module of the app is evaluated (MOL-144, Б3).
+import '@/zodJitless'
 import { failures, placeFailures } from '@/catchers'
 import { belowFloor } from '@/browserFloor'
 import { createApp } from 'vue'
