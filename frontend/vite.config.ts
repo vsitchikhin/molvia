@@ -91,9 +91,11 @@ const CONTENT_SECURITY_POLICY = {
 // comment outside a script hides what it holds — a comment of this file may well name `<script>` — and a
 // `<!--` inside a script is the script's own text; any case, a `>` inside a quoted value ends no tag.
 // One with a `src` attribute of its own — `data-src` is another — is the bundle's, `'self'` already.
+// The charset the meta follows is found in the same pass, so one a comment quotes is no place for it.
 // What this cannot read the end-to-end reads by the browser's own parser (`csp-built.spec`).
-const COMMENT_OR_SCRIPT =
-  /<!--[\s\S]*?-->|<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script\s*>/gi
+const CHARSET = '<meta charset="utf-8" />'
+const COMMENT_SCRIPT_OR_CHARSET =
+  /<!--[\s\S]*?-->|<script\b((?:[^>"']|"[^"]*"|'[^']*')*)>([\s\S]*?)<\/script\s*>|<meta charset="utf-8" \/>/gi
 const QUOTED = /"[^"]*"|'[^']*'/g
 const WITH_SRC = /(?:^|\s)src\s*=/i
 
@@ -109,9 +111,9 @@ function contentSecurityPolicy(): Plugin {
     transformIndexHtml: {
       order: 'post',
       handler(html) {
-        const scripts = [...html.matchAll(COMMENT_OR_SCRIPT)].filter(([token]) =>
-          /^<script/i.test(token),
-        )
+        const tokens = [...html.matchAll(COMMENT_SCRIPT_OR_CHARSET)]
+        const scripts = tokens.filter(([token]) => /^<script/i.test(token))
+        const at = tokens.find(([token]) => token === CHARSET)?.index ?? -1
         const hashes = scripts
           .filter(([, attributes]) => !WITH_SRC.test((attributes ?? '').replace(QUOTED, '""')))
           .map(
@@ -128,13 +130,11 @@ function contentSecurityPolicy(): Plugin {
           .map(([directive, sources]) => `${directive} ${sources.join(' ')}`)
           .join('; ')
         // First after the charset: a script before the meta would run under no policy at all.
-        const charset = '<meta charset="utf-8" />'
-        const at = html.indexOf(charset)
         if (at < 0 || scripts.some((script) => script.index < at)) {
           throw new Error('index.html has no charset before its first script for the policy')
         }
         const meta = `\n    <meta http-equiv="Content-Security-Policy" content="${policy}" />`
-        return html.slice(0, at + charset.length) + meta + html.slice(at + charset.length)
+        return html.slice(0, at + CHARSET.length) + meta + html.slice(at + CHARSET.length)
       },
     },
   }
