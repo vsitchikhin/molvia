@@ -73,10 +73,13 @@ export interface NameParts {
    */
   readonly letters: string
   /**
-   * The words with every size taken out, as written — case, punctuation and «ё» aside, as `letters` —
-   * sorted, so the order of a label does not matter. Never the key, which folds «ы» into «и», a soft
-   * sign, «щ» into «ш» and a double letter, and made «Игрушка мышка» one key with «Игрушка мишка»
-   * (adversarial В1 of MOL-358). What an item is one spelling by.
+   * The name as written, word by word — its words of letters in any order, those with a digit in theirs
+   * (`writtenOf`) — what an item is one spelling by (MOL-358). Only case, «ё» and the signs of `WORD_SEPARATORS` are nothing; every
+   * other sign stays in its word, so «мед.» is not «мёд» and «шок.» not the brand «Шок» (adversarial Г1,
+   * Г2). A size is its number and its unit as printed, a comma and a point one, glued or apart one: «05 л»
+   * is not «5 л», «1.000 м» not «1 м», «25 пак» not «25 уп» (Г3, Г4) — `sizes` reads those by their value
+   * and its unit, for a candidate. Never the key, which folds «ы» into «и», a soft sign, «щ» into «ш» and a
+   * double letter, and made «Игрушка мышка» one key with «Игрушка мишка» (adversarial В1).
    */
   readonly written: readonly string[]
 }
@@ -118,11 +121,49 @@ export function nameParts(name: string): NameParts {
     // Of the words: a unit after a number, «1 l», is no script of the name.
     scripts: scriptsOf(rest),
     letters: asWritten(name),
-    written: asWritten(rest)
-      .split(' ')
-      .filter((word) => word !== '')
-      .sort(),
+    written: writtenOf(name),
   }
+}
+
+/**
+ * `NameParts.written`: the words of letters alone sorted, then every word with a digit in it in its
+ * place — a number stays with its word and its turn, so «Витамин D3 K2» is not «Витамин D2 K3», «Подгузники
+ * 3 4-9 кг» not «4 3-9 кг» (adversarial round 3). A size's number and its unit are one word, glued or apart,
+ * a comma in it a point.
+ */
+function writtenOf(name: string): string[] {
+  const glued = name
+    .normalize('NFC')
+    .replace(SIZE, (whole, digits: string, _gap: string, after?: string) => {
+      const asPrinted = digits.replace(',', '.')
+      if (after === '%' || (after !== undefined && UNIT_OF.has(after.toLowerCase()))) {
+        return ` ${asPrinted}${after} `
+      }
+      return whole.replace(digits, asPrinted)
+    })
+  const words = wordsAsWritten(glued)
+  return [
+    ...words.filter((word) => !/\p{N}/u.test(word)).sort(),
+    ...words.filter((word) => /\p{N}/u.test(word)),
+  ]
+}
+
+/**
+ * The signs that only part the words of a name: spacing, quotes, a comma, a hyphen or a dash, brackets.
+ * A closed list (MOL-358): any other sign — a point, a slash, a plus, one no table names — is part of its
+ * word, since a sign left out of the list can only make two spellings, never merge them.
+ */
+const WORD_SEPARATORS = /[\s«»"„“”'‘’‚,()[\]\-\u2010-\u2015\u2212]+/u
+
+function wordsAsWritten(text: string): string[] {
+  return text
+    .normalize('NFC')
+    .toLowerCase()
+    .replaceAll('ё', 'е')
+    .replaceAll('և', 'եվ')
+    .replaceAll('եւ', 'եվ')
+    .split(WORD_SEPARATORS)
+    .filter((word) => word !== '')
 }
 
 /** Case, spacing, punctuation and «ё» aside, and nothing else. */
@@ -225,10 +266,11 @@ function bitCount(mask: number): number {
 }
 
 /**
- * Merged by itself: one spelling — the same words as written, in any order, case, punctuation and «ё»
- * aside (`sameWords`; a place's in their order, `sameLetters`) — every size the same, and a meaning at
- * least this close (MOL-358, owner's В-2 «в»). What it takes: a fat with a comma or a point, «ё», the
- * order of words, a unit spelt another way. **Not by the search key**, which folds «ы» into «и», a soft
+ * Merged by itself: one spelling — the same words and sizes as written, in any order, only case, «ё»
+ * and a sign that parts words aside (`sameWords`; a place's in their order, `sameLetters`) — and a
+ * meaning at least this close (MOL-358, owner's В-2 «в»). What it takes: a fat with a comma or a point,
+ * «ё», case, quotes, the order of words, a unit glued to its number. A unit spelt another way, a number
+ * written another way, a point of an abbreviation are a candidate (adversarial Г1–Г4). **Not by the search key**, which folds «ы» into «и», a soft
  * sign, «щ» into «ш» and a double letter: «Игрушка мышка» merged into «Игрушка мишка» at 0.961, «Пенька» into
  * «Пенка» at 0.947 (adversarial В1, В2 of MOL-358). **Not a letter**: one edit a word merged «Курица
  * вареная» into «Курица жареная» at 0.929 (adversarial А1 of MOL-299), and every rule that tried to tell

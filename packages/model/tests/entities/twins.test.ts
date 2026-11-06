@@ -195,7 +195,29 @@ describe('twinVerdict', () => {
     expect(pair('Молоко топлёное', 'Молоко топленое', 0.95)).toBe('merge')
     expect(pair('Молоко топлёное', 'Топленое молоко', 0.95)).toBe('merge')
     expect(pair('Сыр «Чанах»', 'сыр чанах', 0.95)).toBe('merge')
-    expect(pair('Молоко 1л', 'Молоко 1 l', 0.95)).toBe('merge')
+    expect(pair('Молоко 1л', 'Молоко 1 л', 0.95)).toBe('merge')
+    expect(pair('Сок «Добрый» 1 л', 'сок добрый 1л', 0.95)).toBe('merge')
+  })
+
+  // Only case, «ё» and a sign that parts words are nothing (adversarial Г1–Г4 of round 3): a point of an
+  // abbreviation, a number written another way and a unit spelt another way make two spellings.
+  it.each([
+    ['Маска мёд', 'Маска мед.'],
+    ['Конфеты Шок', 'Конфеты шок.'],
+    ['Конфеты «Шок»', 'Конфеты шок.'],
+    ['Пиво 5 л', 'Пиво 05 л'],
+    ['Кабель 1 м', 'Кабель 1.000 м'],
+    ['Чай 25 уп', 'Чай 25 пак'],
+    ['Молоко 1 л', 'Молоко 1 l'],
+    ['Молоко 3,2%', 'Молоко 3,20%'],
+    // a number keeps its word and its turn: only the words of letters are read in any order
+    ['Витамин D3 K2', 'Витамин D2 K3'],
+    ['Телефон A12 64', 'Телефон A64 12'],
+    ['Подгузники 3 4-9 кг', 'Подгузники 4 3-9 кг'],
+    ['Кофе 3в1', 'Кофе 1в3'],
+  ])('never merges «%s» and «%s», two spellings — only names it', (a, b) => {
+    expect(spelling(a, b)).toMatchObject({ edits: 0, sameWords: false })
+    expect(pair(a, b, 0.99)).toBe('candidate')
   })
 
   // One search key is not one spelling (adversarial В1, В2 of round 2): the key folds «ы» into «и», a
@@ -271,11 +293,16 @@ describe('one key in two scripts (review №6)', () => {
     expect(nameParts('Молоко 1 l').scripts).toEqual(['cyrillic'])
     expect(
       twinVerdict({
-        spelling: spelling('Молоко 1 l', 'Молоко 1 л'),
+        spelling: spelling('Молоко 1 l', 'молоко 1L'),
         sameUnit: true,
         meaning: 0.99,
       }),
     ).toBe('merge')
+    // the same unit spelt in another script is a spelling apart (MOL-358, adversarial Г4), not a script
+    expect(spelling('Молоко 1 l', 'Молоко 1 л')).toMatchObject({
+      sameScripts: true,
+      sameWords: false,
+    })
   })
 
   it('still merges «ё» and a comma, one script on both sides', () => {
