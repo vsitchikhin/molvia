@@ -275,6 +275,19 @@ describe('dockerfileProblems', () => {
     ])
   })
 
+  it('keeps a space or a comma inside quotes in its flag, as BuildKit does', () => {
+    const text = [
+      `FROM node:22.23.4-alpine@${DIGEST}`,
+      'RUN --mount=type=bind,target="/opt/tool kit",from=busybox:latest ls "/opt/tool kit"',
+      'RUN --mount=type=bind,target="/a,b",from=busybox:latest ls /a',
+      `RUN --mount=type=bind,target="/opt/tool kit",from=busybox:1.37.0@${DIGEST} ls`,
+    ].join('\n')
+    expect(dockerfileProblems(FILE, text)).toEqual([
+      told(2, 'busybox:latest'),
+      told(3, 'busybox:latest'),
+    ])
+  })
+
   it('refuses an image named by an argument, which it cannot read', () => {
     expect(dockerfileProblems(FILE, 'ARG BASE=node:22\nFROM ${BASE}')).toEqual([
       `${FILE}:2: \${BASE} — an image named by an argument cannot be checked; write it out`,

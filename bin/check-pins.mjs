@@ -151,9 +151,31 @@ function instructionsOf(text) {
 /** A value with the quotes BuildKit takes off it taken off. */
 const unquoted = (value) => value.replace(/^(['"])(.*)\1$/, '$2')
 
+/** The parts of a text between separators, a separator inside quotes kept, as BuildKit reads its
+ * flags and a mount's CSV; the quotes stay, for `unquoted` to take off. */
+function splitOutsideQuotes(text, separator) {
+  const parts = []
+  let part = ''
+  let quote = null
+  for (const char of text) {
+    if (quote) {
+      if (char === quote) quote = null
+    } else if (char === '"' || char === "'") {
+      quote = char
+    } else if (separator.test(char)) {
+      if (part) parts.push(part)
+      part = ''
+      continue
+    }
+    part += char
+  }
+  if (part) parts.push(part)
+  return parts
+}
+
 /** An instruction's word, in capitals, its flags and the rest of its words. */
 function wordsOf(line) {
-  const [word, ...rest] = line.trim().split(/\s+/)
+  const [word, ...rest] = splitOutsideQuotes(line.trim(), /\s/)
   return {
     instruction: word?.toUpperCase(),
     flags: rest.filter((part) => part.startsWith('--')),
@@ -170,7 +192,7 @@ function sourcesOf(instruction, flags) {
     // A mount is a line of CSV whose keys BuildKit reads in any case.
     return flags
       .filter((flag) => flag.startsWith('--mount='))
-      .flatMap((flag) => flag.slice(8).split(','))
+      .flatMap((flag) => splitOutsideQuotes(flag.slice(8), /,/))
       .map(unquoted)
       .filter((pair) => pair.toLowerCase().startsWith('from='))
       .map((pair) => unquoted(pair.slice(5)))
