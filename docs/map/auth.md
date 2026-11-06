@@ -31,7 +31,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 - `backend/src/usecases/create-actor.ts` — Use case: a new owner for a Telegram id, with the first settings the server names (country, city, currencies).
 - `backend/src/usecases/sessions.ts` — Use cases of «Устройства» and «Выйти»: list the owner's live sessions, end one of them, log out by token.
 - `backend/src/usecases/sign-in.ts` — Use case: find or create the owner of a Telegram id, mint a new session token for them and mark the account's visit (MOL-238).
-- `backend/src/usecases/start-login.ts` — Use case: start a login — code, secret and the `t.me` link, under the minute of its address in memory, then everybody's quota in the database (MOL-359). Tests: `backend/tests/login-quota.integration.test.ts`.
+- `backend/src/usecases/start-login.ts` — Use case: start a login — code, secret and the `t.me` link, under the minute of its address in memory, then everybody's quota in the database; a start that made no request gives its place back (MOL-359). Tests: `backend/tests/login-quota.integration.test.ts`.
 
 ## backend · db
 

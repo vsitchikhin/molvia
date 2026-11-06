@@ -67,11 +67,16 @@ is in `bot.md`.
   price accepted while only the owner was on production). **The address is `addressOf`'s**, the rule of
   `/client-errors` — the last `X-Forwarded-For` only from a peer inside, an IPv6 one by its `/48` — and
   **its minute is the API's memory** (`addressMinute`, owner's В-1 «а»): no column, no line of the log,
-  let go by the minute timer within two minutes of its last start. It goes first: a start it turns away
-  takes no lock and writes no request, only `refused` in `login_days`, and takes no place in the minute.
-  **Everybody's three hundred stay the database's**, including consumed requests, serialized with an
-  advisory lock, so they hold across restarts and processes; a start that passed its address and was
-  refused there keeps its place in the address's minute. **The prices, named:** a restart — every merge —
+  let go by the minute timer within two minutes of its last start. **The minute is a clock that never
+  steps back** (`performance.now`, adversarial А1): by the wall clock a step of NTP back by ten minutes
+  held an address for eleven and its IP as long, and a step forward gave five more starts in a second.
+  It goes first: a start it turns away takes no lock and writes no request, only `refused` in
+  `login_days`, and takes no place in the minute. **Everybody's three hundred stay the database's**,
+  including consumed requests, serialized with an advisory lock, so they hold across restarts and
+  processes; the memory holds the same three hundred as the bound of its map, and in one process it is
+  the one that refuses the three hundred and first. **A start that made no request gives its place
+  back** (`giveBack`, adversarial А2): refused by everybody's quota, or the database failing — five
+  answers of 500 were a 429 at the sixth tap. **The prices, named:** a restart — every merge —
   starts every address's minute over, five more starts an attempt; an operator's CGNAT puts thousands
   behind one address and its five, rare among the people of 0.2, and the refusal says «через минуту»;
   sixty addresses, or sixty `/48`, take everybody's three hundred — the botnet's price the owner

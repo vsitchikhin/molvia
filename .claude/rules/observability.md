@@ -238,7 +238,8 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
 - **The limit is the process's** (Р-6): sixty reports a minute from an address — three buffers: one
   was too few for a mobile operator's address, which thousands of phones share (adversarial А6) — and
   two hundred from everybody, the whole body refused past it with `429`, which the phone keeps its
-  buffer through. The address is the one Caddy names last in `X-Forwarded-For`, believed only from
+  buffer through — a minute of a clock that never steps back (`addressMinute`, MOL-359, adversarial А1).
+  The address is the one Caddy names last in `X-Forwarded-For`, believed only from
   inside, **an IPv6 one by its `/48`** (review №2, adversarial Б4, В2: one home connection has 2^64 in
   its `/64`, a flat's router is given a `/56`, and a free tunnel a whole `/48`), the limit's key and
   nothing else — in no log, in no table. **The channel can be silenced, not flooded** — the price,

@@ -150,12 +150,12 @@ export async function open(page: Page, path = '/'): Promise<void> {
   ).not.toHaveText(LOGIN_TITLE)
 }
 
-/** «Мне 16 лет или больше» и «Принимаю» на шаге согласия (MOL-95). */
 /**
  * Свой адрес стартам входа этой страницы (MOL-359): квота — пять стартов в минуту на адрес, а весь
  * прогон идёт с `127.0.0.1` через прокси Vite, так что решали бы число и порядок стартов в прогоне.
  * Прокси передаёт `X-Forwarded-For` как есть, и API верит ему от внутреннего пира — как от Caddy.
- * Сеть `/48` из документационной `2001:db8::/32`: 65 536 сетей, двум тестам одна не выпадет.
+ * Случайная `/48` из документационной `2001:db8::/32` на каждый старт: шесть стартов в одной сети за
+ * минуту на деле не выпадут.
  */
 export async function ownAddress(page: Page): Promise<void> {
   await page.setExtraHTTPHeaders({
@@ -163,6 +163,7 @@ export async function ownAddress(page: Page): Promise<void> {
   })
 }
 
+/** «Мне 16 лет или больше» и «Принимаю» на шаге согласия (MOL-95). */
 export async function acceptTerms(page: Page): Promise<void> {
   await page.getByRole('checkbox', { name: AGE }).check()
   await page.getByRole('button', { name: ACCEPT }).click()
