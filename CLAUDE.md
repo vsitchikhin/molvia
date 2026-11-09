@@ -920,7 +920,8 @@ differently in every working copy by design.
   retry fails CI (`failOnFlakyTests`). There is no `pre-push`.
 - **The one local hook that checks is `pre-commit`, and only the formatting of the files
   committed** (`.githooks`, wired by `make setup`, no husky) — seconds, since CI checks formatting
-  rather than fixing it. `commit-msg` holds the subject. A deliberate bypass is `--no-verify`.
+  rather than fixing it. `commit-msg` holds the subject and refuses a co-author line (MOL-372). A deliberate bypass is
+  `--no-verify`.
 - **What runs here by hand takes turns** (MOL-139): `make check`, `make e2e` and the other check
   targets run under one lock for the whole machine, `bin/one-at-a-time.sh`, and a waiting run says
   whose it waits for. **A test run typed by hand takes the same lock**
