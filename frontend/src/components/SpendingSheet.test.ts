@@ -257,6 +257,49 @@ describe('SpendingSheet: the phone’s day (MOL-121)', () => {
     expect(dayField().max).toBe('2026-09-28')
   }, 15_000)
 
+  // MOL-329, adversarial А3: the sheet's day moves as the app comes back, and its words follow it — the day
+  // chosen at the opening stays the spending's, now «Yesterday», never «Today» of yesterday.
+  it('opened at 23:50 and back in view after midnight: the line says «Yesterday» of the day it holds', async () => {
+    vi.setSystemTime(new Date('2026-09-28T23:50:00Z'))
+    moneyMonth.mockResolvedValue(month('2026-09-28'))
+    const view = await render()
+    await view
+      .findAll('button')
+      .find((one) => one.text().trim() === en.spending.summary.add)
+      ?.trigger('click')
+    await risen()
+    expect(detailsRow().textContent.trim()).toBe('Today · no note')
+
+    vi.setSystemTime(new Date('2026-09-29T00:10:00Z'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await risen()
+    expect(detailsRow().textContent.trim()).toBe('Yesterday · no note')
+    await openDetails()
+    expect(dayField().value).toBe('2026-09-28')
+    expect(dayField().max).toBe('2026-09-29')
+  }, 15_000)
+
+  // MOL-329, adversarial Ж1: a sheet has no caption of a month over it, so a day of another year says its year —
+  // in the field behind the line and on the line itself.
+  it('a day of last year says its year, on the field and on «Date, note, place»', async () => {
+    vi.setSystemTime(new Date('2027-01-05T10:00:00Z'))
+    moneyMonth.mockResolvedValue(month('2027-01-05'))
+    const view = await render()
+    await view
+      .findAll('button')
+      .find((one) => one.text().trim() === en.spending.summary.add)
+      ?.trigger('click')
+    await risen()
+    await openDetails()
+    dayField().value = '2026-12-20'
+    dayField().dispatchEvent(new Event('input'))
+    dayField().dispatchEvent(new Event('change'))
+    await flushPromises()
+    expect(topSheet().querySelector('.shown')?.textContent.trim()).toBe('December 20, 2026')
+    await detailsDone()
+    expect(detailsRow().textContent.trim()).toBe('Dec 20, 2026 · no note')
+  }, 15_000)
+
   it('a new spending on a day the phone has not reached is refused (must not fire)', async () => {
     moneyMonth.mockResolvedValue(month('2026-09-28'))
     const view = await render()
@@ -789,11 +832,20 @@ describe('SpendingSheet: «Дата, заметка, место» behind one lin
     // A bell: a character that draws nothing, which the server refuses.
     await typeInto(textField(en.spending.sheet.note_placeholder), `Lunch${String.fromCharCode(7)}`)
     await detailsDone()
+    // The focus comes once the note is marked, so it is read with its error (MOL-235, MOL-333).
+    // the details are mounted shut with the sheet: the very field they open on
+    const note = document.querySelector<HTMLInputElement>(
+      `input[placeholder="${en.spending.sheet.note_placeholder}"]`,
+    )
+    if (!note) throw new Error('no note field')
+    let marked: string | null = null
+    note.addEventListener('focus', () => (marked = note.getAttribute('aria-invalid')))
     await pressUntil(en.spending.sheet.save, () => {
       expect(topSheet().textContent).toContain(en.spending.sheet.bad_text)
     })
     await flushPromises()
     expect(document.activeElement).toBe(textField(en.spending.sheet.note_placeholder))
+    expect(marked).toBe('true')
     expect(detailsRow().getAttribute('aria-invalid')).toBe('true')
     expect(recordSpending).not.toHaveBeenCalled()
     // Put right, the mark goes with the error.

@@ -18,8 +18,11 @@
     <button class="line main" type="button" @click="$emit('total')">
       <span v-if="totalText" class="label">{{ t('receipt.review.total') }}</span>
       <span v-else class="missing">{{ t('receipt.review.total_missing') }}</span>
-      <span v-if="totalText" class="amount">{{ totalText }}</span>
-      <IconChevronRight class="chevron" aria-hidden="true" />
+      <!-- The sum and its chevron go under the words together where the two do not fit (MOL-334). -->
+      <span class="end"
+        ><span v-if="totalText" class="amount" :style="figureChars(totalText)">{{ totalText }}</span
+        ><IconChevronRight class="chevron" aria-hidden="true"
+      /></span>
     </button>
     <!-- The card's bonus spent on it (MOL-289): the trip is what left the card, the total less it. -->
     <div v-if="redeemedText" class="line">
@@ -43,7 +46,8 @@ import IconChevronRight from '~icons/mdi/chevron-right'
 import { convertMoney, formatEstimate, formatMoney, receiptPaidOf } from '@molvia/model'
 import type { ExchangeRate, Money, ReceiptBalance } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
-import { calendarDay } from '@/days'
+import { figureChars } from '@/components/figure'
+import { calendarDayOfAnyYear } from '@/days'
 
 /**
  * The foot of a receipt on the review (handoff 05): «Строки», the receipt's total, what it is in the
@@ -63,6 +67,8 @@ export default defineComponent({
     rate: { type: Object as PropType<ExchangeRate | null>, default: null },
     /** The day the rate is of: the receipt's. */
     day: { type: String, required: true },
+    /** The screen's day (MOL-329): a receipt of December looked at in January says its year. */
+    today: { type: String, required: true },
     /** The name of the line the difference likely sits in. */
     suspect: { type: String as PropType<string | null>, default: null },
     /** A receipt with no items (MOL-227): the total alone, no «Строки» and no difference. */
@@ -80,7 +86,7 @@ export default defineComponent({
       try {
         return t('receipt.review.approx', {
           amount: formatEstimate(convertMoney(paid, rate), locale.value),
-          day: calendarDay(props.day, locale.value, { day: 'numeric', month: 'short' }),
+          day: calendarDayOfAnyYear(props.day, locale.value, props.today),
         })
       } catch {
         return null
@@ -109,25 +115,37 @@ export default defineComponent({
       redeemedText: computed(() => money(props.redeemed)),
       approx,
       difference,
+      figureChars,
     }
   },
 })
 </script>
 
 <style scoped lang="scss">
+/* One column of the card's width, never of its widest line, and the box the total's figure measures itself against
+   (`figure-fit`, MOL-321): at 150 % «Итог чека 8 676,41 ֏ ›» stood 71 px past the card, and the note under it with
+   it (MOL-334). */
 .total {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-2);
   padding: var(--space-4);
+  container-type: inline-size;
 }
 
+/* A line wraps only where its least widths do not fit (MOL-321): the words first, the figure under them. */
 .line {
   display: flex;
-  gap: var(--space-3);
+  flex-wrap: wrap;
+  column-gap: var(--space-3);
   align-items: baseline;
   justify-content: space-between;
   color: var(--text-muted);
   font-size: var(--text-callout);
+
+  > :first-child {
+    flex: 1 1 min-content;
+  }
 }
 
 .main {
@@ -147,22 +165,28 @@ export default defineComponent({
 }
 
 .label {
-  flex: 1;
   font-size: var(--text-headline);
   font-weight: var(--weight-medium);
 }
 
 .missing {
-  flex: 1;
   color: var(--accent-ink);
   font-size: var(--text-callout);
   font-weight: var(--weight-medium);
 }
 
+.end {
+  display: inline-flex;
+  gap: var(--space-3);
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+/* Never broken, and shrunk to the card less its chevron where even the whole card is narrower. */
 .amount {
   @include display-type;
+  @include figure-fit($less: calc(var(--icon) + var(--space-3)));
 
-  font-size: var(--text-figure);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

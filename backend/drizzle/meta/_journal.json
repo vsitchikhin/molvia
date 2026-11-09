@@ -540,6 +540,34 @@
       "when": 1793437555659,
       "tag": "0076_brand_spellings",
       "breakpoints": true
+    },
+    {
+      "idx": 77,
+      "version": "7",
+      "when": 1793657327961,
+      "tag": "0077_merge_verdict_overwritten",
+      "breakpoints": true
+    },
+    {
+      "idx": 78,
+      "version": "7",
+      "when": 1793706624479,
+      "tag": "0078_merge_pick_written",
+      "breakpoints": true
+    },
+    {
+      "idx": 79,
+      "version": "7",
+      "when": 1794227555075,
+      "tag": "0079_login_notices",
+      "breakpoints": true
+    },
+    {
+      "idx": 80,
+      "version": "7",
+      "when": 1794229965753,
+      "tag": "0080_actor_receipts_sent",
+      "breakpoints": true
     }
   ]
 }

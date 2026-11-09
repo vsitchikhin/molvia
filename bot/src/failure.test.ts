@@ -63,6 +63,7 @@ describe('handlerOf — где случилось, без того, кто и ч
   it.each([
     [press('rate:5b0e7c0e-6d3e-4a53-9c4a-1f1f0b7e2a11:4'), 'callback:rate'],
     [press('remind:off'), 'callback:remind'],
+    [press('session:end:5b0e7c0e-6d3e-4a53-9c4a-1f1f0b7e2a11'), 'callback:session'],
     [press('Аня:секрет'), 'callback:other'],
     [message('/delete'), 'command:delete'],
     [message('/start@molvia_test_bot login_abc'), 'command:start'],

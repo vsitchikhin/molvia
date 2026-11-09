@@ -38,11 +38,28 @@ export const RECEIPT_SIDE_MIN = 200
 export const RECEIPT_KEEP_DAYS = 28
 
 /**
+ * How many receipts a person sends (MOL-360, owner's В-8 «а» of the audit MOL-287): a photo lives in the
+ * database until its receipt is recorded, so with no bound one account filled some 12 GB an hour.
+ * **At most this many not recorded at once** — what holds the disk: a receipt recorded or removed gives
+ * its place back — **and at most this many a day of the person's own** (`TODAY_HEADER`), a count that
+ * removing a receipt never takes back. A receipt by its link counts as a photo does (В-3 «а»).
+ */
+export const RECEIPTS_UNRECORDED_MAX = 20
+export const RECEIPTS_DAY_MAX = 40
+
+/**
  * How long a receipt read not whole keeps its photo and what its reader read, for the developer's review
  * (MOL-309, owner's В-3 «б», Р-8): until the fortnightly review of MOL-310 takes it, recorded or not — two
  * weeks of its cycle and one for the review itself — then the timer lets it go.
  */
 export const RECEIPT_MISS_KEEP_DAYS = 21
+
+/**
+ * How many such receipts one person keeps at once (MOL-360, owner's В-2 «а» of review 1): a copy outlives
+ * «Переснять» and «Записать», so the bound of the unrecorded did not see it, and «Переснять» over a wall kept
+ * forty copies a day. Past it the receipt is read as before and its reasons counted; it is not kept.
+ */
+export const RECEIPT_MISS_KEPT_MAX = 20
 
 /** «Удалить чек · Вернуть» (П-8): the ten minutes every removal of one's own money has (MOL-73). */
 export const RECEIPT_UNDO_MINUTES = EXCHANGE_UNDO_MINUTES

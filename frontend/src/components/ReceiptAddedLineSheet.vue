@@ -3,7 +3,7 @@
     <template #title>{{ t('receipt.added.title') }}</template>
     <template #meta>{{ t('receipt.added.meta') }}</template>
 
-    <div class="form">
+    <div ref="form" class="form">
       <!-- The item: the catalogue's search from an empty field, or a new one named there (MOL-273). -->
       <div class="field">
         <span class="label">{{ t('receipt.line.product') }}</span>
@@ -12,6 +12,7 @@
           :class="{ bad: itemMissing }"
           type="button"
           data-field="item"
+          :aria-describedby="itemMissing ? `${id}-item` : undefined"
           @click="picking = true"
         >
           <span v-if="item" class="product-name">{{ item.name }}</span>
@@ -22,7 +23,9 @@
           /></span>
         </button>
         <p v-if="item && !('id' in item)" class="hint">{{ t('receipt.line.name_note') }}</p>
-        <p v-if="itemMissing" class="error">{{ t('receipt.added.item_missing') }}</p>
+        <p v-if="itemMissing" :id="`${id}-item`" class="error">
+          {{ t('receipt.added.item_missing') }}
+        </p>
       </div>
 
       <div class="row">
@@ -52,7 +55,9 @@
 
       <div class="per-unit">
         <span class="per-unit-label">{{ t('item.unit_price_label') }}</span>
-        <span class="per-unit-value">{{ perUnit ?? '—' }}</span>
+        <span class="per-unit-value" :style="figureChars(perUnit ?? '—')">{{
+          perUnit ?? '—'
+        }}</span>
       </div>
     </div>
 
@@ -68,7 +73,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from 'vue'
+import { computed, defineComponent, ref, useId } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconChevronRight from '~icons/mdi/chevron-right'
@@ -79,6 +84,8 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import ItemPickSheet from '@/components/ItemPickSheet.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import { figureChars } from '@/components/figure'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useLineFigures } from '@/composables/useLineFigures'
 import { newId } from '@/ids'
 import type { AddedLineDraft } from '@/stores/receiptDrafts'
@@ -121,10 +128,18 @@ export default defineComponent({
       useLineFigures(start?.figures ?? { quantity: null, amount: null }, () => props.currency)
     const picking = ref(false)
     const itemMissing = ref(false)
+    const id = useId()
+    const form = ref<HTMLElement | null>(null)
+    // A refusal at «Готово» is heard (MOL-235, MOL-333), the item first, as the form stands. The item is
+    // a button, not a field of the kit: focused, it is read with its error by its description (В-2 «а»).
+    const refuse = useFieldRefusal()
 
     return {
+      figureChars,
       t,
       ERROR,
+      id,
+      form,
       item,
       quantity,
       unit,
@@ -147,7 +162,14 @@ export default defineComponent({
         quantityBad.value = many === 'bad'
         amountBad.value = money === 'bad'
         itemMissing.value = item.value === null
-        if (many === 'bad' || money === 'bad' || item.value === null) return
+        if (many === 'bad' || money === 'bad' || item.value === null) {
+          void refuse(() =>
+            form.value?.querySelector<HTMLElement>(
+              itemMissing.value ? '[data-field="item"]' : '[aria-invalid="true"]',
+            ),
+          )
+          return
+        }
         emit('saved', {
           key: start?.key ?? newId(),
           item: item.value,
@@ -264,8 +286,12 @@ export default defineComponent({
   color: var(--text-muted);
 }
 
+/* A line that wraps only where its least widths do not fit, and the box its figure measures itself against
+   (MOL-321): at 150 % «12 800 ֏/кг» stood past it (MOL-334). */
 .per-unit {
   display: flex;
+  flex-wrap: wrap;
+  container-type: inline-size;
   gap: var(--space-3);
   align-items: baseline;
   justify-content: space-between;
@@ -277,14 +303,16 @@ export default defineComponent({
 }
 
 .per-unit-label {
+  flex: 1 1 min-content;
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
 }
 
 .per-unit-value {
   @include display-type;
+  @include figure-fit(var(--text-title));
 
-  font-size: var(--text-title);
+  margin-inline-start: auto;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

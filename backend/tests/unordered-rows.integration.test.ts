@@ -32,9 +32,17 @@ afterAll(async () => {
 
 const kinds = (rows: readonly { kind: string }[]): string[] => rows.map((row) => row.kind)
 
+// A scan with no order goes by where the rows lie, not by the order they were written (MOL-356): `clearAll` empties
+// by DELETE, so a row written later may lie first. The net reverses that order, so it is what a test compares with.
+const heap = async (): Promise<string[]> =>
+  kinds(await client<{ kind: string }[]>`select kind from owner_notices order by ctid`)
+
 describe('rows given in no order come back reversed', () => {
   it('reverses a read of Drizzle with no orderBy, and leaves one with it', async () => {
-    expect(kinds(await db.select({ kind: ownerNotices.kind }).from(ownerNotices))).toEqual(REVERSED)
+    const backwards = (await heap()).toReversed()
+    expect(kinds(await db.select({ kind: ownerNotices.kind }).from(ownerNotices))).toEqual(
+      backwards,
+    )
     expect(
       kinds(
         await db.select({ kind: ownerNotices.kind }).from(ownerNotices).orderBy(ownerNotices.id),
@@ -45,7 +53,7 @@ describe('rows given in no order come back reversed', () => {
   it('reverses execute of a template with no order of its own, an order in a subquery none', async () => {
     const read = (text: ReturnType<typeof sql>) =>
       db.execute<{ kind: string }>(text).then((rows) => kinds([...rows]))
-    expect(await read(sql`select kind from owner_notices`)).toEqual(REVERSED)
+    expect(await read(sql`select kind from owner_notices`)).toEqual((await heap()).toReversed())
     expect(
       await read(sql`select kind from (select kind, id from owner_notices order by id) n`),
     ).toEqual(REVERSED)
@@ -53,46 +61,58 @@ describe('rows given in no order come back reversed', () => {
   })
 
   it('reverses a query of postgres.js, by its tag and as a string', async () => {
+    const backwards = (await heap()).toReversed()
     expect(kinds(await client<{ kind: string }[]>`select kind from owner_notices`)).toEqual(
-      REVERSED,
+      backwards,
     )
-    expect(kinds(await client.unsafe('select kind from owner_notices'))).toEqual(REVERSED)
+    expect(kinds(await client.unsafe('select kind from owner_notices'))).toEqual(backwards)
   })
 
   it('reverses a read inside a transaction too', async () => {
+    const backwards = (await heap()).toReversed()
     const inside = await db.transaction((tx) =>
       tx.select({ kind: ownerNotices.kind }).from(ownerNotices),
     )
-    expect(kinds(inside)).toEqual(REVERSED)
+    expect(kinds(inside)).toEqual(backwards)
   })
 
-  // review round 13, Н1: every two rows the other way round, so which of two comes first always changes
-  it('puts each two rows the other way round: the first of several alike changes', async () => {
-    await db
-      .insert(ownerNotices)
-      .values({ kind: 'failure', payload: { kind: 'failure', n: 2 }, createdAt: new Date() })
-    const rows = await db.select({ payload: ownerNotices.payload }).from(ownerNotices)
-    const ordered = await db
-      .select({ payload: ownerNotices.payload })
+  // review round 13, Н1: every two rows the other way round, so which of two comes first always changes. Three
+  // alike, since a turn by one moves the first row only: of three, it never gives them reversed, wherever they lie.
+  it('puts each two rows the other way round: several alike come back reversed', async () => {
+    await db.insert(ownerNotices).values(
+      [2, 3].map((n) => ({
+        kind: 'failure',
+        payload: { kind: 'failure', n },
+        createdAt: new Date(),
+      })),
+    )
+    const columns = { kind: ownerNotices.kind, payload: ownerNotices.payload }
+    const failures = (rows: { kind: string; payload: unknown }[]) =>
+      rows.filter((row) => row.kind === 'failure').map((row) => row.payload)
+    const lying = await db
+      .select(columns)
       .from(ownerNotices)
-      .orderBy(ownerNotices.id)
-    const first = (all: typeof rows) =>
-      all.find((row) => (row.payload as { kind: string }).kind === 'failure')
-    expect(first(rows)).not.toEqual(first(ordered))
+      .orderBy(sql`ctid`)
+    const read = await db.select(columns).from(ownerNotices)
+    expect(failures(read)).toEqual(failures(lying).toReversed())
   })
 
   // review round 13, Н2: an update or a delete returns its rows in no promised order either
+  // an update writes each row anew, maybe elsewhere, so where they lie is read before every statement
   it('reverses the rows an update and a delete return, by Drizzle and by a tag', async () => {
+    let backwards = (await heap()).toReversed()
     const updated = await db
       .update(ownerNotices)
       .set({ tries: 1 })
       .returning({ kind: ownerNotices.kind })
-    expect(kinds(updated)).toEqual(REVERSED)
+    expect(kinds(updated)).toEqual(backwards)
+    backwards = (await heap()).toReversed()
     expect(
       kinds(await client<{ kind: string }[]>`update owner_notices set tries = 2 returning kind`),
-    ).toEqual(REVERSED)
+    ).toEqual(backwards)
+    backwards = (await heap()).toReversed()
     expect(kinds(await db.delete(ownerNotices).returning({ kind: ownerNotices.kind }))).toEqual(
-      REVERSED,
+      backwards,
     )
   })
 
@@ -121,20 +141,21 @@ describe('rows given in no order come back reversed', () => {
 
 // review round 14, О1: the net's limit, named — what `bin/check-ordered-reads.mjs` holds instead
 describe('what the net cannot tell', () => {
-  it('reads values the same reversed alike: the first row of failure, silence, failure is failure either way', async () => {
+  // rows of one kind, so the values read are the same whichever way the rows lie (MOL-356)
+  it('reads values the same reversed alike: the rows come back reversed, their kinds as they lie', async () => {
     await clearAll(db)
-    await db.insert(ownerNotices).values(
-      ['failure', 'silence', 'failure'].map((kind, n) => ({
-        kind,
-        payload: { n },
-        createdAt: new Date(),
-      })),
-    )
-    const [reversedFirst] = kinds(await db.select({ kind: ownerNotices.kind }).from(ownerNotices))
-    const [writtenFirst] = kinds(
-      await db.select({ kind: ownerNotices.kind }).from(ownerNotices).orderBy(ownerNotices.id),
-    )
-    expect(reversedFirst).toBe(writtenFirst)
+    await db
+      .insert(ownerNotices)
+      .values([0, 1, 2].map((n) => ({ kind: 'failure', payload: { n }, createdAt: new Date() })))
+    const columns = { kind: ownerNotices.kind, payload: ownerNotices.payload }
+    const lying = await db
+      .select(columns)
+      .from(ownerNotices)
+      .orderBy(sql`ctid`)
+    const read = await db.select(columns).from(ownerNotices)
+    const payloads = (rows: typeof read) => rows.map((row) => row.payload)
+    expect(payloads(read)).toEqual(payloads(lying).toReversed())
+    expect(kinds(read)).toEqual(kinds(lying))
   })
 })
 

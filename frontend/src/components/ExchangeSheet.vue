@@ -33,7 +33,7 @@
       </template>
     </StatusStrip>
 
-    <form class="form" @submit.prevent="submit">
+    <form ref="form" class="form" @submit.prevent="submit">
       <div v-for="side in sides" :key="side" class="pair">
         <AppField
           v-model="amounts[side]"
@@ -218,10 +218,12 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import { useAccountChoice } from '@/composables/useAccountChoice'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useOnline } from '@/composables/useOnline'
 import { useAccountsStore } from '@/stores/accounts'
 import { shown } from '@/composables/useItemDetails'
-import { calendarDay, localDay, purchaseDay } from '@/days'
+import { calendarDayOfAnyYear, dateOfAnyYear, localDay } from '@/days'
 import { newId } from '@/ids'
 
 type Side = 'given' | 'received'
@@ -305,11 +307,21 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const id = useId()
     const sides: readonly Side[] = ['given', 'received']
+    const form = ref<HTMLFormElement | null>(null)
+    // A field refused is heard (MOL-235, MOL-333): the first one marked in the form, the server's
+    // refusals under a field too — never into a sheet swept away while the answer was on its way.
+    const refuse = useFieldRefusal()
+    function refuseField(): void {
+      if (props.open)
+        void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
+    }
 
     const amounts = reactive<Record<Side, string>>({ given: '', received: '' })
     const currencies = reactive<Record<Side, Currency>>({ given: 'RUB', received: 'AMD' })
     const amountErrors = reactive<Record<Side, ErrorCode | null>>({ given: null, received: null })
-    const today = ref(localDay())
+    // The sheet's day moves as the app comes back and at midnight, so its words follow it while the day it
+    // opened on stays the record's (MOL-329, adversarial А2, А3).
+    const today = useLocalDay()
     const day = ref(today.value)
     const held = ref('')
     const note = ref('')
@@ -507,12 +519,14 @@ export default defineComponent({
     /** «до 25 сент.: 20 000 ₽ → 100 000 ֏ · 16 сент. · ВТБ банкомат» */
     function versionOf(version: ExchangeView['history'][number]): string {
       const words = {
-        until: purchaseDay(version.replacedAt, locale.value),
+        // Always a date, its year when another (adversarial Г2): «до» puts its own word before the day, and
+        // «до вчера» is no Russian (adversarial Д1, the rule of «Раньше …», MOL-204 Р-9).
+        until: dateOfAnyYear(version.replacedAt, locale.value, today.value),
         amounts: t('exchange.row_amounts', {
           given: formatMoney(version.given, locale.value),
           received: formatMoney(version.received, locale.value),
         }),
-        date: calendarDay(version.exchangedOn, locale.value, { day: 'numeric', month: 'short' }),
+        date: calendarDayOfAnyYear(version.exchangedOn, locale.value, today.value),
       }
       // The channel too: changed alone, it made a version that read as the one after it (review).
       const note = [
@@ -535,7 +549,7 @@ export default defineComponent({
           given: formatMoney(exchange.given, locale.value),
           received: formatMoney(exchange.received, locale.value),
         }),
-        calendarDay(exchange.exchangedOn, locale.value, { day: 'numeric', month: 'short' }),
+        calendarDayOfAnyYear(exchange.exchangedOn, locale.value, today.value),
         ...(exchange.heldBefore
           ? [
               t('exchange.sheet.current_held', {
@@ -580,14 +594,21 @@ export default defineComponent({
       // Empty is «no note»; anything typed must be a line the server keeps (MOL-42, В-4).
       const typedNote = note.value.trim() ? exchangeNoteSchema.safeParse(note.value) : null
       noteInvalid.value = typedNote !== null && !typedNote.success
-      if (!given || !received || amountErrors.given || amountErrors.received) return
+      if (!given || !received || amountErrors.given || amountErrors.received) {
+        refuseField()
+        return
+      }
       // Amounts no rate in the band says — a zero too many — refused before the connection is
       // asked; the server refuses the same (adversarial А3).
       if (!isPlausibleExchange(given, received)) {
         amountErrors.received = ERROR.INVALID_RATE
+        refuseField()
         return
       }
-      if (sameCurrency.value || heldError.value || dayInvalid.value || noteInvalid.value) return
+      if (sameCurrency.value || heldError.value || dayInvalid.value || noteInvalid.value) {
+        refuseField()
+        return
+      }
 
       const fields = {
         given,
@@ -626,8 +647,10 @@ export default defineComponent({
         // The refusals a person can answer stay under their field; anything else is said once.
         if (caught instanceof ApiError && caught.code === ERROR.EXCHANGE_IN_FUTURE) {
           dayError.value = ERROR.EXCHANGE_IN_FUTURE
+          refuseField()
         } else if (caught instanceof ApiError && caught.code === ERROR.INVALID_RATE) {
           amountErrors.received = ERROR.INVALID_RATE
+          refuseField()
         } else {
           failed.value = true
         }
@@ -648,6 +671,7 @@ export default defineComponent({
       fillHeld,
       t,
       id,
+      form,
       sides,
       amounts,
       currencies,

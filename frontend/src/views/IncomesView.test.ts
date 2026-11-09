@@ -327,7 +327,8 @@ describe('IncomesView: the months (В-2)', () => {
     expect(view.text()).toContain(en.income.source.freelance)
   })
 
-  it('past New Year’s midnight with the screen in the hand, the year goes by the clock (А1)', async () => {
+  // MOL-329: the screen's day moves at midnight itself, and the captions and the cards with it (А1, Б1).
+  it('past New Year’s midnight with the screen in the hand, the year goes by the screen’s day (А1)', async () => {
     const month = (month: string, receivedOn: string, id: string) => ({
       month,
       sums: [{ minor: 100_000n, currency: 'RUB' as const }],
@@ -339,7 +340,7 @@ describe('IncomesView: the months (В-2)', () => {
       view.findAll('.month-head .words').map((words) => words.text())
     const heads = (view: VueWrapper): string[] =>
       view.findAll('article .head .day').map((day) => day.text())
-    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
     try {
       vi.setSystemTime(new Date(2026, 11, 31, 23, 50))
       incomes.mockResolvedValue(overview({ months: [december] }))
@@ -351,8 +352,13 @@ describe('IncomesView: the months (В-2)', () => {
       expect(captions(view)).toEqual(['December'])
       expect(heads(view)).toEqual(['Today'])
 
-      // 00:05 of the 1st, never hidden: the screen's own day is still the 31st, the answer of the
-      // write redraws it.
+      // 00:05 of the 1st, never hidden: midnight moved the screen's day, nothing else did.
+      await vi.advanceTimersByTimeAsync(15 * 60_000)
+      expect(captions(view)).toEqual(['December 2026'])
+      expect(heads(view)).toEqual(['Yesterday'])
+
+      // The sheet waits on real timers; the date stays the test's.
+      vi.useFakeTimers({ toFake: ['Date'] })
       vi.setSystemTime(new Date(2027, 0, 1, 0, 5))
       await recordThroughSheet(view)
       expect(incomes).toHaveBeenCalledTimes(1)
@@ -561,6 +567,25 @@ describe('IncomesView: recording, amending and removing', () => {
     await flushPromises()
     expect(view.text()).toContain(en.income.vanished)
     expect(view.text()).not.toContain(en.income.failed)
+  })
+
+  // The question has no caption of a month over it (MOL-329, adversarial Ж1).
+  it('the question names an income of last year with its year', async () => {
+    incomes.mockResolvedValue(
+      overview({
+        months: [
+          {
+            month: '2025-09',
+            sums: [{ minor: 9_961_500n, currency: 'RUB' }],
+            incomes: [row({ receivedOn: '2025-09-15' })],
+          },
+        ],
+      }),
+    )
+    const view = await render()
+    await askToRemove(view)
+    const sheets = document.querySelectorAll('dialog[open]')
+    expect(sheets[1]?.textContent).toContain('Sep 15, 2025')
   })
 
   it('the bin asks first, then removes, puts the focus on «Bring back» and brings it back', async () => {

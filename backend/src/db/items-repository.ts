@@ -29,7 +29,7 @@ import { kindAt } from './kind-word'
 import { idOrNull, rowLimit, theRow } from './rows'
 import { vectorLiteral } from './item-embeddings-repository'
 import { itemBarcodes, itemEmbeddings, items, searchPicks } from './schema'
-import { liveItemId } from './trace'
+import { liveItemId, noteTraceWrite } from './trace'
 
 export interface ItemRepository {
   /** `createdBy` is null for a seeded item — it belongs to nobody. */
@@ -518,6 +518,11 @@ export function rankedCandidates(
 
   // Placed by its meaning: found by it and not within one edit by its letters — the row that takes
   // \`MEANING_DISTANCE\` and makes the answer near. Over the final select's \`r\` and \`mg\`.
+  //
+  // Near only where it is placed, a price (MOL-332, owner's В-3 «а»): a row within one edit by the mean
+  // with a word two off is not near, though a typo more would make it so. Near wherever found, the
+  // meaning called «Масло детское» found for «мыло детское» — one exact word lends the vector its
+  // sense as it lent the mean its edits, and review А of MOL-46 was undone.
   const byMeaning = sql`coalesce(mg.sim >= ${MEANING_THRESHOLD}
                                and not coalesce(r.distance <= ${NEAR_DISTANCE}, false), false)`
 
@@ -1113,6 +1118,12 @@ export function createItemRepository(db: Conn): ItemRepository {
           const claimed = await claim(tx, [code], row.id)
           if ('taken' in claimed) return holder(tx, claimed.taken)
           await bind(tx, row.id, claimed.free, actorId)
+          // A code bound by a trace's id goes home with an undo (MOL-299, А2).
+          if (row.id !== itemId.toLowerCase()) {
+            for (const free of claimed.free) {
+              await noteTraceWrite(tx, 'item', itemId, 'barcode', { code: free })
+            }
+          }
           const [item] = await load([row.id], tx)
           return item ? { item, added: claimed.free.length > 0 } : null
         }),

@@ -36,6 +36,17 @@ export interface LoginRequestRepository {
     deviceName: string | null,
     again?: boolean,
   ): Promise<LoginRequest>
+  /**
+   * A start the address's minute turned away (MOL-359): it makes no request and takes no quota lock,
+   * so only its count in `login_days`, on the day it was refused — as a refusal by the quota counts.
+   */
+  refuse(): Promise<void>
+  /**
+   * A session ended by «Это не я — завершить» under the bot's message about a sign-in (MOL-361, В-4):
+   * counted on the day of the press, since the request it began with is gone. In the caller's
+   * transaction, the last statement of it, so a session not deleted is not counted.
+   */
+  endedByNotice(): Promise<void>
   /** Deletes what ran out, and counts in `login_days` those that ran out with no outcome. */
   removeExpired(): Promise<void>
 
@@ -148,7 +159,8 @@ async function insert(
 }
 
 /** A step of the login's funnel that is counted where it happens (MOL-68). */
-type LoginStep = 'started' | 'again' | 'confirmed' | 'declined' | 'collected' | 'refused'
+type LoginStep =
+  'started' | 'again' | 'confirmed' | 'declined' | 'collected' | 'refused' | 'endedByNotice'
 
 /**
  * Adds one to each step in the row of `day`, read from `source` — the request's own row, so the
@@ -205,6 +217,14 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
   const live = sql`${loginRequests.consumedAt} is null and ${loginRequests.expiresAt} > clock_timestamp()`
 
   return {
+    async refuse() {
+      await tally(db, ['refused'], yerevanDay(sql`clock_timestamp()`))
+    },
+
+    async endedByNotice() {
+      await tally(db, ['endedByNotice'], yerevanDay(sql`clock_timestamp()`))
+    },
+
     async removeExpired() {
       // `skip locked`: a row somebody holds is left for the next pass (MOL-58, adversarial Р-3).
       // Erasure holds every request of the person it erases, expired ones too, and this runs
@@ -239,7 +259,8 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
 
     async createLimited(id, code, secret, deviceName, again = false) {
       const started = await db.transaction(async (tx) => {
-        // One quota for this database, including concurrent starts and process restarts.
+        // Everybody's quota, one for this database, including concurrent starts and process restarts;
+        // the address's minute is the use case's, checked before this (MOL-359).
         await tx.execute(
           sql`select pg_advisory_xact_lock(hashtextextended('molvia:login-quota', 0))`,
         )

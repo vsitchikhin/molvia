@@ -239,7 +239,9 @@
       "too_large": "the photo is too large",
       "lost": "the photo wasn’t kept on this phone",
       "other": "the server didn’t take the receipt",
-      "link": "the link did not fit"
+      "link": "the link did not fit",
+      "day_limit": "{n} receipt already sent today | {n} receipts already sent today",
+      "unrecorded_limit": "{n} receipt is waiting to be recorded | {n} receipts are waiting to be recorded"
     },
     "recorded_receipt": "{count} · {day} · from a receipt",
     "recorded_sum": "receipt total · {day}",
@@ -249,6 +251,8 @@
       "sending": "The photos are going to the server. If you close the app, sending goes on the next time you open it.",
       "stuck": "The server got only some parts of this receipt, and this phone has none of them. Delete the receipt and take it again.",
       "rejected": "The server didn’t take this receipt: {reason}. Remove it and take it again.",
+      "rejected_day_limit": "The server did not accept this receipt: {reason}. Remove it and send the receipt tomorrow.",
+      "rejected_unrecorded_limit": "The server did not accept this receipt: {reason}. Record or delete the ones waiting, remove this one and send the receipt again.",
       "link_waiting": "The link is on your phone. We will send it once there is a connection — nothing to do.",
       "link_sending": "The link is going to the server. If you close the app, sending carries on next time you open it.",
       "link_parsing": "Asking the Serbian tax office. A receipt just printed shows up there in a couple of minutes — you can close the app. Once ready, the receipt moves to «Check and save».",
@@ -261,9 +265,9 @@
       "body": "Photograph a receipt — we read the lines, you check them and save with one button. No receipt — “Add by hand”."
     },
     "error_capture": "You can still photograph a receipt or add by hand",
-    "stale": "Offline · purchases as of {day}, {time}",
+    "stale": "Offline · purchases as of {when}",
     "stale_untimed": "Offline · purchases saved on this phone",
-    "stale_error": "The server did not answer · purchases as of {day}, {time}",
+    "stale_error": "The server did not answer · purchases as of {when}",
     "stale_error_untimed": "The server did not answer · purchases saved on this phone",
     "earlier_online": "Earlier than {day} — once online",
     "offline": {
@@ -425,9 +429,9 @@
     "ratings_count": "{n} rating | {n} ratings",
     "rating_line": "{rating} · {count}",
     "truncated": "Showing {shown} of {total}",
-    "stale": "Offline · the list as of {day}, {time}",
-    "stale_error": "The server did not answer — the list as of {day}, {time}",
-    "stale_loading": "Refreshing · the list as of {day}, {time}",
+    "stale": "Offline · the list as of {when}",
+    "stale_error": "The server did not answer — the list as of {when}",
+    "stale_loading": "Refreshing · the list as of {when}",
     "edit_action": "Change the rating",
     "edit": {
       "meta": "Only your own rating changes",
@@ -454,7 +458,7 @@
       "body_capture": "We’ll show the list as soon as you’re back online. You can photograph a receipt now"
     },
     "city_reloading": "Refreshing · the list for {city}",
-    "stale_other_city": "Offline · the list for {oldCity} as of {day}, {time}. Prices for {city} will appear once you are back online",
+    "stale_other_city": "Offline · the list for {oldCity} as of {when}. Prices for {city} will appear once you are back online",
     "cities_genitive": {
       "Гюмри": "Gyumri",
       "Ереван": "Yerevan",
@@ -474,7 +478,7 @@
         "body_offline": "Without a connection we search only what was rated. The whole catalogue — with a connection"
       },
       "error_body": "The search did not go through. Try again — or clear the field: the list is still there",
-      "offline": "Offline · searching only the list as of {day}, {time}",
+      "offline": "Offline · searching only the list as of {when}",
       "offline_more": "Unrated items and the whole catalogue — once there is a connection"
     },
     "home": {
@@ -1482,6 +1486,8 @@
     "receipt_in_future": "The receipt's date has not come yet",
     "receipt_total_required": "Enter the receipt's total — without it there is nothing to record",
     "receipt_link_invalid": "This is not a link from a Serbian tax receipt, or it is damaged",
+    "receipts_day_limited": "Many receipts already sent today. Send the receipt tomorrow",
+    "receipts_unrecorded_limited": "Many receipts are waiting to be recorded. Record or delete them",
     "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow",
     "feedback_picture_invalid": "The picture would not do — choose another one",
     "feedback_picture_too_large": "The picture is too large — choose another one",
@@ -1721,7 +1727,7 @@
       },
       "receipts": {
         "term": "Receipts",
-        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; if reading receipts by the Claude model is on for you, the whole photo goes to it — to Anthropic (see «Who the data goes to»). No other outside service sees the photo. A Serbian receipt comes as the link of its QR code, with no photo: the phone reads the QR code, and the shot does not leave it — see «A Serbian receipt by its link». On our server the photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. Except a receipt the model did not read whole: its photo and what the model read are kept by the developer for up to 21 days after reading — after recording and after «Retake» too — to find why lines were not read and to fix the reading; then they are deleted. The developer gets a message in Telegram about such a receipt: the start of its number, the country, how many lines were not read and why — no products, sums or shop. Not in the nightly copy, not in the logs; your data copy shows what is kept, until when and why. Delete the receipt or your data, and they go with it. A photo sent to Anthropic lives there up to 30 days, or up to 2 years if its check flags it (see «Who the data goes to»). The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them; a receipt read by the model has no lines cut out. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off. A recorded receipt is kept while its record is in «Purchases»: delete the record, and ten minutes later the receipt goes too, with all its lines. Delete one purchase, and its line goes at once. With the record or the purchase goes your word on the line in the shop’s memory; if another purchase of yours at the same shop recorded the same line, the word is taken from it again — its item, price and day. Lines you chose not to record are deleted when you record the receipt."
+        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; if reading receipts by the Claude model is on for you, the whole photo goes to it — to Anthropic (see «Who the data goes to»). No other outside service sees the photo. A Serbian receipt comes as the link of its QR code, with no photo: the phone reads the QR code, and the shot does not leave it — see «A Serbian receipt by its link». On our server the photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. Except a receipt the model did not read whole: its photo and what the model read are kept by the developer for up to 21 days after reading — after recording and after «Retake» too — to find why lines were not read and to fix the reading; then they are deleted. The developer gets a message in Telegram about such a receipt: the start of its number, the country, how many lines were not read and why — no products, sums or shop. Not in the nightly copy, not in the logs; your data copy shows what is kept, until when and why. Delete the receipt or your data, and they go with it. A photo sent to Anthropic lives there up to 30 days, or up to 2 years if its check flags it (see «Who the data goes to»). The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them; a receipt read by the model has no lines cut out. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off. A recorded receipt is kept while its record is in «Purchases»: delete the record, and ten minutes later the receipt goes too, with all its lines. Delete one purchase, and its line goes at once. With the record or the purchase goes your word on the line in the shop’s memory; if another purchase of yours at the same shop recorded the same line, the word is taken from it again — its item, price and day. Lines you chose not to record are deleted when you record the receipt. We also keep how many receipts you sent on your own day: you can send at most 40 a day and keep at most 20 unrecorded at once — so the photos do not fill the server."
       },
       "accounts": {
         "term": "Accounts",
@@ -1737,7 +1743,7 @@
       },
       "ratings": {
         "term": "Ratings and reviews",
-        "text": "Only you see your review. Others see a rating only inside an average of three people. A rating you withdrew stays with us as a row without its review — why is said under «Statistics — with your consent»."
+        "text": "Only you see your review. Others see a rating only inside an average of three people. A rating you withdrew stays with us as a row without its review — why is said under «Statistics — with your consent». If two item cards turned out to be one and were merged, and a rating given by the old card landed over your rating of the other, the earlier one — its score and dates, without the review — is kept while the merge can be undone: undoing it brings that rating back."
       },
       "reminders": {
         "term": "Rating reminders",
@@ -1757,7 +1763,7 @@
       },
       "devices": {
         "term": "Sign-in devices",
-        "text": "The name of the phone and browser you signed in from, and when you last used them. The list is in Settings, under Devices, where any sign-in can be ended. A sign-in unused for six months is deleted by itself."
+        "text": "The name of the phone and browser you signed in from, and when you last used them. The list is in Settings, under Devices, where any sign-in can be ended. The bot tells you in Telegram of every new sign-in — which device, in its own words, and when — with a button that ends it; until the bot has written, a record of it waits on the server. A sign-in unused for six months is deleted by itself."
       },
       "settings": {
         "term": "Your settings",
@@ -1784,7 +1790,7 @@
       },
       "telegram": {
         "term": "Telegram",
-        "text": "The bot’s messages to you — sign-in, reminders, “receipt read”, the developer’s replies, a notice of a data breach, a warning before an inactive account is deleted — and your messages to the developer with their screenshots. Telegram is a company abroad; this has to go to it because Molvia’s sign-in and bot work through Telegram — a channel you chose yourself by signing in."
+        "text": "The bot’s messages to you — sign-in and a message about each new sign-in, reminders, “receipt read”, the developer’s replies, a notice of a data breach, a warning before an inactive account is deleted — and your messages to the developer with their screenshots. Telegram is a company abroad; this has to go to it because Molvia’s sign-in and bot work through Telegram — a channel you chose yourself by signing in."
       },
       "contabo": {
         "term": "Contabo, server in France",
@@ -1813,7 +1819,7 @@
     },
     "logs": {
       "title": "Server logs",
-      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach the server's error log — and it too lives there no longer than 14 days — and the server's memory along with an app failure: see «App failures». And the server keeps metrics: how many requests reached each part of it and how fast it answered — every 15 seconds, without a name, an address or what you searched for: this is how we see whether something broke. The last 30 days of them can be read, and they leave the disk month by month — within two months."
+      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach the server's error log — and it too lives there no longer than 14 days — and the server's memory: along with an app failure — see «App failures» — and for a couple of minutes when you start signing in, so that one address cannot start too many sign-ins. And the server keeps metrics: how many requests reached each part of it and how fast it answered — every 15 seconds, without a name, an address or what you searched for: this is how we see whether something broke. The last 30 days of them can be read, and they leave the disk month by month — within two months."
     },
     "failures": {
       "title": "App failures",
@@ -1837,7 +1843,7 @@
     },
     "copy": {
       "title": "A copy of your data",
-      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked, the receipts read — without their photos — and your messages to the developer — without their screenshots. A rating you withdrew is there too: without its review it stays with us — why is said under «Statistics — with your consent». What you removed and can still bring back is there as well, marked. The file holds no login keys."
+      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked, the receipts read — without their photos — your messages to the developer — without their screenshots — and the earlier ratings kept until a merge is undone. A rating you withdrew is there too: without its review it stays with us — why is said under «Statistics — with your consent». What you removed and can still bring back is there as well, marked. The file holds no login keys."
     },
     "erase": {
       "title": "Delete everything",
@@ -1953,7 +1959,7 @@
     "savings_tag": "savings",
     "total": "Total",
     "total_foot": "Spendable {spendable} · savings {savings}",
-    "stale": "Offline · balances as of {time}",
+    "stale": "Offline · balances as of {when}",
     "unassigned": "{n} entry isn't in any balance | {n} entries aren't in any balance",
     "load_failed": "Couldn't load balances",
     "done": "Done",
@@ -1990,8 +1996,8 @@
       "removed": "Deleted: {name}",
       "removed_announced": "Deleted: {name}. Undo within 10 seconds",
       "archived_done": "“{name}” put away — find it under “Put away”",
-      "offline": "Offline · balances as of {time}. Accounts and checks wait for a connection",
-      "unanswered": "The server did not answer · balances as of {time}",
+      "offline": "Offline · balances as of {when}. Accounts and checks wait for a connection",
+      "unanswered": "The server did not answer · balances as of {when}",
       "empty": {
         "body": "Add cash and cards — balances will follow your spending, income, exchanges and purchases"
       },
@@ -2164,7 +2170,7 @@
     "card_from": "from “{name}”",
     "card_to": "to “{name}”",
     "card_name": "“{name}”",
-    "stale_error": "Couldn’t refresh — balances as of {time}"
+    "stale_error": "Couldn’t refresh — balances as of {when}"
   },
   "update": {
     "ready": "A new version is out",
@@ -2458,7 +2464,9 @@
       "when": "When",
       "city": "City",
       "done": "Done",
-      "name": "Shop"
+      "name": "Shop",
+      "choose_place": "Choose the shop",
+      "choose_day": "Choose the day"
     },
     "recorded": {
       "title": "Saved {n} purchase | Saved {n} purchases",

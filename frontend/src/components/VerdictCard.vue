@@ -1,5 +1,5 @@
 <template>
-  <AppCard as="section" class="verdict" :aria-labelledby="titleId">
+  <AppCard ref="root" as="section" class="verdict" :aria-labelledby="titleId">
     <SectionCaption as="p" inset class="context">{{
       t('verdict.context', { when: day, place })
     }}</SectionCaption>
@@ -7,7 +7,7 @@
       {{ card.name }}<br />{{ t('verdict.question_tail') }}
     </h2>
 
-    <RatingScale v-model="score" :current="returnedWith" />
+    <RatingScale v-model="score" class="keys" :current="returnedWith" />
 
     <AppField
       v-model="review"
@@ -41,9 +41,10 @@ import AppCard from '@/components/AppCard.vue'
 import AppField from '@/components/AppField.vue'
 import RatingScale from '@/components/RatingScale.vue'
 import { placeLabel } from '@/components/placeLabel'
-import { purchaseDay } from '@/days'
+import { dayOfAnyYear } from '@/days'
 import { SCORES } from '@/components/rating'
 import SectionCaption from '@/components/SectionCaption.vue'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import type { Score, VerdictDraft } from '@/stores/verdictDrafts'
 
 /** The review's own bound (`newVerdictSchema`), kept by the field so it cannot be passed. */
@@ -86,6 +87,8 @@ export default defineComponent({
      * city (MOL-120) — the queue decides, since the card alone cannot know.
      */
     city: { type: String as PropType<string | null>, default: null },
+    /** The screen's day (`useLocalDay`): «сегодня» and «вчера» of the purchase are said from it (MOL-329). */
+    today: { type: String, required: true },
   },
   emits: {
     save: (score: Score, review: string) =>
@@ -100,6 +103,9 @@ export default defineComponent({
     const { t, locale } = i18n
     const titleId = useId()
     const title = ref<HTMLElement | null>(null)
+    // A review refused is heard (MOL-235, MOL-333): on a screen, so in the app's region.
+    const root = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
 
     const score = ref<Score | null>(props.draft?.score ?? null)
     const review = ref(props.draft?.review ?? '')
@@ -115,7 +121,7 @@ export default defineComponent({
     const returnedWith = props.draft?.error ? props.draft.score : null
     let saved = false
 
-    const day = computed(() => purchaseDay(props.card.boughtAt, locale.value))
+    const day = computed(() => dayOfAnyYear(props.card.boughtAt, locale.value, props.today))
     const place = computed(() => placeLabel(props.card.placeName, props.city, i18n))
 
     // Synchronous, so an error set right after an edit in `save` is not cleared by it later.
@@ -139,6 +145,7 @@ export default defineComponent({
       review.value = tidied.trim() ? tidied : ''
       if (review.value && !ratingSchema.shape.review.safeParse(review.value).success) {
         unsupported.value = true
+        void refuse(() => root.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'))
         return
       }
       // One save per card: a double tap would otherwise hand the next card the second tap.
@@ -155,6 +162,7 @@ export default defineComponent({
       REVIEW_MAX,
       titleId,
       title,
+      root,
       score,
       review,
       error,
@@ -170,7 +178,18 @@ export default defineComponent({
 
 <style scoped lang="scss">
 .verdict {
+  container: verdict / inline-size;
   padding: var(--space-6) var(--space-4);
+}
+
+/* With large text the row of keys takes the card's sides, but for its gap (owner's В-3 «а», MOL-334): its padding
+   grows with the text, and at 200 % the five keys had 190 px of a phone's 320 — 23 px past it. The keys alone: the
+   score as it stands and the scale's ends keep the card's padding, as the question over them does (review №3). At
+   100 % on 320 the card is 16rem and keeps its sides. */
+@container verdict (width < 15rem) {
+  .keys :deep(.scale) {
+    margin-inline: calc(var(--space-keys) - var(--space-4));
+  }
 }
 
 .question {

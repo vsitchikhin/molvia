@@ -21,7 +21,8 @@ const side = (id: string, name: string, day: string, unit = 'l') => ({
 
 const MILK = side('a1', 'Молоко 3,2%', '2026-09-01')
 const MILK_POINT = side('a2', 'Молоко 3.2%', '2026-09-03')
-const MALOKO = side('a3', 'Малоко 3,2%', '2026-09-04')
+// one spelling with MILK_POINT, so the night would merge the two by itself (MOL-358: no letter apart)
+const MILK_SPACED = side('a3', 'Молоко 3.2 %', '2026-09-04')
 
 function world({
   pairs = [] as TwinRow[],
@@ -167,7 +168,7 @@ describe('mergeNight', () => {
     const w = world({
       pairs: [
         { a: MILK, b: MILK_POINT, meaning: 0.97 },
-        { a: MILK_POINT, b: MALOKO, meaning: 0.95 },
+        { a: MILK_POINT, b: MILK_SPACED, meaning: 0.95 },
       ],
     })
     await w.night('on')
@@ -219,7 +220,8 @@ describe('mergeNight', () => {
   it('asks a candidate again tomorrow when a side of it merged tonight (adversarial А8)', async () => {
     const chanah = side('c1', 'Сыр чанах', '2026-09-01')
     const chunuh = side('c2', 'Сыр чаних', '2026-09-02')
-    const chanoh = side('c3', 'Сыр чанох', '2026-09-03')
+    // one spelling with «Сыр чанах», a letter from «Сыр чаних» (MOL-358: only one spelling merges)
+    const chanoh = side('c3', 'Чанах сыр', '2026-09-03')
     const w = world({
       pairs: [
         { a: chanoh, b: chanah, meaning: 0.95 },
@@ -233,7 +235,8 @@ describe('mergeNight', () => {
   it('names that candidate in the report mode, where nothing merged (round 2)', async () => {
     const chanah = side('c1', 'Сыр чанах', '2026-09-01')
     const chunuh = side('c2', 'Сыр чаних', '2026-09-02')
-    const chanoh = side('c3', 'Сыр чанох', '2026-09-03')
+    // one spelling with «Сыр чанах», a letter from «Сыр чаних» (MOL-358: only one spelling merges)
+    const chanoh = side('c3', 'Чанах сыр', '2026-09-03')
     const w = world({
       pairs: [
         { a: chanoh, b: chanah, meaning: 0.95 },

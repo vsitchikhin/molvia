@@ -17,6 +17,7 @@
 // reads them — a declaration `--name:` — with both kinds of comment taken out.
 
 import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import stylelint from 'stylelint'
 
 const {
@@ -31,6 +32,14 @@ const ruleName = 'molvia/known-custom-property'
 export const SET_BY_SCRIPT = {
   '--sheet-drag': 'composables/useSheetDrag.ts',
   '--figure-width': 'components/figure.ts',
+}
+
+// A token one file alone reads or declares, by that file's whole path under `src`. `--text-tab` stops growing at
+// 125 %, which is the tab bar's decision (MOL-321, owner's В-3 «а»): taken by a caption — read from the tokens, or
+// declared anew beside where it is read — it stood 13.75 px at 200 % for 22, with every other check green
+// (MOL-334, adversarial Г20, Г21). The tokens declare it, and nobody else.
+export const OWNED_BY = {
+  '--text-tab': 'components/TabBar.vue',
 }
 
 const DECLARATION = /(--[\w-]+)\s*:/g
@@ -99,10 +108,20 @@ const GLOBAL = new Set([
   ...Object.keys(SET_BY_SCRIPT),
 ])
 
+const OWNERS = Object.fromEntries(
+  Object.entries(OWNED_BY).map(([name, file]) => [
+    name,
+    fileURLToPath(new URL(`../src/${file}`, import.meta.url)),
+  ]),
+)
+const TOKENS = fileURLToPath(new URL('../src/styles/_tokens.scss', import.meta.url))
+
 const messages = ruleMessages(ruleName, {
   rejected: (name) =>
     `${name} is defined nowhere: not in styles/_tokens.scss, not in this file, and no script sets ` +
     `it (frontend/stylelint/known-properties.mjs).`,
+  owned: (name) =>
+    `${name} is ${OWNED_BY[name]}'s alone: no other file reads it or declares it (frontend/stylelint/known-properties.mjs).`,
   darkOnly: (name) =>
     `${name} is declared by the dark scheme alone: the light one has no value for it. Declare it ` +
     `in :root as well.`,
@@ -126,7 +145,18 @@ function rule(primary) {
     root.walkDecls((decl) => check(decl, decl.value))
     root.walkAtRules((atRule) => check(atRule, atRule.params))
 
-    if (root.source?.input.file?.endsWith('/styles/_tokens.scss')) {
+    const file = root.source?.input.file
+    for (const [name, owner] of Object.entries(OWNERS)) {
+      if (file === owner) continue
+      const owned = (node, word) =>
+        report({ ruleName, result, node, message: messages.owned(name), word })
+      root.walkDecls((decl) => {
+        if (decl.prop === name && file !== TOKENS) owned(decl, name)
+        for (const [, read] of decl.value.matchAll(REFERENCE)) if (read === name) owned(decl, name)
+      })
+    }
+
+    if (root.source?.input.file === TOKENS) {
       root.walkAtRules('mixin', (mixin) => {
         if (!mixin.params.startsWith('dark-scheme')) return
         mixin.walkDecls((decl) => {

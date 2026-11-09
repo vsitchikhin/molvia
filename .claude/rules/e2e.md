@@ -123,13 +123,40 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   window of the app, where it does wait (Е1). Beside it `client-errors-built.spec.ts` (MOL-144) and
   `outdated-built.spec.ts` (MOL-231): the line of a browser below the floor is put in by the build,
   and a start that stayed silent is proved where a worker could have registered. `phone` ignores
-  them. The build is a web server of the run, so every `make e2e`
+  them; all three run under the page's policy (below). The build is a web server of the run, so every `make e2e`
   pays for it — some twenty seconds. The spec comes in by `page.goto('/privacy')`, **the one spec
   not through `open()`**: the development seam is not in a build, and that page is open without a
   session. A new version is a byte appended to the built `sw.js`, put back after the spec; `preview`
   keeps plain http even in a copy with certificates (`PWA_PLAIN_HTTP`), since the loopback is a
   secure context anyway. Chromium only: Safari's worker lives by rules of its own, and that is
   checked on a phone.
+- **The page's policy is the build's, so its proof is too** (MOL-363, `security.md`): every spec of a build
+  takes `test` from `e2e/csp.ts`, which fails it on any violation of the Content Security Policy — the document's
+  `securitypolicyviolation` through a binding and an init script, which the page's policy does not reach, and the
+  console of the page and of its workers, where a worker's refusal is said and no event comes. `csp-built.spec.ts`
+  runs in two projects of its own against the same build: **`pwa-camera`**, the full Chromium with the fake camera,
+  and **`pwa-iphone`**, WebKit; `phone` ignores it. It holds the meta first in `index.html` with exactly its scripts'
+  hashes — parsed by the browser's `DOMParser`, never by the build's pattern (adversarial Г1) — a stranger's screens
+  and their faces, and signed in a receipt's photo and its edges, a picture to the developer and the six screens with
+  a `<select>`, on both engines; the scanner reading the code filmed on Chromium alone, WebKit having no fake camera.
+  **The seam is asked without the button the build has not got**: on Chromium `fetch('/api/dev/login')` from the
+  page sets the cookie as the button would; WebKit keeps no `Secure` cookie on the loopback (below), so there the
+  test asks the seam and makes every request of the page to the API itself, with the session, by `route.fetch`, the
+  answer handed back by `route.fulfill` (adversarial А1 of review 1). **The browser carries no cookie of it, by either
+  way tried**: a `Cookie` laid by `route.continue` WebKit never sends (CI, run 42209616807), nor a `__Host-` cookie put
+  in the jar without `Secure` (run 42213747061) — and a Mac's WebKit hid the first by keeping the seam's own, so the
+  jar is emptied first and every machine signs in one way. **On WebKit the walk signed in has no worker**
+  (`serviceWorkers: 'block'` there alone): once it controls the page, the requests go through it and past the route;
+  Chromium keeps the session in its jar and walks the pages its worker serves (review 3, №9). The session
+  is taken by its name — the seam sets the account it remembers first. The device then asks «Is this your account?» (MOL-56) and the terms, as a person
+  answers them. **WebKit's own report of a `<select>`** is the one `csp.ts` lets go — any `style-src-attr` report at a
+  `<select>` on WebKit, with one line of its console for each (owner's В-4 «а», `security.md`): no field tells the
+  engine's style from ours, and Chromium on the same screens fails on ours. The fixture listens on the context, so a
+  second window of a test is heard too (review 1, №4). **Its two projects run after `pwa`, never beside it**
+  (`dependencies`, MOL-365): a version `pwa-update.spec` put out meanwhile — a byte appended to the one built `sw.js` —
+  was let in when a `goto` hid the page, as an installed app does, and the reload ended that `goto` with
+  `ERR_ABORTED` (run 42629452148, a flake that failed CI). The suite's time does not grow: `phone` runs beside them
+  for longer than `pwa` takes.
 - **The camera needs the full Chromium, so the scanner's specs run in one project** (MOL-98): `camera`
   is the same phone with `channel: 'chromium'` and a fake camera filming a barcode drawn by
   `globalSetup` (`e2e/barcode-video.ts`); `phone` ignores `scanner.spec.ts`. The headless shell every
@@ -244,6 +271,15 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   measures and widened «֏30,000» by 3/16 px on WebKit (run 40306940186, 66.203125 → 66.390625). Proved,
   not supposed: held until the first measure, it gave exactly those numbers on every attempt (run
   40646618731); in Chromium the same hold moved nothing. The width stays `toBe`.
+- **A box is measured once what it stands on has stopped moving** (MOL-355, `stillIn` of `e2e/scroll.ts`):
+  the finite animations of the element and of what it is measured against, then two frames. `toBeVisible()` is
+  true from an `appear`'s first frame, and «Вернуть» rose 4 → 8 px over 220 ms after it (sampled frame by frame);
+  it stands on `--dock-height`, which `useHeight` measures a frame behind a strip growing in the dock. On CI it
+  measured 7 over the strip on an account's screen (run 41457518633), with a `hover` before it — which waits for
+  the box to be still two frames, so the motion caught there was not proven to be the rise; the failure is not
+  reproduced. Proved: measured right after `toBeVisible()`, the box stood at 4, and at 8 with `stillIn`. The five
+  measures of «Вернуть» against the dock wait so. **The price, named:** a change that starts after the wait — an
+  answer late enough to bring «обновляем» — still moves what is measured after it.
 - **A weight is held as itself, never by a width alone** (MOL-306, review №4): Chromium in the CI image
   sets text on whole pixels, so «֏30,000» measured 66 at 600 and at 700 (69 on «Месяц»), while WebKit
   told them apart (66.390625 → 66.984375). A chosen row at 700 went green in every [phone] run — the twin

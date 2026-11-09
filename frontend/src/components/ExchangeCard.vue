@@ -120,7 +120,7 @@ export default defineComponent({
       marketLines: computed(() =>
         market.value ? [market.value.best, ...(market.value.own ? [market.value.own] : [])] : [],
       ),
-      shortDay: (when: Date) => purchaseDay(when, locale.value),
+      shortDay: (when: Date) => purchaseDay(when, locale.value, props.today),
       // «Сегодня», «Вчера» by the phone's today (MOL-121, В-1); the button and the rate say the date.
       headOf: (exchange: ExchangeView) => dayWords(exchange.exchangedOn, locale.value, props.today),
     }

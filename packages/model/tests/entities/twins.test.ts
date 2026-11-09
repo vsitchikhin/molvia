@@ -135,8 +135,8 @@ describe('twinVerdict', () => {
   })
 
   it('merges at the threshold exactly and not below it', () => {
-    expect(pair('Малоко', 'Молоко', TWIN_MERGE.meaning)).toBe('merge')
-    expect(pair('Малоко', 'Молоко', TWIN_MERGE.meaning - 0.001)).toBe('candidate')
+    expect(pair('Молоко 3.2%', 'Молоко 3,2%', TWIN_MERGE.meaning)).toBe('merge')
+    expect(pair('Молоко 3.2%', 'Молоко 3,2%', TWIN_MERGE.meaning - 0.001)).toBe('candidate')
   })
 
   it('merges nothing without a vector', () => {
@@ -160,6 +160,83 @@ describe('twinVerdict', () => {
   it('names one edit in a word the model doubts: a typo, or a neighbour on the shelf', () => {
     expect(pair('Кифир', 'Кефир', 0.855)).toBe('candidate')
     expect(pair('Курица', 'Корица', 0.856)).toBe('candidate')
+  })
+
+  // MOL-358, owner's В-2 «в»: one letter apart is never merged by itself, however close the meaning —
+  // a way of cooking (adversarial А1 of MOL-299) in any case, glued by a sign, with a soft hyphen or
+  // an accent, in Latin letters, cut short (Б1–Б5 of MOL-358), two nouns (Б6), a typo of the kind (Б7).
+  it.each([
+    ['Курица жареная', 'Курица вареная'],
+    ['Картофель жареный', 'Картофель вареный'],
+    ['Колбаса вареная', 'Колбаса жареная'],
+    ['Грибы сушёные', 'Грибы тушёные'],
+    ['Овощи сушёные', 'Овощи тушёные'],
+    ['Яйца варёные', 'Яйца жареные'],
+    ['Свёкла варёная', 'Свёкла жареная'],
+    ['Пельмени с жареным луком', 'Пельмени с вареным луком'],
+    ['Пицца с сушёными грибами', 'Пицца с тушёными грибами'],
+    ['Суп из сушёных грибов', 'Суп из тушёных грибов'],
+    ['Свинина тушёная,ГОСТ', 'Свинина сушёная,ГОСТ'],
+    ['Говядина тушёная/ГОСТ', 'Говядина сушёная/ГОСТ'],
+    ['Курица жареная-гриль', 'Курица вареная-гриль'],
+    ['Курица жарен\u00adая', 'Курица варен\u00adая'],
+    ['Курица жарена\u0301я', 'Курица варена\u0301я'],
+    ['Kurica zharenaya', 'Kurica varenaya'],
+    ['Яйца варён.', 'Яйца жарен.'],
+    ['Мойва', 'Мойка'],
+    ['Молоко,топлёное', 'Малоко,топлёное'],
+    ['Молоко', 'Малоко'],
+    ['Творог обезжиренный', 'Творог обизжиренный'],
+  ])('never merges «%s» and «%s», one letter apart — only names it', (a, b) => {
+    expect(pair(a, b, 0.99)).toBe('candidate')
+  })
+
+  it('merges one spelling by itself: «ё», case, a sign, the order of words, a unit spelt another way', () => {
+    expect(pair('Молоко топлёное', 'Молоко топленое', 0.95)).toBe('merge')
+    expect(pair('Молоко топлёное', 'Топленое молоко', 0.95)).toBe('merge')
+    expect(pair('Сыр «Чанах»', 'сыр чанах', 0.95)).toBe('merge')
+    expect(pair('Молоко 1л', 'Молоко 1 л', 0.95)).toBe('merge')
+    expect(pair('Сок «Добрый» 1 л', 'сок добрый 1л', 0.95)).toBe('merge')
+  })
+
+  // Only case, «ё» and a sign that parts words are nothing (adversarial Г1–Г4 of round 3): a point of an
+  // abbreviation, a number written another way and a unit spelt another way make two spellings.
+  it.each([
+    ['Маска мёд', 'Маска мед.'],
+    ['Конфеты Шок', 'Конфеты шок.'],
+    ['Конфеты «Шок»', 'Конфеты шок.'],
+    ['Пиво 5 л', 'Пиво 05 л'],
+    ['Кабель 1 м', 'Кабель 1.000 м'],
+    ['Чай 25 уп', 'Чай 25 пак'],
+    ['Молоко 1 л', 'Молоко 1 l'],
+    ['Молоко 3,2%', 'Молоко 3,20%'],
+    // a number keeps its word and its turn: only the words of letters are read in any order
+    ['Витамин D3 K2', 'Витамин D2 K3'],
+    ['Телефон A12 64', 'Телефон A64 12'],
+    ['Подгузники 3 4-9 кг', 'Подгузники 4 3-9 кг'],
+    ['Кофе 3в1', 'Кофе 1в3'],
+    // a name with a number is read in its order (adversarial Д1), and three digits after the sign may be
+    // a thousand (Д2)
+    ['Батарейки AA 4 шт AAA 2 шт', 'Батарейки AAA 4 шт AA 2 шт'],
+    ['Нитки белые 2 шт чёрные 3 шт', 'Нитки чёрные 2 шт белые 3 шт'],
+    ['Кабель 1.000 м', 'Кабель 1,000 м'],
+  ])('never merges «%s» and «%s», two spellings — only names it', (a, b) => {
+    expect(spelling(a, b)).toMatchObject({ edits: 0, sameWords: false })
+    expect(pair(a, b, 0.99)).toBe('candidate')
+  })
+
+  // One search key is not one spelling (adversarial В1, В2 of round 2): the key folds «ы» into «и», a
+  // soft sign, «щ» into «ш», «й» and a double letter, so a pair of it is named, never merged.
+  it.each([
+    ['Игрушка мишка плюшевая', 'Игрушка мышка плюшевая'],
+    ['Мармелад мишки', 'Мармелад мышки'],
+    ['Пенка', 'Пенька'],
+    ['Масло ши', 'Масло щи'],
+    ['Сыр плавленый', 'Сыр плавленный'],
+    ['Сок Майя', 'Сок Мая'],
+  ])('never merges «%s» and «%s», one key but two spellings — only names it', (a, b) => {
+    expect(spelling(a, b)).toMatchObject({ edits: 0, sameWords: false })
+    expect(pair(a, b, 0.99)).toBe('candidate')
   })
 
   it('leaves what is far by meaning, and what differs in size or a short word', () => {
@@ -221,11 +298,16 @@ describe('one key in two scripts (review №6)', () => {
     expect(nameParts('Молоко 1 l').scripts).toEqual(['cyrillic'])
     expect(
       twinVerdict({
-        spelling: spelling('Молоко 1 l', 'Молоко 1 л'),
+        spelling: spelling('Молоко 1 l', 'молоко 1L'),
         sameUnit: true,
         meaning: 0.99,
       }),
     ).toBe('merge')
+    // the same unit spelt in another script is a spelling apart (MOL-358, adversarial Г4), not a script
+    expect(spelling('Молоко 1 l', 'Молоко 1 л')).toMatchObject({
+      sameScripts: true,
+      sameWords: false,
+    })
   })
 
   it('still merges «ё» and a comma, one script on both sides', () => {
@@ -243,7 +325,10 @@ describe("a proper name, a place's (adversarial Ж1)", () => {
     ['Маркет Ширак', 'Маркет Шираз', 0.942],
     ['Магнит', 'Магнат', 0.919],
     ['Аптека Альфа', 'Аптека Альта', 0.91],
-  ])('never merges «%s» and «%s», a letter apart (%s)', (a, b, meaning) => {
+    // a sign the separators do not name is part of the name (MOL-358, adversarial Д3)
+    ['Магнит', 'Магнит+', 0.926],
+    ['Ереван Сити', 'Ереван Сити+', 0.923],
+  ])('never merges «%s» and «%s», a letter or a sign apart (%s)', (a, b, meaning) => {
     expect(place(a, b, meaning)).toBe('candidate')
   })
 
@@ -251,13 +336,18 @@ describe("a proper name, a place's (adversarial Ж1)", () => {
     ['Ереван  Сити', 'Ереван Сити', 0.98],
     ['Ереван-Сити', 'Ереван Сити', 0.981],
     ['Перекрёсток', 'Перекресток', 0.954],
+    ['Ереван Сити', '«Ереван Сити»', 0.97],
   ])('merges «%s» and «%s», no edit apart (%s)', (a, b, meaning) => {
     expect(place(a, b, meaning)).toBe('merge')
   })
 
-  it("leaves the items' rule as it was", () => {
+  it("leaves the items' rule as it was: one key merges, case and «ё» aside", () => {
     expect(
-      twinVerdict({ spelling: spelling('Малоко', 'Молоко'), sameUnit: true, meaning: 0.95 }),
+      twinVerdict({
+        spelling: spelling('Мёд Липовый', 'мед липовый'),
+        sameUnit: true,
+        meaning: 0.95,
+      }),
     ).toBe('merge')
   })
 })
@@ -285,9 +375,12 @@ describe('a proper name by its letters, not its key (adversarial З1)', () => {
     expect(nameParts('Гранд-Кенди, ЁЛКИ').letters).toBe('гранд кенди елки')
   })
 
-  it("leaves the items' rule to the key: «Майя» and «Мая» of a product may merge", () => {
+  it('reads an item as written too, in any order (MOL-358): «Майя» and «Мая» of a product are named', () => {
     expect(
       twinVerdict({ spelling: spelling('Сок Майя', 'Сок Мая'), sameUnit: true, meaning: 0.95 }),
+    ).toBe('candidate')
+    expect(
+      twinVerdict({ spelling: spelling('Сок Майя', 'Майя сок'), sameUnit: true, meaning: 0.95 }),
     ).toBe('merge')
   })
 })

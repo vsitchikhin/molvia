@@ -461,7 +461,7 @@ describe('a form shown from memory says as of when, and what became of the read 
   const strips = (view: VueWrapper) => view.findAllComponents(StatusStrip)
   // The moment as the strips of «Деньги» print it, by the screen's day (`answeredAt`).
   const asOf = (template: string, at = READ, now = new Date()) =>
-    template.replace('{when}', answeredAt(at, 'en', localDay(now), now))
+    template.replace('{when}', answeredAt(at, 'en', localDay(now)))
 
   /** The phone remembers the settings and, unless `readAt` is null, when the server said them. */
   function remember(readAt: Date | null): void {

@@ -7,6 +7,7 @@ import { startSilenceNotices } from './silence'
 import { startOwnerNotices } from './owner'
 import { startReceiptNotices } from './receipt'
 import { startBroadcasts } from './broadcast'
+import { startLoginNotices } from './signed-in'
 import { botToken, readEnvironment, refusedNames } from './env'
 import type { RunnerHandle } from '@grammyjs/runner'
 import type { BotEnvironment } from './env'
@@ -105,6 +106,9 @@ const stopBroadcasts = startBroadcasts(claims, bot.api)
 // Two years of silence (MOL-239): the warnings before an erasure, claimed every minute the same way.
 const stopSilenceNotices = startSilenceNotices(claims, bot.api, environment.appBaseUrl)
 
+// A new sign-in (MOL-361): the sessions collected that their account was not told of, every minute.
+const stopLoginNotices = startLoginNotices(claims, bot.api)
+
 // The runner keeps fetching updates until it is told to stop, and a kill without this leaves
 // whatever it is holding half-handled. Compose sends SIGTERM on every deploy. A stop that comes
 // while the bot still asks Telegram who it is cuts that short, and the runner never starts.
@@ -121,6 +125,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
       stopReceiptNotices(),
       stopBroadcasts(),
       stopSilenceNotices(),
+      stopLoginNotices(),
       runner?.stop(),
     ])
   })

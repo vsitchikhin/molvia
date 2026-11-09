@@ -281,6 +281,8 @@ export default defineComponent({
 }
 
 .entry-label {
+  @include word-unit;
+
   flex: 1;
 }
 

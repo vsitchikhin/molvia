@@ -1,12 +1,14 @@
 /**
  * The phone's failures into the table (MOL-144) through a real server: taken with no session, by
  * the page's own build and platform, refused past the schema and past the limit, and the address
- * the limit counts by is written nowhere.
+ * the limit counts by is written nowhere — and let go by the minute timer, a login's start's too.
  */
+import { randomBytes } from 'node:crypto'
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import {
   ERROR,
+  LOGIN_HEADER,
   OWNER_NOTICES_PER_CLAIM,
   PHONE_FAILURES_KEPT,
   ownerNoticesSchema,
@@ -331,6 +333,9 @@ describe('поток выдуманных сбоев не топит канал 
     const spy = vi.spyOn(Map.prototype, 'set')
     const kept = (sender: string) =>
       (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(sender))
+    // The hour is the budgets' monotonic clock (MOL-359, Б1), moved by the test alone — faked before
+    // the failure is taken, so its moment is on the same scale.
+    vi.useFakeTimers({ toFake: ['performance'] })
     try {
       const reporter = apiFailureReporter(
         () => db,
@@ -345,12 +350,14 @@ describe('поток выдуманных сбоев не топит канал 
         '203.0.113.7',
       )
       await recorded()
-      const now = Date.now()
-      reporter.forget(new Date(now + 30 * 60 * 1000))
+      vi.advanceTimersByTime(30 * 60 * 1000)
+      reporter.forget()
       expect(kept('203.0.113.7')).toBe(true)
-      reporter.forget(new Date(now + 61 * 60 * 1000))
+      vi.advanceTimersByTime(31 * 60 * 1000)
+      reporter.forget()
       expect(kept('203.0.113.7')).toBe(false)
     } finally {
+      vi.useRealTimers()
       spy.mockRestore()
     }
   })
@@ -359,9 +366,10 @@ describe('поток выдуманных сбоев не топит канал 
     const spy = vi.spyOn(Map.prototype, 'set')
     const kept = (sender: string) =>
       (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(sender))
-    // Only the intervals and the clock: the server's timers tick when the test moves them, and the
-    // budgets read the moment of the fake clock (`new Date()`), the route `Date.now()`.
-    vi.useFakeTimers({ toFake: ['setInterval', 'Date'] })
+    // Only the intervals and the monotonic clock: the server's timers tick when the test moves them,
+    // and the route's minute and the budgets' hour read `performance.now()` — a clock that never
+    // steps back (MOL-359, adversarial А1, Б1).
+    vi.useFakeTimers({ toFake: ['setInterval', 'performance'] })
     const served = buildServer({
       db,
       owner: null,
@@ -378,13 +386,11 @@ describe('поток выдуманных сбоев не топит канал 
       })
       expect(response.statusCode).toBe(204)
       await recorded()
-      // Half an hour on, one tick: the route's minute is gone, the hour of the budgets is not.
-      vi.setSystemTime(Date.now() + 30 * 60_000)
-      await vi.advanceTimersByTimeAsync(60_000)
+      // Half an hour on: the route's minute is gone, the hour of the budgets is not.
+      await vi.advanceTimersByTimeAsync(30 * 60_000)
       expect(kept('203.0.113.7')).toBe(true)
-      // An hour and more on, one tick: nothing of the address is left.
-      vi.setSystemTime(Date.now() + 30 * 60_000)
-      await vi.advanceTimersByTimeAsync(60_000)
+      // An hour and more on: nothing of the address is left.
+      await vi.advanceTimersByTimeAsync(31 * 60_000)
       expect(kept('203.0.113.7')).toBe(false)
     } finally {
       await served.close()
@@ -392,6 +398,38 @@ describe('поток выдуманных сбоев не топит канал 
       spy.mockRestore()
     }
   })
+
+  it('тот же таймер отпускает адрес старта входа через минуту (MOL-359)', async () => {
+    const spy = vi.spyOn(Map.prototype, 'set')
+    const kept = (address: string) =>
+      (spy.mock.contexts as Map<unknown, unknown>[]).some((map) => map.has(address))
+    // Only the intervals and the monotonic clock the minute reads: the server's timers tick when the
+    // test moves them, and the minute moves with them.
+    vi.useFakeTimers({ toFake: ['setInterval', 'performance'] })
+    const served = buildServer({
+      db,
+      owner: null,
+      login: { username: 'molvia_bot', botSecret: randomBytes(32).toString('base64url') },
+      logStream: { write: () => true },
+    })
+    try {
+      await served.ready()
+      const response = await served.inject({
+        method: 'POST',
+        url: '/auth/login',
+        headers: { [LOGIN_HEADER]: '1', 'x-forwarded-for': '203.0.113.8' },
+      })
+      expect(response.statusCode).toBe(201)
+      expect(kept('203.0.113.8')).toBe(true)
+      // A minute on, one tick: nothing of the address is left.
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(kept('203.0.113.8')).toBe(false)
+    } finally {
+      await served.close()
+      vi.useRealTimers()
+      spy.mockRestore()
+    }
+  }, 10_000)
 
   it('сбой API после потока — в первой выдаче бота, раньше телефона', async () => {
     for (let host = 1; host <= 10; host += 1) {

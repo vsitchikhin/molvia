@@ -307,6 +307,16 @@ export const actors = pgTable(
      */
     receiptsModelUntil: timestamp('receipts_model_until', { withTimezone: true }),
     /**
+     * The receipts the person sent on their day (MOL-360, owner's В-1 «а»): the phone's day of the last
+     * receipt taken (`TODAY_HEADER`) and how many that day. A count, never the rows of `receipts`: a
+     * receipt removed goes from there in ten minutes, and its place in the day would come back. The day
+     * only moves on — a day the phone names before it counts in it — so a day header made up walks only
+     * forward through the days that are today somewhere (three at most, a price: `receipts.md`). Not a
+     * change of the row: `updated_at` does not see it (0080).
+     */
+    receiptsDay: date('receipts_day'),
+    receiptsSent: smallint('receipts_sent').notNull().default(0),
+    /**
      * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own, from their
      * exchanges, when there is one for the pair, and the official one otherwise — or always
      * `official`. Beside the settings rather than among them: it is switched on the screen of
@@ -410,6 +420,7 @@ export const actors = pgTable(
       sql`${table.salaryShiftDay} between 1 and ${sql.raw(String(SALARY_SHIFT_DAY_MAX))}`,
     ),
     check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
+    check('actors_receipts_sent_not_negative', sql`${table.receiptsSent} >= 0`),
     // A version without its moment, or a moment of no version, is a consent nobody can show.
     check(
       'actors_consent_whole',
@@ -1204,6 +1215,14 @@ export const MERGE_MOVES = [
   'pick_added',
   // a trace of the merged item, now a trace of the survivor
   'trace',
+  // the survivor's own verdict from before, written over by a trace's id after the merge — a phone's
+  // queue, a bot's button (MOL-299, adversarial Г1, Г2): `before` holds its score and moments, never its
+  // text, and the undo puts them back and gives the trace the person's word
+  'verdict_overwritten',
+  // picks a trace's id added to a row of the survivor no move of its way names — its own from before, or
+  // one another merge brought (MOL-299, К1, owner's В-11 «б»): `before` holds the trace's share and what
+  // the row held before it, and the undo takes the share home
+  'pick_written',
 ] as const
 export type MergeMove = (typeof MERGE_MOVES)[number]
 
@@ -1217,8 +1236,9 @@ export const catalogueMergeMoves = pgTable(
     key: jsonb('key').notNull(),
     before: jsonb('before'),
     /**
-     * The person of a remembered pick, for picks only. Goes with the person by the cascade: once the
-     * pick is erased there is nothing to move back, and the journal keeps no one's trace.
+     * The person of a remembered pick, or of a verdict written over (MOL-299). Goes with the person by
+     * the cascade: once the row is erased there is nothing to move back, and the journal keeps no one's
+     * trace.
      */
     actorId: uuid('actor_id').references(() => actors.id, { onDelete: 'cascade' }),
   },
@@ -1228,7 +1248,7 @@ export const catalogueMergeMoves = pgTable(
     check('catalogue_merge_moves_what_known', oneOf(table.what, MERGE_MOVES)),
     check(
       'catalogue_merge_moves_pick_named',
-      sql`(${table.actorId} is not null) = (${oneOf(table.what, ['pick', 'pick_added'])})`,
+      sql`(${table.actorId} is not null) = (${oneOf(table.what, ['pick', 'pick_added', 'verdict_overwritten', 'pick_written'])})`,
     ),
   ],
 )
@@ -1998,6 +2018,39 @@ export const sessions = pgTable(
 )
 
 /**
+ * A sign-in the bot has yet to tell its account about (MOL-361, audit MOL-287 Ф-3, owner's В-9 «а»):
+ * written by the collection of a session, in its transaction, and **deleted once the bot says it
+ * went** — a row is «not told yet», and nothing else. The API decides and marks as it hands out
+ * (`handed_at`), the bot only sends (MOL-101 Р-1): one account's notice a claim, so one person's
+ * sign-ins never hold another's back, and one the bot could not send given back rather than lost
+ * (adversarial А1, А2) — at most once all the same, since one never spoken of is let go.
+ *
+ * **No key to `sessions`, on purpose** (owner's В-1 «а»): a session ended before the bot's next minute
+ * — a copy downloaded, then «Выйти» — must still be told of, or the hijack that matters most stays
+ * silent. The button then finds no session and says so. The person's own row: it goes with them.
+ */
+export const loginNotices = pgTable('login_notices', {
+  sessionId: uuid('session_id').primaryKey(),
+  actorId: uuid('actor_id')
+    .notNull()
+    .references(() => actors.id, { onDelete: 'cascade' }),
+  /** The session's, as the browser named itself: the person is told it may be forged. */
+  deviceName: varchar('device_name', { length: DEVICE_NAME_MAX }),
+  /** The session's `created_at`, the database's clock. */
+  signedInAt: timestamp('signed_in_at', { withTimezone: true }).notNull(),
+  /**
+   * Handed to the bot and not yet spoken of (adversarial А1): the bot's word lets it go or gives it
+   * back; with no word in `LOGIN_NOTICE_LEASE_SECONDS` it is let go unsent — at most once.
+   */
+  handedAt: timestamp('handed_at', { withTimezone: true }),
+  /**
+   * Given back after a try — Telegram's 429 of that chat, the network: not handed before this moment,
+   * and ordered by it, so a chat kept under flood control goes behind everyone else's (adversarial А1).
+   */
+  notBefore: timestamp('not_before', { withTimezone: true }),
+})
+
+/**
  * A login being waited for: the row that turns a link into a bot into a session for the very
  * browser that asked (MOL-52, MOL-54).
  *
@@ -2105,11 +2158,18 @@ export const loginDays = pgTable(
     /** Ran out confirmed: the bot said yes and the person never came back to the app. */
     expiredConfirmed: integer('expired_confirmed').notNull().default(0),
     refused: integer('refused').notNull().default(0),
+    /**
+     * Sessions ended by «Это не я — завершить» under the bot's message about a sign-in (MOL-361, В-4):
+     * the one trace of a hijack on production, or of a slip of the finger. **Counted on the day of the
+     * press**, in Yerevan — the request the login began with is gone by then, so the funnel's own day is
+     * not known.
+     */
+    endedByNotice: integer('ended_by_notice').notNull().default(0),
   },
   (table) => [
     check(
       'login_days_counts_non_negative',
-      sql`least(${table.started}, ${table.again}, ${table.confirmed}, ${table.declined}, ${table.collected}, ${table.expiredUnconfirmed}, ${table.expiredConfirmed}, ${table.refused}) >= 0`,
+      sql`least(${table.started}, ${table.again}, ${table.confirmed}, ${table.declined}, ${table.collected}, ${table.expiredUnconfirmed}, ${table.expiredConfirmed}, ${table.refused}, ${table.endedByNotice}) >= 0`,
     ),
     // Written by the same statement as `started`, so this one holds by construction.
     check('login_days_again_within_started', sql`${table.again} <= ${table.started}`),

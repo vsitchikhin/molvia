@@ -7,6 +7,7 @@ import {
   accountTransfers,
   actors,
   budgetPlans,
+  catalogueMergeMoves,
   events,
   exchangeRevisions,
   exchanges,
@@ -18,6 +19,7 @@ import {
   incomes,
   itemBarcodes,
   items,
+  loginNotices,
   loginRequests,
   moneyAccountChecks,
   moneyAccounts,
@@ -41,6 +43,7 @@ import {
  * compile until it has a section, and a test compares the counts of a dry run with the sections.
  */
 export const EXPORT_SECTION_OF: Readonly<Record<ErasedTable, keyof ExportContent>> = {
+  login_notices: 'loginNotices',
   sessions: 'sessions',
   search_picks: 'searchPicks',
   rating_reminders: 'ratingReminders',
@@ -116,6 +119,8 @@ export const EXPORT_COLUMNS: Readonly<
       'last_seen_at',
       'silence_warning',
       'silence_warned_at',
+      'receipts_day',
+      'receipts_sent',
       'created_at',
       'updated_at',
     ],
@@ -123,6 +128,14 @@ export const EXPORT_COLUMNS: Readonly<
   sessions: {
     exported: ['id', 'device_name', 'created_at', 'last_seen_at', 'expires_at'],
     omitted: { actor_id: OWNER, token_hash: 'the key to the account, not data about the person' },
+  },
+  login_notices: {
+    exported: ['session_id', 'device_name', 'signed_in_at'],
+    omitted: {
+      actor_id: OWNER,
+      handed_at: 'the moment the bot was handed it, its lease — the sending, not the sign-in',
+      not_before: 'when the bot may try again after Telegram refused it for now — the sending',
+    },
   },
   login_requests: {
     exported: ['id', 'device_name', 'created_at', 'expires_at', 'consumed_at'],
@@ -586,14 +599,14 @@ export const EXPORT_COLUMNS: Readonly<
   // person wrote, to whichever item (MOL-100) — the second is theirs, as an item's author is.
   item_barcodes: { exported: ['code', 'item_id', 'added_at'], omitted: { added_by: OWNER } },
   // The journal of the merge of twins (MOL-106): a remembered pick that moved, kept only so that
-  // `make unmerge` can move it back — the pick itself is in `searchPicks`.
+  // `make unmerge` can move it back — the pick itself is in `searchPicks` — and one's own verdict a
+  // twin's id wrote over, kept for the undo (MOL-299): that one is the person's, in `overwrittenVerdicts`.
+  // `key` and `before` go into the file of that kind of row alone; of a pick they are its pick.
   catalogue_merge_moves: {
-    exported: [],
+    exported: ['key', 'before'],
     omitted: {
       merge_id: 'a number of the catalogue’s journal, about an item, not the person',
-      what: 'the kind of row the merge moved — the moved pick is in searchPicks',
-      key: 'the query the moved pick was remembered under — the pick is in searchPicks',
-      before: 'what the pick held before the merge, for the undo alone',
+      what: 'the kind of row: a verdict written over is in overwrittenVerdicts, a moved pick in searchPicks',
       actor_id: OWNER,
     },
   },
@@ -650,6 +663,23 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(verdicts)
             .where(eq(verdicts.actorId, actorId))
             .orderBy(asc(verdicts.ratedAt), asc(verdicts.id))
+          const journal = catalogueMergeMoves
+          const overwrittenRows = await tx
+            .select({
+              verdictId: sql<string>`${journal.key}->>'id'`,
+              score: sql<number>`(${journal.before}->>'score')::int`,
+              ratedAt: sql`(${journal.before}->>'ratedAt')::timestamptz`.mapWith(verdicts.ratedAt),
+              updatedAt: sql`(${journal.before}->>'updatedAt')::timestamptz`.mapWith(
+                verdicts.updatedAt,
+              ),
+              withdrawnAt: sql`(${journal.before}->>'deletedAt')::timestamptz`.mapWith(
+                verdicts.deletedAt,
+              ),
+              overwrittenAt: sql`(${journal.key}->>'at')::timestamptz`.mapWith(verdicts.updatedAt),
+            })
+            .from(journal)
+            .where(and(eq(journal.actorId, actorId), eq(journal.what, 'verdict_overwritten')))
+            .orderBy(asc(journal.mergeId), asc(sql`${journal.key}->>'id'`))
           const pickRows = await tx
             .select()
             .from(searchPicks)
@@ -781,6 +811,11 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(sessions)
             .where(eq(sessions.actorId, actorId))
             .orderBy(asc(sessions.createdAt), asc(sessions.id))
+          const noticeRows = await tx
+            .select()
+            .from(loginNotices)
+            .where(eq(loginNotices.actorId, actorId))
+            .orderBy(asc(loginNotices.signedInAt), asc(loginNotices.sessionId))
           const loginRows = await tx
             .select()
             .from(loginRequests)
@@ -953,6 +988,8 @@ export function createExportRepository(db: Db): ExportRepository {
               lastSeenAt: account.lastSeenAt,
               silenceWarning: account.silenceWarning,
               silenceWarnedAt: account.silenceWarnedAt,
+              receiptsDay: account.receiptsDay,
+              receiptsSent: account.receiptsSent,
               createdAt: account.createdAt,
               updatedAt: account.updatedAt,
             },
@@ -963,6 +1000,11 @@ export function createExportRepository(db: Db): ExportRepository {
               createdAt: row.createdAt,
               lastSeenAt: row.lastSeenAt,
               expiresAt: row.expiresAt,
+            })),
+            loginNotices: noticeRows.map((row) => ({
+              sessionId: row.sessionId,
+              deviceName: row.deviceName,
+              signedInAt: row.signedInAt,
             })),
             loginRequests: loginRows.map((row) => ({
               id: row.id,
@@ -1035,6 +1077,7 @@ export function createExportRepository(db: Db): ExportRepository {
               updatedAt: row.updatedAt,
               withdrawnAt: row.deletedAt,
             })),
+            overwrittenVerdicts: overwrittenRows,
             searchPicks: pickRows.map((row) => ({
               queryKey: row.queryKey,
               itemId: row.itemId,

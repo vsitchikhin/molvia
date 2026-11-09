@@ -209,8 +209,9 @@ Measured, not assumed — the numbers below come from a probe against a real dat
   dictionary could. MOL-47 measured them a third time with the search by meaning (31.10.2026): none
   moved — under four letters there is no vector, «Cheesecake» is no nearer by meaning, and «Сааар»
   answers as the letters do — and one appeared: «cheesecak» finds «Сыр чечил» by its meaning alone
-  and calls the answer near (MOL-332). A name without a size ranks level with a wrong size — unknown
-  is not worse than wrong, which is likely right.
+  and calls the answer near — a price of a word on its way (MOL-332, «By meaning» below). A name
+  without a size ranks level with a wrong size — unknown is not worse than wrong, which is likely
+  right.
 - **The answer says how near it is (MOL-46), and nothing is dropped for it.** The budget is
   absolute: `pelmeni` is two edits from `zeleni` of «Чай зелёный» exactly as `malako` is from
   `moloko`. Six rules on the letters were measured against the whole corpus and 241 two-edit
@@ -587,16 +588,35 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   two-letter query — holds with room to spare.
 - **Where a name found by meaning stands** (owner's decision В-3): after everything within one edit
   by the mean, before two edits — `MEANING_DISTANCE`, the nearer by meaning first; so nothing the
-  letters found within one edit moves, and an answer with such a name is near — **except one the
-  mean keeps within one edit while a word of it is two off** (adversarial А3 of MOL-47, MOL-332):
-  the meaning leaves it at its place, the letters do not call it near, so «кокосовое малако» (0
-  and 2) reads «не нашли» over «Молоко кокосовое» while «кокосовае малако» (1 and 2) reads near.
-  «молоко» keeps every milk above the kefir; «овощи» puts the carrot above the flour. **A name found
-  both ways takes the nearer place**: «собачий корм» finds the dog food two edits away by its
-  letters and close by its meaning, and left at two it stood under the treat the meaning alone
-  found — so «собачий корм» and «корм собакам» are near now, MOL-46's price taken back. The person's
-  own word keeps its rank; a pick lifts a name found by meaning as any found name (MOL-11) — and
-  lets in none the meaning did not reach.
+  letters found within one edit moves, and an answer with such a name is near. «молоко» keeps every
+  milk above the kefir; «овощи» puts the carrot above the flour. **A name the mean keeps within one
+  edit while a word of it is two off is near neither way — a price, named** (MOL-332, owner's В-3
+  «а»): its place is the mean's, the letters' nearness the worst word's, and the meaning makes near
+  only what it places, so a typo more may read near where the typo less does not. «кокосовое малако»
+  (0 and 2 edits) keeps «Молоко кокосовое» first and not near, «кокосовае малако» (1 and 2) near. On
+  the seed that answer is near either way, by «Кокос», and the row is what differs — «проверьте» on
+  a receipt's line, none of «Что брать» past its twentieth — but **where nothing else is near the
+  whole answer turns**: of the seed's 711 typo ladders (adversarial Б1 of MOL-332), 52 read «не
+  нашли» over the thing meant first at two typos and «нашли» at three — «малако соевое», «вода
+  мениральная», «масло слевачное 82,5%» — counted on a Mac: some stand within 0.006 of the
+  threshold, as «масло кюнжютное» on «Кунжут» at 0.0001, so x86, CI's and production's, may count
+  otherwise. Beside it, the letters' own price of MOL-46: at two typos 247 of 704 answers read «не
+  нашли» over the thing meant first. **Near wherever found was tried and taken back** (adversarial
+  А1, А2 of MOL-332): one exact word lends the vector its sense as it lent the mean its edits, so
+  «мыло детское» read «нашли» over «Масло детское» — review А of MOL-46 undone by the model — and on
+  the seed «вода без сахара» over «Кола без сахара». That decides it, and no number does: on the
+  seed's typo ladders and word swaps (`.scratch/tasks/status/MOL-332-review-probe-3.json`) it made
+  370 rows of the thing meant near on the ladders and 1 192 of another on the swaps at 0.40, and
+  more of another at every threshold to 0.60, but the swaps were made by a generator — 328 of the
+  1 192 differ from their query by «для» alone — so the ratio is the generators', not people's
+  (adversarial Б2). The letters deciding instead brought the dog food back to «не нашли» and fewer
+  typos near than now. No rule is better on both halves, and none is monotone, since the model is
+  not: «агады» and «агади», one key, stand either side of 0.40. **A name found both ways takes the
+  nearer place**: «собачий корм» finds the dog food two edits away by its letters and close by its
+  meaning, and left at two it stood under the treat the meaning alone found — so «собачий корм» and
+  «корм собакам» are near now, MOL-46's price taken back. The person's own word keeps its rank; a
+  pick lifts a name found by meaning as any found name (MOL-11) — and lets in none the meaning did
+  not reach.
 - **The thresholds were measured** on the seed's thirty shelves — 84 shelf words in Russian,
   Armenian, Georgian and Serbian, 25 things the seed does not carry, and every cut of a shelf word
   typed letter by letter. **Similarity 0.40**: 0.38 won seven points of first rows and lost to the
@@ -606,7 +626,12 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   the shelf words, the owner's words of `seed-words.ts` — the first row the letters gave, unmoved —
   and the things that must find nothing near.
 - **The prices, named.** A word still being typed finds by its spelling: «молоч» on its way to
-  «молочка» shows «Мука» and «Мочалка» above the milk two edits away, for a keystroke. «молочка»
+  «молочка» shows «Мука» and «Мочалка» above the milk two edits away, for a keystroke. **So does
+  its meaning, near** (MOL-332, owner's В-1 «а»): «cheesecak» is cheese to the model, «Сыр чечил» at
+  0.412, «кроссо» «Круассан», «морепр» «Морс» — of the 135 words and cuts the meaning alone answers
+  near on the seed, 106 are cuts. No threshold tells them from a shelf: «алкоголь» → «Водка» stands
+  at 0.406, «кисломолочка» → «Молоко» at 0.419; an answer by meaning alone called far turned 28
+  shelf words to «не нашли», a threshold of 0.42 six right ones for four wrong. «молочка»
   reaches the milks and not the kefir or the curd — the name alone goes into the vector (В-4), and
   the kefir stays below the threshold; a section of the seed as data would be a task of its own.
   **Armenian and Georgian shelf words find the wrong thing, near** — the model reads them by their
@@ -689,7 +714,7 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
 The owner's decision of 26.09.2026: strangers proposing items make twins — «Молоко 3.2%» beside
 «Молоко 3,2%», «Малоко» beside «Молоко», «Yerevan City» beside «Ереван Сити» — and a twin splits the
 ratings and prices of one thing in two, so «Что брать» has under three people on each half and shows
-neither. The night merges them by itself; **a false merge is worse than a missed one**, since it pours
+neither. The night merges one spelling by itself and names the rest to the owner; **a false merge is worse than a missed one**, since it pours
 the ratings of two things into one. Places joined from MOL-50 on 02.10.2026: one journal, one undo, one
 report.
 
@@ -699,18 +724,51 @@ report.
   lower case — **never by `toSearchKey`**, which folds «мм» into «м», «км» into «см» and «pc» into a
   pack, and let «Лента 50 мм» merge into «Лента 50 м» at 0.957, adversarial А2; a test holds that no
   spelling stands for two units, and a unit missing is a word, so the pair is a candidate, never a
-  merge) — **the same scripts** (review №6: held by the code, not by the model), **the same number of words,
-  each within one edit, two in the name** (`twinSpelling`: matched one to one in any order, «Чанах сыр» is
-  «Сыр чанах»; a word under four letters must be the same — «SAS» and «SOS» are two shops), **and the
-  names' vectors at least 0.90 apart by cosine**. A word more is a brand, never a twin: «Сыр чанах
-  Ашхар», «Молоко Марианна» (MOL-112, В-1) — not even a candidate, or every brand would stand in the list
-  beside its kind.
+  merge) — **the same scripts** (review №6: held by the code, not by the model), **the same words, one
+  spelling** (`sameWords`, MOL-358, owner's В-2 «в», narrowed by the implementer in two rounds): the name
+  **as written**, word by word — only case, «ё» and the signs of `WORD_SEPARATORS` (spacing, quotes, a
+  comma, a hyphen or a dash, brackets) are nothing, «Сыр «Чанах»» is «сыр чанах»; the words in any order
+  only where none has a digit, «Чанах сыр» is «Сыр чанах»; a name with a number in its order, so «Витамин
+  D3 K2» is not «D2 K3» and «Батарейки AA 4 шт AAA 2 шт» not «AAA 4 шт AA 2 шт» at 0.993 (adversarial Д1);
+  a size its number and unit as printed, glued or apart, a comma a point but before three digits, which may
+  be a thousand — «Молоко 1л» is «Молоко 1 л», «1,000 м» is not «1.000 м» (Д2). A
+  letter apart is a candidate. **A closed list**: any other sign stays in its word, since one left out can
+  only make two spellings — the point of «мед.» is not «мёд» at 0.947, «шок.» not the brand «Шок» at 0.945; a
+  number written another way, «05 л» or «1.000 м», and a unit spelt another way, «25 пак» against «25 уп»,
+  are a candidate (adversarial Г1–Г4) — `sizes` reads them by value for that. **Never by the search key**,
+  which folds «ы» into «и», a soft sign, «щ» into «ш», «й» and a double letter: «Игрушка мышка» merged into
+  «Игрушка мишка» at 0.961, «Пенька» into «Пенка» at 0.947 (adversarial В1, В2). **The price, named:** «ё» and
+  case are still nothing — the twins people make most, «топленое ~ топлёное» (32 of 33) — and so «Маска мед ~
+  мёд», «Лампа лед ~ лёд», «Конфеты шок ~ Шок» merge where no point marks the abbreviation (adversarial
+  round 5: which thing such a name is, nobody can say); «Молоко 1 л ~ 1 l», «3,2% ~ 3,20%», «0,750 л ~
+  0.750 л» and a name with numbers in another order are named, not merged; and the words of a name with no
+  digit are read in any order, so a turn round a noun that does not decline merges — «Филе индейки с пюре ~
+  Пюре с филе индейки» at 0.956 — where no two things were found so (adversarial round 6). **And the names' vectors at least 0.90 apart by
+  cosine**. A word more is a brand, never a twin: «Сыр чанах Ашхар», «Молоко Марианна» (MOL-112, В-1) —
+  not even a candidate, or every brand would stand in the list beside its kind.
+- **Not a letter, since a letter cannot be told** (MOL-358). Until it one edit a word, two a name merged
+  by themselves, and the adversarial pass of MOL-299 (А1) found two ways of cooking one letter apart merged
+  so — «Курица вареная» into «Курица жареная» at 0.929, «Грибы тушёные» into «Грибы сушёные» at 0.946: the
+  model reads a name by its letters. A rule that told a word that describes by an adjective's ending
+  (owner's В-1 «а») was passed the first round by five spellings of the same pair (adversarial Б1–Б5 of
+  MOL-358): another case («Пельмени с жареным луком», 0.972), a sign without a space («тушёная,ГОСТ»), a
+  soft hyphen or an accent the key drops, Latin letters («Kurica zharenaya»), «варён.» — and two nouns merged
+  past it, «Мойва» by «Мойка» at 0.910 (Б6). Every such rule is a list of what describes, with everything
+  else a typo to merge; so a letter is never merged by itself, whatever the word (В-2 «в»), as a shop's name
+  already was. **The price, named:** every typo is a candidate the owner merges by hand — «Малоко»,
+  «Смитана 20%», «Творог обизжиренный» — every one of the bench's 250 that merged, ten a morning, «Сыр плавленый ~ плавленный» and
+  «Сок Майя ~ Мая» among them; the search finds either side meanwhile. A typo of the kind alone (108 of 250) was measured as the middle way and set aside:
+  it left two nouns and an adjective in front the kind does not know («Zharenaya kurica») to merge by
+  themselves.
 - **Measured on the seed** (`.scratch/tasks/status/MOL-106-measure.md`, the bench beside it): of its
-  178 000 pairs none merges; the nearest one edit apart is «Курица» and «Корица» at 0.856; two edits in a
-  word let in «Хлеб» and «Хлебцы» at 0.937, so a word takes one. Taken: a fat with a comma or a point
-  (7 of 7), «ё» (32 of 33), the order of words (207 of 222), half of the typos. 0.88 also had no false
-  merge, but «Курица» stood 0.024 from it. `merge-corpus.integration.test.ts` pins it end to end on the
-  real model, with pairs well clear of the threshold — the model's last digits differ on x86 (MOL-105).
+  178 000 pairs none merges, by any rule measured; the nearest one edit apart is «Курица» and «Корица» at
+  0.856. Taken by itself now: a fat with a comma or a point (7 of 7), «ё» (32 of 33), the order of words (207
+  of 222), none of the 250 typos that merged before. **The seed has no two ways of cooking
+  one letter apart**, so the bench missed them: its list `DESCRIBED_NOT` (MOL-358) holds the probe's seven and
+  fourteen relatives, fifteen of which merged at 0.900–0.946, and none does now (the same run, the rules on its
+  numbers). `merge-corpus.integration.test.ts` pins it end to end on the real model — the seed's twins merge,
+  the probe's pairs and the attacks' are only named — with pairs well clear of the threshold: the model's last
+  digits differ on x86 (MOL-105).
 - **The model does not read across scripts.** «Moloko» against «Молоко» is 0.69 at the median, «Mylo»
   against «Мыло» 0.47 — as far as «Milo» from «Мыло», 0.48: a transliteration and a homograph look alike
   to it — and its highest, «Bulochki dlya burgerov», stands at 0.902, past the threshold. So **a pair
@@ -724,11 +782,12 @@ report.
   proper name by its letters — «Маркет Ширак» and «Маркет Шираз» at 0.942, «Магнит» and «Магнат» at
   0.919, both in Gyumri. Every place the measure merged by itself was no edit apart, so nothing is lost;
   a typo of a shop's name is a candidate. **As written, never by the search key** (`letters`, adversarial
-  З1): case, spacing, punctuation and «ё» aside and nothing else — the key folds a double letter, «й» and a
+  З1): case, «ё» and the separators of an item's spelling aside (`WORD_SEPARATORS`) and nothing else, in
+  its order — the key folds a double letter, «й» and a
   soft sign, and «Аптека Римма» and «Аптека Рима» are one key and two shops. Armenian «և», «եւ» and
-  «եվ» are one spelling (MOL-12). **The price:** a sign that means something in a shop's name goes with
-  the punctuation — «Маркет Ани+» and «Маркет Ани» are one spelling, and merge at 0.92; rare in one
-  city, and `make apart` parts them (adversarial round 9). `merge-corpus.integration.test.ts`
+  «եվ» are one spelling (MOL-12). A sign the separators do not name is part of the name (MOL-358,
+  adversarial Д3): «Магнит+» at 0.926 to «Магнит», «Маркет Ани+» to «Маркет Ани» are named, not merged —
+  until MOL-358 every sign was nothing and they merged, the price of adversarial round 9. `merge-corpus.integration.test.ts`
   pins both on the model.
 - **A candidate** (named to the owner, never merged): the same sizes and words, **one edit a word at
   most** (the owner, 06.10.2026: two named the seed against itself every first morning — «Хлеб ~
@@ -793,6 +852,99 @@ report.
   «Молоко 3,2%», does not merge into what that went into (А5). The owner's `make merge` still may (В-2). A
   pick has no id, so its move names its person and **goes with the person by the cascade**
   (`ACTOR_REFERENCES`); the copy of a person's data leaves the journal out, the pick itself being in it.
+- **What a trace's id writes after its merge goes home with the undo** (MOL-299, adversarial А2): a
+  purchase a phone queued before the night, a first verdict by a bot's button, a new pick, a word of the
+  shop's memory, a code, a receipt's trip at a place named by its id — `liveItemId` lands each on the
+  survivor past the journal, and `unmerge` left it there for good. **A place by its trace's name too**
+  (adversarial Б3, owner's В-7 «а»): «Начать запись» and a receipt's new place find a shop by its name,
+  the main way a place is named, and `places.ensure` answers a trace's name with the survivor and the
+  trace beside it (`trace`), so the trip goes home as well. So the path that writes it notes the
+  row under every merge on the trace's way to the survivor (`noteTraceWrite`), where the id asked is not
+  the row's now, and the undo takes it a merge back as it takes what the merge moved — a chain step by
+  step, from its end. A verdict is noted only as a first one, a pick only as a new row. **Picks a trace's id adds
+  to a row no move of its way names** — the survivor's own from before, or one another merge brought —
+  **are the trace's share** (`pick_written`, adversarial К1, owner's В-11 «б»): the merge into the survivor
+  keeps how many, their last moment and «own word». **A row is its own and the shares standing on it** (Х1 of
+  round 22): every share of one row — `pick_added` and `pick_written`, of any merge into the survivor — keeps
+  the same own, the row's last pick and «own word» without the shares (`keptLastOf`, `keptAdmitsOf`), and the
+  undo of any takes its picks off and gives the row the later of its own moment and the other shares' last, and
+  its own word or another share's. Kept as a snapshot of the row before each share, it held the shares below,
+  and an undo out of their order or a share grown since found the row at no moment it waited for and left the
+  picks or the word behind (О1, П1, Р1, С1, Ф1, Х1 of rounds 15–22). A row a merge brought goes home at what is
+  left of it once every share standing is taken out — never whole while one stands, whatever its moment says
+  (У1 of round 20) — the rest that trace's first pick, and its own what the shares left go back to (as `above`
+  for a verdict, any order, one merge alone too). A pick by the trace's id on a row its merge added the trace's
+  own picks to (`pick_added`) grows that share instead: one share of the trace, never two (Л1 of round 12). A
+  pick by the survivor's own id writes its moment and word into every share standing on the row
+  (`pickWrittenBySurvivor`) — and so does a pick by the id of the trace whose row its merge brought there, the
+  row being that trace's own (Т1 of round 19) — so the undo gives the row back the person's own last pick of it,
+  never the one from before the merge (М1 of round 13, Н1 of round 14).
+  **A verdict, a pick or a word the person touched since
+  stays**
+  (adversarial А3): rated, amended or withdrawn on the survivor, it is their word about the survivor, and
+  taken home or swapped back it put that word on the trace, crossing the scores — «Курица вареная» 1
+  merged, the person gives «Курица жареная» 5, and the undo gave «вареная» the 5; a word of the shop's memory
+  said of the survivor by the next receipt, a pick of it under the same query, went to the trace whole (Б1,
+  Б2). Each verdict, pick and word a merge moves or swaps — or a trace's id writes — is written with its
+  moment to the microsecond (`updated_at`, `last_picked_at`, `written_at`), and the undo moves or swaps back
+  only a row still at it; a swap kept leaves the trace's row withdrawn. **Touched by the trace's id, the row
+  is still the trace's** (adversarial В1, В2): a pick repeated from a phone's queue, a verdict given again,
+  amended or withdrawn by a bot's button land on the survivor's row as any write by a trace's id, and they
+  move its moves' moment with them (`restampTraceWrite`), so it goes home — swapped back, for a swap.
+  **A verdict no move of the way names is the survivor's own from before** (adversarial Г1, Г2, owner's
+  В-10 «б»): the person has one row for one item, so a rating, an amendment or a withdrawal by the trace's
+  id lands on it and writes over their word about the survivor. The merge into the survivor keeps what it
+  said — its score and moments, never its text (`verdict_overwritten`, `before`, with the person's id) — and
+  the undo, last of its moves, gives it back while the row is still at the trace's word, and gives the trace
+  that word: a rating its own verdict, given at the moment of the write, a withdrawal its own withdrawn if
+  it has one. Later writes by the trace's id move the moment and keep the first `before`; rated and then
+  taken back by it, the trace gets its verdict withdrawn — a row, as MOL-27 counts one (И2 of round 9) — a
+  withdrawal alone nothing. What is kept is
+  the person's, in their copy (`overwrittenVerdicts`, version 27), gone with them by the cascade, and gone
+  with the undo. It is kept by the merge into the survivor; on a chain the word goes to that merge's younger
+  and is written there as the trace's id would write it, so the next undo carries it on and the whole chain
+  undone gives it to the trace (№11, Д1 of round 5). **In a fan any order undoes it, and one merge alone too** (№10, Д2, Е1 of
+  round 6, Ж1 of round 7): the earlier merge's trace may write over a row the later merge brought, or over a
+  word another trace wrote, so a verdict's move may find its row at another word. Then what the row said at
+  the move's moment is the `before` of the next word over it, held by a merge still standing: the undo hands
+  that word home and leaves the rest to the merge above (`above`). A row the merge brought goes home itself, at
+  what it said, so the moves that name it carry it on down a chain (№16 of review 8), and the other trace's
+  word stays as a row of its own, noted as its first — a withdrawal of nothing as none, the row it took being
+  the one gone home (З1 of round 8, as Г2), and rated when the trace's id wrote it (И1 of round 9). A word written over goes to its trace, and the move above keeps
+  what this one did. **A trace's word written again over another's lifts its move to the top** (Ц1 of round 23,
+  once the price №14 of the self-review): the move over it takes what lay under it, and it takes what the row said
+  before the write (`liftOverwritten`) — left in the middle, its moment moved past the other's and neither undo
+  found the row at the word it waited for. **And on the row its own merge brought, it goes on top as a move of that merge** (Ч1 of
+  round 24) — one word of a trace on a row, its last: lifted down onto that row by another's word lifted over it, it
+  goes into the merge's `verdict` (Ш1 of round 25). The undo takes the row home whole at that word wherever it lies in
+  the stack — the row's own on top, else the `before` of the word over it, which takes what lay under it — and the
+  rest of the stack stays here as a row of its own at its top word, noted as its lowest trace's first, as for the
+  picks (`traceWordHome`, Щ1 of round 26; З1, У1). So the owner undoes the false twin and keeps the true one. An order by the moment
+  (round 5) refused both undos for good where two people wrote each by the other's trace (Е1), and a move
+  waiting for the other undo (round 6) waited for good where that one was the true twin (Ж1).
+  **The prices, named:** the trace's own score is lost where the person rated the survivor over it by the
+  survivor's id (the row was one: their own act), and the trace's row so kept holds the survivor's
+  old score with its `rated_at`, withdrawn — the gate, the reminder and the copy read it (Б4); a text the
+  trace's id wrote over is not given back; an **item** written by a
+  trace's name — «Предложить товар», a receipt's new line — stays with the survivor, the name being the
+  survivor's second (В-7 «а»: the search shows the survivor, so it is rare); a write by a trace that an
+  `unmerge` commits between its row and its note stays with the survivor too (Б5, owner's В-8 «а»: the
+  owner's hand once a morning against milliseconds); a swap of one person's two verdicts whose kept row
+  another trace's id wrote over waits for that merge's undo, and stays swapped while it stands (Ж1 of round 7:
+  a swap goes over two rows, and handing it on is not worth a case this rare); the row the undo gives a trace is rated at the trace's id's **last** write, not its first
+  rating (Й1 of round 10): the journal keeps one moment of the trace's word, which every write moves, so a rating
+  amended or taken back later by that id stands later in gate 0.2 than it was given — against MOL-27's «re-rating
+  cannot move anyone in the gate», on the side of «stop», and only for a second write by a trace's id between a
+  merge and its undo; keeping the first too would be one more of the person's moments in the journal and the
+  copy; a withdrawal of nothing by one trace's id with a word of another written over it
+  later stays on the survivor as a withdrawn row with the brought row's score, for the gate to count (№19 of the
+  self-review, round 9: three twins, a withdrawal and a word more); a word of the shop's memory
+  settled again after a
+  purchase removed (`settleWords`, MOL-240) takes another moment and stays with the survivor while its
+  purchase goes home — the memory says the survivor until the API's next start settles it whole (№9 of
+  the self-review, owner's В-9 «а»); and a move written before MOL-299 has no moment and goes back as it
+  did. **A dry run of `make merge` prints no number** (adversarial А4): the identity it takes is
+  not rolled back, and «make unmerge ID=» of a dry run named a merge that would never be.
 - **The night** (`mergeTick`): a minute timer in the API, from 04:30 Yerevan — after the copy of the
   database at 04:00, so a copy before every merge exists — claimed by its day in
   `catalogue_merge_runs`, so two instances never run one night and a night slept through runs on waking;
@@ -809,11 +961,23 @@ report.
   first starts after 23:00 — the API down since 04:30 — and dies is claimed again only in the next day,
   and its merges are named by no morning; they stand in the journal and in `make unmerge`. A candidate
   whose side merged that night waits for the next only in `on`, and meets the survivor there only if the
-  survivor is near the other side too («Сыр чанох» merged into «Сыр чанах», whose pair with «Сыр чунух»
+  survivor is near the other side too («Чанах сыр» merged into «Сыр чанах», whose pair with «Сыр чунух»
   is 0.64: never asked) — in `report`, where nothing merged, it is named as it is.
 - **`CATALOGUE_MERGE`**: `on` merges, `report` says what it would and merges nothing — it only sweeps
-  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production runs `report` until
-  the owner says `on`** (В-3): the thresholds stand on a corpus, not yet on strangers' twins. A pair
+  what reached the trace of a merge made by hand — `off` does not look — the default, so a copy, CI and the tests never merge by a timer. **Production's `.env.prod` says `on` from
+  MOL-358, set by the owner's word after its merge** (В-6 «а» of MOL-299) — the compose file's default stays
+  `report`; until then it ran
+  `report` (В-3; MOL-299): the thresholds stand on a corpus, not on live twins. **28 nights of `report`,
+  06.10…02.11, named none to merge** — not one false, nor one true, so the rule has met no live twin — and
+  the owner's rule for `on` (В-3 «а» of MOL-299: before the tag of 0.2, once no pair the night would merge
+  is false) let it in for one evening, 02.11. **The adversarial pass of MOL-299 found the false pair the
+  nights could not**: a way of cooking one letter apart merges by itself — «Курица вареная» into «Курица
+  жареная» at 0.929, «Грибы тушёные» into «Грибы сушёные» at 0.946, seven pairs of seven — since a word is
+  one edit and the model reads a name by its letters; the seed has no such pair, people's items do. So
+  production went back to `report` on 03.11, before a night merged anything, and MOL-358 mends the rule
+  and turns `on` once the owner says so after its merge. Of the 14 candidates of those nights 12 were the seed against itself, set
+  apart by hand, one a receipt's twin across two scripts merged by hand (#1), and one a place in Gyumri
+  left as it is. A pair
   only reported comes with its command **`make apart FROM= INTO=`** (review №7, owner's decision
   05.10.2026): the owner says two things are apart before `on` merges them. `catalogue_apart` holds the
   pair by its ids; the night reads it as a pair undone — by the live things its ends stand in now —

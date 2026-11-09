@@ -196,15 +196,22 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The catalogue grows by «Предложить товар» and the seed** (MOL-112): the seed only adds, is
   not a migration, never stays in `_test` or `_e2e`, and holds no brands.
 - **Twins are merged by the night, and a false merge is worse than a missed one** (MOL-106): every
-  size with its unit (by its spelling, never the search key), one edit a word, two a name, the meaning
-  at 0.90 — measured on the seed; two scripts and a brand's extra word never merge, by the code. Places
+  size with its unit (by its spelling, never the search key), the same words as one spelling — as written, only
+  case, «ё» and a closed list of separators aside, the words in any order only where none has a digit,
+  never by the search key (MOL-358: a letter cannot tell «вареная» from «жареная», the key «мышка» from
+  «мишка», a point «мед.» from «мёд»), the meaning at 0.90 — measured on the seed; a letter apart, two scripts and a brand's extra word
+  never merge, by the code. Places
   by the same rule, one city each, and only as one spelling — as written, not by the key: a shop's
   name is a proper name.
 - **A merged item or place stays a trace** (`merged_into`): its name is the survivor's second name,
   every write by an id goes through `liveItemId` / `livePlaceId`, the search answers the survivor once;
-  one person's two verdicts stay two rows, so the gate does not move. **Production runs
-  `CATALOGUE_MERGE=report` until the owner says `on`** (В-3); `make unmerge ID=` takes a merge back,
-  a chain from its end.
+  one person's two verdicts stay two rows, so the gate does not move. **Production's `.env.prod`
+  says `CATALOGUE_MERGE=on` from MOL-358, set by the owner's word after its merge** (`report` before
+  it — MOL-299: 28 nights named no pair to merge, and one edit a word merged «Курица вареная» into
+  «Курица жареная» by itself until MOL-358); `make unmerge ID=` takes a merge back, a chain from its
+  end, with what a trace's id or a shop's trace's name wrote since — never a verdict, pick or word the
+  survivor's id touched since — and gives back the survivor's own verdict a trace's id wrote over (kept
+  for it, in the person's copy).
 
 - **«Брали здесь в прошлый раз» is the server's, the phone keeps it per place** (MOL-209): the last
   finished trip with a purchase at the trip's place before it, less what this trip holds — the server's
@@ -321,7 +328,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   (`localDay`, MOL-121), on the server too: every request names it (`TODAY_HEADER`) and its zone
   (`ZONE_HEADER`), and every «today» of money and every day of a moment the server stamped is
   counted by them; a write is «in the future» only past `latestDay`; a trip keeps
-  the phone's day of its taps. The frontend's tests run in UTC.
+  the phone's day of its taps. The frontend's tests run in UTC. **Every day a screen says is counted from the
+  screen's day** (`useLocalDay`, MOL-329), moved by the app coming back and by midnight: `days.ts` takes it as a
+  required argument and never reads the clock, and ESLint refuses the clock in the forms it can see.
 - **«Деньги» is the month's summary, «Траты» its journal** (MOL-159): six ways out with one figure
   each, every figure from an answer the screen already has — the counts are the server's (`count`,
   `incomeCount`); the tiles are figures, not buttons; a spending of another month moves «Траты»,
@@ -426,6 +435,33 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **«Выйти» erases this device's drawer after the server's `204`, never on the tap** (MOL-57); a
   lost `204` is settled by the server's next answer; offline there is no way out.
 
+### Security: quotas, outgoing requests, secrets, the edges, the headers — `.claude/rules/security.md`
+
+- **A write that grows what everybody shares, or what the server keeps on disk, has a quota per person**
+  (MOL-287, В-3 «а»: one request without a session or one account in a minute bringing the service down is a
+  blocker) — the login's start by its address, five a minute and three hundred in all (MOL-359); a receipt by its
+  person, forty a day of their own — a count «Удалить» never gives back — and twenty not recorded at once
+  (MOL-360); **not yet** for «Предложить товар» (MOL-362), a blocker of `v0.2.0`; a new write path names its
+  quota in its task. What answers without a session counts by the address Caddy names (`addressOf`), in memory.
+- **A host the server asks is the code's, never the request's**, with a timeout (SSRF).
+- **Every secret of production is a row of «Rotating the secrets» in `deploy/README.md`**, and a new one comes
+  with its row and its line in `.env.prod.example`; the database's password lives in its volume too and takes only
+  what a URL takes bare. A secret never goes on a command line. The images are public on ghcr: nothing secret in a
+  layer or the bundle.
+- **What CI runs is pinned** (MOL-364): a `uses:` by its full sha with its release in a comment, a base image by an
+  exact tag and its digest — `bin/check-pins.mjs` in `npm run lint`; Dependabot moves both, a major of Node never.
+- **No image of ours runs as root, and no npm beside `node`** (MOL-365): the last stage is `runtime` and names its
+  `USER` (`check-pins`); the volumes of a service moved off root are given by its own one-shot service
+  (`frontend-volumes`, `victoria-volumes`) at every `up`, by numbers; `runtime` brings its distribution's packages
+  up to date and the release builds it afresh (`no-cache-filters`).
+- **`/internal/*` is closed twice** — Caddy's 404 and `BOT_API_SECRET` in constant time; a bot's route goes in
+  that scope only. **A finding is a probe on a copy** (`.scratch/tasks/security/MOL-287/probes/`), never prod.
+- **The page's CSP is a meta the build puts first in `index.html`, never Caddy's header** (MOL-363): the worker
+  answers every address with the `index.html` it cached, headers and all, so only a policy inside the file comes
+  with a new version. No `'unsafe-inline'` or `'unsafe-eval'` — the inline scripts by hashes the build counts, Zod
+  told `jitless`; Caddy says `frame-ancestors 'none'` and HSTS (a year, never `localhost`); the built app's e2e
+  fails on any violation.
+
 ### Privacy: erasure, trackers, logs — `.claude/rules/privacy.md`
 
 - **Erasure is one function**, `ErasureRepository.erase`, behind two doors — `/delete` in the bot
@@ -503,7 +539,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   a sender and a thousand in all.
 - **The metrics' labels are a route's template, never a path** (MOL-145): `/metrics` on its own port
   (`METRICS_PORT`), never the API's, which is all Caddy reaches; what sees the machine or the database
-  is on `metrics`, a network with no way out, and Grafana calls nobody home. **The dashboard and every
+  is on `metrics`, a network with no way out, and Grafana calls nobody home. **postgres_exporter is
+  `molvia_metrics`, `pg_monitor` and no table** (MOL-366): the API makes the role at every start and sets
+  its password as a verifier, never a migration — `pg_dump` carries no role. **The dashboard and every
   threshold are JSON in `deploy/grafana`**, baked into its image; a test holds the thresholds and that
   every figure read is written. A restart is a reset of the same container's CPU counter, never
   `changes()`; a request whose client left is `aborted`, never lost. **The alarms read a person's
@@ -532,6 +570,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   statement, at most once, within 6 h; no sum, no line; the receipt's language; its own switch on the
   page «Бот» (`/settings/bot`), never the rating reminders'; **a block is `actors.bot_blocked_at`**,
   which «chosen» in `reminders_off` cannot hide.
+- **Every session collected is told of in the bot, with «Это не я — завершить»** (MOL-361): the collection queues
+  it, the API marks it as it hands it out — one account's oldest a claim — and lets it go by the bot's word: given
+  back behind the others, its account with it, when Telegram refuses for now, let go unsent past the lease; the notice
+  outlives the session; the button ends that one session for `ctx.from.id`, one `404` for anything else; Russian then
+  English, no switch.
 - **Telegram updates are never logged whole.**
 - **The message about a leak is queued by `make notify` and sent by the bot** (MOL-237): the API
   decides who — created before it, of its countries, the bot not blocked — in batches after a cursor
@@ -574,7 +617,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The amount typed is `AppField size="entry"`, a currency beside it `CurrencySelect`, a checkbox
   `AppCheckbox`** (MOL-235): a static `inputmode="decimal"`, `type="checkbox"` or a `<select>` outside the kit
   fails ESLint, in any case; a field's classes are the kit's own words (`app-field…`), and every focus a
-  refusal puts in a field goes through `useFieldRefusal` — never a bare `focus()` (sheets that move none: MOL-333).
+  refusal puts in a field goes through `useFieldRefusal`, a server's under a field too — never a bare `focus()`,
+  never no focus at all (MOL-333).
 - **Every screen has four states — loading, empty, error, offline — drawn by `ScreenSkeleton` and
   `ScreenState` only** (MOL-19): offline is never red, and offline or error is decided after the
   failure; polite states speak through the one live region in `App.vue`. **Empty is one quiet
@@ -617,18 +661,21 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `minmax(0, 1fr)`; a name kept on one line — a row of chips, a cut name — has no width of its own
   (`contain: inline-size`), and words that may hold a name break it (`overflow-wrap: anywhere`) — a grid
   column of `auto` takes the least width of what stands in it, and a name is forty letters of one word.
-- **Nor does large text on «Деньги», «Настройки» and a newcomer's «Что брать»** (MOL-321; the rest — MOL-334):
-  Android's 150 % and 200 % on 320 stand within the phone (`e2e/large-text.spec.ts`). A row of segments its words
-  do not fit stands them one under another, the word whole; what stands beside something turns by `@container`
-  in `rem`; a card's figure shrinks to its card by its length (`figure-fit`); a line wraps only where the least
-  widths do not fit, and a hyphen comes only with large text (`data-large-text`) — so 100 % keeps its look.
+- **Nor does large text, anywhere in the app** (MOL-321, MOL-334): Android's 150 % and 200 % on 320 stand within the
+  phone (`e2e/large-text.spec.ts`), and the system's font size is the root's (`<meta name="text-scale">`, Chrome 146+,
+  owner's В-1 «а»), so no stylesheet sets the root's `font-size`, nor draws the text back with `zoom`. A row of segments its words do not fit stands them
+  one under another, the word whole; what stands beside something turns by `@container` in `rem`; a card's figure
+  shrinks to its card by its length (`figure-fit`), and a sum never breaks; a line wraps only where the least widths do
+  not fit; a word wider than its line breaks (`overflow-wrap: break-word` on `body`), and only while the text is large
+  (`data-large-text`) words take a hyphen — from five letters in a title, six in a row of the kit and a button, twelve in
+  a paragraph, never in a segment — so 100 % keeps its look; a key of the 1–5 scale is never under 44 px.
 - **A screen is built from the kit** (MOL-18); the sheet is a native `<dialog>` with an entry in the
   history, and puts the page back — and focus, wherever the platform gave it — by what it was
   opened from (MOL-63, MOL-80). **Its press is heard on the document**: iOS hands a tap on the
   scrim only to a listener there (MOL-80). **Over the keyboard its height is a share of the visual
   viewport**, never of the window, and it scrolls itself to the field being typed in (MOL-135);
   **its footer is pinned to its edge, sticky in its own scroll, and what it brings into sight stops at
-  the footer's top** (`scroll-padding`, MOL-182);
+  the footer's top** (`scroll-padding`, MOL-182) — a field with its error (MOL-354);
   **the lift is the pinned box less the visible height**, never `100dvh` or `innerHeight`, and
   **before the keys come it takes the height they left last time** (MOL-151); **a field takes the focus
   at the opening only in the tap that opened it** (MOL-212), else × keeps it.
@@ -1111,6 +1158,10 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
   by the vitest global setup — a test run can never truncate data entered by hand. Each worker
   runs its files in a copy of it (`…_test_w<n>`, MOL-164), so the files go in parallel. This is
   why `make check` needs `make up` first, and why CI runs a Postgres service.
+- **A test is written past the six ways tests here have flaked** (owner, 02.11.2026; `.claude/rules/testing.md`):
+  chance in «not there», an order Postgres never promised, the real clock, work left past the end, a box measured
+  mid-motion, a race of the network or the focus in e2e. Read before the commit, and a flake of one found in a task
+  is fixed in it, not filed.
 - **When a test fails, look for the bug in the code first** — do not adjust the test to
   match the behaviour. A test proves the app works, not the other way round. And **never by
   making it tolerate leftovers**: that hides the cause and leaves the suite depending on the

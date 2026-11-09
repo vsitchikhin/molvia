@@ -15,7 +15,7 @@
       <StatusStrip
         v-if="phase === 'ready' && (!online || failed === 'offline')"
         kind="offline"
-        :text="countedAt ? t('accounts.stale', { time: countedAt }) : t('spending.offline.title')"
+        :text="countedAt ? t('accounts.stale', { when: countedAt }) : t('spending.offline.title')"
       />
       <StatusStrip
         v-else-if="phase === 'ready' && failed === 'error'"
@@ -259,13 +259,7 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import TransferSheet from '@/components/TransferSheet.vue'
 import type { TransferOutcome } from '@/components/TransferSheet.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
-import {
-  canTransfer,
-  countedWhen,
-  operationRowProps,
-  shortDay,
-  signedAmount,
-} from '@/components/accounts'
+import { canTransfer, operationRowProps, signedAmount } from '@/components/accounts'
 import type { Removed } from '@/components/spending'
 import { figureChars } from '@/components/figure'
 import { useAccountJournal } from '@/composables/useAccountJournal'
@@ -274,7 +268,7 @@ import { useLocalDay } from '@/composables/useLocalDay'
 import { useOwnCategories } from '@/composables/useOwnCategories'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTransferOutcome } from '@/composables/useTransferOutcome'
-import { calendarDay, shiftDay } from '@/days'
+import { answeredAt, calendarDay, calendarDayOfAnyYear, dateOfAnyYear, shiftDay } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useAccountsOnScreen, useAccountsStore } from '@/stores/accounts'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
@@ -378,13 +372,13 @@ export default defineComponent({
     const money = (value: Money) => signedAmount(value, locale.value)
     const estimate = (value: Money) => signedAmount(value, locale.value, { estimate: true })
     const countedAt = computed(() =>
-      store.overview ? countedWhen(store.overview.countedAt, locale.value) : null,
+      store.overview ? answeredAt(store.overview.countedAt, locale.value, today.value) : null,
     )
     // The hour only where the balance is the phone's too: over a page this session read, it named the
     // minute of an answer the journal under it never had (review №1).
     const unansweredLine = computed(() =>
       countedAt.value && store.stale !== null
-        ? t('accounts.screen.unanswered', { time: countedAt.value })
+        ? t('accounts.screen.unanswered', { when: countedAt.value })
         : t('accounts.account.unanswered'),
     )
 
@@ -400,20 +394,21 @@ export default defineComponent({
       if (!value) return ''
       const started = t('accounts.account.started', {
         amount: money(value.start),
-        date: shortDay(value.startOn, locale.value),
+        date: calendarDayOfAnyYear(value.startOn, locale.value, today.value),
       })
+      // An account lives across years, and so do its start and its check (adversarial Б2).
       return value.lastCheckedOn
-        ? `${started} · ${t('accounts.account.checked', { date: shortDay(value.lastCheckedOn, locale.value) })}`
+        ? `${started} · ${t('accounts.account.checked', { date: calendarDayOfAnyYear(value.lastCheckedOn, locale.value, today.value) })}`
         : started
     })
     const archivedLine = computed(() => {
       const at = account.value?.archivedAt
       if (!at) return ''
-      // Whole: after «21 сент.» the full stop of the sentence doubled (handoff 03).
-      const date = new Intl.DateTimeFormat(locale.value, { day: 'numeric', month: 'long' }).format(
-        at,
-      )
-      return t('accounts.account.archived', { date })
+      // Whole: after «21 сент.» the full stop of the sentence doubled (handoff 03). A year of its own ends with
+      // its full stop too — «21 сентября 2025 г.» — and closes the sentence with it: one, never two (adversarial Б1).
+      const date = dateOfAnyYear(at, locale.value, today.value, 'long')
+      const line = t('accounts.account.archived', { date })
+      return date.endsWith('.') ? line.replace(`${date}.`, date) : line
     })
 
     /** Rows by day, as the server ordered them: newest first, and within a day newest first. */
@@ -435,10 +430,13 @@ export default defineComponent({
       const date = calendarDay(day, locale.value)
       if (day === today.value) return t('spending.day_today', { date })
       if (day === shiftDay(today.value, -1)) return t('spending.day_yesterday', { date })
+      // The journal goes back to the account's start, across years: a day of another year says its year, or
+      // its weekday read as this year's (adversarial Б2).
       const text = calendarDay(day, locale.value, {
         weekday: 'short',
         day: 'numeric',
         month: 'long',
+        ...(day.slice(0, 4) === today.value.slice(0, 4) ? {} : { year: 'numeric' }),
       })
       return text.charAt(0).toLocaleUpperCase(locale.value) + text.slice(1)
     }

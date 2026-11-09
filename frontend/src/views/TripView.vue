@@ -129,7 +129,7 @@
          tap away from «Добавить позицию». An empty one finished is a row of nothing in «Покупки»
          for good: it is offered to go instead, and finishing it stays the second action (MOL-76,
          В-2). Away, the screen goes up to «Покупки» — there is nothing left on it. -->
-    <BottomSheet v-model:open="finishing" :on-closed="leaveIfOver">
+    <BottomSheet ref="finishSheet" v-model:open="finishing" :on-closed="leaveIfOver">
       <template #title>{{
         finishingEmpty ? t('trip.remove.empty.title') : t('trip.finish_confirm.title')
       }}</template>
@@ -278,6 +278,8 @@ import TripTotalCard from '@/components/TripTotalCard.vue'
 import type { TripRowView } from '@/components/tripRow'
 import { useTripRows } from '@/composables/useTripRows'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { shown } from '@/composables/useItemDetails'
 import type { RetryPurchase } from '@/composables/useItemDetails'
 import { useReconnect } from '@/composables/useReconnect'
@@ -351,6 +353,8 @@ export default defineComponent({
   },
   setup() {
     const { t, locale } = useI18n()
+    // The screen's day, asked again as the app comes back: the day words are said from it (MOL-329).
+    const today = useLocalDay()
     const router = useRouter()
     const itemEntry = useItemEntryStore()
     const { goTab, goUp } = useNavigation()
@@ -366,6 +370,9 @@ export default defineComponent({
     /** Answers that failed, so a retry failing the same way is said again (MOL-181, C1). */
     const attempt = ref(0)
     const finishing = ref(false)
+    // The sum or «Списано» refused at «Закончить» is heard (MOL-235, MOL-333): the first one marked.
+    const finishSheet = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
     /** Taken when «Закончить» is tapped: a row arriving while the sheet is up does not reword it. */
     const finishingEmpty = ref(false)
     const removing = ref(false)
@@ -411,7 +418,7 @@ export default defineComponent({
       return since
         ? t('trip.manual_meta', {
             when: t('trip.manual_since', {
-              day: purchaseDay(since, locale.value),
+              day: purchaseDay(since, locale.value, today.value),
               time: timeOfDay(since, locale.value),
             }),
           })
@@ -501,7 +508,12 @@ export default defineComponent({
       // the account likewise (MOL-312): «Списано» that is not money holds the finish
       const paid = finishingEmpty.value ? undefined : paymentBody()
       debitedBad.value = paid === 'bad'
-      if (receipt === null || paid === 'bad') return
+      if (receipt === null || paid === 'bad') {
+        void refuse(() =>
+          finishSheet.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'),
+        )
+        return
+      }
       if (id && receipt) queue.enqueue({ kind: 'receipt', tripId: id, body: { receipt } })
       const payment = receipt ? paymentAfterSum(paid) : changedPayment(paid)
       if (id && payment) {
@@ -741,6 +753,7 @@ export default defineComponent({
       receiptText,
       receiptCurrency,
       receiptBad,
+      finishSheet,
       receiptOpen,
       receiptWaiting,
       receiptCurrent,
@@ -805,12 +818,23 @@ export default defineComponent({
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+  container-type: inline-size;
 
   /* Half the line each by the outer box — a basis of 0 left the secondary's edge out, and the pair
      came 2 px apart — and never narrower than its word, which is what sends one under the other. */
   > * {
     flex: 1 0 calc((100% - var(--space-2)) / 2);
     min-width: max-content;
+  }
+}
+
+/* With large text one word and its glyph may be wider than the strip itself: the pills stand one under the other
+   across it, the word broken with a hyphen where it must (MOL-334) — at 200 % «Штрихкод» stood 7 px past the phone,
+   «Закончить» with it. At 100 % on 320 the strip is 18rem. */
+@container (width < 12rem) {
+  .pair > * {
+    flex-basis: 100%;
+    min-width: 0;
   }
 }
 

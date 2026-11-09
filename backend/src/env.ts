@@ -25,6 +25,13 @@ export const ownerTelegramIdSchema = z
   .transform(Number)
   .pipe(telegramUserIdSchema)
 
+/**
+ * The password of the role postgres_exporter logs in as (MOL-366, Р-3): printable ASCII with no space,
+ * which SASLprep leaves as it is — any other letter it would normalise, and the verifier the API writes
+ * would differ from the keys libpq counts on the exporter's side. 24 at least; `openssl rand -hex 24`.
+ */
+export const metricsDbPasswordSchema = z.string().regex(/^[\x21-\x7e]{24,}$/)
+
 const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(3300),
   /**
@@ -37,6 +44,14 @@ const envSchema = z.object({
     z.coerce.number().int().positive().optional(),
   ),
   DATABASE_URL: z.string().min(1),
+  /**
+   * The password the API gives `molvia_metrics` at its start (MOL-366): production's alone, where the
+   * exporter runs. Unset or empty in a copy, end-to-end and CI, and the role is left as it is.
+   */
+  METRICS_DB_PASSWORD: z.preprocess(
+    (value) => (value === '' ? undefined : value),
+    metricsDbPasswordSchema.optional(),
+  ),
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   /**
    * The hourly refresh of official rates (MOL-39), which goes out to the central banks. On by
@@ -47,7 +62,7 @@ const envSchema = z.object({
   /**
    * The nightly merge of twins in the catalogue (MOL-106): `on` merges, `report` only says what it
    * would, `off` does not look. Off by default — a copy, CI and the tests never merge by a timer;
-   * production passes `report` until the owner says `on` (В-3).
+   * production passes `report` until MOL-358 says `on` (В-3, MOL-299).
    */
   CATALOGUE_MERGE: catalogueMergeModeSchema.default('off'),
   /**

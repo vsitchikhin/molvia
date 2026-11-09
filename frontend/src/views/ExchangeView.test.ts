@@ -631,6 +631,15 @@ describe('ExchangeView: the rate and the list', () => {
     expect(removeExchange).not.toHaveBeenCalled()
   })
 
+  // The question has no caption of a month over it (MOL-329, adversarial Ж1).
+  it('the question names an exchange of last year with its year', async () => {
+    exchanges.mockResolvedValue(overview({ exchanges: [row({ exchangedOn: '2025-09-15' })] }))
+    const view = await render()
+    await askToRemove(view)
+    const sheets = document.querySelectorAll('dialog[open]')
+    expect(sheets[1]?.textContent).toContain('Sep 15, 2025')
+  })
+
   it('removes when confirmed, puts the focus on «Bring back», which brings the same row back', async () => {
     exchanges.mockResolvedValue(overview())
     removeExchange.mockResolvedValue(overview({ exchanges: [], wallet: null }))
@@ -2068,8 +2077,10 @@ describe('ExchangeView: «Курс рубля за месяц, 6 и 12 меся�
     expect(exchanges.mock.calls.length).toBe(asked)
   })
 
-  it('the period moved past midnight, the app never hidden: the strip says «yesterday» (Б2)', async () => {
-    vi.useFakeTimers({ toFake: ['Date'] })
+  // MOL-329: the screen's day moves at midnight itself, so the strip says «yesterday» before anything redraws
+  // it — MOL-187's Б2 read the clock where the words were drawn, and a partial redraw spoke of two days.
+  it('the app never hidden past midnight: the strip says «yesterday» (Б2; MOL-329)', async () => {
+    vi.useFakeTimers({ toFake: ['Date', 'setTimeout', 'clearTimeout'] })
     try {
       vi.setSystemTime(new Date(2026, 9, 14, 23, 58))
       exchanges.mockResolvedValue(overview({ rateCharts }))
@@ -2079,8 +2090,9 @@ describe('ExchangeView: «Курс рубля за месяц, 6 и 12 меся�
       await flushPromises()
       expect(view.get('.status').text()).toContain('today, 11:58 PM')
 
-      // 00:05, the phone in hand all along: nothing told the screen the day changed.
-      vi.setSystemTime(new Date(2026, 9, 15, 0, 5))
+      // 00:05, the phone in hand all along: nothing told the screen the day changed but midnight itself.
+      await vi.advanceTimersByTimeAsync(7 * 60_000)
+      expect(view.get('.status').text()).toContain('yesterday, 11:58 PM')
       await view.findAll('.periods input')[0]?.setValue(true)
       await flushPromises()
       expect(view.get('.status').text()).toContain('yesterday, 11:58 PM')

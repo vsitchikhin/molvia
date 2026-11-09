@@ -4,6 +4,7 @@ import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import type { ReceiptNotice } from '@molvia/model'
 import { t } from './i18n'
+import { dayInWords } from './when'
 import { reportDefect } from './failure'
 import { Flooded, deliver, sleep } from './deliver'
 import type { Wait } from './deliver'
@@ -26,38 +27,30 @@ function lines(language: string, n: number): string {
   return t(language, key, { n })
 }
 
-/** «4 октября», «4 October»: the receipt's calendar day, without the year. */
-function dateOf(language: string, day: string): string {
-  return new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : language, {
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  }).format(new Date(`${day}T12:00:00Z`))
-}
-
 /** The words of the message: the place where the review knows it, else the day; never a sum. */
 export function receiptText(notice: ReceiptNotice): string {
   const { language, place, day, lineCount, outcome, duplicate, taxOffice } = notice
   // a receipt by its link has no photo: the tax office's word, never «переснять» (MOL-232, Р2-1)
   if (taxOffice !== null) {
-    return t(language, `receipt.link_${taxOffice}`, { date: dateOf(language, day) })
+    return t(language, `receipt.link_${taxOffice}`, { date: dayInWords(language, day) })
   }
-  if (outcome === 'failed') return t(language, 'receipt.failed', { date: dateOf(language, day) })
+  if (outcome === 'failed')
+    return t(language, 'receipt.failed', { date: dayInWords(language, day) })
   // a second shot of a receipt recorded before: the review says «уже записан» (adversarial А4)
   if (duplicate) {
     return place === null
-      ? t(language, 'receipt.duplicate_no_place', { date: dateOf(language, day) })
+      ? t(language, 'receipt.duplicate_no_place', { date: dayInWords(language, day) })
       : t(language, 'receipt.duplicate', { place })
   }
   // a sole trader's section with no items: a sum to record, not «0 позиций» (MOL-227)
   if (lineCount === 0) {
     return place === null
-      ? t(language, 'receipt.no_items_no_place', { date: dateOf(language, day) })
+      ? t(language, 'receipt.no_items_no_place', { date: dayInWords(language, day) })
       : t(language, 'receipt.no_items', { place })
   }
   const count = lines(language, lineCount)
   return place === null
-    ? t(language, 'receipt.parsed_no_place', { date: dateOf(language, day), count })
+    ? t(language, 'receipt.parsed_no_place', { date: dayInWords(language, day), count })
     : t(language, 'receipt.parsed', { place, count })
 }
 

@@ -10,7 +10,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `packages/model/src/entities/expense.ts` — Entity of a trip purchase: item required, quantity and amount optional; the new-row and patch schemas.
 - `packages/model/src/entities/place.ts` — Entity of a place (shop or venue) with its country and city; the schema a new place is named by.
 - `packages/model/src/entities/trip.ts` — Entity of a trip: rate snapshot and rate choice, `TRIP_UNDO_MINUTES`, the effective rate, staleness, totals and conversion.
-- `packages/model/src/values/geo.ts` — Value schemas of a country code and a city name, and the time zone a country's day is read in (MOL-101).
+- `packages/model/src/values/geo.ts` — Value schemas of a country code and a city name, and the time zone a country's day is read in (MOL-101); `personZoneOf`, that zone or Yerevan's, for a message that must reach a person whatever their row (MOL-239, MOL-361).
 - `packages/model/src/values/place-identity.ts` — When two spellings name one place, the TypeScript twin of the database's place index; and `cityWhereNameRepeats` (MOL-120), the one rule for when a place is printed with its city. Tests: `backend/tests/place-identity.integration.test.ts`.
 
 ## backend · routes
@@ -67,7 +67,7 @@ Rules: `.claude/rules/trips.md`. A test beside its source, or mirroring it under
 - `frontend/src/components/ReceiptSheet.vue` — Sheet «Сумма по чеку»: typed at any time into a record open or finished, «Убрать сумму»; writes to the trip queue.
 - `frontend/src/components/receipt.ts` — What was typed as «Сумма по чеку» — money above zero or nothing — and a sum put back into the field.
 - `frontend/src/components/SettingsFields.vue` — The settings fields (country, city, two currencies) with «changed» marks; shared by «Настройки» and the trip-context sheet.
-- `frontend/src/components/StartTripSheet.vue` — Sheet «Где вы?»: recent shops and a field for a new one; queues the start of a record, finishing or removing the open one first when asked to.
+- `frontend/src/components/StartTripSheet.vue` — Sheet «Где вы?»: recent shops and a field for a new one; queues the start of a record, finishing or removing the open one first when asked to; «Начать запись» is not now saying what it waits for, a name no place takes refused at the tap (MOL-354).
 - `frontend/src/components/TripContextSheet.vue` — Sheet «Уточните город и валюты записи» for a trip the old app started, holding the queue until confirmed.
 - `frontend/src/components/TripNotices.vue` — What the queue says about any record — refusals, a record open elsewhere, unsent purchases, a city to name — on «Покупки» and on the record.
 - `frontend/src/components/TripRateNotes.vue` — Notes about the rate a trip counts by: it jumped, it is not the central bank's, or the bank has been silent.

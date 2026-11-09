@@ -52,8 +52,12 @@ export const EXPORT_FORMAT = 'molvia-export'
 // of payment say (MOL-312). 24: the account's `lastSeenAt`, when the person last used the app or signed
 // in — the clock of the two years of silence (MOL-238). 25: `receiptReviews`, the receipts read not whole kept for the developer's review —
 // until when and why, never the photo or what was read (MOL-309). 26: the account's `silenceWarning` and
-// `silenceWarnedAt`, the last warning before an erasure for two years of silence and when (MOL-239).
-export const EXPORT_VERSION = 26
+// `silenceWarnedAt`, the last warning before an erasure for two years of silence and when (MOL-239). 27:
+// `overwrittenVerdicts`, one's own verdict written over after a merge by its twin's id, kept for the undo
+// (MOL-299). 28: `loginNotices`, the sign-ins the bot has not told of yet — the session, the device and
+// when (MOL-361). 29: the account's `receiptsDay` and `receiptsSent`, the receipts sent on the person's day,
+// which the day's quota counts (MOL-360).
+export const EXPORT_VERSION = 29
 
 const day = z.iso.date()
 
@@ -140,6 +144,8 @@ const accountSchema = z.strictObject({
   lastSeenAt: isoDate,
   silenceWarning: z.int().nullable(),
   silenceWarnedAt: isoDate.nullable(),
+  receiptsDay: day.nullable(),
+  receiptsSent: z.int(),
   createdAt: isoDate,
   updatedAt: isoDate,
 })
@@ -159,6 +165,12 @@ const loginRequestSchema = z.strictObject({
   createdAt: isoDate,
   expiresAt: isoDate,
   consumedAt: isoDate.nullable(),
+})
+
+const loginNoticeSchema = z.strictObject({
+  sessionId: z.uuid(),
+  deviceName: z.string().nullable(),
+  signedInAt: isoDate,
 })
 
 const tripSchema = z.strictObject({
@@ -207,6 +219,19 @@ const verdictSchema = z.strictObject({
   ratedAt: isoDate,
   updatedAt: isoDate,
   withdrawnAt: isoDate.nullable(),
+})
+
+/**
+ * One's own verdict written over after a merge of twins by the twin's id — a phone's queue, a bot's
+ * button — kept for the undo of the merge (MOL-299): what it said before, never its text, and when.
+ */
+const overwrittenVerdictSchema = z.strictObject({
+  verdictId: z.uuid(),
+  score: z.int(),
+  ratedAt: isoDate,
+  updatedAt: isoDate,
+  withdrawnAt: isoDate.nullable(),
+  overwrittenAt: isoDate,
 })
 
 /** Where the person stands on the ladder of rating reminders (MOL-101): at most one row. */
@@ -558,9 +583,11 @@ export const exportContentCodec = z.strictObject({
   account: accountSchema,
   sessions: z.array(sessionSchema),
   loginRequests: z.array(loginRequestSchema),
+  loginNotices: z.array(loginNoticeSchema),
   trips: z.array(tripSchema),
   expenses: z.array(expenseSchema),
   verdicts: z.array(verdictSchema),
+  overwrittenVerdicts: z.array(overwrittenVerdictSchema),
   searchPicks: z.array(searchPickSchema),
   ratingReminders: z.array(ratingReminderSchema),
   events: z.array(eventSchema),

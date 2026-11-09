@@ -231,7 +231,7 @@ import DonutChart from '@/components/DonutChart.vue'
 import type { DonutData } from '@/components/DonutChart.vue'
 import MonthSwitcher from '@/components/MonthSwitcher.vue'
 import ScreenState from '@/components/ScreenState.vue'
-import { countedWhen, signedAmount } from '@/components/accounts'
+import { signedAmount } from '@/components/accounts'
 import {
   longMonth,
   monthGenitive,
@@ -246,7 +246,7 @@ import StatusStrip from '@/components/StatusStrip.vue'
 import { figureChars } from '@/components/figure'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useMoneyChartYear } from '@/composables/useMoneyCharts'
-import { calendarDay } from '@/days'
+import { answeredAt, calendarDay } from '@/days'
 
 type YearMonth = MoneyChartYearView['months'][number]
 
@@ -304,7 +304,7 @@ export default defineComponent({
       value ? `≈ ${whole(value)}` : t('spending.charts.no_rate')
     const signedApprox = (value: Money) =>
       `≈ ${signedAmount(value, locale.value, { plus: true, estimate: true })}`
-    const when = (at: Date) => countedWhen(at, locale.value)
+    const when = (at: Date) => answeredAt(at, locale.value, today.value)
     const nameOf = (category: SpendingCategoryView) =>
       category.preset ? t(`spending.category.${category.preset}`) : (category.name ?? '')
     const both = computed(() => charts.value?.spendCurrency !== charts.value?.incomeCurrency)

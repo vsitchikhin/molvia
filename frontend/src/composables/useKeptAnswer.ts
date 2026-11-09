@@ -187,7 +187,13 @@ export function useKeptAnswer<T>(options: KeptAnswerOptions<T>): KeptAnswer<T> {
     const fetchedAt = new Date()
     remember(id, asked, answer, fetchedAt)
     recallKept()
-    if (subject.value !== asked) return answer
+    // A write for another subject than the one shown — a sheet that kept the month it opened on while midnight
+    // moved the screen to the next (MOL-329, adversarial Г1) — may change the one shown too: a plan from September
+    // on holds in October. So the screen reads its own; its answer from before the write is not left standing.
+    if (subject.value !== asked) {
+      void load()
+      return answer
+    }
     shown.value = { answer, fetchedAt }
     failure.value = null
     confirmed.value = true

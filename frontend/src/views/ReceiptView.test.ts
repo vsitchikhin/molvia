@@ -736,6 +736,24 @@ describe('ReceiptView (MOL-127)', () => {
     expect(foot).toMatch(/≈ 202/)
   })
 
+  // MOL-329, adversarial Ж1: the rate's day names its year when it is not the screen's — December seen in January.
+  it('names the year of a rate of another year at the foot', async () => {
+    const shown = detail()
+    receipt.mockResolvedValue({
+      ...shown,
+      // Yerevan's midnight of 30 December 2025
+      rate: {
+        base: 'RUB',
+        quote: 'AMD',
+        scaled: 4_000_000n,
+        source: 'official',
+        asOf: new Date('2025-12-29T20:00:00Z'),
+      },
+    })
+    const { view } = await render()
+    expect(view.get('.total').text()).toContain('30 дек. 2025 г.')
+  })
+
   it('says «проверьте» of figures the font’s swaps put right, and why (MOL-290)', async () => {
     const one = detail()
     receipt.mockResolvedValue({
@@ -952,7 +970,18 @@ describe('ReceiptView (MOL-127)', () => {
       await button(view, ru.receipt.review.record_sum).trigger('click')
       await flushPromises()
       expect(recordReceipt).not.toHaveBeenCalled()
-      expect(sheet()?.textContent).toContain(ru.receipt.review.record_sum)
+      // Not now until a shop is named, saying so on itself (MOL-333, В-3 «б»); then the action's word.
+      expect(sheet()?.querySelector('.footer button')?.textContent.trim()).toBe(
+        ru.receipt.place.choose_place,
+      )
+      const name = sheet()?.querySelector<HTMLInputElement>('input:not([type="date"])')
+      if (!name) throw new Error('нет поля магазина')
+      name.value = 'Ереван Сити'
+      name.dispatchEvent(new Event('input'))
+      await flushPromises()
+      expect(sheet()?.querySelector('.footer button')?.textContent.trim()).toBe(
+        ru.receipt.review.record_sum,
+      )
     })
   })
 
@@ -1389,9 +1418,17 @@ describe('ReceiptView — the account it was paid from (MOL-312)', () => {
       JSON.stringify({ [ID]: { accountId: roubles.id, debited: '0' } }),
     )
     const { view } = await render()
-    await button(view, 'Записать 2 покупки').trigger('click')
+    const charged = view.get('.charged input').element as HTMLInputElement
+    let marked: string | null = null
+    charged.addEventListener('focus', () => (marked = charged.getAttribute('aria-invalid')))
+    const record = button(view, 'Записать 2 покупки')
+    ;(record.element as HTMLButtonElement).focus()
+    await record.trigger('click')
     await flushPromises()
     expect(recordReceipt).not.toHaveBeenCalled()
     expect(view.find('.charged').text()).toContain(ru.spending.sheet.bad_amount)
+    // and heard (MOL-333): the focus goes from «Записать» to «Списано», already marked
+    expect(document.activeElement).toBe(charged)
+    expect(marked).toBe('true')
   })
 })

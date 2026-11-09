@@ -3,7 +3,7 @@
     <template #title>{{ t('receipt.line.title') }}</template>
     <template #meta>{{ meta }}</template>
 
-    <div class="form">
+    <div ref="form" class="form">
       <div v-if="skip" class="plate quiet">{{ t('receipt.line.skipped') }}</div>
 
       <div class="plate printed-box">
@@ -86,7 +86,9 @@
       <div class="per-unit-box">
         <div class="per-unit">
           <span class="per-unit-label">{{ t('item.unit_price_label') }}</span>
-          <span class="per-unit-value">{{ perUnit ?? '—' }}</span>
+          <span class="per-unit-value" :style="figureChars(perUnit ?? '—')">{{
+            perUnit ?? '—'
+          }}</span>
         </div>
         <p v-if="itemHint" :key="itemHint.text" class="cheaper" :class="`cheaper-${itemHint.kind}`">
           <span>{{ itemHint.text }}</span>
@@ -145,9 +147,12 @@ import ItemPickSheet from '@/components/ItemPickSheet.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { formatRating, unitPriceText } from '@/components/adviceRow'
+import { figureChars } from '@/components/figure'
 import { useCheaperHint } from '@/composables/useCheaperHint'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useLineFigures } from '@/composables/useLineFigures'
-import { calendarDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { calendarDayOfAnyYear } from '@/days'
 import type { ReviewLine } from '@/receipts/review'
 import type { LineDraft, LineFigures } from '@/stores/receiptDrafts'
 
@@ -212,6 +217,9 @@ export default defineComponent({
       perUnit,
     } = useLineFigures(start, () => props.currency)
     const skip = ref(start.skip)
+    const form = ref<HTMLElement | null>(null)
+    // A field refused at «Сохранить» is heard (MOL-235, MOL-333): the first one marked in the form.
+    const refuse = useFieldRefusal()
     const picking = ref(false)
     const nameBad = ref(false)
     /** «проверьте» holds until the person settles the item one way or another. */
@@ -238,8 +246,10 @@ export default defineComponent({
       currency: () => props.currency,
       unit: () => unit.value,
     })
+    // One's own history goes back across years, and a sheet has no month's caption over it (MOL-329, Ж1).
+    const today = useLocalDay()
     const shortDay = (day: string) =>
-      calendarDay(day, locale.value, { day: '2-digit', month: '2-digit' })
+      calendarDayOfAnyYear(day, locale.value, today.value, { day: '2-digit', month: '2-digit' })
     const sameItem = computed(() => hintItem !== null && item.value.id === hintItem)
     const itemHint = computed(() => {
       const found = sameItem.value ? hint.value.item : null
@@ -381,7 +391,10 @@ export default defineComponent({
 
     function finish(skipped: boolean, figuresToo: boolean): void {
       const next = line(skipped, figuresToo)
-      if (!next) return
+      if (!next) {
+        void refuse(() => form.value?.querySelector<HTMLElement>('[aria-invalid="true"]'))
+        return
+      }
       // Nothing changed: no draft — the line goes on following the server and the shop's memory,
       // and «≠» and «проверьте» stay (review 16).
       if (!same(next)) emit('saved', next)
@@ -389,9 +402,11 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       t,
       ERROR,
       NAME_MAX,
+      form,
       item,
       name,
       quantity,
@@ -602,8 +617,12 @@ export default defineComponent({
   background: var(--good-tint);
 }
 
+/* A line that wraps only where its least widths do not fit, and the box its figure measures itself against
+   (MOL-321): at 150 % «12 800 ֏/кг» stood past it (MOL-334). */
 .per-unit {
   display: flex;
+  flex-wrap: wrap;
+  container-type: inline-size;
   gap: var(--space-3);
   align-items: baseline;
   justify-content: space-between;
@@ -612,14 +631,16 @@ export default defineComponent({
 }
 
 .per-unit-label {
+  flex: 1 1 min-content;
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
 }
 
 .per-unit-value {
   @include display-type;
+  @include figure-fit(var(--text-title));
 
-  font-size: var(--text-title);
+  margin-inline-start: auto;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

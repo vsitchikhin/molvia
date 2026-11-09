@@ -413,6 +413,19 @@ describe('a check and the operations of its reasons', () => {
     expect(view.text()).toContain(en.accounts.reconcile.recounting)
   })
 
+  // MOL-329, self-review Р3-2: a check's window may begin with an even check of last year, and its day says so.
+  it('a window begun last year says the year of its day', async () => {
+    const view = await checkWith(session(), {
+      ...answer('10000', '11200', [
+        { kind: 'unassigned', operation: spendingRow(TAXI, '-1200', null) },
+      ]),
+      since: '2025-10-03',
+    })
+    expect(view.text().replaceAll('\u00a0', ' ')).toContain(
+      'What could explain it since Oct 3, 2025',
+    )
+  })
+
   it('a difference above zero opens the sheet of an income, filled — nothing written yet (В-5)', async () => {
     const pinia = session()
     incomes.mockResolvedValue({
@@ -1251,5 +1264,126 @@ describe('the account’s sheet over a page kept from before (MOL-196, adversari
     await settle()
     expect(plain(view.get('.balance .figure').text())).toContain('98,000')
     expect(nowOf(view)).toBe('now ֏98,000')
+  })
+})
+
+// MOL-329, adversarial А1, А5: the balances' age and the day an account was put away are said from the
+// screen's day — `answeredAt`, a date with its year when another — never the clock's default or `Intl` in place.
+describe('the screen`s day (MOL-329)', () => {
+  const READ = new Date('2026-10-30T23:40:00.000Z')
+  const BEFORE = new Date('2026-10-30T23:50:00.000Z')
+  const AFTER = new Date('2026-10-31T00:10:00.000Z')
+  const offline = () => vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+  const stripText = (view: VueWrapper) => view.getComponent(StatusStrip).props('text') as string
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('А1: a page kept from another year says its year, on «Счета» and on the account', async () => {
+    useAccountsStore(session()).accept(page([cash()], new Date('2025-09-26T10:05:00Z')))
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const list = await open(AccountsView, '/money/accounts', session())
+    expect(stripText(list)).toMatch(/^The server did not answer · balances as of Sep 26, 2025, /)
+
+    rememberJournal(OWNER, journal(cash(), [spendingRow(TAXI, '-500', CASH)]))
+    offline()
+    moneyAccounts.mockRejectedValue(new TypeError('Failed to fetch'))
+    accountJournal.mockRejectedValue(new TypeError('Failed to fetch'))
+    const account = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(stripText(account)).toMatch(/^Offline · balances as of Sep 26, 2025, /)
+  })
+
+  it('А1: the account offline — «today» at 23:50, «yesterday» once the app is back after midnight', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(BEFORE)
+    useAccountsStore(session()).accept(page([cash()], READ))
+    rememberJournal(OWNER, journal(cash(), [spendingRow(TAXI, '-500', CASH)]))
+    offline()
+    moneyAccounts.mockRejectedValue(new TypeError('Failed to fetch'))
+    accountJournal.mockRejectedValue(new TypeError('Failed to fetch'))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(stripText(view)).toBe('Offline · balances as of today, 11:40 PM')
+
+    vi.setSystemTime(AFTER)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await settle()
+    expect(stripText(view)).toBe('Offline · balances as of yesterday, 11:40 PM')
+  })
+
+  it('А1: the account, server silent — a failed read on return says «yesterday» too', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(BEFORE)
+    useAccountsStore(session()).accept(page([cash()], READ))
+    rememberJournal(OWNER, journal(cash(), [spendingRow(TAXI, '-500', CASH)]))
+    moneyAccounts.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    accountJournal.mockRejectedValue(new ApiError(ERROR.INTERNAL))
+    const view = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(stripText(view)).toBe('The server did not answer · balances as of today, 11:40 PM')
+
+    vi.setSystemTime(AFTER)
+    document.dispatchEvent(new Event('visibilitychange'))
+    await settle()
+    expect(stripText(view)).toBe('The server did not answer · balances as of yesterday, 11:40 PM')
+  })
+
+  // Adversarial Б1 of round 2: in Russian a year ends with its own full stop, «2025 г.», and it closes the sentence.
+  it('Б1: put away last year, in Russian — one full stop after the year, never two', async () => {
+    const removed = cash({ archivedAt: new Date('2025-09-21T10:00:00Z') })
+    moneyAccounts.mockResolvedValue(page([removed]))
+    accountJournal.mockResolvedValue(journal(removed, []))
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push(`/money/accounts/${CASH}`)
+    const view = mount(AccountView as never, {
+      attachTo: document.body,
+      global: { plugins: [router, session(), createAppI18n('ru')] },
+    })
+    views.push(view)
+    await settle()
+    expect(view.get('.balance ~ .note').text()).toBe(
+      'Убран из выбора 21 сентября 2025 г. История и остаток сохранены',
+    )
+  })
+
+  // Adversarial Б2 of round 2: an account lives across years, its start, its check and its journal with it.
+  it('Б2: the start, the check and the journal of another year say the year', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
+    const old = cash({ startOn: '2025-09-16', lastCheckedOn: '2025-10-03' })
+    const lastYear = {
+      ...spendingRow(TAXI, '-500', CASH),
+      day: '2025-10-14',
+      at: new Date('2025-10-14T09:00:00Z'),
+    }
+    moneyAccounts.mockResolvedValue(page([old]))
+    const list = await open(AccountsView, '/money/accounts', session())
+    expect(list.text().replaceAll('\u00a0', ' ')).toContain('AMD · checked Oct 3, 2025')
+    // Whole as a date, a line may break before its year (self-review Р3-3).
+    expect(list.text()).toContain('Oct\u00a03, 2025')
+
+    accountJournal.mockResolvedValue(journal(old, [lastYear]))
+    const account = await open(AccountView, `/money/accounts/${CASH}`, session())
+    const text = account.text().replaceAll('\u00a0', ' ')
+    expect(text).toMatch(/on Sep 16, 2025 · checked Oct 3, 2025/)
+    // 14 October 2025 was a Tuesday; this year it is a Wednesday.
+    expect(text).toContain('Tue, October 14, 2025')
+  })
+
+  it('А5: an account put away last year says the year, on its screen and in the list', async () => {
+    const removed = cash({ archivedAt: new Date('2025-09-21T10:00:00Z') })
+    moneyAccounts.mockResolvedValue(page([removed]))
+    accountJournal.mockResolvedValue(journal(removed, []))
+    const account = await open(AccountView, `/money/accounts/${CASH}`, session())
+    expect(account.get('.balance ~ .note').text()).toContain('September 21, 2025')
+
+    moneyAccounts.mockResolvedValue(page([removed, cash({ id: OTHER, name: 'Card ֏' })]))
+    const list = await open(AccountsView, '/money/accounts', session())
+    await list
+      .findAll('button')
+      .find((one) => one.attributes('aria-expanded') !== undefined)
+      ?.trigger('click')
+    await settle()
+    // The date is kept whole on its line by no-break spaces (`whole`).
+    expect(list.text().replaceAll('\u00a0', ' ')).toMatch(/put away Sep 21, 2025/)
   })
 })

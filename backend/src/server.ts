@@ -10,6 +10,8 @@ import {
   DomainError,
   ERROR,
   ISSUE,
+  LOGIN_ADDRESS_LIMIT,
+  LOGIN_WINDOW_LIMIT,
   VERSION_HEADER,
   errorResponseSchema,
   isWireCode,
@@ -64,6 +66,7 @@ import { ownPrices } from '@/usecases/own-prices'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
+import { claimLoginNotices, endSessionFromBot, loginNoticesTold } from '@/usecases/tell-logins'
 import { SILENCE_ERASE_EVERY_MS, claimSilenceNotices, eraseSilent } from '@/usecases/silence'
 import { exportMine } from '@/usecases/export-mine'
 import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
@@ -187,6 +190,7 @@ import { consentRoutes } from '@/routes/consent'
 import { startTrip } from '@/usecases/start-trip'
 import { removeTrip, restoreTrip } from '@/usecases/remove-trip'
 import { startLogin } from '@/usecases/start-login'
+import { addressMinute } from '@/usecases/address-minute'
 import {
   addExpense,
   finishTrip,
@@ -212,6 +216,7 @@ import { createExportRepository } from '@/db/export-repository'
 import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
 import { authTransactOn } from '@/db/auth-unit-of-work'
+import { createLoginNoticeRepository } from '@/db/login-notices-repository'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { databaseIsReachable, getDb } from '@/db'
@@ -228,6 +233,8 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.FEEDBACK_PICTURE_INVALID]: 415,
   [ERROR.FEEDBACK_PICTURE_TOO_LARGE]: 413,
   [ERROR.CLIENT_ERRORS_RATE_LIMITED]: 429,
+  [ERROR.RECEIPTS_DAY_LIMITED]: 429,
+  [ERROR.RECEIPTS_UNRECORDED_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
   // The request is well formed; another row already holds what it claims — a barcode that
@@ -639,6 +646,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopSenderForget: (() => Promise<void>) | undefined
     // The route's minute of the phone's reports (MOL-144), let go by the timer below too (MOL-241).
     const phoneLimit = phoneReportLimit()
+    // An address's minute of the login's starts (MOL-359), let go by the same timer. Its three
+    // hundred are the bound of its own map, and in one process the first to refuse; the database's
+    // are the ceiling that survives a restart (`startLogin`).
+    const loginLimit = addressMinute(LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT)
     let stopMergeTwins: (() => Promise<void>) | undefined
     let stopSilence: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
@@ -697,8 +708,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       )
       // An expired session has no reader, and it kept a device name for good while the privacy
       // page promises 180 days from the last use (MOL-57, owner's decision Q4).
+      // …and a notice of a sign-in handed to the bot and never spoken of (MOL-361): let go unsent.
       stopSessionCleanup = startLoginCleanup(
-        () => sessions.removeExpired(),
+        async () => {
+          await sessions.removeExpired()
+          await createLoginNoticeRepository(db).removeLost()
+        },
         (error) => {
           failures.report(error, job('session-cleanup'), 'expired session cleanup failed')
         },
@@ -721,9 +736,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // keep them as long.
       stopSenderForget = startLoginCleanup(
         () => {
-          const now = new Date()
-          failures.forget(now)
-          phoneLimit.forget(now.getTime())
+          failures.forget()
+          phoneLimit.forget()
+          loginLimit.forget()
           return Promise.resolve()
         },
         (error) => {
@@ -1040,9 +1055,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     healthRoutes(instance, { databaseIsReachable })
     const login = options.login === undefined ? loginConfig : options.login
     authRoutes(instance, {
-      start: (name, again) => {
+      start: (name, again, address) => {
         if (!login) throw new DomainError(ERROR.LOGIN_DISABLED)
-        return startLogin(loginRequests, login.username, name, again)
+        return startLogin(
+          loginRequests,
+          { limit: loginLimit, address },
+          login.username,
+          name,
+          again,
+        )
       },
       poll: (id, secret, zone) => completeLogin(authTransactOn(db), id, secret, zone),
       logout: (token) => logout(sessions, token),
@@ -1117,6 +1138,17 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           new Date(),
         ),
       broadcastDone: (body) => broadcastDone(createBroadcastRepository(db), body),
+      // A new sign-in (MOL-361): a notice the contract refuses is that message lost, and said.
+      claimLoginNotices: () =>
+        claimLoginNotices(createLoginNoticeRepository(db), (issue) => {
+          failures.report(
+            issue,
+            { source: 'api', route: 'POST /internal/logins/claim' },
+            'login notice unreadable',
+          )
+        }),
+      loginNoticesTold: (word) => loginNoticesTold(createLoginNoticeRepository(db), word),
+      endSession: (sessionId, body) => endSessionFromBot(authTransactOn(db), sessionId, body),
     })
 
     // The phone's failures (MOL-144): no session, a limit in memory, the page's own build.
@@ -1130,7 +1162,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         },
         body,
         address,
-        Date.now(),
       )
     })
 
@@ -1242,8 +1273,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         restore: (actor, id) => restoreIncome(tripData, actor, id),
       })
       receiptRoutes(guarded, {
-        send: async (actorId, body) => {
-          const sent = await sendReceipt(receipts, actorId, body)
+        send: async (actor, body) => {
+          const sent = await sendReceipt(receipts, actor, body)
           // a receipt by its link is in the queue as it arrives: asked now, not in a minute
           if (sent.created && sent.receipt.status === 'queued') linkQueue?.nudge()
           return sent

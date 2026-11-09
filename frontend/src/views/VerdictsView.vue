@@ -110,6 +110,7 @@
             :draft="drafts.drafts[current.itemId]"
             :focus-on-mount="moved"
             :city="city"
+            :today="today"
             @save="save"
             @skip="skip"
             @change="keep"
@@ -174,8 +175,9 @@ import ScreenState from '@/components/ScreenState.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import type { StripKind } from '@/components/StatusStrip.vue'
 import VerdictCard from '@/components/VerdictCard.vue'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useVerdictQueue } from '@/composables/useVerdictQueue'
-import { purchaseDay } from '@/days'
+import { answeredAt } from '@/days'
 import { useNavigation } from '@/navigation'
 import { useVerdictDraftsStore } from '@/stores/verdictDrafts'
 import type { Score } from '@/stores/verdictDrafts'
@@ -249,8 +251,11 @@ export default defineComponent({
       if (queue.stale.value === 'error') void queue.retry()
     }
 
+    // The screen's day, asked again as the app comes back and at midnight (MOL-329). The list's moment is
+    // said as every strip says it — the day, its time, its year when another (self-review №1).
+    const today = useLocalDay()
     function day(when: Date): string {
-      return purchaseDay(when, locale.value)
+      return answeredAt(when, locale.value, today.value)
     }
 
     function afterMove(): void {
@@ -282,6 +287,7 @@ export default defineComponent({
 
     return {
       t,
+      today,
       IconCheck,
       IconStar,
       drafts,

@@ -3,7 +3,8 @@ import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { searchQueryKey } from './items-repository'
 import { QUERY_KEY_MAX_OCTETS, searchPicks } from './schema'
-import { liveItemId } from './trace'
+import { liveItemId, pickWrittenBySurvivor, pickWrittenByTrace } from './trace'
+import type { PickBefore } from './trace'
 
 export interface SearchPickRepository {
   /**
@@ -37,19 +38,49 @@ export function createSearchPickRepository(db: Conn): SearchPickRepository {
     // the item from the input the expense was written with. A missing item is a
     // foreign-key refusal and reaches the caller like everywhere else.
     await translateFailures(() =>
-      db
-        .insert(searchPicks)
-        // A pick of an id from before a merge is the survivor's (MOL-106).
-        .values({ actorId, queryKey: key, itemId: liveItemId(itemId), admits })
-        .onConflictDoUpdate({
-          target: [searchPicks.actorId, searchPicks.queryKey, searchPicks.itemId],
-          set: {
-            picks: sql`${searchPicks.picks} + 1`,
-            lastPickedAt: sql`now()`,
-            // Once a synonym, always: an ordinary pick under the same key does not unlearn it.
-            admits: sql`${searchPicks.admits} or ${admits}`,
-          },
-        }),
+      db.transaction(async (tx) => {
+        // what the row held before, for a pick by a trace's id added to a row not its own (К1)
+        const [prior] = await tx.execute<PickBefore & Record<string, unknown>>(sql`
+          select last_picked_at::text as "lastPickedAt", admits from search_picks
+          where actor_id = ${actorId}::uuid and query_key = ${key} and item_id = ${liveItemId(itemId)}
+          for update`)
+        const [row] = await tx
+          .insert(searchPicks)
+          // A pick of an id from before a merge is the survivor's (MOL-106).
+          .values({ actorId, queryKey: key, itemId: liveItemId(itemId), admits })
+          .onConflictDoUpdate({
+            target: [searchPicks.actorId, searchPicks.queryKey, searchPicks.itemId],
+            set: {
+              picks: sql`${searchPicks.picks} + 1`,
+              lastPickedAt: sql`now()`,
+              // Once a synonym, always: an ordinary pick under the same key does not unlearn it.
+              admits: sql`${searchPicks.admits} or ${admits}`,
+            },
+          })
+          .returning({
+            itemId: searchPicks.itemId,
+            inserted: sql<boolean>`xmax = 0`,
+            at: sql<string>`${searchPicks.lastPickedAt}::text`,
+          })
+        if (row === undefined) return
+        // A pick by the survivor's own id is the row's own moment under traces' shares (М1, Н1).
+        if (row.itemId === itemId.toLowerCase()) {
+          if (!row.inserted) await pickWrittenBySurvivor(tx, itemId, actorId, key, row.at, admits)
+        } else {
+          await pickWrittenByTrace(
+            tx,
+            itemId,
+            actorId,
+            key,
+            row.at,
+            row.inserted ? null : (prior ?? null),
+            {
+              picks: 1,
+              admits,
+            },
+          )
+        }
+      }),
     )
   }
 

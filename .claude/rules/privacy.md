@@ -34,7 +34,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   withdrawn ones, events, expenses, trips, exchanges and incomes (MOL-40,
   MOL-66 — the person's own money), spendings, their categories and frozen rates (MOL-73), accounts
   and their checks after every operation that named one (MOL-115), the messages to the developer
-  with the owner's replies (MOL-147), login requests by Telegram id
+  with the owner's replies (MOL-147), the sign-ins the bot has not told of yet (MOL-361), login requests by Telegram id
   — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
   `erasures` for the week they appeared (MOL-91). Catalogue items the
   person added stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
@@ -61,9 +61,13 @@ The detail behind the privacy lines of `CLAUDE.md`.
   **a dry run is the real run, rolled back**, so its count cannot disagree with what erasure does.
   **A new table that points at `actors` must join erasure** — a test compares every foreign key
   on `actors` with `ACTOR_REFERENCES`, and another scans every table for the erased person's uuid
-  and Telegram id. The journal of the merge of twins (MOL-106) joined this way: a pick moved names
-  its person, so `catalogue_merge_moves.actor_id` goes with the person by the cascade and the copy
-  leaves the journal out, the pick itself being in it. **Its first lock is the account's, then the person's login requests, and only
+  and Telegram id. The journal of the merge of twins (MOL-106) joined this way: a pick moved — or a
+  share of picks a twin's id added to one (MOL-299, К1) — names its person, so `catalogue_merge_moves.actor_id` goes with the person by the cascade and the copy
+  leaves that move out, the pick itself being in it. **One's own verdict a twin's id wrote over after a
+  merge** (MOL-299, owner's В-10 «б») is kept there for the undo — its score and moments, never its text —
+  so it names its person too, is in the copy (`overwrittenVerdicts`, version 27), goes with the undo, and
+  has its row in the record of processing; `/privacy` says it under «Оценки» and «Копия ваших данных» (a
+  revision). **Its first lock is the account's, then the person's login requests, and only
   then the owner** (adversarial О-3, П-2): `for update` on an owner who does not exist yet locks
   nothing, and a login collected meanwhile created an owner the transaction had already decided
   was not there — «nobody to erase» over a live account. Collection locks its request row before
@@ -399,3 +403,6 @@ The detail behind the privacy lines of `CLAUDE.md`.
   `App.vue` draws past the login screen (MOL-56), linked from that screen and from the settings: a change to either is a change to both — and it says only what they keep: other
   people's prices are shown in the shared mode (MOL-31), so «shown to nobody» is said of the list
   of purchases, and an address can reach Caddy's error log, so «no address» is said of requests.
+  **An address the API keeps in memory is named there too** (MOL-359): a phone's failure's for its hour
+  (MOL-144, MOL-241) and a login's start's for its minute — a limit's key, in no table and no line of the
+  log, «на пару минут» in «Логи сервера», a revision.

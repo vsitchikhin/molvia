@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import { actorSchema, deviceNameOrNull, newSessionSchema, sessionSchema } from '@molvia/model'
-import type { Actor, Session } from '@molvia/model'
+import type { Actor, Session, TelegramUserId } from '@molvia/model'
 import { sha256Hex } from './digest'
 import { secretOrNull } from '@/secret'
 import { translateFailures } from './failure'
@@ -106,6 +106,14 @@ export interface SessionRepository {
    * deleting the row (MOL-52, Р-4), so «revoked», «expired» and «never existed» stay one answer.
    */
   removeFor(actorId: string, id: string): Promise<boolean>
+
+  /**
+   * Deletes the live session `id` of the account behind a Telegram id — «Это не я — завершить» under
+   * the bot's message about a sign-in (MOL-361). Whose it is, is Telegram's word (`ctx.from.id`), never
+   * the button's: the button carries the session alone. Another account's, a missing one, one that ran
+   * out and a malformed id all delete nothing and answer `false`, as `removeFor` does.
+   */
+  removeForTelegram(telegramUserId: TelegramUserId, id: string): Promise<boolean>
 
   /**
    * Deletes the session behind a token — the way out of this very device (`POST /auth/logout`).
@@ -235,6 +243,22 @@ export function createSessionRepository(db: Conn): SessionRepository {
           and(
             eq(sessions.id, own),
             eq(sessions.actorId, actorId),
+            gt(sessions.expiresAt, sql`now()`),
+          ),
+        )
+        .returning({ id: sessions.id })
+      return removed.length > 0
+    },
+
+    async removeForTelegram(telegramUserId, id) {
+      const own = idOrNull(id)
+      if (own === null) return false
+      const removed = await db
+        .delete(sessions)
+        .where(
+          and(
+            eq(sessions.id, own),
+            sql`${sessions.actorId} = (select ${actors.id} from ${actors} where ${actors.telegramUserId} = ${telegramUserId})`,
             gt(sessions.expiresAt, sql`now()`),
           ),
         )

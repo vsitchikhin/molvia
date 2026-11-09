@@ -103,4 +103,29 @@ describe('molvia/known-custom-property', () => {
       ),
     ).toEqual(['--a'])
   })
+
+  // MOL-334, adversarial Г20, Г21: a size that stops growing is the tab bar's decision alone.
+  it('keeps a token its owner’s alone: read or declared anew anywhere else, refused', async () => {
+    const at = (file: string): string => fileURLToPath(new URL(`../src/${file}`, import.meta.url))
+    const said = async (code: string, codeFilename: string): Promise<string[]> => {
+      const { results } = await stylelint.lint({ code, config, codeFilename })
+      return (results[0]?.warnings ?? []).map((warning) => warning.text)
+    }
+    const caption = at('components/SectionCaption.scss')
+    expect(await said('.a { font-size: var(--text-tab); }', caption)).toEqual([
+      expect.stringMatching(/^--text-tab is components\/TabBar\.vue's alone/),
+    ])
+    expect(
+      await said(
+        '.a { --text-tab: min(var(--text-caption), 13.75px); font-size: var(--text-tab); }',
+        caption,
+      ),
+    ).toHaveLength(2)
+    expect(await said('.tab { font-size: var(--text-tab); }', at('components/TabBar.vue'))).toEqual(
+      [],
+    )
+    expect(await said(':root { --text-tab: min(var(--text-caption), 13.75px); }', TOKENS)).toEqual(
+      [],
+    )
+  })
 })

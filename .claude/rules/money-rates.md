@@ -750,8 +750,8 @@ set of rules — the task's own «as for exchanges in MOL-40» predates MOL-42's
   vanished income then say they will show it once the server is reached (`*_stale`, by `behind`), never
   «показываем, как он записан» over the list from before. **A month is captioned without its year when
   it is the phone's year** («СЕНТЯБРЬ», «ДЕКАБРЬ 2025», owner's В-2 «а»): the handoff drew no year, and
-  a journal reaches back across years. **The captions and the cards speak by one day**, the later of
-  the screen's and the clock's (`shownDay`, as `answeredAt`, adversarial А1, Б1): a screen held past
+  a journal reaches back across years. **The captions and the cards speak by one day**, the screen's
+  (`useLocalDay`, which moves at midnight too since MOL-329 — `shownDay` read the clock and is gone; adversarial А1, Б1): a screen held past
   New Year's midnight and drawn again by a write's answer said «ЯНВАРЬ 2027» over «ДЕКАБРЬ», and then
   «DECEMBER 2026» over a card of the 31st that said «Today». **The skeleton's cards are an income's**
   (`OperationSkeleton form="income"`, А2), **their plates by whether a new income lands on an account**

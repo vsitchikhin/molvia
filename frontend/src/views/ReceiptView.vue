@@ -196,6 +196,7 @@
           :redeemed="detail.redeemed ?? null"
           :rate="detail.rate"
           :day="rateDay"
+          :today="today"
           :suspect="suspect"
           :no-items="noItems"
           @total="!locked && (totalOpen = true)"
@@ -203,7 +204,7 @@
         <!-- The account it was paid from (MOL-312): a draft of the review, recorded with «Записать». Grown in
              where «Счета» answer after the review, as it pushes what stands under it (review Р1-3). -->
         <AppReveal>
-          <AppCard v-if="showsAccount" class="block account">
+          <AppCard v-if="showsAccount" ref="paymentCard" class="block account">
             <AccountRow
               :label="t('accounts.picker.row_spending')"
               :account="account"
@@ -429,9 +430,11 @@ import ScreenState from '@/components/ScreenState.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { api } from '@/api'
+import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useOnline } from '@/composables/useOnline'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { calendarDayOfAnyYear, dayOfAnyYear, localDay } from '@/days'
 import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
@@ -492,6 +495,8 @@ export default defineComponent({
   },
   setup() {
     const { t, locale } = useI18n()
+    // The screen's day, asked again as the app comes back: the day words are said from it (MOL-329).
+    const today = useLocalDay()
     const route = useRoute()
     const router = useRouter()
     const { goUp } = useNavigation()
@@ -624,6 +629,9 @@ export default defineComponent({
       },
     })
     const debitedBad = ref(false)
+    // «Списано» refused at «Записать» is heard (MOL-235, MOL-333): on the screen, in the app's region.
+    const paymentCard = ref<{ $el: Element } | null>(null)
+    const refuse = useFieldRefusal()
     const pickerOpen = ref(false)
     function pickAccount(next: string | null): void {
       debitedBad.value = false
@@ -650,8 +658,8 @@ export default defineComponent({
 
     const dayOf = (at: Date | string) =>
       typeof at === 'string'
-        ? calendarDayOfAnyYear(at, locale.value)
-        : dayOfAnyYear(at, locale.value)
+        ? calendarDayOfAnyYear(at, locale.value, today.value)
+        : dayOfAnyYear(at, locale.value, today.value)
     const positions = (n: number): string => t('trip.items_count', { n }, n)
 
     const title = computed(() => {
@@ -919,6 +927,9 @@ export default defineComponent({
       const paid = paymentBody()
       if (paid === 'bad') {
         debitedBad.value = true
+        void refuse(() =>
+          paymentCard.value?.$el.querySelector<HTMLElement>('[aria-invalid="true"]'),
+        )
         return
       }
       const barcodes = bind === true ? lineCodes.value.map((code) => code.position) : undefined
@@ -976,6 +987,7 @@ export default defineComponent({
       charged,
       debited,
       debitedBad,
+      paymentCard,
       pickerOpen,
       pickAccount,
       draft,
@@ -1054,6 +1066,7 @@ export default defineComponent({
       locked,
       digits,
       rateDay,
+      today,
       retakeMounted,
       retake: () => {
         retakeMounted.value = true

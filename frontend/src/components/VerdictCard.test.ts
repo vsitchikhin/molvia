@@ -1,8 +1,10 @@
-import { mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
+import { flushPromises, mount, type DOMWrapper, type VueWrapper } from '@vue/test-utils'
 import { describe, expect, it } from 'vitest'
+import { defineComponent, h, type Ref } from 'vue'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { PendingVerdict } from '@molvia/model'
 import VerdictCard from '@/components/VerdictCard.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
 import type { VerdictDraft } from '@/stores/verdictDrafts'
@@ -16,7 +18,7 @@ const milk: PendingVerdict = {
 
 function render(draft?: VerdictDraft, city: string | null = null) {
   return mount(VerdictCard, {
-    props: { card: milk, draft, city },
+    props: { card: milk, draft, city, today: '2026-09-20' },
     global: { plugins: [createAppI18n('en')] },
     attachTo: document.body,
   })
@@ -39,6 +41,23 @@ describe('VerdictCard', () => {
     expect(view.get('h2').text()).toContain(en.verdict.question_tail)
     expect(view.get('.context').text()).toBe('Sep 12 · Ереван Сити')
     view.unmount()
+  })
+
+  // «Оценки» keeps a purchase not rated for as long as it waits (MOL-329, adversarial Е1): «Oct 14» of last year read as this one.
+  it('MOL-329: a purchase of another year says its year; «yesterday» across New Year stays a word', () => {
+    const old = mount(VerdictCard, {
+      props: { card: { ...milk, boughtAt: new Date(2025, 9, 14, 17, 40) }, today: '2026-11-02' },
+      global: { plugins: [createAppI18n('en')] },
+    })
+    expect(old.get('.context').text()).toBe('Oct 14, 2025 · Ереван Сити')
+    old.unmount()
+
+    const eve = mount(VerdictCard, {
+      props: { card: { ...milk, boughtAt: new Date(2025, 11, 31, 22, 0) }, today: '2026-01-01' },
+      global: { plugins: [createAppI18n('en')] },
+    })
+    expect(eve.get('.context').text()).toBe('yesterday · Ереван Сити')
+    eve.unmount()
   })
 
   it('MOL-120: names the city the queue gives it, in brackets when the dictionary has no case', () => {
@@ -268,13 +287,58 @@ describe('VerdictCard', () => {
     view.unmount()
   })
 
+  // A review refused is heard (MOL-333): the focus stayed on «Save», and nothing was said.
+  it('a review refused: the focus goes from «Save» to the review, already marked', async () => {
+    const view = render()
+    await key(view, 4).trigger('click')
+    const review = view.get('textarea')
+    await review.setValue(`Как в ${String.fromCodePoint(0xf8ff)} Store`)
+    let marked: string | null = null
+    review.element.addEventListener('focus', () => {
+      marked = review.element.getAttribute('aria-invalid')
+    })
+    const save = button(view, en.verdict.save)
+    save.element.focus()
+    await save.trigger('click')
+    await flushPromises()
+    expect(view.emitted('save')).toBeUndefined()
+    expect(document.activeElement).toBe(review.element)
+    expect(marked).toBe('true')
+    view.unmount()
+  })
+
+  // On a screen, not in a sheet: the words go to the app's region.
+  it('a review refused with the focus in it: its error is said in the app’s region', async () => {
+    const said: { app?: Ref<readonly { text: string }[]> } = {}
+    const host = mount(
+      defineComponent({
+        setup() {
+          said.app = provideAnnouncer()
+          return () => h(VerdictCard, { card: milk, today: '2026-09-20' })
+        },
+      }),
+      { global: { plugins: [createAppI18n('en')] }, attachTo: document.body },
+    )
+    const view = host.findComponent(VerdictCard)
+    await key(view, 4).trigger('click')
+    const review = view.get('textarea')
+    await review.setValue(`Как в ${String.fromCodePoint(0xf8ff)} Store`)
+    review.element.focus()
+    await button(view, en.verdict.save).trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(document.activeElement).toBe(review.element)
+    expect(said.app?.value.map((one) => one.text)).toContain(en.verdict.review_unsupported)
+    host.unmount()
+  })
+
   it('takes the focus on arrival only when asked', () => {
     const quiet = render()
     expect(document.activeElement?.tagName).not.toBe('H2')
     quiet.unmount()
 
     const moved = mount(VerdictCard, {
-      props: { card: milk, focusOnMount: true },
+      props: { card: milk, focusOnMount: true, today: '2026-09-20' },
       global: { plugins: [createAppI18n('en')] },
       attachTo: document.body,
     })

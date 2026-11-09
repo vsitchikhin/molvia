@@ -3,10 +3,12 @@ import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { IncomeAmendBody, IncomeBody, IncomeView, IncomesResponse } from '@molvia/model'
 import IncomeSheet from './IncomeSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -72,14 +74,27 @@ afterEach(() => {
 async function render(
   state: IncomesResponse = overview(),
   editing: IncomeView | null = null,
+  announced = false,
 ): Promise<VueWrapper> {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/money/incomes')
-  const view = mount(IncomeSheet, {
-    props: { open: true, overview: state, record, amend, editing },
+  const props = { open: true, overview: state, record, amend, editing }
+  const mounting = {
     attachTo: document.body,
     global: { plugins: [router, createPinia(), createAppI18n('en')] },
-  })
+  }
+  // Under an announcer, as `App.vue` holds every sheet: what the sheet says lands in its region.
+  const view: VueWrapper = announced
+    ? mount(
+        defineComponent({
+          setup() {
+            provideAnnouncer()
+            return () => h(IncomeSheet, props)
+          },
+        }),
+        mounting,
+      )
+    : mount(IncomeSheet, { props, ...mounting })
   await flushPromises()
   clock += 1000
   await new Promise((resolve) => setTimeout(resolve, 5))
@@ -96,6 +111,22 @@ async function fill(view: VueWrapper, amount: string, currency = 'RUB', source =
   await field(view, en.income.sheet.amount).get('input').setValue(amount)
   await field(view, en.income.sheet.currency).get('select').setValue(currency)
   if (source) await field(view, en.income.sheet.source).get('select').setValue(source)
+}
+
+/** The control, and whether it was marked at the moment the focus came to it. */
+function watchFocus(view: VueWrapper, label: string, tag: 'input' | 'select' = 'input') {
+  const control = field(view, label).get(tag).element as HTMLElement
+  const at = { marked: null as string | null }
+  control.addEventListener('focus', () => {
+    at.marked = control.getAttribute('aria-invalid')
+  })
+  return { control, at }
+}
+
+function saveButton(view: VueWrapper): HTMLButtonElement {
+  const button = view.findAll('button').find((one) => one.text() === en.income.sheet.save)
+  if (!button) throw new Error('no «Save income»')
+  return button.element
 }
 
 async function save(view: VueWrapper, label = en.income.sheet.save): Promise<void> {
@@ -212,6 +243,75 @@ describe('IncomeSheet', () => {
     expect(view.text()).toContain(hint)
   })
 
+  // A field refused is heard (MOL-333): the focus went nowhere, and nothing was said.
+  it('no source chosen: the focus goes to «Source», already marked', async () => {
+    const view = await render()
+    await fill(view, '99615', 'RUB', '')
+    const source = watchFocus(view, en.income.sheet.source, 'select')
+    saveButton(view).focus()
+    await save(view)
+    expect(record).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(source.control)
+    expect(source.at.marked).toBe('true')
+  })
+
+  it('the first field marked in the form takes it: the sum before the source', async () => {
+    const view = await render()
+    await fill(view, 'abc', 'RUB', '')
+    const amount = watchFocus(view, en.income.sheet.amount)
+    saveButton(view).focus()
+    await save(view)
+    expect(field(view, en.income.sheet.source).get('select').attributes('aria-invalid')).toBe(
+      'true',
+    )
+    expect(document.activeElement).toBe(amount.control)
+    expect(amount.at.marked).toBe('true')
+  })
+
+  it('a note refused from inside it keeps the focus there and says its error', async () => {
+    const view = await render(overview(), null, true)
+    await fill(view, '99615')
+    const note = field(view, en.income.sheet.note).get('input')
+    await note.setValue(String.fromCharCode(7))
+    ;(note.element as HTMLInputElement).focus()
+    await view.get('form').trigger('submit')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(record).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(note.element)
+    expect(document.querySelector('dialog .region')?.textContent).toContain(
+      en.income.sheet.bad_note,
+    )
+  })
+
+  it('a day the server refuses takes the focus from the button to the day', async () => {
+    record.mockRejectedValue(new ApiError(ERROR.INCOME_IN_FUTURE))
+    const view = await render()
+    await fill(view, '1')
+    const day = watchFocus(view, en.income.sheet.day)
+    saveButton(view).focus()
+    await save(view)
+    await flushPromises()
+    expect(document.activeElement).toBe(day.control)
+    expect(day.at.marked).toBe('true')
+  })
+
+  it('must not fire: a refusal landing after the sheet was put away moves no focus into it', async () => {
+    let refuse: (error: unknown) => void = () => undefined
+    record.mockReturnValue(new Promise((_, reject) => (refuse = reject)))
+    const view = await render()
+    await fill(view, '1')
+    await save(view)
+    await view.setProps({ open: false })
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    outside.focus()
+    refuse(new ApiError(ERROR.INCOME_IN_FUTURE))
+    await flushPromises()
+    await flushPromises()
+    expect(document.activeElement).toBe(outside)
+  })
+
   it('a day the server says has not come yet is said under the day', async () => {
     record.mockRejectedValue(new ApiError(ERROR.INCOME_IN_FUTURE))
     const view = await render()
@@ -299,6 +399,54 @@ describe('IncomeSheet', () => {
 
 // MOL-189, Ф-34, owner's В-1 «а»: removing is the amendment's, and only where the screen offers
 // «Вернуть» after it — never in a new income, never from an account's journal.
+// MOL-329, adversarial А2: a version's day is the sheet's day, which moves as the app comes back.
+describe('IncomeSheet: a version after midnight (MOL-329)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // «до» takes a date, never «вчера» (adversarial Д1); past New Year's midnight the date says its year.
+  it('a version of the 31st: no year at 23:50, its year once the app is back after New Year’s midnight', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-31T23:50:00.000Z'))
+    const at = new Date('2026-12-31T23:45:00.000Z')
+    const [version] = amended.history
+    if (!version) throw new Error('the fixture has a version')
+    const late: IncomeView = {
+      ...amended,
+      amendedAt: at,
+      history: [{ ...version, replacedAt: at }],
+    }
+    const view = await render(overview(), late)
+    expect(view.get('.versions li').text()).toMatch(/^until Dec 31: /)
+
+    vi.setSystemTime(new Date('2027-01-01T00:10:00.000Z'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(view.get('.versions li').text().replaceAll('\u00a0', ' ')).toMatch(
+      /^until Dec 31, 2026: /,
+    )
+  })
+
+  // Adversarial Г2 of round 4: a version of last year says the year of «until» and of its day.
+  it('a version of last year says its year', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00.000Z'))
+    const at = new Date('2025-09-25T09:00:00.000Z')
+    const [version] = amended.history
+    if (!version) throw new Error('the fixture has a version')
+    const old: IncomeView = {
+      ...amended,
+      receivedOn: '2025-09-15',
+      amendedAt: at,
+      history: [{ ...version, receivedOn: '2025-09-15', replacedAt: at }],
+    }
+    const view = await render(overview(), old)
+    const line = view.get('.versions li').text().replaceAll('\u00a0', ' ')
+    expect(line).toMatch(/^until Sep 25, 2025: .*Sep 15, 2025/)
+  })
+})
+
 describe('IncomeSheet: removing from the amendment (MOL-189)', () => {
   const words = (view: VueWrapper) => view.findAll('button').map((button) => button.text())
 

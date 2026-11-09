@@ -1,6 +1,7 @@
 import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
@@ -12,6 +13,7 @@ import type {
   ExchangeView,
 } from '@molvia/model'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
@@ -99,14 +101,27 @@ afterEach(() => {
 async function render(
   state: ExchangesResponse = overview(),
   editing: ExchangeView | null = null,
+  announced = false,
 ): Promise<VueWrapper> {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/money/exchange')
-  const view = mount(ExchangeSheet, {
-    props: { open: true, overview: state, record, amend, editing },
+  const props = { open: true, overview: state, record, amend, editing }
+  const mounting = {
     attachTo: document.body,
     global: { plugins: [router, createPinia(), createAppI18n('en')] },
-  })
+  }
+  // Under an announcer, as `App.vue` holds every sheet: what the sheet says lands in its region.
+  const view: VueWrapper = announced
+    ? mount(
+        defineComponent({
+          setup() {
+            provideAnnouncer()
+            return () => h(ExchangeSheet, props)
+          },
+        }),
+        mounting,
+      )
+    : mount(ExchangeSheet, { props, ...mounting })
   // Past the moment the sheet rises: until then it takes no tap at all.
   clock += 1000
   await new Promise((resolve) => setTimeout(resolve, 5))
@@ -124,6 +139,22 @@ function field(view: VueWrapper, label: string) {
 async function fill(view: VueWrapper, given: string, received: string): Promise<void> {
   await field(view, en.exchange.sheet.given).get('input').setValue(given)
   await field(view, en.exchange.sheet.received).get('input').setValue(received)
+}
+
+/** The field's input, and whether it was marked at the moment the focus came to it. */
+function watchFocus(view: VueWrapper, label: string) {
+  const input = field(view, label).get('input').element as HTMLInputElement
+  const at = { marked: null as string | null }
+  input.addEventListener('focus', () => {
+    at.marked = input.getAttribute('aria-invalid')
+  })
+  return { input, at }
+}
+
+function saveButton(view: VueWrapper): HTMLButtonElement {
+  const button = view.findAll('button').find((one) => one.text() === en.exchange.sheet.save)
+  if (!button) throw new Error('no «Save the exchange»')
+  return button.element
 }
 
 async function save(view: VueWrapper): Promise<void> {
@@ -365,6 +396,90 @@ describe('ExchangeSheet', () => {
     expect(view.text()).toContain(en.exchange.sheet.same_currency)
   })
 
+  // A field refused is heard (MOL-333): the focus goes to the first field marked, in the order of the
+  // form, once its error is drawn — it stayed on the button, and nothing was said.
+  it('a sum missing: the focus goes to the first field marked, already marked', async () => {
+    const view = await render()
+    await field(view, en.exchange.sheet.given).get('input').setValue('20000')
+    await field(view, en.exchange.sheet.day).get('input').setValue('')
+    const received = watchFocus(view, en.exchange.sheet.received)
+    saveButton(view).focus()
+    await save(view)
+    expect(record).not.toHaveBeenCalled()
+    // «Got» stands before the day in the form, and both are marked.
+    expect(field(view, en.exchange.sheet.day).get('input').attributes('aria-invalid')).toBe('true')
+    expect(document.activeElement).toBe(received.input)
+    expect(received.at.marked).toBe('true')
+  })
+
+  it('one currency on both sides: the focus goes to the currency of «Got»', async () => {
+    const view = await render()
+    await fill(view, '20000', '95000')
+    const select = view.findAll('select')[1]
+    await select?.setValue('RUB')
+    saveButton(view).focus()
+    await save(view)
+    expect(record).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(select?.element)
+  })
+
+  // «Done» on the keyboard sends the form with the focus in the note: nothing to move, so it is said.
+  it('a note refused from inside it keeps the focus there and says its error', async () => {
+    const view = await render(overview(), null, true)
+    await fill(view, '20000', '95000')
+    const note = field(view, en.exchange.sheet.note).get('input')
+    await note.setValue(String.fromCharCode(7))
+    ;(note.element as HTMLInputElement).focus()
+    await view.get('form').trigger('submit')
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    await flushPromises()
+    expect(record).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(note.element)
+    expect(document.querySelector('dialog .region')?.textContent).toContain(
+      en.exchange.sheet.bad_note,
+    )
+  })
+
+  it('must not fire: an exchange that saves moves no focus and says nothing', async () => {
+    record.mockReturnValue(new Promise(() => undefined))
+    const view = await render(overview(), null, true)
+    await fill(view, '20000', '95000')
+    const button = saveButton(view)
+    button.focus()
+    await save(view)
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(document.activeElement).toBe(button)
+    expect(document.querySelector('dialog .region')?.textContent.trim()).toBe('')
+  })
+
+  it('a day the server refuses takes the focus from the button to the day', async () => {
+    record.mockRejectedValue(new ApiError(ERROR.EXCHANGE_IN_FUTURE))
+    const view = await render()
+    await fill(view, '20000', '95000')
+    const day = watchFocus(view, en.exchange.sheet.day)
+    saveButton(view).focus()
+    await save(view)
+    await flushPromises()
+    expect(document.activeElement).toBe(day.input)
+    expect(day.at.marked).toBe('true')
+  })
+
+  it('must not fire: an answer refused after the sheet was put away moves no focus into it', async () => {
+    let refuse: (error: unknown) => void = () => undefined
+    record.mockReturnValue(new Promise((_, reject) => (refuse = reject)))
+    const view = await render()
+    await fill(view, '20000', '95000')
+    await save(view)
+    await view.setProps({ open: false })
+    const outside = document.createElement('button')
+    document.body.append(outside)
+    outside.focus()
+    refuse(new ApiError(ERROR.INVALID_RATE))
+    await flushPromises()
+    await flushPromises()
+    expect(document.activeElement).toBe(outside)
+  })
+
   it('keeps the sheet open with the day marked when the server says the day has not come', async () => {
     record.mockRejectedValue(new ApiError(ERROR.EXCHANGE_IN_FUTURE))
     const view = await render()
@@ -599,6 +714,76 @@ describe('ExchangeSheet: the channel in the versions (MOL-137, review)', () => {
     }
     const view = await render(overview({ exchanges: [amended] }), amended)
     expect(view.get('.versions li').text()).toContain(en.exchange.sheet.channel_exchanger)
+  })
+})
+
+// MOL-329, adversarial А2: a version's day is the sheet's day, which moves as the app comes back.
+describe('ExchangeSheet: a version after midnight (MOL-329)', () => {
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  // «до» takes a date, never «вчера» (adversarial Д1); past New Year's midnight the date says its year.
+  it('a version of the 31st: no year at 23:50, its year once the app is back after New Year’s midnight', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-12-31T23:50:00.000Z'))
+    const [base] = overview().exchanges
+    if (!base) throw new Error('the fixture has an exchange')
+    const at = new Date('2026-12-31T23:45:00.000Z')
+    const amended: ExchangeView = {
+      ...base,
+      revision: 2,
+      amendedAt: at,
+      history: [
+        {
+          given: base.given,
+          received: base.received,
+          exchangedOn: base.exchangedOn,
+          heldBefore: null,
+          note: null,
+          channel: null,
+          replacedAt: at,
+        },
+      ],
+    }
+    const view = await render(overview({ exchanges: [amended] }), amended)
+    expect(view.get('.versions li').text()).toMatch(/^until Dec 31: /)
+
+    vi.setSystemTime(new Date('2027-01-01T00:10:00.000Z'))
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(view.get('.versions li').text().replaceAll('\u00a0', ' ')).toMatch(
+      /^until Dec 31, 2026: /,
+    )
+  })
+
+  // Adversarial Г2 of round 4: a version of last year says the year of «until» and of its day.
+  it('a version of last year says its year', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00.000Z'))
+    const [base] = overview().exchanges
+    if (!base) throw new Error('the fixture has an exchange')
+    const at = new Date('2025-09-25T09:00:00.000Z')
+    const old: ExchangeView = {
+      ...base,
+      exchangedOn: '2025-09-16',
+      revision: 2,
+      amendedAt: at,
+      history: [
+        {
+          given: base.given,
+          received: base.received,
+          exchangedOn: '2025-09-16',
+          heldBefore: null,
+          note: null,
+          channel: null,
+          replacedAt: at,
+        },
+      ],
+    }
+    const view = await render(overview({ exchanges: [old] }), old)
+    const line = view.get('.versions li').text().replaceAll('\u00a0', ' ')
+    expect(line).toMatch(/^until Sep 25, 2025: .* · Sep 16, 2025/)
   })
 })
 

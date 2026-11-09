@@ -815,6 +815,12 @@ describe('ItemDetailsSheet · «Тут дешевле» (MOL-92)', () => {
     expect(spaced(hint(view).text())).toBe('Дешевле всего брали в Зовуни — 540 ֏/л, 12.09')
   })
 
+  // One's own history goes back across years, and the sheet has no month's caption (MOL-329, adversarial Ж1).
+  it('a price of last year says its year', async () => {
+    const { view } = await priced(history([place(ZOVUNI, 540, '2025-09-12')]))
+    expect(spaced(hint(view).text())).toBe('Дешевле всего брали в Зовуни — 540 ֏/л, 12.09.2025')
+  })
+
   it('asks by the city of a record still in the queue — the server has not seen it (review №1)', async () => {
     useTripQueueStore().enqueue({
       kind: 'start',

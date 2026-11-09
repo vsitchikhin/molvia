@@ -839,6 +839,23 @@ describe('ReconcileSheet (handoff 05)', () => {
 })
 
 describe('AccountSheet (handoff 03)', () => {
+  // A sheet has no caption of a month over it to say the year (MOL-329, adversarial Ж1).
+  it('the start of an account of last year says its year', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-11-02T12:00:00Z'))
+    try {
+      const old = account('Cash ֏', 'AMD', { startOn: '2025-09-16' })
+      const view = await mounted(
+        AccountSheet,
+        { open: true, account: old, spendCurrency: 'AMD' },
+        withAccounts([old]),
+      )
+      expect(view.text()).toContain('September 16, 2025')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('refuses an empty name and a name already there, under the field, before sending', async () => {
     const cash = account('Cash ֏')
     const view = await mounted(
@@ -876,7 +893,7 @@ describe('AccountSheet (handoff 03)', () => {
       })
       const save = button(view, en.accounts.sheet.save)
       ;(save?.element as HTMLButtonElement).focus()
-      return { date, save, invalidAtFocus: () => invalidAtFocus }
+      return { view, date, save, invalidAtFocus: () => invalidAtFocus }
     }
 
     it('cleared on the phone: nothing is sent, the focus goes to the day, marked', async () => {
@@ -899,6 +916,24 @@ describe('AccountSheet (handoff 03)', () => {
       expect(
         document.getElementById(date.attributes('aria-errormessage') ?? '')?.textContent,
       ).toContain(en.error.money_account_in_future)
+    })
+
+    // MOL-333, adversarial Р2-А3: the answer landing after the sheet was swept away moves no focus into it.
+    it('must not fire: refused by the server after the sheet was put away, it moves no focus', async () => {
+      let refuse: (error: unknown) => void = () => undefined
+      addMoneyAccount.mockReturnValue(new Promise((_, reject) => (refuse = reject)))
+      const { view, save } = await typed('2026-10-31')
+      await save?.trigger('click')
+      await flushPromises()
+      await view.setProps({ open: false })
+      await flushPromises()
+      const outside = document.createElement('button')
+      document.body.append(outside)
+      outside.focus()
+      refuse(new ApiError(ERROR.MONEY_ACCOUNT_IN_FUTURE, 'future', true))
+      await flushPromises()
+      await flushPromises()
+      expect(document.activeElement).toBe(outside)
     })
   })
 

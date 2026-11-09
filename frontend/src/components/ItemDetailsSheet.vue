@@ -37,7 +37,9 @@
       <div class="per-unit-box">
         <div class="per-unit">
           <span class="per-unit-label">{{ t('item.unit_price_label') }}</span>
-          <span class="per-unit-value">{{ perUnit ?? '—' }}</span>
+          <span class="per-unit-value" :style="figureChars(perUnit ?? '—')">{{
+            perUnit ?? '—'
+          }}</span>
         </div>
         <AppReveal>
           <!-- Keyed by its words: a line that says something else goes and comes rather than changing
@@ -50,18 +52,30 @@
             data-hint="item"
           >
             <component :is="itemHint.icon" class="hint-icon" aria-hidden="true" />
-            <span>{{ itemHint.text }}</span>
+            <span
+              >{{ itemHint.parts.before
+              }}<span class="money" :style="figureChars(itemHint.parts.figure, 'text')">{{
+                itemHint.parts.figure
+              }}</span
+              >{{ itemHint.parts.after }}</span
+            >
           </p>
         </AppReveal>
         <AppReveal>
           <p
             v-if="alternativeHint"
-            :key="alternativeHint"
+            :key="alternativeHint.text"
             class="hint hint-alternative"
             data-hint="alternative"
           >
             <IconSwapHorizontal class="hint-icon" aria-hidden="true" />
-            <span>{{ alternativeHint }}</span>
+            <span
+              >{{ alternativeHint.parts.before
+              }}<span class="money" :style="figureChars(alternativeHint.parts.figure, 'text')">{{
+                alternativeHint.parts.figure
+              }}</span
+              >{{ alternativeHint.parts.after }}</span
+            >
           </p>
         </AppReveal>
       </div>
@@ -159,6 +173,7 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { formatRating, unitPriceText } from '@/components/adviceRow'
+import { aroundFigure, figureChars } from '@/components/figure'
 import { useCheaperHint } from '@/composables/useCheaperHint'
 import type { HintRecord } from '@/composables/useCheaperHint'
 import { useCurrentTrip } from '@/composables/useCurrentTrip'
@@ -166,7 +181,8 @@ import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useItemDetails } from '@/composables/useItemDetails'
 import { keyedIn } from '@/composables/useKeyboardInset'
 import type { DetailsField, RetryPurchase } from '@/composables/useItemDetails'
-import { calendarDay } from '@/days'
+import { useLocalDay } from '@/composables/useLocalDay'
+import { calendarDayOfAnyYear } from '@/days'
 import { useRecentItemsStore } from '@/stores/recentItems'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -353,8 +369,10 @@ export default defineComponent({
       currency: () => details.currency.value,
       unit: () => details.unit.value,
     })
+    // One's own history goes back across years, and a sheet has no month's caption over it (MOL-329, Ж1).
+    const today = useLocalDay()
     const shortDay = (day: string) =>
-      calendarDay(day, locale.value, { day: '2-digit', month: '2-digit' })
+      calendarDayOfAnyYear(day, locale.value, today.value, { day: '2-digit', month: '2-digit' })
     const HINT_ICONS = {
       best: IconArrowDown,
       there: IconArrowDown,
@@ -369,22 +387,26 @@ export default defineComponent({
         price: unitPriceText(item.place.unitPrice, t, locale.value),
         day: shortDay(item.place.day),
       }
+      const text = t(`item.cheaper.${item.kind}${item.here ? '_here' : ''}`, named)
       return {
         kind: item.kind,
         icon: HINT_ICONS[item.kind],
-        text: t(`item.cheaper.${item.kind}${item.here ? '_here' : ''}`, named),
+        text,
+        parts: aroundFigure(text, named.price),
       }
     })
     const alternativeHint = computed(() => {
       const other = hint.value.alternative
       if (!other) return null
-      return t('item.cheaper.alternative', {
+      const price = unitPriceText(other.place.unitPrice, t, locale.value)
+      const text = t('item.cheaper.alternative', {
         name: other.name,
-        price: unitPriceText(other.place.unitPrice, t, locale.value),
+        price,
         place: other.place.name,
         day: shortDay(other.place.day),
         rating: formatRating(other.rating, locale.value),
       })
+      return { text, parts: aroundFigure(text, price) }
     })
 
     // Read out through the app's one live region, not a region of its own born with the sheet —
@@ -394,7 +416,7 @@ export default defineComponent({
       [
         perUnit.value ? t('item.unit_price_announced', { value: perUnit.value }) : null,
         itemHint.value?.text ?? null,
-        alternativeHint.value,
+        alternativeHint.value?.text ?? null,
       ]
         .filter((line) => line !== null)
         .join('. '),
@@ -598,6 +620,7 @@ export default defineComponent({
     }
 
     return {
+      figureChars,
       t,
       open,
       form,
@@ -657,8 +680,12 @@ export default defineComponent({
   color: var(--good-ink);
 }
 
+/* A line that wraps only where its least widths do not fit, and the box its figure measures itself against
+   (MOL-321): at 150 % «12 800 ֏/кг» stood past it (MOL-334). */
 .per-unit {
   display: flex;
+  flex-wrap: wrap;
+  container-type: inline-size;
   align-items: baseline;
   justify-content: space-between;
   gap: var(--space-3);
@@ -677,6 +704,15 @@ export default defineComponent({
   font-size: var(--text-footnote);
   line-height: var(--leading-snug);
   overflow-wrap: anywhere;
+  container-type: inline-size;
+}
+
+/* The price whole in the words around it, shrunk to the line less the icon where even the line is narrower
+   (`figure-fit`, MOL-334, owner's В-6 «а»): at 200 % «125 403,50 ֏/кг» broke as «125 403,50 / ֏/кг». */
+.money {
+  @include figure-fit(1em, $less: calc(var(--icon-sm) + var(--space-2)));
+
+  white-space: nowrap;
 }
 
 .hint-icon {
@@ -702,14 +738,16 @@ export default defineComponent({
 }
 
 .per-unit-label {
+  flex: 1 1 min-content;
   font-size: var(--text-footnote);
   font-weight: var(--weight-medium);
 }
 
 .per-unit-value {
   @include display-type;
+  @include figure-fit(var(--text-title));
 
-  font-size: var(--text-title);
+  margin-inline-start: auto;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }

@@ -17,7 +17,7 @@
     "dev:api": "npm run dev -w @molvia/backend",
     "dev:pwa": "npm run dev -w @molvia/frontend",
     "dev:bot": "npm run dev -w @molvia/bot",
-    "lint": "npm run lint --workspaces --if-present && eslint . && npm run lint:style -w @molvia/frontend && node bin/check-code-map.mjs && node bin/check-clock-bounds.mjs && node bin/check-ordered-reads.mjs && node bin/check-playwright-image.mjs && node bin/design-md.mjs --check frontend/DESIGN.md",
+    "lint": "npm run lint --workspaces --if-present && eslint . && npm run lint:style -w @molvia/frontend && node bin/check-code-map.mjs && node bin/check-clock-bounds.mjs && node bin/check-ordered-reads.mjs && node bin/check-playwright-image.mjs && node bin/check-pins.mjs && node bin/design-md.mjs --check frontend/DESIGN.md",
     "format": "node bin/design-md.mjs --write frontend/DESIGN.md && prettier --write . && npm run lint:fix --workspaces --if-present && eslint . --fix && npm run lint:style -w @molvia/frontend -- --fix",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit -p packages/model && tsc --noEmit -p packages/client && tsc --noEmit -p backend && tsc --noEmit -p bot && tsc --noEmit -p deploy/watch && tsc --noEmit -p deploy/watch/tests && vue-tsc --noEmit -p frontend && tsc --noEmit",
@@ -29,16 +29,16 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.64.1",
-    "@types/node": "^26.6.5",
-    "@vitest/coverage-v8": "^5.0.5",
+    "@types/node": "^26.6.6",
+    "@vitest/coverage-v8": "^5.1.0",
     "@vue/eslint-config-typescript": "^14.9.0",
     "@vue/test-utils": "^2.5.1",
     "concurrently": "^10.0.6",
     "esbuild": "^0.28.2",
-    "eslint": "^10.13.0",
+    "eslint": "^10.14.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-vue": "^10.11.1",
-    "globals": "^17.13.0",
+    "eslint-plugin-vue": "^10.12.0",
+    "globals": "^17.14.0",
     "happy-dom": "^21.0.4",
     "postcss-html": "^2.0.0",
     "postgres": "^4.0.0",
@@ -49,6 +49,6 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.0",
-    "vue-tsc": "^3.3.13"
+    "vue-tsc": "^3.3.14"
   }
 }

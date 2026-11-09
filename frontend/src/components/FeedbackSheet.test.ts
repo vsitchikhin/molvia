@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { defineComponent, h } from 'vue'
 import { flushPromises, mount, type VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
@@ -11,6 +12,7 @@ import { createAppI18n } from '@/i18n'
 import { pwaUpdateKey, NO_UPDATE } from '@/pwaUpdate'
 import { routes } from '@/router'
 import FeedbackSheet from '@/components/FeedbackSheet.vue'
+import { provideAnnouncer } from '@/composables/useAnnouncer'
 import type * as FeedbackPictureExports from '@/feedbackPicture'
 import { useActorStore } from '@/stores/actor'
 import {
@@ -48,17 +50,32 @@ function online(value: boolean): void {
 }
 
 /** The sheet over a screen, the way `App.vue` holds it: mounted once, shut until a way in opens it. */
-async function render(screen = '/settings', build: string | null = null) {
+async function render(screen = '/settings', build: string | null = null, announced = false) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push(screen)
-  const wrapper = mount(FeedbackSheet, {
+  const mounting = {
     attachTo: document.body,
     global: {
       plugins: [router, createAppI18n('en')],
       provide: { [pwaUpdateKey as symbol]: { ...NO_UPDATE, build: () => build } },
     },
-  })
-  mounted.push(wrapper)
+  }
+  // Under an announcer, as `App.vue` holds it: what the sheet says lands in its region.
+  const host = announced
+    ? mount(
+        defineComponent({
+          setup() {
+            provideAnnouncer()
+            return () => h(FeedbackSheet)
+          },
+        }),
+        mounting,
+      )
+    : null
+  const wrapper: VueWrapper = host
+    ? host.findComponent(FeedbackSheet)
+    : mount(FeedbackSheet, mounting)
+  mounted.push(host ?? wrapper)
   return { wrapper, router }
 }
 
@@ -859,6 +876,35 @@ describe('sending', () => {
     expect(sheet.text()).toContain(en.feedback.unsupported)
     await type(sheet, 'Broken')
     expect(sheet.text()).not.toContain(en.feedback.unsupported)
+  })
+
+  // Words refused are heard (MOL-333): the button kept the focus, and the error under the field was unheard.
+  it('a character that cannot be sent: the focus goes from the button to the field, already marked', async () => {
+    const { wrapper } = await render()
+    const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.bug)
+    await type(sheet, `Broken ${String.fromCodePoint(0xe000)}`)
+    const field = textarea(sheet).element
+    let marked: string | null = null
+    field.addEventListener('focus', () => (marked = field.getAttribute('aria-invalid')))
+    ;(button(sheet).element as HTMLButtonElement).focus()
+    await press(sheet)
+    expect(sendFeedback).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(field)
+    expect(marked).toBe('true')
+  })
+
+  it('refused with the focus in the field: its error is said in the sheet', async () => {
+    const { wrapper } = await render('/settings', null, true)
+    const sheet = await open(wrapper)
+    await choose(sheet, en.feedback.kinds.bug)
+    await type(sheet, `Broken ${String.fromCodePoint(0xe000)}`)
+    textarea(sheet).element.focus()
+    await press(sheet)
+    await new Promise((resolve) => setTimeout(resolve, 150))
+    expect(sendFeedback).not.toHaveBeenCalled()
+    expect(document.activeElement).toBe(textarea(sheet).element)
+    expect(document.querySelector('dialog .region')?.textContent).toContain(en.feedback.unsupported)
   })
 
   it('takes no more than the bound, and counts the last of it', async () => {

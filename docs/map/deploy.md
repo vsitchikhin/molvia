@@ -19,6 +19,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 ## backend · tests
 
+- `backend/tests/compose-volumes.integration.test.ts` — Integration test: `frontend-volumes` and `victoria-volumes` give every volume their service mounts, and only those, to the uid and gid the Dockerfiles of Caddy and VictoriaMetrics run as, by numbers, as root on their service's image with no network and `CHOWN`, `DAC_READ_SEARCH` alone, each waited for.
 - `backend/tests/compose.ts` — Test helper: `docker-compose.prod.yml` as text and each service's block of lines, for the tests that hold its shape.
 - `backend/src/db/journal.test.ts` — Unit test: the journal of migrations is numbered in order and every stamp is later than the one before it.
 - `backend/tests/migration-stamps.integration.test.ts` — Integration test: a migration drizzle skipped because its stamp is older than one applied is named, and stops the chain.
@@ -51,7 +52,8 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 - `.github/workflows/release.yml` — Release workflow: after green CI on master builds the six images — the receipt reader's and the metrics' two (MOL-145) too — and rolls them out over ssh; a version tag names built images; the outside watch goes to Cloudflare in a job of its own (MOL-221).
 - `.github/workflows/watch.yml` — The certificate's term from outside (MOL-142, MOL-221): hourly, more than fourteen days left to the healthchecks.io check «molvia-cert», fewer a `/fail`; red only when it could not report. The site is the Worker's, `deploy/watch/`.
 - `bin/bundle.mjs` — esbuild bundler for the API and bot images; the API also gets its forget, seed-catalogue, gates, failures, merge, notify, repack-receipts and rename-receipt-items tools.
-- `deploy/Caddyfile` — Caddy config: TLS for the domain, `/api` stripped and proxied to the API, internal routes closed, SPA fallback, headers, no access log.
+- `deploy/Caddyfile` — Caddy config: TLS for the domain, `/api` stripped and proxied to the API, internal routes closed, SPA fallback, headers — `frame-ancestors 'none'` and HSTS but on localhost (MOL-363) — no access log.
+- `backend/tests/caddyfile.integration.test.ts` — Test of the Caddyfile as text (MOL-363): the audit's three headers kept, the one CSP of Caddy is `frame-ancestors 'none'`, HSTS a year with no preload or subdomains and never for localhost.
 - `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, signals, the metrics and their alarms (MOL-145), backups and restore, the Postgres image and its move off alpine.
 - `deploy/backup/backup.env.example` — Template of the server's `backup.env`: age recipient, R2 remote, healthchecks.io URL, retention days.
 - `deploy/backup/backup.sh` — Nightly backup: `pg_dump` in the container without the data of receipt photos and cut-out lines (MOL-125), encrypted to the owner's age key, streamed to R2, pinged to healthchecks.io.

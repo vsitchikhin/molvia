@@ -238,7 +238,8 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
 - **The limit is the process's** (Р-6): sixty reports a minute from an address — three buffers: one
   was too few for a mobile operator's address, which thousands of phones share (adversarial А6) — and
   two hundred from everybody, the whole body refused past it with `429`, which the phone keeps its
-  buffer through. The address is the one Caddy names last in `X-Forwarded-For`, believed only from
+  buffer through — a minute of a clock that never steps back (`addressMinute`, MOL-359, adversarial А1).
+  The address is the one Caddy names last in `X-Forwarded-For`, believed only from
   inside, **an IPv6 one by its `/48`** (review №2, adversarial Б4, В2: one home connection has 2^64 in
   its `/64`, a flat's router is given a `/56`, and a free tunnel a whole `/48`), the limit's key and
   nothing else — in no log, in no table. **The channel can be silenced, not flooded** — the price,
@@ -283,7 +284,11 @@ build); the owner's decisions of this task are В-1…В-4 in `.scratch/tasks/re
   the new rows of every phone behind the same address — telling phones apart would need a mark of the
   device, which is tracking. The nightly copy keeps the table: what is in it is bounded.
 - **A sender is let go an hour after its last failure, by both budgets — and the route's minute after
-  its minute** (MOL-241, owner's В-1 «а»): `forget`, on a minute timer of its own — the failures' cleanup waits on the database, and a query
+  its minute** (MOL-241, owner's В-1 «а»), **the hour and the minute by a clock that never steps back**
+  (`monotonic`, MOL-359, adversarial Б1, owner's В-3 «а»): by the wall clock a step of NTP back by ten
+  minutes kept an address seventy against the page's «час», and a step forward gave a sender sixty more
+  rows; a place given back is the very one taken (`claim`, `ask` hand back how), never a neighbour's.
+  The summary «скрыто» keeps its hour by the same clock. Let go by `forget`, on a minute timer of its own — the failures' cleanup waits on the database, and a query
   hung there would hold the next tick as long, since the pool has no timeout — whether or not an
   owner is set. `claim` is asked of every failure of a phone, a known fingerprint
   too, and the row budget let go of nobody: every address that ever sent a failure stayed in memory,
@@ -346,7 +351,54 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
 - **What sees the whole machine or the database has no way out** (Р-7, Р-8): VictoriaMetrics,
   node_exporter, cAdvisor and postgres_exporter are on `metrics`, an `internal` network; Postgres and
   the API join it beside their own. cAdvisor reads Docker's socket — root on the machine — and
-  postgres_exporter logs in as the database's own user (В-5): neither can send anything anywhere.
+  neither it nor postgres_exporter can send anything anywhere. **postgres_exporter logs in as
+  `molvia_metrics`, never the database's own user** (MOL-366, Ф-8 of MOL-287): `pg_monitor` — the
+  statistics, the settings, every session's state — and not one table, so a broken exporter reads no
+  person and writes nothing. No way out kept it from taking anything away, never from erasing it: the
+  database's own user is the cluster's superuser (В-5 of MOL-145, taken back). **Nor does it hold a lock
+  the API waits on** (adversarial А1): the advisory locks of the API's database are revoked from `PUBLIC`
+  — the API waits on them with no term, their keys are strings of a public repository, and one key held
+  closed the login for everybody, ten waiting the API's whole pool; the API, a superuser, keeps them.
+  **Nor the disk** (owner's В-4 «б», adversarial А2в): no temporary table in any database of the cluster
+  — revoked from `PUBLIC` and from the role — no database but the API's to log in to, its grant there the
+  role's own, and `temp_file_limit` 64 MB, a setting only a superuser lifts; three connections at most.
+  **A database made after the API's start keeps `PUBLIC`'s defaults until its next start** (adversarial
+  В1): no trigger fires on `CREATE DATABASE`, and its rights come from no template. So `restore.sh --into-prod`, which makes the
+  API's database anew while the exporter runs on, takes its temporary tables at once and then closes the
+  role's sessions — a table made in the moment between is written to after the revoke, and goes only with
+  its session (adversarial В2) — and closes them again once `pg_restore` is done, since the copy's revoke
+  of the advisory locks comes last and a lock taken meanwhile outlives the API's start under the same
+  password (В3); a session left is a failure of the restore — and **`pg_hba.conf`
+  lets the role into the API's database alone** (owner's В-5 «б»):
+  `host <db> molvia_metrics all scram-sha-256` before `host all molvia_metrics all reject`, a step by
+  hand on every machine (`deploy/README.md`, «Metrics») — the file is the volume's, so no test holds it,
+  and a machine set up without it is open to a database made by hand until the API's next start.
+  **The role is the API's, made at every start** (`ensureMetricsRole`, В-1
+  «а»), never a migration's: a role is the cluster's, a migration runs in each of its databases, and
+  `pg_dump` carries none — a machine restored from a copy would have had no role behind a journal that
+  says everything ran. **Its form is set again each time** (adversarial А2б, А4): its attributes, its term
+  (`valid until`), its settings — those it may give itself for one database too — and `pg_monitor` its
+  one membership; grants on objects are not looked at, since nothing grants any. One start at a time in a
+  database, by an advisory lock of its own (А5). Its password, `METRICS_DB_PASSWORD`, goes as a SCRAM
+  verifier the API counts — the password itself never in a statement, which a failure writes into
+  Postgres's log — and only when another; then the role's sessions are closed before the write, so one
+  holding its row in an open transaction cannot leave the start waiting (А3), and after it, and the
+  verifier read again — a session may change its own password between the commit and its end; one left
+  open, or a password not the one written, is a failure. A lock the role holds is waited on five seconds
+  at most. A failure of it is `job:metrics-role` and the API runs on (В-2 «а»): the exporter not let in is
+  «Метрики молчат». Unset — a copy, end-to-end, CI — the role is left alone. **The prices:** five seconds a
+  statement is the exporter's default, never a bound — any session lifts it with `SET` (adversarial А2),
+  `work_mem` too (Б3б): a broken exporter can still burn the CPU and the memory of the database through its
+  three connections, as the superuser could before (В-4 «б»: the disk closed, not those); **a leaked password
+  can silence the metrics of Postgres** — hold the three connections, so the exporter, a fourth, is refused
+  (Б1), or change the role's own password, which Postgres lets every role do (Б2) — until the API's next
+  start: «Метрики молчат» says so, the reverse of hiding, and no role can be kept from either;
+  `pg_monitor` reads the text of every running query (no value in it: the API's queries are
+  parameterised), the names of the tables and how many rows they hold, and the verifier while its
+  `ALTER ROLE` runs — of no use without an exchange taken off the network, and a broken exporter is
+  handed the new password by its environment anyway; `pg_hba` lets any container of `metrics` try the
+  password; and nothing removes the role — taking the exporter away leaves it until `drop owned by molvia_metrics`
+  and `drop role` by hand, its grant on the database being its own.
   node_exporter is not on the host's network, which would be a port outside, so the machine's network
   counters are not there. **Grafana is in `metrics` and in `alerts` of its own**, for Telegram and the
   pulse — not in `default` (review №4), beside Caddy, the API, the bot and the receipt reader, which
