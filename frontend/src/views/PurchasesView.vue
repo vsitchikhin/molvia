@@ -272,7 +272,12 @@ import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { usePendingFrom } from '@/composables/usePendingFrom'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
-import { WORKING, rejectedReason, useReceipts } from '@/composables/useReceipts'
+import {
+  REJECTED_REASON_COUNTS,
+  WORKING,
+  rejectedReason,
+  useReceipts,
+} from '@/composables/useReceipts'
 import type { ReceiptRow } from '@/composables/useReceipts'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTripHistory } from '@/composables/useTripHistory'
@@ -536,6 +541,7 @@ export default defineComponent({
           return t('purchases.rejected_meta', {
             reason: t(
               `purchases.reasons.${rejectedReason(row.rejected?.code ?? 'error.internal')}`,
+              REJECTED_REASON_COUNTS,
             ),
           })
         case 'parsing':

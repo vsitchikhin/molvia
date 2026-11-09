@@ -1,6 +1,11 @@
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
-import { ERROR, receiptsResponseCodec } from '@molvia/model'
+import {
+  ERROR,
+  RECEIPTS_DAY_MAX,
+  RECEIPTS_UNRECORDED_MAX,
+  receiptsResponseCodec,
+} from '@molvia/model'
 import type { Money, ReceiptSummary, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import { useKeptAnswer } from '@/composables/useKeptAnswer'
@@ -39,14 +44,23 @@ export interface ReceiptRow {
 /** Why a receipt was not accepted, in the words of «Не принят: …». */
 export function rejectedReason(
   code: WireCode,
-): 'not_photo' | 'too_large' | 'lost' | 'link' | 'other' {
+): 'not_photo' | 'too_large' | 'lost' | 'link' | 'day_limit' | 'unrecorded_limit' | 'other' {
   if (code === ERROR.RECEIPT_NOT_PHOTO) return 'not_photo'
   // a receipt's link the server did not take (MOL-232): the phone checks it first, so an old build
   if (code === ERROR.RECEIPT_LINK_INVALID) return 'link'
   if (code === ERROR.RECEIPT_TOO_LARGE) return 'too_large'
   if (code === ERROR.NOT_FOUND) return 'lost'
+  // the person's quota (MOL-360): the words name its number, never a copy of it
+  if (code === ERROR.RECEIPTS_DAY_LIMITED) return 'day_limit'
+  if (code === ERROR.RECEIPTS_UNRECORDED_LIMITED) return 'unrecorded_limit'
   return 'other'
 }
+
+/** The numbers the words of a reason name (MOL-360): the quota is the model's. */
+export const REJECTED_REASON_COUNTS = {
+  day: RECEIPTS_DAY_MAX,
+  unrecorded: RECEIPTS_UNRECORDED_MAX,
+} as const
 
 /** The rows a working section shows (`Разбираем`), and the ones to look at (`Посмотреть и записать`). */
 export const WORKING: readonly ReceiptRowState[] = [
