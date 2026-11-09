@@ -11,9 +11,11 @@ import {
 import type { ReceiptPhotoBody } from '@molvia/model'
 import { madeUpSerbianLink } from '@molvia/model/testing/serbian-receipt'
 import type { FastifyInstance } from 'fastify'
+import type { Sql } from 'postgres'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
-import { actors, receiptMisses, receipts, taxReceiptDays } from '@/db/schema'
+import type { ReadOutcome } from '@/db/receipts-repository'
+import { actors, receiptMisses, receiptReasonDays, receipts, taxReceiptDays } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertPlace, insertTrip, signIn } from './fixtures'
@@ -68,6 +70,33 @@ const parsed = (): ReceiptPhotoBody => ({
   language: 'ru',
   capturedAt: new Date('2026-11-09T08:15:00.000Z'),
 })
+
+/** Until `n` statements of this database wait on a lock: a step of a race seen, never a time. */
+async function waitingOn(watcher: Sql, n: number): Promise<void> {
+  for (;;) {
+    const row = onlyRow(
+      await watcher<{ n: number }[]>`
+        select count(*)::int as n from pg_stat_activity
+        where datname = current_database() and wait_event_type = 'Lock'`,
+    )
+    if ((row?.n ?? 0) >= n) return
+    await new Promise((resolve) => setTimeout(resolve, 25))
+  }
+}
+
+/** What the model's reading hands `finish` for a shot with no line in it: «переснимите», its copy kept. */
+function reshoot(
+  parts: readonly { readonly position: number; readonly photo: Buffer }[],
+): ReadOutcome {
+  return {
+    kind: 'failed',
+    failure: 'reshoot',
+    readerVersion: 'claude-haiku-5-5@v5',
+    head: null,
+    miss: { reading: { lines: [] }, parts },
+    tell: true,
+  }
+}
 
 let counter = 0
 const byLink = () => ({
@@ -321,17 +350,7 @@ describe('the account locked first (MOL-360, review 1, №2, adversarial А3)', 
     const eraser = connectDrizzle()
     const sender = connectDrizzle()
     const watcher = connect()
-    const waitingOnLocks = async (n: number) => {
-      for (;;) {
-        const row = onlyRow(
-          await watcher<{ n: number }[]>`
-            select count(*)::int as n from pg_stat_activity
-            where datname = current_database() and wait_event_type = 'Lock'`,
-        )
-        if ((row?.n ?? 0) >= n) return
-        await new Promise((resolve) => setTimeout(resolve, 25))
-      }
-    }
+    const waitingOnLocks = (n: number) => waitingOn(watcher, n)
     try {
       // erasure held between the account's lock and its rows: a session of the person locked elsewhere
       let letGo: () => void = () => undefined
@@ -362,6 +381,119 @@ describe('the account locked first (MOL-360, review 1, №2, adversarial А3)', 
       await eraser.close()
       await sender.close()
       await watcher.end()
+    }
+  }, 30_000)
+})
+
+describe('a reading ends beside «Вернуть» and erasure (MOL-360, review 2, Б1, Б1б)', () => {
+  /** A person granted the model, the edition of the review accepted: a reading keeps a copy keyed to them. */
+  async function granted() {
+    return owner({
+      consentVersion: POLICY_VERSION,
+      consentedAt: new Date(),
+      receiptsModelUntil: new Date(Date.now() + 30 * 86_400_000),
+    })
+  }
+
+  async function claimed(me: Owner) {
+    const body = parsed()
+    await repository.create(me.id, body, '2026-11-09')
+    await repository.putPart(me.id, body.id, 1, {
+      photo: Buffer.alloc(4096, 7),
+      width: 1200,
+      height: 3200,
+    })
+    const next = await repository.claimNext()
+    expect(next?.id).toBe(body.id)
+    return { id: body.id, parts: next?.parts ?? [] }
+  }
+
+  /**
+   * The reading held between its receipt's row and its copy — the tally of reasons busy a moment — while
+   * `other` starts; then let go. Both outcomes, as they settled.
+   */
+  async function raced(
+    read: {
+      readonly id: string
+      readonly parts: readonly { readonly position: number; readonly photo: Buffer }[]
+    },
+    other: () => Promise<unknown>,
+  ) {
+    const blocker = connect()
+    const reader = connectDrizzle()
+    const watcher = connect()
+    try {
+      let letGo: () => void = () => undefined
+      const gate = new Promise<void>((resolve) => (letGo = resolve))
+      let held: () => void = () => undefined
+      const holdingNow = new Promise<void>((resolve) => (held = resolve))
+      const holding = blocker.begin(async (tx) => {
+        await tx`select 1 from receipt_reason_days for update`
+        held()
+        await gate
+      })
+      await holdingNow
+      const finishing = createReceiptRepository(reader.db).finish(read.id, reshoot(read.parts))
+      finishing.catch(() => undefined) // judged below, by allSettled
+      await waitingOn(watcher, 1) // the reading waits at the tally
+      const running = other()
+      running.catch(() => undefined) // judged below, by allSettled
+      await waitingOn(watcher, 2) // the other waits on what the reading holds
+      letGo()
+      await holding
+      return await Promise.allSettled([finishing, running])
+    } finally {
+      await blocker.end()
+      await reader.close()
+      await watcher.end()
+    }
+  }
+
+  it('«Вернуть» of a receipt removed while read waits for the reading, and both stand (Б1)', async () => {
+    const me = await granted()
+    const earlier = await claimed(me)
+    await repository.finish(earlier.id, reshoot(earlier.parts))
+    expect(
+      (await db.select({ n: receiptReasonDays.n }).from(receiptReasonDays)).length,
+    ).toBeGreaterThan(0)
+    const read = await claimed(me)
+    await repository.remove(me.id, read.id)
+
+    const phone = connectDrizzle()
+    try {
+      const [finished, restored] = await raced(read, () =>
+        createReceiptRepository(phone.db).restore(me.id, read.id),
+      )
+      expect(finished.status).toBe('fulfilled')
+      expect(restored).toEqual({ status: 'fulfilled', value: true })
+      expect((await held(read.id)).deletedAt).toBeNull()
+    } finally {
+      await phone.close()
+    }
+  }, 30_000)
+
+  it('erasure while a reading ends waits for it and takes everything (Б1б)', async () => {
+    const me = await granted()
+    const read = db.select({ tg: actors.telegramUserId }).from(actors).where(eq(actors.id, me.id))
+    const { tg } = there(onlyRow(await read))
+    const earlier = await claimed(me)
+    await repository.finish(earlier.id, reshoot(earlier.parts))
+    const reading = await claimed(me)
+
+    const eraser = connectDrizzle()
+    try {
+      const [finished, erased] = await raced(reading, () =>
+        createErasureRepository(eraser.db).erase(tg, { dryRun: false }),
+      )
+      expect(finished.status).toBe('fulfilled')
+      expect(erased.status).toBe('fulfilled')
+      const left = db
+        .select({ n: sql<number>`count(*)::int` })
+        .from(receipts)
+        .where(eq(receipts.actorId, me.id))
+      expect(there(onlyRow(await left)).n).toBe(0)
+    } finally {
+      await eraser.close()
     }
   }, 30_000)
 })
