@@ -2029,10 +2029,15 @@ audit MOL-287, `probes/receipt-flood.mts`): the disk full, Postgres stops, and t
 - **The same receipt sent again is answered whatever the quota**: the queue's repeat after a lost answer
   is no new receipt, and counts nothing. **The day is asked first**, then the unrecorded: nothing put right
   today gives the day back.
-- **Two receipts of one person at once take turns**: the person's row is locked first (`FOR UPDATE`, the
-  account first as `privacy.md` orders the locks), before any row of a receipt — the stale one a send deletes
-  included, which erasure met the other way round (review 1, №2, adversarial А3) — and the counts are read and
-  the receipt written under it; erased while it waited, there is nobody to send for (`error.no_actor`).
+- **Two receipts of one person at once take turns**: the person's row is locked first (the account first as
+  `privacy.md` orders the locks), before any row of a receipt — the stale one a send deletes included, which
+  erasure met the other way round (review 1, №2, adversarial А3) — and the counts are read and the receipt
+  written under it; erased while it waited, there is nobody to send for (`error.no_actor`). **The lock is
+  `FOR NO KEY UPDATE`**, the strength of the count's own `UPDATE`: a key share — every foreign key to the
+  person — passes it, and `FOR UPDATE` met a reading that held its receipt and waited for that share to write
+  the copy for the review (review 2, Б1). **A reading's end takes the person's key share before its receipt's
+  row** (`finish`): taken after it by the copy's key, it waited on erasure holding the account while erasure
+  waited on the receipt — a deadlock of MOL-309's, closed here as one class (Б1б).
 - **«Вернуть» is refused with the places taken** (owner's В-2 «а»), the receipt left removed: «remove twenty,
   send twenty, bring the twenty back» made forty not recorded, every day. The day is not asked — the receipt
   had its place in it.
