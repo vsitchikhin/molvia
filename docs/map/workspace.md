@@ -56,7 +56,7 @@ under `packages/model/tests/`, is covered by the source's entry.
 
 - `.editorconfig` — Editor settings: UTF-8, LF, two-space indent, tabs in the Makefile.
 - `.env.example` — Sample of the generated `.env` for copy 0: ports, databases (dev, test, e2e), bot settings, rate provider URLs.
-- `.githooks/commit-msg` — Git hook: refuses a subject that is not a Conventional Commit with the Jira key as scope.
+- `.githooks/commit-msg` — Git hook: refuses a subject that is not a Conventional Commit with the Jira key as scope, and any `Co-Authored-By` line.
 - `.githooks/pre-commit` — Git hook: refuses a commit whose files are not formatted by Prettier; every other check is CI's.
 - `.github/dependabot.yml` — Dependabot: weekly grouped npm updates and base images, monthly GitHub Actions updates.
 - `.github/workflows/ci.yml` — CI on push and pull request: format check, lint, types and tests against Postgres, the receipt reader's image and its live test, and end-to-end in a phone browser, in the image of Playwright of the lockfile's version (MOL-295) — the only place any check runs unasked; both jobs gate a merge.

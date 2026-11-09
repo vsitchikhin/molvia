@@ -1,11 +1,23 @@
 #!/usr/bin/env bash
 # Keeps commit messages in the format CLAUDE.md documents: Conventional Commits with the
 # Jira key as scope. A regex rather than commitlint — the format is four lines of grammar
-# and does not justify a dependency tree.
+# and does not justify a dependency tree. The only author is the repository owner, so a
+# co-author trailer is refused in any commit, merges included (MOL-372).
 #
 # Deliberate bypass: git commit --no-verify
 
 set -euo pipefail
+
+# Lines starting with `#` are git's comments, cut after this hook runs.
+if grep -v '^#' "$1" | grep -Eiq '^[[:space:]]*co-?authored-?by[[:space:]]*:'; then
+  cat >&2 <<'MSG'
+commit-msg: the message names a co-author.
+
+  The only author is the repository owner: a Co-Authored-By line in any
+  form is forbidden (CLAUDE.md, «Commits»). Remove the line and commit again.
+MSG
+  exit 1
+fi
 
 subject=$(head -n 1 "$1")
 
