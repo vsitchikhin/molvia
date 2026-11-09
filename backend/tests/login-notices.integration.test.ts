@@ -284,13 +284,13 @@ describe('one person never holds another back (adversarial А1, А2)', () => {
     const victims = await queue(victim, 1)
     const handed = await claim()
     expect(handed).toHaveLength(3)
-    const [first, second] = handed
+    const [flooded, alsoFlooded] = handed
     // Both refused for now, the victim's given back untried, as two refusals in a row have it.
     await told({
       told: [],
       back: [
-        { sessionId: first!.sessionId, afterSeconds: 0 },
-        { sessionId: second!.sessionId, afterSeconds: 0 },
+        { sessionId: flooded!.sessionId, afterSeconds: 0 },
+        { sessionId: alsoFlooded!.sessionId, afterSeconds: 0 },
         { sessionId: victims, afterSeconds: null },
       ],
     })

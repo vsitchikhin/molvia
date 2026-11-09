@@ -34,18 +34,19 @@ export const endSessionFromBotSchema = z.strictObject({ telegramUserId: telegram
 export type EndSessionFromBot = z.infer<typeof endSessionFromBotSchema>
 
 /**
- * The bot's word on a claim (`POST /internal/logins/told`, MOL-361, adversarial А1): what went — sent,
- * the bot blocked, refused for good — and is let go, and what did not, given back. A notice tried and
- * refused for now (Telegram's 429 of that chat, the network) comes back `afterSeconds` on, behind the
- * ones not tried yet; one not tried (`null`) keeps its place. A notice the bot never speaks of is let
- * go after `LOGIN_NOTICE_LEASE_SECONDS`, unsent: at most once, as the task asks.
- */
-/**
  * The longest a notice given back waits (adversarial Б2): Telegram may ask hours of the whole bot, and
  * the bot gives back no later than this — tried again then, and given back again if still refused.
  */
 export const LOGIN_NOTICE_BACK_MAX_SECONDS = 3_600
 
+/**
+ * The bot's word on a claim (`POST /internal/logins/told`, MOL-361, adversarial А1): what went — sent,
+ * the bot blocked, refused for good — and is let go, and what did not, given back. A notice tried and
+ * refused for now (Telegram's 429 of that chat, the network) comes back `afterSeconds` on, behind the
+ * ones not tried yet, its account's other notices with it (adversarial Б1); one not tried (`null`)
+ * keeps its place. A notice the bot never speaks of is let go after `LOGIN_NOTICE_LEASE_SECONDS`,
+ * unsent: at most once, as the task asks.
+ */
 export const loginNoticesToldSchema = z.strictObject({
   told: z.array(z.uuid()).max(LOGIN_NOTICES_PER_CLAIM),
   back: z
