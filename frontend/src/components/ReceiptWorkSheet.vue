@@ -41,7 +41,7 @@ import { useI18n } from 'vue-i18n'
 import IconDelete from '~icons/mdi/delete-outline'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
-import { rejectedReason } from '@/composables/useReceipts'
+import { rejectedReason, rejectedReasonWords } from '@/composables/useReceipts'
 import type { ReceiptRow } from '@/composables/useReceipts'
 import { photoShelf } from '@/receipts/photoShelf'
 import { useActorStore } from '@/stores/actor'
@@ -98,12 +98,15 @@ export default defineComponent({
           return t(`purchases.queued.${link}sending`)
         case 'stuck':
           return t('purchases.queued.stuck')
-        case 'rejected':
-          return t(`purchases.queued.${link}rejected`, {
-            reason: t(
-              `purchases.reasons.${rejectedReason(row.rejected?.code ?? 'error.internal')}`,
-            ),
-          })
+        case 'rejected': {
+          const code = row.rejected?.code ?? 'error.internal'
+          const why = rejectedReason(code)
+          const reason = rejectedReasonWords(t, code)
+          // over the quota a new shot helps only later, so the words say when (MOL-360)
+          if (why === 'day_limit' || why === 'unrecorded_limit')
+            return t(`purchases.queued.rejected_${why}`, { reason })
+          return t(`purchases.queued.${link}rejected`, { reason })
+        }
         case 'waiting':
           return t(`purchases.queued.${link}waiting`)
         default:

@@ -555,8 +555,15 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
   /**
    * «Отправить чек»: the photos onto the shelf first, then the writes that name them. False — the
    * phone had nowhere to keep a photo, and nothing is queued: a receipt without its photos is not one.
+   * `replacing` — «Переснять»: the receipt it replaces is removed before the new one is announced, so at
+   * the bound of receipts not recorded the new one takes its place (MOL-360, adversarial А4); a photo the
+   * shelf refused removes nothing.
    */
-  async function capture(body: ReceiptPhotoBody, photos: readonly Blob[]): Promise<boolean> {
+  async function capture(
+    body: ReceiptPhotoBody,
+    photos: readonly Blob[],
+    replacing: string | null = null,
+  ): Promise<boolean> {
     const owner = actor.id
     if (!owner || photos.length !== body.parts) return false
     const shelf = photoShelf(owner)
@@ -566,6 +573,7 @@ export const useReceiptQueueStore = defineStore('receiptQueue', () => {
         return false
       }
     }
+    if (replacing) remove(replacing, true)
     change(() => {
       kept = [
         ...kept,

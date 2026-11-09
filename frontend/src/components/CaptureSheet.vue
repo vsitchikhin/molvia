@@ -347,12 +347,12 @@ export default defineComponent({
             capturedAt: new Date(),
           },
           parts.value.map((part) => part.photo),
+          props.replacing,
         )
         if (!kept) {
           problem.value = 'not_kept'
           return
         }
-        if (props.replacing) queue.remove(props.replacing, true)
         sentOffline = !navigator.onLine
         emit('update:open', false)
       } finally {

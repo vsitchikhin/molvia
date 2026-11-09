@@ -130,6 +130,16 @@ export const ERROR = {
    */
   RECEIPT_LINK_INVALID: 'error.receipt_link_invalid',
   /**
+   * A receipt past `RECEIPTS_DAY_MAX` of the person's day (MOL-360): the queue sets it aside, the phone
+   * says to shoot it tomorrow.
+   */
+  RECEIPTS_DAY_LIMITED: 'error.receipts_day_limited',
+  /**
+   * A receipt sent, or brought back, with `RECEIPTS_UNRECORDED_MAX` not recorded already (MOL-360): the
+   * phone says to record or remove those first.
+   */
+  RECEIPTS_UNRECORDED_LIMITED: 'error.receipts_unrecorded_limited',
+  /**
    * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
    * the text and says to send it tomorrow.
    */
