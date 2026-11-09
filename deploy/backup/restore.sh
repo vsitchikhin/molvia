@@ -126,6 +126,9 @@ case "$mode" in
     remote "$compose stop backend bot"
     stage=dropped
     remote "$compose exec -T postgres sh -c 'dropdb -U \"\$POSTGRES_USER\" --force \"\$POSTGRES_DB\" && createdb -U \"\$POSTGRES_USER\" \"\$POSTGRES_DB\"'"
+    # A new database gives PUBLIC a temporary table, and the exporter's role runs on through the restore:
+    # taken here, before the API's next start takes it again (MOL-366, adversarial В1).
+    remote "$compose exec -T postgres sh -c 'psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -v ON_ERROR_STOP=1 -Atqc \"revoke temporary on database \\\"\$POSTGRES_DB\\\" from public\"'"
     fetch "$copy" | remote "$compose exec -T postgres sh -c 'pg_restore -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" --no-owner --exit-on-error'"
     stage=poured
     remote "$compose up -d backend bot"
