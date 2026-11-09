@@ -1,4 +1,3 @@
-import { createRequire } from 'node:module'
 import postgres from 'postgres'
 
 /**
@@ -67,8 +66,8 @@ interface Pending {
   resolve: (result: unknown) => void
 }
 
-// The class of a query of postgres.js, taken from one never run — queries are run when awaited — of both builds
-// of the package, its ESM and its CommonJS, so that no client of the process escapes by loading the other.
+// The class of a query of postgres.js, taken from one never run — queries are run when awaited. Since 4.0 the
+// package is an ES module alone, so one build serves every client of the process.
 async function reverseIn(factory: typeof postgres): Promise<void> {
   const probe = factory('postgres://localhost/unused', { max: 1 })
   const prototype = Object.getPrototypeOf(probe.unsafe('select 1')) as Record<symbol, unknown>
@@ -92,4 +91,3 @@ async function reverseIn(factory: typeof postgres): Promise<void> {
 }
 
 await reverseIn(postgres)
-await reverseIn(createRequire(import.meta.url)('postgres') as typeof postgres)
