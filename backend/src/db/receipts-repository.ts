@@ -15,6 +15,8 @@ import {
   RECEIPT_TELL_AFTER_SECONDS,
   RECEIPT_TELL_WITHIN_HOURS,
   RECEIPT_UNDO_MINUTES,
+  RECEIPTS_DAY_MAX,
+  RECEIPTS_UNRECORDED_MAX,
   receiptCard,
   receiptClockOf,
   serbianReceiptLink,
@@ -522,8 +524,16 @@ async function keepMiss(
 }
 
 export interface ReceiptRepository {
-  /** «Отправить чек»: a new receipt, or the same one sent again; anything else under its id is a 409. */
-  create(actorId: string, body: ReceiptBody): Promise<{ receipt: ReceiptSummary; created: boolean }>
+  /**
+   * «Отправить чек»: a new receipt, or the same one sent again; anything else under its id is a 409. A new
+   * one past the person's quota is refused (MOL-360): `RECEIPTS_DAY_MAX` of `phoneDay`, the phone's, and
+   * `RECEIPTS_UNRECORDED_MAX` not recorded at once; the same one again is answered whatever the quota.
+   */
+  create(
+    actorId: string,
+    body: ReceiptBody,
+    phoneDay: string,
+  ): Promise<{ receipt: ReceiptSummary; created: boolean }>
   /**
    * A part of the photo: the same part again is the same write, another photo under its place is a
    * 409. The last part puts the receipt in the queue — `queued` says this write did.
@@ -586,7 +596,10 @@ export interface ReceiptRepository {
    * its trip. `retake` — «Переснять» removed it: its review stays past it (MOL-309, owner's В-6 «а»).
    */
   remove(actorId: string, id: string, options?: { readonly retake?: boolean }): Promise<void>
-  /** «Вернуть»: `false` for anything that is not the owner's receipt removed within the window. */
+  /**
+   * «Вернуть»: `false` for anything that is not the owner's receipt removed within the window; refused with
+   * `RECEIPTS_UNRECORDED_MAX` not recorded already (MOL-360, owner's В-2 «а»).
+   */
   restore(actorId: string, id: string): Promise<boolean>
   /**
    * The minute timer's (П-8, В-3): a removal final after its ten minutes, a receipt not recorded
@@ -638,6 +651,33 @@ export interface ReceiptRepository {
 }
 
 const undoFrom = () => sql`clock_timestamp() - make_interval(mins => ${RECEIPT_UNDO_MINUTES})`
+
+/**
+ * The person's row, locked: the account first (`privacy.md`), so two receipts of one person at once take
+ * turns at the quota (MOL-360) — and with it the count of their day.
+ */
+async function lockedAccount(tx: Conn, actorId: string) {
+  const [account] = await tx
+    .select({ day: actors.receiptsDay, sent: actors.receiptsSent })
+    .from(actors)
+    .where(eq(actors.id, actorId))
+    .for('update')
+  return theRow(account, 'actors')
+}
+
+/** A receipt not recorded holds its photo (MOL-360): removed, it gives its place back at once. */
+async function refuseUnrecordedPast(tx: Conn, actorId: string): Promise<void> {
+  const [{ n } = { n: 0 }] = await tx
+    .select({ n: sql<number>`count(*)::int` })
+    .from(receipts)
+    .where(
+      and(
+        eq(receipts.actorId, actorId),
+        sql`${receipts.deletedAt} is null and ${receipts.status} <> 'recorded'`,
+      ),
+    )
+  if (n >= RECEIPTS_UNRECORDED_MAX) throw new DomainError(ERROR.RECEIPTS_UNRECORDED_LIMITED)
+}
 
 // The parts held and the lines read, beside the row: what «Покупки» shows of a receipt.
 const received = sql<number>`(select count(*)::int from ${receiptParts} where ${receiptParts.receiptId} = ${receipts.id})`
@@ -826,7 +866,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
   }
 
   return {
-    async create(actorId, body) {
+    async create(actorId, body, phoneDay) {
       return translateFailures(() =>
         db.transaction(async (tx) => {
           // Past its ten minutes a removal is final whether or not the timer has come round: the same
@@ -840,6 +880,22 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                 sql`${receipts.deletedAt} <= ${undoFrom()}`,
               ),
             )
+          const account = await lockedAccount(tx, actorId)
+          // The day only moves on: a day the phone names before it counts in it (MOL-360, В-1 «а»), so a
+          // header made up gives one day ahead at most. A removal never takes a place of the day back.
+          const day = account.day !== null && account.day > phoneDay ? account.day : phoneDay
+          const sent = account.day === day ? account.sent : 0
+          // the same receipt sent again by the queue is answered below, whatever the quota
+          const [known] = await tx
+            .select({ id: receipts.id })
+            .from(receipts)
+            .where(eq(receipts.id, body.id))
+            .limit(1)
+          if (known === undefined) {
+            // the day first: nothing put right today gives it back
+            if (sent >= RECEIPTS_DAY_MAX) throw new DomainError(ERROR.RECEIPTS_DAY_LIMITED)
+            await refuseUnrecordedPast(tx, actorId)
+          }
           const [inserted] = await tx
             .insert(receipts)
             .values({
@@ -856,6 +912,10 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             .onConflictDoNothing({ target: receipts.id })
             .returning({ id: receipts.id })
           if (inserted) {
+            await tx
+              .update(actors)
+              .set({ receiptsDay: day, receiptsSent: sent + 1 })
+              .where(eq(actors.id, actorId))
             // the link in a table of its own, out of the nightly copy (adversarial А4)
             if ('link' in body) {
               const { link, row } = linkReceipt(body)
@@ -1284,26 +1344,32 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     async restore(actorId, id) {
       const own = idOrNull(id)
       if (own === null) return false
-      const restored = await db
-        .update(receipts)
-        .set({ deletedAt: null })
-        .where(
-          and(
+      return translateFailures(() =>
+        db.transaction(async (tx) => {
+          await lockedAccount(tx, actorId)
+          // Past its time a removal is final even before the timer comes round.
+          const yours = and(
             eq(receipts.id, own),
             eq(receipts.actorId, actorId),
-            // Past its time a removal is final even before the timer comes round.
             sql`(${receipts.deletedAt} is null or ${receipts.deletedAt} > ${undoFrom()})`,
-          ),
-        )
-        .returning({ id: receipts.id })
-      // brought back, it is no receipt replaced: its review goes with it again
-      if (restored.length > 0) {
-        await db
-          .update(receiptMisses)
-          .set({ retakenAt: null })
-          .where(eq(receiptMisses.receiptId, own))
-      }
-      return restored.length > 0
+          )
+          const [held] = await tx
+            .select({ deletedAt: receipts.deletedAt })
+            .from(receipts)
+            .where(yours)
+          if (held === undefined) return false
+          // brought back, it holds its photo again: the cycle «remove, send, bring back» passed the bound
+          // (MOL-360, owner's В-2 «а»); a recorded receipt is never removed, so every one here counts
+          if (held.deletedAt !== null) await refuseUnrecordedPast(tx, actorId)
+          await tx.update(receipts).set({ deletedAt: null }).where(yours)
+          // brought back, it is no receipt replaced: its review goes with it again
+          await tx
+            .update(receiptMisses)
+            .set({ retakenAt: null })
+            .where(eq(receiptMisses.receiptId, own))
+          return true
+        }),
+      )
     },
 
     async purgeStale() {
