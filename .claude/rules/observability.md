@@ -366,7 +366,9 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   В1): no trigger fires on `CREATE DATABASE`, and its rights come from no template. So `restore.sh --into-prod`, which makes the
   API's database anew while the exporter runs on, takes its temporary tables at once and then closes the
   role's sessions — a table made in the moment between is written to after the revoke, and goes only with
-  its session (adversarial В2) — and **`pg_hba.conf`
+  its session (adversarial В2) — and closes them again once `pg_restore` is done, since the copy's revoke
+  of the advisory locks comes last and a lock taken meanwhile outlives the API's start under the same
+  password (В3); a session left is a failure of the restore — and **`pg_hba.conf`
   lets the role into the API's database alone** (owner's В-5 «б»):
   `host <db> molvia_metrics all scram-sha-256` before `host all molvia_metrics all reject`, a step by
   hand on every machine (`deploy/README.md`, «Metrics») — the file is the volume's, so no test holds it,

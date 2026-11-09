@@ -122,6 +122,9 @@ describe('the compose file', () => {
     expect(services().get('backend')).toMatch(
       /^ {6}METRICS_DB_PASSWORD: \$\{METRICS_DB_PASSWORD:\?/m,
     )
+    // A restore closes the role's sessions by its name, a literal of the script (review №10): renamed, it
+    // would close nothing and say nothing.
+    expect(read('deploy/backup/restore.sh')).toContain(`usename = '${METRICS_ROLE}'`)
   })
 
   it('scrapes the API on the port the API is given, and not through Caddy', () => {
