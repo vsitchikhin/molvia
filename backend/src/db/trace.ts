@@ -68,7 +68,7 @@ export async function restampTraceWrite(
     set key = jsonb_set(mv.key, '{at}', to_jsonb(${at}::text)),
         before = case when mv.what = 'verdict_overwritten' and ${how !== null}
                       then mv.before || jsonb_build_object(
-                             'withdrew', ${how?.withdrew ?? false},
+                             'withdrew', ${how?.withdrew ?? false}::boolean,
                              'reviewChanged', (mv.before->>'reviewChanged')::boolean or ${how?.reviewChanged ?? false},
                              'rated', coalesce((mv.before->>'rated')::boolean, false) or ${how !== null && ratedBy(how)})
                       else mv.before end
