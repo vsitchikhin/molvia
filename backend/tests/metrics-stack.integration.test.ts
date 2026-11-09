@@ -16,6 +16,7 @@ import { metricsDbPasswordSchema, ownerTelegramIdSchema } from '@/env'
 import { httpMetrics, processMetrics } from '@/metrics'
 import { compose, services } from './compose'
 import { connect, connectDrizzle, testDatabaseUrl } from './db'
+import { onlyRow } from './rows'
 
 function read(path: string): string {
   return readFileSync(fileURLToPath(new URL(`../../${path}`, import.meta.url)), 'utf8')
@@ -241,8 +242,10 @@ describe('the exporter’s role', () => {
   }
 
   async function storedVerifier(): Promise<string | null> {
-    const [row] = await admin<{ rolpassword: string | null }[]>`
-      select rolpassword from pg_authid where rolname = ${METRICS_ROLE}`
+    const row = onlyRow(
+      await admin<{ rolpassword: string | null }[]>`
+        select rolpassword from pg_authid where rolname = ${METRICS_ROLE}`,
+    )
     return row?.rolpassword ?? null
   }
 
@@ -259,14 +262,17 @@ describe('the exporter’s role', () => {
     const [{ pid } = { pid: 0 }] = await admin<{ pid: number }[]>`select pg_backend_pid() as pid`
     // Without `pg_read_all_stats` another role's session shows no state, and the panel of
     // connections by state would count them all as null.
-    const [seen] = await role<{ state: string | null }[]>`
-      select state from pg_stat_activity where pid = ${pid}`
+    const seen = onlyRow(
+      await role<{ state: string | null }[]>`select state from pg_stat_activity where pid = ${pid}`,
+    )
     expect(seen?.state).toBe('idle')
-    const [figures] = await role<{ max: string; size: string; deadlocks: string | null }[]>`
-      select (select setting from pg_settings where name = 'max_connections') as max,
-             pg_database_size(current_database())::text as size,
-             (select deadlocks::text from pg_stat_database where datname = current_database())
-               as deadlocks`
+    const figures = onlyRow(
+      await role<{ max: string; size: string; deadlocks: string | null }[]>`
+        select (select setting from pg_settings where name = 'max_connections') as max,
+               pg_database_size(current_database())::text as size,
+               (select deadlocks::text from pg_stat_database where datname = current_database())
+                 as deadlocks`,
+    )
     expect(Number(figures?.max)).toBeGreaterThan(0)
     expect(Number(figures?.size)).toBeGreaterThan(0)
     expect(figures?.deadlocks).not.toBeNull()
@@ -325,12 +331,15 @@ describe('the exporter’s role', () => {
 
   it('brings a role changed by hand back to its form', async () => {
     await ensureMetricsRole(db, password())
-    await admin.unsafe(`alter role ${METRICS_ROLE} superuser createdb connection limit -1`)
+    // The connection limit is set by the same statement as these, and held at 3 above.
+    await admin.unsafe(`alter role ${METRICS_ROLE} superuser createdb`)
     await admin.unsafe(`alter role ${METRICS_ROLE} reset statement_timeout`)
     await ensureMetricsRole(db, password())
-    const [role] = await admin`
-      select rolsuper, rolcreatedb, rolconnlimit, rolconfig from pg_roles
-      where rolname = ${METRICS_ROLE}`
+    const role = onlyRow(
+      await admin`
+        select rolsuper, rolcreatedb, rolconnlimit, rolconfig from pg_roles
+        where rolname = ${METRICS_ROLE}`,
+    )
     expect(role).toEqual({
       rolsuper: false,
       rolcreatedb: false,
