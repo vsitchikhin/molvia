@@ -1058,7 +1058,7 @@ export function createMergeRepository(db: Conn): MergeRepository {
               await tx.execute(sql`
                 update catalogue_merge_moves o
                 set before = o.before || jsonb_build_object(
-                      'keptAdmits', ${next.before.admits},
+                      'keptAdmits', ${next.before.admits}::boolean,
                       'keptLastPickedAt', ${next.before.lastPickedAt}::text)
                 from catalogue_merges l
                 where l.id = o.merge_id and l.undone_at is null and l.into_item = ${next.into_item}::uuid
