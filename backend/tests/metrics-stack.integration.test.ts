@@ -9,7 +9,7 @@ import { randomBytes } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import postgres from 'postgres'
-import type { Sql } from 'postgres'
+import type { ISql, Sql } from 'postgres'
 import { afterAll, describe, expect, it } from 'vitest'
 import { METRICS_ROLE, ensureMetricsRole } from '@/db/metrics-role'
 import { metricsDbPasswordSchema, ownerTelegramIdSchema } from '@/env'
@@ -246,7 +246,7 @@ describe('the exporter’s role', () => {
   }
 
   /** The session's own process, the one a termination names. */
-  async function backendPid(client: Sql): Promise<number> {
+  async function backendPid(client: ISql): Promise<number> {
     const row = onlyRow(await client<{ pid: number }[]>`select pg_backend_pid() as pid`)
     if (row === undefined) throw new Error('no backend pid read')
     return row.pid
