@@ -4,6 +4,7 @@ import { getDb } from '@/db'
 import { describeMigrationFailure } from '@/db/failure'
 import { startEmbedder } from '@/embeddings/embedder'
 import { migrateToLatest } from '@/db/migrate'
+import { ensureMetricsRole } from '@/db/metrics-role'
 import { rekeyItems } from '@/db/rekey'
 import { settleStoreMemory } from '@/db/store-memory-repository'
 import { createMarketRateRepository } from '@/db/market-rates-repository'
@@ -138,6 +139,20 @@ if (http !== undefined && env.METRICS_PORT !== undefined) {
 app
   .listen({ port: env.API_PORT, host })
   .then(async () => {
+    // The exporter's role (MOL-366): a metric is no reason for the API not to start (В-2 «а») — a
+    // failure goes to the owner, and the exporter not let in is «Метрики молчат» five minutes on.
+    if (env.METRICS_DB_PASSWORD !== undefined) {
+      try {
+        if (await ensureMetricsRole(getDb(), env.METRICS_DB_PASSWORD))
+          app.log.info('metrics role password set')
+      } catch (error) {
+        apiFailureReporter(getDb, env.OWNER_TELEGRAM_ID ?? null, app.log).report(
+          error,
+          { source: 'api', route: 'job:metrics-role' },
+          'metrics role failed',
+        )
+      }
+    }
     // Each person's word in the shops' memory is what their last line still there says (MOL-240): 0061
     // deleted lines whose words SQL cannot find, and an image rolled back deletes without settling. Once
     // listening, a person at a time under their lock — never on the way to `listen` (round 4, Р4-2): the
