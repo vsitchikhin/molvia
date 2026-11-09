@@ -67,6 +67,31 @@ export async function settleKeeping(
 }
 
 /**
+ * An outcome written **under** the message, its buttons taken away (MOL-361): the notice of a sign-in
+ * keeps saying which device and when — the person may want it later — and «вход завершён» follows it.
+ * A message handed over without its text (`InaccessibleMessage`) cannot be read back, so the outcome
+ * goes as a reply, as `settleKeeping` does.
+ */
+export async function settleUnder(ctx: Context, outcome: string): Promise<void> {
+  const message = ctx.callbackQuery?.message
+  const text = message !== undefined && 'text' in message ? message.text : undefined
+  if (text === undefined) {
+    await ctx.reply(outcome)
+    return
+  }
+  try {
+    // No `reply_markup`: Telegram drops the keyboard when an edit does not carry one.
+    await ctx.editMessageText(`${text}\n\n${outcome}`)
+  } catch (error) {
+    // A second press already wrote it (see `settle`).
+    if (error instanceof GrammyError && error.description.includes('message is not modified')) {
+      return
+    }
+    await ctx.reply(outcome)
+  }
+}
+
+/**
  * A refusal, shown **over** the message and written nowhere at all.
  *
  * This is О-1's rule, and it is absolute: the chat holds outcomes, and a refusal is a thing

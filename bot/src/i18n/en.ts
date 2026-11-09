@@ -105,6 +105,13 @@ export const en: Dictionary = {
   'silence.days.few': '{n} days',
   'silence.days.many': '{n} days',
   'silence.open': 'Open Molvia',
+  'signed_in.notice':
+    'A new device signed in to your Molvia account: {device}, {date} at {time}.\n\nThe device name comes from the browser itself and is easy to fake. If it was you, there is nothing to do. If not, end this sign-in with the button below.',
+  'signed_in.device_unknown': 'an unknown device',
+  'signed_in.end': 'Not me, end it',
+  'signed_in.ended':
+    '✓ Sign-in ended: this device is no longer in your account. Your other sign-ins are in Molvia: Settings → Devices.',
+  'signed_in.gone': 'This sign-in has already ended.',
   'owner.failure.new': '🔴 New failure · {source}',
   'owner.failure.again': '🟠 {count} times in this build already · {source}',
   'owner.failure.what': '{kind} · {place}',
