@@ -4,23 +4,24 @@ paths:
   - 'packages/client/src/bot.ts'
   - 'backend/src/routes/internal-auth.ts'
   - 'backend/src/usecases/bot-login.ts'
-  - 'backend/src/usecases/{remind-ratings,rate-from-bot,reminders-switch,tell-receipts,broadcast}.ts'
+  - 'backend/src/usecases/{remind-ratings,rate-from-bot,reminders-switch,tell-receipts,tell-logins,broadcast}.ts'
   - 'backend/src/routes/{reminders,receipt-notices}.ts'
-  - 'backend/src/db/{reminders,broadcasts}-repository.ts'
+  - 'backend/src/db/{reminders,broadcasts,login-notices}-repository.ts'
   - 'backend/src/{notify,notify-cli}.ts'
   - 'backend/tests/{broadcasts,notify-bundle}.integration.test.ts'
   - 'bin/notify.sh'
   - 'backend/tests/reminders*.ts'
   - 'packages/model/src/{entities,contracts}/reminder.ts'
-  - 'packages/model/src/contracts/{receipt-notice,broadcast,silence}.ts'
+  - 'packages/model/src/contracts/{receipt-notice,login-notice,broadcast,silence}.ts'
   - 'backend/src/usecases/silence.ts'
   - 'backend/tests/receipt-notices*'
+  - 'backend/tests/login-notices*'
   - 'frontend/src/views/BotView*'
   - 'frontend/src/components/BotSwitchRow*'
   - 'frontend/src/composables/{useReminders,useReceiptNotices}*'
 ---
 
-# The bot, and what it is allowed to know (MOL-55, MOL-58, MOL-101, MOL-129, MOL-237, MOL-239)
+# The bot, and what it is allowed to know (MOL-55, MOL-58, MOL-101, MOL-129, MOL-237, MOL-239, MOL-361)
 
 The bot did two things in 0.1, and 0.2 gives it a third — the rating reminder, below. It is the
 second half of the login: the one place a person is shown **which device** they are letting in and
@@ -111,9 +112,8 @@ press — the only channel people are given, because there Telegram already says
   get it wrong. «Войти в Molvia?» over a button labelled «Войти» read as «log _me_ in» — the
   wrong way round for the one attack the button exists to stop, where a stranger's link makes
   your tap let **their** browser into **your** account. **The words alone do not hold it once strangers come** (MOL-287 Ф-3, reproduced:
-  the device is named by the stranger's own User-Agent, «iPhone · Safari»), and nothing tells the person
-  afterwards. The bot is to tell of every new sign-in with «Это не я — завершить» before `v0.2.0` (owner's
-  В-9 «а», MOL-361).
+  the device is named by the stranger's own User-Agent, «iPhone · Safari»), so **the bot tells of every
+  sign-in afterwards, with «Это не я — завершить»** (owner's В-9 «а», MOL-361, below).
 - **An outcome is written into the message; a refusal is only shown over it** (О-1). Both
   presses of a double tap leave before the first edit lands — the buttons are still on screen,
   which at a shelf on a slow connection is ordinary — so the second was refused by the API,
@@ -629,3 +629,45 @@ Owner's decisions of 28.10.2026 in `.scratch/tasks/requirements/MOL-239.md`.
 - **The owner hears how many** (В-3 «а»): the claim queues `silence` with the warnings by step, the day's run with the
   accounts erased and how many of them had the bot blocked — tried, maybe refused (`owner.silence.*`). A notice that fails to queue is reported
   and the warnings still go — marked already, lost there they would be lost for good.
+
+## The message about a new sign-in (MOL-361)
+
+The answer to the audit's Ф-3 (MOL-287): a stranger starts a login, forwards the link under a pretext, and the
+person's «Войти» lets the stranger's browser into their account — the question names the device by the stranger's
+own User-Agent, and before this nothing told the person afterwards. Owner's В-9 «а» of the audit and В-1…В-4 «а» of
+09.11.2026 in `.scratch/tasks/requirements/MOL-361.md`.
+
+- **The collection queues it, the API takes it off as it hands it out, the bot only sends** — the reminders' rule
+  (Р-1, Р-2 of MOL-101). `completeLogin` writes a row of `login_notices` in the collection's own transaction, read off
+  the session's row; `POST /internal/logins/claim`, every minute, deletes the oldest under `for update skip locked` and
+  hands them out in the same statement, so two claims never share one and a bot that dies after the claim loses that
+  message. **Only a collection**: the development seam signs in with none, and the sessions alive at the rollout were
+  told of by nobody. **Every collection, a newcomer's first too** (В-3 «а»): a link forwarded to someone without an
+  account makes them one, with the stranger's browser already in it.
+- **The notice outlives the session** (В-1 «а»): `login_notices` has no key to `sessions`, so a session ended before
+  the bot's next minute — a copy downloaded, then «Выйти» — is still told of; the button then finds no session and
+  says so. It points at `actors` and goes with them: erasure, the copy (`loginNotices`, version 28), the record of
+  processing.
+- **No switch, no filter** (Р-1): neither the reminders off, nor «чек разобран» off, nor the statistics, nor an
+  edition accepted silence it — a duty, as the warning before an erasure is; a blocked bot is tried, and a 403 marks
+  the block by MOL-103's path. **With sound at any hour** (Р-2): a sign-in at night is the one to hear of at once.
+- **Russian, then English, in one message** (В-2 «а»), the button named in both: nobody's language is kept, and a
+  notice not understood is a hijack not ended. It names the device as the browser named itself and says so — a
+  stranger forges it — and **the day and time in the account's zone** (`signedInClock`, Р-3): absolute, since the
+  message stays in the chat; MOL-55's reason for «минуту назад», that the zone is not known, does not hold where the
+  account has a country.
+- **One button, `session:end:<uuid>`, one press, no second question** (Р-4): a slip costs one login again, the hijack
+  it ends costs the account, and it has no term — a session lives up to 180 days. **Whose session is `ctx.from.id`**:
+  `POST /internal/sessions/:id/end` deletes it only for the account behind that Telegram id; another account's, one
+  gone, a malformed id are one `404` (MOL-25 Р-3), and the bot says «Этот вход уже завершён» over the message and
+  takes the button. **The outcome is written under the notice** (`settleUnder`, Р-5) — which device and when stay
+  readable — the button gone; a failure of the API is said over it and keeps the button (О-1, О-3). Both speak the
+  presser's language. The device put out learns it on its next request: `401`, the login screen (MOL-57).
+- **Counted** (В-4 «а»): `login_days.ended_by_notice`, a session ended by the button, in the transaction that deletes
+  it, by the day of the press in Yerevan — the login's own day is gone with its request; `make gates` prints it in the
+  login's block, with no verdict: the one trace of a hijack on production, or of a slip.
+- **The prices, named** (Р-7): in the first minute the stranger can still take the copy or erase the account — the
+  notice ends a silent long hijack, not an instant one; a notice lost between the claim and Telegram is not sent again;
+  a forwarded notice pressed by another Telegram ends nothing.
+- **The privacy page names it** under «Telegram» and «Устройства входа» — a revision of edition 6 (Р-8): the device's
+  name already went to Telegram in the login's question, to the same recipient for the same purpose.
