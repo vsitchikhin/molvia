@@ -66,8 +66,8 @@ const envSchema = z.object({
    */
   CATALOGUE_MERGE: catalogueMergeModeSchema.default('off'),
   /**
-   * The build `/health` names (MOL-90): `git describe` of the commit the image was built from —
-   * `v0.1.1-3-g1a2b3c4`, or the tag alone on a tagged commit. The image carries it; outside one it
+   * The build `/health` names (MOL-90): the last tag, the releases since it and the commit the image
+   * was built from — `v0.1.5-81-g0f371828`, `-0-` on the tag's own commit (MOL-371, `release.yml`). The image carries it; outside one it
    * is `dev`. What the deploy compares with to know the new containers are the ones answering.
    */
   APP_VERSION: z.string().min(1).default(UNNAMED_BUILD),
