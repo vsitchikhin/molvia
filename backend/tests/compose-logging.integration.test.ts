@@ -20,6 +20,7 @@ describe('docker-compose.prod.yml', () => {
       'postgres-exporter',
       'receipt-reader',
       'victoria',
+      'volume-owners',
     ])
     for (const [, block] of found) expect(block).toMatch(/^ {4}logging: \*logging$/m)
   })

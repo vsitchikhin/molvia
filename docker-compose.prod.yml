@@ -154,7 +154,33 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      - backend
+      volume-owners:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
+
+  # Gives the volumes of the two services that no longer run as root to their users (MOL-365): Docker
+  # hands a volume the owner of the image's directory only while it is empty, and these hold the
+  # certificate and the ACME account (root, 0600) and the metrics. Caddy as `caddy` on them would not
+  # start, and the rollout would roll back. Run at every `up` and gone in a second: the files an image of
+  # before MOL-365, put back by a rollback, writes as root are given back by the next one. The frontend's
+  # image of the same tag, root for this alone, with no network and only the rights a `chown` needs.
+  volume-owners:
+    logging: *logging
+    image: ghcr.io/vsitchikhin/molvia-frontend:${IMAGE_TAG:-latest}
+    user: '0'
+    network_mode: none
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_READ_SEARCH]
+    # The numbers are those of the images: `caddy` of frontend/Dockerfile, nobody of deploy/victoria.
+    entrypoint:
+      - sh
+      - -c
+      - chown -R 10001:10001 /caddy/data /caddy/config && chown -R 65534:65534 /victoria
+    volumes:
+      - caddy_data:/caddy/data
+      - caddy_config:/caddy/config
+      - vmdata:/victoria
 
   # ── The metrics (MOL-145) ──────────────────────────────────────────────────────────────────────
   # VictoriaMetrics and three exporters on a network with no way out (`metrics`, `internal`): what
@@ -179,6 +205,9 @@ services:
     mem_limit: 256m
     volumes:
       - vmdata:/storage
+    depends_on:
+      volume-owners:
+        condition: service_completed_successfully
     networks: [metrics]
 
   node-exporter:
