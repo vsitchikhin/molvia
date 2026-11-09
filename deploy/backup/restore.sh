@@ -127,8 +127,13 @@ case "$mode" in
     stage=dropped
     remote "$compose exec -T postgres sh -c 'dropdb -U \"\$POSTGRES_USER\" --force \"\$POSTGRES_DB\" && createdb -U \"\$POSTGRES_USER\" \"\$POSTGRES_DB\"'"
     # A new database gives PUBLIC a temporary table, and the exporter's role runs on through the restore:
-    # taken here, before the API's next start takes it again (MOL-366, adversarial В1).
-    remote "$compose exec -T postgres sh -c 'psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -v ON_ERROR_STOP=1 -Atqc \"revoke temporary on database \\\"\$POSTGRES_DB\\\" from public\"'"
+    # taken here, before the API's next start takes it again (MOL-366, adversarial В1) — and the role's
+    # sessions closed after it, since a table made before the revoke is still written to (В2); it goes
+    # with its session.
+    remote "$compose exec -T postgres sh -c 'psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -v ON_ERROR_STOP=1 -Atq'" <<'SQL'
+do $$ begin execute format('revoke temporary on database %I from public', current_database()); end $$;
+do $$ begin perform pg_terminate_backend(pid, 5000) from pg_stat_activity where usename = 'molvia_metrics'; end $$;
+SQL
     fetch "$copy" | remote "$compose exec -T postgres sh -c 'pg_restore -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" --no-owner --exit-on-error'"
     stage=poured
     remote "$compose up -d backend bot"
