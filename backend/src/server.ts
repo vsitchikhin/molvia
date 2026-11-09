@@ -66,6 +66,7 @@ import { ownPrices } from '@/usecases/own-prices'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
+import { claimLoginNotices, endSessionFromBot, loginNoticesTold } from '@/usecases/tell-logins'
 import { SILENCE_ERASE_EVERY_MS, claimSilenceNotices, eraseSilent } from '@/usecases/silence'
 import { exportMine } from '@/usecases/export-mine'
 import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
@@ -215,6 +216,7 @@ import { createExportRepository } from '@/db/export-repository'
 import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
 import { authTransactOn } from '@/db/auth-unit-of-work'
+import { createLoginNoticeRepository } from '@/db/login-notices-repository'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { databaseIsReachable, getDb } from '@/db'
@@ -706,8 +708,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       )
       // An expired session has no reader, and it kept a device name for good while the privacy
       // page promises 180 days from the last use (MOL-57, owner's decision Q4).
+      // …and a notice of a sign-in handed to the bot and never spoken of (MOL-361): let go unsent.
       stopSessionCleanup = startLoginCleanup(
-        () => sessions.removeExpired(),
+        async () => {
+          await sessions.removeExpired()
+          await createLoginNoticeRepository(db).removeLost()
+        },
         (error) => {
           failures.report(error, job('session-cleanup'), 'expired session cleanup failed')
         },
@@ -1132,6 +1138,17 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           new Date(),
         ),
       broadcastDone: (body) => broadcastDone(createBroadcastRepository(db), body),
+      // A new sign-in (MOL-361): a notice the contract refuses is that message lost, and said.
+      claimLoginNotices: () =>
+        claimLoginNotices(createLoginNoticeRepository(db), (issue) => {
+          failures.report(
+            issue,
+            { source: 'api', route: 'POST /internal/logins/claim' },
+            'login notice unreadable',
+          )
+        }),
+      loginNoticesTold: (word) => loginNoticesTold(createLoginNoticeRepository(db), word),
+      endSession: (sessionId, body) => endSessionFromBot(authTransactOn(db), sessionId, body),
     })
 
     // The phone's failures (MOL-144): no session, a limit in memory, the page's own build.

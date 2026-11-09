@@ -58,6 +58,7 @@ function fakeSessions(overrides: Partial<SessionRepository> = {}): SessionReposi
     touch: () => Promise.reject(new Error('touch was not expected')),
     listFor: () => Promise.reject(new Error('listFor was not expected')),
     removeFor: () => Promise.reject(new Error('removeFor was not expected')),
+    removeForTelegram: () => Promise.reject(new Error('removeForTelegram was not expected')),
     removeByToken: () => Promise.reject(new Error('removeByToken was not expected')),
     removeExpired: () => Promise.reject(new Error('removeExpired was not expected')),
     ...overrides,

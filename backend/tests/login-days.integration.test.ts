@@ -39,6 +39,7 @@ const NOTHING: Day = {
   expiredUnconfirmed: 0,
   expiredConfirmed: 0,
   refused: 0,
+  endedByNotice: 0,
 }
 
 async function days(): Promise<Record<string, Day>> {

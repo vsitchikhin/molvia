@@ -3,9 +3,9 @@ import type { Context } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
-import { dropKeyboard, refuse, settleKeeping, stopSpinner } from './answer'
+import { dropKeyboard, refuse, settleKeeping, shownText, stopSpinner } from './answer'
 import { t } from './i18n'
-import { SCALE_DATA, keyboardOf, readText, scale, shownText, writeText } from './remind'
+import { SCALE_DATA, keyboardOf, readText, scale, writeText } from './remind'
 import { handlerOf, reportDefect } from './failure'
 
 export interface RateDeps {

@@ -1,4 +1,4 @@
-import { COUNTRY_TIME_ZONES, timeZoneOf } from '#model/values/geo'
+import { COUNTRY_TIME_ZONES, PERSON_DEFAULT_ZONE, personZoneOf } from '#model/values/geo'
 import { daysBetween, localClock } from '#model/entities/reminder'
 
 /**
@@ -43,14 +43,14 @@ export const SILENCE_SEND_FROM_HOUR = 10
 export const SILENCE_SEND_UNTIL_HOUR = 20
 
 /**
- * The zone a person's day is read in for a warning: their country's, else Yerevan's (self-review №4).
- * No country of the settings is without a zone, but a row older than them may be, and a person never
- * warned would never be erased either — the page's «удалится сам» silently broken for good.
+ * The zone a person's day is read in for a warning: their country's, else Yerevan's (self-review №4,
+ * `personZoneOf`) — a person never warned would never be erased either, the page's «удалится сам»
+ * silently broken for good.
  */
-export const SILENCE_DEFAULT_ZONE = 'Asia/Yerevan'
+export const SILENCE_DEFAULT_ZONE = PERSON_DEFAULT_ZONE
 
 export function silenceZoneOf(country: string): string {
-  return timeZoneOf(country) ?? SILENCE_DEFAULT_ZONE
+  return personZoneOf(country)
 }
 
 function isSendHour(now: Date, zone: string): boolean {

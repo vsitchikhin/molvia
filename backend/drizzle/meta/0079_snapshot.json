@@ -1,5 +1,5 @@
 {
-  "id": "0ce436a1-cfeb-4af4-8df2-90ebb0a8c5f5",
+  "id": "d29be8f7-147e-48d9-9893-59ec39654fd1",
   "prevId": "54501da2-cbc6-4339-aff3-55f74e16a15e",
   "version": "7",
   "dialect": "postgresql",
@@ -324,19 +324,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "receipts_day": {
-          "name": "receipts_day",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "receipts_sent": {
-          "name": "receipts_sent",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "rate_preference": {
           "name": "rate_preference",
           "type": "text",
@@ -492,10 +479,6 @@
         "actors_reminders_off_known": {
           "name": "actors_reminders_off_known",
           "value": "\"actors\".\"reminders_off\" in ('chosen', 'blocked')"
-        },
-        "actors_receipts_sent_not_negative": {
-          "name": "actors_receipts_sent_not_negative",
-          "value": "\"actors\".\"receipts_sent\" >= 0"
         },
         "actors_consent_whole": {
           "name": "actors_consent_whole",
@@ -3398,6 +3381,13 @@
           "primaryKey": false,
           "notNull": true,
           "default": 0
+        },
+        "ended_by_notice": {
+          "name": "ended_by_notice",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
         }
       },
       "indexes": {},
@@ -3408,13 +3398,72 @@
       "checkConstraints": {
         "login_days_counts_non_negative": {
           "name": "login_days_counts_non_negative",
-          "value": "least(\"login_days\".\"started\", \"login_days\".\"again\", \"login_days\".\"confirmed\", \"login_days\".\"declined\", \"login_days\".\"collected\", \"login_days\".\"expired_unconfirmed\", \"login_days\".\"expired_confirmed\", \"login_days\".\"refused\") >= 0"
+          "value": "least(\"login_days\".\"started\", \"login_days\".\"again\", \"login_days\".\"confirmed\", \"login_days\".\"declined\", \"login_days\".\"collected\", \"login_days\".\"expired_unconfirmed\", \"login_days\".\"expired_confirmed\", \"login_days\".\"refused\", \"login_days\".\"ended_by_notice\") >= 0"
         },
         "login_days_again_within_started": {
           "name": "login_days_again_within_started",
           "value": "\"login_days\".\"again\" <= \"login_days\".\"started\""
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.login_notices": {
+      "name": "login_notices",
+      "schema": "",
+      "columns": {
+        "session_id": {
+          "name": "session_id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "actor_id": {
+          "name": "actor_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "device_name": {
+          "name": "device_name",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "signed_in_at": {
+          "name": "signed_in_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "handed_at": {
+          "name": "handed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "not_before": {
+          "name": "not_before",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "login_notices_actor_id_actors_id_fk": {
+          "name": "login_notices_actor_id_actors_id_fk",
+          "tableFrom": "login_notices",
+          "tableTo": "actors",
+          "columnsFrom": ["actor_id"],
+          "columnsTo": ["id"],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     },
     "public.login_requests": {

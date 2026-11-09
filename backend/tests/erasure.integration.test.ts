@@ -167,6 +167,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     expect(report).toEqual({
       found: true,
       erased: {
+        login_notices: 1,
         sessions: 1,
         search_picks: 1,
         rating_reminders: 1,

@@ -5,6 +5,7 @@ import { FORGET_USAGE, forget } from '@/forget'
 const REPORT: ErasureReport = {
   found: true,
   erased: {
+    login_notices: 0,
     sessions: 2,
     search_picks: 1,
     rating_reminders: 1,

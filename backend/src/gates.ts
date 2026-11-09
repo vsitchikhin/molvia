@@ -367,6 +367,11 @@ function loginLines({ firstDay, lastDay, days }: LoginsInWindow): string[] {
     row('  «not me» in the bot', [String(total((day) => day.declined)), '']),
     row('  refused by the quota', [String(total((day) => day.refused)), 'starts, not in «began»']),
     row('began again on the same device', [String(again), 'not counted as beginning']),
+    // The one trace of a hijack (MOL-361, В-4): counted on the day of the press, not of the login.
+    row('ended «not me» after getting in', [
+      String(total((day) => day.endedByNotice)),
+      'sessions, by the day of the press',
+    ]),
   ]
   if (days.length === 0) return lines
   return [

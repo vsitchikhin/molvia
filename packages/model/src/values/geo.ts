@@ -22,3 +22,15 @@ export const COUNTRY_TIME_ZONES: Readonly<Record<string, string>> = {
 export function timeZoneOf(country: string): string | null {
   return Object.hasOwn(COUNTRY_TIME_ZONES, country) ? (COUNTRY_TIME_ZONES[country] ?? null) : null
 }
+
+/**
+ * The zone a person's day is read in where a message must reach them all the same — a warning before
+ * an erasure (MOL-239), the notice of a sign-in (MOL-361): their country's, else the first market's.
+ * No country of the settings is without a zone, but a row older than them may be, and such a person
+ * left out would be warned of nothing.
+ */
+export const PERSON_DEFAULT_ZONE = 'Asia/Yerevan'
+
+export function personZoneOf(country: string): string {
+  return timeZoneOf(country) ?? PERSON_DEFAULT_ZONE
+}
