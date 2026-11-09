@@ -567,6 +567,40 @@ describe('dockerfileProblems and a heredoc', () => {
     }
   })
 
+  it('reads the word of a heredoc as the shell does — a backslash, quotes inside it (Р3-А1)', () => {
+    for (const opener of ['<<\\EOF', '<<E"O"F', "<<'E'OF", '<<-\\EOF']) {
+      const text = `RUN cat ${opener} > /tmp/x\nuser nginx;\nEOF\nFROM alpine:latest AS runtime\nUSER root`
+      expect(dockerfileProblems('frontend/Dockerfile', text), opener).toEqual([
+        'frontend/Dockerfile:4: alpine:latest — pin it by an exact tag and its digest, image:1.2.3@sha256:…',
+      ])
+      expect(lastStageProblems('frontend/Dockerfile', text), opener).toEqual([
+        'frontend/Dockerfile:4: USER root — root, by its user or its group; name another',
+      ])
+    }
+  })
+
+  it('reads the lines of a heredoc that never closes as instructions — in doubt it sees too much, never too little', () => {
+    const text = 'RUN cat <<"EOF"x > /tmp/x\nFROM alpine:latest AS runtime\nUSER root'
+    expect(dockerfileProblems('frontend/Dockerfile', text)).toEqual([
+      'frontend/Dockerfile:2: alpine:latest — pin it by an exact tag and its digest, image:1.2.3@sha256:…',
+    ])
+    expect(lastStageProblems('frontend/Dockerfile', text)).toEqual([
+      'frontend/Dockerfile:2: USER root — root, by its user or its group; name another',
+    ])
+  })
+
+  it("takes a backslash outside single quotes as an escape — `it\\'s` opens no quote (Р3-А2)", () => {
+    const text = [
+      'FROM caddy AS runtime',
+      "RUN echo it\\'s done; cat <<EOF > /tmp/nginx.conf",
+      'user nginx;',
+      'EOF',
+    ].join('\n')
+    expect(lastStageProblems('frontend/Dockerfile', text)).toEqual([
+      "frontend/Dockerfile:1: the last stage names no user — the base's is not taken; USER <name or uid>",
+    ])
+  })
+
   it('takes no image from the body of a heredoc', () => {
     const text = `FROM caddy:2.11.9-alpine@${DIGEST} AS runtime\nRUN <<EOF\nFROM caddy:latest\nEOF\nUSER caddy`
     expect(dockerfileProblems('frontend/Dockerfile', text)).toEqual([])

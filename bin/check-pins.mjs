@@ -23,12 +23,13 @@
 // (`ADD --checksum=…`, `#<sha>`) are review's.
 //
 // And the last stage of every Dockerfile (MOL-365) is named `runtime` — the one stage `release.yml`
-// builds afresh (`no-cache-filters`), so its upgrade of the distribution runs at every release — and
-// names its user with `USER`: neither root by name nor uid 0 in any spelling Docker reads as a number
-// (`00`, `+0`, `-0`), nor the group root written beside it (`caddy:0`) — the group a user without
-// one takes from the image's `/etc/passwd` is the image's (Grafana's 472 is in group 0, by its authors). The base's user is not taken: a base moved by Dependabot
-// may change it, and an image built without one ran as root in silence (Caddy and VictoriaMetrics,
-// audit MOL-287). A user named by an argument is refused, as an image is: the check cannot read it.
+// builds afresh (`no-cache-filters`), so its upgrade of the distribution runs at every release —
+// and names its user with `USER`: neither root by name nor uid 0 in any spelling Docker reads as a
+// number (`00`, `+0`, `-0`), nor the group root written beside it (`caddy:0`) — the group a user
+// without one takes from the image's `/etc/passwd` is the image's (Grafana's 472 is in group 0, by
+// its authors). The base's user is not taken: a base moved by Dependabot may change it, and an
+// image built without one ran as root in silence (Caddy and VictoriaMetrics, audit MOL-287). A user
+// named by an argument is refused, as an image is: the check cannot read it.
 //
 //   node bin/check-pins.mjs
 
@@ -137,17 +138,41 @@ const linesOf = (text) => text.replace(/^\uFEFF/, '').split(/\r?\n/)
 
 // A heredoc of BuildKit (`heredocsFromLine`): a word of the instruction, split outside quotes, that is
 // the whole of `<<WORD`, `<<-WORD`, `<<"WORD"`, `2<<WORD` — never `<<` inside a word or a quote
-// (`'<<EOF'`, `cat<<EOF`, `$((1<<N))`, round 2, №6 and Р2-А1). The word is what follows, quotes off.
+// (`'<<EOF'`, `cat<<EOF`, `$((1<<N))`, round 2, №6 and Р2-А1). The word is what follows, read as the
+// shell reads a word (`shellWord`): `<<\EOF` and `<<E"O"F` end at `EOF` (adversarial Р3-А1).
 const HEREDOC = /^\d*<<(-?)([^<]+)$/
 const TAKES_HEREDOCS = new Set(['RUN', 'COPY', 'ADD'])
 
-/** The instructions of a Dockerfile, each its lines joined at `\` and the number of its first line;
- * the body of a heredoc is no instruction (adversarial Б2 of MOL-365: `user nginx;` of a config). */
-function instructionsOf(text) {
+/** A word as the shell reads it: quotes taken off, a backslash outside single quotes escaping the next
+ * character — inside double quotes only `"`, `\`, `$` and the backtick. */
+function shellWord(word) {
+  let out = ''
+  let quote = null
+  for (let i = 0; i < word.length; i += 1) {
+    const char = word[i]
+    if (quote === "'") {
+      if (char === "'") quote = null
+      else out += char
+    } else if (char === '\\' && i + 1 < word.length && (!quote || '"\\$`'.includes(word[i + 1]))) {
+      i += 1
+      out += word[i]
+    } else if (char === quote) {
+      quote = null
+    } else if (!quote && (char === '"' || char === "'")) {
+      quote = char
+    } else {
+      out += char
+    }
+  }
+  return out
+}
+
+/** One reading of the instructions; the heredocs begun on the lines of `plain` are not taken. */
+function scanInstructions(lines, plain) {
   const instructions = []
   let parts = null
   const bodies = []
-  linesOf(text).forEach((line, index) => {
+  lines.forEach((line, index) => {
     // Inside a heredoc, until the line of its word alone — `<<-` lets tabs stand before it.
     if (bodies.length > 0) {
       const [{ dash, word }] = bodies
@@ -164,29 +189,52 @@ function instructionsOf(text) {
     if (!continued) {
       instructions.push(parts)
       const { instruction, args } = wordsOf(parts.text)
-      if (TAKES_HEREDOCS.has(instruction ?? '')) {
+      if (TAKES_HEREDOCS.has(instruction ?? '') && !plain.has(parts.number)) {
         for (const [, dash, word] of args.map((arg) => HEREDOC.exec(arg)).filter(Boolean)) {
-          bodies.push({ dash, word: unquoted(word) })
+          bodies.push({ dash, word: shellWord(word), opened: parts.number })
         }
       }
       parts = null
     }
   })
   if (parts) instructions.push(parts)
-  return instructions
+  return { instructions, unclosed: bodies[0]?.opened }
+}
+
+/** The instructions of a Dockerfile, each its lines joined at `\` and the number of its first line;
+ * the body of a heredoc is no instruction (adversarial Б2 of MOL-365: `user nginx;` of a config).
+ * **A heredoc that never closes is no heredoc** (adversarial Р3-А1): read as one, a word this check
+ * spells otherwise than BuildKit made the rest of the file a body, and every `FROM` and `USER` below
+ * went unread. Its lines are read as instructions instead, as before MOL-365 — in doubt, the check
+ * sees too much, never too little. */
+function instructionsOf(text) {
+  const lines = linesOf(text)
+  const plain = new Set()
+  for (;;) {
+    const { instructions, unclosed } = scanInstructions(lines, plain)
+    if (unclosed === undefined) return instructions
+    plain.add(unclosed)
+  }
 }
 
 /** A value with the quotes BuildKit takes off it taken off. */
 const unquoted = (value) => value.replace(/^(['"])(.*)\1$/, '$2')
 
-/** The parts of a text between separators, a separator inside quotes kept, as BuildKit reads its
- * flags and a mount's CSV; the quotes stay, for `unquoted` to take off. */
+/** The parts of a text between separators, a separator inside quotes or escaped kept, as BuildKit reads
+ * its flags and a mount's CSV; the quotes and backslashes stay, for `unquoted` or `shellWord`. */
 function splitOutsideQuotes(text, separator) {
   const parts = []
   let part = ''
   let quote = null
+  let escaped = false
   for (const char of text) {
-    if (quote) {
+    // A backslash outside single quotes escapes the next character, as BuildKit's lexer reads it
+    // (adversarial Р3-А2: `it\'s` opened no quote there).
+    if (escaped) {
+      escaped = false
+    } else if (char === '\\' && quote !== "'") {
+      escaped = true
+    } else if (quote) {
       if (char === quote) quote = null
     } else if (char === '"' || char === "'") {
       quote = char
