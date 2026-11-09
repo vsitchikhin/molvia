@@ -52,8 +52,8 @@ COPY --from=build /ort ./node_modules
 COPY --from=build /model ./model
 ENV EMBEDDINGS_DIR=/app/model ORT_DISABLE_TELEMETRY=1
 
-# What `/health` names as the version (MOL-90): `git describe` of the commit, handed in by
-# `release.yml`. Last, so a new version does not throw away the layers above it.
+# What `/health` names as the version (MOL-90): the last tag, the releases since it and the commit
+# (MOL-371), handed in by `release.yml`. Last, so a new version does not throw away the layers above it.
 ARG APP_VERSION=dev
 ENV APP_VERSION=$APP_VERSION
 
