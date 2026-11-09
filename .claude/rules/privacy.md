@@ -34,7 +34,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   withdrawn ones, events, expenses, trips, exchanges and incomes (MOL-40,
   MOL-66 — the person's own money), spendings, their categories and frozen rates (MOL-73), accounts
   and their checks after every operation that named one (MOL-115), the messages to the developer
-  with the owner's replies (MOL-147), login requests by Telegram id
+  with the owner's replies (MOL-147), the sign-ins the bot has not told of yet (MOL-361), login requests by Telegram id
   — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
   `erasures` for the week they appeared (MOL-91). Catalogue items the
   person added stay with `created_by` nulled, the codes they wrote to items stay with `added_by`

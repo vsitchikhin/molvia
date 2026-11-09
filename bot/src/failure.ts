@@ -18,7 +18,7 @@ import type { BotFailure } from '@molvia/model'
  * (adversarial review 1).
  */
 const COMMANDS = new Set(['start', 'delete'])
-const BUTTONS = new Set(['login', 'erase', 'rate', 'remind'])
+const BUTTONS = new Set(['login', 'erase', 'rate', 'remind', 'session'])
 
 /**
  * Where in the bot a failure happened (MOL-143, Р-5): the kind of update and the bot's own name of

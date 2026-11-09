@@ -565,6 +565,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   statement, at most once, within 6 h; no sum, no line; the receipt's language; its own switch on the
   page «Бот» (`/settings/bot`), never the rating reminders'; **a block is `actors.bot_blocked_at`**,
   which «chosen» in `reminders_off` cannot hide.
+- **Every session collected is told of in the bot, with «Это не я — завершить»** (MOL-361): the collection queues
+  it, the API marks it as it hands it out — one account's oldest a claim — and lets it go by the bot's word: given
+  back behind the others, its account with it, when Telegram refuses for now, let go unsent past the lease; the notice
+  outlives the session; the button ends that one session for `ctx.from.id`, one `404` for anything else; Russian then
+  English, no switch.
 - **Telegram updates are never logged whole.**
 - **The message about a leak is queued by `make notify` and sent by the bot** (MOL-237): the API
   decides who — created before it, of its countries, the bot not blocked — in batches after a cursor

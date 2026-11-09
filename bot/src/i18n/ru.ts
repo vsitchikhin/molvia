@@ -200,6 +200,19 @@ export const ru = {
   'silence.days.many': '{n} дней',
   'silence.open': 'Открыть Molvia',
   /**
+   * A new sign-in (MOL-361, audit MOL-287 Ф-3): Russian, then English in the same message (owner's В-2
+   * «а»), since nobody's language is kept. The device is the browser's own word, and a stranger forges
+   * it — the message says so. The day and time are the account's zone (Р-3). The outcome and the
+   * refusal answer a press, so they speak the presser's language.
+   */
+  'signed_in.notice':
+    'В ваш аккаунт Molvia вошло новое устройство: {device}, {date} в {time}.\n\nНазвание устройства сообщил сам браузер — подделать его нетрудно. Если входили вы, ничего делать не нужно. Если нет — завершите этот вход кнопкой ниже.',
+  'signed_in.device_unknown': 'неизвестное устройство',
+  'signed_in.end': 'Это не я — завершить',
+  'signed_in.ended':
+    '✓ Вход завершён: это устройство больше не в вашем аккаунте. Другие входы — в Molvia: «Настройки → Устройства».',
+  'signed_in.gone': 'Этот вход уже завершён.',
+  /**
    * A failure, told to the owner (MOL-143): the first time in a build, then at 10, 100 and 1000
    * there. Russian always — the owner's language is not kept. The kind and the place are the
    * table's own words, a class name and a route's template, and are printed as they are.
