@@ -669,7 +669,8 @@ node-exporter`, and `✅ Прошло` follows.
 - `METRICS_DB_PASSWORD` in `~/molvia/.env.prod` (MOL-366): the password of `molvia_metrics`, the role
   postgres_exporter logs in as — never the database's own user, the cluster's superuser. **The API makes
   the role at every start**, after the migrations: made if missing, its attributes, term, settings and
-  `pg_monitor` set again, the advisory locks of the database taken from it, the password written only
+  `pg_monitor` set again, the advisory locks of the database, every temporary table and every other
+  database taken from it, the password written only
   when another — the role's sessions closed before and after. So a new machine, a restored copy and a rotation take no
   step by hand — `pg_dump` carries no role. Compose refuses to start the API or the exporter without the
   line; one shorter than 24 characters, or with a space or a letter beyond ASCII, stops the API. A failure
