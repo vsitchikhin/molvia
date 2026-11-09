@@ -6,6 +6,12 @@ import { services } from './compose'
 const dockerfile = (path: string): string =>
   readFileSync(fileURLToPath(new URL(`../../${path}`, import.meta.url)), 'utf8')
 
+/** Each one-shot service that gives volumes, beside the service that waits for it. */
+const OWNERS = [
+  ['frontend-volumes', 'frontend'],
+  ['victoria-volumes', 'victoria'],
+] as const
+
 /** The owner a one-shot service of the compose file gives its volumes, as `uid:gid`. */
 function ownerGiven(service: string): string | undefined {
   return /^ {4}entrypoint: \[chown, -R, '(\d+:\d+)',/m.exec(services().get(service) ?? '')?.[1]
@@ -54,10 +60,7 @@ describe('docker-compose.prod.yml gives the volumes to the users of the images',
   })
 
   it('each walks every volume its service mounts, and nothing else — a volume left out stays root (Р2-В1)', () => {
-    for (const [owner, service] of [
-      ['frontend-volumes', 'frontend'],
-      ['victoria-volumes', 'victoria'],
-    ] as const) {
+    for (const [owner, service] of OWNERS) {
       const mounted = volumesOf(owner)
       expect(mounted.size, owner).toBeGreaterThan(0)
       expect([...mounted.keys()].sort(), owner).toEqual([...volumesOf(service).keys()].sort())
@@ -67,10 +70,7 @@ describe('docker-compose.prod.yml gives the volumes to the users of the images',
 
   it('each runs as root on its service image, with no network and only the rights a chown needs', () => {
     const blocks = services()
-    for (const [owner, service] of [
-      ['frontend-volumes', 'frontend'],
-      ['victoria-volumes', 'victoria'],
-    ] as const) {
+    for (const [owner, service] of OWNERS) {
       const image = /^ {4}image: (.+)$/m.exec(blocks.get(service) ?? '')?.[1]
       const block = blocks.get(owner) ?? ''
       expect(block, owner).toContain(`    image: ${String(image)}\n`)

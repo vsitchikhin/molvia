@@ -52,8 +52,9 @@ The shape worth knowing here:
   node_exporter, cAdvisor and postgres_exporter on `metrics`, an `internal` network with no way out,
   Grafana in `metrics` and in `alerts`, a network of its own with a way out, its one port on
   `127.0.0.1:3000` for an SSH tunnel. `molvia-grafana` and `molvia-victoria` carry what they read baked
-  in and are built by the release beside the four — Grafana from `grafana/grafana`, never `grafana/grafana-oss`, which
-  stopped at 13.0.2 in June 2026 and so would never have reached Dependabot (MOL-365); the exporters are upstream images of exact tags.
+  in and are built by the release beside the four — Grafana from `grafana/grafana`, never
+  `grafana/grafana-oss`, which stopped at 13.0.2 in June 2026 and so would never have reached Dependabot
+  (MOL-365); the exporters are upstream images of exact tags.
   **They never judge a rollout** (adversarial А4): their images are pulled before anything changes, the
   upstream ones too, but a registry's refusal is a warning; the rollout's success is
   `up -d postgres backend bot frontend receipt-reader` and the health that follows, and only then are
@@ -71,8 +72,9 @@ The shape worth knowing here:
   names it, the base's word is not taken, and `bin/check-pins.mjs` refuses a last stage without `USER` or with
   root — by name, uid 0 in any spelling, or a group root written beside the user (owner's В-5 «а»). **A group a
   user takes from the image's `/etc/passwd` is not read**: Grafana's 472 is in group 0, as its authors made it, and
-  its provisioning is `472:0` for that (adversarial Р2-Б1 — a price, named). Caddy opens 80 and 443 by the `cap_net_bind_service` its binary carries and by Docker's
-  `ip_unprivileged_port_start=0` in a container's network (Docker 20.10 and later). **A volume keeps the owner it
+  its provisioning is `472:0` for that (adversarial Р2-Б1 — a price, named). Caddy opens 80 and 443 by the
+  `cap_net_bind_service` its binary carries and by Docker's `ip_unprivileged_port_start=0` in a container's
+  network (Docker 20.10 and later). **A volume keeps the owner it
   was filled by**: Docker gives a volume the image directory's owner only while it is empty, and `caddy_data`
   holds the certificate and the ACME account as root 0600 — Caddy as `caddy` on it refused to start (probe of
   09.11.2026), and the rollout, whose health goes through Caddy, would roll back. So **a one-shot service per
@@ -100,11 +102,11 @@ The shape worth knowing here:
   В-3 «а»): `apk upgrade` (Caddy, the bot, VictoriaMetrics, Grafana), `apt-get upgrade` (the API, the reader, in a
   stage of its own after the install, which stays cached). `release.yml`'s `no-cache-filters: runtime` is what makes
   it happen — and `bin/check-pins.mjs` refuses a last stage named otherwise, which the filter would not reach
-  (review 1, №1; adversarial В1): from the cache the layer stays as its first build left it until the base's digest moves. So a fix of
-  Alpine or Debian comes with the next merge, not a week later with Dependabot's pull request — the price of MOL-364
-  undone. **The price:** a build is not reproducible byte for byte, a broken package of the distribution comes as
-  silently as a fixed one, and a mirror down fails the release — the previous images keep running. The reader's
-  Tesseract moves only with a point release of trixie.
+  (review 1, №1; adversarial В1): from the cache the layer stays as its first build left it until the base's
+  digest moves. So a fix of Alpine or Debian comes with the next merge, not a week later with Dependabot's
+  pull request — the price of MOL-364 undone. **The price:** a build is not reproducible byte for byte, a
+  broken package of the distribution comes as silently as a fixed one, and a mirror down fails the release —
+  the previous images keep running. The reader's Tesseract moves only with a point release of trixie.
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the
