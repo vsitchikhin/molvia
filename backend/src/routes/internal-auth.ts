@@ -8,9 +8,11 @@ import {
   broadcastDoneSchema,
   confirmLoginSchema,
   dueBroadcastSchema,
+  dueLoginNoticesSchema,
   dueReceiptNoticesSchema,
   dueRemindersSchema,
   dueSilenceNoticesSchema,
+  endSessionFromBotSchema,
   eraseMeSchema,
   feedbackFromBotAnswerSchema,
   feedbackFromBotSchema,
@@ -26,9 +28,11 @@ import type {
   BotFailure,
   BroadcastDone,
   DueBroadcast,
+  DueLoginNotices,
   DueReceiptNotices,
   DueReminders,
   DueSilenceNotices,
+  EndSessionFromBot,
   FeedbackFromBot,
   FeedbackFromBotAnswer,
   FeedbackPicture,
@@ -71,6 +75,8 @@ export function internalAuthRoutes(
     claimBroadcast(): Promise<DueBroadcast>
     broadcastDone(body: BroadcastDone): Promise<void>
     claimSilenceNotices(): Promise<DueSilenceNotices>
+    claimLoginNotices(): Promise<DueLoginNotices>
+    endSession(sessionId: string, body: EndSessionFromBot): Promise<void>
   },
 ): void {
   const digest = (value: string): Buffer => createHash('sha256').update(value).digest()
@@ -196,6 +202,22 @@ export function internalAuthRoutes(
       parseQuery(z.strictObject({}), request.query)
       return dueSilenceNoticesSchema.parse(await api.claimSilenceNotices())
     })
+    // A new sign-in (MOL-361): the sessions collected that their account has not been told of, taken
+    // off the queue as they are handed; and «Это не я — завершить» under the message, which ends the
+    // one session the button names for the account `ctx.from.id` is — `404` for anything else.
+    scope.post('/internal/logins/claim', { onRequest: refuseAnyBody }, async (request) => {
+      parseQuery(z.strictObject({}), request.query)
+      return dueLoginNoticesSchema.parse(await api.claimLoginNotices())
+    })
+    scope.post<{ Params: { sessionId: string } }>(
+      '/internal/sessions/:sessionId/end',
+      async (request, reply) => {
+        parseQuery(z.strictObject({}), request.query)
+        const body = parseBody(endSessionFromBotSchema, request.body)
+        await api.endSession(request.params.sessionId, body)
+        return reply.code(204).send()
+      },
+    )
     scope.post('/internal/broadcasts/claim', { onRequest: refuseAnyBody }, async (request) => {
       parseQuery(z.strictObject({}), request.query)
       return dueBroadcastSchema.parse(await api.claimBroadcast())

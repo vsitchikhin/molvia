@@ -41,6 +41,12 @@ export interface LoginRequestRepository {
    * so only its count in `login_days`, on the day it was refused — as a refusal by the quota counts.
    */
   refuse(): Promise<void>
+  /**
+   * A session ended by «Это не я — завершить» under the bot's message about a sign-in (MOL-361, В-4):
+   * counted on the day of the press, since the request it began with is gone. In the caller's
+   * transaction, the last statement of it, so a session not deleted is not counted.
+   */
+  endedByNotice(): Promise<void>
   /** Deletes what ran out, and counts in `login_days` those that ran out with no outcome. */
   removeExpired(): Promise<void>
 
@@ -153,7 +159,8 @@ async function insert(
 }
 
 /** A step of the login's funnel that is counted where it happens (MOL-68). */
-type LoginStep = 'started' | 'again' | 'confirmed' | 'declined' | 'collected' | 'refused'
+type LoginStep =
+  'started' | 'again' | 'confirmed' | 'declined' | 'collected' | 'refused' | 'endedByNotice'
 
 /**
  * Adds one to each step in the row of `day`, read from `source` — the request's own row, so the
@@ -212,6 +219,10 @@ export function createLoginRequestRepository(db: Conn): LoginRequestRepository {
   return {
     async refuse() {
       await tally(db, ['refused'], yerevanDay(sql`clock_timestamp()`))
+    },
+
+    async endedByNotice() {
+      await tally(db, ['endedByNotice'], yerevanDay(sql`clock_timestamp()`))
     },
 
     async removeExpired() {

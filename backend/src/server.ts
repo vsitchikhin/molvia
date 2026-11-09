@@ -66,6 +66,7 @@ import { ownPrices } from '@/usecases/own-prices'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
+import { claimLoginNotices, endSessionFromBot } from '@/usecases/tell-logins'
 import { SILENCE_ERASE_EVERY_MS, claimSilenceNotices, eraseSilent } from '@/usecases/silence'
 import { exportMine } from '@/usecases/export-mine'
 import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
@@ -215,6 +216,7 @@ import { createExportRepository } from '@/db/export-repository'
 import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
 import { authTransactOn } from '@/db/auth-unit-of-work'
+import { createLoginNoticeRepository } from '@/db/login-notices-repository'
 import { transactOn, tripRepositories } from '@/db/unit-of-work'
 import { createVerdictRepository } from '@/db/verdicts-repository'
 import { databaseIsReachable, getDb } from '@/db'
@@ -1130,6 +1132,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           new Date(),
         ),
       broadcastDone: (body) => broadcastDone(createBroadcastRepository(db), body),
+      // A new sign-in (MOL-361): a notice the contract refuses is that message lost, and said.
+      claimLoginNotices: () =>
+        claimLoginNotices(createLoginNoticeRepository(db), (issue) => {
+          failures.report(
+            issue,
+            { source: 'api', route: 'POST /internal/logins/claim' },
+            'login notice unreadable',
+          )
+        }),
+      endSession: (sessionId, body) => endSessionFromBot(authTransactOn(db), sessionId, body),
     })
 
     // The phone's failures (MOL-144): no session, a limit in memory, the page's own build.
