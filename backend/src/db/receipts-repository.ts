@@ -662,14 +662,16 @@ const undoFrom = () => sql`clock_timestamp() - make_interval(mins => ${RECEIPT_U
 /**
  * The person's row, locked: the account first (`privacy.md`), so two receipts of one person at once take
  * turns at the quota (MOL-360) — and with it the count of their day. Erased while this waited, there is
- * nobody to send for.
+ * nobody to send for. `no key update`, the strength of the count's own `UPDATE`: it never changes the
+ * key, so a key share — every foreign key to the person, a copy for the review a reading writes — passes
+ * it; `for update` met a reading that held its receipt and waited on that share (review 2, Б1).
  */
 async function lockedAccount(tx: Conn, actorId: string) {
   const [account] = await tx
     .select({ day: actors.receiptsDay, sent: actors.receiptsSent })
     .from(actors)
     .where(eq(actors.id, actorId))
-    .for('update')
+    .for('no key update')
   if (account === undefined) throw new DomainError(ERROR.NO_ACTOR)
   return account
 }
@@ -1538,6 +1540,12 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
 
     async finish(id, outcome) {
       return db.transaction(async (tx) => {
+        // the account before the receipt's row, as erasure takes them (`privacy.md`, review 2 of MOL-360, Б1б):
+        // the copy for the review is keyed to the person, and its share of the account was taken after the
+        // receipt, which erasure holding the account waited for
+        await tx.execute(
+          sql`select 1 from ${actors} where ${actors.id} = (select ${receipts.actorId} from ${receipts} where ${receipts.id} = ${id}) for key share`,
+        )
         const head = outcome.head
         const [done] = await tx
           .update(receipts)
