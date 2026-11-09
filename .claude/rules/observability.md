@@ -353,22 +353,34 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   the API join it beside their own. cAdvisor reads Docker's socket — root on the machine — and
   neither it nor postgres_exporter can send anything anywhere. **postgres_exporter logs in as
   `molvia_metrics`, never the database's own user** (MOL-366, Ф-8 of MOL-287): `pg_monitor` — the
-  statistics, the settings, every session's state — and not one table; three connections and five
-  seconds a statement, so a broken exporter can neither read a person nor take the API's connections.
-  No way out kept it from taking anything away, never from erasing it: the database's own user is the
-  cluster's superuser (В-5 of MOL-145, taken back). **The role is the API's, made at every start**
-  (`ensureMetricsRole`, В-1 «а»), never a migration's: a role is the cluster's, a migration runs in each
-  of its databases, and `pg_dump` carries none — a machine restored from a copy would have had no role
-  behind a journal that says everything ran. Its attributes and `pg_monitor` are set again each time; its
-  password, `METRICS_DB_PASSWORD`, goes as a SCRAM verifier the API counts — the password itself never
-  in a statement, which `pg_stat_activity` shows and a failure writes into Postgres's log — and only when
-  another, then closing what the role had open, so a connection a leaked password made does not outlive
-  the rotation. A failure of it is `job:metrics-role` and the API runs on (В-2 «а»): the exporter not let
-  in is «Метрики молчат». Unset — a copy, end-to-end, CI — the role is left alone. **The prices:**
+  statistics, the settings, every session's state — and not one table, so a broken exporter reads no
+  person and writes nothing. No way out kept it from taking anything away, never from erasing it: the
+  database's own user is the cluster's superuser (В-5 of MOL-145, taken back). **Nor does it hold a lock
+  the API waits on** (adversarial А1): the advisory locks of the API's database are revoked from `PUBLIC`
+  — the API waits on them with no term, their keys are strings of a public repository, and one key held
+  closed the login for everybody, ten waiting the API's whole pool; the API, a superuser, keeps them.
+  Three connections at most. **The role is the API's, made at every start** (`ensureMetricsRole`, В-1
+  «а»), never a migration's: a role is the cluster's, a migration runs in each of its databases, and
+  `pg_dump` carries none — a machine restored from a copy would have had no role behind a journal that
+  says everything ran. **Its form is set again each time** (adversarial А2б, А4): its attributes, its term
+  (`valid until`), its settings — those it may give itself for one database too — and `pg_monitor` its
+  one membership; grants on objects are not looked at, since nothing grants any. One start at a time in a
+  database, by an advisory lock of its own (А5). Its password, `METRICS_DB_PASSWORD`, goes as a SCRAM
+  verifier the API counts — the password itself never in a statement, which a failure writes into
+  Postgres's log — and only when another; then the role's sessions are closed before the write, so one
+  holding its row in an open transaction cannot leave the start waiting (А3), and after it, and the
+  verifier read again — a session may change its own password between the commit and its end; one left
+  open, or a password not the one written, is a failure. A lock the role holds is waited on five seconds
+  at most. A failure of it is `job:metrics-role` and the API runs on (В-2 «а»): the exporter not let in is
+  «Метрики молчат». Unset — a copy, end-to-end, CI — the role is left alone. **The prices:** five seconds a
+  statement is the exporter's default, never a bound — any session lifts it with `SET` (adversarial А2),
+  and the role's own temporary table has no limit (А2в): a broken exporter can still burn the CPU, the
+  memory and the disk of the database through its three connections, as the superuser could before;
   `pg_monitor` reads the text of every running query (no value in it: the API's queries are
-  parameterised), the names of the tables and how many rows they hold; `PUBLIC`'s rights stay —
-  a temporary table is the role's to make; `pg_hba` lets any container of `metrics` try the password; and
-  nothing removes the role — taking the exporter away leaves it until a `drop role` by hand.
+  parameterised), the names of the tables and how many rows they hold, and the verifier while its
+  `ALTER ROLE` runs — of no use without an exchange taken off the network, and a broken exporter is
+  handed the new password by its environment anyway; `pg_hba` lets any container of `metrics` try the
+  password; and nothing removes the role — taking the exporter away leaves it until a `drop role` by hand.
   node_exporter is not on the host's network, which would be a port outside, so the machine's network
   counters are not there. **Grafana is in `metrics` and in `alerts` of its own**, for Telegram and the
   pulse — not in `default` (review №4), beside Caddy, the API, the bot and the receipt reader, which

@@ -668,8 +668,9 @@ node-exporter`, and `✅ Прошло` follows.
   from `openssl rand -base64 24`.
 - `METRICS_DB_PASSWORD` in `~/molvia/.env.prod` (MOL-366): the password of `molvia_metrics`, the role
   postgres_exporter logs in as — never the database's own user, the cluster's superuser. **The API makes
-  the role at every start**, after the migrations: made if missing, its attributes and `pg_monitor` set
-  again, the password written only when another. So a new machine, a restored copy and a rotation take no
+  the role at every start**, after the migrations: made if missing, its attributes, term, settings and
+  `pg_monitor` set again, the advisory locks of the database taken from it, the password written only
+  when another — the role's sessions closed before and after. So a new machine, a restored copy and a rotation take no
   step by hand — `pg_dump` carries no role. Compose refuses to start the API or the exporter without the
   line; one shorter than 24 characters, or with a space or a letter beyond ASCII, stops the API. A failure
   of the role reaches the owner as `job:metrics-role`, the API running on, and «Метрики молчат: postgres»
@@ -835,7 +836,8 @@ written as their documentation has them and not drilled.
   runs. Then `curl https://molvia.net/api/health` says `ok`: the API is in with the new password.
 
 - **`METRICS_DB_PASSWORD`** (MOL-366): the line, then both at once — the API writes the new password into
-  `molvia_metrics` at its start and closes what the role had open, so a session the old one made goes too;
+  `molvia_metrics` at its start and closes what the role had open, before and after, so a session the old
+  one made goes too, a session left or a password changed meanwhile being `job:metrics-role`;
   the exporter is recreated with the new line:
 
   ```bash
