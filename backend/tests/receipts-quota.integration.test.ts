@@ -1,13 +1,21 @@
 import { randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { ERROR, RECEIPTS_DAY_MAX, RECEIPTS_UNRECORDED_MAX } from '@molvia/model'
+import {
+  ERROR,
+  POLICY_VERSION,
+  RECEIPT_MISS_KEPT_MAX,
+  RECEIPTS_DAY_MAX,
+  RECEIPTS_UNRECORDED_MAX,
+} from '@molvia/model'
+import type { ReceiptPhotoBody } from '@molvia/model'
 import { madeUpSerbianLink } from '@molvia/model/testing/serbian-receipt'
 import type { FastifyInstance } from 'fastify'
+import { createErasureRepository } from '@/db/erasure-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
-import { actors, receipts, taxReceiptDays } from '@/db/schema'
+import { actors, receiptMisses, receipts, taxReceiptDays } from '@/db/schema'
 import { buildServer } from '@/server'
-import { connectDrizzle } from './db'
+import { connect, connectDrizzle } from './db'
 import { clearAll, insertActor, insertPlace, insertTrip, signIn } from './fixtures'
 import { onlyRow, sum } from './rows'
 
@@ -51,6 +59,14 @@ const photo = () => ({
   country: 'AM',
   language: 'ru',
   capturedAt: '2026-11-09T08:15:00.000Z',
+})
+
+/** What the route hands the repository: the body parsed, its moment a Date. */
+const parsed = (): ReceiptPhotoBody => ({
+  ...photo(),
+  country: 'AM',
+  language: 'ru',
+  capturedAt: new Date('2026-11-09T08:15:00.000Z'),
 })
 
 let counter = 0
@@ -244,4 +260,108 @@ describe('the receipts not recorded at once (MOL-360)', () => {
     const tallied = await db.select({ n: taxReceiptDays.sentUnnamed }).from(taxReceiptDays)
     expect(sum(tallied.map((row) => row.n))).toBe(RECEIPTS_UNRECORDED_MAX)
   }, 15_000)
+})
+
+describe('the copies kept for the review (MOL-360, review 1, В-2 «а», adversarial А2)', () => {
+  it('keeps twenty a person at most: «Переснять» over a wall gives its place back, the copy stays', async () => {
+    // granted the model (MOL-272), the edition of the review accepted (MOL-309)
+    const me = await owner({
+      consentVersion: POLICY_VERSION,
+      consentedAt: new Date(),
+      receiptsModelUntil: new Date(Date.now() + 30 * 86_400_000),
+    })
+    const kept: (Date | null)[] = []
+    for (let i = 0; i <= RECEIPT_MISS_KEPT_MAX; i++) {
+      const body = parsed()
+      await repository.create(me.id, body, '2026-11-09')
+      await repository.putPart(me.id, body.id, 1, {
+        photo: Buffer.alloc(1024, i),
+        width: 1200,
+        height: 3200,
+      })
+      const claimed = await repository.claimNext()
+      expect(claimed?.reviewable).toBe(true)
+      // «переснимите» read by the model, as `readByModel` hands it over
+      const written = await repository.finish(body.id, {
+        kind: 'failed',
+        failure: 'reshoot',
+        readerVersion: 'claude-haiku-5-5@v5',
+        head: null,
+        miss: { reading: { lines: [] }, parts: claimed?.parts ?? [] },
+        tell: true,
+      })
+      kept.push(written?.keptUntil ?? null)
+      await repository.remove(me.id, body.id, { retake: true })
+    }
+    expect(kept.slice(0, RECEIPT_MISS_KEPT_MAX).every((until) => until !== null)).toBe(true)
+    expect(kept.at(-1)).toBeNull()
+    const read = db
+      .select({ n: sql<number>`count(*)::int` })
+      .from(receiptMisses)
+      .where(eq(receiptMisses.actorId, me.id))
+    expect(there(onlyRow(await read)).n).toBe(RECEIPT_MISS_KEPT_MAX)
+  }, 30_000)
+})
+
+describe('the account locked first (MOL-360, review 1, №2, adversarial А3)', () => {
+  it('a receipt sent again while its person is erased waits for the account, and finds nobody — no deadlock', async () => {
+    const me = await owner()
+    const read = db.select({ tg: actors.telegramUserId }).from(actors).where(eq(actors.id, me.id))
+    const { tg } = there(onlyRow(await read))
+    // a receipt removed past its ten minutes, the timer not come round: its row is deleted by the next send
+    const body = parsed()
+    await repository.create(me.id, body, '2026-11-09')
+    await repository.remove(me.id, body.id)
+    await db
+      .update(receipts)
+      .set({ deletedAt: sql`now() - interval '11 minutes'` })
+      .where(eq(receipts.id, body.id))
+
+    const blocker = connect()
+    const eraser = connectDrizzle()
+    const sender = connectDrizzle()
+    const watcher = connect()
+    const waitingOnLocks = async (n: number) => {
+      for (;;) {
+        const row = onlyRow(
+          await watcher<{ n: number }[]>`
+            select count(*)::int as n from pg_stat_activity
+            where datname = current_database() and wait_event_type = 'Lock'`,
+        )
+        if ((row?.n ?? 0) >= n) return
+        await new Promise((resolve) => setTimeout(resolve, 25))
+      }
+    }
+    try {
+      // erasure held between the account's lock and its rows: a session of the person locked elsewhere
+      let letGo: () => void = () => undefined
+      const gate = new Promise<void>((resolve) => (letGo = resolve))
+      let locked: () => void = () => undefined
+      const lockTaken = new Promise<void>((resolve) => (locked = resolve))
+      const holding = blocker.begin(async (tx) => {
+        await tx`select 1 from sessions where actor_id = ${me.id} for update`
+        locked()
+        await gate
+      })
+      await lockTaken
+
+      const erasing = createErasureRepository(eraser.db).erase(tg, { dryRun: false })
+      erasing.catch(() => undefined) // judged below, by allSettled
+      await waitingOnLocks(1) // erasure holds the account and waits at `sessions`
+      const sending = createReceiptRepository(sender.db).create(me.id, body, '2026-11-09')
+      sending.catch(() => undefined) // judged below, by allSettled
+      await waitingOnLocks(2) // the send waits for the account before touching the receipt's row
+
+      letGo()
+      await holding
+      const [erased, sent] = await Promise.allSettled([erasing, sending])
+      expect(erased.status).toBe('fulfilled')
+      expect(sent).toMatchObject({ status: 'rejected', reason: { code: ERROR.NO_ACTOR } })
+    } finally {
+      await blocker.end()
+      await eraser.close()
+      await sender.close()
+      await watcher.end()
+    }
+  }, 30_000)
 })

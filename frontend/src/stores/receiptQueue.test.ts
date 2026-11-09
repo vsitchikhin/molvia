@@ -389,6 +389,40 @@ describe('receipt queue', () => {
       expect(JSON.parse(retakes() ?? '[]')).toEqual([])
     })
 
+    it('removes the receipt replaced before the new one, so at the bound of the unrecorded it takes its place (MOL-360, adversarial А4)', async () => {
+      // the server at its bound of the unrecorded, the one replaced holding the last place
+      const held = new Set([RECEIPT])
+      sendReceipt.mockImplementation((sent) => {
+        if (held.size >= 1)
+          return Promise.reject(
+            new ApiError(ERROR.RECEIPTS_UNRECORDED_LIMITED, undefined, true, 429, {
+              fromApi: true,
+            }),
+          )
+        held.add(sent.id)
+        return Promise.resolve(undefined)
+      })
+      removeReceipt.mockImplementation((id) => (held.delete(id), Promise.resolve()))
+      const queue = fresh()
+      expect(await queue.capture(body(SECOND, 1), shots(1), RECEIPT)).toBe(true)
+      await queue.flush()
+      expect(calls).toEqual([`remove ${RECEIPT}`, `create ${SECOND}`, `part ${SECOND} 1`])
+      expect(removeReceipt).toHaveBeenCalledWith(RECEIPT, { retake: true })
+      expect(queue.rejected).toEqual([])
+      expect([...held]).toEqual([SECOND])
+    })
+
+    it('removes nothing it would replace when the shelf refused the new photo', async () => {
+      const queue = fresh()
+      await queue.capture(body(RECEIPT, 1), shots(1))
+      await queue.flush()
+      calls.length = 0
+      refusePut = true
+      expect(await queue.capture(body(SECOND, 1), shots(1), RECEIPT)).toBe(false)
+      await queue.flush()
+      expect(calls).toEqual([])
+    })
+
     it('sends «Удалить чек» with no retake', async () => {
       const queue = fresh()
       await queue.capture(body(RECEIPT, 1), shots(1))
