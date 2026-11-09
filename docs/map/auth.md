@@ -36,7 +36,7 @@ Rules: `.claude/rules/auth.md`. A test beside its source, or mirroring it under
 ## backend · db
 
 - `backend/src/db/actors-repository.ts` — Repository of owners: create under the account lock, find by id or Telegram id, update the settings, lock an account, mark the account's visit once a day (MOL-238).
-- `backend/src/db/auth-unit-of-work.ts` — Unit of work of the login: the owner, session and login-request repositories built on one transaction.
+- `backend/src/db/auth-unit-of-work.ts` — Unit of work of the login: the owner, session, login-request and login-notice (MOL-361) repositories built on one transaction.
 - `backend/src/db/login-requests-repository.ts` — Repository of login requests: quota-limited create, a refusal by the address counted (`refuse`), confirm, decline, lock, consume, expired cleanup, a session ended from the bot counted (`endedByNotice`, MOL-361); secrets kept only as hashes; every step counted into `login_days` in its own transaction. Tests: `backend/tests/login-requests.integration.test.ts`, `backend/tests/login-days.integration.test.ts`.
 - `backend/src/db/sessions-repository.ts` — Repository of sessions: create by token hash, live lookup with its owner, daily touch, list and remove for «Устройства», remove by the Telegram account that pressed «Это не я — завершить» (MOL-361), expired cleanup. Tests: `backend/tests/sessions.integration.test.ts`.
 - `backend/src/db/telegram-lock.ts` — SQL of the advisory lock on one Telegram account, taken first by login confirmation, owner creation and erasure. Tests: `backend/tests/erasure.integration.test.ts`.

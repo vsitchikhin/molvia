@@ -637,11 +637,22 @@ person's «Войти» lets the stranger's browser into their account — the q
 own User-Agent, and before this nothing told the person afterwards. Owner's В-9 «а» of the audit and В-1…В-4 «а» of
 09.11.2026 in `.scratch/tasks/requirements/MOL-361.md`.
 
-- **The collection queues it, the API takes it off as it hands it out, the bot only sends** — the reminders' rule
-  (Р-1, Р-2 of MOL-101). `completeLogin` writes a row of `login_notices` in the collection's own transaction, read off
-  the session's row; `POST /internal/logins/claim`, every minute, deletes the oldest under `for update skip locked` and
-  hands them out in the same statement, so two claims never share one and a bot that dies after the claim loses that
-  message. **Only a collection**: the development seam signs in with none, and the sessions alive at the rollout were
+- **The collection queues it, the API marks it as it hands it out, the bot only sends and says what went** — the
+  reminders' rule (Р-1 of MOL-101), with the bot's word of the broadcasts (MOL-237). `completeLogin` writes a row of
+  `login_notices` in the collection's own transaction, read off the session's row; `POST /internal/logins/claim`, every
+  minute, marks `handed_at` in the statement that hands them, re-checked under the row's lock, so two claims never share
+  one. **One account's oldest notice a claim** (adversarial А2): a queue in one line let one account's sixty sign-ins —
+  a stranger's own, a minute of the login's quota — push the victim's notice minutes on; one a claim also keeps the bot
+  from writing fifty times running into one chat, which is what Telegram's flood control of a chat answers. **The
+  account is locked first, `for key share skip locked`** (adversarial А3): one an erasure holds is passed over and its
+  notice goes with the erasure, never a message about an account erased that second. **The bot's word**
+  (`POST /internal/logins/told`, adversarial А1): what went — sent, the bot blocked, refused for good — is let go; what
+  Telegram refused for now is given back, `not_before` its `retry_after` or now, and ordered by it, so a chat kept under
+  flood control — the stranger's own, by `/start` spammed — goes behind everyone else's instead of ending the run with
+  the victim's notice in it. **Nothing is waited out**: a 429 of any length gives the notice back and the next is tried;
+  two refusals in a row are Telegram's, not a chat's, and the rest of the claim goes back untried, keeping its place.
+  **At most once all the same**: a notice handed and never spoken of — the bot died, its word was lost — is let go past
+  `LOGIN_NOTICE_LEASE_SECONDS` by the sessions' minute timer, unsent. **Only a collection**: the development seam signs in with none, and the sessions alive at the rollout were
   told of by nobody. **Every collection, a newcomer's first too** (В-3 «а»): a link forwarded to someone without an
   account makes them one, with the stranger's browser already in it.
 - **The notice outlives the session** (В-1 «а»): `login_notices` has no key to `sessions`, so a session ended before
@@ -667,7 +678,10 @@ own User-Agent, and before this nothing told the person afterwards. Owner's В-9
   it, by the day of the press in Yerevan — the login's own day is gone with its request; `make gates` prints it in the
   login's block, with no verdict: the one trace of a hijack on production, or of a slip.
 - **The prices, named** (Р-7): in the first minute the stranger can still take the copy or erase the account — the
-  notice ends a silent long hijack, not an instant one; a notice lost between the claim and Telegram is not sent again;
-  a forwarded notice pressed by another Telegram ends nothing.
+  notice ends a silent long hijack, not an instant one; a notice handed and never spoken of is not sent again; a
+  forwarded notice pressed by another Telegram ends nothing. **And a stranger with many Telegram accounts** — each
+  with a chat of its own kept under flood control and a notice before the victim's — holds the victim's back a claim
+  for every two of them, since two refusals in a row end the claim; each costs a Telegram account and is given back
+  behind the victim's the next minute.
 - **The privacy page names it** under «Telegram» and «Устройства входа» — a revision of edition 6 (Р-8): the device's
   name already went to Telegram in the login's question, to the same recipient for the same purpose.
