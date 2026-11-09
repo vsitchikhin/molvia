@@ -376,9 +376,12 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   open, or a password not the one written, is a failure. A lock the role holds is waited on five seconds
   at most. A failure of it is `job:metrics-role` and the API runs on (В-2 «а»): the exporter not let in is
   «Метрики молчат». Unset — a copy, end-to-end, CI — the role is left alone. **The prices:** five seconds a
-  statement is the exporter's default, never a bound — any session lifts it with `SET` (adversarial А2):
-  a broken exporter can still burn the CPU and the memory of the database through its three connections,
-  as the superuser could before (В-4 «б»: the disk closed, not those);
+  statement is the exporter's default, never a bound — any session lifts it with `SET` (adversarial А2),
+  `work_mem` too (Б3б): a broken exporter can still burn the CPU and the memory of the database through its
+  three connections, as the superuser could before (В-4 «б»: the disk closed, not those); **a leaked password
+  can silence the metrics of Postgres** — hold the three connections, so the exporter, a fourth, is refused
+  (Б1), or change the role's own password, which Postgres lets every role do (Б2) — until the API's next
+  start: «Метрики молчат» says so, the reverse of hiding, and no role can be kept from either;
   `pg_monitor` reads the text of every running query (no value in it: the API's queries are
   parameterised), the names of the tables and how many rows they hold, and the verifier while its
   `ALTER ROLE` runs — of no use without an exchange taken off the network, and a broken exporter is
