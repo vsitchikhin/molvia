@@ -17,6 +17,7 @@ import {
   feedbackFromBotAnswerSchema,
   feedbackFromBotSchema,
   feedbackPictureSchema,
+  loginNoticesToldSchema,
   loginPreviewCodec,
   ownerNoticesSchema,
   ownerNoticesSentSchema,
@@ -36,6 +37,7 @@ import type {
   FeedbackFromBot,
   FeedbackFromBotAnswer,
   FeedbackPicture,
+  LoginNoticesTold,
   LoginPreview,
   OwnerNotices,
   OwnerNoticesSent,
@@ -76,6 +78,7 @@ export function internalAuthRoutes(
     broadcastDone(body: BroadcastDone): Promise<void>
     claimSilenceNotices(): Promise<DueSilenceNotices>
     claimLoginNotices(): Promise<DueLoginNotices>
+    loginNoticesTold(word: LoginNoticesTold): Promise<void>
     endSession(sessionId: string, body: EndSessionFromBot): Promise<void>
   },
 ): void {
@@ -208,6 +211,13 @@ export function internalAuthRoutes(
     scope.post('/internal/logins/claim', { onRequest: refuseAnyBody }, async (request) => {
       parseQuery(z.strictObject({}), request.query)
       return dueLoginNoticesSchema.parse(await api.claimLoginNotices())
+    })
+    // The bot's word on the claim (adversarial А1): what went is let go, what Telegram refused for now
+    // is handed again — never lost to one chat's flood control, never sent twice.
+    scope.post('/internal/logins/told', async (request, reply) => {
+      parseQuery(z.strictObject({}), request.query)
+      await api.loginNoticesTold(parseBody(loginNoticesToldSchema, request.body))
+      return reply.code(204).send()
     })
     scope.post<{ Params: { sessionId: string } }>(
       '/internal/sessions/:sessionId/end',

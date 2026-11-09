@@ -5,7 +5,12 @@ import {
   loginNoticeSchema,
   signedInClock,
 } from '@molvia/model'
-import type { DueLoginNotices, EndSessionFromBot, LoginNotice } from '@molvia/model'
+import type {
+  DueLoginNotices,
+  EndSessionFromBot,
+  LoginNotice,
+  LoginNoticesTold,
+} from '@molvia/model'
 import type { AuthTransact } from '@/db/auth-unit-of-work'
 import type { LoginNoticeRepository } from '@/db/login-notices-repository'
 
@@ -20,9 +25,9 @@ export class LoginNoticeUnreadable extends Error {
 }
 
 /**
- * «В ваш аккаунт вошло новое устройство» (MOL-361): the sessions collected that the bot has not told
- * their account of, taken off the queue as they are handed out. The API decides, the bot only sends
- * (MOL-101 Р-1); a bot that dies between the two loses the message, and nothing sends it twice.
+ * «В ваш аккаунт вошло новое устройство» (MOL-361): the oldest notice of each account the bot has not
+ * told, marked as handed. The API decides, the bot only sends (MOL-101 Р-1) and says what went
+ * (`loginNoticesTold`); a bot that dies between the two loses the message, and nothing sends it twice.
  */
 export async function claimLoginNotices(
   notices: Pick<LoginNoticeRepository, 'claim'>,
@@ -40,6 +45,14 @@ export async function claimLoginNotices(
     else unreadable(new LoginNoticeUnreadable(notice.error))
   }
   return { notices: due }
+}
+
+/** The bot's word on a claim: what went is let go, what did not is handed again (adversarial А1). */
+export async function loginNoticesTold(
+  notices: Pick<LoginNoticeRepository, 'told'>,
+  word: LoginNoticesTold,
+): Promise<void> {
+  await notices.told(word)
 }
 
 /**

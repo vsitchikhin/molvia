@@ -8,6 +8,7 @@ import {
   confirmLoginSchema,
   dueBroadcastSchema,
   dueLoginNoticesSchema,
+  loginNoticesToldSchema,
   dueSilenceNoticesSchema,
   dueReceiptNoticesSchema,
   dueRemindersSchema,
@@ -31,6 +32,7 @@ import type {
   BroadcastDone,
   DueBroadcast,
   DueLoginNotices,
+  LoginNoticesTold,
   DueSilenceNotices,
   DueReceiptNotices,
   DueReminders,
@@ -115,6 +117,8 @@ export interface MolviaBotClient {
    * they are handed: a notice lost on the way is not handed again.
    */
   claimLoginNotices(): Promise<DueLoginNotices>
+  /** What of a claim went and what did not (adversarial А1): the API lets go of one, hands the other again. */
+  loginNoticesTold(word: LoginNoticesTold): Promise<void>
   /**
    * «Это не я — завершить»: ends the session the button names for the account that pressed it. A
    * session that is gone, or another account's, is `not_found`.
@@ -228,6 +232,11 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
       request('/internal/silence/claim', dueSilenceNoticesSchema, { method: 'POST' }),
     claimLoginNotices: async () =>
       request('/internal/logins/claim', dueLoginNoticesSchema, { method: 'POST' }),
+    loginNoticesTold: async (word) => {
+      const body = loginNoticesToldSchema.safeParse(word)
+      if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'word')
+      await request('/internal/logins/told', z.undefined(), { method: 'POST', body: body.data })
+    },
     endSession: async (sessionId, telegramUserId) => {
       const id = resourceIdOf(sessionId)
       if (id === null) throw new ApiError(ISSUE.PATH_INVALID, 'sessionId')

@@ -2008,9 +2008,11 @@ export const sessions = pgTable(
 
 /**
  * A sign-in the bot has yet to tell its account about (MOL-361, audit MOL-287 Ф-3, owner's В-9 «а»):
- * written by the collection of a session, in its transaction, and **deleted as it is handed to the
- * bot** — a row is «not told yet», and nothing else. The API decides and marks as it hands out, the
- * bot only sends (MOL-101 Р-1, Р-2): at most once.
+ * written by the collection of a session, in its transaction, and **deleted once the bot says it
+ * went** — a row is «not told yet», and nothing else. The API decides and marks as it hands out
+ * (`handed_at`), the bot only sends (MOL-101 Р-1): one account's notice a claim, so one person's
+ * sign-ins never hold another's back, and one the bot could not send given back rather than lost
+ * (adversarial А1, А2) — at most once all the same, since one never spoken of is let go.
  *
  * **No key to `sessions`, on purpose** (owner's В-1 «а»): a session ended before the bot's next minute
  * — a copy downloaded, then «Выйти» — must still be told of, or the hijack that matters most stays
@@ -2025,6 +2027,16 @@ export const loginNotices = pgTable('login_notices', {
   deviceName: varchar('device_name', { length: DEVICE_NAME_MAX }),
   /** The session's `created_at`, the database's clock. */
   signedInAt: timestamp('signed_in_at', { withTimezone: true }).notNull(),
+  /**
+   * Handed to the bot and not yet spoken of (adversarial А1): the bot's word lets it go or gives it
+   * back; with no word in `LOGIN_NOTICE_LEASE_SECONDS` it is let go unsent — at most once.
+   */
+  handedAt: timestamp('handed_at', { withTimezone: true }),
+  /**
+   * Given back after a try — Telegram's 429 of that chat, the network: not handed before this moment,
+   * and ordered by it, so a chat kept under flood control goes behind everyone else's (adversarial А1).
+   */
+  notBefore: timestamp('not_before', { withTimezone: true }),
 })
 
 /**

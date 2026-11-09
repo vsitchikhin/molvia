@@ -66,7 +66,7 @@ import { ownPrices } from '@/usecases/own-prices'
 import { authenticate } from '@/usecases/authenticate'
 import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
-import { claimLoginNotices, endSessionFromBot } from '@/usecases/tell-logins'
+import { claimLoginNotices, endSessionFromBot, loginNoticesTold } from '@/usecases/tell-logins'
 import { SILENCE_ERASE_EVERY_MS, claimSilenceNotices, eraseSilent } from '@/usecases/silence'
 import { exportMine } from '@/usecases/export-mine'
 import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
@@ -706,8 +706,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       )
       // An expired session has no reader, and it kept a device name for good while the privacy
       // page promises 180 days from the last use (MOL-57, owner's decision Q4).
+      // …and a notice of a sign-in handed to the bot and never spoken of (MOL-361): let go unsent.
       stopSessionCleanup = startLoginCleanup(
-        () => sessions.removeExpired(),
+        async () => {
+          await sessions.removeExpired()
+          await createLoginNoticeRepository(db).removeLost()
+        },
         (error) => {
           failures.report(error, job('session-cleanup'), 'expired session cleanup failed')
         },
@@ -1141,6 +1145,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             'login notice unreadable',
           )
         }),
+      loginNoticesTold: (word) => loginNoticesTold(createLoginNoticeRepository(db), word),
       endSession: (sessionId, body) => endSessionFromBot(authTransactOn(db), sessionId, body),
     })
 

@@ -19,8 +19,15 @@ export const RETRY_AFTER_CAP_SECONDS = 10
 /** Waits `ms`; `false` when a stop cut the wait short. */
 export type Wait = (ms: number) => Promise<boolean>
 
-/** Telegram asked for longer than we wait: every message after this one would be refused too. */
-export class Flooded extends Error {}
+/**
+ * Telegram asked for longer than we wait: every message after this one would be refused too — or,
+ * for the message about a sign-in, only this chat's (MOL-361, adversarial А1): it says how long.
+ */
+export class Flooded extends Error {
+  constructor(readonly seconds: number) {
+    super('flooded')
+  }
+}
 
 /**
  * What became of one message: sent, the person blocked the bot, refused for good (`failed` — the chat
@@ -76,7 +83,7 @@ export async function deliver(
     } catch (error) {
       if (!(error instanceof GrammyError) || error.error_code !== 429) throw error
       const seconds = error.parameters.retry_after ?? 1
-      if (seconds > RETRY_AFTER_CAP_SECONDS) throw new Flooded()
+      if (seconds > RETRY_AFTER_CAP_SECONDS) throw new Flooded(seconds)
       if (!(await wait(seconds * 1000))) throw error
       await message()
     }

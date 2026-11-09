@@ -4,11 +4,13 @@ import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import type { LoginNotice } from '@molvia/model'
-import { dropKeyboard, refuse, settleUnder, stopSpinner } from './answer'
+import { dropKeyboard, refuse, settleKeeping, stopSpinner } from './answer'
+import { shownText } from './remind'
 import { t } from './i18n'
+import { dayInWords } from './when'
 import type { MessageKey } from './i18n'
 import { handlerOf, reportDefect } from './failure'
-import { Flooded, deliver, sleep } from './deliver'
+import { Flooded, deliver } from './deliver'
 import type { Wait } from './deliver'
 
 /**
@@ -20,22 +22,12 @@ import type { Wait } from './deliver'
  * and whose it is, is `ctx.from.id`.
  */
 
-/** Telegram's limit on `callback_data`, in bytes: `session:end:` and a uuid are 48. */
-const CALLBACK_DATA_MAX = 64
+/** `session:end:` and a uuid are 48 bytes of Telegram's 64 for `callback_data`. */
 const PREFIX = 'session:end:'
 const BUTTON_DATA = new RegExp(`^${PREFIX}(.*)$`, 's')
 
 export function endButtonData(sessionId: string): string {
   return `${PREFIX}${sessionId}`
-}
-
-/** «9 ноября», «9 November»: the day of the sign-in, without the year — Telegram dates the message. */
-function dateOf(language: 'ru' | 'en', day: string): string {
-  return new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : language, {
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  }).format(new Date(`${day}T12:00:00Z`))
 }
 
 /**
@@ -47,7 +39,7 @@ export function signedInText(notice: LoginNotice): string {
     .map((language) =>
       t(language, 'signed_in.notice', {
         device: notice.deviceName ?? t(language, 'signed_in.device_unknown'),
-        date: dateOf(language, notice.day),
+        date: dayInWords(language, notice.day),
         time: notice.time,
       }),
     )
@@ -66,20 +58,20 @@ export function signedInMessage(notice: LoginNotice): {
   }
 }
 
+/** Two refusals for now in a row are Telegram's, not a chat's: the rest of the claim waits for the next. */
+const REFUSED_IN_A_ROW = 2
+
 /**
- * Asks the API which sign-ins to tell of and sends them, one message each, with sound whatever the hour
- * (Р-2) — a 429 waited out once, a 403 marking the bot blocked, as `deliver` does for every message. A
- * notice lost here is not handed out again: at most once (MOL-101 Р-2).
+ * Asks the API which sign-ins to tell of, sends them one message each with sound whatever the hour
+ * (Р-2), and says what went (adversarial А1). **Nothing waits**: a 429 — of one chat, the attacker's
+ * own under flood control (`/start` spammed), or the bot's — gives that notice back, behind everyone
+ * else's, and the next one is tried; two in a row say it is Telegram's, and the rest of the claim is
+ * given back untried. A 403 marks the bot blocked, as `deliver` does for every message, and is told.
+ * Lost only if the bot dies before its word, or the word itself is lost — at most once (MOL-101 Р-2).
  */
-export async function tellSignIns(
-  api: MolviaBotClient,
-  telegram: Api,
-  wait: Wait = async (ms) => sleep(ms),
-): Promise<void> {
+export async function tellSignIns(api: MolviaBotClient, telegram: Api): Promise<void> {
   let due: LoginNotice[]
   try {
-    // Never cut short by a stop: the API took them off its queue, so a claim given up midway loses
-    // those messages — its own thirty seconds are the bound.
     due = (await api.claimLoginNotices()).notices
   } catch (error) {
     console.error(
@@ -88,40 +80,66 @@ export async function tellSignIns(
     reportDefect(api, error, 'signed_in:claim')
     return
   }
-  for (const [index, notice] of due.entries()) {
-    // A session id is a uuid, so this holds by construction; a notice it would not hold for is one
-    // whose button could not be pressed, and the message without it is what this task exists against.
-    if (Buffer.byteLength(endButtonData(notice.sessionId)) > CALLBACK_DATA_MAX) continue
+  if (due.length === 0) return
+  const word: { told: string[]; back: { sessionId: string; afterSeconds: number | null }[] } = {
+    told: [],
+    back: [],
+  }
+  let refused = 0
+  for (const notice of due) {
+    if (refused >= REFUSED_IN_A_ROW) {
+      word.back.push({ sessionId: notice.sessionId, afterSeconds: null })
+      continue
+    }
     const { text, keyboard } = signedInMessage(notice)
     const message = async () =>
       telegram.sendMessage(notice.telegramUserId, text, { reply_markup: keyboard })
+    let afterSeconds = 0
     try {
-      await deliver(api, notice.telegramUserId, message, wait, 'signed_in')
+      // A wait refused: a 429 within the cap is given back at once rather than waited out here.
+      const delivered = await deliver(api, notice.telegramUserId, message, noWait, 'signed_in')
+      if (delivered !== 'again') {
+        word.told.push(notice.sessionId)
+        refused = 0
+        continue
+      }
     } catch (error) {
       if (!(error instanceof Flooded)) throw error
-      console.error(`[molvia] signed in: 429 flood, ${String(due.length - index)} notices given up`)
-      return
+      afterSeconds = error.seconds
     }
+    word.back.push({ sessionId: notice.sessionId, afterSeconds })
+    refused += 1
+  }
+  if (refused >= REFUSED_IN_A_ROW) {
+    console.error(
+      `[molvia] signed in: refused ${String(REFUSED_IN_A_ROW)} in a row, the rest given back`,
+    )
+  }
+  try {
+    await api.loginNoticesTold(word)
+  } catch (error) {
+    console.error(
+      `[molvia] login notices told: ${error instanceof ApiError ? error.code : 'unexpected failure'}`,
+    )
+    reportDefect(api, error, 'signed_in:told')
   }
 }
+
+const noWait: Wait = () => Promise.resolve(false)
 
 /** How often the bot asks: a sign-in is told of within the minute after it. */
 export const SIGNED_IN_EVERY_MS = 60_000
 
-/**
- * The notices' timer, a twin of the receipts': a run still going is not doubled, the timer keeps no
- * process alive, and a stop cuts the waits short and waits for the rest of the run.
- */
+/** The notices' timer: a run still going is not doubled, the timer keeps no process alive. */
 export function startLoginNotices(
   api: MolviaBotClient,
   telegram: Api,
   everyMs = SIGNED_IN_EVERY_MS,
 ): () => Promise<void> {
   let running: Promise<void> | undefined
-  const stopping = new AbortController()
   const tick = (): void => {
     if (running) return
-    running = tellSignIns(api, telegram, async (ms) => sleep(ms, stopping.signal)).finally(() => {
+    running = tellSignIns(api, telegram).finally(() => {
       running = undefined
     })
   }
@@ -130,7 +148,6 @@ export function startLoginNotices(
   timer.unref()
   return async () => {
     clearInterval(timer)
-    stopping.abort()
     await running
   }
 }
@@ -171,7 +188,15 @@ export function signedInComposer({ api }: { readonly api: MolviaBotClient }): Co
     }
     if (refused === null) {
       try {
-        await settleUnder(ctx, t(ctx.from.language_code, 'signed_in.ended'))
+        // Under the notice, which keeps saying which device and when; the button goes.
+        const outcome = t(ctx.from.language_code, 'signed_in.ended')
+        const shown = shownText(ctx.callbackQuery.message)
+        await settleKeeping(
+          ctx,
+          shown === null ? null : `${shown}\n\n${outcome}`,
+          undefined,
+          outcome,
+        )
       } finally {
         await stopSpinner(ctx)
       }

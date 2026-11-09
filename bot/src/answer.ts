@@ -44,11 +44,14 @@ export async function settle(ctx: Context, key: MessageKey): Promise<void> {
  * **A message Telegram handed over without its text** (`InaccessibleMessage`) is not edited at all:
  * its question cannot be read back, and an edit would leave the outcome alone in its place, the
  * question and the scale gone (adversarial Г). `text` is `null` then, and the outcome is a reply.
+ *
+ * **With no `keyboard` the buttons go and the question stays** (MOL-361): the notice of a sign-in keeps
+ * saying which device and when, «вход завершён» under it.
  */
 export async function settleKeeping(
   ctx: Context,
   text: string | null,
-  keyboard: InlineKeyboard,
+  keyboard: InlineKeyboard | undefined,
   fallback: string,
 ): Promise<void> {
   if (text === null) {
@@ -56,38 +59,14 @@ export async function settleKeeping(
     return
   }
   try {
-    await ctx.editMessageText(text, { reply_markup: keyboard })
+    // Without a keyboard the edit carries none, and Telegram takes the buttons away (MOL-361).
+    await ctx.editMessageText(text, keyboard === undefined ? {} : { reply_markup: keyboard })
   } catch (error) {
     // The same digit pressed twice: this very answer is already on screen (see `settle`).
     if (error instanceof GrammyError && error.description.includes('message is not modified')) {
       return
     }
     await ctx.reply(fallback)
-  }
-}
-
-/**
- * An outcome written **under** the message, its buttons taken away (MOL-361): the notice of a sign-in
- * keeps saying which device and when — the person may want it later — and «вход завершён» follows it.
- * A message handed over without its text (`InaccessibleMessage`) cannot be read back, so the outcome
- * goes as a reply, as `settleKeeping` does.
- */
-export async function settleUnder(ctx: Context, outcome: string): Promise<void> {
-  const message = ctx.callbackQuery?.message
-  const text = message !== undefined && 'text' in message ? message.text : undefined
-  if (text === undefined) {
-    await ctx.reply(outcome)
-    return
-  }
-  try {
-    // No `reply_markup`: Telegram drops the keyboard when an edit does not carry one.
-    await ctx.editMessageText(`${text}\n\n${outcome}`)
-  } catch (error) {
-    // A second press already wrote it (see `settle`).
-    if (error instanceof GrammyError && error.description.includes('message is not modified')) {
-      return
-    }
-    await ctx.reply(outcome)
   }
 }
 

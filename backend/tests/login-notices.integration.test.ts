@@ -6,13 +6,16 @@ import {
   LOGIN_COOKIE,
   LOGIN_HEADER,
   SESSION_COOKIE,
+  LOGIN_NOTICE_LEASE_SECONDS,
   dueLoginNoticesSchema,
   loginStartedCodec,
 } from '@molvia/model'
+import type { LoginNoticesTold } from '@molvia/model'
 import { buildServer } from '@/server'
 import { sha256Hex } from '@/db/digest'
 import { createLoginNoticeRepository } from '@/db/login-notices-repository'
 import { loginDays, loginNotices, sessions } from '@/db/schema'
+import { lockTelegramAccount } from '@/db/telegram-lock'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, telegramId } from './fixtures'
 import { onlyRow, sorted, sum } from './rows'
@@ -96,6 +99,27 @@ async function claim() {
   return dueLoginNoticesSchema.parse(response.json()).notices
 }
 
+function told(word: LoginNoticesTold) {
+  return app.inject({
+    method: 'POST',
+    url: '/internal/logins/told',
+    headers: botHeaders,
+    payload: word,
+  })
+}
+
+/** A notice written as the collection writes it, `minutesAgo` before now — for the order of the queue. */
+async function queue(actorId: string, minutesAgo = 0): Promise<string> {
+  const sessionId = randomUUID()
+  await db.insert(loginNotices).values({
+    sessionId,
+    actorId,
+    deviceName: null,
+    signedInAt: sql`clock_timestamp() - make_interval(mins => ${minutesAgo})`,
+  })
+  return sessionId
+}
+
 function end(sessionId: string, telegramUserId: number) {
   return app.inject({
     method: 'POST',
@@ -136,7 +160,7 @@ describe('a session collected queues one notice (MOL-361)', () => {
 })
 
 describe('the claim hands a notice out once', () => {
-  it('hands the session, the device as the browser named it and when; a second claim is empty', async () => {
+  it('hands the session, the device as the browser named it and when; handed, it is not handed again; told, it goes', async () => {
     const person = await signedIn()
     const notice = onlyRow(await claim())
     expect(notice).toMatchObject({
@@ -147,6 +171,8 @@ describe('the claim hands a notice out once', () => {
     expect(notice?.day).toMatch(/^\d{4}-\d{2}-\d{2}$/)
     expect(notice?.time).toMatch(/^\d{2}:\d{2}$/)
     expect(await claim()).toEqual([])
+    expect(await queued()).toBe(1)
+    expect((await told({ told: [person.sessionId], back: [] })).statusCode).toBe(204)
     expect(await queued()).toBe(0)
   })
 
@@ -164,16 +190,11 @@ describe('the claim hands a notice out once', () => {
   })
 
   it('two claims at once never share a notice', async () => {
-    const owner = await insertActor(db)
-    const ids = [randomUUID(), randomUUID(), randomUUID()]
-    await db.insert(loginNotices).values(
-      ids.map((sessionId) => ({
-        sessionId,
-        actorId: owner,
-        deviceName: null,
-        signedInAt: new Date(),
-      })),
-    )
+    const ids = [
+      await queue(await insertActor(db)),
+      await queue(await insertActor(db)),
+      await queue(await insertActor(db)),
+    ]
     const [a, b] = await Promise.all([
       createLoginNoticeRepository(first.db).claim(2),
       createLoginNoticeRepository(second.db).claim(2),
@@ -211,6 +232,97 @@ describe('the claim hands a notice out once', () => {
   })
 })
 
+describe('one person never holds another back (adversarial А1, А2)', () => {
+  it('one notice an account a claim: sixty of one account and the victim’s after them — the victim’s in the first claim', async () => {
+    const attacker = await insertActor(db)
+    const victim = await insertActor(db)
+    const first = await queue(attacker, 61)
+    for (let minutes = 60; minutes > 0; minutes -= 1) await queue(attacker, minutes)
+    const victims = await queue(victim, 0)
+    expect(sorted((await claim()).map((notice) => notice.sessionId))).toEqual(
+      sorted([first, victims]),
+    )
+  })
+
+  it('the next claim hands the account’s next notice, one a claim', async () => {
+    const owner = await insertActor(db)
+    const older = await queue(owner, 2)
+    const newer = await queue(owner, 1)
+    expect(onlyRow(await claim())?.sessionId).toBe(older)
+    expect(onlyRow(await claim())?.sessionId).toBe(newer)
+    expect(await claim()).toEqual([])
+  })
+
+  it('given back after a try, a notice goes behind everyone else’s; untried, it keeps its place', async () => {
+    const attacker = await insertActor(db)
+    const victim = await insertActor(db)
+    const bystander = await insertActor(db)
+    const flooded = await queue(attacker, 3)
+    const victims = await queue(victim, 2)
+    const untried = await queue(bystander, 1)
+    expect((await claim()).map((notice) => notice.sessionId)).toEqual([flooded, victims, untried])
+    await told({
+      told: [],
+      back: [
+        { sessionId: flooded, afterSeconds: 0 },
+        { sessionId: victims, afterSeconds: null },
+        { sessionId: untried, afterSeconds: null },
+      ],
+    })
+    expect((await claim()).map((notice) => notice.sessionId)).toEqual([victims, untried, flooded])
+  })
+
+  it('given back for Telegram’s seconds, it is not handed before them', async () => {
+    const owner = await insertActor(db)
+    const flooded = await queue(owner)
+    await claim()
+    await told({ told: [], back: [{ sessionId: flooded, afterSeconds: 3_600 }] })
+    expect(await claim()).toEqual([])
+    expect(await queued()).toBe(1)
+  })
+
+  it('handed and never spoken of past the lease, it is let go unsent — at most once', async () => {
+    const owner = await insertActor(db)
+    const lost = await queue(owner, 2)
+    const kept = await queue(await insertActor(db), 1)
+    await claim()
+    await db
+      .update(loginNotices)
+      .set({
+        handedAt: sql`clock_timestamp() - make_interval(secs => ${LOGIN_NOTICE_LEASE_SECONDS + 1})`,
+      })
+      .where(eq(loginNotices.sessionId, lost))
+    await createLoginNoticeRepository(db).removeLost()
+    expect(
+      sorted((await db.select().from(loginNotices)).map((notice) => notice.sessionId)),
+    ).toEqual([kept])
+    // A word that comes after the lease changes nothing; nor does one about a notice never handed.
+    await told({ told: [lost], back: [{ sessionId: lost, afterSeconds: 0 }] })
+    const waiting = await queue(owner)
+    await told({ told: [waiting], back: [] })
+    expect(await queued()).toBe(2)
+  })
+
+  it('an account an erasure holds is passed over, and its notice goes with the erasure (adversarial А3)', async () => {
+    const person = await signedIn()
+    const handed = await second.db.transaction(async (tx) => {
+      // The locks `ErasureRepository.erase` takes before it deletes a row (MOL-58).
+      await tx.execute(lockTelegramAccount(person.telegramUserId))
+      await tx.execute(
+        sql`select 1 from login_requests where telegram_user_id = ${person.telegramUserId} for update`,
+      )
+      await tx.execute(
+        sql`select 1 from actors where telegram_user_id = ${person.telegramUserId} for update`,
+      )
+      const during = await claim()
+      await tx.execute(sql`delete from actors where telegram_user_id = ${person.telegramUserId}`)
+      return during
+    })
+    expect(handed).toEqual([])
+    expect(await queued()).toBe(0)
+  })
+})
+
 describe('«Это не я — завершить» ends the one session for the account that pressed', () => {
   it('the same Telegram: 204, the session is gone — its next request is 401 — and it is counted', async () => {
     const person = await signedIn()
@@ -238,6 +350,11 @@ describe('«Это не я — завершить» ends the one session for the
     const person = await signedIn()
     expect((await end(randomUUID(), person.telegramUserId)).statusCode).toBe(404)
     expect((await end('not-a-session', person.telegramUserId)).statusCode).toBe(404)
+    expect((await me(person.cookie)).statusCode).toBe(200)
+  })
+
+  it('an id in upper case is the same session — 204 (MOL-25, Р-3)', async () => {
+    const person = await signedIn()
     expect((await end(person.sessionId.toUpperCase(), person.telegramUserId)).statusCode).toBe(204)
     expect((await me(person.cookie)).statusCode).toBe(401)
   })

@@ -129,7 +129,11 @@ export const EXPORT_COLUMNS: Readonly<
   },
   login_notices: {
     exported: ['session_id', 'device_name', 'signed_in_at'],
-    omitted: { actor_id: OWNER },
+    omitted: {
+      actor_id: OWNER,
+      handed_at: 'the moment the bot was handed it, its lease — the sending, not the sign-in',
+      not_before: 'when the bot may try again after Telegram refused it for now — the sending',
+    },
   },
   login_requests: {
     exported: ['id', 'device_name', 'created_at', 'expires_at', 'consumed_at'],

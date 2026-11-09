@@ -54,8 +54,11 @@ describe('сообщение о новом входе (MOL-361)', () => {
   })
 })
 
-/** Telegram, faked: every call recorded, the chats in `blocked` answering 403. */
-function telegram(blocked: readonly number[] = []) {
+/**
+ * Telegram, faked: every call recorded; the chats in `blocked` answer 403, those in `flooded` 429 with
+ * their own `retry_after` — a chat under its flood control, the attacker's spamming `/start`.
+ */
+function telegram(blocked: readonly number[] = [], flooded: Readonly<Record<number, number>> = {}) {
   const calls: Call[] = []
   const bot = new Bot('42:TEST', { botInfo: { id: 42 } as UserFromGetMe })
   const transformer: Transformer = (_prev, method, payload) => {
@@ -68,15 +71,27 @@ function telegram(blocked: readonly number[] = []) {
         description: 'Forbidden: bot was blocked by the user',
       }) as never
     }
+    const retryAfter = flooded[chat]
+    if (retryAfter !== undefined) {
+      return Promise.resolve({
+        ok: false,
+        error_code: 429,
+        description: `Too Many Requests: retry after ${String(retryAfter)}`,
+        parameters: { retry_after: retryAfter },
+      }) as never
+    }
     return Promise.resolve({ ok: true, result: { message_id: 1 } }) as never
   }
   bot.api.config.use(transformer)
-  return { api: bot.api, calls }
+  const sentTo = () =>
+    calls.filter(({ method }) => method === 'sendMessage').map(({ payload }) => payload.chat_id)
+  return { api: bot.api, calls, sentTo }
 }
 
 function client(notices: LoginNotice[]) {
   return {
     claimLoginNotices: vi.fn(() => Promise.resolve({ notices })),
+    loginNoticesTold: vi.fn(() => Promise.resolve()),
     switchReminders: vi.fn(() => Promise.resolve()),
     reportFailure: vi.fn(() => Promise.resolve()),
   }
@@ -84,26 +99,103 @@ function client(notices: LoginNotice[]) {
 
 const asClient = (fake: ReturnType<typeof client>) => fake as unknown as MolviaBotClient
 
+const ATTACKER = 1111
+const VICTIM = 4242
+const sessionOf = (n: number) => `5b0e7c0e-6d3e-4a53-9c4a-${String(n).padStart(12, '0')}`
+
 describe('отправка', () => {
-  it('каждому — своё сообщение с кнопкой и со звуком; 403 отмечает блок, остальные уходят', async () => {
+  it('каждому — своё сообщение с кнопкой и со звуком; 403 отмечает блок; оба сказаны ушедшими', async () => {
     const { api, calls } = telegram([4242])
-    const fake = client([notice(), notice({ telegramUserId: 5151 })])
-    await tellSignIns(asClient(fake), api, () => Promise.resolve(true))
+    const fake = client([
+      notice({ sessionId: sessionOf(1) }),
+      notice({ telegramUserId: 5151, sessionId: sessionOf(2) }),
+    ])
+    await tellSignIns(asClient(fake), api)
     expect(calls.map(({ payload }) => payload.chat_id)).toEqual([4242, 5151])
     for (const { payload } of calls) {
-      expect(payload.reply_markup).toEqual(signedInMessage(notice()).keyboard)
       expect(payload.disable_notification).toBeUndefined()
     }
+    expect(calls[1]?.payload.reply_markup).toEqual(
+      signedInMessage(notice({ sessionId: sessionOf(2) })).keyboard,
+    )
     expect(fake.switchReminders).toHaveBeenCalledWith(4242, 'blocked')
+    expect(fake.loginNoticesTold).toHaveBeenCalledWith({
+      told: [sessionOf(1), sessionOf(2)],
+      back: [],
+    })
   })
 
-  it('claim не ответил — ничего не отправлено, сбой залогирован по коду', async () => {
+  it('долгий 429 чата угонщика: его уведомление — назад на его retry_after, жертве уходит (адверсариальное А1)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api, sentTo } = telegram([], { [ATTACKER]: 30 })
+    const fake = client([
+      notice({ telegramUserId: ATTACKER, sessionId: sessionOf(1) }),
+      notice({ telegramUserId: VICTIM, sessionId: sessionOf(2) }),
+    ])
+    await tellSignIns(asClient(fake), api)
+    expect(sentTo()).toEqual([ATTACKER, VICTIM])
+    expect(fake.loginNoticesTold).toHaveBeenCalledWith({
+      told: [sessionOf(2)],
+      back: [{ sessionId: sessionOf(1), afterSeconds: 30 }],
+    })
+  })
+
+  it('короткий 429 не ждётся: уведомление — назад сразу, следующее пробуется (А1б)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api, sentTo } = telegram([], { [ATTACKER]: 5 })
+    const fake = client([
+      notice({ telegramUserId: ATTACKER, sessionId: sessionOf(1) }),
+      notice({ telegramUserId: VICTIM, sessionId: sessionOf(2) }),
+    ])
+    await tellSignIns(asClient(fake), api)
+    // One try each: the 429 was not waited out and retried.
+    expect(sentTo()).toEqual([ATTACKER, VICTIM])
+    expect(fake.loginNoticesTold).toHaveBeenCalledWith({
+      told: [sessionOf(2)],
+      back: [{ sessionId: sessionOf(1), afterSeconds: 0 }],
+    })
+  })
+
+  it('два отказа подряд — это Telegram, не чат: остаток выдачи — назад, не тронутым', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api, sentTo } = telegram([], { 1: 30, 2: 30 })
+    const fake = client([
+      notice({ telegramUserId: 1, sessionId: sessionOf(1) }),
+      notice({ telegramUserId: 2, sessionId: sessionOf(2) }),
+      notice({ telegramUserId: VICTIM, sessionId: sessionOf(3) }),
+    ])
+    await tellSignIns(asClient(fake), api)
+    expect(sentTo()).toEqual([1, 2])
+    expect(fake.loginNoticesTold).toHaveBeenCalledWith({
+      told: [],
+      back: [
+        { sessionId: sessionOf(1), afterSeconds: 30 },
+        { sessionId: sessionOf(2), afterSeconds: 30 },
+        { sessionId: sessionOf(3), afterSeconds: null },
+      ],
+    })
+    expect(error).toHaveBeenCalledWith(
+      '[molvia] signed in: refused 2 in a row, the rest given back',
+    )
+  })
+
+  it('слово боту не дошло — сбой залогирован по коду', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api } = telegram()
+    const fake = client([notice()])
+    fake.loginNoticesTold.mockImplementationOnce(() => Promise.reject(new Error('boom')))
+    await tellSignIns(asClient(fake), api)
+    expect(error).toHaveBeenCalledWith('[molvia] login notices told: unexpected failure')
+  })
+
+  it('claim не ответил — ничего не отправлено и не сказано, сбой залогирован по коду', async () => {
     const { api, calls } = telegram()
     const fake = client([])
     fake.claimLoginNotices.mockImplementationOnce(() => Promise.reject(new Error('boom')))
     const error = vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    await tellSignIns(asClient(fake), api, () => Promise.resolve(true))
+    await tellSignIns(asClient(fake), api)
     expect(calls).toEqual([])
+    expect(fake.loginNoticesTold).not.toHaveBeenCalled()
     expect(error).toHaveBeenCalledWith('[molvia] login notice claim: unexpected failure')
   })
 })
