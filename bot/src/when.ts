@@ -31,3 +31,16 @@ export function timeAgo(
   if (minutes < 5) return t(languageCode, 'login.when.few', { n: minutes })
   return t(languageCode, 'login.when.many', { n: minutes })
 }
+
+/**
+ * «9 ноября», «9 November»: a calendar day in words, without the year — «чек разобран» (MOL-129), the
+ * warning before an erasure (MOL-239) and the notice of a sign-in (MOL-361) all say it so, and Telegram
+ * dates the message. Read at noon in UTC, so no zone moves the day.
+ */
+export function dayInWords(language: string, day: string): string {
+  return new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : language, {
+    day: 'numeric',
+    month: 'long',
+    timeZone: 'UTC',
+  }).format(new Date(`${day}T12:00:00Z`))
+}

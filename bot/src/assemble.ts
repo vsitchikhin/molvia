@@ -8,6 +8,7 @@ import { loginComposer } from './login'
 import type { LoginDeps } from './login'
 import { heardFrom, muteComposer } from './mute'
 import { rateComposer } from './rate'
+import { signedInComposer } from './signed-in'
 import { feedbackComposer } from './feedback'
 import { handlerOf, reportFailure } from './failure'
 
@@ -57,6 +58,9 @@ export function assembleBot(
   // A text written as a reply to the bot — the owner's reply, a person's word (MOL-148). Before the
   // login's catch-all, which greets every text; what is not ours goes on to it.
   bot.use(feedbackComposer(deps))
+  // «Это не я — завершить» under the notice of a sign-in (MOL-361), before the login's catch-all,
+  // which refuses every press it does not know as a dead link.
+  bot.use(signedInComposer(deps))
   bot.use(loginComposer(deps))
 
   // The last resort: a handler that throws must not take the process with it. The update itself

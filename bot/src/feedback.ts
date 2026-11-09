@@ -18,7 +18,7 @@ export interface FeedbackDeps {
 export const DELIVERED_REACTION = '👌'
 
 /** The day a reply answers, as the person reads it: «3 октября», «October 3». */
-function dayInWords(day: string, locale: AppLocale): string {
+function answeredDay(day: string, locale: AppLocale): string {
   return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(
     new Date(`${day}T00:00:00Z`),
   )
@@ -30,7 +30,7 @@ function dayInWords(day: string, locale: AppLocale): string {
  */
 export function replyFrame(text: string, day: string, locale: AppLocale): string {
   return [
-    t(locale, 'feedback.frame', { date: dayInWords(day, locale) }),
+    t(locale, 'feedback.frame', { date: answeredDay(day, locale) }),
     '',
     text,
     '',

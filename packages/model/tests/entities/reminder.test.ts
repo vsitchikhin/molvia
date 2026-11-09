@@ -71,19 +71,22 @@ describe('planReminder — the ladder of MOL-101', () => {
 })
 
 describe('localClock', () => {
-  it('reads the day and hour in Yerevan, whatever the machine’s zone', () => {
+  it('reads the day, hour and minute in Yerevan, whatever the machine’s zone', () => {
     // 14:59 UTC is 18:59 in Yerevan, a minute before the reminder; 20:00 UTC is midnight.
     expect(localClock(new Date('2026-10-14T14:59:00Z'), 'Asia/Yerevan')).toEqual({
       day: '2026-10-14',
       hour: 18,
+      minute: 59,
     })
     expect(localClock(new Date('2026-10-14T15:00:00Z'), 'Asia/Yerevan')).toEqual({
       day: '2026-10-14',
       hour: 19,
+      minute: 0,
     })
     expect(localClock(new Date('2026-10-14T20:00:00Z'), 'Asia/Yerevan')).toEqual({
       day: '2026-10-15',
       hour: 0,
+      minute: 0,
     })
   })
 

@@ -7,6 +7,8 @@ import { createActor } from '@/usecases/create-actor'
 
 export interface SignedIn {
   readonly actor: Actor
+  /** The session written — what the bot's message about a sign-in names (MOL-361). */
+  readonly sessionId: string
   /** The only moment the token exists outside the browser: it goes into the cookie and nowhere
    * else. The database has its `sha256` and never had this. */
   readonly token: string
@@ -43,9 +45,9 @@ export async function signIn(
 
   const token = mintToken()
   const expiresAt = new Date(Date.now() + SESSION_LIFETIME_DAYS * 24 * 3_600_000)
-  await sessions.create(randomUUID(), actor.id, token, deviceName, expiresAt)
+  const session = await sessions.create(randomUUID(), actor.id, token, deviceName, expiresAt)
   // A login is the account's visit (MOL-238), whenever the last one was: the person is here.
   await actors.markSeen(actor.id, 0)
 
-  return { actor, token, expiresAt }
+  return { actor, sessionId: session.id, token, expiresAt }
 }
