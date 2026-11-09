@@ -8,6 +8,11 @@ export const METRICS_ROLE = 'molvia_metrics'
 /** What a role so bounded still holds (В-3 «а»): enough for one exporter, not for the API's hundred. */
 const CONNECTION_LIMIT = 3
 const STATEMENT_TIMEOUT = '5s'
+/**
+ * The disk its sorts and hashes may write (owner's В-4 «б»): a setting only a superuser sets, so no
+ * session of the role lifts it as it lifts its five seconds. The exporter's queries write none.
+ */
+const TEMP_FILE_LIMIT = '64MB'
 
 /** How long a start waits on a lock the role may hold (adversarial А3): then it fails, and the owner hears. */
 const LOCK_TIMEOUT = '5s'
@@ -71,7 +76,11 @@ async function closeSessions(db: Db): Promise<void> {
  * membership (А4). Grants on objects are not looked at: nothing grants any. **And the advisory locks
  * of this database are not the role's** (А1): `PUBLIC` may take them, the API waits on them with no
  * term, and their keys are strings of a public repository — held by the role, one key closed the
- * login for everybody and ten waiting took the API's pool. The API, a superuser, keeps them.
+ * login for everybody and ten waiting took the API's pool. The API, a superuser, keeps them. **Nor
+ * the disk** (owner's В-4 «б», adversarial А2в): no temporary table in any database of the cluster, no
+ * database but the API's to log in to, and a limit on its temporary files. Its five seconds a statement
+ * are the exporter's default, never a bound — any session lifts them (А2), and the CPU and the memory of
+ * its three connections are a price.
  *
  * Its password is written only when another (Р-2). Then the role's sessions are closed before — one
  * holding its row in an open transaction would leave the start waiting (А3) — and after, and the
@@ -107,6 +116,9 @@ export async function ensureMetricsRole(db: Db, password: string): Promise<boole
       sql.raw(`alter role ${METRICS_ROLE} set statement_timeout = '${STATEMENT_TIMEOUT}'`),
     )
     await tx.execute(
+      sql.raw(`alter role ${METRICS_ROLE} set temp_file_limit = '${TEMP_FILE_LIMIT}'`),
+    )
+    await tx.execute(
       sql.raw(`do $$ declare r name; begin
         for r in select granted.rolname from pg_auth_members m join pg_roles granted on granted.oid = m.roleid
           where m.member = '${METRICS_ROLE}'::regrole and granted.rolname <> 'pg_monitor' loop
@@ -120,6 +132,20 @@ export async function ensureMetricsRole(db: Db, password: string): Promise<boole
           where p.pronamespace = 'pg_catalog'::regnamespace
             and p.proname ~ '^pg_(try_)?advisory_(xact_)?lock(_shared)?$' loop
           execute format('revoke execute on function %s from public', f);
+        end loop; end $$`),
+    )
+    // No temporary table anywhere in the cluster, and no database but this one to log in to (В-4 «б»):
+    // a table of its own had no limit, and `postgres` or `template1` would take one all the same. The
+    // role's own grant too — given by a start in another database of the cluster, as the tests' are.
+    await tx.execute(
+      sql.raw(`do $$ declare d name; begin
+        for d in select datname from pg_database where datallowconn loop
+          if d = current_database() then
+            execute format('revoke temporary on database %I from public, ${METRICS_ROLE}', d);
+            execute format('grant connect on database %I to ${METRICS_ROLE}', d);
+          else
+            execute format('revoke connect, temporary on database %I from public, ${METRICS_ROLE}', d);
+          end if;
         end loop; end $$`),
     )
 

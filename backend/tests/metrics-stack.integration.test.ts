@@ -325,7 +325,7 @@ describe('the exporter’s role', () => {
         rolinherit: true,
         rolcanlogin: true,
         rolconnlimit: 3,
-        rolconfig: ['statement_timeout=5s'],
+        rolconfig: ['statement_timeout=5s', 'temp_file_limit=64MB'],
       },
     ])
     const memberships = await admin<{ name: string }[]>`
@@ -361,7 +361,7 @@ describe('the exporter’s role', () => {
       rolsuper: false,
       rolcreatedb: false,
       rolconnlimit: 3,
-      rolconfig: ['statement_timeout=5s'],
+      rolconfig: ['statement_timeout=5s', 'temp_file_limit=64MB'],
       term: 'infinity',
     })
     const memberships = await admin<{ name: string }[]>`
@@ -393,6 +393,44 @@ describe('the exporter’s role', () => {
     await expect(role`select pg_advisory_lock_shared(1)`).rejects.toMatchObject({ code: '42501' })
   })
 
+  it('writes no disk of its own: no temporary table, no other database (owner’s В-4 «б»)', async () => {
+    const secret = password()
+    await ensureMetricsRole(db, secret)
+    const role = asRole(secret)
+    await expect(role`create temp table fill (g int)`).rejects.toMatchObject({ code: '42501' })
+    // Its sorts and hashes have a limit only a superuser lifts — unlike the five seconds (А2).
+    expect(
+      onlyRow(await role<{ temp_file_limit: string }[]>`show temp_file_limit`)?.temp_file_limit,
+    ).toBe('64MB')
+    await expect(role`set temp_file_limit = -1`).rejects.toMatchObject({ code: '42501' })
+    // Nor `postgres`, where a temporary table would be the cluster's disk all the same.
+    const elsewhere = new URL(testDatabaseUrl())
+    elsewhere.pathname = '/postgres'
+    elsewhere.username = METRICS_ROLE
+    elsewhere.password = secret
+    const other = postgres(elsewhere.toString(), {
+      max: 1,
+      connect_timeout: 5,
+      onnotice: () => undefined,
+    })
+    opened.push(other)
+    await expect(other`select 1`).rejects.toMatchObject({ code: '42501' })
+    // A database the role was let into by a start there is closed by a start in another (the cluster
+    // of the tests holds a database for each worker), and the one it starts in opened again.
+    const database = new URL(testDatabaseUrl()).pathname.slice(1)
+    await admin.unsafe(`grant connect on database postgres to ${METRICS_ROLE}`)
+    await admin.unsafe(`revoke connect on database ${database} from public, ${METRICS_ROLE}`)
+    await ensureMetricsRole(db, secret)
+    await expect(asRole(secret)`select 1 as one`).resolves.toEqual([{ one: 1 }])
+    const again = postgres(elsewhere.toString(), {
+      max: 1,
+      connect_timeout: 5,
+      onnotice: () => undefined,
+    })
+    opened.push(again)
+    await expect(again`select 1`).rejects.toMatchObject({ code: '42501' })
+  })
+
   it('rotates past a session of the role holding its own row (adversarial А3)', async () => {
     const leaked = password()
     await ensureMetricsRole(db, leaked)
@@ -413,6 +451,8 @@ describe('the exporter’s role', () => {
     const two = connectDrizzle()
     try {
       await admin`select pg_terminate_backend(pid, 5000) from pg_stat_activity where usename = ${METRICS_ROLE}`
+      // Its grant on the database is its own: `drop owned` takes it, a bare `drop role` is refused.
+      await admin.unsafe(`drop owned by ${METRICS_ROLE}`)
       await admin.unsafe(`drop role ${METRICS_ROLE}`)
       for (let round = 0; round < 2; round++) {
         const results = await Promise.allSettled([
