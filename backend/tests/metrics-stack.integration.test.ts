@@ -16,7 +16,7 @@ import { metricsDbPasswordSchema, ownerTelegramIdSchema } from '@/env'
 import { httpMetrics, processMetrics } from '@/metrics'
 import { compose, services } from './compose'
 import { connect, connectDrizzle, testDatabaseUrl } from './db'
-import { onlyRow } from './rows'
+import { onlyRow, sorted } from './rows'
 
 function read(path: string): string {
   return readFileSync(fileURLToPath(new URL(`../../${path}`, import.meta.url)), 'utf8')
@@ -241,6 +241,13 @@ describe('the exporter’s role', () => {
     return client
   }
 
+  /** The session's own process, the one a termination names. */
+  async function backendPid(client: Sql): Promise<number> {
+    const row = onlyRow(await client<{ pid: number }[]>`select pg_backend_pid() as pid`)
+    if (row === undefined) throw new Error('no backend pid read')
+    return row.pid
+  }
+
   async function storedVerifier(): Promise<string | null> {
     const row = onlyRow(
       await admin<{ rolpassword: string | null }[]>`
@@ -259,7 +266,7 @@ describe('the exporter’s role', () => {
     const secret = password()
     await ensureMetricsRole(db, secret)
     const role = asRole(secret)
-    const [{ pid } = { pid: 0 }] = await admin<{ pid: number }[]>`select pg_backend_pid() as pid`
+    const pid = await backendPid(admin)
     // Without `pg_read_all_stats` another role's session shows no state, and the panel of
     // connections by state would count them all as null.
     const seen = onlyRow(
@@ -277,7 +284,8 @@ describe('the exporter’s role', () => {
     expect(Number(figures?.size)).toBeGreaterThan(0)
     expect(figures?.deadlocks).not.toBeNull()
     expect(
-      (await role<{ statement_timeout: string }[]>`show statement_timeout`)[0]?.statement_timeout,
+      onlyRow(await role<{ statement_timeout: string }[]>`show statement_timeout`)
+        ?.statement_timeout,
     ).toBe('5s')
   })
 
@@ -329,15 +337,24 @@ describe('the exporter’s role', () => {
     expect(memberships.map((row) => row.name)).toEqual(['pg_monitor'])
   })
 
-  it('brings a role changed by hand back to its form', async () => {
-    await ensureMetricsRole(db, password())
+  it('brings a role changed by hand, or by itself, back to its form (adversarial А2б, А4)', async () => {
+    const secret = password()
+    await ensureMetricsRole(db, secret)
+    const database = new URL(testDatabaseUrl()).pathname.slice(1)
+    // A role may give itself a setting for one database, which stands above its own for all.
+    await asRole(secret).unsafe(
+      `alter role ${METRICS_ROLE} in database ${database} set statement_timeout = 0`,
+    )
     // The connection limit is set by the same statement as these, and held at 3 above.
-    await admin.unsafe(`alter role ${METRICS_ROLE} superuser createdb`)
+    await admin.unsafe(`alter role ${METRICS_ROLE} superuser createdb valid until '2000-01-01'`)
     await admin.unsafe(`alter role ${METRICS_ROLE} reset statement_timeout`)
-    await ensureMetricsRole(db, password())
+    await admin.unsafe(`grant pg_read_all_data to ${METRICS_ROLE}`)
+    // The same password: nothing to rotate, and the form comes back all the same.
+    expect(await ensureMetricsRole(db, secret)).toBe(false)
     const role = onlyRow(
       await admin`
-        select rolsuper, rolcreatedb, rolconnlimit, rolconfig from pg_roles
+        select rolsuper, rolcreatedb, rolconnlimit, rolconfig, rolvaliduntil::text as term
+        from pg_roles
         where rolname = ${METRICS_ROLE}`,
     )
     expect(role).toEqual({
@@ -345,7 +362,69 @@ describe('the exporter’s role', () => {
       rolcreatedb: false,
       rolconnlimit: 3,
       rolconfig: ['statement_timeout=5s'],
+      term: 'infinity',
     })
+    const memberships = await admin<{ name: string }[]>`
+      select granted.rolname as name
+      from pg_auth_members m
+      join pg_roles granted on granted.oid = m.roleid
+      join pg_roles member on member.oid = m.member
+      where member.rolname = ${METRICS_ROLE}`
+    expect(sorted(memberships.map((row) => row.name))).toEqual(['pg_monitor'])
+    // The exporter logs in again — its term past refused it — with no limit lifted for this database.
+    const exporter = asRole(secret)
+    expect(
+      onlyRow(await exporter<{ statement_timeout: string }[]>`show statement_timeout`)
+        ?.statement_timeout,
+    ).toBe('5s')
+  })
+
+  it('takes no advisory lock, which the API waits on with no term (adversarial А1)', async () => {
+    const secret = password()
+    await ensureMetricsRole(db, secret)
+    const role = asRole(secret)
+    // The login's quota and a person's writes wait on such keys, strings of a public repository.
+    await expect(
+      role`select pg_advisory_lock(hashtextextended('molvia:login-quota', 0))`,
+    ).rejects.toMatchObject({ code: '42501' })
+    await expect(role`select pg_try_advisory_xact_lock(1, 2)`).rejects.toMatchObject({
+      code: '42501',
+    })
+    await expect(role`select pg_advisory_lock_shared(1)`).rejects.toMatchObject({ code: '42501' })
+  })
+
+  it('rotates past a session of the role holding its own row (adversarial А3)', async () => {
+    const leaked = password()
+    await ensureMetricsRole(db, leaked)
+    // A role may change its own password; in an open transaction its row of pg_authid is held.
+    const holder = await asRole(leaked).reserve()
+    await holder`begin`
+    await holder.unsafe(`alter role ${METRICS_ROLE} password 'the-leaked-session-holds-it'`)
+    const pid = await backendPid(holder)
+    const fresh = password()
+    expect(await ensureMetricsRole(db, fresh)).toBe(true)
+    expect(await admin`select 1 from pg_stat_activity where pid = ${pid}`).toEqual([])
+    await expect(asRole(leaked)`select 1`).rejects.toMatchObject({ code: '28P01' })
+    await expect(asRole(fresh)`select 1 as one`).resolves.toEqual([{ one: 1 }])
+  })
+
+  it('takes two starts at once, made or not, one after the other (adversarial А5)', async () => {
+    const one = connectDrizzle()
+    const two = connectDrizzle()
+    try {
+      await admin`select pg_terminate_backend(pid, 5000) from pg_stat_activity where usename = ${METRICS_ROLE}`
+      await admin.unsafe(`drop role ${METRICS_ROLE}`)
+      for (let round = 0; round < 2; round++) {
+        const results = await Promise.allSettled([
+          ensureMetricsRole(one.db, password()),
+          ensureMetricsRole(two.db, password()),
+        ])
+        expect(results.map((result) => result.status)).toEqual(['fulfilled', 'fulfilled'])
+      }
+    } finally {
+      await one.close()
+      await two.close()
+    }
   })
 
   it('writes nothing and closes nothing when started again with the same password (Р-2)', async () => {
@@ -353,22 +432,21 @@ describe('the exporter’s role', () => {
     await ensureMetricsRole(db, secret)
     const stored = await storedVerifier()
     const role = asRole(secret)
-    const [before] = await role<{ pid: number }[]>`select pg_backend_pid() as pid`
+    const before = await backendPid(role)
     expect(await ensureMetricsRole(db, secret)).toBe(false)
     expect(await storedVerifier()).toBe(stored)
-    const [after] = await role<{ pid: number }[]>`select pg_backend_pid() as pid`
-    expect(after?.pid).toBe(before?.pid)
+    expect(await backendPid(role)).toBe(before)
   })
 
   it('takes a new password, refuses the old one and closes what it opened (Р-2)', async () => {
     const old = password()
     await ensureMetricsRole(db, old)
     const role = asRole(old)
-    const [held] = await role<{ pid: number }[]>`select pg_backend_pid() as pid`
+    const held = await backendPid(role)
     const fresh = password()
     expect(await ensureMetricsRole(db, fresh)).toBe(true)
     // Gone when the call returns: the termination waits for it.
-    const left = await admin`select 1 from pg_stat_activity where pid = ${held?.pid ?? 0}`
+    const left = await admin`select 1 from pg_stat_activity where pid = ${held}`
     expect(left).toEqual([])
     // A leaked password neither keeps its session nor opens a new one.
     await expect(asRole(old)`select 1`).rejects.toMatchObject({ code: '28P01' })

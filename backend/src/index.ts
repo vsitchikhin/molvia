@@ -139,6 +139,7 @@ if (http !== undefined && env.METRICS_PORT !== undefined) {
 app
   .listen({ port: env.API_PORT, host })
   .then(async () => {
+    const failures = apiFailureReporter(getDb, env.OWNER_TELEGRAM_ID ?? null, app.log)
     // The exporter's role (MOL-366): a metric is no reason for the API not to start (В-2 «а») — a
     // failure goes to the owner, and the exporter not let in is «Метрики молчат» five minutes on.
     if (env.METRICS_DB_PASSWORD !== undefined) {
@@ -146,11 +147,7 @@ app
         if (await ensureMetricsRole(getDb(), env.METRICS_DB_PASSWORD))
           app.log.info('metrics role password set')
       } catch (error) {
-        apiFailureReporter(getDb, env.OWNER_TELEGRAM_ID ?? null, app.log).report(
-          error,
-          { source: 'api', route: 'job:metrics-role' },
-          'metrics role failed',
-        )
+        failures.report(error, { source: 'api', route: 'job:metrics-role' }, 'metrics role failed')
       }
     }
     // Each person's word in the shops' memory is what their last line still there says (MOL-240): 0061
@@ -161,7 +158,7 @@ app
       const settled = await settleStoreMemory(getDb())
       if (settled > 0) app.log.info({ settled }, 'store memory settled')
     } catch (error) {
-      apiFailureReporter(getDb, env.OWNER_TELEGRAM_ID ?? null, app.log).report(
+      failures.report(
         error,
         { source: 'api', route: 'job:store-memory' },
         'store memory settle failed',
