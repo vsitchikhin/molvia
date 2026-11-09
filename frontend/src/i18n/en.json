@@ -1757,7 +1757,7 @@
       },
       "devices": {
         "term": "Sign-in devices",
-        "text": "The name of the phone and browser you signed in from, and when you last used them. The list is in Settings, under Devices, where any sign-in can be ended. A sign-in unused for six months is deleted by itself."
+        "text": "The name of the phone and browser you signed in from, and when you last used them. The list is in Settings, under Devices, where any sign-in can be ended. The bot tells you in Telegram of every new sign-in — which device, in its own words, and when — with a button that ends it; until the bot has written, a record of it waits on the server. A sign-in unused for six months is deleted by itself."
       },
       "settings": {
         "term": "Your settings",
@@ -1784,7 +1784,7 @@
       },
       "telegram": {
         "term": "Telegram",
-        "text": "The bot’s messages to you — sign-in, reminders, “receipt read”, the developer’s replies, a notice of a data breach, a warning before an inactive account is deleted — and your messages to the developer with their screenshots. Telegram is a company abroad; this has to go to it because Molvia’s sign-in and bot work through Telegram — a channel you chose yourself by signing in."
+        "text": "The bot’s messages to you — sign-in and a message about each new sign-in, reminders, “receipt read”, the developer’s replies, a notice of a data breach, a warning before an inactive account is deleted — and your messages to the developer with their screenshots. Telegram is a company abroad; this has to go to it because Molvia’s sign-in and bot work through Telegram — a channel you chose yourself by signing in."
       },
       "contabo": {
         "term": "Contabo, server in France",

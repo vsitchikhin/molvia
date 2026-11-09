@@ -86,6 +86,8 @@ export interface LoginDay {
   readonly expiredUnconfirmed: number
   readonly expiredConfirmed: number
   readonly refused: number
+  /** Sessions ended by «Это не я — завершить» under the bot's message (MOL-361), by the day of the press. */
+  readonly endedByNotice: number
 }
 
 /**

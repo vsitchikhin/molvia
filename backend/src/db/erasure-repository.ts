@@ -22,6 +22,7 @@ export const ACTOR_REFERENCES = [
   'incomes.actor_id',
   'item_barcodes.added_by',
   'items.created_by',
+  'login_notices.actor_id',
   'money_account_checks.actor_id',
   'money_accounts.actor_id',
   'money_month_rates.actor_id',
@@ -39,6 +40,7 @@ export const ACTOR_REFERENCES = [
 
 /** What erasure removes, in the order it removes it. `items` is kept and only loses its author. */
 export const ERASED_TABLES = [
+  'login_notices',
   'sessions',
   'search_picks',
   'rating_reminders',
@@ -112,6 +114,7 @@ class DryRun extends Error {
 /** Every table at nought: the start of a count, and the whole report of an erasure that did not happen. */
 function noneErased(): Record<ErasedTable, number> {
   return {
+    login_notices: 0,
     sessions: 0,
     search_picks: 0,
     rating_reminders: 0,
@@ -203,6 +206,10 @@ export function createErasureRepository(db: Db): ErasureRepository {
               sql`select count(*)::int as n from store_memory where actor_id = ${actorId}`,
             )
             memoryReleased = words?.n ?? 0
+            // A sign-in the bot has not told of yet (MOL-361): which device, and when.
+            erased.login_notices = await count(
+              sql`delete from login_notices where actor_id = ${actorId} returning 1`,
+            )
             erased.sessions = await count(
               sql`delete from sessions where actor_id = ${actorId} returning 1`,
             )

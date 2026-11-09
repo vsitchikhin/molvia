@@ -80,16 +80,20 @@ export function planReminder({
 }
 
 /**
- * The person's day and hour at `now`, in `timeZone`. Through `Intl`, which knows the zones'
+ * The person's day, hour and minute at `now`, in `timeZone`. Through `Intl`, which knows the zones'
  * history — Serbia moves its clock twice a year, and a fixed offset would move the reminder.
  */
-export function localClock(now: Date, timeZone: string): { day: string; hour: number } {
+export function localClock(
+  now: Date,
+  timeZone: string,
+): { day: string; hour: number; minute: number } {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
+    minute: '2-digit',
     hourCycle: 'h23',
   }).formatToParts(now)
   const part = (type: Intl.DateTimeFormatPartTypes): string =>
@@ -97,6 +101,7 @@ export function localClock(now: Date, timeZone: string): { day: string; hour: nu
   return {
     day: `${part('year')}-${part('month')}-${part('day')}`,
     hour: Number(part('hour')),
+    minute: Number(part('minute')),
   }
 }
 
