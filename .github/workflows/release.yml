@@ -100,6 +100,10 @@ jobs:
           # A cache per image: shared, the images overwrote each other's layers.
           cache-from: type=gha,scope=${{ matrix.name }}
           cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+          # The last stage of every image, `runtime`, is built afresh (MOL-365): it brings the packages
+          # of its distribution up to date, and from the cache that layer would stay as the first build
+          # left it until the base's digest moved.
+          no-cache-filters: runtime
 
   tag:
     name: name the images of a release tag
