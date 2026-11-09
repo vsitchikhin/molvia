@@ -2018,8 +2018,8 @@ audit MOL-287, `probes/receipt-flood.mts`): the disk full, Postgres stops, and t
   **A count, never the rows of `receipts`** (owner's В-1 «а»): a receipt removed goes from there in ten
   minutes, and «send, let it be read, remove, wait» gave the day its place back for as long as one kept at
   it. Two columns of the person's row, `actors.receipts_day` and `receipts_sent`, moved by the receipt that
-  takes a place and by nothing else — erasure takes them, the copy carries them (version 28), `/privacy`
-  says them under «Чеки» (a revision), and `updated_at` does not see them (0079), as the visit. **The day
+  takes a place and by nothing else — erasure takes them, the copy carries them (version 29), `/privacy`
+  says them under «Чеки» (a revision), and `updated_at` does not see them (0080), as the visit. **The day
   only moves on**: a day the phone names before the one begun counts in it, so a header made up walks only
   forward through the days that are today somewhere on Earth (`todayFrom`, from `earliestDay` to
   `latestDay`) — two of them most of the day, three for the two hours from 10:00 to 12:00 UTC; **one

@@ -310,8 +310,9 @@ export const actors = pgTable(
      * The receipts the person sent on their day (MOL-360, owner's В-1 «а»): the phone's day of the last
      * receipt taken (`TODAY_HEADER`) and how many that day. A count, never the rows of `receipts`: a
      * receipt removed goes from there in ten minutes, and its place in the day would come back. The day
-     * only moves on — a day the phone names before it counts in it — so a day header made up gives one
-     * day ahead at most. Not a change of the row: `updated_at` does not see it (0079).
+     * only moves on — a day the phone names before it counts in it — so a day header made up walks only
+     * forward through the days that are today somewhere (three at most, a price: `receipts.md`). Not a
+     * change of the row: `updated_at` does not see it (0080).
      */
     receiptsDay: date('receipts_day'),
     receiptsSent: smallint('receipts_sent').notNull().default(0),
