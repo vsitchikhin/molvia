@@ -132,9 +132,13 @@ export default defineConfig({
     // The policy is the build's (MOL-363): a walk under it signed in, with the camera the scanner needs,
     // and the screens of a stranger on an iPhone's engine too — Safari runs the hashes and the bundle by
     // rules of its own, and only the walk signed in is Chromium's (WebKit keeps no `Secure` cookie on
-    // the loopback).
+    // the loopback). **After `pwa`, never beside it** (MOL-365): `pwa-update.spec` puts out a version by
+    // a byte appended to the one built `sw.js`, and a page of this walk that a `goto` hides lets that
+    // version in and reloads, as an installed app does (MOL-132) — the `goto` ended `ERR_ABORTED`
+    // (run 42629452148).
     {
       name: 'pwa-camera',
+      dependencies: ['pwa'],
       use: {
         ...devices['Pixel 7'],
         baseURL: `http://127.0.0.1:${previewPort}`,
@@ -145,6 +149,7 @@ export default defineConfig({
     },
     {
       name: 'pwa-iphone',
+      dependencies: ['pwa'],
       use: { ...devices['iPhone 14'], baseURL: `http://127.0.0.1:${previewPort}` },
       testMatch: /csp-built\.spec\.ts$/,
     },

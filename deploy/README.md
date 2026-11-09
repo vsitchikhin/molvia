@@ -221,6 +221,22 @@ well; Grafana is then at `http://127.0.0.1:3000`. On Docker Desktop node_exporte
 `rslave` — an override with `/:/host:ro` tries it there — and the disk's panels stay empty: the
 virtual machine has no `/` of the kind a server has.
 
+## Images run as users (MOL-365)
+
+Every image of ours runs as a user: `docker inspect --format '{{.Config.User}}'` names `node`, `caddy`, `65534:65534`,
+`472` or `nobody`. Caddy as `caddy` and VictoriaMetrics as nobody read their volumes only once `frontend-volumes` and
+`victoria-volumes` have given them over — one-shot services of the compose file, at every `up` of the service that
+waits for each. Their exit is in `docker compose ps -a`: `exited (0)`; anything else and that service does not
+start — Caddy's rollout rolls back, VictoriaMetrics stays stopped with a warning.
+
+**The rollout of MOL-365**, once:
+
+1. Before the merge: `ssh molvia docker version` — Caddy opens 80 and 443 as a user only on Docker 20.10 or later.
+2. The release stops red on the compose file, as with any change of it: copy both files by hand,
+   `scp docker-compose.prod.yml deploy/deploy.sh molvia:molvia/`, then «Re-run failed jobs».
+3. After it: the users above; the certificate is the old one — Caddy's journal has no `obtaining certificate`
+   (`docker compose … logs frontend | grep -i obtain`); Grafana opens through the tunnel with its dashboard and alarms.
+
 ## The page's headers (MOL-363)
 
 The page's Content Security Policy is a meta of the built `index.html` (`frontend/vite.config.ts`); Caddy adds
