@@ -25,7 +25,8 @@
 // And the last stage of every Dockerfile (MOL-365) is named `runtime` — the one stage `release.yml`
 // builds afresh (`no-cache-filters`), so its upgrade of the distribution runs at every release — and
 // names its user with `USER`: neither root by name nor uid 0 in any spelling Docker reads as a number
-// (`00`, `+0`, `-0`), nor the group root. The base's user is not taken: a base moved by Dependabot
+// (`00`, `+0`, `-0`), nor the group root written beside it (`caddy:0`) — the group a user without
+// one takes from the image's `/etc/passwd` is the image's (Grafana's 472 is in group 0, by its authors). The base's user is not taken: a base moved by Dependabot
 // may change it, and an image built without one ran as root in silence (Caddy and VictoriaMetrics,
 // audit MOL-287). A user named by an argument is refused, as an image is: the check cannot read it.
 //
@@ -134,8 +135,10 @@ export function workflowProblems(path, text) {
  * the directives and the instructions alike, as BuildKit takes it off. */
 const linesOf = (text) => text.replace(/^\uFEFF/, '').split(/\r?\n/)
 
-// A heredoc of BuildKit: `<<EOF`, `<<-EOF`, `<<"EOF"`, `<<'EOF'` — its words, in the order they stand.
-const HEREDOC = /<<(-?)(["']?)([A-Za-z_][A-Za-z0-9_]*)\2/g
+// A heredoc of BuildKit (`heredocsFromLine`): a word of the instruction, split outside quotes, that is
+// the whole of `<<WORD`, `<<-WORD`, `<<"WORD"`, `2<<WORD` — never `<<` inside a word or a quote
+// (`'<<EOF'`, `cat<<EOF`, `$((1<<N))`, round 2, №6 and Р2-А1). The word is what follows, quotes off.
+const HEREDOC = /^\d*<<(-?)([^<]+)$/
 const TAKES_HEREDOCS = new Set(['RUN', 'COPY', 'ADD'])
 
 /** The instructions of a Dockerfile, each its lines joined at `\` and the number of its first line;
@@ -160,8 +163,11 @@ function instructionsOf(text) {
     else parts = { text: part, number: index + 1 }
     if (!continued) {
       instructions.push(parts)
-      if (TAKES_HEREDOCS.has(parts.text.trim().split(/\s/)[0]?.toUpperCase() ?? '')) {
-        for (const [, dash, , word] of parts.text.matchAll(HEREDOC)) bodies.push({ dash, word })
+      const { instruction, args } = wordsOf(parts.text)
+      if (TAKES_HEREDOCS.has(instruction ?? '')) {
+        for (const [, dash, word] of args.map((arg) => HEREDOC.exec(arg)).filter(Boolean)) {
+          bodies.push({ dash, word: unquoted(word) })
+        }
       }
       parts = null
     }
@@ -205,6 +211,9 @@ function wordsOf(line) {
   }
 }
 
+/** The name a `FROM` gives its stage, in lower case — `FROM image AS name`, `AS` in any case. */
+const stageOf = (args) => (args[1]?.toUpperCase() === 'AS' ? args[2]?.toLowerCase() : undefined)
+
 /** The images one instruction takes from elsewhere: `COPY --from`, `RUN --mount=…,from=`. */
 function sourcesOf(instruction, flags) {
   if (instruction === 'COPY') {
@@ -246,10 +255,8 @@ export function dockerfileProblems(path, text) {
     }
     // A stage is named only after its own line: it cannot be its own base, and Docker takes that
     // one from the registry.
-    const [, as, stage] = args
-    if (instruction === 'FROM' && as?.toUpperCase() === 'AS' && stage) {
-      stages.add(stage.toLowerCase())
-    }
+    const stage = instruction === 'FROM' ? stageOf(args) : undefined
+    if (stage) stages.add(stage)
   }
   return problems
 }
@@ -264,7 +271,7 @@ export function lastStageProblems(path, text) {
   for (const { text: line, number } of instructionsOf(text)) {
     const { instruction, args } = wordsOf(line)
     if (instruction === 'FROM') {
-      last = { number, name: args[1]?.toUpperCase() === 'AS' ? args[2] : undefined }
+      last = { number, name: stageOf(args) }
       user = null
     } else if (instruction === 'USER' && args[0]) {
       user = unquoted(args[0])
@@ -273,7 +280,7 @@ export function lastStageProblems(path, text) {
   if (last === null) return []
   const where = `${path}:${String(last.number)}`
   const problems = []
-  if (last.name?.toLowerCase() !== 'runtime') {
+  if (last.name !== 'runtime') {
     problems.push(
       `${where}: the last stage is not named runtime, the stage the release builds afresh (no-cache-filters) — FROM … AS runtime`,
     )

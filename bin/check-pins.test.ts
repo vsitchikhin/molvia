@@ -537,6 +537,36 @@ describe('lastStageProblems', () => {
 })
 
 describe('dockerfileProblems and a heredoc', () => {
+  it('takes a heredoc only from a whole word, as BuildKit does — never one inside a word, a quote or arithmetic', () => {
+    for (const line of [
+      'RUN echo $((1<<SHIFT))',
+      'RUN echo "see <<EOF in the docs"',
+      "RUN echo '<<EOF'",
+      'RUN cat<<EOF',
+      'ENV A=<<EOF',
+    ]) {
+      const text = `${line}\nFROM alpine:latest AS runtime\nUSER root`
+      expect(dockerfileProblems('frontend/Dockerfile', text), line).toEqual([
+        'frontend/Dockerfile:2: alpine:latest — pin it by an exact tag and its digest, image:1.2.3@sha256:…',
+      ])
+      expect(lastStageProblems('frontend/Dockerfile', text), line).toEqual([
+        'frontend/Dockerfile:2: USER root — root, by its user or its group; name another',
+      ])
+    }
+  })
+
+  it('ends a heredoc at its whole word, a dash and quotes in it, a descriptor before it', () => {
+    for (const [line, end] of [
+      ['COPY <<END-CONF /tmp/x.conf', 'END-CONF'],
+      ['RUN 3<<"MY.WORD" cat', 'MY.WORD'],
+    ] as const) {
+      const text = `${line}\nFROM caddy:latest\n${end}\nFROM alpine:latest AS runtime\nUSER caddy`
+      expect(dockerfileProblems('frontend/Dockerfile', text), line).toEqual([
+        'frontend/Dockerfile:4: alpine:latest — pin it by an exact tag and its digest, image:1.2.3@sha256:…',
+      ])
+    }
+  })
+
   it('takes no image from the body of a heredoc', () => {
     const text = `FROM caddy:2.11.9-alpine@${DIGEST} AS runtime\nRUN <<EOF\nFROM caddy:latest\nEOF\nUSER caddy`
     expect(dockerfileProblems('frontend/Dockerfile', text)).toEqual([])
