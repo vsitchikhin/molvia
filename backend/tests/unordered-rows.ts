@@ -63,7 +63,6 @@ export function inNoOrder(result: unknown, text: string): result is unknown[] {
 
 interface Pending {
   strings: string | readonly string[]
-  resolve: (result: unknown) => void
 }
 
 // The class of a query of postgres.js, taken from one never run — queries are run when awaited. Since 4.0 the
@@ -74,16 +73,17 @@ async function reverseIn(factory: typeof postgres): Promise<void> {
   await probe.end()
   if (prototype[REVERSED]) return
   prototype[REVERSED] = true
-  // A query sets its own `resolve` as it is made; the setter puts the reversal in front of it.
-  Object.defineProperty(prototype, 'resolve', {
+  // A query sets its own `fulfil`, the settling of its promise, as it is made — before its text, so the text is read
+  // when it settles; the setter puts the reversal in front of it.
+  Object.defineProperty(prototype, 'fulfil', {
     configurable: true,
-    set(this: Pending, resolve: (result: unknown) => void) {
-      const text = typeof this.strings === 'string' ? this.strings : this.strings.join(' ? ')
-      Object.defineProperty(this, 'resolve', {
+    set(this: Pending, fulfil: (result: unknown) => void) {
+      Object.defineProperty(this, 'fulfil', {
         configurable: true,
         writable: true,
         value: (result: unknown) => {
-          resolve(inNoOrder(result, text) ? reversed(result) : result)
+          const text = typeof this.strings === 'string' ? this.strings : this.strings.join(' ? ')
+          fulfil(inNoOrder(result, text) ? reversed(result) : result)
         },
       })
     },
