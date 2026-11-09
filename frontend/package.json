@@ -18,11 +18,11 @@
   "dependencies": {
     "@molvia/client": "*",
     "@molvia/model": "*",
-    "d3-shape": "^3.2.0",
+    "d3-shape": "^3.2.1",
     "pinia": "^4.1.0",
     "reka-ui": "^2.11.0",
-    "vue": "^3.5.44",
-    "vue-i18n": "^11.4.16",
+    "vue": "^3.5.45",
+    "vue-i18n": "^11.4.18",
     "vue-router": "^5.4.0",
     "zxing-wasm": "^3.1.6"
   },
@@ -30,9 +30,9 @@
     "@iconify-json/mdi": "^1.2.3",
     "@types/d3-shape": "^3.2.0",
     "@vitejs/plugin-vue": "^6.0.10",
-    "sass-embedded": "^1.106.1",
+    "sass-embedded": "^1.108.0",
     "unplugin-icons": "^24.0.0",
-    "vite": "^8.3.5",
+    "vite": "^8.3.6",
     "vite-plugin-pwa": "^2.0.0"
   }
 }
