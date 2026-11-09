@@ -188,7 +188,10 @@ function scanInstructions(lines, plain) {
     else parts = { text: part, number: index + 1 }
     if (!continued) {
       instructions.push(parts)
-      const { instruction, args } = wordsOf(parts.text)
+      const words = wordsOf(parts.text)
+      // `ONBUILD COPY <<EOF` takes a heredoc as `COPY` does (adversarial Р4-Б1).
+      const { instruction, args } =
+        words.instruction === 'ONBUILD' ? wordsOf(words.args.join(' ')) : words
       if (TAKES_HEREDOCS.has(instruction ?? '') && !plain.has(parts.number)) {
         for (const [, dash, word] of args.map((arg) => HEREDOC.exec(arg)).filter(Boolean)) {
           bodies.push({ dash, word: shellWord(word), opened: parts.number })
@@ -220,9 +223,11 @@ function instructionsOf(text) {
 /** A value with the quotes BuildKit takes off it taken off. */
 const unquoted = (value) => value.replace(/^(['"])(.*)\1$/, '$2')
 
-/** The parts of a text between separators, a separator inside quotes or escaped kept, as BuildKit reads
- * its flags and a mount's CSV; the quotes and backslashes stay, for `unquoted` or `shellWord`. */
-function splitOutsideQuotes(text, separator) {
+/** The parts of a text between separators, a separator inside quotes kept, as BuildKit reads its flags
+ * and a mount's CSV; the quotes and backslashes stay, for `unquoted` or `shellWord`. `escapes` is the
+ * shell's words alone (`wordsOf`): a mount's CSV is Go's `encoding/csv`, where `\` is a character and
+ * `\,` still parts a field (review 4, №12, adversarial Р4-А1). */
+function splitOutsideQuotes(text, separator, escapes = false) {
   const parts = []
   let part = ''
   let quote = null
@@ -232,7 +237,7 @@ function splitOutsideQuotes(text, separator) {
     // (adversarial Р3-А2: `it\'s` opened no quote there).
     if (escaped) {
       escaped = false
-    } else if (char === '\\' && quote !== "'") {
+    } else if (escapes && char === '\\' && quote !== "'") {
       escaped = true
     } else if (quote) {
       if (char === quote) quote = null
@@ -251,7 +256,7 @@ function splitOutsideQuotes(text, separator) {
 
 /** An instruction's word, in capitals, its flags and the rest of its words. */
 function wordsOf(line) {
-  const [word, ...rest] = splitOutsideQuotes(line.trim(), /\s/)
+  const [word, ...rest] = splitOutsideQuotes(line.trim(), /\s/, true)
   return {
     instruction: word?.toUpperCase(),
     flags: rest.filter((part) => part.startsWith('--')),

@@ -601,6 +601,22 @@ describe('dockerfileProblems and a heredoc', () => {
     ])
   })
 
+  it("reads a mount's CSV as Go's csv does — a backslash parts no field there (Р4-А1)", () => {
+    const text = `FROM caddy:2.11.9-alpine@${DIGEST} AS runtime\nRUN --mount=type=bind,target=/x\\,from=alpine:latest true\nUSER caddy`
+    expect(dockerfileProblems('frontend/Dockerfile', text)).toEqual([
+      'frontend/Dockerfile:2: alpine:latest — pin it by an exact tag and its digest, image:1.2.3@sha256:…',
+    ])
+  })
+
+  it('takes a heredoc of ONBUILD COPY and ONBUILD RUN as their own (Р4-Б1)', () => {
+    for (const line of ['ONBUILD COPY <<EOF /tmp/nginx.conf', 'onbuild run <<EOF']) {
+      const text = `FROM caddy AS runtime\n${line}\nuser nginx;\nEOF`
+      expect(lastStageProblems('frontend/Dockerfile', text), line).toEqual([
+        "frontend/Dockerfile:1: the last stage names no user — the base's is not taken; USER <name or uid>",
+      ])
+    }
+  })
+
   it('takes no image from the body of a heredoc', () => {
     const text = `FROM caddy:2.11.9-alpine@${DIGEST} AS runtime\nRUN <<EOF\nFROM caddy:latest\nEOF\nUSER caddy`
     expect(dockerfileProblems('frontend/Dockerfile', text)).toEqual([])
