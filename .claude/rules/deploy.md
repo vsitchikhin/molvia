@@ -194,8 +194,10 @@ The shape worth knowing here:
   tag is the build that runs, never one that rolled back (owner's decision В-4). **`.env.prod` is
   read by asking compose** (`config --environment`), never by parsing it: two rounds of review found
   a form the copied grammar missed each time. `v0.2.0`
-  starts the 0.2 cohort. **`/api/health` names the build** — `git describe --long`,
-  `v0.1.1-3-g1a2b3c4`.
+  starts the 0.2 cohort. **`/api/health` names the build** — the last tag, the releases since it
+  and the commit, `v0.1.5-81-g0f371828` (MOL-371): a release is a commit of master's first line, each a pull
+  request merged, by a merge or a squash, and rolled out; `git describe --long` counted every commit of the
+  branches merged too — 1282 for those 81. The form is `describe`'s, `-g<sha>` what the tag's job looks for.
 - **Production is watched from outside, never from the machine (MOL-142; MOL-149, В-4).** A watch on
   the same machine does not notice the machine is down. **The Worker `molvia-watch` on Cloudflare**
   (`deploy/watch`, MOL-221) asks every five minutes for `/api/health` and the page and pings the
