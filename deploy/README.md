@@ -30,6 +30,10 @@ same machine and the same network; only Caddy is reachable from outside.
    address and no query string, and Caddy keeps no access log, but Caddy's errors can carry an
    address — this is what bounds them.
 
+6. Once Postgres has run, **let the exporter's role into the API's database alone** — the two lines of
+   `pg_hba.conf`, «Metrics», «Where it is set» (MOL-366, owner's В-5 «б»). The file lives in the database's
+   volume: a new machine, or a volume lost, has none of them.
+
 ## Deploys (MOL-90)
 
 A merge into master is a deploy. When CI passes on master, `release.yml` builds the three images
@@ -201,6 +205,7 @@ No real Telegram request is made by the login API itself.
 
 ```bash
 DOMAIN=localhost POSTGRES_DB=molvia POSTGRES_USER=molvia POSTGRES_PASSWORD=localtest \
+METRICS_DB_PASSWORD=localtest-metrics-password-24 \
 HTTP_PORT=8080 HTTPS_PORT=8443 LOG_DRIVER=json-file \
 docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
 
@@ -604,7 +609,8 @@ the disk fills, and what share of the answers is 5xx, which the watch does not s
 
 VictoriaMetrics keeps thirty days of figures, scraped every fifteen seconds from the API's own port
 (9464, never through Caddy), node_exporter (the machine), cAdvisor (the containers) and
-postgres_exporter (the database). All four are on a network with no way out. Grafana draws them and
+postgres_exporter (the database, as `molvia_metrics`: `pg_monitor` and no table — MOL-366). All four
+are on a network with no way out. Grafana draws them and
 sends the alarms; it is the only one with a port, on the machine's loopback. Nothing leaves the machine
 but the alarms, through Telegram, and the alarms' pulse, to healthchecks.io.
 
@@ -680,6 +686,37 @@ node-exporter`, and `✅ Прошло` follows.
   (`docker compose … up -d --force-recreate grafana`); Grafana itself keeps only the first. One it
   refuses — shorter than four characters — stops Grafana rather than leave the old one open; take it
   from `openssl rand -base64 24`.
+- `METRICS_DB_PASSWORD` in `~/molvia/.env.prod` (MOL-366): the password of `molvia_metrics`, the role
+  postgres_exporter logs in as — never the database's own user, the cluster's superuser. **The API makes
+  the role at every start**, after the migrations: made if missing, its attributes, term, settings and
+  `pg_monitor` set again, the advisory locks of the database, every temporary table and every other
+  database taken from it, the password written only
+  when another — the role's sessions closed before and after. So a restored copy and a rotation take no
+  step by hand — `pg_dump` carries no role. Compose refuses to start the API or the exporter without the
+  line; one shorter than 24 characters, or with a space or a letter beyond ASCII, stops the API. A failure
+  of the role reaches the owner as `job:metrics-role`, the API running on, and «Метрики молчат: postgres»
+  follows.
+- **The role logs in to the API's database and no other, by `pg_hba.conf`** (MOL-366, owner's В-5 «б»): the
+  API takes `CONNECT` from every database there is at its start, but a database made afterwards — by hand,
+  for anything — gives `PUBLIC` its defaults until the next start, a temporary table with no limit
+  included. Two lines before the image's last, `host all all all scram-sha-256`, once on every machine — the
+  file is the volume's, not the repository's, so nothing but this step puts them there:
+
+  ```bash
+  $C exec -T postgres sh -c 'f="$PGDATA/pg_hba.conf"; grep -q molvia_metrics "$f" || sed -i "/^host all all all scram-sha-256\$/i host $POSTGRES_DB molvia_metrics all scram-sha-256\nhost all molvia_metrics all reject" "$f"'
+  $C exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select pg_reload_conf()"'
+  $C exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At' <<'SQL'
+  select line_number, database, user_name, auth_method from pg_hba_file_rules
+  where 'molvia_metrics' = any(user_name);
+  SQL
+  ```
+
+  The last prints the two lines, `{molvia}` with `scram-sha-256` before `{all}` with `reject`. Run twice, the
+  first writes nothing. Tried on the production image `pgvector/pgvector:0.8.7-pg17-bookworm`: the role is
+  let into `molvia` and refused `postgres` and `template1` (`28000`) even with a grant, the owner let into
+  all. **The price:** no test holds it — a machine set up without the step is open as before, and nothing
+  says so.
+
 - The images `molvia-grafana` and `molvia-victoria` are built by the release with the others. **The
   metrics never judge a rollout**: pulled before anything changes, a refusal of the registry a
   warning; started only once the API answers healthy, a failure of theirs a warning in
@@ -803,6 +840,7 @@ written as their documentation has them and not drilled.
 | Secret                                 | Where                                              | Stops meanwhile                              |
 | -------------------------------------- | -------------------------------------------------- | -------------------------------------------- |
 | `POSTGRES_PASSWORD`                    | `.env.prod`; **and the role in the volume**        | the database's and the API's restart         |
+| `METRICS_DB_PASSWORD`                  | `.env.prod`; the API writes it into the role       | the API's restart, a scrape of Postgres      |
 | `BOT_API_SECRET`                       | `.env.prod`                                        | the API's and the bot's restart              |
 | `GRAFANA_ADMIN_PASSWORD`               | `.env.prod`                                        | Grafana's restart                            |
 | `TELEGRAM_BOT_TOKEN`                   | `.env.prod`, BotFather                             | the bot's restart; no login meanwhile        |
@@ -831,13 +869,27 @@ written as their documentation has them and not drilled.
   printf '%s\n%s\n' "$NEW" "$NEW" | $C exec -T postgres sh -c \
     'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\password $POSTGRES_USER"'
   NEW="$NEW" perl -pi -e 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$ENV{NEW}/' .env.prod
-  $C up -d backend postgres-exporter
+  $C up -d backend
   ```
 
   `POSTGRES_PASSWORD` is in the database's own environment as well, so that `up -d` **recreates
   Postgres too**: every open connection drops and the API is down for the database's start, its
   healthcheck and the API's start — about a minute. Not near 04:00 Yerevan, when the nightly copy
   runs. Then `curl https://molvia.net/api/health` says `ok`: the API is in with the new password.
+
+- **`METRICS_DB_PASSWORD`** (MOL-366): the line, then both at once — the API writes the new password into
+  `molvia_metrics` at its start and closes what the role had open, before and after, so a session the old
+  one made goes too, a session left or a password changed meanwhile being `job:metrics-role`;
+  the exporter is recreated with the new line:
+
+  ```bash
+  NEW="$(openssl rand -hex 24)"
+  NEW="$NEW" perl -pi -e 's/^METRICS_DB_PASSWORD=.*/METRICS_DB_PASSWORD=$ENV{NEW}/' .env.prod
+  $C up -d backend postgres-exporter
+  ```
+
+  Then `$C logs --since 5m postgres-exporter | grep -ci 'password authentication failed'` is `0` once the
+  exporter is back, and the row «Postgres» in Grafana goes on drawing.
 
 - **`BOT_API_SECRET`** (drilled): 43 characters of base64url — anything else and the API does not
   start (`openssl rand -base64 32 | tr '+/' '-_' | tr -d '='`, written into the line as above, by a

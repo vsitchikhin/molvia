@@ -60,6 +60,9 @@ services:
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:?set TELEGRAM_BOT_USERNAME}
       BOT_API_SECRET: ${BOT_API_SECRET:?set BOT_API_SECRET}
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      # The password the API gives the exporter's role at every start (MOL-366): the role is made, kept
+      # to its form and its password set by the API, never by a migration — a copy carries no role.
+      METRICS_DB_PASSWORD: ${METRICS_DB_PASSWORD:?set METRICS_DB_PASSWORD}
       # The nightly merge of twins (MOL-106): `report` says each morning what it would merge, `on`
       # merges — the owner's word, one line in .env.prod (В-3).
       CATALOGUE_MERGE: ${CATALOGUE_MERGE:-report}
@@ -279,15 +282,16 @@ services:
   postgres-exporter:
     logging: *logging
     # Connections, the size of the database, the longest transaction — figures, never a query's text
-    # (В-4). The database's own user (В-5): the exporter has no way out to take anything anywhere.
+    # (В-4). Its own role, `pg_monitor` and no table (MOL-366): no way out kept it from taking anything
+    # away, not from erasing it — the database's own user was the cluster's superuser.
     image: prometheuscommunity/postgres-exporter:v0.20.1
     restart: unless-stopped
     command:
       - --collector.long_running_transactions
     environment:
       DATA_SOURCE_URI: postgres:5432/${POSTGRES_DB}?sslmode=disable
-      DATA_SOURCE_USER: ${POSTGRES_USER}
-      DATA_SOURCE_PASS: ${POSTGRES_PASSWORD}
+      DATA_SOURCE_USER: molvia_metrics
+      DATA_SOURCE_PASS: ${METRICS_DB_PASSWORD:?set METRICS_DB_PASSWORD}
     read_only: true
     mem_limit: 64m
     networks: [metrics]
