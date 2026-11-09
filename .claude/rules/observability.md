@@ -363,9 +363,12 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   — revoked from `PUBLIC` and from the role — no database but the API's to log in to, its grant there the
   role's own, and `temp_file_limit` 64 MB, a setting only a superuser lifts. **A database made after the
   API's start keeps `PUBLIC`'s defaults until its next start** (adversarial В1): no trigger fires on
-  `CREATE DATABASE`, and its rights come from no template — so `restore.sh --into-prod`, which makes the
-  database anew while the exporter runs on, takes its temporary tables at once; one made by hand is open so
-  long. Three connections at most.
+  `CREATE DATABASE`, and its rights come from no template. So `restore.sh --into-prod`, which makes the
+  API's database anew while the exporter runs on, takes its temporary tables at once, and **`pg_hba.conf`
+  lets the role into the API's database alone** (owner's В-5 «б»):
+  `host <db> molvia_metrics all scram-sha-256` before `host all molvia_metrics all reject`, a step by
+  hand on every machine (`deploy/README.md`, «Metrics») — the file is the volume's, so no test holds it,
+  and a machine set up without it is open to a database made by hand until the API's next start. Three connections at most.
   **The role is the API's, made at every start** (`ensureMetricsRole`, В-1
   «а»), never a migration's: a role is the cluster's, a migration runs in each of its databases, and
   `pg_dump` carries none — a machine restored from a copy would have had no role behind a journal that

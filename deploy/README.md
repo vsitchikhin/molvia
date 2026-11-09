@@ -30,6 +30,10 @@ same machine and the same network; only Caddy is reachable from outside.
    address and no query string, and Caddy keeps no access log, but Caddy's errors can carry an
    address — this is what bounds them.
 
+6. Once Postgres has run, **let the exporter's role into the API's database alone** — the two lines of
+   `pg_hba.conf`, «Metrics», «Where it is set» (MOL-366, owner's В-5 «б»). The file lives in the database's
+   volume: a new machine, or a volume lost, has none of them.
+
 ## Deploys (MOL-90)
 
 A merge into master is a deploy. When CI passes on master, `release.yml` builds the three images
@@ -671,11 +675,32 @@ node-exporter`, and `✅ Прошло` follows.
   the role at every start**, after the migrations: made if missing, its attributes, term, settings and
   `pg_monitor` set again, the advisory locks of the database, every temporary table and every other
   database taken from it, the password written only
-  when another — the role's sessions closed before and after. So a new machine, a restored copy and a rotation take no
+  when another — the role's sessions closed before and after. So a restored copy and a rotation take no
   step by hand — `pg_dump` carries no role. Compose refuses to start the API or the exporter without the
   line; one shorter than 24 characters, or with a space or a letter beyond ASCII, stops the API. A failure
   of the role reaches the owner as `job:metrics-role`, the API running on, and «Метрики молчат: postgres»
   follows.
+- **The role logs in to the API's database and no other, by `pg_hba.conf`** (MOL-366, owner's В-5 «б»): the
+  API takes `CONNECT` from every database there is at its start, but a database made afterwards — by hand,
+  for anything — gives `PUBLIC` its defaults until the next start, a temporary table with no limit
+  included. Two lines before the image's last, `host all all all scram-sha-256`, once on every machine — the
+  file is the volume's, not the repository's, so nothing but this step puts them there:
+
+  ```bash
+  $C exec -T postgres sh -c 'f="$PGDATA/pg_hba.conf"; grep -q molvia_metrics "$f" || sed -i "/^host all all all scram-sha-256\$/i host $POSTGRES_DB molvia_metrics all scram-sha-256\nhost all molvia_metrics all reject" "$f"'
+  $C exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "select pg_reload_conf()"'
+  $C exec -T postgres sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -At' <<'SQL'
+  select line_number, database, user_name, auth_method from pg_hba_file_rules
+  where 'molvia_metrics' = any(user_name);
+  SQL
+  ```
+
+  The last prints the two lines, `{molvia}` with `scram-sha-256` before `{all}` with `reject`. Run twice, the
+  first writes nothing. Tried on the production image `pgvector/pgvector:0.8.7-pg17-bookworm`: the role is
+  let into `molvia` and refused `postgres` and `template1` (`28000`) even with a grant, the owner let into
+  all. **The price:** no test holds it — a machine set up without the step is open as before, and nothing
+  says so.
+
 - The images `molvia-grafana` and `molvia-victoria` are built by the release with the others. **The
   metrics never judge a rollout**: pulled before anything changes, a refusal of the registry a
   warning; started only once the API answers healthy, a failure of theirs a warning in
