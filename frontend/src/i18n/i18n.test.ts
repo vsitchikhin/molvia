@@ -562,6 +562,8 @@ describe('словарь: плюральные формы', () => {
       'trip.caveat.pending',
       'trip.unsent.title',
       'purchases.issues_check',
+      'purchases.reasons.day_limit',
+      'purchases.reasons.unrecorded_limit',
       'item.results_announced',
       'item.far_announced',
       'advice.ratings_count',
@@ -723,6 +725,14 @@ describe('русская плюрализация', () => {
     expect(t('trip.items_count', 1)).toBe('1 позиция')
     expect(t('trip.items_count', 2)).toBe('2 позиции')
     expect(t('trip.items_count', 5)).toBe('5 позиций')
+  })
+
+  it('число квоты чеков — в своей форме, не «21 чеков» (MOL-360, ревью 1, №5)', () => {
+    const t = russian().t
+    expect(t('purchases.reasons.unrecorded_limit', 21)).toBe('21 чек ждёт записи')
+    expect(t('purchases.reasons.unrecorded_limit', 20)).toBe('20 чеков ждут записи')
+    expect(t('purchases.reasons.day_limit', 22)).toBe('сегодня отправлено уже 22 чека')
+    expect(t('purchases.reasons.day_limit', 40)).toBe('сегодня отправлено уже 40 чеков')
   })
 
   it('держит второй десяток: 11–14 всегда третья форма', () => {

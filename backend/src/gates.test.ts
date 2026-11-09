@@ -39,6 +39,7 @@ const REPORT: GatesReport = {
         expiredUnconfirmed: 2,
         expiredConfirmed: 0,
         refused: 0,
+        endedByNotice: 0,
       },
       {
         day: '2026-11-20',
@@ -50,6 +51,7 @@ const REPORT: GatesReport = {
         expiredUnconfirmed: 13,
         expiredConfirmed: 4,
         refused: 2,
+        endedByNotice: 1,
       },
     ],
   },
@@ -398,6 +400,7 @@ describe('gates — чтение ворот вручную', () => {
       '       «not me» in the bot               1',
       '       refused by the quota              2          starts, not in «began»',
       '     began again on the same device      12         not counted as beginning',
+      '     ended «not me» after getting in     1          sessions, by the day of the press',
       '',
       '     day            began     again confirmed  declined    got in   expired   refused',
       '     2026-10-05         3         2         3         0         3         2         0',
@@ -588,6 +591,7 @@ describe('gates — чтение ворот вручную', () => {
       '       «not me» in the bot               0',
       '       refused by the quota              0          starts, not in «began»',
       '     began again on the same device      0          not counted as beginning',
+      '     ended «not me» after getting in     0          sessions, by the day of the press',
     ])
     expect(lines.join('\n')).not.toMatch(/NaN/)
   })

@@ -439,8 +439,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 - **A write that grows what everybody shares, or what the server keeps on disk, has a quota per person**
   (MOL-287, В-3 «а»: one request without a session or one account in a minute bringing the service down is a
-  blocker) — the login's start by its address, five a minute and three hundred in all (MOL-359); **not yet** for
-  receipts (MOL-360) and «Предложить товар» (MOL-362), each a blocker of `v0.2.0`; a new write path names its
+  blocker) — the login's start by its address, five a minute and three hundred in all (MOL-359); a receipt by its
+  person, forty a day of their own — a count «Удалить» never gives back — and twenty not recorded at once
+  (MOL-360); **not yet** for «Предложить товар» (MOL-362), a blocker of `v0.2.0`; a new write path names its
   quota in its task. What answers without a session counts by the address Caddy names (`addressOf`), in memory.
 - **A host the server asks is the code's, never the request's**, with a timeout (SSRF).
 - **Every secret of production is a row of «Rotating the secrets» in `deploy/README.md`**, and a new one comes
@@ -449,6 +450,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   layer or the bundle.
 - **What CI runs is pinned** (MOL-364): a `uses:` by its full sha with its release in a comment, a base image by an
   exact tag and its digest — `bin/check-pins.mjs` in `npm run lint`; Dependabot moves both, a major of Node never.
+- **No image of ours runs as root, and no npm beside `node`** (MOL-365): the last stage is `runtime` and names its
+  `USER` (`check-pins`); the volumes of a service moved off root are given by its own one-shot service
+  (`frontend-volumes`, `victoria-volumes`) at every `up`, by numbers; `runtime` brings its distribution's packages
+  up to date and the release builds it afresh (`no-cache-filters`).
 - **`/internal/*` is closed twice** — Caddy's 404 and `BOT_API_SECRET` in constant time; a bot's route goes in
   that scope only. **A finding is a probe on a copy** (`.scratch/tasks/security/MOL-287/probes/`), never prod.
 - **The page's CSP is a meta the build puts first in `index.html`, never Caddy's header** (MOL-363): the worker
@@ -534,7 +539,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   a sender and a thousand in all.
 - **The metrics' labels are a route's template, never a path** (MOL-145): `/metrics` on its own port
   (`METRICS_PORT`), never the API's, which is all Caddy reaches; what sees the machine or the database
-  is on `metrics`, a network with no way out, and Grafana calls nobody home. **The dashboard and every
+  is on `metrics`, a network with no way out, and Grafana calls nobody home. **postgres_exporter is
+  `molvia_metrics`, `pg_monitor` and no table** (MOL-366): the API makes the role at every start and sets
+  its password as a verifier, never a migration — `pg_dump` carries no role. **The dashboard and every
   threshold are JSON in `deploy/grafana`**, baked into its image; a test holds the thresholds and that
   every figure read is written. A restart is a reset of the same container's CPU counter, never
   `changes()`; a request whose client left is `aborted`, never lost. **The alarms read a person's
@@ -563,6 +570,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   statement, at most once, within 6 h; no sum, no line; the receipt's language; its own switch on the
   page «Бот» (`/settings/bot`), never the rating reminders'; **a block is `actors.bot_blocked_at`**,
   which «chosen» in `reminders_off` cannot hide.
+- **Every session collected is told of in the bot, with «Это не я — завершить»** (MOL-361): the collection queues
+  it, the API marks it as it hands it out — one account's oldest a claim — and lets it go by the bot's word: given
+  back behind the others, its account with it, when Telegram refuses for now, let go unsent past the lease; the notice
+  outlives the session; the button ends that one session for `ctx.from.id`, one `404` for anything else; Russian then
+  English, no switch.
 - **Telegram updates are never logged whole.**
 - **The message about a leak is queued by `make notify` and sent by the bot** (MOL-237): the API
   decides who — created before it, of its countries, the bot not blocked — in batches after a cursor

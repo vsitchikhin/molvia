@@ -7,9 +7,12 @@ import {
   broadcastDoneSchema,
   confirmLoginSchema,
   dueBroadcastSchema,
+  dueLoginNoticesSchema,
+  loginNoticesToldSchema,
   dueSilenceNoticesSchema,
   dueReceiptNoticesSchema,
   dueRemindersSchema,
+  endSessionFromBotSchema,
   eraseMeSchema,
   feedbackFromBotAnswerSchema,
   feedbackFromBotSchema,
@@ -20,6 +23,7 @@ import {
   ownerNoticesSentSchema,
   rateFromBotSchema,
   replyDeliveredSchema,
+  resourceIdOf,
   switchRemindersFromBotSchema,
   verdictPathSchema,
 } from '@molvia/model'
@@ -27,6 +31,8 @@ import type {
   BotFailure,
   BroadcastDone,
   DueBroadcast,
+  DueLoginNotices,
+  LoginNoticesTold,
   DueSilenceNotices,
   DueReceiptNotices,
   DueReminders,
@@ -106,6 +112,18 @@ export interface MolviaBotClient {
    * warning lost on the way is not handed again.
    */
   claimSilenceNotices(): Promise<DueSilenceNotices>
+  /**
+   * The sessions collected that their account has not been told of (MOL-361), one an account, marked as
+   * handed: say what went with `loginNoticesTold`; one never spoken of is let go past the lease, unsent.
+   */
+  claimLoginNotices(): Promise<DueLoginNotices>
+  /** What of a claim went and what did not (adversarial А1): the API lets go of one, hands the other again. */
+  loginNoticesTold(word: LoginNoticesTold): Promise<void>
+  /**
+   * «Это не я — завершить»: ends the session the button names for the account that pressed it. A
+   * session that is gone, or another account's, is `not_found`.
+   */
+  endSession(sessionId: string, telegramUserId: TelegramUserId): Promise<void>
 }
 
 /** An internal client has no session and cannot attach its secret to an arbitrary API path. */
@@ -212,6 +230,23 @@ export function createBotClient({ secret, ...options }: BotClientOptions): Molvi
       request('/internal/broadcasts/claim', dueBroadcastSchema, { method: 'POST' }),
     claimSilenceNotices: async () =>
       request('/internal/silence/claim', dueSilenceNoticesSchema, { method: 'POST' }),
+    claimLoginNotices: async () =>
+      request('/internal/logins/claim', dueLoginNoticesSchema, { method: 'POST' }),
+    loginNoticesTold: async (word) => {
+      const body = loginNoticesToldSchema.safeParse(word)
+      if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'word')
+      await request('/internal/logins/told', z.undefined(), { method: 'POST', body: body.data })
+    },
+    endSession: async (sessionId, telegramUserId) => {
+      const id = resourceIdOf(sessionId)
+      if (id === null) throw new ApiError(ISSUE.PATH_INVALID, 'sessionId')
+      const body = endSessionFromBotSchema.safeParse({ telegramUserId })
+      if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'telegramUserId')
+      await request(`/internal/sessions/${id}/end`, z.undefined(), {
+        method: 'POST',
+        body: body.data,
+      })
+    },
     broadcastDone: async (report) => {
       const body = broadcastDoneSchema.safeParse(report)
       if (!body.success) throw new ApiError(ISSUE.BODY_INVALID, 'report')

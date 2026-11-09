@@ -40,6 +40,8 @@ const file: ExportFile = {
     lastSeenAt: at,
     silenceWarning: 7,
     silenceWarnedAt: at,
+    receiptsDay: '2026-09-20',
+    receiptsSent: 3,
     createdAt: at,
     updatedAt: at,
   },
@@ -54,6 +56,7 @@ const file: ExportFile = {
     },
   ],
   loginRequests: [{ id: id(3), deviceName: null, createdAt: at, expiresAt: at, consumedAt: at }],
+  loginNotices: [{ sessionId: id(2), deviceName: 'iPhone · Safari', signedInAt: at }],
   trips: [
     {
       id: id(4),
@@ -426,7 +429,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(27)
+    expect(wire.version).toBe(29)
     expect(wire.account.lastSeenAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.silenceWarning).toBe(7)
     expect(wire.account.silenceWarnedAt).toBe('2026-09-20T10:00:00.000Z')

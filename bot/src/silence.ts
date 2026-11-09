@@ -4,6 +4,7 @@ import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import type { SilenceNotice } from '@molvia/model'
 import { t } from './i18n'
+import { dayInWords } from './when'
 import { reportDefect } from './failure'
 import { Flooded, deliver, sleep } from './deliver'
 import type { Wait } from './deliver'
@@ -22,21 +23,12 @@ function days(language: 'ru' | 'en', n: number): string {
   return t(language, key, { n })
 }
 
-/** «26 сентября», «26 September»: the day it goes, without the year — it is a month away at most. */
-function dateOf(language: 'ru' | 'en', day: string): string {
-  return new Intl.DateTimeFormat(language === 'en' ? 'en-GB' : language, {
-    day: 'numeric',
-    month: 'long',
-    timeZone: 'UTC',
-  }).format(new Date(`${day}T12:00:00Z`))
-}
-
 /** The words: the Russian, then the English, each with its own date and count. */
 export function silenceText(notice: SilenceNotice): string {
   return (['ru', 'en'] as const)
     .map((language) =>
       t(language, 'silence.warn', {
-        date: dateOf(language, notice.day),
+        date: dayInWords(language, notice.day),
         days: days(language, notice.days),
       }),
     )

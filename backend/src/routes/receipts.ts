@@ -35,7 +35,11 @@ import { parseBody, parseQuery } from '@/parse'
 import type { Today } from '@/usecases/today'
 
 export interface ReceiptsApi {
-  send(actorId: string, body: ReceiptBody): Promise<{ receipt: ReceiptSummary; created: boolean }>
+  /** The person's quota counts their own day (MOL-360): «today» is the phone's (MOL-121). */
+  send(
+    actor: Actor & Today,
+    body: ReceiptBody,
+  ): Promise<{ receipt: ReceiptSummary; created: boolean }>
   putPart(actorId: string, id: string, part: string, photo: Buffer): Promise<ReceiptSummary>
   /** `shown` — the phone asked with its page in view (MOL-129, А1): what it is handed read is heard. */
   list(actor: Actor, shown: boolean): Promise<ReceiptSummary[]>
@@ -175,7 +179,7 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
     /** 201 for a new receipt, 200 for the same one again — the queue sending twice. */
     scope.post('/receipts', async (request, reply) => {
       const body = parseBody(receiptBodySchema, request.body)
-      const { receipt, created } = await api.send(ownerOf(request), body)
+      const { receipt, created } = await api.send(askingOf(request), body)
       return privately(reply.code(created ? 201 : 200)).send(z.encode(receiptSummaryCodec, receipt))
     })
 

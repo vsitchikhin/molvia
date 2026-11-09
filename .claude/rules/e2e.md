@@ -152,8 +152,11 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   answers them. **WebKit's own report of a `<select>`** is the one `csp.ts` lets go — any `style-src-attr` report at a
   `<select>` on WebKit, with one line of its console for each (owner's В-4 «а», `security.md`): no field tells the
   engine's style from ours, and Chromium on the same screens fails on ours. The fixture listens on the context, so a
-  second window of a test is heard too (review 1, №4). A version `pwa-update.spec` puts out meanwhile only adds its
-  strip over the tab bar.
+  second window of a test is heard too (review 1, №4). **Its two projects run after `pwa`, never beside it**
+  (`dependencies`, MOL-365): a version `pwa-update.spec` put out meanwhile — a byte appended to the one built `sw.js` —
+  was let in when a `goto` hid the page, as an installed app does, and the reload ended that `goto` with
+  `ERR_ABORTED` (run 42629452148, a flake that failed CI). The suite's time does not grow: `phone` runs beside them
+  for longer than `pwa` takes.
 - **The camera needs the full Chromium, so the scanner's specs run in one project** (MOL-98): `camera`
   is the same phone with `channel: 'chromium'` and a fake camera filming a barcode drawn by
   `globalSetup` (`e2e/barcode-video.ts`); `phone` ignores `scanner.spec.ts`. The headless shell every

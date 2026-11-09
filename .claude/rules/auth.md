@@ -46,7 +46,9 @@ is in `bot.md`.
   account, and the browser that started it silently collects _that_ account — its purchases
   then land there — and anyone holding the code can decline it. Accepted while the code goes
   from the browser straight into Telegram on the same device; a QR or a login from another
-  device reopens the question. The term is the database clock's alone: the row takes both of
+  device reopens the question. **A link forwarded to the account's owner is answered after the fact**
+  (audit MOL-287 Ф-3, MOL-361): every session collected is told of in the bot, with «Это не я —
+  завершить», which ends that session for `ctx.from.id` — `bot.md`. The term is the database clock's alone: the row takes both of
   its times from `clock_timestamp()` and the cookie's `Max-Age` is the lifetime itself, so an
   API clock off Postgres neither refuses a start nor shortens the cookie.
   Collection locks the row before checking the current database clock, then consumes it,

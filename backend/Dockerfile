@@ -34,6 +34,14 @@ FROM node:22.23.4-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68ae
 WORKDIR /app
 ENV NODE_ENV=production
 
+# The runtime is `node` alone (MOL-365): npm, npx, corepack and yarn of the base image run nothing
+# here, and every finding trivy had in this image was theirs. Debian's packages are brought up to
+# date in the same layer, which the release builds afresh (`no-cache-filters`), so a fix of the
+# distribution comes with the next merge rather than with the base's digest moved.
+RUN apt-get update && apt-get upgrade -y --no-install-recommends && rm -rf /var/lib/apt/lists/* \
+ && rm -rf /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/corepack /opt/yarn-v* \
+      /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack /usr/local/bin/yarn /usr/local/bin/yarnpkg
+
 # One bundled file and the migrations beside it. One module beside them, and nothing else of
 # node_modules: onnxruntime, whose native library no bundle can hold (MOL-105).
 COPY --from=build /repo/backend/dist ./dist

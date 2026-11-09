@@ -13,7 +13,7 @@ export async function completeLogin(
   secret: string,
   zone?: string,
 ): Promise<CompletedLogin> {
-  return transact(async ({ actors, sessions, requests }) => {
+  return transact(async ({ actors, sessions, requests, notices }) => {
     // The account's lock before the request's row, the order erasure takes them in (MOL-58,
     // adversarial Р-1): making the owner takes the account's lock, and taken only then — with
     // the row already held — a collection and an erasure could each wait on the other. The
@@ -39,6 +39,10 @@ export async function completeLogin(
       consumed.deviceName,
       zone,
     )
+    // The bot tells the account of every session collected, its first one too (MOL-361, В-3 «а»):
+    // a link forwarded under a pretext lets a stranger's browser in, and the words of the question
+    // alone do not stop it once strangers come (audit MOL-287 Ф-3).
+    await notices.add(signedIn.sessionId)
     return { status: 'authenticated', signedIn }
   })
 }

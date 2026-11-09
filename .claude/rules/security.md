@@ -36,15 +36,15 @@ file holds what belongs to no single area, and what the audit found missing.
 - **A write that grows what everybody shares, or what the server keeps on its disk, has a quota per person**
   (MOL-287, owner's В-3 «а»: a cheap way to bring the service down — one request without a session, or one
   account within a minute — is a blocker of the release). **The login's is an address's** (Ф-1,
-  MOL-359): five starts a minute from an address, three hundred from everybody — `auth.md`. **Two have
-  none yet, each a blocker of `v0.2.0`**: a receipt's photos have none, and one
-  account fills some 12 GB an hour against 51 GB free (Ф-2, MOL-360: forty a day, twenty not recorded at
-  once); «Предложить товар» has none, and some nine thousand names an hour go into everybody's search
+  MOL-359): five starts a minute from an address, three hundred from everybody — `auth.md`. **A receipt's
+  is a person's** (Ф-2, MOL-360): forty a day of their own and twenty not recorded at once — one account had
+  filled some 12 GB an hour against 51 GB free — `receipts.md`. **One has none yet, a blocker of
+  `v0.2.0`**: «Предложить товар», and some nine thousand names an hour go into everybody's search
   (Ф-4, MOL-362: sixty a day). Each task, merged, rewrites its line here. **A new write path names its
   quota in its task**, or says why it needs none. **A person's own rows of money have none either, and
   that is a price, not a reason** (self-review №5): the bodies are small and bounded, but nothing bounds
   their number, and how fast one account fills the disk with them was not measured — the disk alarm of
-  MOL-360 is what would say it first.
+  MOL-145 (`molvia-disk`, less than a fifth of `/` free) is what would say it first.
 - **What answers without a session is limited by the address Caddy names**, never by anything the client
   sends: the last `X-Forwarded-For` only from a peer inside, an IPv6 address by its `/48` (`addressOf`,
   `/client-errors`, MOL-144, and the login's start, MOL-359), counted in the API's memory
@@ -62,16 +62,33 @@ file holds what belongs to no single area, and what the audit found missing.
   addresses are constants. A new outgoing request keeps the same shape — the input is a parameter, never a
   URL — and has a timeout. The size of an answer is not limited yet (MOL-368).
 
+## What an image carries (MOL-365)
+
+- **trivy over the images of the release finds nothing with a fix but inside a Go binary of another's release**
+  (owner's В-4 «а»): measured on 09.11.2026 (trivy 0.76.1, HIGH and CRITICAL with a fix) — production's six images
+  held 142, 110 of them Grafana's; the new ones hold 7, one in Caddy's binary (`golang.org/x/net`) and six in
+  Grafana's (go-jose, tempo, prometheus, `x/net`). Those wait for their releases, which Dependabot's weekly `images`
+  brings; building Caddy ourselves would make every later update of it ours. Nothing of ours is Go: Caddy,
+  VictoriaMetrics and Grafana are programs we ship as their authors built them, and a scanner reads the modules a
+  Go binary carries inside it. How it holds — no npm beside `node`, a user in every last stage, the distribution
+  brought up to date at every release — is `deploy.md`. **Checked again by hand**: trivy is not in CI.
+- **`npm audit --omit=dev` leaves one moderate, `uuid` 8 under exceljs** (MOL-365): fixed only by exceljs a major
+  back (3.4.0), and the hole is in v3, v5 and v6 with a `buf` — exceljs, which reads the banks' xlsx
+  (`backend/src/rates/xlsx.ts`), calls v4. A price, named. `fast-uri` was brought to 3.1.9 and 4.2.3; the alerts of
+  `development` are Dependabot's and never reach an image.
+
 ## Secrets
 
 - **Every secret of production is a row of «Rotating the secrets» in `deploy/README.md`**: where it lives,
   how it is changed, and what stops meanwhile. A new secret comes with its row and its line in
   `.env.prod.example`, in the same pull request. **The database's password lives in its volume too**, so
   changing the line alone breaks the API, and it takes only what a URL takes bare — compose puts it into
-  `DATABASE_URL` as it is (drilled and attacked, MOL-287). **A secret never goes on a command line**: argv
-  is everybody's in `ps`, and the history keeps it on the machine that leaked. Typed at `read -rs`, it goes
-  into a pipe, a heredoc, a shell builtin or a command's environment — never its arguments, a variable's
-  expansion included (MOL-287, adversarial Р2-А2).
+  `DATABASE_URL` as it is (drilled and attacked, MOL-287). **What reads the database for counters has a role of
+  its own, never the owner's password** (MOL-366): postgres_exporter is `molvia_metrics`, `pg_monitor` and no
+  table, its password `METRICS_DB_PASSWORD` set by the API at its start (`observability.md`). **A secret never
+  goes on a command line**: argv is everybody's in `ps`, and the history keeps it on the machine that leaked.
+  Typed at `read -rs`, it goes into a pipe, a heredoc, a shell builtin or a command's environment — never its
+  arguments, a variable's expansion included (MOL-287, adversarial Р2-А2).
 - **The images are public** (ghcr, pulled anonymously): nothing secret goes into a layer, a build argument
   or the PWA's bundle — the audit read all six images and the bundle. A secret reaches a container only
   through compose's environment from `.env.prod` on the machine. **The machine has no login to the
@@ -130,8 +147,8 @@ file holds what belongs to no single area, and what the audit found missing.
   **Every directory with a Dockerfile that takes an image is in the docker entry's `directories`**: the check
   refuses one left out, since a digest nobody moves is frozen for good (adversarial В1). A security update of
   npm comes in one pull request (`security`, `applies-to: security-updates`), Playwright's apart, as its
-  version updates. **The price**: a patch of Alpine under the same tag no longer comes with any build — only
-  with the bot's pull request, a week late at most and merged by the owner. **Not watched**: the images of
+  version updates. A patch of Alpine or Debian under the same tag comes with
+  every release since MOL-365 — the stage `runtime` brings the distribution up to date and is built afresh (`deploy.md`). **Not watched**: the images of
   compose (`pgvector` — a contract of ICU and glibc that a migration moves, `deploy.md`; the exporters and
   cAdvisor on `metrics`, which has no way out — each move of `docker-compose.prod.yml` a copy by hand to the
   machine) and `services:`/`container:` of `ci.yml`, the Playwright image held by its own check (`e2e.md`).

@@ -54,8 +54,10 @@ export const EXPORT_FORMAT = 'molvia-export'
 // until when and why, never the photo or what was read (MOL-309). 26: the account's `silenceWarning` and
 // `silenceWarnedAt`, the last warning before an erasure for two years of silence and when (MOL-239). 27:
 // `overwrittenVerdicts`, one's own verdict written over after a merge by its twin's id, kept for the undo
-// (MOL-299).
-export const EXPORT_VERSION = 27
+// (MOL-299). 28: `loginNotices`, the sign-ins the bot has not told of yet — the session, the device and
+// when (MOL-361). 29: the account's `receiptsDay` and `receiptsSent`, the receipts sent on the person's day,
+// which the day's quota counts (MOL-360).
+export const EXPORT_VERSION = 29
 
 const day = z.iso.date()
 
@@ -142,6 +144,8 @@ const accountSchema = z.strictObject({
   lastSeenAt: isoDate,
   silenceWarning: z.int().nullable(),
   silenceWarnedAt: isoDate.nullable(),
+  receiptsDay: day.nullable(),
+  receiptsSent: z.int(),
   createdAt: isoDate,
   updatedAt: isoDate,
 })
@@ -161,6 +165,12 @@ const loginRequestSchema = z.strictObject({
   createdAt: isoDate,
   expiresAt: isoDate,
   consumedAt: isoDate.nullable(),
+})
+
+const loginNoticeSchema = z.strictObject({
+  sessionId: z.uuid(),
+  deviceName: z.string().nullable(),
+  signedInAt: isoDate,
 })
 
 const tripSchema = z.strictObject({
@@ -573,6 +583,7 @@ export const exportContentCodec = z.strictObject({
   account: accountSchema,
   sessions: z.array(sessionSchema),
   loginRequests: z.array(loginRequestSchema),
+  loginNotices: z.array(loginNoticeSchema),
   trips: z.array(tripSchema),
   expenses: z.array(expenseSchema),
   verdicts: z.array(verdictSchema),

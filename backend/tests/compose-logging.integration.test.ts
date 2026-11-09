@@ -14,12 +14,14 @@ describe('docker-compose.prod.yml', () => {
       'bot',
       'cadvisor',
       'frontend',
+      'frontend-volumes',
       'grafana',
       'node-exporter',
       'postgres',
       'postgres-exporter',
       'receipt-reader',
       'victoria',
+      'victoria-volumes',
     ])
     for (const [, block] of found) expect(block).toMatch(/^ {4}logging: \*logging$/m)
   })

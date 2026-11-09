@@ -4,9 +4,9 @@ import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type { ReminderSwitch } from '@molvia/model'
-import { dropKeyboard, refuse, settleKeeping, stopSpinner } from './answer'
+import { dropKeyboard, refuse, settleKeeping, shownText, stopSpinner } from './answer'
 import { t } from './i18n'
-import { SWITCH_DATA, keyboardOf, readText, scale, shownText, writeText } from './remind'
+import { SWITCH_DATA, keyboardOf, readText, scale, writeText } from './remind'
 import { handlerOf, reportDefect } from './failure'
 
 export interface MuteDeps {
