@@ -307,6 +307,15 @@ export const actors = pgTable(
      */
     receiptsModelUntil: timestamp('receipts_model_until', { withTimezone: true }),
     /**
+     * The receipts the person sent on their day (MOL-360, owner's В-1 «а»): the phone's day of the last
+     * receipt taken (`TODAY_HEADER`) and how many that day. A count, never the rows of `receipts`: a
+     * receipt removed goes from there in ten minutes, and its place in the day would come back. The day
+     * only moves on — a day the phone names before it counts in it — so a day header made up gives one
+     * day ahead at most. Not a change of the row: `updated_at` does not see it (0079).
+     */
+    receiptsDay: date('receipts_day'),
+    receiptsSent: smallint('receipts_sent').notNull().default(0),
+    /**
      * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own, from their
      * exchanges, when there is one for the pair, and the official one otherwise — or always
      * `official`. Beside the settings rather than among them: it is switched on the screen of
@@ -410,6 +419,7 @@ export const actors = pgTable(
       sql`${table.salaryShiftDay} between 1 and ${sql.raw(String(SALARY_SHIFT_DAY_MAX))}`,
     ),
     check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
+    check('actors_receipts_sent_not_negative', sql`${table.receiptsSent} >= 0`),
     // A version without its moment, or a moment of no version, is a consent nobody can show.
     check(
       'actors_consent_whole',
