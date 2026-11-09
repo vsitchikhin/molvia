@@ -80,8 +80,10 @@ async function signedIn(telegramUserId = telegramId()) {
 }
 
 async function queued(): Promise<number> {
-  const [row] = await db.execute<{ n: number }>(sql`select count(*)::int as n from login_notices`)
-  return row?.n ?? 0
+  return (
+    onlyRow(await db.execute<{ n: number }>(sql`select count(*)::int as n from login_notices`))
+      ?.n ?? 0
+  )
 }
 
 async function claim() {
