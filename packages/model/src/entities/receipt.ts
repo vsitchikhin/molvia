@@ -54,6 +54,13 @@ export const RECEIPTS_DAY_MAX = 40
  */
 export const RECEIPT_MISS_KEEP_DAYS = 21
 
+/**
+ * How many such receipts one person keeps at once (MOL-360, owner's В-2 «а» of review 1): a copy outlives
+ * «Переснять» and «Записать», so the bound of the unrecorded did not see it, and «Переснять» over a wall kept
+ * forty copies a day. Past it the receipt is read as before and its reasons counted; it is not kept.
+ */
+export const RECEIPT_MISS_KEPT_MAX = 20
+
 /** «Удалить чек · Вернуть» (П-8): the ten minutes every removal of one's own money has (MOL-73). */
 export const RECEIPT_UNDO_MINUTES = EXCHANGE_UNDO_MINUTES
 
