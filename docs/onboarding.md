@@ -5445,3 +5445,18 @@ Dockerfile с CRLF и пустой строкой внутри продолже�
 первой строкой снова проглатывал `FROM` (Р8-А1); первое слово значения `# syntax=` — до любого пробельного знака (№18).
 **Ревью 9**: master с MOL-363 влит, конфликт хроники разрешён (№19); слова инструкции и пары `--mount` делятся вне
 кавычек, как у BuildKit — пробел в `target="/opt/tool kit"` больше не отрезает `from=` (Р9-А1).
+
+## Образы — без лишнего и не от root (MOL-365)
+
+Находки Ф-5, Ф-9, Ф-16 аудита MOL-287. Замер 09.11.2026 (trivy 0.76.1, HIGH и CRITICAL с исправлением) по шести
+образам прода `sha-822fde6`: 142, из них 110 у Grafana — `grafana/grafana-oss` заморожен на 13.0.2 с июня и
+Dependabot его не сдвинул бы; frontend и victoria работали от root. После задачи — 7, все внутри Go-бинарников Caddy и
+Grafana (ждём их выпусков, В-4 «а»). Рантайм API и бота без npm, npx, corepack и yarn (было 10 HIGH у каждого, все в
+npm, В-1 «а»); стадия `runtime` каждого образа обновляет пакеты своего дистрибутива и собирается релизом заново
+(`no-cache-filters`, В-3 «а»); Grafana — `grafana/grafana:13.0.12`, VictoriaMetrics — v1.156.0; каждый образ от
+пользователя, Caddy — `caddy` 10001, и это держит `userProblems` в `bin/check-pins.mjs` (В-5 «а»). Тома, заполненные
+от root, отдаёт одноразовый сервис compose `volume-owners` при каждом `up` (В-2 «а»): проба — Caddy от не-root на
+томе от root не стартует, после `chown` отдаёт страницу, откат и выкатка снова проходят. `fast-uri` — 3.1.9 и 4.2.3;
+`uuid` под exceljs — цена. Правила — `deploy.md`, `security.md`, строка в `CLAUDE.md`; порядок выкатки —
+`deploy/README.md`, «Images run as users». Требования и план — `.scratch/tasks/{requirements,plans}/MOL-365.md`,
+артефакт — `.lavish/mol-365-plan.html`.

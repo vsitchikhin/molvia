@@ -62,6 +62,21 @@ file holds what belongs to no single area, and what the audit found missing.
   addresses are constants. A new outgoing request keeps the same shape — the input is a parameter, never a
   URL — and has a timeout. The size of an answer is not limited yet (MOL-368).
 
+## What an image carries (MOL-365)
+
+- **trivy over the images of the release finds nothing with a fix but inside a Go binary of another's release**
+  (owner's В-4 «а»): measured on 09.11.2026 (trivy 0.76.1, HIGH and CRITICAL with a fix) — production's six images
+  held 142, 110 of them Grafana's; the new ones hold 7, one in Caddy's binary (`golang.org/x/net`) and six in
+  Grafana's (go-jose, tempo, prometheus, `x/net`). Those wait for their releases, which Dependabot's weekly `images`
+  brings; building Caddy ourselves would make every later update of it ours. Nothing of ours is Go: Caddy,
+  VictoriaMetrics and Grafana are programs we ship as their authors built them, and a scanner reads the modules a
+  Go binary carries inside it. How it holds — no npm beside `node`, a user in every last stage, the distribution
+  brought up to date at every release — is `deploy.md`. **Checked again by hand**: trivy is not in CI.
+- **`npm audit --omit=dev` leaves one moderate, `uuid` 8 under exceljs** (MOL-365): fixed only by exceljs a major
+  back (3.4.0), and the hole is in v3, v5 and v6 with a `buf` — exceljs, which reads the banks' xlsx
+  (`backend/src/rates/xlsx.ts`), calls v4. A price, named. `fast-uri` was brought to 3.1.9 and 4.2.3; the alerts of
+  `development` are Dependabot's and never reach an image.
+
 ## Secrets
 
 - **Every secret of production is a row of «Rotating the secrets» in `deploy/README.md`**: where it lives,
@@ -130,8 +145,8 @@ file holds what belongs to no single area, and what the audit found missing.
   **Every directory with a Dockerfile that takes an image is in the docker entry's `directories`**: the check
   refuses one left out, since a digest nobody moves is frozen for good (adversarial В1). A security update of
   npm comes in one pull request (`security`, `applies-to: security-updates`), Playwright's apart, as its
-  version updates. **The price**: a patch of Alpine under the same tag no longer comes with any build — only
-  with the bot's pull request, a week late at most and merged by the owner. **Not watched**: the images of
+  version updates. A patch of Alpine or Debian under the same tag comes with
+  every release since MOL-365 — the stage `runtime` brings the distribution up to date and is built afresh (`deploy.md`). **Not watched**: the images of
   compose (`pgvector` — a contract of ICU and glibc that a migration moves, `deploy.md`; the exporters and
   cAdvisor on `metrics`, which has no way out — each move of `docker-compose.prod.yml` a copy by hand to the
   machine) and `services:`/`container:` of `ci.yml`, the Playwright image held by its own check (`e2e.md`).

@@ -34,6 +34,10 @@ The shape worth knowing here:
   only, 45 MB of 288 — into `node_modules`; the model, fetched and checked by sha256 in the build,
   into `model/`. The runtime is Node's `bookworm-slim` (an exact tag and its digest, MOL-364), since that build is for glibc. The image is
   some 520 MB, the API's memory some 460 MB with the model loaded.
+  **Nor npm** (MOL-365, owner's В-1 «а»): the runtime stage of the API and the bot takes npm, npx, corepack and yarn
+  off the official image — every HIGH trivy found in either was theirs (ten, MOL-287 Ф-9), and nothing here runs
+  them: the owner's tools are `exec backend node dist/….js`. Their bytes stay in the base's layer, public as the
+  base is, and out of the container's files, which is what a scanner and an intruder read.
   **Names survive the bundle** (`keepNames`, MOL-142): node-fetch under grammY takes a signal only
   from a constructor called `AbortSignal`, and the bot's first use of the global one had esbuild
   rename abort-controller's class — every call to Telegram failed in production, every unbundled
@@ -48,7 +52,8 @@ The shape worth knowing here:
   node_exporter, cAdvisor and postgres_exporter on `metrics`, an `internal` network with no way out,
   Grafana in `metrics` and in `alerts`, a network of its own with a way out, its one port on
   `127.0.0.1:3000` for an SSH tunnel. `molvia-grafana` and `molvia-victoria` carry what they read baked
-  in and are built by the release beside the four; the exporters are upstream images of exact tags.
+  in and are built by the release beside the four — Grafana from `grafana/grafana`, never `grafana/grafana-oss`, which
+  stopped at 13.0.2 in June 2026 and so would never have reached Dependabot (MOL-365); the exporters are upstream images of exact tags.
   **They never judge a rollout** (adversarial А4): their images are pulled before anything changes, the
   upstream ones too, but a registry's refusal is a warning; the rollout's success is
   `up -d postgres backend bot frontend receipt-reader` and the health that follows, and only then are
@@ -61,6 +66,28 @@ The shape worth knowing here:
   required and filled — empty is no longer a way to tell nobody of the failures (review №3). **The
   first rollout recreates Postgres** too: its networks changed. The rules of what they measure are
   `observability.md`; `deploy/README.md`, «Metrics».
+- **Every image of ours runs as a user, never root** (MOL-365, Ф-16 of MOL-287): `node` for the API and the bot,
+  `caddy` (10001) for Caddy, `nobody` (65534) for VictoriaMetrics and the reader, Grafana's 472 — the last stage
+  names it, the base's word is not taken, and `bin/check-pins.mjs` refuses a last stage without `USER` or with
+  root (owner's В-5 «а»). Caddy opens 80 and 443 by the `cap_net_bind_service` its binary carries and by Docker's
+  `ip_unprivileged_port_start=0` in a container's network (Docker 20.10 and later). **A volume keeps the owner it
+  was filled by**: Docker gives a volume the image directory's owner only while it is empty, and `caddy_data`
+  holds the certificate and the ACME account as root 0600 — Caddy as `caddy` on it refused to start (probe of
+  09.11.2026), and the rollout, whose health goes through Caddy, would roll back. So **`volume-owners`**, a
+  one-shot service of the compose file (owner's В-2 «а»), `chown`s `caddy_data`, `caddy_config` and `vmdata` to
+  those numbers before `frontend` and `victoria` start (`service_completed_successfully`), at every `up`: the
+  frontend's image of the tag, root for that alone, with no network and `CHOWN` and `DAC_READ_SEARCH` only. A
+  rollback to an image of before MOL-365 runs as root over files of any owner, and whatever it writes the next
+  `up` gives back — tried: root-filled volumes, the new images, a rollback writing, forward again. A new number
+  in a Dockerfile is the same number in `volume-owners`.
+- **The stage `runtime` brings its distribution up to date, and the release builds it afresh** (MOL-365, owner's
+  В-3 «а»): `apk upgrade` (Caddy, the bot, VictoriaMetrics, Grafana), `apt-get upgrade` (the API, the reader, in a
+  stage of its own after the install, which stays cached). `release.yml`'s `no-cache-filters: runtime` is what makes
+  it happen: from the cache the layer stays as its first build left it until the base's digest moves. So a fix of
+  Alpine or Debian comes with the next merge, not a week later with Dependabot's pull request — the price of MOL-364
+  undone. **The price:** a build is not reproducible byte for byte, a broken package of the distribution comes as
+  silently as a fixed one, and a mirror down fails the release — the previous images keep running. The reader's
+  Tesseract moves only with a point release of trixie.
 - **Every container logs to journald**, which keeps fourteen days (MOL-58). `LOG_DRIVER=json-file`
   exists only for trying the stack on a laptop, where Docker Desktop has no journald.
 - **The database is copied every night, encrypted, off the machine** (MOL-70): `pg_dump` inside the
