@@ -601,7 +601,7 @@ describe('dockerfileProblems and a heredoc', () => {
     ])
   })
 
-  it("reads a mount's CSV as Go's csv does — a backslash parts no field there (Р4-А1)", () => {
+  it("reads a mount's CSV as Go's csv does — a backslash escapes no comma there, `\\,` still parts a field (Р4-А1)", () => {
     const text = `FROM caddy:2.11.9-alpine@${DIGEST} AS runtime\nRUN --mount=type=bind,target=/x\\,from=alpine:latest true\nUSER caddy`
     expect(dockerfileProblems('frontend/Dockerfile', text)).toEqual([
       'frontend/Dockerfile:2: alpine:latest — pin it by an exact tag and its digest, image:1.2.3@sha256:…',

@@ -190,8 +190,10 @@ function scanInstructions(lines, plain) {
       instructions.push(parts)
       const words = wordsOf(parts.text)
       // `ONBUILD COPY <<EOF` takes a heredoc as `COPY` does (adversarial Р4-Б1).
-      const { instruction, args } =
-        words.instruction === 'ONBUILD' ? wordsOf(words.args.join(' ')) : words
+      const [instruction, args] =
+        words.instruction === 'ONBUILD'
+          ? [words.args[0]?.toUpperCase(), words.args.slice(1)]
+          : [words.instruction, words.args]
       if (TAKES_HEREDOCS.has(instruction ?? '') && !plain.has(parts.number)) {
         for (const [, dash, word] of args.map((arg) => HEREDOC.exec(arg)).filter(Boolean)) {
           bodies.push({ dash, word: shellWord(word), opened: parts.number })
