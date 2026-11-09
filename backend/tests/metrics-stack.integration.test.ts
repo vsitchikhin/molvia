@@ -228,8 +228,9 @@ describe('the exporter’s role', () => {
     return randomBytes(24).toString('hex')
   }
 
-  function asRole(secret: string): Sql {
+  function asRole(secret: string, database?: string): Sql {
     const url = new URL(testDatabaseUrl())
+    if (database !== undefined) url.pathname = `/${database}`
     url.username = METRICS_ROLE
     url.password = secret
     const client = postgres(url.toString(), {
@@ -246,6 +247,16 @@ describe('the exporter’s role', () => {
     const row = onlyRow(await client<{ pid: number }[]>`select pg_backend_pid() as pid`)
     if (row === undefined) throw new Error('no backend pid read')
     return row.pid
+  }
+
+  async function memberships(): Promise<string[]> {
+    const rows = await admin<{ name: string }[]>`
+      select granted.rolname as name
+      from pg_auth_members m
+      join pg_roles granted on granted.oid = m.roleid
+      join pg_roles member on member.oid = m.member
+      where member.rolname = ${METRICS_ROLE}`
+    return sorted(rows.map((row) => row.name))
   }
 
   async function storedVerifier(): Promise<string | null> {
@@ -328,13 +339,7 @@ describe('the exporter’s role', () => {
         rolconfig: ['statement_timeout=5s', 'temp_file_limit=64MB'],
       },
     ])
-    const memberships = await admin<{ name: string }[]>`
-      select granted.rolname as name
-      from pg_auth_members m
-      join pg_roles granted on granted.oid = m.roleid
-      join pg_roles member on member.oid = m.member
-      where member.rolname = ${METRICS_ROLE}`
-    expect(memberships.map((row) => row.name)).toEqual(['pg_monitor'])
+    expect(await memberships()).toEqual(['pg_monitor'])
   })
 
   it('brings a role changed by hand, or by itself, back to its form (adversarial А2б, А4)', async () => {
@@ -364,13 +369,7 @@ describe('the exporter’s role', () => {
       rolconfig: ['statement_timeout=5s', 'temp_file_limit=64MB'],
       term: 'infinity',
     })
-    const memberships = await admin<{ name: string }[]>`
-      select granted.rolname as name
-      from pg_auth_members m
-      join pg_roles granted on granted.oid = m.roleid
-      join pg_roles member on member.oid = m.member
-      where member.rolname = ${METRICS_ROLE}`
-    expect(sorted(memberships.map((row) => row.name))).toEqual(['pg_monitor'])
+    expect(await memberships()).toEqual(['pg_monitor'])
     // The exporter logs in again — its term past refused it — with no limit lifted for this database.
     const exporter = asRole(secret)
     expect(
@@ -404,17 +403,7 @@ describe('the exporter’s role', () => {
     ).toBe('64MB')
     await expect(role`set temp_file_limit = -1`).rejects.toMatchObject({ code: '42501' })
     // Nor `postgres`, where a temporary table would be the cluster's disk all the same.
-    const elsewhere = new URL(testDatabaseUrl())
-    elsewhere.pathname = '/postgres'
-    elsewhere.username = METRICS_ROLE
-    elsewhere.password = secret
-    const other = postgres(elsewhere.toString(), {
-      max: 1,
-      connect_timeout: 5,
-      onnotice: () => undefined,
-    })
-    opened.push(other)
-    await expect(other`select 1`).rejects.toMatchObject({ code: '42501' })
+    await expect(asRole(secret, 'postgres')`select 1`).rejects.toMatchObject({ code: '42501' })
     // A database the role was let into by a start there is closed by a start in another (the cluster
     // of the tests holds a database for each worker), and the one it starts in opened again.
     const database = new URL(testDatabaseUrl()).pathname.slice(1)
@@ -422,13 +411,7 @@ describe('the exporter’s role', () => {
     await admin.unsafe(`revoke connect on database ${database} from public, ${METRICS_ROLE}`)
     await ensureMetricsRole(db, secret)
     await expect(asRole(secret)`select 1 as one`).resolves.toEqual([{ one: 1 }])
-    const again = postgres(elsewhere.toString(), {
-      max: 1,
-      connect_timeout: 5,
-      onnotice: () => undefined,
-    })
-    opened.push(again)
-    await expect(again`select 1`).rejects.toMatchObject({ code: '42501' })
+    await expect(asRole(secret, 'postgres')`select 1`).rejects.toMatchObject({ code: '42501' })
   })
 
   it('rotates past a session of the role holding its own row (adversarial А3)', async () => {

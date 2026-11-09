@@ -7,6 +7,10 @@ export const METRICS_ROLE = 'molvia_metrics'
 
 /** What a role so bounded still holds (В-3 «а»): enough for one exporter, not for the API's hundred. */
 const CONNECTION_LIMIT = 3
+/**
+ * The exporter's default, never a bound (adversarial А2): any session lifts it with `SET`, and the CPU
+ * and the memory of its three connections are a price (owner's В-4 «б»).
+ */
 const STATEMENT_TIMEOUT = '5s'
 /**
  * The disk its sorts and hashes may write (owner's В-4 «б»): a setting only a superuser sets, so no
@@ -66,95 +70,109 @@ async function closeSessions(db: Db): Promise<void> {
 }
 
 /**
+ * The role as it is meant to be, whatever was done to it by hand or by itself: made if missing — two
+ * databases of one cluster, one after the other, find it there; its attributes and term (`valid until`,
+ * adversarial А4б); its own settings, those it may give itself for one database too (А2б); `pg_monitor`
+ * its one membership (А4). Grants on objects are not looked at: nothing grants any.
+ */
+async function roleForm(tx: Conn): Promise<void> {
+  await tx.execute(
+    sql.raw(`do $$ begin create role ${METRICS_ROLE} login;
+      exception when duplicate_object or unique_violation then null; end $$`),
+  )
+  await tx.execute(
+    sql.raw(`alter role ${METRICS_ROLE} login inherit nosuperuser nocreatedb nocreaterole
+      noreplication nobypassrls connection limit ${String(CONNECTION_LIMIT)}
+      valid until 'infinity'`),
+  )
+  await tx.execute(sql.raw(`alter role ${METRICS_ROLE} reset all`))
+  await tx.execute(
+    sql.raw(`do $$ declare d name; begin
+      for d in select db.datname from pg_db_role_setting s join pg_database db on db.oid = s.setdatabase
+        where s.setrole = '${METRICS_ROLE}'::regrole loop
+        execute format('alter role ${METRICS_ROLE} in database %I reset all', d);
+      end loop; end $$`),
+  )
+  await tx.execute(
+    sql.raw(`alter role ${METRICS_ROLE} set statement_timeout = '${STATEMENT_TIMEOUT}'`),
+  )
+  await tx.execute(sql.raw(`alter role ${METRICS_ROLE} set temp_file_limit = '${TEMP_FILE_LIMIT}'`))
+  await tx.execute(
+    sql.raw(`do $$ declare r name; begin
+      for r in select granted.rolname from pg_auth_members m join pg_roles granted on granted.oid = m.roleid
+        where m.member = '${METRICS_ROLE}'::regrole and granted.rolname <> 'pg_monitor' loop
+        execute format('revoke %I from ${METRICS_ROLE}', r);
+      end loop; end $$`),
+  )
+  await tx.execute(sql.raw(`grant pg_monitor to ${METRICS_ROLE}`))
+}
+
+/**
+ * The advisory locks of this database taken from `PUBLIC`, so from every role but a superuser
+ * (adversarial А1): the API waits on them with no term, and their keys are strings of a public
+ * repository — held by the exporter's role, one key closed the login for everybody, and ten waiting
+ * took the API's pool. The API, a superuser, keeps them.
+ */
+async function publicLocksClosed(tx: Conn): Promise<void> {
+  await tx.execute(
+    sql.raw(`do $$ declare f regprocedure; begin
+      for f in select p.oid::regprocedure from pg_proc p
+        where p.pronamespace = 'pg_catalog'::regnamespace
+          and p.proname ~ '^pg_(try_)?advisory_(xact_)?lock(_shared)?$' loop
+        execute format('revoke execute on function %s from public', f);
+      end loop; end $$`),
+  )
+}
+
+/**
+ * No temporary table in any database of the cluster, for `PUBLIC` and the role, and no database but
+ * this one for them to log in to (owner's В-4 «б», adversarial А2в): a table of its own had no limit,
+ * and `postgres` or `template1` would take one all the same. The role's own grant elsewhere goes too —
+ * given by a start in another database of the cluster, as the tests' are — and here it is given.
+ */
+async function diskClosed(tx: Conn): Promise<void> {
+  await tx.execute(
+    sql.raw(`do $$ declare d name; begin
+      for d in select datname from pg_database where datallowconn loop
+        if d = current_database() then
+          execute format('revoke temporary on database %I from public, ${METRICS_ROLE}', d);
+          execute format('grant connect on database %I to ${METRICS_ROLE}', d);
+        else
+          execute format('revoke connect, temporary on database %I from public, ${METRICS_ROLE}', d);
+        end if;
+      end loop; end $$`),
+  )
+}
+
+/** The password, when the stored verifier is not of it (Р-2); whether it was written. */
+async function passwordSet(tx: Conn, password: string): Promise<boolean> {
+  if (isVerifierOf(await storedVerifier(tx), password)) return false
+  // `ALTER ROLE` takes no parameter; the verifier is base64 and `$:` alone, checked by its shape.
+  const verifier = scramVerifier(password)
+  if (!VERIFIER.test(verifier)) throw new Error('a SCRAM verifier out of its shape')
+  await tx.execute(sql.raw(`alter role ${METRICS_ROLE} password '${verifier}'`))
+  return true
+}
+
+/**
  * The exporter's role brought to its form at every start of the API (MOL-366, В-1 «а»), never by a
  * migration: a role is the cluster's, a migration runs in each of its databases, and `pg_dump`
  * carries no role — a machine restored from a copy would have none behind a journal that says
- * everything ran.
- *
- * Its form: made if missing; its attributes, its term (`valid until`, adversarial А4б) and its own
- * settings set again — those it may give itself for one database too (А2б); `pg_monitor` its one
- * membership (А4). Grants on objects are not looked at: nothing grants any. **And the advisory locks
- * of this database are not the role's** (А1): `PUBLIC` may take them, the API waits on them with no
- * term, and their keys are strings of a public repository — held by the role, one key closed the
- * login for everybody and ten waiting took the API's pool. The API, a superuser, keeps them. **Nor
- * the disk** (owner's В-4 «б», adversarial А2в): no temporary table in any database of the cluster, no
- * database but the API's to log in to, and a limit on its temporary files. Its five seconds a statement
- * are the exporter's default, never a bound — any session lifts them (А2), and the CPU and the memory of
- * its three connections are a price.
- *
- * Its password is written only when another (Р-2). Then the role's sessions are closed before — one
- * holding its row in an open transaction would leave the start waiting (А3) — and after, and the
- * stored verifier read again: a session may change its own password between the commit and its end.
- * A lock the role holds is waited on five seconds at most, then a failure the owner hears (В-2 «а»).
- * One start at a time in a database (А5): two at once raced to the same row.
- * Returns whether the password changed.
+ * everything ran. One transaction, one start at a time in a database (А5), a lock the role holds
+ * waited on five seconds at most, then a failure the owner hears (А3, В-2 «а»). A new password closes
+ * the role's sessions before — one holding its row in an open transaction would leave the start
+ * waiting (А3) — and after, and the stored verifier is read again: a session may change its own
+ * password between the commit and its end. Returns whether the password changed.
  */
 export async function ensureMetricsRole(db: Db, password: string): Promise<boolean> {
   if (!isVerifierOf(await storedVerifier(db), password)) await closeSessions(db)
   const changed = await db.transaction(async (tx) => {
     await tx.execute(sql.raw(`set local lock_timeout = '${LOCK_TIMEOUT}'`))
-    await tx.execute(sql`select pg_advisory_xact_lock(hashtext('molvia:metrics-role'))`)
-    // Two databases of one cluster, one after the other: «already there» is the answer, not a failure.
-    await tx.execute(
-      sql.raw(`do $$ begin create role ${METRICS_ROLE} login;
-        exception when duplicate_object or unique_violation then null; end $$`),
-    )
-    await tx.execute(
-      sql.raw(`alter role ${METRICS_ROLE} login inherit nosuperuser nocreatedb nocreaterole
-        noreplication nobypassrls connection limit ${String(CONNECTION_LIMIT)}
-        valid until 'infinity'`),
-    )
-    await tx.execute(sql.raw(`alter role ${METRICS_ROLE} reset all`))
-    await tx.execute(
-      sql.raw(`do $$ declare d name; begin
-        for d in select db.datname from pg_db_role_setting s join pg_database db on db.oid = s.setdatabase
-          where s.setrole = '${METRICS_ROLE}'::regrole loop
-          execute format('alter role ${METRICS_ROLE} in database %I reset all', d);
-        end loop; end $$`),
-    )
-    await tx.execute(
-      sql.raw(`alter role ${METRICS_ROLE} set statement_timeout = '${STATEMENT_TIMEOUT}'`),
-    )
-    await tx.execute(
-      sql.raw(`alter role ${METRICS_ROLE} set temp_file_limit = '${TEMP_FILE_LIMIT}'`),
-    )
-    await tx.execute(
-      sql.raw(`do $$ declare r name; begin
-        for r in select granted.rolname from pg_auth_members m join pg_roles granted on granted.oid = m.roleid
-          where m.member = '${METRICS_ROLE}'::regrole and granted.rolname <> 'pg_monitor' loop
-          execute format('revoke %I from ${METRICS_ROLE}', r);
-        end loop; end $$`),
-    )
-    await tx.execute(sql.raw(`grant pg_monitor to ${METRICS_ROLE}`))
-    await tx.execute(
-      sql.raw(`do $$ declare f regprocedure; begin
-        for f in select p.oid::regprocedure from pg_proc p
-          where p.pronamespace = 'pg_catalog'::regnamespace
-            and p.proname ~ '^pg_(try_)?advisory_(xact_)?lock(_shared)?$' loop
-          execute format('revoke execute on function %s from public', f);
-        end loop; end $$`),
-    )
-    // No temporary table anywhere in the cluster, and no database but this one to log in to (В-4 «б»):
-    // a table of its own had no limit, and `postgres` or `template1` would take one all the same. The
-    // role's own grant too — given by a start in another database of the cluster, as the tests' are.
-    await tx.execute(
-      sql.raw(`do $$ declare d name; begin
-        for d in select datname from pg_database where datallowconn loop
-          if d = current_database() then
-            execute format('revoke temporary on database %I from public, ${METRICS_ROLE}', d);
-            execute format('grant connect on database %I to ${METRICS_ROLE}', d);
-          else
-            execute format('revoke connect, temporary on database %I from public, ${METRICS_ROLE}', d);
-          end if;
-        end loop; end $$`),
-    )
-
-    if (isVerifierOf(await storedVerifier(tx), password)) return false
-    // `ALTER ROLE` takes no parameter; the verifier is base64 and `$:` alone, checked by its shape.
-    const verifier = scramVerifier(password)
-    if (!VERIFIER.test(verifier)) throw new Error('a SCRAM verifier out of its shape')
-    await tx.execute(sql.raw(`alter role ${METRICS_ROLE} password '${verifier}'`))
-    return true
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended('molvia:metrics-role', 0))`)
+    await roleForm(tx)
+    await publicLocksClosed(tx)
+    await diskClosed(tx)
+    return passwordSet(tx, password)
   })
   if (changed) {
     await closeSessions(db)
