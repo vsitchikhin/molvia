@@ -272,12 +272,7 @@ import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { usePendingFrom } from '@/composables/usePendingFrom'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
-import {
-  REJECTED_REASON_COUNTS,
-  WORKING,
-  rejectedReason,
-  useReceipts,
-} from '@/composables/useReceipts'
+import { WORKING, rejectedReasonWords, useReceipts } from '@/composables/useReceipts'
 import type { ReceiptRow } from '@/composables/useReceipts'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTripHistory } from '@/composables/useTripHistory'
@@ -539,10 +534,7 @@ export default defineComponent({
           return t('purchases.stuck_meta', { parts })
         case 'rejected':
           return t('purchases.rejected_meta', {
-            reason: t(
-              `purchases.reasons.${rejectedReason(row.rejected?.code ?? 'error.internal')}`,
-              REJECTED_REASON_COUNTS,
-            ),
+            reason: rejectedReasonWords(t, row.rejected?.code ?? 'error.internal'),
           })
         case 'parsing':
           return t(byLink ? 'purchases.asking_tax_office' : 'purchases.parsing_unknown')

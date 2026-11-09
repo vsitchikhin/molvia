@@ -41,7 +41,7 @@ import { useI18n } from 'vue-i18n'
 import IconDelete from '~icons/mdi/delete-outline'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
-import { REJECTED_REASON_COUNTS, rejectedReason } from '@/composables/useReceipts'
+import { rejectedReason, rejectedReasonWords } from '@/composables/useReceipts'
 import type { ReceiptRow } from '@/composables/useReceipts'
 import { photoShelf } from '@/receipts/photoShelf'
 import { useActorStore } from '@/stores/actor'
@@ -99,8 +99,9 @@ export default defineComponent({
         case 'stuck':
           return t('purchases.queued.stuck')
         case 'rejected': {
-          const why = rejectedReason(row.rejected?.code ?? 'error.internal')
-          const reason = t(`purchases.reasons.${why}`, REJECTED_REASON_COUNTS)
+          const code = row.rejected?.code ?? 'error.internal'
+          const why = rejectedReason(code)
+          const reason = rejectedReasonWords(t, code)
           // over the quota a new shot helps only later, so the words say when (MOL-360)
           if (why === 'day_limit' || why === 'unrecorded_limit')
             return t(`purchases.queued.rejected_${why}`, { reason })

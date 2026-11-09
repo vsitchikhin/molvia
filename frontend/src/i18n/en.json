@@ -240,8 +240,8 @@
       "lost": "the photo wasn’t kept on this phone",
       "other": "the server didn’t take the receipt",
       "link": "the link did not fit",
-      "day_limit": "{day} receipts already sent today",
-      "unrecorded_limit": "{unrecorded} receipts are waiting to be recorded"
+      "day_limit": "{n} receipt already sent today | {n} receipts already sent today",
+      "unrecorded_limit": "{n} receipt is waiting to be recorded | {n} receipts are waiting to be recorded"
     },
     "recorded_receipt": "{count} · {day} · from a receipt",
     "recorded_sum": "receipt total · {day}",

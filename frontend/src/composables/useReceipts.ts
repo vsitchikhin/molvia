@@ -56,11 +56,24 @@ export function rejectedReason(
   return 'other'
 }
 
-/** The numbers the words of a reason name (MOL-360): the quota is the model's. */
-export const REJECTED_REASON_COUNTS = {
-  day: RECEIPTS_DAY_MAX,
-  unrecorded: RECEIPTS_UNRECORDED_MAX,
-} as const
+/** How many a reason of the quota names (MOL-360): the model's number, never a copy in the words. */
+const QUOTA_OF: Partial<Record<ReturnType<typeof rejectedReason>, number>> = {
+  day_limit: RECEIPTS_DAY_MAX,
+  unrecorded_limit: RECEIPTS_UNRECORDED_MAX,
+}
+
+/**
+ * The words of «Не принят: …», whole, for every place that says them (review 1 of MOL-360, №4): a quota's
+ * number in its plural form (№5).
+ */
+export function rejectedReasonWords(
+  t: (key: string, named: Record<string, unknown>, plural: number) => string,
+  code: WireCode,
+): string {
+  const why = rejectedReason(code)
+  const n = QUOTA_OF[why] ?? 1
+  return t(`purchases.reasons.${why}`, { n }, n)
+}
 
 /** The rows a working section shows (`Разбираем`), and the ones to look at (`Посмотреть и записать`). */
 export const WORKING: readonly ReceiptRowState[] = [
