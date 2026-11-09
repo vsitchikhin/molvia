@@ -2020,16 +2020,19 @@ audit MOL-287, `probes/receipt-flood.mts`): the disk full, Postgres stops, and t
   it. Two columns of the person's row, `actors.receipts_day` and `receipts_sent`, moved by the receipt that
   takes a place and by nothing else — erasure takes them, the copy carries them (version 28), `/privacy`
   says them under «Чеки» (a revision), and `updated_at` does not see them (0079), as the visit. **The day
-  only moves on**: a day the phone names before the one begun counts in it, so a header made up gives one
-  day ahead at most — the latest on Earth (`todayFrom`) — and then stands there; **one counter, by the day**
-  (owner's В-5 «а»: «a counter that only goes up» was this one, never a month's).
+  only moves on**: a day the phone names before the one begun counts in it, so a header made up walks only
+  forward through the days that are today somewhere on Earth (`todayFrom`, from `earliestDay` to
+  `latestDay`) — two of them most of the day, three for the two hours from 10:00 to 12:00 UTC; **one
+  counter, by the day** (owner's В-5 «а»: «a counter that only goes up» was this one, never a month's).
 - **A receipt by its link counts as a photo does** (В-3 «а»): one rule for the person, though it holds no
   photo — it holds a turn at the tax office instead.
 - **The same receipt sent again is answered whatever the quota**: the queue's repeat after a lost answer
   is no new receipt, and counts nothing. **The day is asked first**, then the unrecorded: nothing put right
   today gives the day back.
 - **Two receipts of one person at once take turns**: the person's row is locked first (`FOR UPDATE`, the
-  account first as `privacy.md` orders the locks), and the counts are read and the receipt written under it.
+  account first as `privacy.md` orders the locks), before any row of a receipt — the stale one a send deletes
+  included, which erasure met the other way round (review 1, №2, adversarial А3) — and the counts are read and
+  the receipt written under it; erased while it waited, there is nobody to send for (`error.no_actor`).
 - **«Вернуть» is refused with the places taken** (owner's В-2 «а»), the receipt left removed: «remove twenty,
   send twenty, bring the twenty back» made forty not recorded, every day. The day is not asked — the receipt
   had its place in it.
@@ -2038,16 +2041,29 @@ audit MOL-287, `probes/receipt-flood.mts`): the disk full, Postgres stops, and t
   (owner's В-4 «а»): the queue sets it aside and never sends it again, the row «Не принят: сегодня отправлено
   уже 40 чеков» / «20 чеков ждут записи», the numbers the model's, and the sheet says when a new shot helps —
   tomorrow, or once those waiting are recorded or deleted — instead of «снимите заново»; the photo stays on
-  the phone until «Убрать».
+  the phone until «Убрать». The number is said in its plural form (review 1, №5), and the words of a
+  reason are one function, `rejectedReasonWords` (№4).
+- **«Переснять» removes the receipt it replaces before the new one is announced** (`capture`'s
+  `replacing`, adversarial А4): announced first, at the bound of twenty — the old one among them — the new one
+  was refused and the old one removed all the same, and the person had neither. Now the place is given back
+  first; a photo the phone could not keep removes nothing.
+- **A copy kept for the developer's review is bounded too** (`RECEIPT_MISS_KEPT_MAX`, 20 a person, owner's
+  В-2 «а» of review 1, adversarial А2): it outlives «Переснять» and «Записать» for up to 21 days (MOL-309),
+  so the bound of the unrecorded did not see it, and «Переснять» over a wall kept forty a day. Past twenty the
+  receipt is read and its reasons counted as before, and no copy is kept.
 
 **The disk is watched by MOL-145's alarm** (`molvia-disk`, `deploy/grafana`): above 80 % of `/` taken — less
 than a fifth free — the owner hears of it by the alarms' bot, the threshold held by the test of the thresholds.
-**The prices, named:** a person holds up to 640 MB of photos not recorded (20 × 4 × 8 MB) and as much removed
-within their ten minutes, so some forty accounts at once fill 51 GB — a login is a Telegram account, and the
-alarm speaks first; a receipt refused was shot for nothing, since the phone offers no «send again» — the paper
-is shot again; a refused «Вернуть» is said nowhere on the phone, which shows no removed receipt, and the
-receipt goes with its ten minutes; and a person who flew west counts in the day begun until their own day
-catches up.
+**The prices, named:** a person holds up to 640 MB of photos not recorded (20 × 4 × 8 MB), and the removed hold
+theirs for ten minutes — with a header made up, every day that is today somewhere is a day of forty, so at its
+peak, in the two hours of three days, one account holds 120 receipts × 32 MB = 3.84 GB for those ten minutes
+(owner's В-1 «а» of review 1, adversarial А1: named, not closed), some fourteen accounts at once 51 GB — a login
+is a Telegram account, and the alarm speaks first; on average it is forty a day all the same. Beside them, a
+person granted the model keeps up to twenty copies for the review (640 MB). A receipt refused was shot for
+nothing, since the phone offers no «send again» — the paper is shot again; «Переснять» refused by the day's
+forty has removed the old one already; a refused «Вернуть» is said nowhere on the phone, which shows no removed
+receipt, and the receipt goes with its ten minutes; and a person who flew west counts in the day begun until
+their own day catches up.
 
 ## Why a receipt was not read whole (MOL-309)
 
