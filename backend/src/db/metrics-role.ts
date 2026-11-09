@@ -28,7 +28,7 @@ export function scramVerifier(
   const clientKey = createHmac('sha256', salted).update('Client Key').digest()
   const storedKey = createHash('sha256').update(clientKey).digest('base64')
   const serverKey = createHmac('sha256', salted).update('Server Key').digest('base64')
-  return `SCRAM-SHA-256$${iterations}:${salt.toString('base64')}$${storedKey}:${serverKey}`
+  return `SCRAM-SHA-256$${String(iterations)}:${salt.toString('base64')}$${storedKey}:${serverKey}`
 }
 
 /** Whether the stored verifier is of this password: counted again with its own salt. */
@@ -74,8 +74,9 @@ export async function ensureMetricsRole(db: Db, password: string): Promise<boole
     return true
   })
   if (changed) {
+    // With a timeout it waits for each to be gone, so the rotation is over when this returns.
     await db.execute(
-      sql`select pg_terminate_backend(pid) from pg_stat_activity where usename = ${METRICS_ROLE}`,
+      sql`select pg_terminate_backend(pid, 5000) from pg_stat_activity where usename = ${METRICS_ROLE}`,
     )
   }
   return changed
