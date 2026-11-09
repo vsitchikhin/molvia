@@ -35,6 +35,14 @@ export async function settle(ctx: Context, key: MessageKey): Promise<void> {
 }
 
 /**
+ * The text of the message a press came under, or `null` when Telegram handed it over without one —
+ * an `InaccessibleMessage`: then there is nothing to read back, and nothing may be written over it.
+ */
+export function shownText(message: { readonly text?: string } | undefined): string | null {
+  return message?.text ?? null
+}
+
+/**
  * An outcome written into the message **with its buttons kept** (MOL-101). The scale of a rating
  * reminder stays under the answer, the pressed digit marked, so that a slip of the finger is one
  * more press rather than a trip to the app: every press is the same idempotent verdict, and

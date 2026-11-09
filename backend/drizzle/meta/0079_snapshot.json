@@ -1,5 +1,5 @@
 {
-  "id": "bf9ebf64-0dcd-4bd5-bb08-df420b6dfef7",
+  "id": "d29be8f7-147e-48d9-9893-59ec39654fd1",
   "prevId": "54501da2-cbc6-4339-aff3-55f74e16a15e",
   "version": "7",
   "dialect": "postgresql",
@@ -3434,6 +3434,18 @@
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
+        },
+        "handed_at": {
+          "name": "handed_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "not_before": {
+          "name": "not_before",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {},

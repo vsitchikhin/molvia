@@ -236,11 +236,11 @@ describe('one person never holds another back (adversarial А1, А2)', () => {
   it('one notice an account a claim: sixty of one account and the victim’s after them — the victim’s in the first claim', async () => {
     const attacker = await insertActor(db)
     const victim = await insertActor(db)
-    const first = await queue(attacker, 61)
+    const oldest = await queue(attacker, 61)
     for (let minutes = 60; minutes > 0; minutes -= 1) await queue(attacker, minutes)
     const victims = await queue(victim, 0)
     expect(sorted((await claim()).map((notice) => notice.sessionId))).toEqual(
-      sorted([first, victims]),
+      sorted([oldest, victims]),
     )
   })
 
@@ -270,6 +270,31 @@ describe('one person never holds another back (adversarial А1, А2)', () => {
       ],
     })
     expect((await claim()).map((notice) => notice.sessionId)).toEqual([victims, untried, flooded])
+  })
+
+  it('given back after a try, its account goes behind — a stock of older notices holds nobody (adversarial Б1)', async () => {
+    const a = await insertActor(db)
+    const b = await insertActor(db)
+    const victim = await insertActor(db)
+    // Six notices of each, all older than the victim's.
+    for (let minutes = 20; minutes > 14; minutes -= 1) {
+      await queue(a, minutes)
+      await queue(b, minutes)
+    }
+    const victims = await queue(victim, 1)
+    const handed = await claim()
+    expect(handed).toHaveLength(3)
+    const [first, second] = handed
+    // Both refused for now, the victim's given back untried, as two refusals in a row have it.
+    await told({
+      told: [],
+      back: [
+        { sessionId: first!.sessionId, afterSeconds: 0 },
+        { sessionId: second!.sessionId, afterSeconds: 0 },
+        { sessionId: victims, afterSeconds: null },
+      ],
+    })
+    expect((await claim())[0]?.sessionId).toBe(victims)
   })
 
   it('given back for Telegram’s seconds, it is not handed before them', async () => {

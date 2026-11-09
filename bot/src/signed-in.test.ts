@@ -4,8 +4,8 @@ import type { Transformer } from 'grammy'
 import type { Update, UserFromGetMe } from 'grammy/types'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
-import { ERROR } from '@molvia/model'
-import type { LoginNotice } from '@molvia/model'
+import { ERROR, loginNoticesToldSchema } from '@molvia/model'
+import type { LoginNotice, LoginNoticesTold } from '@molvia/model'
 import { assembleBot } from './assemble'
 import { t } from './i18n'
 import { endButtonData, signedInMessage, signedInText, tellSignIns } from './signed-in'
@@ -91,7 +91,7 @@ function telegram(blocked: readonly number[] = [], flooded: Readonly<Record<numb
 function client(notices: LoginNotice[]) {
   return {
     claimLoginNotices: vi.fn(() => Promise.resolve({ notices })),
-    loginNoticesTold: vi.fn(() => Promise.resolve()),
+    loginNoticesTold: vi.fn<(word: LoginNoticesTold) => Promise<void>>(() => Promise.resolve()),
     switchReminders: vi.fn(() => Promise.resolve()),
     reportFailure: vi.fn(() => Promise.resolve()),
   }
@@ -138,6 +138,18 @@ describe('отправка', () => {
       told: [sessionOf(2)],
       back: [{ sessionId: sessionOf(1), afterSeconds: 30 }],
     })
+  })
+
+  it('retry_after дольше часа — назад на час, предел контракта: слово проходит (адверсариальное Б2)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const { api } = telegram([], { [ATTACKER]: 7_200 })
+    const fake = client([
+      notice({ telegramUserId: ATTACKER, sessionId: sessionOf(1) }),
+      notice({ telegramUserId: VICTIM, sessionId: sessionOf(2) }),
+    ])
+    await tellSignIns(asClient(fake), api)
+    const word = loginNoticesToldSchema.parse(fake.loginNoticesTold.mock.calls[0]?.[0])
+    expect(word.back).toEqual([{ sessionId: sessionOf(1), afterSeconds: 3_600 }])
   })
 
   it('короткий 429 не ждётся: уведомление — назад сразу, следующее пробуется (А1б)', async () => {

@@ -36,9 +36,9 @@ export interface LoginNoticeRepository {
   claim(limit: number): Promise<readonly HandedLoginNotice[]>
 
   /**
-   * The bot's word on what it was handed: `told` let go, `back` handed again — after `afterSeconds`, or,
-   * with `null`, as it stood. Only a notice still handed moves: a word that came after the lease let it
-   * go changes nothing.
+   * The bot's word on what it was handed, in one transaction: `told` let go, `back` handed again —
+   * after `afterSeconds`, with the rest of its account's, or, with `null`, as it stood. Only a notice
+   * still handed moves: a word that came after the lease let it go changes nothing.
    */
   told(word: LoginNoticesTold): Promise<void>
 
@@ -97,25 +97,43 @@ export function createLoginNoticeRepository(db: Conn): LoginNoticeRepository {
     },
 
     async told({ told, back }) {
-      if (told.length > 0) {
-        await db.execute(sql`
-          delete from ${loginNotices}
-          where handed_at is not null and session_id in (${sql.join(
-            told.map((id) => sql`${id}::uuid`),
-            sql`, `,
-          )})`)
-      }
-      for (const { sessionId, afterSeconds } of back) {
-        await db.execute(sql`
-          update ${loginNotices}
-          set handed_at = null,
-            not_before = ${
-              afterSeconds === null
-                ? sql`not_before`
-                : sql`clock_timestamp() + make_interval(secs => ${afterSeconds})`
-            }
-          where session_id = ${sessionId}::uuid and handed_at is not null`)
-      }
+      await db.transaction(async (tx) => {
+        if (told.length > 0) {
+          await tx.execute(sql`
+            delete from ${loginNotices}
+            where handed_at is not null and session_id in (${sql.join(
+              told.map((id) => sql`${id}::uuid`),
+              sql`, `,
+            )})`)
+        }
+        if (back.length === 0) return
+        const word = sql.join(
+          back.map(
+            ({ sessionId, afterSeconds }) => sql`(${sessionId}::uuid, ${afterSeconds}::int)`,
+          ),
+          sql`, `,
+        )
+        // A notice given back after a try takes **its account** behind everyone else's (adversarial Б1):
+        // sent behind alone, the account's next notice — older than the victim's — stood first again,
+        // and two accounts with a stock of them held the victim a claim for every pair.
+        await tx.execute(sql`
+          with word (session_id, after_seconds) as (values ${word}),
+          given as (
+            update ${loginNotices} n
+            set handed_at = null,
+              not_before = case when w.after_seconds is null then n.not_before
+                else clock_timestamp() + make_interval(secs => w.after_seconds) end
+            from word w
+            where n.session_id = w.session_id and n.handed_at is not null
+            returning n.actor_id, w.after_seconds
+          )
+          update ${loginNotices} o
+          set not_before = greatest(
+            coalesce(o.not_before, o.signed_in_at),
+            clock_timestamp() + make_interval(secs => g.after_seconds))
+          from given g
+          where o.actor_id = g.actor_id and g.after_seconds is not null and o.handed_at is null`)
+      })
     },
 
     async removeLost() {

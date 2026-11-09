@@ -40,13 +40,19 @@ export type EndSessionFromBot = z.infer<typeof endSessionFromBotSchema>
  * ones not tried yet; one not tried (`null`) keeps its place. A notice the bot never speaks of is let
  * go after `LOGIN_NOTICE_LEASE_SECONDS`, unsent: at most once, as the task asks.
  */
+/**
+ * The longest a notice given back waits (adversarial Б2): Telegram may ask hours of the whole bot, and
+ * the bot gives back no later than this — tried again then, and given back again if still refused.
+ */
+export const LOGIN_NOTICE_BACK_MAX_SECONDS = 3_600
+
 export const loginNoticesToldSchema = z.strictObject({
   told: z.array(z.uuid()).max(LOGIN_NOTICES_PER_CLAIM),
   back: z
     .array(
       z.strictObject({
         sessionId: z.uuid(),
-        afterSeconds: z.int().min(0).max(3_600).nullable(),
+        afterSeconds: z.int().min(0).max(LOGIN_NOTICE_BACK_MAX_SECONDS).nullable(),
       }),
     )
     .max(LOGIN_NOTICES_PER_CLAIM),

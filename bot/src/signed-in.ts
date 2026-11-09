@@ -2,10 +2,9 @@ import { Composer, InlineKeyboard } from 'grammy'
 import type { Api, Context } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
-import { ERROR, ISSUE } from '@molvia/model'
-import type { LoginNotice } from '@molvia/model'
-import { dropKeyboard, refuse, settleKeeping, stopSpinner } from './answer'
-import { shownText } from './remind'
+import { ERROR, ISSUE, LOGIN_NOTICE_BACK_MAX_SECONDS } from '@molvia/model'
+import type { LoginNotice, LoginNoticesTold } from '@molvia/model'
+import { dropKeyboard, refuse, settleKeeping, shownText, stopSpinner } from './answer'
 import { t } from './i18n'
 import { dayInWords } from './when'
 import type { MessageKey } from './i18n'
@@ -81,10 +80,7 @@ export async function tellSignIns(api: MolviaBotClient, telegram: Api): Promise<
     return
   }
   if (due.length === 0) return
-  const word: { told: string[]; back: { sessionId: string; afterSeconds: number | null }[] } = {
-    told: [],
-    back: [],
-  }
+  const word: LoginNoticesTold = { told: [], back: [] }
   let refused = 0
   for (const notice of due) {
     if (refused >= REFUSED_IN_A_ROW) {
@@ -105,7 +101,8 @@ export async function tellSignIns(api: MolviaBotClient, telegram: Api): Promise<
       }
     } catch (error) {
       if (!(error instanceof Flooded)) throw error
-      afterSeconds = error.seconds
+      // Telegram's hours are the contract's hour at most, or the whole word would be refused (Б2).
+      afterSeconds = Math.min(error.seconds, LOGIN_NOTICE_BACK_MAX_SECONDS)
     }
     word.back.push({ sessionId: notice.sessionId, afterSeconds })
     refused += 1

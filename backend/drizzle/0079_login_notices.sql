@@ -1,12 +1,16 @@
 -- MOL-361 (аудит MOL-287 Ф-3, решение владельца В-9 «а»): вход, о котором бот ещё не сказал владельцу
--- аккаунта, — строка ставится сбором сессии и удаляется выдачей боту. Без ключа на сессию (В-1 «а»): сессия,
--- завершённая до выдачи, всё равно попадает в сообщение. Живые сессии на момент выкатки уведомлений не
--- получают. И счёт сессий, завершённых кнопкой под сообщением (В-4 «а»).
+-- аккаунта, — строка ставится сбором сессии, выдача боту отмечает её (`handed_at`), слово бота отпускает
+-- ушедшее и возвращает отказанное с `not_before`, за спины остальных; без слова за аренду — отпускается
+-- неотправленной (адверсариальное А1, А2). Без ключа на сессию (В-1 «а»): сессия, завершённая до выдачи, всё
+-- равно попадает в сообщение. Живые сессии на момент выкатки уведомлений не получают. И счёт сессий,
+-- завершённых кнопкой под сообщением (В-4 «а»).
 CREATE TABLE "login_notices" (
 	"session_id" uuid PRIMARY KEY NOT NULL,
 	"actor_id" uuid NOT NULL,
 	"device_name" varchar(80),
-	"signed_in_at" timestamp with time zone NOT NULL
+	"signed_in_at" timestamp with time zone NOT NULL,
+	"handed_at" timestamp with time zone,
+	"not_before" timestamp with time zone
 );
 --> statement-breakpoint
 ALTER TABLE "login_days" DROP CONSTRAINT "login_days_counts_non_negative";--> statement-breakpoint

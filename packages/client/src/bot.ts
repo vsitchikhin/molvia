@@ -113,8 +113,8 @@ export interface MolviaBotClient {
    */
   claimSilenceNotices(): Promise<DueSilenceNotices>
   /**
-   * The sessions collected that their account has not been told of (MOL-361), taken off the queue as
-   * they are handed: a notice lost on the way is not handed again.
+   * The sessions collected that their account has not been told of (MOL-361), one an account, marked as
+   * handed: say what went with `loginNoticesTold`; one never spoken of is let go past the lease, unsent.
    */
   claimLoginNotices(): Promise<DueLoginNotices>
   /** What of a claim went and what did not (adversarial А1): the API lets go of one, hands the other again. */
