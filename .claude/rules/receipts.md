@@ -2002,6 +2002,53 @@ by its queue, never retried. **The ceiling of a side lets a phone's whole frame 
 12-megapixel camera, 5 712 of a 24-megapixel one (review А8): the phone crops to 3 200, and one that did
 not would otherwise be refused for good. Whether the data decodes is the reader's to find out.
 
+## How many a person sends (MOL-360)
+
+**A receipt's photos live in the database until it is recorded**, up to four parts of 8 MB, a receipt not
+recorded 28 days — and with no bound one account filled some 12 GB an hour against 51 GB free (Ф-2 of the
+audit MOL-287, `probes/receipt-flood.mts`): the disk full, Postgres stops, and the whole server with it. So
+(owner's В-8 «а» of the audit, 03.11.2026, «35–40 в день максимум, мало ли какие шопоголики»):
+
+- **At most `RECEIPTS_UNRECORDED_MAX` (20) not recorded at once** — what holds the disk: twenty days of the
+  day's bound kept 28 days would be some 36 GB a person. Not recorded is every receipt neither recorded nor
+  removed — waiting for its parts, queued, being read, read, and failed too, which keeps its photo its 28
+  days. **A receipt recorded or removed gives its place back at once**, a removal while its ten minutes of
+  «Вернуть» run, the photo still there — a price, below.
+- **At most `RECEIPTS_DAY_MAX` (40) a day of the person's own** (`TODAY_HEADER`, as money's days, MOL-121).
+  **A count, never the rows of `receipts`** (owner's В-1 «а»): a receipt removed goes from there in ten
+  minutes, and «send, let it be read, remove, wait» gave the day its place back for as long as one kept at
+  it. Two columns of the person's row, `actors.receipts_day` and `receipts_sent`, moved by the receipt that
+  takes a place and by nothing else — erasure takes them, the copy carries them (version 28), `/privacy`
+  says them under «Чеки» (a revision), and `updated_at` does not see them (0079), as the visit. **The day
+  only moves on**: a day the phone names before the one begun counts in it, so a header made up gives one
+  day ahead at most — the latest on Earth (`todayFrom`) — and then stands there; **one counter, by the day**
+  (owner's В-5 «а»: «a counter that only goes up» was this one, never a month's).
+- **A receipt by its link counts as a photo does** (В-3 «а»): one rule for the person, though it holds no
+  photo — it holds a turn at the tax office instead.
+- **The same receipt sent again is answered whatever the quota**: the queue's repeat after a lost answer
+  is no new receipt, and counts nothing. **The day is asked first**, then the unrecorded: nothing put right
+  today gives the day back.
+- **Two receipts of one person at once take turns**: the person's row is locked first (`FOR UPDATE`, the
+  account first as `privacy.md` orders the locks), and the counts are read and the receipt written under it.
+- **«Вернуть» is refused with the places taken** (owner's В-2 «а»), the receipt left removed: «remove twenty,
+  send twenty, bring the twenty back» made forty not recorded, every day. The day is not asked — the receipt
+  had its place in it.
+- **The refusal is `429`, `error.receipts_day_limited` or `error.receipts_unrecorded_limited`**, nothing
+  written: no row, no count, no `tax_receipt_days`. **On the phone it is a refusal like any other**
+  (owner's В-4 «а»): the queue sets it aside and never sends it again, the row «Не принят: сегодня отправлено
+  уже 40 чеков» / «20 чеков ждут записи», the numbers the model's, and the sheet says when a new shot helps —
+  tomorrow, or once those waiting are recorded or deleted — instead of «снимите заново»; the photo stays on
+  the phone until «Убрать».
+
+**The disk is watched by MOL-145's alarm** (`molvia-disk`, `deploy/grafana`): above 80 % of `/` taken — less
+than a fifth free — the owner hears of it by the alarms' bot, the threshold held by the test of the thresholds.
+**The prices, named:** a person holds up to 640 MB of photos not recorded (20 × 4 × 8 MB) and as much removed
+within their ten minutes, so some forty accounts at once fill 51 GB — a login is a Telegram account, and the
+alarm speaks first; a receipt refused was shot for nothing, since the phone offers no «send again» — the paper
+is shot again; a refused «Вернуть» is said nowhere on the phone, which shows no removed receipt, and the
+receipt goes with its ten minutes; and a person who flew west counts in the day begun until their own day
+catches up.
+
 ## Why a receipt was not read whole (MOL-309)
 
 **Owner, 26.10.2026: such a receipt is kept, the developer told, and its reasons counted** — the photo went
