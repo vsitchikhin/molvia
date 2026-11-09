@@ -69,7 +69,9 @@ The shape worth knowing here:
 - **Every image of ours runs as a user, never root** (MOL-365, Ф-16 of MOL-287): `node` for the API and the bot,
   `caddy` (10001) for Caddy, `nobody` (65534) for VictoriaMetrics and the reader, Grafana's 472 — the last stage
   names it, the base's word is not taken, and `bin/check-pins.mjs` refuses a last stage without `USER` or with
-  root (owner's В-5 «а»). Caddy opens 80 and 443 by the `cap_net_bind_service` its binary carries and by Docker's
+  root — by name, uid 0 in any spelling, or a group root written beside the user (owner's В-5 «а»). **A group a
+  user takes from the image's `/etc/passwd` is not read**: Grafana's 472 is in group 0, as its authors made it, and
+  its provisioning is `472:0` for that (adversarial Р2-Б1 — a price, named). Caddy opens 80 and 443 by the `cap_net_bind_service` its binary carries and by Docker's
   `ip_unprivileged_port_start=0` in a container's network (Docker 20.10 and later). **A volume keeps the owner it
   was filled by**: Docker gives a volume the image directory's owner only while it is empty, and `caddy_data`
   holds the certificate and the ACME account as root 0600 — Caddy as `caddy` on it refused to start (probe of
@@ -87,8 +89,13 @@ The shape worth knowing here:
   named** (А2): compose has stopped the old Caddy when `frontend-volumes` runs, so the site waits for the walk — a
   fraction of a second — and a walk that fails leaves it down until the rollback starts it again; in the metrics'
   step a failed `victoria-volumes` leaves VictoriaMetrics stopped with a warning alone (the metrics never judge a
-  rollout), and the alarms' pulse, which needs it, goes quiet — healthchecks.io says so. An `up` that recreates
-  nothing starts the dependency over a container that runs; no rollout does that.
+  rollout), and the alarms' pulse, which needs it, goes quiet — healthchecks.io says so. **An `up` that recreates
+  nothing starts the dependency over a container that runs** — a rollout of the tag already running does that
+  (`deploy.sh` refuses none, and a re-run of a rollout is one), and the walk then goes over a Caddy and a
+  VictoriaMetrics at work (adversarial Р2-А2: 13 walks of 112 710 failed under load). Caddy writes rarely (a
+  certificate's renewal); a walk that fails is `up -d` red over containers that keep running — the rollout puts
+  the same tag back, the metrics' step warns. **The price, named:** a red rollout of the same tag now and then, no
+  outage.
 - **The stage `runtime` brings its distribution up to date, and the release builds it afresh** (MOL-365, owner's
   В-3 «а»): `apk upgrade` (Caddy, the bot, VictoriaMetrics, Grafana), `apt-get upgrade` (the API, the reader, in a
   stage of its own after the install, which stays cached). `release.yml`'s `no-cache-filters: runtime` is what makes
