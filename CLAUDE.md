@@ -534,7 +534,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   a sender and a thousand in all.
 - **The metrics' labels are a route's template, never a path** (MOL-145): `/metrics` on its own port
   (`METRICS_PORT`), never the API's, which is all Caddy reaches; what sees the machine or the database
-  is on `metrics`, a network with no way out, and Grafana calls nobody home. **The dashboard and every
+  is on `metrics`, a network with no way out, and Grafana calls nobody home. **postgres_exporter is
+  `molvia_metrics`, `pg_monitor` and no table** (MOL-366): the API makes the role at every start and sets
+  its password as a verifier, never a migration — `pg_dump` carries no role. **The dashboard and every
   threshold are JSON in `deploy/grafana`**, baked into its image; a test holds the thresholds and that
   every figure read is written. A restart is a reset of the same container's CPU counter, never
   `changes()`; a request whose client left is `aborted`, never lost. **The alarms read a person's
