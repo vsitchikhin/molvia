@@ -22,11 +22,12 @@
 // git, and whatever `RUN` downloads, is no image and is not read here: its pinned forms
 // (`ADD --checksum=…`, `#<sha>`) are review's.
 //
-// And an image of ours never runs as root (MOL-365): the last stage of every Dockerfile names its
-// user with `USER`, neither `root` nor `0` — the base's user is not trusted, since a base moved by
-// Dependabot may change it, and an image built without one ran as root in silence (Caddy and
-// VictoriaMetrics, audit MOL-287). A user named by an argument is refused, as an image is: the
-// check cannot read it.
+// And the last stage of every Dockerfile (MOL-365) is named `runtime` — the one stage `release.yml`
+// builds afresh (`no-cache-filters`), so its upgrade of the distribution runs at every release — and
+// names its user with `USER`: neither root by name nor uid 0 in any spelling Docker reads as a number
+// (`00`, `+0`, `-0`), nor the group root. The base's user is not taken: a base moved by Dependabot
+// may change it, and an image built without one ran as root in silence (Caddy and VictoriaMetrics,
+// audit MOL-287). A user named by an argument is refused, as an image is: the check cannot read it.
 //
 //   node bin/check-pins.mjs
 
@@ -133,11 +134,23 @@ export function workflowProblems(path, text) {
  * the directives and the instructions alike, as BuildKit takes it off. */
 const linesOf = (text) => text.replace(/^\uFEFF/, '').split(/\r?\n/)
 
-/** The instructions of a Dockerfile, each its lines joined at `\` and the number of its first line. */
+// A heredoc of BuildKit: `<<EOF`, `<<-EOF`, `<<"EOF"`, `<<'EOF'` — its words, in the order they stand.
+const HEREDOC = /<<(-?)(["']?)([A-Za-z_][A-Za-z0-9_]*)\2/g
+const TAKES_HEREDOCS = new Set(['RUN', 'COPY', 'ADD'])
+
+/** The instructions of a Dockerfile, each its lines joined at `\` and the number of its first line;
+ * the body of a heredoc is no instruction (adversarial Б2 of MOL-365: `user nginx;` of a config). */
 function instructionsOf(text) {
   const instructions = []
   let parts = null
+  const bodies = []
   linesOf(text).forEach((line, index) => {
+    // Inside a heredoc, until the line of its word alone — `<<-` lets tabs stand before it.
+    if (bodies.length > 0) {
+      const [{ dash, word }] = bodies
+      if ((dash ? line.replace(/^\t+/, '') : line) === word) bodies.shift()
+      return
+    }
     // A comment is never an instruction, nor goes on with one, whatever it ends with; a blank line
     // inside an instruction is no part of it — as BuildKit reads them.
     if (/^[\t ]*#/.test(line) || (parts && /^[\t ]*$/.test(line))) return
@@ -147,6 +160,9 @@ function instructionsOf(text) {
     else parts = { text: part, number: index + 1 }
     if (!continued) {
       instructions.push(parts)
+      if (TAKES_HEREDOCS.has(parts.text.trim().split(/\s/)[0]?.toUpperCase() ?? '')) {
+        for (const [, dash, , word] of parts.text.matchAll(HEREDOC)) bodies.push({ dash, word })
+      }
       parts = null
     }
   })
@@ -238,32 +254,41 @@ export function dockerfileProblems(path, text) {
   return problems
 }
 
-/** Why the last stage of one Dockerfile would run as root, in sentences: none, or one. */
-export function userProblems(path, text) {
+/** Root by its name, or uid 0 as Docker reads a number (`strconv.Atoi`: `00`, `+0`, `-0`). */
+const isRoot = (id) => id === 'root' || /^[+-]?0+$/.test(id)
+
+/** What is wrong with the last stage of one Dockerfile, in sentences: its name, its user. */
+export function lastStageProblems(path, text) {
   let last = null
   let user = null
   for (const { text: line, number } of instructionsOf(text)) {
     const { instruction, args } = wordsOf(line)
     if (instruction === 'FROM') {
-      last = number
+      last = { number, name: args[1]?.toUpperCase() === 'AS' ? args[2] : undefined }
       user = null
     } else if (instruction === 'USER' && args[0]) {
       user = unquoted(args[0])
     }
   }
   if (last === null) return []
-  const name = user?.split(':')[0]
-  if (!name || name === 'root' || name === '0') {
-    return [
-      `${path}:${String(last)}: the last stage runs as root — name its user, USER <name or uid>`,
-    ]
+  const where = `${path}:${String(last.number)}`
+  const problems = []
+  if (last.name?.toLowerCase() !== 'runtime') {
+    problems.push(
+      `${where}: the last stage is not named runtime, the stage the release builds afresh (no-cache-filters) — FROM … AS runtime`,
+    )
   }
-  if (name.includes('$')) {
-    return [
-      `${path}:${String(last)}: USER ${user} — named by an argument, which this check cannot read`,
-    ]
+  const [name, group] = user?.split(':') ?? []
+  if (!name) {
+    problems.push(
+      `${where}: the last stage names no user — the base's is not taken; USER <name or uid>`,
+    )
+  } else if (user?.includes('$')) {
+    problems.push(`${where}: USER ${user} — named by an argument, which this check cannot read`)
+  } else if (isRoot(name) || (group !== undefined && isRoot(group))) {
+    problems.push(`${where}: USER ${user} — root, by its user or its group; name another`)
   }
-  return []
+  return problems
 }
 
 /** The directories the docker entry of `dependabot.yml` names, as it is written there. */
@@ -302,7 +327,7 @@ export function dependabotProblems(dockerfiles, text) {
   return [...patterns, ...missing]
 }
 
-/** Every problem of the files given, each a path and its text. */
+/** Every pin problem of the files given, each a path and its text. */
 export function pinProblems(files) {
   return files.flatMap(({ path, text }) =>
     isYaml(path) ? workflowProblems(path, text) : dockerfileProblems(path, text),
@@ -329,7 +354,7 @@ export function repositoryProblems() {
     ...pinProblems(files),
     ...files
       .filter(({ path }) => isDockerfile(path))
-      .flatMap(({ path, text }) => userProblems(path, text)),
+      .flatMap(({ path, text }) => lastStageProblems(path, text)),
     ...dependabotProblems(imageTakers(files), readFileSync(DEPENDABOT, 'utf8')),
   ]
 }
@@ -337,7 +362,7 @@ export function repositoryProblems() {
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
   const problems = repositoryProblems()
   if (problems.length > 0) {
-    console.error('pins and users (MOL-364, MOL-365):')
+    console.error('pins and last stages (MOL-364, MOL-365):')
     for (const problem of problems) console.error(`  ${problem}`)
     process.exitCode = 1
   }

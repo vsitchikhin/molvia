@@ -6,7 +6,7 @@ import {
   dockerfileProblems,
   pinProblems,
   repositoryProblems,
-  userProblems,
+  lastStageProblems,
   workflowProblems,
 } from './check-pins.mjs'
 
@@ -440,52 +440,111 @@ describe('dependabotProblems', () => {
   })
 })
 
-describe('userProblems', () => {
+describe('lastStageProblems', () => {
   const FILE = 'deploy/victoria/Dockerfile'
-  const root = (line: number): string =>
-    `${FILE}:${String(line)}: the last stage runs as root — name its user, USER <name or uid>`
+  const at = (line: number): string => `${FILE}:${String(line)}`
+  const noUser = (line: number): string =>
+    `${at(line)}: the last stage names no user — the base's is not taken; USER <name or uid>`
+  const root = (line: number, user: string): string =>
+    `${at(line)}: USER ${user} — root, by its user or its group; name another`
+  const unnamed = (line: number): string =>
+    `${at(line)}: the last stage is not named runtime, the stage the release builds afresh (no-cache-filters) — FROM … AS runtime`
 
-  it('is quiet on a last stage that names a user by its name or number, a group beside it or not', () => {
-    for (const user of ['caddy', 'node', '472', '65534:65534', '"nobody"']) {
+  it('is quiet on a last stage runtime that names a user by its name or number, a group beside it or not', () => {
+    for (const user of ['caddy', 'node', '472', '65534:65534', '"nobody"', '10', '1000:472']) {
       const text = [
-        `FROM node AS build`,
+        'FROM node AS build',
         'RUN true',
-        `FROM caddy AS runtime`,
+        'FROM caddy as Runtime',
         'RUN true',
         `user ${user}`,
-      ].join('\n')
-      expect(userProblems(FILE, text), user).toEqual([])
+      ]
+      expect(lastStageProblems(FILE, text.join('\n')), user).toEqual([])
     }
   })
 
-  it('refuses a last stage with no USER, by the line of its FROM — a user of an earlier stage does not carry over', () => {
-    expect(userProblems(FILE, 'FROM victoria\nCOPY a b\n')).toEqual([root(1)])
-    expect(userProblems(FILE, 'FROM node AS build\nUSER node\nFROM build\nCOPY a b')).toEqual([
-      root(3),
-    ])
+  it('refuses a last stage not named runtime — the one stage the release builds afresh', () => {
+    expect(lastStageProblems(FILE, 'FROM caddy\nUSER caddy')).toEqual([unnamed(1)])
+    expect(
+      lastStageProblems(FILE, 'FROM node AS runtime\nUSER node\nFROM runtime AS final\nUSER node'),
+    ).toEqual([unnamed(3)])
   })
 
-  it('refuses root by its name or number, a group beside it, and a later USER root over a user', () => {
-    for (const user of ['root', '0', '0:0', 'root:472']) {
-      expect(userProblems(FILE, `FROM caddy\nUSER ${user}`), user).toEqual([root(1)])
+  it('refuses a last stage that names no user, by the line of its FROM — even one built from a stage that names one: only its own USER counts', () => {
+    expect(lastStageProblems(FILE, 'FROM victoria AS runtime\nCOPY a b\n')).toEqual([noUser(1)])
+    const text = 'FROM node AS build\nUSER node\nFROM build AS runtime\nCOPY a b'
+    expect(lastStageProblems(FILE, text)).toEqual([noUser(3)])
+  })
+
+  it('refuses root by its name or by uid 0 in any spelling Docker reads as a number, and the group root', () => {
+    for (const user of [
+      'root',
+      '0',
+      '00',
+      '+0',
+      '-0',
+      '0000:0000',
+      '0:0',
+      'root:472',
+      'caddy:0',
+      'caddy:root',
+      '472:00',
+    ]) {
+      expect(lastStageProblems(FILE, `FROM caddy AS runtime\nUSER ${user}`), user).toEqual([
+        root(1, user),
+      ])
     }
-    expect(userProblems(FILE, 'FROM grafana\nUSER 472\nUSER root\nRUN true')).toEqual([root(1)])
+    const later = 'FROM grafana AS runtime\nUSER 472\nUSER root\nRUN true'
+    expect(lastStageProblems(FILE, later)).toEqual([root(1, 'root')])
   })
 
   it('takes the last USER of the stage — root for a RUN and back is a user', () => {
-    expect(userProblems(FILE, 'FROM grafana\nUSER root\nRUN apk upgrade\nUSER 472')).toEqual([])
+    const text = 'FROM grafana AS runtime\nUSER root\nRUN apk upgrade\nUSER 472'
+    expect(lastStageProblems(FILE, text)).toEqual([])
+  })
+
+  it('reads no instruction in the body of a heredoc — a config line `user nginx;` is no USER, a `FROM` of SQL no stage', () => {
+    const config = [
+      'FROM caddy AS runtime',
+      'COPY <<EOF /etc/nginx/nginx.conf',
+      'user nginx;',
+      'worker_processes auto;',
+      'EOF',
+    ].join('\n')
+    expect(lastStageProblems(FILE, config)).toEqual([noUser(1)])
+    const sql = [
+      'FROM postgres AS runtime',
+      'USER postgres',
+      "RUN <<-'SQL' psql",
+      '\tSELECT 1',
+      '\tFROM pg_class;',
+      '\tSQL',
+      'COPY <<A /a <<"B" /b',
+      'USER root',
+      'A',
+      'FROM x',
+      'B',
+    ].join('\n')
+    expect(lastStageProblems(FILE, sql)).toEqual([])
   })
 
   it('refuses a user named by an argument, and is quiet on a file with no FROM', () => {
-    expect(userProblems(FILE, 'ARG WHO=caddy\nFROM caddy\nUSER ${WHO}')).toEqual([
-      `${FILE}:2: USER \${WHO} — named by an argument, which this check cannot read`,
+    expect(lastStageProblems(FILE, 'ARG WHO=caddy\nFROM caddy AS runtime\nUSER ${WHO}')).toEqual([
+      `${at(2)}: USER \${WHO} — named by an argument, which this check cannot read`,
     ])
-    expect(userProblems(FILE, '# a note\n')).toEqual([])
+    expect(lastStageProblems(FILE, '# a note\n')).toEqual([])
+  })
+})
+
+describe('dockerfileProblems and a heredoc', () => {
+  it('takes no image from the body of a heredoc', () => {
+    const text = `FROM caddy:2.11.9-alpine@${DIGEST} AS runtime\nRUN <<EOF\nFROM caddy:latest\nEOF\nUSER caddy`
+    expect(dockerfileProblems('frontend/Dockerfile', text)).toEqual([])
   })
 })
 
 describe('the repository', () => {
-  it('pins every action and every image, and Dependabot watches every Dockerfile', () => {
+  it('pins every action and every image, Dependabot watches every Dockerfile, and every last stage is runtime with a user', () => {
     expect(repositoryProblems()).toEqual([])
   })
 })
