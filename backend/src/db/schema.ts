@@ -2007,6 +2007,27 @@ export const sessions = pgTable(
 )
 
 /**
+ * A sign-in the bot has yet to tell its account about (MOL-361, audit MOL-287 Ф-3, owner's В-9 «а»):
+ * written by the collection of a session, in its transaction, and **deleted as it is handed to the
+ * bot** — a row is «not told yet», and nothing else. The API decides and marks as it hands out, the
+ * bot only sends (MOL-101 Р-1, Р-2): at most once.
+ *
+ * **No key to `sessions`, on purpose** (owner's В-1 «а»): a session ended before the bot's next minute
+ * — a copy downloaded, then «Выйти» — must still be told of, or the hijack that matters most stays
+ * silent. The button then finds no session and says so. The person's own row: it goes with them.
+ */
+export const loginNotices = pgTable('login_notices', {
+  sessionId: uuid('session_id').primaryKey(),
+  actorId: uuid('actor_id')
+    .notNull()
+    .references(() => actors.id, { onDelete: 'cascade' }),
+  /** The session's, as the browser named itself: the person is told it may be forged. */
+  deviceName: varchar('device_name', { length: DEVICE_NAME_MAX }),
+  /** The session's `created_at`, the database's clock. */
+  signedInAt: timestamp('signed_in_at', { withTimezone: true }).notNull(),
+})
+
+/**
  * A login being waited for: the row that turns a link into a bot into a session for the very
  * browser that asked (MOL-52, MOL-54).
  *
@@ -2114,11 +2135,18 @@ export const loginDays = pgTable(
     /** Ran out confirmed: the bot said yes and the person never came back to the app. */
     expiredConfirmed: integer('expired_confirmed').notNull().default(0),
     refused: integer('refused').notNull().default(0),
+    /**
+     * Sessions ended by «Это не я — завершить» under the bot's message about a sign-in (MOL-361, В-4):
+     * the one trace of a hijack on production, or of a slip of the finger. **Counted on the day of the
+     * press**, in Yerevan — the request the login began with is gone by then, so the funnel's own day is
+     * not known.
+     */
+    endedByNotice: integer('ended_by_notice').notNull().default(0),
   },
   (table) => [
     check(
       'login_days_counts_non_negative',
-      sql`least(${table.started}, ${table.again}, ${table.confirmed}, ${table.declined}, ${table.collected}, ${table.expiredUnconfirmed}, ${table.expiredConfirmed}, ${table.refused}) >= 0`,
+      sql`least(${table.started}, ${table.again}, ${table.confirmed}, ${table.declined}, ${table.collected}, ${table.expiredUnconfirmed}, ${table.expiredConfirmed}, ${table.refused}, ${table.endedByNotice}) >= 0`,
     ),
     // Written by the same statement as `started`, so this one holds by construction.
     check('login_days_again_within_started', sql`${table.again} <= ${table.started}`),

@@ -19,6 +19,7 @@ import {
   incomes,
   itemBarcodes,
   items,
+  loginNotices,
   loginRequests,
   moneyAccountChecks,
   moneyAccounts,
@@ -42,6 +43,7 @@ import {
  * compile until it has a section, and a test compares the counts of a dry run with the sections.
  */
 export const EXPORT_SECTION_OF: Readonly<Record<ErasedTable, keyof ExportContent>> = {
+  login_notices: 'loginNotices',
   sessions: 'sessions',
   search_picks: 'searchPicks',
   rating_reminders: 'ratingReminders',
@@ -124,6 +126,10 @@ export const EXPORT_COLUMNS: Readonly<
   sessions: {
     exported: ['id', 'device_name', 'created_at', 'last_seen_at', 'expires_at'],
     omitted: { actor_id: OWNER, token_hash: 'the key to the account, not data about the person' },
+  },
+  login_notices: {
+    exported: ['session_id', 'device_name', 'signed_in_at'],
+    omitted: { actor_id: OWNER },
   },
   login_requests: {
     exported: ['id', 'device_name', 'created_at', 'expires_at', 'consumed_at'],
@@ -799,6 +805,11 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(sessions)
             .where(eq(sessions.actorId, actorId))
             .orderBy(asc(sessions.createdAt), asc(sessions.id))
+          const noticeRows = await tx
+            .select()
+            .from(loginNotices)
+            .where(eq(loginNotices.actorId, actorId))
+            .orderBy(asc(loginNotices.signedInAt), asc(loginNotices.sessionId))
           const loginRows = await tx
             .select()
             .from(loginRequests)
@@ -981,6 +992,11 @@ export function createExportRepository(db: Db): ExportRepository {
               createdAt: row.createdAt,
               lastSeenAt: row.lastSeenAt,
               expiresAt: row.expiresAt,
+            })),
+            loginNotices: noticeRows.map((row) => ({
+              sessionId: row.sessionId,
+              deviceName: row.deviceName,
+              signedInAt: row.signedInAt,
             })),
             loginRequests: loginRows.map((row) => ({
               id: row.id,

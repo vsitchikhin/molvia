@@ -13,6 +13,7 @@ import {
   feedbackReplies,
   incomeRevisions,
   incomes,
+  loginNotices,
   moneyAccountChecks,
   accountTransferRevisions,
   accountTransfers,
@@ -292,7 +293,11 @@ export async function aLife(
     accountId,
     transferId,
   })
-  await insertSession(db, { actorId })
+  const sessionId = await insertSession(db, { actorId, deviceName: 'iPhone · Safari' })
+  // A sign-in the bot has not told of yet (MOL-361).
+  await db
+    .insert(loginNotices)
+    .values({ sessionId, actorId, deviceName: 'iPhone · Safari', signedInAt: new Date() })
   await insertLoginRequest(db, { telegramUserId }) // confirmed, not yet collected
   await insertLoginRequest(db, { telegramUserId, consumedAt: new Date() })
   // What the person wrote to the developer (MOL-147): a message, the owner's reply, and the
