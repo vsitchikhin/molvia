@@ -121,12 +121,37 @@ case "$mode" in
         echo "$1"
       fi
     }
+    # Every session of the exporter's role closed (MOL-366): it runs on through the restore, and what a
+    # session takes while the database is new — a temporary table before the revoke (adversarial В2), an
+    # advisory lock before pg_restore puts the copy's revoke back (В3) — outlives the API's start, which
+    # closes nothing under the same password. One left is a failure, and the restore says so (review №9).
+    close_metrics_sessions() {
+      remote "$compose exec -T postgres sh -c 'psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -v ON_ERROR_STOP=1 -Atq'" <<'SQL'
+do $$ declare outlived int; begin
+  -- Terminated only after WHERE: beside it in an AND, Postgres may call it on every backend first.
+  select count(*) filter (where not pg_terminate_backend(pid, 5000)) into outlived
+    from pg_stat_activity where usename = 'molvia_metrics';
+  if outlived > 0 then
+    raise exception 'a session of molvia_metrics outlived its termination';
+  end if;
+end $$;
+SQL
+    }
     trap finish EXIT
     remote "{ [ -e deploy.hold ] || echo restore >deploy.hold; } && flock -w 900 .deploy.lock true"
     remote "$compose stop backend bot"
     stage=dropped
     remote "$compose exec -T postgres sh -c 'dropdb -U \"\$POSTGRES_USER\" --force \"\$POSTGRES_DB\" && createdb -U \"\$POSTGRES_USER\" \"\$POSTGRES_DB\"'"
+    # A new database gives PUBLIC a temporary table: taken here, before the API's next start takes it again
+    # (MOL-366, adversarial В1), and the role's sessions closed after it — a table made before the revoke is
+    # still written to and goes only with its session (В2).
+    remote "$compose exec -T postgres sh -c 'psql -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" -v ON_ERROR_STOP=1 -Atq'" <<'SQL'
+do $$ begin execute format('revoke temporary on database %I from public', current_database()); end $$;
+SQL
+    close_metrics_sessions
     fetch "$copy" | remote "$compose exec -T postgres sh -c 'pg_restore -U \"\$POSTGRES_USER\" -d \"\$POSTGRES_DB\" --no-owner --exit-on-error'"
+    # pg_restore puts the copy's rights back last, its revoke of the advisory locks among them (В3).
+    close_metrics_sessions
     stage=poured
     remote "$compose up -d backend bot"
     stage=restored

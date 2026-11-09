@@ -68,10 +68,12 @@ file holds what belongs to no single area, and what the audit found missing.
   how it is changed, and what stops meanwhile. A new secret comes with its row and its line in
   `.env.prod.example`, in the same pull request. **The database's password lives in its volume too**, so
   changing the line alone breaks the API, and it takes only what a URL takes bare — compose puts it into
-  `DATABASE_URL` as it is (drilled and attacked, MOL-287). **A secret never goes on a command line**: argv
-  is everybody's in `ps`, and the history keeps it on the machine that leaked. Typed at `read -rs`, it goes
-  into a pipe, a heredoc, a shell builtin or a command's environment — never its arguments, a variable's
-  expansion included (MOL-287, adversarial Р2-А2).
+  `DATABASE_URL` as it is (drilled and attacked, MOL-287). **What reads the database for counters has a role of
+  its own, never the owner's password** (MOL-366): postgres_exporter is `molvia_metrics`, `pg_monitor` and no
+  table, its password `METRICS_DB_PASSWORD` set by the API at its start (`observability.md`). **A secret never
+  goes on a command line**: argv is everybody's in `ps`, and the history keeps it on the machine that leaked.
+  Typed at `read -rs`, it goes into a pipe, a heredoc, a shell builtin or a command's environment — never its
+  arguments, a variable's expansion included (MOL-287, adversarial Р2-А2).
 - **The images are public** (ghcr, pulled anonymously): nothing secret goes into a layer, a build argument
   or the PWA's bundle — the audit read all six images and the bundle. A secret reaches a container only
   through compose's environment from `.env.prod` on the machine. **The machine has no login to the
