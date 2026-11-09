@@ -61,7 +61,7 @@ Rules: `.claude/rules/bot.md`. A test beside its source, or mirroring it under
 - `bot/src/pulse.ts` — The bot's pulse (MOL-142): a ping to healthchecks.io after a claim went through, while a `getUpdates` succeeded within two minutes (`hearTelegram`), at most once in five minutes by a monotonic clock, the first a minute into the process; without a URL, nothing; the URL never logged.
 - `bot/src/remind.ts` — The rating reminder (MOL-101): the minute timer that claims what is due, tells the pulse a claim went through, a message an item with the scale 1–5, only the first one ringing, «Не напоминать» under the last; a 403 turns the reminders off (MOL-103); the keyboard and the outcomes read back off the message.
 - `bot/src/login.ts` — The bot's half of the login: `/start` with a code asks «Впустить это устройство в ваш аккаунт Molvia?»; «Войти» and «Это не я» confirm or decline.
-- `bot/src/when.ts` — `timeAgo`: the age of a login request in words («2 минуты назад») for the bot's question.
+- `bot/src/when.ts` — `timeAgo`: the age of a login request in words («2 минуты назад») for the bot's question; `dayInWords`: a calendar day in words, no year, for «чек разобран», the warning before an erasure and the notice of a sign-in.
 
 ## repository
 

@@ -649,7 +649,11 @@ own User-Agent, and before this nothing told the person afterwards. Owner's В-9
   (`POST /internal/logins/told`, adversarial А1): what went — sent, the bot blocked, refused for good — is let go; what
   Telegram refused for now is given back, `not_before` its `retry_after` or now, and ordered by it, so a chat kept under
   flood control — the stranger's own, by `/start` spammed — goes behind everyone else's instead of ending the run with
-  the victim's notice in it. **Nothing is waited out**: a 429 of any length gives the notice back and the next is tried;
+  the victim's notice in it. **The account goes behind with it** (adversarial Б1): every notice of its own not handed
+  takes the same `not_before` at least, or its next notice, older than the victim's, stood first again, and two
+  accounts with a stock of them held the victim a claim a pair. **An hour at most** (`LOGIN_NOTICE_BACK_MAX_SECONDS`,
+  Б2): Telegram may ask hours of the whole bot, and a word with more refused itself whole, every notice of the claim
+  then let go by the lease unsent; past the hour it is tried again and given back again. **Nothing is waited out**: a 429 of any length gives the notice back and the next is tried;
   two refusals in a row are Telegram's, not a chat's, and the rest of the claim goes back untried, keeping its place.
   **At most once all the same**: a notice handed and never spoken of — the bot died, its word was lost — is let go past
   `LOGIN_NOTICE_LEASE_SECONDS` by the sessions' minute timer, unsent. **Only a collection**: the development seam signs in with none, and the sessions alive at the rollout were
@@ -681,7 +685,7 @@ own User-Agent, and before this nothing told the person afterwards. Owner's В-9
   notice ends a silent long hijack, not an instant one; a notice handed and never spoken of is not sent again; a
   forwarded notice pressed by another Telegram ends nothing. **And a stranger with many Telegram accounts** — each
   with a chat of its own kept under flood control and a notice before the victim's — holds the victim's back a claim
-  for every two of them, since two refusals in a row end the claim; each costs a Telegram account and is given back
-  behind the victim's the next minute.
+  for every two of them, since two refusals in a row end the claim; each pair costs two Telegram accounts and goes
+  behind the victim's, whole accounts, the next minute.
 - **The privacy page names it** under «Telegram» and «Устройства входа» — a revision of edition 6 (Р-8): the device's
   name already went to Telegram in the login's question, to the same recipient for the same purpose.
