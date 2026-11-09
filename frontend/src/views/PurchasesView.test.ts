@@ -537,6 +537,50 @@ describe('PurchasesView (MOL-128)', () => {
       // Still there until «Убрать» in the sheet.
       expect(localStorage.getItem(`molvia.receipt-rejected.${ME}`)).toContain('k1')
     })
+
+    it.each([
+      [
+        'error.receipts_unrecorded_limited',
+        '20 чеков ждут записи',
+        'Запишите или удалите те, что ждут записи',
+      ],
+      ['error.receipts_day_limited', 'сегодня отправлено уже 40 чеков', 'отправьте чек завтра'],
+    ])(
+      'отказ по квоте (MOL-360, %s) — её число в строке и когда снимать снова в шторке',
+      async (code, reason, advice) => {
+        const { view } = await render({
+          before: () => {
+            localStorage.setItem(
+              `molvia.receipt-rejected.${ME}`,
+              JSON.stringify([
+                {
+                  key: 'k1',
+                  code,
+                  at: Date.now(),
+                  write: {
+                    kind: 'create',
+                    body: {
+                      id: 'cccccccc-0000-4000-8000-000000000001',
+                      parts: 1,
+                      country: 'AM',
+                      language: 'ru',
+                      capturedAt: new Date().toISOString(),
+                    },
+                  },
+                },
+              ]),
+            )
+          },
+        })
+        const row = view.findAll('.list-row').find((one) => one.text().includes('Не принят'))
+        expect(row?.text()).toContain(`Не принят: ${reason}`)
+        await row?.trigger('click')
+        await flushPromises()
+        expect(openSheet()?.textContent).toContain(reason)
+        expect(openSheet()?.textContent).toContain(advice)
+        expect(openSheet()?.textContent).not.toContain('Уберите его и снимите заново')
+      },
+    )
   })
 
   describe('пусто — только когда это известно (MOL-77)', () => {
