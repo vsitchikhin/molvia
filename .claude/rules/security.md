@@ -36,15 +36,15 @@ file holds what belongs to no single area, and what the audit found missing.
 - **A write that grows what everybody shares, or what the server keeps on its disk, has a quota per person**
   (MOL-287, owner's В-3 «а»: a cheap way to bring the service down — one request without a session, or one
   account within a minute — is a blocker of the release). **The login's is an address's** (Ф-1,
-  MOL-359): five starts a minute from an address, three hundred from everybody — `auth.md`. **Two have
-  none yet, each a blocker of `v0.2.0`**: a receipt's photos have none, and one
-  account fills some 12 GB an hour against 51 GB free (Ф-2, MOL-360: forty a day, twenty not recorded at
-  once); «Предложить товар» has none, and some nine thousand names an hour go into everybody's search
+  MOL-359): five starts a minute from an address, three hundred from everybody — `auth.md`. **A receipt's
+  is a person's** (Ф-2, MOL-360): forty a day of their own and twenty not recorded at once — one account had
+  filled some 12 GB an hour against 51 GB free — `receipts.md`. **One has none yet, a blocker of
+  `v0.2.0`**: «Предложить товар», and some nine thousand names an hour go into everybody's search
   (Ф-4, MOL-362: sixty a day). Each task, merged, rewrites its line here. **A new write path names its
   quota in its task**, or says why it needs none. **A person's own rows of money have none either, and
   that is a price, not a reason** (self-review №5): the bodies are small and bounded, but nothing bounds
   their number, and how fast one account fills the disk with them was not measured — the disk alarm of
-  MOL-360 is what would say it first.
+  MOL-145 (`molvia-disk`, less than a fifth of `/` free) is what would say it first.
 - **What answers without a session is limited by the address Caddy names**, never by anything the client
   sends: the last `X-Forwarded-For` only from a peer inside, an IPv6 address by its `/48` (`addressOf`,
   `/client-errors`, MOL-144, and the login's start, MOL-359), counted in the API's memory

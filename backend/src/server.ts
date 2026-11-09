@@ -233,6 +233,8 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.FEEDBACK_PICTURE_INVALID]: 415,
   [ERROR.FEEDBACK_PICTURE_TOO_LARGE]: 413,
   [ERROR.CLIENT_ERRORS_RATE_LIMITED]: 429,
+  [ERROR.RECEIPTS_DAY_LIMITED]: 429,
+  [ERROR.RECEIPTS_UNRECORDED_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
   // The request is well formed; another row already holds what it claims — a barcode that
@@ -1271,8 +1273,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         restore: (actor, id) => restoreIncome(tripData, actor, id),
       })
       receiptRoutes(guarded, {
-        send: async (actorId, body) => {
-          const sent = await sendReceipt(receipts, actorId, body)
+        send: async (actor, body) => {
+          const sent = await sendReceipt(receipts, actor, body)
           // a receipt by its link is in the queue as it arrives: asked now, not in a minute
           if (sent.created && sent.receipt.status === 'queued') linkQueue?.nudge()
           return sent

@@ -439,8 +439,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 - **A write that grows what everybody shares, or what the server keeps on disk, has a quota per person**
   (MOL-287, В-3 «а»: one request without a session or one account in a minute bringing the service down is a
-  blocker) — the login's start by its address, five a minute and three hundred in all (MOL-359); **not yet** for
-  receipts (MOL-360) and «Предложить товар» (MOL-362), each a blocker of `v0.2.0`; a new write path names its
+  blocker) — the login's start by its address, five a minute and three hundred in all (MOL-359); a receipt by its
+  person, forty a day of their own — a count «Удалить» never gives back — and twenty not recorded at once
+  (MOL-360); **not yet** for «Предложить товар» (MOL-362), a blocker of `v0.2.0`; a new write path names its
   quota in its task. What answers without a session counts by the address Caddy names (`addressOf`), in memory.
 - **A host the server asks is the code's, never the request's**, with a timeout (SSRF).
 - **Every secret of production is a row of «Rotating the secrets» in `deploy/README.md`**, and a new one comes

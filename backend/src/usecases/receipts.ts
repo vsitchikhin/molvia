@@ -42,13 +42,17 @@ export type ReceiptReviewRepositories = Pick<
   'receipts' | 'storeMemory' | 'items' | 'places' | 'exchanges' | 'incomes' | 'rates'
 >
 
-/** «Отправить чек» (MOL-125): 201 for a new receipt, the same answer for the queue sending it again. */
+/**
+ * «Отправить чек» (MOL-125): 201 for a new receipt, the same answer for the queue sending it again. The
+ * quota counts the person's own day (MOL-360), as money does (MOL-121).
+ */
 export function sendReceipt(
   receipts: ReceiptRepository,
-  actorId: string,
+  actor: Actor & Today,
   body: ReceiptBody,
+  now: Date = new Date(),
 ): Promise<{ receipt: ReceiptSummary; created: boolean }> {
-  return receipts.create(actorId, body)
+  return receipts.create(actor.id, body, todayOf(actor, now))
 }
 
 /**
