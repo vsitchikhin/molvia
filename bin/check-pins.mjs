@@ -22,6 +22,12 @@
 // git, and whatever `RUN` downloads, is no image and is not read here: its pinned forms
 // (`ADD --checksum=…`, `#<sha>`) are review's.
 //
+// And an image of ours never runs as root (MOL-365): the last stage of every Dockerfile names its
+// user with `USER`, neither `root` nor `0` — the base's user is not trusted, since a base moved by
+// Dependabot may change it, and an image built without one ran as root in silence (Caddy and
+// VictoriaMetrics, audit MOL-287). A user named by an argument is refused, as an image is: the
+// check cannot read it.
+//
 //   node bin/check-pins.mjs
 
 import { execFileSync } from 'node:child_process'
@@ -232,6 +238,34 @@ export function dockerfileProblems(path, text) {
   return problems
 }
 
+/** Why the last stage of one Dockerfile would run as root, in sentences: none, or one. */
+export function userProblems(path, text) {
+  let last = null
+  let user = null
+  for (const { text: line, number } of instructionsOf(text)) {
+    const { instruction, args } = wordsOf(line)
+    if (instruction === 'FROM') {
+      last = number
+      user = null
+    } else if (instruction === 'USER' && args[0]) {
+      user = unquoted(args[0])
+    }
+  }
+  if (last === null) return []
+  const name = user?.split(':')[0]
+  if (!name || name === 'root' || name === '0') {
+    return [
+      `${path}:${String(last)}: the last stage runs as root — name its user, USER <name or uid>`,
+    ]
+  }
+  if (name.includes('$')) {
+    return [
+      `${path}:${String(last)}: USER ${user} — named by an argument, which this check cannot read`,
+    ]
+  }
+  return []
+}
+
 /** The directories the docker entry of `dependabot.yml` names, as it is written there. */
 function watchedDirectories(text) {
   const lines = text.split(/\r?\n/)
@@ -293,6 +327,9 @@ export function repositoryProblems() {
   const files = paths.map((path) => ({ path, text: readFileSync(path, 'utf8') }))
   return [
     ...pinProblems(files),
+    ...files
+      .filter(({ path }) => isDockerfile(path))
+      .flatMap(({ path, text }) => userProblems(path, text)),
     ...dependabotProblems(imageTakers(files), readFileSync(DEPENDABOT, 'utf8')),
   ]
 }
@@ -300,7 +337,7 @@ export function repositoryProblems() {
 if (process.argv[1] && import.meta.url.endsWith(process.argv[1].split('/').pop() ?? '')) {
   const problems = repositoryProblems()
   if (problems.length > 0) {
-    console.error('pins (MOL-364):')
+    console.error('pins and users (MOL-364, MOL-365):')
     for (const problem of problems) console.error(`  ${problem}`)
     process.exitCode = 1
   }

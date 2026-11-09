@@ -6,6 +6,7 @@ import {
   dockerfileProblems,
   pinProblems,
   repositoryProblems,
+  userProblems,
   workflowProblems,
 } from './check-pins.mjs'
 
@@ -436,6 +437,50 @@ describe('dependabotProblems', () => {
     expect(
       dependabotProblems(['frontend/Dockerfile'], 'updates:\n  - package-ecosystem: npm\n'),
     ).toEqual(['.github/dependabot.yml: no docker entry — Dependabot moves no base image'])
+  })
+})
+
+describe('userProblems', () => {
+  const FILE = 'deploy/victoria/Dockerfile'
+  const root = (line: number): string =>
+    `${FILE}:${String(line)}: the last stage runs as root — name its user, USER <name or uid>`
+
+  it('is quiet on a last stage that names a user by its name or number, a group beside it or not', () => {
+    for (const user of ['caddy', 'node', '472', '65534:65534', '"nobody"']) {
+      const text = [
+        `FROM node AS build`,
+        'RUN true',
+        `FROM caddy AS runtime`,
+        'RUN true',
+        `user ${user}`,
+      ].join('\n')
+      expect(userProblems(FILE, text), user).toEqual([])
+    }
+  })
+
+  it('refuses a last stage with no USER, by the line of its FROM — a user of an earlier stage does not carry over', () => {
+    expect(userProblems(FILE, 'FROM victoria\nCOPY a b\n')).toEqual([root(1)])
+    expect(userProblems(FILE, 'FROM node AS build\nUSER node\nFROM build\nCOPY a b')).toEqual([
+      root(3),
+    ])
+  })
+
+  it('refuses root by its name or number, a group beside it, and a later USER root over a user', () => {
+    for (const user of ['root', '0', '0:0', 'root:472']) {
+      expect(userProblems(FILE, `FROM caddy\nUSER ${user}`), user).toEqual([root(1)])
+    }
+    expect(userProblems(FILE, 'FROM grafana\nUSER 472\nUSER root\nRUN true')).toEqual([root(1)])
+  })
+
+  it('takes the last USER of the stage — root for a RUN and back is a user', () => {
+    expect(userProblems(FILE, 'FROM grafana\nUSER root\nRUN apk upgrade\nUSER 472')).toEqual([])
+  })
+
+  it('refuses a user named by an argument, and is quiet on a file with no FROM', () => {
+    expect(userProblems(FILE, 'ARG WHO=caddy\nFROM caddy\nUSER ${WHO}')).toEqual([
+      `${FILE}:2: USER \${WHO} — named by an argument, which this check cannot read`,
+    ])
+    expect(userProblems(FILE, '# a note\n')).toEqual([])
   })
 })
 
