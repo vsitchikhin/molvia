@@ -73,17 +73,27 @@ The shape worth knowing here:
   `ip_unprivileged_port_start=0` in a container's network (Docker 20.10 and later). **A volume keeps the owner it
   was filled by**: Docker gives a volume the image directory's owner only while it is empty, and `caddy_data`
   holds the certificate and the ACME account as root 0600 — Caddy as `caddy` on it refused to start (probe of
-  09.11.2026), and the rollout, whose health goes through Caddy, would roll back. So **`volume-owners`**, a
-  one-shot service of the compose file (owner's В-2 «а»), `chown`s `caddy_data`, `caddy_config` and `vmdata` to
-  those numbers before `frontend` and `victoria` start (`service_completed_successfully`), at every `up`: the
-  frontend's image of the tag, root for that alone, with no network and `CHOWN` and `DAC_READ_SEARCH` only. A
+  09.11.2026), and the rollout, whose health goes through Caddy, would roll back. So **a one-shot service per
+  service** (owner's В-2 «а»): `frontend-volumes` `chown`s `caddy_data` and `caddy_config`, `victoria-volumes`
+  `vmdata`, before their service starts (`service_completed_successfully`), at every `up` of it — the service's own
+  image of the tag, root for that alone, with no network and `CHOWN` and `DAC_READ_SEARCH` only. **One per service,
+  never one for both** (adversarial А1 of review 1): a `chown -R` over a volume something writes fails on a file
+  gone mid-walk, and one service for both walked VictoriaMetrics' parts while it ran — about one walk in 4 500
+  under load. compose stops the container it replaces before it runs the dependency, so each walks a volume
+  nobody writes. **Numbers, never names**: an image of before MOL-365 has no `caddy`, and `chown caddy` in a
+  rollback would stop Caddy; `compose-volumes.integration.test.ts` holds each number to its Dockerfile (В2). A
   rollback to an image of before MOL-365 runs as root over files of any owner, and whatever it writes the next
-  `up` gives back — tried: root-filled volumes, the new images, a rollback writing, forward again. A new number
-  in a Dockerfile is the same number in `volume-owners`.
+  `up` gives back — tried: root-filled volumes, the new images, a rollback writing, forward again. **The price,
+  named** (А2): compose has stopped the old Caddy when `frontend-volumes` runs, so the site waits for the walk — a
+  fraction of a second — and a walk that fails leaves it down until the rollback starts it again; in the metrics'
+  step a failed `victoria-volumes` leaves VictoriaMetrics stopped with a warning alone (the metrics never judge a
+  rollout), and the alarms' pulse, which needs it, goes quiet — healthchecks.io says so. An `up` that recreates
+  nothing starts the dependency over a container that runs; no rollout does that.
 - **The stage `runtime` brings its distribution up to date, and the release builds it afresh** (MOL-365, owner's
   В-3 «а»): `apk upgrade` (Caddy, the bot, VictoriaMetrics, Grafana), `apt-get upgrade` (the API, the reader, in a
   stage of its own after the install, which stays cached). `release.yml`'s `no-cache-filters: runtime` is what makes
-  it happen: from the cache the layer stays as its first build left it until the base's digest moves. So a fix of
+  it happen — and `bin/check-pins.mjs` refuses a last stage named otherwise, which the filter would not reach
+  (review 1, №1; adversarial В1): from the cache the layer stays as its first build left it until the base's digest moves. So a fix of
   Alpine or Debian comes with the next merge, not a week later with Dependabot's pull request — the price of MOL-364
   undone. **The price:** a build is not reproducible byte for byte, a broken package of the distribution comes as
   silently as a fixed one, and a mirror down fails the release — the previous images keep running. The reader's

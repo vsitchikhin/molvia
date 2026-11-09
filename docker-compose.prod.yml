@@ -154,33 +154,30 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      volume-owners:
+      frontend-volumes:
         condition: service_completed_successfully
       backend:
         condition: service_started
 
-  # Gives the volumes of the two services that no longer run as root to their users (MOL-365): Docker
-  # hands a volume the owner of the image's directory only while it is empty, and these hold the
-  # certificate and the ACME account (root, 0600) and the metrics. Caddy as `caddy` on them would not
-  # start, and the rollout would roll back. Run at every `up` and gone in a second: the files an image of
-  # before MOL-365, put back by a rollback, writes as root are given back by the next one. The frontend's
-  # image of the same tag, root for this alone, with no network and only the rights a `chown` needs.
-  volume-owners:
+  # Gives Caddy's volumes to its user (MOL-365): Docker hands a volume the owner of the image's directory
+  # only while it is empty, and these hold the certificate and the ACME account as root 0600 — Caddy as
+  # `caddy` on them would not start, and the rollout would roll back. At every `up` of `frontend`, after
+  # compose has stopped the Caddy it replaces, so nothing writes the volumes while it walks them (a file
+  # gone mid-walk is an exit of 1, adversarial А1). The files an image of before MOL-365, put back by a
+  # rollback, writes as root are given back by the next one. The frontend's image of the same tag, root
+  # for this alone, with no network and only the rights a `chown` needs. Numbers, never names: an image
+  # of before MOL-365 has no `caddy` (`compose-volumes.integration.test.ts` holds them to the Dockerfile).
+  frontend-volumes:
     logging: *logging
     image: ghcr.io/vsitchikhin/molvia-frontend:${IMAGE_TAG:-latest}
     user: '0'
     network_mode: none
     cap_drop: [ALL]
     cap_add: [CHOWN, DAC_READ_SEARCH]
-    # The numbers are those of the images: `caddy` of frontend/Dockerfile, nobody of deploy/victoria.
-    entrypoint:
-      - sh
-      - -c
-      - chown -R 10001:10001 /caddy/data /caddy/config && chown -R 65534:65534 /victoria
+    entrypoint: [chown, -R, '10001:10001', /caddy/data, /caddy/config]
     volumes:
       - caddy_data:/caddy/data
       - caddy_config:/caddy/config
-      - vmdata:/victoria
 
   # ── The metrics (MOL-145) ──────────────────────────────────────────────────────────────────────
   # VictoriaMetrics and three exporters on a network with no way out (`metrics`, `internal`): what
@@ -206,9 +203,23 @@ services:
     volumes:
       - vmdata:/storage
     depends_on:
-      volume-owners:
+      victoria-volumes:
         condition: service_completed_successfully
     networks: [metrics]
+
+  # Gives `vmdata` to nobody, VictoriaMetrics' user (MOL-365), as `frontend-volumes` gives Caddy's: at
+  # every `up` of `victoria`, after compose has stopped the one it replaces — never while it writes (А1).
+  # Its own image, root for this alone; the number is held to its Dockerfile by the same test.
+  victoria-volumes:
+    logging: *logging
+    image: ghcr.io/vsitchikhin/molvia-victoria:${IMAGE_TAG:-latest}
+    user: '0'
+    network_mode: none
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_READ_SEARCH]
+    entrypoint: [chown, -R, '65534:65534', /storage]
+    volumes:
+      - vmdata:/storage
 
   node-exporter:
     logging: *logging

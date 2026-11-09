@@ -449,10 +449,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   layer or the bundle.
 - **What CI runs is pinned** (MOL-364): a `uses:` by its full sha with its release in a comment, a base image by an
   exact tag and its digest — `bin/check-pins.mjs` in `npm run lint`; Dependabot moves both, a major of Node never.
-- **No image of ours runs as root, and none carries what its runtime does not run** (MOL-365): the last stage names
-  its `USER` (`check-pins`), the volumes of a service moved off root are given by `volume-owners` at every `up`; the
-  stage `runtime` brings its distribution's packages up to date and the release builds it afresh
-  (`no-cache-filters`); no npm, npx, corepack or yarn beside `node`.
+- **No image of ours runs as root, and no npm beside `node`** (MOL-365): the last stage is `runtime` and names its
+  `USER` (`check-pins`); the volumes of a service moved off root are given by its own one-shot service
+  (`frontend-volumes`, `victoria-volumes`) at every `up`, by numbers; `runtime` brings its distribution's packages
+  up to date and the release builds it afresh (`no-cache-filters`).
 - **`/internal/*` is closed twice** — Caddy's 404 and `BOT_API_SECRET` in constant time; a bot's route goes in
   that scope only. **A finding is a probe on a copy** (`.scratch/tasks/security/MOL-287/probes/`), never prod.
 - **The page's CSP is a meta the build puts first in `index.html`, never Caddy's header** (MOL-363): the worker

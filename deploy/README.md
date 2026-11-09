@@ -219,9 +219,10 @@ virtual machine has no `/` of the kind a server has.
 ## Images run as users (MOL-365)
 
 Every image of ours runs as a user: `docker inspect --format '{{.Config.User}}'` names `node`, `caddy`, `65534:65534`,
-`472` or `nobody`. Caddy as `caddy` and VictoriaMetrics as nobody read their volumes only once `volume-owners` has
-given them over — a one-shot service of the compose file, at every `up`, that `frontend` and `victoria` wait for.
-Its exit is in `docker compose ps -a`: `exited (0)`; anything else and Caddy does not start, the rollout rolls back.
+`472` or `nobody`. Caddy as `caddy` and VictoriaMetrics as nobody read their volumes only once `frontend-volumes` and
+`victoria-volumes` have given them over — one-shot services of the compose file, at every `up` of the service that
+waits for each. Their exit is in `docker compose ps -a`: `exited (0)`; anything else and that service does not
+start — Caddy's rollout rolls back, VictoriaMetrics stays stopped with a warning.
 
 **The rollout of MOL-365**, once:
 
