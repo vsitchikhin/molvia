@@ -44,11 +44,21 @@ The detail behind the privacy lines of `CLAUDE.md`.
   a purchase, a verdict (a withdrawn one too), a pick, a line of a receipt not recorded (В-2 «а»: its
   «Записать» sends the item's id), a code or a word not the person's own, a merge either way, the
   owner's «apart», and the seed's Armenian names or headings — only the seed writes them, on an item
-  someone proposed first; `ITEM_REFERENCES` holds every foreign key on `items` to that list. An item
-  another transaction holds is skipped (`skip locked`) and stays: erasure waits on nobody and cannot
-  deadlock with the merge night — the price, an item somebody writes to at that very moment stays
-  without its author. A write to an item gone meanwhile is the foreign key's 404, as an item never
-  there. Items left without an author before MOL-374 stay (В-6 «а»), and the copy and `erasures` are
+  someone proposed first, and every line of the seed has them; `ITEM_REFERENCES` holds every foreign key
+  on `items`, and the test of the holders takes a case for each key (review 1, №2). **An item whose
+  author is gone goes with the last person who stood on it** (adversarial А1): erased after the author,
+  the one whose pick kept it left it nobody's for good — so erasure takes too the items with no author
+  the person's rows point at, by the same test, and the seed's name is what keeps a seed's item. **The
+  items are locked right after the owner, before anything of the person is deleted, and waited on**
+  (А2): `delete from actors` updates them anyway by the cascade of `created_by`, so skipping one under
+  somebody's lock only left it nobody's when that write came to nothing; taken this early, the merge
+  night holding one finishes first and erasure decides by what it left. **The price, named:** a write of
+  the person's own that holds their item and then waits on their account — a code bound to it,
+  `attachBarcode`, for `added_by` — meets erasure in a deadlock and one of the two fails, as it did by
+  the cascade before MOL-374. A write to an item gone meanwhile is the foreign key's 404, as an item never
+  there; the two that write by an item's id without a person to answer — the queue of receipts writing a
+  reading (А6) and the writer of vectors (А5) — take a key share of the items first, so an item erased
+  meanwhile makes its line a new one and leaves its vector out, never refusing the whole. Items left without an author before MOL-374 stay (В-6 «а»), and the copy and `erasures` are
   as they were (В-3 «а»): the report and `make forget` name both counts. The items someone stands on
   stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
   nulled (MOL-100), the words they gave the shops' memory stay with `actor_id` nulled and still count

@@ -716,8 +716,9 @@ error.items_day_limited` with nothing written. The seed and a receipt's «Зап
   six rounds in one minute from two `/48`, 360 items with no author): MOL-359's price of a botnet, which the
   owner accepted for the login — and until MOL-374 it outlived the attack (adversarial round 3, owner's
   В-5 «б»). **Erasure now takes the person's items nobody else stands on** (MOL-374, `privacy.md`), so the
-  loop leaves nothing behind it: at any moment the catalogue holds only live accounts' proposals. What is
-  left of the price: an item somebody else bought, rated or picked before the erasure stays, as it should.
+  loop leaves nothing behind it once its accounts are gone — an item kept at its author's erasure by
+  somebody's pick goes with that somebody (adversarial А1 of MOL-374). What is left of the price: an item
+  somebody still alive bought, rated or picked stays, as it should.
   Remembering anything of the erased would undo the erasure; and **«Записать» takes any name** — typed over every line
   read, up to 500, and up to `RECEIPT_ADDED_MAX` lines added — so one receipt carries up to 600 new names:
   Tesseract's reading has no ceiling of lines, the 300 of `MODEL_RECEIPT_LINES_MAX` is the model's alone
