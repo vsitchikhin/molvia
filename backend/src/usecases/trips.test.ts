@@ -290,6 +290,7 @@ function fakeRepositories(
       chooseNotices: unexpected('receipts.chooseNotices'),
       recordedTwin: unexpected('receipts.recordedTwin'),
       placesOfTins: unexpected('receipts.placesOfTins'),
+      lockAccount: unexpected('receipts.lockAccount'),
       lockForRecord: unexpected('receipts.lockForRecord'),
       markRecorded: unexpected('receipts.markRecorded'),
       sourceOf: () => Promise.resolve(null),

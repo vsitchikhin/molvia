@@ -6,6 +6,7 @@ import {
   ERROR,
   ITEM_BARCODES_MAX,
   ITEMS_PROPOSED_DAY_MAX,
+  RECEIPT_ITEMS_DAY_MAX,
   WORD_BREAK,
   barcodeTwins,
   itemSchema,
@@ -55,10 +56,10 @@ export interface ItemRepository {
    * `origin` marks a new item whose data may be Open Food Facts' (MOL-162); an item already there
    * keeps its own.
    *
-   * `quota` is given by «Предложить товар» alone (MOL-362): a new item then counts in
-   * `ITEMS_PROPOSED_DAY_MAX` of that person's day, the phone's, and one past it is refused with nothing
-   * written. A name already there and a code another item holds are answered whatever the count. The seed
-   * and a receipt's «Записать» give none, and count nothing.
+   * `quota` is the person's count a new item goes into, on their day, the phone's: «Предложить товар»'s
+   * `ITEMS_PROPOSED_DAY_MAX` (MOL-362) or a receipt's «Записать»'s `RECEIPT_ITEMS_DAY_MAX` (MOL-373), and
+   * one past it is refused with nothing written. A name already there and a code another item holds are
+   * answered whatever the count. The seed gives none, and counts nothing.
    */
   createUnlessNamed(
     input: NewItem,
@@ -112,10 +113,14 @@ export interface ItemRepository {
   nodes(language: ItemNameLanguage): Promise<CatalogueNode[]>
 }
 
-/** Whose day a proposal counts in, and which day that is — the phone's (MOL-362). */
+/**
+ * Whose day a new item counts in, which day that is — the phone's — and by which way it came:
+ * «Предложить товар» (MOL-362) or «Записать» of a receipt (MOL-373), each a count of its own.
+ */
 export interface ProposalQuota {
   readonly actorId: string
   readonly day: string
+  readonly of: 'proposed' | 'recorded'
 }
 
 /**
@@ -874,20 +879,39 @@ async function lockBarcodes(tx: Conn, forms: readonly string[]): Promise<void> {
   }
 }
 
+/** Each way into the catalogue a person's quota counts, by its columns, bound and refusal. */
+const COUNTS = {
+  proposed: {
+    day: actors.itemsDay,
+    n: actors.itemsProposed,
+    max: ITEMS_PROPOSED_DAY_MAX,
+    refusal: ERROR.ITEMS_DAY_LIMITED,
+    set: (day: string, n: number) => ({ itemsDay: day, itemsProposed: n }),
+  },
+  recorded: {
+    day: actors.receiptItemsDay,
+    n: actors.receiptItemsNew,
+    max: RECEIPT_ITEMS_DAY_MAX,
+    refusal: ERROR.RECEIPT_ITEMS_DAY_LIMITED,
+    set: (day: string, n: number) => ({ receiptItemsDay: day, receiptItemsNew: n }),
+  },
+} as const
+
 /**
- * The person's count of the day's proposals (MOL-362), their row locked: two proposals of one person at
- * once take turns at the quota. `no key update`, the strength of the count's own `UPDATE`, as the
- * receipts' count takes it (MOL-360): a key share — the new item's own `created_by` — passes it. The day is
- * `countOfDay`'s. Erased while this waited, there is nobody to propose for.
+ * The person's count of the day's new items by one way (MOL-362, MOL-373), their row locked: two writes
+ * of one person at once take turns at the quota. `no key update`, the strength of the count's own
+ * `UPDATE`, as the receipts' count takes it (MOL-360): a key share — the new item's own `created_by` —
+ * passes it. The day is `countOfDay`'s. Erased while this waited, there is nobody to write for.
  */
 async function proposalsOf(tx: Conn, quota: ProposalQuota) {
+  const count = COUNTS[quota.of]
   const [account] = await tx
-    .select({ day: actors.itemsDay, n: actors.itemsProposed })
+    .select({ day: count.day, n: count.n })
     .from(actors)
     .where(eq(actors.id, quota.actorId))
     .for('no key update')
   if (account === undefined) throw new DomainError(ERROR.NO_ACTOR)
-  return { actorId: quota.actorId, ...countOfDay(account, quota.day) }
+  return { actorId: quota.actorId, count, ...countOfDay(account, quota.day) }
 }
 
 export function createItemRepository(db: Conn): ItemRepository {
@@ -1133,10 +1157,10 @@ export function createItemRepository(db: Conn): ItemRepository {
           const claimed = await claim(tx, input.barcodes, null)
           if ('taken' in claimed) return holder(tx, claimed.taken)
           if (counted !== null) {
-            if (counted.n >= ITEMS_PROPOSED_DAY_MAX) throw new DomainError(ERROR.ITEMS_DAY_LIMITED)
+            if (counted.n >= counted.count.max) throw new DomainError(counted.count.refusal)
             await tx
               .update(actors)
-              .set({ itemsDay: counted.day, itemsProposed: counted.n + 1 })
+              .set(counted.count.set(counted.day, counted.n + 1))
               .where(eq(actors.id, counted.actorId))
           }
           return { item: await insert(tx, input, createdBy, origin), created: true }

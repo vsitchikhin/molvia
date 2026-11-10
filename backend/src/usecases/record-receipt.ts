@@ -34,6 +34,7 @@ import { findByBarcode } from './find-by-barcode'
 import { shownLines } from './receipts'
 import type { ShownLines } from './receipts'
 import { tripRateOn } from './start-trip'
+import { todayOf } from './today'
 import type { Today } from './today'
 
 type RecordedLine = Extract<ReceiptRecordBody['lines'][number], { skip: false }>
@@ -237,8 +238,10 @@ export async function recordReceipt(
 ): Promise<ReceiptRecorded> {
   return transact(async (repositories) => {
     const { receipts, places, items, trips, expenses, storeMemory } = repositories
-    // the owner first, then the receipt (the plan's order): two shots of one receipt recorded at once
-    // meet here, and the second sees the first recorded (review 7, В3)
+    // the account before all, as everywhere (privacy.md): the new items count in the person's day (MOL-373)
+    await receipts.lockAccount(actor.id)
+    // the owner, then the receipt (the plan's order): two shots of one receipt recorded at once meet here,
+    // and the second sees the first recorded (review 7, В3)
     await trips.lockOwner(actor.id)
     const held = await receipts.lockForRecord(actor.id, id)
     if (held === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -395,6 +398,9 @@ export async function recordReceipt(
           ...(pack !== null && pack.unit === unit ? { typicalQuantity: pack } : {}),
         },
         actor.id,
+        null,
+        // every new item of the record counts, read or typed (MOL-373, В-4 «а»); one past the day's refuses it all
+        { actorId: actor.id, day: todayOf(actor, now), of: 'recorded' },
       )
       // the item is made with no codes, so none of them can be another item's
       if ('taken' in proposal) throw new DomainError(ERROR.CONFLICT)

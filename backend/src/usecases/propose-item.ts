@@ -51,5 +51,6 @@ export async function proposeItem(
   return items.createUnlessNamed({ ...input, barcodes }, proposer.actorId, origin, {
     actorId: proposer.actorId,
     day: todayOf(proposer, now),
+    of: 'proposed',
   })
 }

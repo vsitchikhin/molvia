@@ -64,7 +64,12 @@ describe('proposeItem', () => {
     const result = await proposeItem(items, NAMED_NOTHING, PROPOSER, input)
 
     expect(asked).toEqual([
-      [{ ...input, barcodes: [] }, ACTOR, null, { actorId: ACTOR, day: '2026-11-10' }],
+      [
+        { ...input, barcodes: [] },
+        ACTOR,
+        null,
+        { actorId: ACTOR, day: '2026-11-10', of: 'proposed' },
+      ],
     ])
     expect(result).toMatchObject({ created: true })
   })
