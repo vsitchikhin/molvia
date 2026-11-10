@@ -989,7 +989,7 @@ describe('a café’s bill (MOL-310)', () => {
     ])
   })
 
-  it('takes no service by the vote once the service line stayed a line: never counted twice (adversarial В2)', () => {
+  it('takes no service twice: a service line not in the total is no dish, the bill whole (adversarial В2, Г1)', () => {
     // «Service 10%» a line not in the total: the dishes alone are 19 500, paid by the terminal
     const served = [
       dish('Service 10%', '1.00', null, '1950.00'),
@@ -1004,9 +1004,9 @@ describe('a café’s bill (MOL-310)', () => {
       ],
       served,
     )
-    // the service line is the lines' excess, said as it is
-    expect(shown(text).slice(0, 3)).toEqual([1_950_000, null, 'lines_over'])
-    expect(text.lines).toHaveLength(4)
+    // the dishes met the total without it: the line is no dish of the total, and the bill is whole (adversarial Г1)
+    expect(shown(text).slice(0, 3)).toEqual([1_950_000, null, null])
+    expect(text.lines).toHaveLength(3)
   })
 
   it('reads a service whose percent is in brackets: «Հավելավճար (10%)» (adversarial Б2)', () => {

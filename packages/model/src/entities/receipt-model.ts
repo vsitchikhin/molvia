@@ -321,9 +321,11 @@ function totalOf(
   reading: PhotoReading,
   answer: ModelReceipt,
   lines: readonly ReceiptTextLine[],
-  served: readonly (number | null)[] = [],
-  /** `false` — the service was decided against already, and its line stays a line: none is taken (review №9, В2). */
-  takesService = true,
+  /**
+   * The service's amounts the model copied as lines; `null` — the service was decided against already and its line
+   * stays a line, so none is taken, by a label or a vote (review №9, adversarial В2, review №14).
+   */
+  served: readonly (number | null)[] | null = [],
 ): {
   total: number | null
   read: number | null
@@ -354,7 +356,7 @@ function totalOf(
     ['section', new Set()],
   ])
   const [sentToCard, taxed, spent] = [new Set<number>(), new Set<number>(), new Set<number>()]
-  const surcharges = new Set(served)
+  const surcharges = new Set(served ?? [])
   // what the card's words do not name, and the prepayment slip's own sum (MOL-310, Р-1)
   const prepaid = new RegExp(`^${MARKS}(?:${w.prepayment})${MARKS}$`, 'u')
   const [slips, unnamed] = [new Set<number>(), new Set<number>()]
@@ -396,7 +398,7 @@ function totalOf(
   }
   // a café's service, one amount read wherever it is printed (MOL-310); two, or one not read, are a doubt
   const fee = surcharges.size === 1 ? ([...surcharges][0] ?? null) : null
-  const surcharge = takesService && fee !== null && fee > 0 ? fee : null
+  const surcharge = served !== null && fee !== null && fee > 0 ? fee : null
   if (cashback === null) {
     // the service counts only where the total takes it: a bill that prints it apart, «not included», meets its
     // total without it, and the trip is what was paid
@@ -785,16 +787,17 @@ export function receiptTextOfModel(
   const apart = serviceApart(reading, whole)
   const apartLines = apart.answer.lines.map(lineOf)
   const tried = totalOf(reading, apart.answer, apartLines, apart.served)
-  // the service line goes out of the lines only where the surcharge is taken: else it stays the model's line, and
-  // the foot's shortfall has it to show (review №5)
-  const keptApart = apart.served.length === 0 || tried.service !== null
+  // the service line goes out of the lines where the surcharge is taken, or where the lines met the total without it —
+  // then it is no dish of the total (adversarial Г1); else it stays the model's line, for the foot's shortfall to show
+  // (review №5)
+  const keptApart = apart.served.length === 0 || tried.service !== null || tried.met
   const answer = keptApart ? apart.answer : whole
   const copied = keptApart ? apartLines : whole.lines.map(lineOf)
   // the service decided against stays decided: its line a line, no service taken by a label or a vote — taken, it was
   // counted twice, as a line and as the surcharge (review №9, adversarial В2)
   const { total, read, met, owed, cashback, redeemed, service } = keptApart
     ? tried
-    : totalOf(reading, whole, copied, [], false)
+    : totalOf(reading, whole, copied, null)
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
   // a total two places vouch for that the lines do not meet: put right by the font's swaps, or not. The total first,
   // and on its own (MOL-291): a line it vouches for as copied is no doubt of the memory's, nor are the lines it put
