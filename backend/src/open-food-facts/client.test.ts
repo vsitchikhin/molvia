@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  OFF_MAX_BYTES,
   OFF_PAUSE_MS,
   OFF_PER_MINUTE,
   OFF_TIMEOUT_MS,
@@ -98,6 +99,13 @@ describe('клиент Open Food Facts', () => {
 
     expect(await client().product(NUTELLA, ANNA)).toBeNull()
     expect(failures).toEqual(['open food facts: not json'])
+  })
+
+  it('ответ больше OFF_MAX_BYTES целиком не читается — сбой, как база недоступна (MOL-368)', async () => {
+    answering('x'.repeat(OFF_MAX_BYTES + 1))
+
+    expect(await client().product(NUTELLA, ANNA)).toBeNull()
+    expect(failures).toEqual(['open food facts: too large'])
   })
 
   it.each([429, 403, 500])('HTTP %i — база недоступна', async (status) => {

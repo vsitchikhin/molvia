@@ -9,7 +9,7 @@ import {
 } from '@molvia/model'
 import type { AmdRate } from '@molvia/model'
 import { CBA_URL } from './cba'
-import { FeedError, request } from './feed'
+import { FeedError, request, textOf } from './feed'
 
 function envelope(from: string, to: string): string {
   return (
@@ -75,5 +75,5 @@ export async function fetchCbaRange(from: string, to: string, url = CBA_URL): Pr
     },
     body: envelope(from, to),
   })
-  return parseCbaRange(await response.text())
+  return parseCbaRange(await textOf('cba', response))
 }

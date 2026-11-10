@@ -48,6 +48,7 @@ import { createBroadcastRepository } from '@/db/broadcasts-repository'
 import { healthRoutes } from '@/routes/health'
 import { internalAuthRoutes } from '@/routes/internal-auth'
 import { withActor } from '@/routes/actor'
+import { refuseOutsideTheApp } from '@/routes/fetch-site'
 import { actorEraseRoute, actorExportRoute, actorMeRoute } from '@/routes/actors'
 import { authRoutes } from '@/routes/auth'
 import { adviceRoutes } from '@/routes/advice'
@@ -1187,6 +1188,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     // is only true if the guarded place is where routes are actually added. MOL-21 and MOL-27
     // add theirs next to these.
     void instance.register((guarded, _guardedOptions, guardedDone) => {
+      // Before the session is looked up: a foreign page or a link moves nothing (MOL-368).
+      guarded.addHook('onRequest', refuseOutsideTheApp)
       withActor(guarded, (token) => authenticate(sessions, actors, token))
       actorMeRoute(guarded)
       actorExportRoute(guarded, (actorId, sessionId) =>

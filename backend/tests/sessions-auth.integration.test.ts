@@ -410,6 +410,70 @@ describe('шов входа не слушается чужой страницы'
   })
 })
 
+describe('запрос с сессией с чужой страницы или по ссылке (MOL-368)', () => {
+  // `SameSite=Lax` отдаёт cookie на переход верхнего уровня с любого сайта, так что ссылка на
+  // чужой странице — запрос человека, и GET, который пишет, писал (аудит MOL-287, Ф-13). Ссылку из
+  // чата или письма другое приложение отдаёт браузеру как `none` с `navigate` (Chrome, 10.11.2026,
+  // адверсариальное А1): само приложение в API не переходит никогда, только `fetch`.
+  const OUTSIDE_THE_APP = [
+    { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' },
+    { 'sec-fetch-site': 'same-site', 'sec-fetch-mode': 'cors' },
+    { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' },
+    { 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'navigate' },
+  ]
+  const askWith = (
+    method: 'GET' | 'DELETE',
+    url: string,
+    cookie: string,
+    headers: Record<string, string>,
+  ) => app.inject({ method, url, headers: { cookie, ...headers } })
+
+  it('не доходит до сессии: 404, срок и последний визит на месте, cookie не погашен', async () => {
+    const { actorId, id, cookie } = await signedIn(SESSION_TOUCH_AFTER_HOURS + 1)
+    const stale = new Date(Date.now() - 2 * SESSION_TOUCH_AFTER_HOURS * HOUR)
+    await db.update(actors).set({ lastSeenAt: stale }).where(eq(actors.id, actorId))
+    const before = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
+
+    for (const headers of OUTSIDE_THE_APP) {
+      const refused = await askWith('GET', '/actors/me', cookie, headers)
+
+      expect(refused.statusCode).toBe(404)
+      expect(JSON.parse(refused.body) as unknown).toEqual({ code: ERROR.NOT_FOUND })
+      // Наш 401 погасил бы cookie, и чужая ссылка выкидывала бы человека из приложения.
+      expect(refused.headers['set-cookie']).toBeUndefined()
+    }
+
+    const after = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
+    expect(after?.lastSeenAt).toEqual(before?.lastSeenAt)
+    expect(after?.expiresAt).toEqual(before?.expiresAt)
+    const owner = onlyRow(await db.select().from(actors).where(eq(actors.id, actorId)))
+    expect(owner?.lastSeenAt).toEqual(stale)
+  })
+
+  it('не только GET: удаление своей сессии с чужой страницы — 404, сессия жива', async () => {
+    const { id, cookie } = await signedIn()
+
+    const ended = await askWith('DELETE', `/sessions/${id}`, cookie, {
+      'sec-fetch-site': 'cross-site',
+      'sec-fetch-mode': 'cors',
+    })
+
+    expect(ended.statusCode).toBe(404)
+    expect(await db.select().from(sessions).where(eq(sessions.id, id))).toHaveLength(1)
+  })
+
+  it('контроль: своё приложение и curl проходят', async () => {
+    const { cookie } = await signedIn()
+
+    for (const headers of [
+      { 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' },
+      {},
+    ]) {
+      expect((await askWith('GET', '/actors/me', cookie, headers)).statusCode).toBe(200)
+    }
+  })
+})
+
 describe('два входа одним Telegram-аккаунтом', () => {
   it('одновременно — это один владелец и две сессии, а не CONFLICT', async () => {
     // Двойное нажатие кнопки в боте или повторная доставка апдейта (MOL-53, А4). Чтение и

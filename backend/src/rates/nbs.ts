@@ -1,5 +1,5 @@
 import { PUBLISHED, RATE_DIGITS, divideRounded, scaledFromDecimal } from '@molvia/model'
-import { FeedError, published, request } from './feed'
+import { FeedError, published, request, textOf } from './feed'
 import type { Published, RateFeed } from './feed'
 
 /**
@@ -88,10 +88,10 @@ export function nbsFeed(url = NBS_URL): NbsFeed {
   const list = async (id: string) => {
     const query = `ExchangeRateListID=${id}&ExchangeRateListTypeName=srednjiKurs&Format=xml`
     const response = await request('nbs', `${url}/Download?${query}`)
-    return parseNbs(await response.text())
+    return parseNbs(await textOf('nbs', response))
   }
   const page = async (path: string) =>
-    listIdOf(await (await request('nbs', `${url}/${path}`)).text())
+    listIdOf(await textOf('nbs', await request('nbs', `${url}/${path}`)))
   const onDay = (date: string) =>
     page(`IndexByDate?isSearchExecuted=true&Date=${bankDay(date)}&ExchangeRateListTypeID=3`)
 

@@ -1,5 +1,5 @@
 import { PUBLISHED, RATE_DIGITS, RATE_SCALE, divideRounded, scaledFromDecimal } from '@molvia/model'
-import { FeedError, published, request } from './feed'
+import { FeedError, bytesOf, published, request } from './feed'
 import type { Published, RateFeed } from './feed'
 
 export const CBR_URL = 'https://www.cbr.ru/scripts/XML_daily.asp'
@@ -62,7 +62,7 @@ export function cbrFeed(url = CBR_URL): RateFeed {
       const response = await request('cbr', url)
       // The bank still answers in windows-1251; the fields read here are ASCII, but a decoder
       // that guessed UTF-8 would turn the currency names into replacement characters around them.
-      const xml = new TextDecoder('windows-1251').decode(await response.arrayBuffer())
+      const xml = new TextDecoder('windows-1251').decode(await bytesOf('cbr', response))
       return parseCbr(xml)
     },
   }
