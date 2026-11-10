@@ -1,4 +1,4 @@
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { ownerNoticeSchema } from '@molvia/model'
 import { eq } from 'drizzle-orm'
 import { createModelSpendRepository } from '@/db/model-spend-repository'
@@ -196,6 +196,14 @@ describe('a person’s share (MOL-367, owner’s В-1…В-3 «а»)', () => {
     ])
   })
 
+  it('keeps a cost not known in the month and gives it back to the share (В-4 «а»)', async () => {
+    const boris = await callOf()
+    await spend.reserve(MONTH, 8_200, boris, at)
+    await spend.settle(MONTH, 8_200, null, boris, at)
+    expect((await share(boris.actorId))?.spent).toBe(0)
+    expect((await spend.month(MONTH))?.spentMicroUsd).toBe(8_200)
+  })
+
   it('puts what a call cost in place of its worst in the share, and keeps the worst of one never settled', async () => {
     const boris = await callOf()
     await spend.reserve(MONTH, 8_200, boris, at)
@@ -248,31 +256,5 @@ describe('a person’s share (MOL-367, owner’s В-1…В-3 «а»)', () => {
     const gone = { ...(await callOf()), actorId: '00000000-0000-4000-8000-000000000367' }
     expect(await spend.reserve(MONTH, 1, gone, at)).toBe('share')
     expect(await spend.month(MONTH)).toBeNull()
-  })
-})
-
-describe('the share in the environment (MOL-367, adversarial А3)', () => {
-  it('lets the API start with the cap lowered below the share: lowering the cap is one line', async () => {
-    const saved = {
-      cap: process.env.RECEIPT_MODEL_MONTHLY_CAP_USD,
-      share: process.env.RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD,
-    }
-    try {
-      // the compose file's own forms: `${…:-2}` passes 2, a variable not in `.env` reaches the API empty or absent
-      for (const share of [undefined, '', '2']) {
-        vi.resetModules()
-        process.env.RECEIPT_MODEL_MONTHLY_CAP_USD = '1'
-        if (share === undefined) delete process.env.RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD
-        else process.env.RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD = share
-        const { env } = await import('@/env')
-        expect(env.RECEIPT_MODEL_MONTHLY_CAP_USD).toBe(1)
-      }
-    } finally {
-      vi.resetModules()
-      if (saved.cap === undefined) delete process.env.RECEIPT_MODEL_MONTHLY_CAP_USD
-      else process.env.RECEIPT_MODEL_MONTHLY_CAP_USD = saved.cap
-      if (saved.share === undefined) delete process.env.RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD
-      else process.env.RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD = saved.share
-    }
   })
 })

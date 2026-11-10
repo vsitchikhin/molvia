@@ -140,15 +140,6 @@ const envSchema = z.object({
     z.coerce.number().positive().max(100_000).default(200),
   ),
   /**
-   * What the model may cost reading one person's receipts in that month, in dollars (MOL-367, owner's В-1 «а»):
-   * $2, the price of a month of receipts (MOL-271) — one person never takes the cap from the others. Above the
-   * month's cap it is the cap (adversarial А3): lowering the cap to stop the spending is one line, as before.
-   */
-  RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    z.coerce.number().positive().max(100_000).default(2),
-  ),
-  /**
    * Whom the bot writes about failures (MOL-143, Р-9 of MOL-149): the owner's Telegram id. Set in
    * production only — without it nothing is queued for anyone, so a copy's failures go to its table
    * and stay there. Empty is unset, as compose passes a variable it was not given.

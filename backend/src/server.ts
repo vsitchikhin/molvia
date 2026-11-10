@@ -12,6 +12,7 @@ import {
   ISSUE,
   LOGIN_ADDRESS_LIMIT,
   LOGIN_WINDOW_LIMIT,
+  RECEIPT_MODEL_SHARE_MICRO_USD,
   VERSION_HEADER,
   errorResponseSchema,
   isWireCode,
@@ -396,7 +397,7 @@ export interface ServerOptions {
   readonly receiptModel?: ReceiptModel | null
   /** The month's cap of the model in micro-dollars; absent, `RECEIPT_MODEL_MONTHLY_CAP_USD`'s. */
   readonly receiptModelCapMicroUsd?: number
-  /** A person's share of it in micro-dollars (MOL-367); absent, `RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD`'s. */
+  /** A person's share of it in micro-dollars (MOL-367); absent, `RECEIPT_MODEL_SHARE_MICRO_USD`. */
   readonly receiptModelShareMicroUsd?: number
   /**
    * The owner's Telegram id the failures are queued for (MOL-143). Absent, it is the environment's
@@ -899,8 +900,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000)
         // a share above the cap is the cap: lowering the cap stays one line (MOL-367, adversarial А3)
         const shareMicroUsd = Math.min(
-          options.receiptModelShareMicroUsd ??
-            Math.round(env.RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD * 1_000_000),
+          options.receiptModelShareMicroUsd ?? RECEIPT_MODEL_SHARE_MICRO_USD,
           capMicroUsd,
         )
         const modelDeps =
