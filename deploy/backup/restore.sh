@@ -5,7 +5,8 @@
 #
 #   deploy/backup/restore.sh --list                  the copies in the bucket, oldest first
 #   deploy/backup/restore.sh --drill [copy]          restore into a throwaway Postgres on the server,
-#                                                     compare row counts with the live database, drop it
+#                                                     compare row counts with the live database — those
+#                                                     backup.sh excludes must come back empty — drop it
 #   deploy/backup/restore.sh --into-prod <copy>      replace the production database — asks first
 #
 # MOLVIA_SSH (default: molvia) is the ssh host; AGE_KEY (default: ~/.config/molvia/backup.key) is
@@ -52,7 +53,10 @@ case "$mode" in
     # The tables backup.sh leaves out of the copy, read where they are written — one list (MOL-368).
     # They are not compared with the live database: each must come back empty, or the copy carried
     # what /privacy promises it never keeps. None read is a drill that proved nothing either.
-    excluded="$(grep -o -- '--exclude-table-data=[a-z_]*' "$(dirname "$0")/backup.sh" | cut -d= -f2 | sort -u | tr '\n' ' ')"
+    list="$(dirname "$0")/backup.sh"
+    [[ -r "$list" ]] || { echo "drill: no backup.sh beside restore.sh to read the excluded tables from" >&2; exit 1; }
+    # grep finding nothing is an answer here, not a failure for `set -e` to end the script on in silence.
+    excluded="$({ grep -o -- '--exclude-table-data=[a-z_]*' "$list" || true; } | cut -d= -f2 | sort -u | tr '\n' ' ')"
     [[ -n "${excluded// /}" ]] || { echo "drill: no table excluded in backup.sh was read" >&2; exit 1; }
     [[ -n "$copy" ]] || copy="$(copies | tail -n 1)"
     [[ -n "$copy" ]] || { echo "the bucket holds no copy" >&2; exit 1; }

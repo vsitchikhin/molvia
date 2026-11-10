@@ -827,7 +827,12 @@ deploy/backup/restore.sh --into-prod <copy>       # asks for the copy's name, st
 those it reads from `backup.sh`'s `--exclude-table-data`, one list, and each must come back empty —
 «excluded» on its row — or the drill fails: the copy carried photos or links `/privacy` promises it
 never keeps. Before, they always differed from the live database, and «counts differ» on every drill
-hid a real failure among them. Rows written since the copy still differ, as before.
+hid a real failure among them. **Rows written since the copy still differ, as before — a price**
+(adversarial А3): the copy is taken at 04:00 and a drill in the day finds the tables that write
+themselves grown — the rates hourly, the counters by day, the timers' cleanups — and «counts differ»
+can then not tell them from a restore that lost rows. Read the `≠` rows; the drill that matches every
+table is one right after a copy with writes stopped («The Postgres image is part of the contract»).
+What is exact in either is the excluded tables' verdict.
 
 `--into-prod` holds rollouts while it runs (`deploy.hold`, «Deploys» above), so a merge meanwhile
 does not start an API on the empty database; it takes the hold off however it ends.
