@@ -5,7 +5,7 @@ import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
-import { insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
+import { insertPlace, insertTrip, telegramId } from './fixtures'
 import { storeMemoryWords } from '@molvia/model'
 import { MIGRATIONS } from '@/db/migrate'
 import * as schema from '@/db/schema'
@@ -81,7 +81,11 @@ describe('0061: what a removed trip or purchase left of its receipt', () => {
     await sql`
       insert into actors (id, telegram_user_id, country, city, spend_currency, income_currency)
       values (${me}, ${telegramId()}, 'AM', 'Гюмри', 'AMD', 'RUB')`
-    const milk = await insertItem(db)
+    // the item by SQL too: `items` has a column since (0084, MOL-374)
+    const milk = randomUUID()
+    await sql`
+      insert into items (id, kind, name, search_key, default_unit)
+      values (${milk}, 'product', 'Молоко «Ашхар»', 'moloko ashar', 'l')`
     const place = await insertPlace(db)
     const trip = await insertTrip(db, { actorId: me, placeId: place })
     const bought = randomUUID()
