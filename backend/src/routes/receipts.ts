@@ -10,6 +10,7 @@ import {
   RECEIPT_SPELLED_HEADER,
   RECEIPT_PACK_HEADER,
   RECEIPT_PAID_BY_HEADER,
+  RECEIPT_BILL_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
   ERROR,
   RECEIPT_PART_BYTES_MAX,
@@ -50,7 +51,8 @@ export interface ReceiptsApi {
    * (`RECEIPT_READ_PARTLY_HEADER`, MOL-255); `cashback` — its `cashback` and `redeemed`
    * (`RECEIPT_CASHBACK_HEADER`, MOL-289); `repaired` — a line's `repaired` (`RECEIPT_REPAIRED_HEADER`,
    * MOL-290); `spelled` — a line's `spelled` (`RECEIPT_SPELLED_HEADER`, MOL-293); `pack` — a line's `pack`
-   * (`RECEIPT_PACK_HEADER`, MOL-264); `paidBy` — the detail's `paidBy` (`RECEIPT_PAID_BY_HEADER`, MOL-312).
+   * (`RECEIPT_PACK_HEADER`, MOL-264); `paidBy` — the detail's `paidBy` (`RECEIPT_PAID_BY_HEADER`, MOL-312);
+   * `bill` — its `service` and `slip` (`RECEIPT_BILL_HEADER`, MOL-310).
    */
   one(
     actor: Actor & Today,
@@ -64,6 +66,7 @@ export interface ReceiptsApi {
     spelled: boolean,
     pack: boolean,
     paidBy: boolean,
+    bill: boolean,
   ): Promise<ReceiptDetail>
   remove(actorId: string, id: string, retake: boolean): Promise<void>
   restore(actorId: string, id: string): Promise<ReceiptSummary>
@@ -121,6 +124,11 @@ function packOf(request: FastifyRequest): boolean {
 /** Whether the phone knows the detail's `paidBy` (MOL-312). */
 function paidByOf(request: FastifyRequest): boolean {
   return request.headers[RECEIPT_PAID_BY_HEADER.toLowerCase()] === '1'
+}
+
+/** Whether the phone knows the detail's `service` and `slip` (MOL-310). */
+function billOf(request: FastifyRequest): boolean {
+  return request.headers[RECEIPT_BILL_HEADER.toLowerCase()] === '1'
 }
 
 function ownerOf(request: FastifyRequest): string {
@@ -240,6 +248,7 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
               spelledOf(request),
               packOf(request),
               paidByOf(request),
+              billOf(request),
             ),
           ),
         ),

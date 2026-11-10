@@ -247,6 +247,7 @@ const file: ExportFile = {
       readTotal: money(74_000n, 'AMD'),
       cashback: money(740n, 'AMD'),
       redeemed: null,
+      service: null,
       readPartly: false,
       paidBy: 'card',
       balanced: true,

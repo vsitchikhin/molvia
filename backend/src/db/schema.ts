@@ -2839,6 +2839,9 @@ export const receipts = pgTable(
     // («Կանխավճարի մարում»): the trip's money is the total less it. Only a model's reading names them.
     cashbackMinor: bigint('cashback_minor', { mode: 'bigint' }),
     redeemedMinor: bigint('redeemed_minor', { mode: 'bigint' }),
+    // A café's service, «Հավելավճար 10%» (MOL-310): no dish, the lines make the total less it, and the total is
+    // what was paid. Only a model's reading names it.
+    serviceMinor: bigint('service_minor', { mode: 'bigint' }),
     // Read in part (MOL-222's `readPartly`), of the lines as read, before the check emptied any (MOL-255,
     // А6 «а»): what the phone, which sees only the lines shown, says «Прочитали не всё» by. Null — read
     // before it, or not read.
@@ -2956,6 +2959,10 @@ export const receipts = pgTable(
     check(
       'receipts_cashback_positive',
       sql`${table.cashbackMinor} is null or ${table.cashbackMinor} > 0`,
+    ),
+    check(
+      'receipts_service_positive',
+      sql`${table.serviceMinor} is null or ${table.serviceMinor} > 0`,
     ),
     check(
       'receipts_redeemed_positive',

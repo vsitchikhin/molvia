@@ -1297,6 +1297,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           spelled,
           pack,
           paidBy,
+          bill,
         ) =>
           receiptOfOwner(
             tripData,
@@ -1311,6 +1312,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
             spelled,
             pack,
             paidBy,
+            bill,
           ),
         remove: (actorId, id, retake) => removeReceipt(receipts, actorId, id, retake),
         restore: (actorId, id) => restoreReceipt(receipts, actorId, id),

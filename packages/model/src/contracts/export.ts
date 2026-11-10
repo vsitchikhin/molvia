@@ -56,8 +56,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // `overwrittenVerdicts`, one's own verdict written over after a merge by its twin's id, kept for the undo
 // (MOL-299). 28: `loginNotices`, the sign-ins the bot has not told of yet — the session, the device and
 // when (MOL-361). 29: the account's `receiptsDay` and `receiptsSent`, the receipts sent on the person's day,
-// which the day's quota counts (MOL-360).
-export const EXPORT_VERSION = 29
+// which the day's quota counts (MOL-360). 30: a receipt's `service`, a café's service the lines make the total
+// less (MOL-310).
+export const EXPORT_VERSION = 30
 
 const day = z.iso.date()
 
@@ -384,6 +385,7 @@ const receiptSchema = z.strictObject({
   readTotal: signedMoneyCodec.nullable(),
   cashback: signedMoneyCodec.nullable(),
   redeemed: signedMoneyCodec.nullable(),
+  service: signedMoneyCodec.nullable(),
   readPartly: z.boolean().nullable(),
   paidBy: z.string().nullable(),
   balanced: z.boolean(),

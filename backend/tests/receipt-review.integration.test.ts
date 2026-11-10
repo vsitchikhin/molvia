@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
+  RECEIPT_BILL_HEADER,
   RECEIPT_CASHBACK_HEADER,
   RECEIPT_MODEL,
   RECEIPT_PAID_BY_HEADER,
@@ -271,6 +272,53 @@ describe('the review of a receipt', () => {
     const asked = receiptDetailCodec.parse(response.json())
     expect([asked.cashback, asked.redeemed]).toEqual([amd(15.11), amd(100)])
     expect(asked.receipt.total).toEqual({ minor: 152_611n, currency: 'AMD' })
+  })
+
+  it('sets the lines against the total less a café’s service, and tells a phone that asks (MOL-310)', async () => {
+    const me = await insertActor(db)
+    const lines: Line[] = [
+      { printed: 'Չիզբուրգեր', price: 2200, sum: 2200 },
+      { printed: 'Mojito', price: 3000, sum: 3000 },
+    ]
+    // 5 200 of dishes, 520 of service: «ՎՃԱՐՄԱՆ» 5 720
+    const bill = { totalMinor: 572_000n, serviceMinor: 52_000n, layout: 'class' as const }
+    const id = await parsedReceipt(me, lines, bill)
+    // an earlier build, which knows no service, is told what the lines come to
+    const shown = await review(me, id)
+    expect([shown.receipt.total, shown.service]).toEqual([amd(5200), undefined])
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_BILL_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect([asked.receipt.total, asked.service, asked.slip]).toEqual([
+      amd(5720),
+      amd(520),
+      undefined,
+    ])
+  })
+
+  it('shows a terminal’s slip with its total only to a phone that asks, and none to an earlier build (MOL-310)', async () => {
+    const me = await insertActor(db)
+    const id = await parsedReceipt(me, [], { totalMinor: 1_166_000n, layout: 'slip' })
+    // must not: an earlier build would show a total read in one place as vouched for — it gets none, to type
+    expect((await review(me, id)).receipt.total).toBeNull()
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_BILL_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect([asked.receipt.total, asked.slip, asked.service]).toEqual([amd(11_660), true, null])
   })
 
   it('tells how the receipt was paid only to a phone that asks (MOL-312)', async () => {

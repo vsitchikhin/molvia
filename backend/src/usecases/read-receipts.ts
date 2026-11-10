@@ -193,6 +193,7 @@ function headOf(
     totalMinor: moneyOfHundredths(text.totalHundredths, currency)?.minor ?? null,
     readTotalMinor: moneyOfHundredths(text.readTotalHundredths, currency)?.minor ?? null,
     cashbackMinor: moneyOfHundredths(text.cashbackHundredths ?? null, currency)?.minor ?? null,
+    serviceMinor: moneyOfHundredths(text.serviceHundredths ?? null, currency)?.minor ?? null,
     redeemedMinor: moneyOfHundredths(text.redeemedHundredths ?? null, currency)?.minor ?? null,
     paidBy,
     balanced: text.balanced,
@@ -530,10 +531,12 @@ async function parsed(
   // a total no second source vouched for is not shown, and still says the lines are too few (MOL-244)
   const measured = head.totalMinor ?? head.readTotalMinor
   const cashback = head.cashbackMinor ?? null
-  // the lines make the total less what a card sent to the card (MOL-289)
+  const service = head.serviceMinor ?? null
+  // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
   const total = linesTotalOf(
     measured === null ? null : { minor: measured, currency },
     cashback === null ? null : { minor: cashback, currency },
+    service === null ? null : { minor: service, currency },
   )
   return {
     kind: 'parsed',
