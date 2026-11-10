@@ -55,9 +55,10 @@ export type ModelReading = (
 /**
  * The model could not be asked now — no connection, its time out, a 429, its own 5xx or overload, an answer
  * torn on its way: the receipt is not at fault and waits in the queue (Р-9). `costMicroUsd` is what the call
- * cost where that is known — nothing for an answer that was a refusal to serve; `null` where it is not — a
- * time out, a connection lost after the request may have gone, an answer cut off under its body (adversarial
- * А3) — and then the worst reserved stays counted.
+ * cost where that is known — nothing for an answer that was a refusal to serve, nor for a connection never made
+ * (MOL-367, В-6 «а»); `null` where it is not — a time out, a connection lost after the request may have gone, an
+ * answer cut off under its body (adversarial А3) — and then the worst reserved stays counted, in the month and in
+ * the person's share alike.
  */
 export class ModelUnavailable extends Error {
   constructor(
@@ -137,6 +138,34 @@ function outputSchema(answer: z.ZodType = modelReceiptSchema): Record<string, un
 const base64Bytes = (part: Buffer): number => Math.ceil(part.length / 3) * 4
 
 /**
+ * What a connection fails with before a byte of the request leaves (MOL-367, owner's В-6 «а» on adversarial Б1): no
+ * address for the host, the port refused, no route, no connection made in time. A closed list — anything else, a
+ * connection reset or closed under the request included, may have carried it, and is paid in doubt.
+ */
+const NEVER_CONNECTED = new Set([
+  'ENOTFOUND',
+  'EAI_AGAIN',
+  'ECONNREFUSED',
+  'ENETUNREACH',
+  'EHOSTUNREACH',
+  'UND_ERR_CONNECT_TIMEOUT',
+])
+
+/**
+ * Whether a failure of the connection is one of those, down its causes — the client wraps `fetch`'s, which wraps the
+ * socket's — and, for an attempt at every address of the host (`AggregateError`), of every one of them.
+ */
+function neverConnected(error: unknown, depth = 0): boolean {
+  if (depth > 4 || typeof error !== 'object' || error === null) return false
+  if (error instanceof AggregateError && error.errors.length > 0) {
+    return error.errors.every((one) => neverConnected(one, depth + 1))
+  }
+  const code: unknown = (error as { code?: unknown }).code
+  if (typeof code === 'string' && NEVER_CONNECTED.has(code)) return true
+  return neverConnected((error as { cause?: unknown }).cause, depth + 1)
+}
+
+/**
  * The client of the model that reads receipts (MOL-272): every part in one message, the answer by the
  * schema. It holds nothing, and logs nothing — what it read goes back to the queue alone (Т-8). A key of a
  * person rather than a workspace is named with its workspace (`CLAUDE_WORKSPACE_ID`).
@@ -213,10 +242,11 @@ export function receiptModel(options: {
         if (typeof status === 'number') throw new ModelRejected(status)
       }
       // no answer, or one torn under its head or its body (adversarial А3): the request may have gone, and
-      // been paid (review №2)
-      throw error instanceof APIConnectionError
-        ? new ModelUnavailable('unreachable', null)
-        : new ModelUnavailable('dropped', null, error)
+      // been paid (review №2) — unless no connection was ever made, and then nothing was (В-6 «а»)
+      if (error instanceof APIConnectionError) {
+        throw new ModelUnavailable('unreachable', neverConnected(error) ? 0 : null)
+      }
+      throw new ModelUnavailable('dropped', null, error)
     }
     // an answer of 200 with no body is one torn too: the SDK hands it over as nothing
     const answered: unknown = message

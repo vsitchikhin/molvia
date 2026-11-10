@@ -36,9 +36,11 @@ export interface ModelSpendRepository {
   reserve(month: string, worstMicroUsd: number, call: ModelCall, at: Date): Promise<ModelReserved>
   /**
    * Puts what the call cost in place of its worst — in the person's share while it still counts that month — and
-   * tells the owner of a share of the cap passed. **A cost not known** (`null`: a time out, a connection lost, a
-   * fault of ours) keeps the worst in the month, which holds the money, and gives it back to the share, which holds
-   * the people apart (MOL-367, owner's В-4 «а» on adversarial А1): a person chooses no outage of the network.
+   * tells the owner of a share of the cap passed. **A fault of ours** (`null`: whether it was paid is not known)
+   * keeps the worst in the month, which holds the money, and gives it back to the share, which holds the people apart
+   * (MOL-367, owner's В-4 «а»): it is once a receipt, and the owner hears of it. A time out or a connection lost is
+   * never settled so — it may have been paid and is asked again every minute (В-6 «а» on adversarial Б1); a request
+   * that never left settles at nought in both.
    */
   settle(
     month: string,

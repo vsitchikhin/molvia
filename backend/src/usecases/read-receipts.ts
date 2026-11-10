@@ -272,8 +272,11 @@ async function readByModel(
     reading = await model.read(parts)
   } catch (error) {
     if (error instanceof ModelUnavailable) {
-      // a time out may have been paid: its worst stays in the month, and goes back to the person's share (В-4 «а»)
-      await spend.settle(month, worst, error.costMicroUsd, call, now())
+      // a time out may have been paid: its worst stays counted, in the month and the person's share alike — a request
+      // that never left costs nothing (MOL-367, В-6 «а» on adversarial Б1)
+      if (error.costMicroUsd !== null) {
+        await spend.settle(month, worst, error.costMicroUsd, call, now())
+      }
       report({ kind: 'model_unavailable', reason: error.reason })
       if (error.broken !== undefined) report({ kind: 'model_broken', error: error.broken })
       const waited = now().getTime() - (claimed.queuedAt ?? now()).getTime()

@@ -599,23 +599,24 @@ describe('the model away (Р-9)', () => {
     expect(reports).toContainEqual({ kind: 'model_unavailable', reason: 'status 529' })
   }, 30_000)
 
-  it('keeps the worst counted for a time out, whose price is not known — in the month, never the share', async () => {
+  it('keeps the worst counted for a time out, whose price is not known — in the month and the share alike', async () => {
     const me = await person(LATER)
     await queued(me)
     const model = fakeModel(() => Promise.reject(new ModelUnavailable('timeout', null)))
-    await readAll(benchReader(), model)
-    expect((await month())?.spentMicroUsd).toBe(9_000)
-    // a person chooses no outage of the network (MOL-367, owner's В-4 «а» on adversarial А1)
-    expect(await spentOf(me)).toBe(0)
-  }, 30_000)
-
-  it('takes nothing of the share for every minute a receipt waits with no connection (MOL-367, А1)', async () => {
-    const me = await person(LATER)
-    await queued(me)
-    const model = fakeModel(() => Promise.reject(new ModelUnavailable('unreachable', null)))
     for (let minute = 0; minute < 3; minute += 1) await readAll(benchReader(), model)
     expect(model.asked).toBe(3)
+    // asked again every minute, each may have been paid: the share holds them (MOL-367, В-6 «а» on adversarial Б1)
     expect((await month())?.spentMicroUsd).toBe(3 * 9_000)
+    expect(await spentOf(me)).toBe(3 * 9_000)
+  }, 30_000)
+
+  it('takes nothing for a request that never left, however long the receipt waits (MOL-367, А1, В-6 «а»)', async () => {
+    const me = await person(LATER)
+    await queued(me)
+    const model = fakeModel(() => Promise.reject(new ModelUnavailable('unreachable', 0)))
+    for (let minute = 0; minute < 3; minute += 1) await readAll(benchReader(), model)
+    expect(model.asked).toBe(3)
+    expect((await month())?.spentMicroUsd).toBe(0)
     expect(await spentOf(me)).toBe(0)
   }, 30_000)
 

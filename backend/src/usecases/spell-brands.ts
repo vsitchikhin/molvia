@@ -90,8 +90,11 @@ export async function spelledBrands(
     answer = await reader.spellBrands(brands)
   } catch (error) {
     if (error instanceof ModelUnavailable) {
-      // a time out may have been paid: its worst stays in the month, and goes back to the person's share (В-4 «а»)
-      await spend.settle(month, worst, error.costMicroUsd, call, now())
+      // a time out may have been paid: its worst stays counted, in the share too — a request that never left costs
+      // nothing (MOL-367, В-6 «а»)
+      if (error.costMicroUsd !== null) {
+        await spend.settle(month, worst, error.costMicroUsd, call, now())
+      }
       report({ kind: 'brands_unavailable', reason: error.reason })
       return taken
     }

@@ -169,6 +169,31 @@ describe('the model that reads receipts (MOL-272)', () => {
     expect(asked).toBe(1)
   })
 
+  it('costs nothing where no connection was ever made, and is in doubt where one broke (MOL-367, В-6 «а»)', async () => {
+    const failing = (cause: unknown) =>
+      (() => Promise.reject(new TypeError('fetch failed', { cause }))) as typeof fetch
+    const socket = (code: string) => Object.assign(new Error(`socket ${code}`), { code })
+    for (const code of ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ENETUNREACH', 'EHOSTUNREACH']) {
+      await expect(model(failing(socket(code))).read([jpeg(10, 10)])).rejects.toMatchObject({
+        reason: 'unreachable',
+        costMicroUsd: 0,
+      })
+    }
+    // every address of the host refused: no connection either
+    const everyAddress = new AggregateError([socket('ECONNREFUSED'), socket('ENETUNREACH')])
+    await expect(model(failing(everyAddress)).read([jpeg(10, 10)])).rejects.toMatchObject({
+      costMicroUsd: 0,
+    })
+    // one address reached and reset under the request: it may have gone
+    const oneReached = new AggregateError([socket('ECONNREFUSED'), socket('ECONNRESET')])
+    for (const cause of [socket('ECONNRESET'), socket('UND_ERR_SOCKET'), oneReached, undefined]) {
+      await expect(model(failing(cause)).read([jpeg(10, 10)])).rejects.toMatchObject({
+        reason: 'unreachable',
+        costMicroUsd: null,
+      })
+    }
+  })
+
   const hung = (count: { asked: number }) =>
     ((_input: unknown, init?: RequestInit) => {
       count.asked += 1
