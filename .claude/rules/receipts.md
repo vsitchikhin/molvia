@@ -298,17 +298,22 @@ month — two processes at a rollout, a clock stepped back — counts in the new
 the old one at nought; its settling under the old month leaves its worst there. **One transaction a call, the
 account's lock first** (privacy.md): the share is taken in one statement, then the month; the share refusing leaves the
 month untouched and tells no stop, the cap refusing gives the share back. `settle` puts the call's own price in the
-share too, while the share still counts that month. **A request that never left costs nothing** (В-4 «а» on adversarial
-А1, narrowed by В-6 «а» on Б1): a connection that fails before a byte goes — no address, the port refused, no route, no
-connection in time (`NEVER_CONNECTED` in `model-reader.ts`, a closed list down the error's causes, judged at `fetch`
-itself, since the client reads undici's «Connect Timeout Error» as its own time out with no cause — adversarial В1 —
-and a time out of the connecting alone, `ETIMEDOUT` of `connect`, the host's addresses tried in turn — Г1) —
-settles at nought
-in the month and the share; a receipt waiting ten minutes for the model away is reserved every minute, and an evening
-with no connection took 99 % of a share with not a cent billed. **Anything else in doubt is paid** — a time out, a
-connection reset under the request, an answer torn: the worst stays in both, since the request went and the queue asks
-it again every minute; given back to the share, a receipt the model answers past its 120 s put $2,15 a day of one
-person into the month with the share at nought (Б1). **A fault of ours goes to the month alone**
+share too, while the share still counts that month. **A request known not to have left costs nothing** (В-4 «а» on adversarial
+А1, narrowed by В-6 «а» on Б1): a connection that fails in one of the ways of a closed list — no address, the port
+refused, no route, no connection in time (`NEVER_CONNECTED` in `model-reader.ts`, down the error's causes, judged at
+`fetch` itself, since the client reads undici's «Connect Timeout Error» as its own time out with no cause — adversarial
+В1 — and beside it a time out of the connecting alone, `ETIMEDOUT` of `connect`, the host's addresses tried in turn —
+Г1) — settles at nought in the month and the share; a receipt waiting ten minutes for the model away is reserved every
+minute, and an evening with no connection took 99 % of a share with not a cent billed. **The list is closed, never a
+promise for every failure before a byte goes** (owner's В-7 «а» after round 5, Д1: five rounds found one more form
+each). **Anything else is paid in doubt** — a time out, a connection reset under the request, an answer torn, and any
+failure the list does not name, a request that never left included: the worst stays in both, since the request may have
+gone and the queue asks it again every minute; given back to the share, a receipt the model answers past its 120 s put
+$2,15 a day of one person into the month with the share at nought (Б1). **The price, named as a class:** a TLS handshake
+that fails — the server's clock months off, a proxy taking TLS apart — a local firewall (`EPERM`), a network down
+(`ENETDOWN`), the ephemeral ports run out (`EADDRNOTAVAIL`), and any other form outside the list cost the share some
+$0,009 a minute a waiting receipt while they last, as before В-4; an outage that wide breaks the rates and the bot too,
+and is seen. A form found outside the list is the owner's to add, never a fix of its own. **A fault of ours goes to the month alone**
 (`keepInMonth`, never `settle`, which takes a price): once a receipt, and the owner hears of it. A process lost between
 the reserve and the answer still leaves the worst in both. **A brand's call is paid from the share of the
 receipt that asked it** (В-2 «а»): over it the brand waits for the next receipt that asks, whosever. Over the share
