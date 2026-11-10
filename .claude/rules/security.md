@@ -10,6 +10,11 @@ paths:
   - '.github/workflows/*.yml'
   - '.github/dependabot.yml'
   - 'bin/check-pins*'
+  - 'bin/npm-audit*'
+  - 'bin/scan-images*'
+  - '.github/scanners/*/Dockerfile'
+  - '.gitleaks.toml'
+  - '.gitleaksignore'
   - '*/Dockerfile'
   - 'services/*/Dockerfile'
   - 'deploy/*/Dockerfile'
@@ -80,7 +85,7 @@ file holds what belongs to no single area, and what the audit found missing.
   brings; building Caddy ourselves would make every later update of it ours. Nothing of ours is Go: Caddy,
   VictoriaMetrics and Grafana are programs we ship as their authors built them, and a scanner reads the modules a
   Go binary carries inside it. How it holds — no npm beside `node`, a user in every last stage, the distribution
-  brought up to date at every release — is `deploy.md`. **Checked again by hand**: trivy is not in CI.
+  brought up to date at every release — is `deploy.md`. **Checked again by CI** since MOL-369, below.
 - **`npm audit --omit=dev` leaves one moderate, `uuid` 8 under exceljs** (MOL-365): fixed only by exceljs a major
   back (3.4.0), and the hole is in v3, v5 and v6 with a `buf` — exceljs, which reads the banks' xlsx
   (`backend/src/rates/xlsx.ts`), calls v4. A price, named. `fast-uri` was brought to 3.1.9 and 4.2.3; the alerts of
@@ -105,8 +110,8 @@ file holds what belongs to no single area, and what the audit found missing.
   private.
 - **The repository is public, its history and every pull request's ref included**: a token committed is
   read before it is removed, and a force push removes nothing (`CLAUDE.md`). A secret found there is
-  rotated, never rewritten out. gitleaks over the whole history found none (MOL-287); a guard in CI is
-  MOL-369.
+  rotated, never rewritten out. gitleaks over the whole history found none (MOL-287), and reads every pull
+  request's commits since MOL-369 (below).
 - **CI's secrets stand in the environment `production`, which admits `master` alone**, and a job holding
   one has `permissions: contents: read` or none — `HC_CERT_URL` of `watch.yml` too, moved there from the
   repository (MOL-368), with `deployment: false`: the environment's secrets and rule of branches, and no
@@ -167,6 +172,73 @@ file holds what belongs to no single area, and what the audit found missing.
   (`allowed_actions: selected`, owner's В-3 «а») and only by a full sha (`sha_pinning_required`). A new action
   of another author is a dependency to discuss, then a pattern in that list. Checked by
   `gh api repos/vsitchikhin/molvia --jq .security_and_analysis` and `…/actions/permissions`.
+
+## What CI scans (MOL-369)
+
+The audit ran gitleaks, trivy and `npm audit` once (В-5 «а» of MOL-287): a picture of one day, and the next token
+in a test or the next advisory against Alpine would have waited for the audit to be run again by hand. Each now runs
+by itself; the owner's decisions are В-1…В-5 in `.scratch/tasks/plans/MOL-369.md`.
+
+- **The scanners are images by digest, each in a Dockerfile of its own** (`.github/scanners/<name>/`, owner's В-1
+  «а»): `FROM` their official image `AS runtime`, `USER 1001` — the runner's uid, so the checkout is its own — and
+  nothing of ours built. So Dependabot's `images` moves them and `bin/check-pins.mjs` holds them, which a
+  `docker run …@sha256` of a workflow neither does; their actions would have been code of third authors beside
+  `packages: write`, which `allowed_actions` keeps out (MOL-364).
+- **gitleaks reads every commit of a pull request** (`HEAD^1..HEAD^2` of the merge CI checks out), first in the job
+  `check` — a third job would need the ruleset changed, and red in seconds is the point. **A commit, not the diff**:
+  a secret removed by the next commit is public in its ref all the same, so the step stays red until the secret is
+  rotated by its row of «Rotating the secrets» and its fingerprint goes into `.gitleaksignore` with a line of what
+  it was and the day (Р-4) — a record, never a rewrite. `--redact`: the log of a public repository is public. A push
+  to master is not read: master takes pull requests alone. **gitleaks says «no leaks found» and exits 0 when its git
+  cannot read the range** (seen on a worktree whose `.git` the container did not have), so the same git of the same
+  image counts the range first and fails the step where it cannot — a run that is no merge included. **A merge of
+  master in the branch is read by what it brought** (adversarial А1): `git log -p` shows a merge no diff, and a
+  conflict resolved by hand is exactly where a token is typed — so `--diff-merges=first-parent`, master's changes
+  read again with the hand's; `--remerge-diff`, the hand's alone, writes objects into a checkout mounted read-only.
+  **A file git calls binary is read as text** (`--text`, А3): a NUL or `-diff` in a `.gitattributes` of the same
+  pull request hid a `.env`. **A commit's message is read too** (А6), as public as its diff and out of gitleaks' git
+  mode: a file per commit through `gitleaks dir`, its fingerprint `/messages/<commit>:<rule>:<line>`.
+  **`gitleaks:allow` in a line silences nothing** (`--ignore-gitleaks-allow`, А2): a comment in code is no change of
+  the configuration review watches. **Its rules are its defaults and ours** (`.gitleaks.toml`): a ping URL of
+  healthchecks.io, and a Telegram bot's token by its shape alone — the default wants `telegr…` in the name beside
+  it, and the local check of the red path passed `const TOKEN = '…'` until this rule — bounded on the left alone, by
+  what is no digit, not `\b`: Bot API's address puts it after `…/bot` (А4), its last sign may be `-` (А5), and a
+  bound on the right took the comma before a second token, which then went unfound and unredacted (В1). **A test's
+  value is let go by its value, for the generic rule alone** (Р-2): a path such as `*.test.ts` would pass a real
+  token pasted into a test, and a pattern given to every rule would silence the ping URL, whose path is a uuid. On
+  10.11.2026 the history of master held sixteen such findings and every branch the audit's thirty-three: none after
+  the allowlist. **The prices, named:** the configuration is the pull request's own, so a pull request may loosen it
+  for itself — a change of `.gitleaks.toml`, `.gitleaksignore` or `.gitattributes` is review's; only what a rule
+  knows is found, and a binary's text only where it lies bare (a zip or an xlsx is compressed); a merge of master
+  reads what master brought again, so a secret rotated and left in a file reddens every branch merging it — the
+  secret goes out of the file with its rotation.
+- **`npm audit` of what ships is judged by `bin/npm-audit.mjs`** in `check` (owner's В-4 «б»): a high or critical
+  advisory is red unless `bin/npm-audit-accepted.json` accepts it — its GHSA, the reason and the day to look again,
+  a day of the calendar a year ahead at most (adversarial Б2), red once more the day after. **What ships is read
+  from the lockfile, not `--omit=dev`** (adversarial Б1): the whole tree is audited and a package counts where a
+  path of it is not `dev`, or where it is workbox's runtime — `generateSW` copies it into `sw.js`, which runs on
+  every request of the page, and the lockfile calls it development's; its builder `workbox-build` does not ship. In
+  doubt — no lockfile, a path it does not know — a package ships. **The price, named:** the few lines Vite and
+  `@vitejs/plugin-vue` put into the bundle (`modulepreload`, `_export_sfc`) stay development's — every advisory of
+  either is of the dev server. npm has no list of its own, and `--audit-level=high` alone would hold every pull
+  request, a hotfix included, on the day an advisory comes with no fix. A report that did not come — the registry
+  down — is red: «could not check» is never «clean». A line no advisory needs is said, to be taken out.
+  Development's alerts stay Dependabot's.
+- **trivy reads the six images of a release beside its rollout, and daily what production runs** (`scan.yml`,
+  `bin/scan-images.mjs`, owner's В-2 «а», В-3 «а»): HIGH and CRITICAL with a fix, from ghcr with no pull. **A module
+  inside a Go binary is said, never red**: Caddy, Grafana and VictoriaMetrics as their authors built them wait for
+  their release, which Dependabot's `images` brings — were it red, every merge would be red until Monday's update.
+  **Everything else is ours, and red** (review №3): the distribution's packages and `node_modules` today — the stage
+  `runtime` brings the first up to date at every release, so a fix of Alpine or Debian shows red the day it comes
+  out and goes with the next merge — and a kind of package no image holds yet, which in doubt is ours to look at.
+  **The list of images is `release.yml`'s matrix**, which `scan-images.test.ts` holds `IMAGES` to: an image built
+  and not scanned would be green by silence. **It never judges a rollout**: a hotfix does not wait for a scanner,
+  and a red run on master comes by GitHub's e-mail. The daily run takes the commit `/api/health` names,
+  `sha-<7 hex>`; production not answering, or an image not scanned — the database of trivy not downloaded — is red.
+  On 10.11.2026, production's `sha-a557664`: none ours, the seven of MOL-365 in Go binaries. **The prices, named:**
+  GitHub's cron runs hours late on this repository (MOL-221), so «daily» is «within a day»; a fix of the
+  distribution red on a quiet week waits for a merge, as there is no rollout without one; a Go binary's finding is
+  said and not followed — Dependabot's Monday is what moves it.
 
 ## The edges
 
