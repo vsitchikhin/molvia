@@ -60,8 +60,8 @@ export const EXPORT_FORMAT = 'molvia-export'
 // the shared catalogue by «Предложить товар» on the person's day, which its quota counts (MOL-362).
 // 31: the account's `modelMonth`, `modelSpentMicroUsd` and `modelShareTold`, how much of the person's share of the
 // model is counted this month — a call whose price is not known at its highest — and whether the owner heard they
-// reached it (MOL-367).
-export const EXPORT_VERSION = 31
+// reached it (MOL-367). 32: a receipt's `service`, a café's service the lines make the total less (MOL-310).
+export const EXPORT_VERSION = 32
 
 const day = z.iso.date()
 
@@ -393,6 +393,7 @@ const receiptSchema = z.strictObject({
   readTotal: signedMoneyCodec.nullable(),
   cashback: signedMoneyCodec.nullable(),
   redeemed: signedMoneyCodec.nullable(),
+  service: signedMoneyCodec.nullable(),
   readPartly: z.boolean().nullable(),
   paidBy: z.string().nullable(),
   balanced: z.boolean(),

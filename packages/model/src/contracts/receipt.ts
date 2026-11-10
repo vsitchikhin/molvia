@@ -235,6 +235,14 @@ export const receiptDetailCodec = z.strictObject({
   cashback: moneyCodec.nullable().optional(),
   redeemed: moneyCodec.nullable().optional(),
   /**
+   * A café's service (MOL-310, «Հավելավճար 10%»): no dish, the lines make the total less it — `linesTotalOf` — and
+   * the trip is the total. `slip` — a bank terminal's slip with no bill, its total read in one place, for the person
+   * to check (В-3 «а»). Sent only to a phone that asked by `RECEIPT_BILL_HEADER`, as `readTotal`: an earlier build
+   * is told the lines' total as the receipt's, and a slip's total as none.
+   */
+  service: moneyCodec.nullable().optional(),
+  slip: z.literal(true).optional(),
+  /**
    * How the receipt was paid, as its words of payment say (MOL-312): cash or a card, only where one of
    * them carries the sum — `null` when the receipt does not say, or says both. It suggests an account,
    * never chooses one. Sent only to a phone that asked by `RECEIPT_PAID_BY_HEADER`, as `readTotal`.
@@ -400,6 +408,9 @@ export const RECEIPT_REPAIRED_HEADER = 'X-Molvia-Receipt-Repaired'
 
 /** A phone that knows the detail's `cashback` and `redeemed` says so by this header (MOL-289). */
 export const RECEIPT_CASHBACK_HEADER = 'X-Molvia-Receipt-Cashback'
+
+/** A phone that knows the detail's `service` and `slip` says so by this header (MOL-310). */
+export const RECEIPT_BILL_HEADER = 'X-Molvia-Receipt-Bill'
 
 /** A phone that knows a line's `spelled` says so by this header (MOL-293), as `RECEIPT_CODES_HEADER`. */
 export const RECEIPT_SPELLED_HEADER = 'X-Molvia-Receipt-Spelled'
