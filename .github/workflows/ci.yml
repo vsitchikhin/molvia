@@ -51,18 +51,32 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           docker build --quiet --tag molvia-gitleaks .github/scanners/gitleaks
+          # `safe.directory` for a run where the checkout is not the container's uid — a copy on a Mac.
           image() {
             docker run --rm --volume "$PWD:/repo:ro" \
               --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/repo \
               "$@"
           }
+          flags=(--config /repo/.gitleaks.toml --gitleaks-ignore-path /repo/.gitleaksignore
+            --ignore-gitleaks-allow --redact --verbose --no-banner)
           # gitleaks says «no leaks found» and exits 0 when its git cannot read the range: the same git of
           # the same image counts it first, and fails the step where it cannot.
           commits="$(image --entrypoint git molvia-gitleaks -C /repo rev-list --count 'HEAD^1..HEAD^2')"
           echo "the pull request's commits: $commits"
-          image molvia-gitleaks git /repo --config /repo/.gitleaks.toml \
-            --gitleaks-ignore-path /repo/.gitleaksignore --log-opts='HEAD^1..HEAD^2' \
-            --redact --verbose --no-banner
+          # A merge of master shows what it brought against the branch — a conflict resolved by hand
+          # included; without it `git log -p` shows a merge no diff (adversarial А1). `--text`: a file git
+          # calls binary — by a NUL, by `-diff` in `.gitattributes` — is read as well (А3).
+          found=0
+          image molvia-gitleaks git /repo "${flags[@]}" \
+            --log-opts='--text --diff-merges=first-parent HEAD^1..HEAD^2' || found=$?
+          # A commit's message is as public as its diff, and gitleaks reads only the diff (А6): a file per
+          # commit, so a finding's fingerprint names it.
+          messages="$(mktemp -d)"
+          for commit in $(git rev-list 'HEAD^1..HEAD^2'); do
+            git log -1 --format=%B "$commit" > "$messages/$commit"
+          done
+          image --volume "$messages:/messages:ro" molvia-gitleaks dir /messages "${flags[@]}" || found=$?
+          exit "$found"
 
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
