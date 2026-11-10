@@ -199,18 +199,19 @@ describe('the new items of a day’s records (MOL-373)', () => {
   it('refuses a record past its day before any of its names is locked, and takes one of names there (adversarial А2)', async () => {
     const me = await owner()
     await spent(me, RECEIPT_ITEMS_DAY_MAX)
-    await insertItem(db, { name: 'Сыр Лори', searchKey: toSearchKey('Сыр Лори') })
+    await insertItem(db, { name: 'Сыр Брынза', searchKey: toSearchKey('Сыр Брынза') })
     const receiptId = await parsedReceipt(me.id, 2)
 
-    // the name already there locked elsewhere — «Предложить товар» of another person on that very name: a record
-    // that locked its names before it met its new one would wait here, and the test would run out of time
+    // the name already there locked elsewhere — «Предложить товар» of another person on that very name. Its key,
+    // `sir brinza`, comes before the new one's, `sir chanah`, and names are made in the order of their keys: a
+    // record that met its day only at its new name would wait here, and the test would run out of time
     const holder = connectDrizzle()
     let letGo: () => void = () => undefined
     const gate = new Promise<void>((resolve) => (letGo = resolve))
     let locked: () => void = () => undefined
     const lockTaken = new Promise<void>((resolve) => (locked = resolve))
     const holding = holder.db.transaction(async (tx) => {
-      await lockItemKey(tx, 'product', toSearchKey('Сыр Лори'))
+      await lockItemKey(tx, 'product', toSearchKey('Сыр Брынза'))
       locked()
       await gate
     })
@@ -219,7 +220,7 @@ describe('the new items of a day’s records (MOL-373)', () => {
       const refused = await record(
         me,
         receiptId,
-        bodyOf([{ name: 'Сыр Лори' }, { name: 'Сыр Чанах' }]),
+        bodyOf([{ name: 'Сыр Брынза' }, { name: 'Сыр Чанах' }]),
       )
       expect(refused.statusCode).toBe(429)
       expect(refused.json()).toMatchObject({ code: ERROR.ITEMS_DAY_LIMITED })
@@ -230,7 +231,11 @@ describe('the new items of a day’s records (MOL-373)', () => {
     }
 
     // names already there are no new items: the full day takes them
-    const taken = await record(me, receiptId, bodyOf([{ name: 'Сыр Лори' }, { name: 'сыр  лори' }]))
+    const taken = await record(
+      me,
+      receiptId,
+      bodyOf([{ name: 'Сыр Брынза' }, { name: 'сыр  брынза' }]),
+    )
     expect(taken.statusCode).toBe(200)
     expect(await named('Сыр Чанах')).toHaveLength(0)
     expect((await count(me)).n).toBe(RECEIPT_ITEMS_DAY_MAX)

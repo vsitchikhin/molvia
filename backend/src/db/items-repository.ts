@@ -68,9 +68,9 @@ export interface ItemRepository {
     quota?: NewItemsQuota,
   ): Promise<Proposal>
   /**
-   * Refuses up front, before anything is locked or written, names of which more are new than the person's
-   * day has room for (MOL-373, adversarial А2): a record past its day found it only at its first new
-   * name, every name before it locked — up to 599 — some 3–6 s a refusal and again at will. Read with no
+   * Refuses up front, before any name is locked or anything written, names of which more are new than
+   * the person's day has room for (MOL-373, adversarial А2): a record past its day found it only at its
+   * first new name, every name before it locked — up to 599 — some 3–6 s a refusal and again at will. Read with no
    * lock on the names, so this is the bound and `createUnlessNamed` the truth: a name made by someone in
    * between is counted new here, and the record refused so goes through when sent again.
    */
