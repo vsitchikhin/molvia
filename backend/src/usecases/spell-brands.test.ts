@@ -8,8 +8,10 @@ import type { SpellReport } from './spell-brands'
 
 const NOW = new Date('2026-10-31T12:00:00Z')
 const PAID = { costMicroUsd: 120, tokens: { input: 400, output: 60 } }
-// a receipt the model read
-const ASK = { ask: true }
+const ACTOR = '6f1d6c2e-0000-4000-8000-000000000367'
+// a receipt the model read, whose owner pays from their share (MOL-367)
+const ASK = { ask: true, actorId: ACTOR }
+const CALL = { actorId: ACTOR, capMicroUsd: 200_000_000, shareMicroUsd: 2_000_000 }
 
 const FELIX: BrandAsked = { brand: 'Ֆելիքս', line: 'Կատվի կեր «Ֆելիքս» 85գ' }
 const LOCAL: BrandAsked = { brand: 'Աշտարակ Կաթ', line: 'Կաթ «Աշտարակ Կաթ» 1լ' }
@@ -18,8 +20,8 @@ function harness(
   answer: () => Promise<BrandSpelling>,
   {
     said = new Map<string, string | null>(),
-    room = true,
-  }: { said?: Map<string, string | null>; room?: boolean } = {},
+    refused,
+  }: { said?: Map<string, string | null>; refused?: 'cap' | 'share' } = {},
 ) {
   const remembered: BrandSpelt[] = []
   const spellings: BrandSpellingRepository = {
@@ -31,7 +33,9 @@ function harness(
       return Promise.resolve()
     },
   }
-  const reserve = vi.fn<ModelSpendRepository['reserve']>(() => Promise.resolve(room))
+  const reserve = vi.fn<ModelSpendRepository['reserve']>(() =>
+    Promise.resolve(refused ?? 'reserved'),
+  )
   const settle = vi.fn<ModelSpendRepository['settle']>(() => Promise.resolve())
   const spellBrands = vi.fn<ReceiptModel['spellBrands']>(answer)
   const reader = {
@@ -48,7 +52,8 @@ function harness(
     model: {
       reader,
       spend: { reserve, settle, month: () => Promise.resolve(null) },
-      capMicroUsd: 200_000_000,
+      capMicroUsd: CALL.capMicroUsd,
+      shareMicroUsd: CALL.shareMicroUsd,
     },
     report: (event: SpellReport) => reports.push(event),
     now: () => NOW,
@@ -70,7 +75,7 @@ describe('the brands of a receipt the model read, asked of it (MOL-326, В-1 «�
       { brand: 'ֆելիքս', spelling: 'Felix' },
       { brand: 'աշտարակ կաթ', spelling: null },
     ])
-    expect(h.settle).toHaveBeenCalledWith('2026-10-01', expect.any(Number), 120, 200_000_000, NOW)
+    expect(h.settle).toHaveBeenCalledWith('2026-10-01', expect.any(Number), 120, CALL, NOW)
     expect(h.reports).toEqual([{ kind: 'brands_spelt', asked: 2, taken: 1, paid: PAID }])
   })
 
@@ -92,11 +97,24 @@ describe('the brands of a receipt the model read, asked of it (MOL-326, В-1 «�
   })
 
   it('must not ask over the cap: the brands are spelt in letters, and asked with the next receipt', async () => {
-    const h = harness(() => read(['Felix']), { room: false })
+    const h = harness(() => read(['Felix']), { refused: 'cap' })
     expect(await spelledBrands(h.deps, [FELIX], ASK)).toEqual(new Map())
     expect(h.spellBrands).not.toHaveBeenCalled()
     expect(h.remembered).toEqual([])
     expect(h.reports).toEqual([{ kind: 'brands_passed', reason: 'cap' }])
+  })
+
+  it('reserves from the share of the receipt’s owner, and asks nothing over it (MOL-367, В-2 «а»)', async () => {
+    const paid = harness(() => read(['Felix']))
+    await spelledBrands(paid.deps, [FELIX], ASK)
+    expect(paid.reserve).toHaveBeenCalledWith('2026-10-01', expect.any(Number), CALL, NOW)
+
+    const over = harness(() => read(['Felix']), { refused: 'share' })
+    expect(await spelledBrands(over.deps, [FELIX], ASK)).toEqual(new Map())
+    expect(over.spellBrands).not.toHaveBeenCalled()
+    expect(over.settle).not.toHaveBeenCalled()
+    expect(over.remembered).toEqual([])
+    expect(over.reports).toEqual([{ kind: 'brands_passed', reason: 'share' }])
   })
 
   it('remembers nothing of a refusal, a cut answer or one of no schema — each paid', async () => {
@@ -104,7 +122,7 @@ describe('the brands of a receipt the model read, asked of it (MOL-326, В-1 «�
       const h = harness(() => Promise.resolve({ kind, ...PAID }))
       expect(await spelledBrands(h.deps, [FELIX], ASK)).toEqual(new Map())
       expect(h.remembered).toEqual([])
-      expect(h.settle).toHaveBeenCalledWith('2026-10-01', expect.any(Number), 120, 200_000_000, NOW)
+      expect(h.settle).toHaveBeenCalledWith('2026-10-01', expect.any(Number), 120, CALL, NOW)
       expect(h.reports).toEqual([{ kind: 'brands_passed', reason: kind, paid: PAID }])
     }
   })
@@ -117,25 +135,19 @@ describe('the brands of a receipt the model read, asked of it (MOL-326, В-1 «�
 
     const busy = harness(() => Promise.reject(new ModelUnavailable('status 429', 0)))
     await spelledBrands(busy.deps, [FELIX], ASK)
-    expect(busy.settle).toHaveBeenCalledWith('2026-10-01', expect.any(Number), 0, 200_000_000, NOW)
+    expect(busy.settle).toHaveBeenCalledWith('2026-10-01', expect.any(Number), 0, CALL, NOW)
 
     const rejected = new ModelRejected(400)
     const refused = harness(() => Promise.reject(rejected))
     await spelledBrands(refused.deps, [FELIX], ASK)
-    expect(refused.settle).toHaveBeenCalledWith(
-      '2026-10-01',
-      expect.any(Number),
-      0,
-      200_000_000,
-      NOW,
-    )
+    expect(refused.settle).toHaveBeenCalledWith('2026-10-01', expect.any(Number), 0, CALL, NOW)
     expect(refused.reports).toEqual([{ kind: 'brands_rejected', error: rejected }])
   })
 
   it('answers what was said before, and asks nothing, of a receipt the model did not read (self-review №3)', async () => {
     const said = new Map<string, string | null>([['ֆելիքս', 'Felix']])
     const h = harness(() => read(['Աշտարակ']), { said })
-    expect(await spelledBrands(h.deps, [FELIX, LOCAL], { ask: false })).toEqual(
+    expect(await spelledBrands(h.deps, [FELIX, LOCAL], { ...ASK, ask: false })).toEqual(
       new Map([['ֆելիքս', 'Felix']]),
     )
     expect(h.spellBrands).not.toHaveBeenCalled()
