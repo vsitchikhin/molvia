@@ -470,7 +470,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 - **Erasure is one function**, `ErasureRepository.erase`, behind two doors — `/delete` in the bot
   and «Удалить мои данные» in the settings (`DELETE /actors/me`, MOL-94) — in one transaction; the person's catalogue
-  items go where nobody else stands on them (MOL-374, `ITEM_REFERENCES`), the rest stay with `created_by` nulled, every
+  items lose their author and are marked, and a sweep deletes a marked item once no living person, merge or seed
+  stands on it — the authorless one kept for somebody goes when that somebody does (MOL-374, `ITEM_REFERENCES`); every
   place stays, and one is added to `erasures` — a count by week of
   arrival, no id (MOL-91). **A new table that points at `actors` must join
   erasure** — a test holds `ACTOR_REFERENCES` to every foreign key — **and the record of processing**

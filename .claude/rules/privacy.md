@@ -37,29 +37,30 @@ The detail behind the privacy lines of `CLAUDE.md`.
   with the owner's replies (MOL-147), the sign-ins the bot has not told of yet (MOL-361), login requests by Telegram id
   — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
   `erasures` for the week they appeared (MOL-91). **Catalogue items the person added go when nobody
-  else stands on them** (MOL-374, owner's В-5 «б» of MOL-362: «60 → erase → sign in again» left them in
-  everybody's search for good) — with their vector, the codes the person wrote to them and the person's
-  own words of the shops' memory about them (В-1 «а»: a receipt's «Записать» makes both the item and the
-  word, so their own word holding it would keep every name a receipt made). Someone stands on an item by
-  a purchase, a verdict (a withdrawn one too), a pick, a line of a receipt not recorded (В-2 «а»: its
-  «Записать» sends the item's id), a code or a word not the person's own, a merge either way, the
-  owner's «apart», and the seed's Armenian names or headings — only the seed writes them, on an item
-  someone proposed first, and every line of the seed has them; `ITEM_REFERENCES` holds every foreign key
-  on `items`, and the test of the holders takes a case for each key (review 1, №2). **An item whose
-  author is gone goes with the last person who stood on it** (adversarial А1): erased after the author,
-  the one whose pick kept it left it nobody's for good — so erasure takes too the items with no author
-  the person's rows point at, by the same test, and the seed's name is what keeps a seed's item. **The
-  items are locked right after the owner, before anything of the person is deleted, and waited on**
-  (А2): `delete from actors` updates them anyway by the cascade of `created_by`, so skipping one under
-  somebody's lock only left it nobody's when that write came to nothing; taken this early, the merge
-  night holding one finishes first and erasure decides by what it left. **The price, named:** a write of
-  the person's own that holds their item and then waits on their account — a code bound to it,
-  `attachBarcode`, for `added_by` — meets erasure in a deadlock and one of the two fails, as it did by
-  the cascade before MOL-374. A write to an item gone meanwhile is the foreign key's 404, as an item never
-  there; the two that write by an item's id without a person to answer — the queue of receipts writing a
-  reading (А6) and the writer of vectors (А5) — take a key share of the items first, so an item erased
-  meanwhile makes its line a new one and leaves its vector out, never refusing the whole. Items left without an author before MOL-374 stay (В-6 «а»), and the copy and `erasures` are
-  as they were (В-3 «а»): the report and `make forget` name both counts. The items someone stands on
+  living stands on them** (MOL-374, owner's В-5 «б» of MOL-362: «60 → erase → sign in again» left them in
+  everybody's search for good) — **erasure only marks them, a sweep deletes them** (owner's В-7 «а», after
+  two rounds of review in which every lock erasure took on an item met another path's in a deadlock):
+  `items.released_at` is set as the author goes, and `sweepReleasedItems` deletes a marked item nothing
+  stands on any more — right after each door's erasure and every minute on the cleanups' timer, a batch a
+  transaction, `for update skip locked`, asked again as it deletes. So erasure locks no item anybody
+  else writes to — the person's own, marked right after the owner and in the order of their ids with a
+  lock a key share passes, the traces last with the cascade that updates them anyway (Р2-А9) — and an
+  item somebody is writing a purchase of is left to a later minute, which decides by what that write
+  left. Something stands on an item while a living person has a purchase, a verdict (a withdrawn one
+  too), a pick, a line of a receipt not recorded (В-2 «а»: its «Записать» sends the item's id), a code
+  or a word of the shops' memory on it — an erased person's code or word has no author left and holds
+  nothing (Р2-А7), nor do the person's own, which go with the item (В-1 «а»: a receipt's «Записать» makes
+  both the item and the word) — and while a merge either way, the owner's «apart» or the seed's Armenian
+  names or headings hold it; `nobodyStandsOn` is the one test, `ITEM_REFERENCES` holds every foreign key
+  on `items`, and the test of the holders takes a case for each key (review 1, №2). **An item the
+  author's erasure left because someone stood on it goes when the last of them does** (adversarial А1):
+  it is marked, and the sweep asks again. The seed and the items left without an author before MOL-374
+  carry no mark and are never swept (В-6 «а», Р2-А8, Р2-А11). Two writers by an item's id with no person
+  to answer — the queue of receipts writing a reading (А6) and the writer of vectors (А5) — take a key
+  share of the items first, so an item swept meanwhile makes its line a new one and leaves its vector
+  out, never refusing the whole; anybody else's write to an item gone is the foreign key's 404, as an
+  item never there. The copy and `erasures` are as they were (В-3 «а»): the report and `make forget`
+  name the items the sweep will take and those that stay. The items someone stands on
   stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
   nulled (MOL-100), the words they gave the shops' memory stay with `actor_id` nulled and still count
   (MOL-126: a fact about the shop, never shown as anyone's; a shelf price in it reaches another person
