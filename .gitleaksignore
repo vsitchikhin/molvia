@@ -1,0 +1,4 @@
+# A finding of gitleaks that is a secret indeed, already rotated (MOL-369, Р-4). The commit is public
+# and stays, so its fingerprint goes here — `<commit>:<file>:<rule>:<line>`, as the report prints it —
+# with a line above it: what it was and the day it was rotated by «Rotating the secrets» of
+# deploy/README.md. A test value is never here: it goes to the allowlist of `.gitleaks.toml`.

@@ -37,11 +37,25 @@ jobs:
           --health-retries 10
 
     steps:
-      # The merge's first parent too: the time reporter turns red only for the files the pull request
-      # changes, `HEAD^1..HEAD` (MOL-266, В-4 «а»).
+      # The whole history: gitleaks reads the pull request's own commits, `HEAD^1..HEAD^2` of the merge,
+      # and the time reporter the files it changes, `HEAD^1..HEAD` (MOL-266, В-4 «а»).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          fetch-depth: 0
+
+      # A secret in any commit of the pull request (MOL-369): its ref is public, so a commit removed later
+      # leaks all the same, and the step stays red until the secret is rotated and its fingerprint goes into
+      # `.gitleaksignore`. First, so it is red in seconds; `--redact`, since the log of a public repository
+      # is public too. A push to master needs none: master takes pull requests alone, read here.
+      - name: secrets in the pull request's commits
+        if: github.event_name == 'pull_request'
+        run: |
+          docker build --quiet --tag molvia-gitleaks .github/scanners/gitleaks
+          docker run --rm --volume "$PWD:/repo:ro" \
+            --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/repo \
+            molvia-gitleaks git /repo --config /repo/.gitleaks.toml \
+            --gitleaks-ignore-path /repo/.gitleaksignore --log-opts='HEAD^1..HEAD^2' \
+            --redact --verbose --no-banner
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc

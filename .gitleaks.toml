@@ -1,0 +1,41 @@
+# gitleaks over the commits of every pull request (MOL-369). The repository is public with every pull
+# request's ref: a secret committed is read before it is removed, so it is rotated, never rewritten out
+# (`.claude/rules/security.md`, «Secrets»). GitHub's push protection knows the providers' tokens; this
+# adds the shapes of our own and the generic `key = '…'`.
+
+[extend]
+useDefault = true
+
+# A ping URL of healthchecks.io: whoever has one can say «alive» for the check (deploy.md). By its uuid
+# or by a project's ping key and a slug; the placeholders of the tests (`0f1e2d3c-secret`, `pk/…`) are
+# neither.
+[[rules]]
+id = "healthchecks-ping-url"
+description = "healthchecks.io ping URL"
+regex = '''hc-ping\.com/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9_-]{22}/[a-z0-9-]+)'''
+keywords = ["hc-ping.com"]
+
+# The values of the tests, by their value and for the generic rule alone (owner's Р-2): a path such as
+# `*.test.ts` would pass a real token pasted into a test, and a pattern given to every rule would
+# silence the one above, whose URL holds a uuid.
+[[allowlists]]
+description = "Test values the generic rule takes for keys"
+targetRules = ["generic-api-key"]
+regexes = [
+  # An id — a `clientKey`, a row's uuid — is no secret.
+  '''^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$''',
+  # A build as `/api/health` names it (MOL-371).
+  '''^v\d+\.\d+\.\d+-\d+-g[0-9a-f]{7,40}$''',
+  # The session token of the tests: base64url of «foobar-token-32-bytes-base64url».
+  '''^Zm9vYmFyLXRva2VuLTMyLWJ5dGVzLWJhc2U2NHVybA$''',
+  # The key of a feedback draft in end-to-end.
+  '''^aa00bb11cc22dd33ee44ff55$''',
+]
+
+# The model's files are checked by their sha256 (MOL-105) — in that file only.
+[[allowlists]]
+description = "sha256 of the embedding model's files"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''^backend/src/embeddings/model\.json$''']
+regexes = ['''^[0-9a-f]{64}$''']
