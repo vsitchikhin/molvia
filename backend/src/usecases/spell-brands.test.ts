@@ -37,6 +37,7 @@ function harness(
     Promise.resolve(refused ?? 'reserved'),
   )
   const settle = vi.fn<ModelSpendRepository['settle']>(() => Promise.resolve())
+  const keepInMonth = vi.fn<ModelSpendRepository['keepInMonth']>(() => Promise.resolve())
   const spellBrands = vi.fn<ReceiptModel['spellBrands']>(answer)
   const reader = {
     version: 'claude-haiku-5-5@v5',
@@ -51,7 +52,7 @@ function harness(
     spellings,
     model: {
       reader,
-      spend: { reserve, settle, month: () => Promise.resolve(null) },
+      spend: { reserve, settle, keepInMonth, month: () => Promise.resolve(null) },
       capMicroUsd: CALL.capMicroUsd,
       shareMicroUsd: CALL.shareMicroUsd,
     },

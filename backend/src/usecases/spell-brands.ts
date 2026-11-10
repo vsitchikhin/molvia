@@ -105,7 +105,7 @@ export async function spelledBrands(
     }
     // ours, and the receipt is not at fault: its brands are spelt in letters, the worst stays in the month alone
     report({ kind: 'error', error })
-    await spend.settle(month, worst, null, call, now())
+    await spend.keepInMonth(month, worst, call)
     return taken
   }
   const paid: ModelPaid = { costMicroUsd: answer.costMicroUsd, tokens: answer.tokens }

@@ -293,7 +293,7 @@ async function readByModel(
     // anything else is ours, and the receipt is not at fault: the owner hears of it, Tesseract reads, and the
     // worst stays in the month — whether it was paid is not known (review №4) — never in the person's share
     report({ kind: 'error', error })
-    await spend.settle(month, worst, null, call, now())
+    await spend.keepInMonth(month, worst, call)
     return null
   }
   const paid: ModelPaid = { costMicroUsd: reading.costMicroUsd, tokens: reading.tokens }

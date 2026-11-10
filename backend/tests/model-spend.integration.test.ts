@@ -196,10 +196,10 @@ describe('a person’s share (MOL-367, owner’s В-1…В-3 «а»)', () => {
     ])
   })
 
-  it('keeps a cost not known in the month and gives it back to the share (В-4 «а»)', async () => {
+  it('keeps a fault of ours in the month and gives it back to the share (В-4 «а»)', async () => {
     const boris = await callOf()
     await spend.reserve(MONTH, 8_200, boris, at)
-    await spend.settle(MONTH, 8_200, null, boris, at)
+    await spend.keepInMonth(MONTH, 8_200, boris)
     expect((await share(boris.actorId))?.spent).toBe(0)
     expect((await spend.month(MONTH))?.spentMicroUsd).toBe(8_200)
   })
