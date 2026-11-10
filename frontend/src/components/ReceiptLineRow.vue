@@ -29,7 +29,8 @@
           t('receipt.review.mismatch', { printed })
         }}</span>
       </span>
-      <!-- Figures put right by the font's 5↔6, the receipt whole by them: «проверьте» (MOL-290). -->
+      <!-- Figures put right by the font's 5↔6, the receipt whole by them (MOL-290), or a bill's price worked out of
+           its sum with a quantity nothing vouches for (MOL-310, В-6 «а»): «проверьте». -->
       <span v-if="line.repaired && figures" class="figures">{{
         t('receipt.review.repaired_note')
       }}</span>

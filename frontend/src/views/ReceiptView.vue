@@ -144,7 +144,8 @@
         <!-- A sole trader's section with no items (MOL-227): the sum is what there is to record;
              the purchases, if wanted, are added later in the trip (В-1). -->
         <AppNote v-if="noItems" class="no-items">
-          {{ t('receipt.review.no_items') }}
+          <!-- A terminal's slip with no bill (MOL-310, В-3 «а»): its sum is read in one place, for the eye to check. -->
+          {{ t(detail.slip ? 'receipt.review.slip' : 'receipt.review.no_items') }}
           <!-- A receipt with items whose every mark OCR lost is read so too (Р-7): a new shot is a tap
                away, as on «Прочитали не всё» (adversarial А6). -->
           <AppButton v-if="canRetake && !locked" variant="ghost" @click="retake">
@@ -193,6 +194,7 @@
           :balance="balance"
           :total="shownTotal"
           :cashback="detail.cashback ?? null"
+          :service="detail.service ?? null"
           :redeemed="detail.redeemed ?? null"
           :rate="detail.rate"
           :day="rateDay"
@@ -804,8 +806,12 @@ export default defineComponent({
     const partly = computed(() => {
       const one = detail.value
       if (!one || one.lines.length === 0) return null
-      // the lines make the total less what a card sent to the card (MOL-289)
-      const total = linesTotalOf(one.receipt.total ?? one.readTotal ?? null, one.cashback ?? null)
+      // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
+      const total = linesTotalOf(
+        one.receipt.total ?? one.readTotal ?? null,
+        one.cashback ?? null,
+        one.service ?? null,
+      )
       const blank = one.lines.some((line) => line.sum === null)
       // a receipt read before keeps no word, and no line the check emptied (А5 «а»)
       if (!(one.readPartly ?? (!blank && readPartly(one.lines, total)))) return null

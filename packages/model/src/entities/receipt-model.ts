@@ -9,6 +9,7 @@ import type { RememberedPrices } from '#model/entities/receipt-remembered'
 import {
   DEPARTMENT,
   TOLERANCE_HUNDREDTHS,
+  linesTotalHundredths,
   paidByOf,
   printedDayOf,
 } from '#model/entities/receipt-text'
@@ -197,14 +198,22 @@ function lineOf(line: ModelReceipt['lines'][number]): ReceiptTextLine {
   const sumHundredths = figureOf(line.sum, 2)
   const discountHundredths = figureOf(line.discount, 2)
   const rounding = discountHundredths === null ? 0 : TOLERANCE_HUNDREDTHS
-  const settled =
+  // a bill that prints no price — «Блюдо, Кол-во, Сумма» (MOL-310) — has no arithmetic to hold: its quantity and
+  // sum are as printed, and only a total they meet vouches for them (`verifiedReading`)
+  const priceless =
+    line.unit_price === null &&
+    discountHundredths === null &&
     quantityMilli !== null &&
-    priceHundredths !== null &&
-    sumHundredths !== null &&
-    Math.abs(
-      Math.round((quantityMilli * priceHundredths) / 1_000) -
-        (sumHundredths + (discountHundredths ?? 0)),
-    ) <= rounding
+    sumHundredths !== null
+  const settled =
+    priceless ||
+    (quantityMilli !== null &&
+      priceHundredths !== null &&
+      sumHundredths !== null &&
+      Math.abs(
+        Math.round((quantityMilli * priceHundredths) / 1_000) -
+          (sumHundredths + (discountHundredths ?? 0)),
+      ) <= rounding)
   return {
     printed: line.printed.trim(),
     hs: classOf(line.code),
@@ -222,12 +231,88 @@ function lineOf(line: ModelReceipt['lines'][number]): ReceiptTextLine {
   }
 }
 
+/** What a label prints around its word: spaces, a colon, «=», a slash, a dash. */
+const MARKS = '[\\s:=/-]*'
+
+/**
+ * A café's service by its word alone, a percent after it at most — «Service 10%», «Հավելավճար 10%:» (MOL-310): one
+ * rule for a line and a summary's label, so «Итого с обслуживанием», a total that names the word, stays a total
+ * (review №3, adversarial А4) and «Салат Service» a dish. In any case.
+ */
+const serviceWordOf = (reading: PhotoReading): RegExp =>
+  new RegExp(
+    `^${MARKS}(?:${reading.words.service})${MARKS}(?:\\(?\\d{1,2}(?:[.,]\\d+)?\\s*%\\)?)?${MARKS}$`,
+    'iu',
+  )
+
+/** The percent a service's label or line prints beside its word — «Service 10%», «Հավելավճար (12,5%)» — or none. */
+function servicePercentOf(text: string): number | null {
+  const [, percent = ''] = /(\d{1,2}(?:[.,]\d+)?)\s*%/u.exec(text) ?? []
+  return percent === '' ? null : Number(percent.replace(',', '.'))
+}
+
+/** A service amount as printed, with the percent printed beside it, if any (MOL-310). */
+interface Served {
+  readonly sum: number | null
+  readonly percent: number | null
+}
+
+/**
+ * A café's service the model copied as a line — «Service 10%  1.00  1950.00» (MOL-310). It is no dish: its sum goes
+ * to the surcharge, and the line out of the lines — only where the surcharge is taken (`receiptTextOfModel`).
+ */
+function serviceApart(
+  reading: PhotoReading,
+  answer: ModelReceipt,
+): { answer: ModelReceipt; served: Served[]; isService: readonly boolean[] } {
+  const word = serviceWordOf(reading)
+  // which of the model's lines are the service, marked once (review №16)
+  const isService = answer.lines.map((line) => word.test(line.printed))
+  const served = answer.lines.filter((_, i) => isService[i])
+  if (served.length === 0) return { answer, served: [], isService }
+  return {
+    answer: { ...answer, lines: answer.lines.filter((_, i) => !isService[i]) },
+    served: served.map((line) => ({
+      sum: figureOf(line.sum, 2),
+      percent: servicePercentOf(line.printed),
+    })),
+    isService,
+  }
+}
+
+/**
+ * How far a service may stand from the percent printed beside it (MOL-310): to the dram, as a till rounds it —
+ * 10 % of 19 500 is 1 950, of 22 899,50 is 2 290.
+ */
+const SERVICE_PERCENT_ROUNDING_HUNDREDTHS = 50
+
 /** What a till rounds a card's payment by: to the dram, «19 098,00» paid for 19 097,86. */
 const PAYMENT_ROUNDING_HUNDREDTHS = 50
 
 /** The one amount of them, or none — two are a doubt, not a choice. */
 const sole = (amounts: ReadonlySet<number>): number | null =>
   amounts.size === 1 ? ([...amounts][0] ?? null) : null
+
+/**
+ * The card's discount the model copied under another word (MOL-310, Р-1): «Ереван Сити» prints it as the prepayment
+ * slip over the receipt, «Կանխավճար … Ընդամենը 169,34», and again under the total — where the model wrote
+ * «կանխավճարին ավել. մանր» or «Կանխավճար» for «Զեղչ գործարքից». The slip's sum is the cashback where a second
+ * place vouches for it, as for the total (MOL-244): the same sum under another word, or a total less the sum taxed
+ * with VAT («ԱԱՀ-ով հարկվող»). One place is none, and two sums so vouched are a doubt.
+ */
+function misnamedCashback(
+  slips: ReadonlySet<number>,
+  unnamed: ReadonlySet<number>,
+  totals: readonly number[],
+  taxed: ReadonlySet<number>,
+): number | null {
+  const vouched = [...slips].filter(
+    (slip) =>
+      unnamed.has(slip) ||
+      totals.some((total) => total > slip && [...taxed].some((sum) => total - sum === slip)),
+  )
+  return vouched.length === 1 ? (vouched[0] ?? null) : null
+}
 
 /**
  * The total two places vouch for (MOL-244), as the parse's `votedTotal` decides it: the lines that met a
@@ -250,11 +335,21 @@ const sole = (amounts: ReadonlySet<number>): number | null =>
  * only where a second place vouches for that difference — the lines or «ԱԱՀ-ով հարկվող» (review round 2, owner's Б1
  * «а»). The cashback is one figure the model copies with the same 5↔6, and the total vouched by itself and a payment
  * says nothing of it: 54,00 copied for 64,00 made water at 160 the one choice that met 6 550 less it.
+ *
+ * **A café's bill** (MOL-310): its total in words no fiscal till prints — «ՎՃԱՐՄԱՆ», «Всего», «Итого к оплате» — and a
+ * service under the dishes, «Հավելավճար 10%», which the lines make the total less, as a cashback: the lines that meet
+ * the total with it prove the bill whole, and the trip is the total. A total voted by two places with a service the
+ * lines did not meet is shown with it, and the font's swaps put no line right under it.
  */
 function totalOf(
   reading: PhotoReading,
   answer: ModelReceipt,
   lines: readonly ReceiptTextLine[],
+  /**
+   * The service's amounts the model copied as lines; `null` — the service was decided against already and its line
+   * stays a line, so none is taken, by a label or a vote (review №9, adversarial В2, review №14).
+   */
+  served: readonly Served[] | null = [],
 ): {
   total: number | null
   read: number | null
@@ -262,9 +357,12 @@ function totalOf(
   owed: number | null
   cashback: number | null
   redeemed: number | null
+  service: number | null
 } {
   const w = reading.words
   const word = (fragment: string): RegExp => new RegExp(`(?:${fragment})`, 'u')
+  // a café's words are printed in capitals as often as not, «ՎՃԱՐՄԱՆ» (MOL-310)
+  const [service, bill] = [serviceWordOf(reading), new RegExp(`(?:${w.billTotal})`, 'iu')]
   const [total, discount, cashbacks, taxedSum, redemption] = [
     word(w.totalKept),
     word(w.discountKept),
@@ -282,22 +380,38 @@ function totalOf(
     ['section', new Set()],
   ])
   const [sentToCard, taxed, spent] = [new Set<number>(), new Set<number>(), new Set<number>()]
+  const surcharges = new Set((served ?? []).map((one) => one.sum))
+  const percents = (served ?? []).flatMap((one) => (one.percent === null ? [] : [one.percent]))
+  // what the card's words do not name, and the prepayment slip's own sum (MOL-310, Р-1)
+  const prepaid = new RegExp(`^${MARKS}(?:${w.prepayment})${MARKS}$`, 'u')
+  const [slips, unnamed] = [new Set<number>(), new Set<number>()]
   for (const { label, amount } of answer.totals) {
     const hundredths = figureOf(amount, 2)
     if (hundredths === null || hundredths <= 0) continue
     if (discount.test(label) && cashbacks.test(label)) sentToCard.add(hundredths)
     else if (redemption.test(label)) spent.add(hundredths)
     else if (taxedSum.test(label)) taxed.add(hundredths)
-    else if (total.test(label) && !discount.test(label) && !sinceStart.test(label))
+    else if (service.test(label)) {
+      surcharges.add(hundredths)
+      const percent = servicePercentOf(label)
+      if (percent !== null) percents.push(percent)
+    } else if (
+      (total.test(label) || bill.test(label)) &&
+      !discount.test(label) &&
+      !sinceStart.test(label)
+    )
       places.get('total')?.add(hundredths)
     else if (paid.test(label)) places.get('paid')?.add(hundredths)
     else if (lines.length === 0 && DEPARTMENT.test(label)) places.get('section')?.add(hundredths)
+    else if (prepaid.test(label)) slips.add(hundredths)
+    else unnamed.add(hundredths)
   }
   const totals = [...(places.get('total') ?? [])]
   // the largest the total's word stands by: a prepayment slip's total is smaller and the one before the
   // card's discount larger, so «Прочитали не всё» errs only towards being said (MOL-244)
   const read = totals.length === 0 ? null : Math.max(...totals)
-  const cashback = sole(sentToCard)
+  const cashback =
+    sentToCard.size > 0 ? sole(sentToCard) : misnamedCashback(slips, unnamed, totals, taxed)
   const sum = lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
   const asPrinted = lines.length > 0 && lines.every((line) => line.asPrinted)
   const vote = (all: Iterable<ReadonlySet<number>>): number | null => {
@@ -310,11 +424,54 @@ function totalOf(
     const voted = backed.filter(([, n]) => n === most)
     return voted.length === 1 ? (voted[0]?.[0] ?? null) : null
   }
+  // a café's service, one amount read wherever it is printed (MOL-310); two, or one not read, are a doubt
+  const fee = surcharges.size === 1 ? ([...surcharges][0] ?? null) : null
+  // a percent printed beside the service is its second place, in either way the total is vouched for: the service is
+  // that percent of the dishes, to the dram, or no service (adversarial Е1, Ж1); with none printed it stands as copied
+  const percentHolds = (dishes: number, service: number): boolean =>
+    percents.every(
+      (percent) =>
+        Math.abs((dishes * percent) / 100 - service) <= SERVICE_PERCENT_ROUNDING_HUNDREDTHS,
+    )
+  const surcharge = served !== null && fee !== null && fee > 0 ? fee : null
   if (cashback === null) {
+    // the service counts only where the total takes it: a bill that prints it apart, «not included», meets its
+    // total without it, and the trip is what was paid
+    if (
+      asPrinted &&
+      surcharge !== null &&
+      totals.includes(sum + surcharge) &&
+      percentHolds(sum, surcharge)
+    ) {
+      return {
+        total: sum + surcharge,
+        read,
+        met: true,
+        owed: sum,
+        cashback,
+        redeemed: null,
+        service: surcharge,
+      }
+    }
     const met = asPrinted && totals.includes(sum)
-    if (met) return { total: sum, read, met, owed: sum, cashback, redeemed: null }
+    if (met) return { total: sum, read, met, owed: sum, cashback, redeemed: null, service: null }
+    // a total voted by its places took the service: every bill seen prints it so — ZERO, Bakery, Аракс (owner's В-7
+    // «а», adversarial Б1) — so the lines make it less the service, the font's swaps putting them right to that
     const voted = vote(places.values())
-    return { total: voted, read, met, owed: voted, cashback, redeemed: null }
+    // the service alone is one figure the model may copy 5↔6: where a percent is printed beside it, that is its second
+    // place — the percent of the dishes, to the dram (adversarial Е1); with none it stands as printed (В-7 «а»)
+    const service =
+      voted !== null &&
+      surcharge !== null &&
+      surcharge < voted &&
+      percentHolds(voted - surcharge, surcharge)
+        ? surcharge
+        : null
+    const owed =
+      voted === null
+        ? null
+        : linesTotalHundredths({ cashbackHundredths: null, serviceHundredths: service }, voted)
+    return { total: voted, read, met, owed, cashback, redeemed: null, service }
   }
   // what the lines make: a total less what went to the card
   const owed = new Set(totals.map((one) => one - cashback).filter((one) => one > 0))
@@ -338,7 +495,8 @@ function totalOf(
     )
       ? bonus
       : null
-  return { total: shown, read, met, owed: lined, cashback, redeemed }
+  // a card's discount and a café's service on one paper are no receipt seen: the cashback's rule alone
+  return { total: shown, read, met, owed: lined, cashback, redeemed, service: null }
 }
 
 /** The most swaps in one figure: «550» copied as «660» is two (owner, В-2 of MOL-290). */
@@ -432,6 +590,7 @@ interface LineReading {
 function choicesOf(
   swaps: Readonly<Record<string, string>>,
   line: ModelReceipt['lines'][number],
+  slipped: readonly { value: number | null; swaps: number }[],
   rate: number | null,
   budget: { left: number },
   broken: boolean,
@@ -439,7 +598,7 @@ function choicesOf(
   // a discount of 0 is no card's and needs no rate (review round 2, №6), as in `cardRate`
   const discount = figureOf(line.discount, 2)
   if (discount !== null && discount > 0 && rate === null) return []
-  const qtys = readingsOf(swaps, line.quantity, 3)
+  const qtys = [...readingsOf(swaps, line.quantity, 3), ...slipped]
   const prices = readingsOf(swaps, line.unit_price, 2)
   const discounts = readingsOf(swaps, line.discount, 2)
   const sums = new Map<number, number>()
@@ -506,15 +665,54 @@ function choicesOf(
     .map((one) => one.reading)
 }
 
-/** Whether any figure of a line holds a digit the font's swaps take: one that holds none reads one way. */
+/** Whether any figure of a line holds a digit the swaps take, or a slip of copying: else it reads one way. */
 function swappable(
   swaps: Readonly<Record<string, string>>,
   line: ModelReceipt['lines'][number],
+  slipped: readonly unknown[],
 ): boolean {
   const digits = Object.keys(swaps)
-  return [line.quantity, line.unit_price, line.discount, line.sum].some(
-    (figure) => figure !== null && digits.some((digit) => figure.includes(digit)),
+  return (
+    [line.quantity, line.unit_price, line.discount, line.sum].some(
+      (figure) => figure !== null && digits.some((digit) => figure.includes(digit)),
+    ) || slipped.length > 0
   )
+}
+
+/** The digits the repair swaps on a model's line: the font's, and those seen only where the total put it right. */
+const repairSwapsOf = (reading: PhotoReading): Readonly<Record<string, string>> => ({
+  ...reading.modelSwaps,
+  ...reading.modelRepairSwaps,
+})
+
+/**
+ * A line's quantity as the model's copying slips it (MOL-310, owner's В-5 «а»), each one slip more than the swaps
+ * its figure took: a weight whose «կգ» the model glued on as a 4 — «0,65կգ» copied 0.654 — and a count of one the
+ * model took from the name, «Հավկիթ … 10հտ» bought once copied as 10. The repair's other readings, never on their
+ * own: the total confirms one, as it confirms a swap.
+ */
+function slippedQuantities(
+  swaps: Readonly<Record<string, string>>,
+  piece: string,
+  line: ModelReceipt['lines'][number],
+): { value: number | null; swaps: number }[] {
+  const copied = line.quantity
+  if (copied === null) return []
+  const glued =
+    line.unit === 'kg' && /^\d+\.\d{2}4$/u.test(copied)
+      ? readingsOf(swaps, copied.slice(0, -1), 3)
+      : []
+  const count = figureOf(copied, 3)
+  const named =
+    line.unit === 'pcs' &&
+    count !== null &&
+    count > 1_000 &&
+    count % 1_000 === 0 &&
+    new RegExp(`(?<!\\d)${String(count / 1_000)}\\s*(?:${piece})`, 'u').test(line.printed)
+  return [
+    ...glued.map((one) => ({ ...one, swaps: one.swaps + 1 })),
+    ...(named ? [{ value: 1_000, swaps: 1 }] : []),
+  ]
 }
 
 /**
@@ -535,6 +733,10 @@ function repaired(
   if (lines.length === 0 || lines.every((line) => line.settled)) return null
   const rate = cardRate(lines)
   const budget = { left: REPAIR_RECEIPT_COMBINATIONS_MAX }
+  // the swaps once a reading, a line's slips once a line (review №8)
+  const swaps = repairSwapsOf(reading)
+  const slipsOf = (copied: ModelReceipt['lines'][number]) =>
+    slippedQuantities(swaps, reading.words.units.piece, copied)
   const options: (LineReading[] | null)[] = []
   let read = 0
   // how far the lines read whole as copied may be off, each read whole by the swaps as well: 0 where none is
@@ -546,8 +748,9 @@ function repaired(
       read += own
       options.push(null)
       if (copied === undefined || line.sumHundredths === null) continue
-      if (!swappable(reading.modelSwaps, copied)) continue
-      const other = choicesOf(reading.modelSwaps, copied, rate, budget, false)
+      const slipped = slipsOf(copied)
+      if (!swappable(swaps, copied, slipped)) continue
+      const other = choicesOf(swaps, copied, slipped, rate, budget, false)
       if (other === null) return null
       const offs = new Set(other.map((one) => one.sum - own).filter((off) => off !== 0))
       if (offs.size === 0) continue
@@ -558,7 +761,7 @@ function repaired(
       continue
     }
     const found =
-      copied === undefined ? null : choicesOf(reading.modelSwaps, copied, rate, budget, true)
+      copied === undefined ? null : choicesOf(swaps, copied, slipsOf(copied), rate, budget, true)
     if (found === null || found.length === 0) return null
     options.push(found)
   }
@@ -619,18 +822,40 @@ function repaired(
  * The model's answer as the parse's reading of the receipt (MOL-272, Т-2). The layout is the card's where
  * any line prints a discount, a zero one too — «Ереван Сити»'s till rounds what was paid off its shelf
  * price, «250 249,99» — the class code's where lines print none, and a section's where there is no line
- * and a section «Բաժին» is printed or a total vouched for; no line and neither is a reading of nothing.
- * Then `verifiedReading(text, { byModel: true })`, as for Tesseract's reading.
+ * and a section «Բաժին» is printed or a total vouched for, a terminal's slip's where its rows name the terminal
+ * (MOL-310); no line and none of them is a reading of nothing. Then `verifiedReading(text, { byModel: true })`, as
+ * for Tesseract's reading.
  */
 export function receiptTextOfModel(
   reading: PhotoReading,
   written: ModelReceipt,
   prices: RememberedPrices = new Map(),
 ): ReceiptText {
-  const { answer } = canonicalAnswer(reading, written)
+  const whole = canonicalAnswer(reading, written).answer
+  const apart = serviceApart(reading, whole)
+  const apartLines = apart.answer.lines.map(lineOf)
+  const tried = totalOf(reading, apart.answer, apartLines, apart.served)
+  // the service line goes out of the lines only where the surcharge is taken: else it stays the model's line, for the
+  // foot's shortfall to show (review №5). Never where the lines met the total without it (adversarial Г1, Д1): that is
+  // a bill «not included» as often as a subtotal whose total with the service the model lost, and a wrong total is worse
+  // than none (MOL-255, Р-2)
+  const keptApart = apart.served.length === 0 || tried.service !== null
+  const answer = keptApart ? apart.answer : whole
+  // a service line left among the lines is no dish read: «проверьте», never a line that proves the bill whole with the
+  // service in doubt (adversarial Е2)
+  const copied = keptApart
+    ? apartLines
+    : whole.lines.map((line, i) =>
+        apart.isService[i] === true
+          ? { ...lineOf(line), settled: false, asPrinted: false }
+          : lineOf(line),
+      )
+  // the service decided against stays decided: its line a line, no service taken by a label or a vote — taken, it was
+  // counted twice, as a line and as the surcharge (review №9, adversarial В2)
+  const { total, read, met, owed, cashback, redeemed, service } = keptApart
+    ? tried
+    : totalOf(reading, whole, copied, null)
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
-  const copied = answer.lines.map(lineOf)
-  const { total, read, met, owed, cashback, redeemed } = totalOf(reading, answer, copied)
   // a total two places vouch for that the lines do not meet: put right by the font's swaps, or not. The total first,
   // and on its own (MOL-291): a line it vouches for as copied is no doubt of the memory's, nor are the lines it put
   // right (adversarial А3, review №1); and the memory chooses none of a line's readings — between 0,6 × 550 and
@@ -639,7 +864,9 @@ export function receiptTextOfModel(
   // else the shop's memory, a line at a time, and the total again over what it decided
   const swaps = { price: reading.modelSwaps, others: reading.modelSwaps, doubt: reading.modelSwaps }
   const less = (amount: number | null): number | null =>
-    amount === null ? null : amount - (cashback ?? 0)
+    amount === null
+      ? null
+      : linesTotalHundredths({ cashbackHundredths: cashback, serviceHundredths: service }, amount)
   const voiced =
     met || byTotal !== null
       ? copied
@@ -653,14 +880,18 @@ export function receiptTextOfModel(
   // total (MOL-227) — the model names a sole trader's «Բաժին 1» as a total no more often than not; with
   // neither it is a reading of nothing, «переснимите» as Tesseract's (`needsReshoot`)
   const section = answer.totals.some(({ label }) => DEPARTMENT.test(label))
+  const slip =
+    lines.length === 0 && !section && total === null ? slipAmountOf(reading, answer) : null
   const layout =
-    lines.length === 0
-      ? section || total !== null
-        ? 'department'
-        : 'class'
-      : discounted
-        ? 'card'
-        : 'class'
+    slip !== null
+      ? 'slip'
+      : lines.length === 0
+        ? section || total !== null
+          ? 'department'
+          : 'class'
+        : discounted
+          ? 'card'
+          : 'class'
   const { tin, number } = keyOf(reading, answer)
   return {
     layout,
@@ -669,8 +900,8 @@ export function receiptTextOfModel(
     date: printedDayOf(answer.date, reading),
     time: clockOf(answer.time),
     receiptNo: number,
-    totalHundredths: total,
-    readTotalHundredths: read,
+    totalHundredths: total ?? slip,
+    readTotalHundredths: read ?? slip,
     balanced:
       met ||
       fixed !== null ||
@@ -680,8 +911,32 @@ export function receiptTextOfModel(
         lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0) === owed),
     cashbackHundredths: cashback,
     redeemedHundredths: redeemed,
+    serviceHundredths: service,
     lines,
   }
+}
+
+/**
+ * A bank terminal's slip with no bill beside it (MOL-310, owner's В-3 «а»): no line, rows naming the terminal, and
+ * one amount after its word — the sum the card paid. Printed once, it is the one total no second place vouches for:
+ * shown as the slip's, for the person to check, and the trip's money. Two amounts, or none, are no slip.
+ */
+function slipAmountOf(reading: PhotoReading, answer: ModelReceipt): number | null {
+  const terminal = new RegExp(`(?:${reading.words.slipTerminal})`, 'u')
+  if (!answer.id_rows.some((row) => terminal.test(row))) return null
+  const word = new RegExp(`(?:${reading.words.slipAmount})`, 'iu')
+  // every amount the slip's: a fiscal receipt shot with its slip prints «Ընդամենը» beside it, and lines lost there are
+  // «переснимите», never a slip with no items (adversarial А5)
+  // an amount read as nothing says nothing — tips of 0 (adversarial Б3); one not read at all may be any label's total
+  // (review №12)
+  const said = answer.totals.filter(({ amount }) => figureOf(amount, 2) !== 0)
+  if (!said.every(({ label }) => word.test(label))) return null
+  const amounts = new Set(
+    said
+      .map(({ amount }) => figureOf(amount, 2))
+      .filter((amount): amount is number => amount !== null && amount > 0),
+  )
+  return amounts.size === 1 ? ([...amounts][0] ?? null) : null
 }
 
 /**

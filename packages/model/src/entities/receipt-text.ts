@@ -62,7 +62,9 @@ export interface ReceiptTextLine {
   /**
    * Put right by the digits the till's font confuses, on a model's reading proven whole by it (MOL-290):
    * the one reading of the line that holds its arithmetic and the card's rate, every line then meeting a
-   * total two places vouch for. Shown with «проверьте», never as printed.
+   * total two places vouch for. Or a bill's line that prints no price, its price worked out of the sum on a
+   * receipt proven whole, the quantity vouched for by nothing (MOL-310, owner's В-6 «а»). Shown with
+   * «проверьте», never as printed.
    */
   readonly repaired?: boolean
   /**
@@ -87,9 +89,10 @@ export interface ReceiptTextLine {
 
 /**
  * How the lines were found: «Ереван Сити»'s card, Dog City's table, the class code (MOL-226) — or a
- * till's section with no items printed at all, the sole trader's receipt (MOL-227).
+ * till's section with no items printed at all, the sole trader's receipt (MOL-227), or a bank terminal's
+ * slip with no bill beside it, its total printed once (MOL-310).
  */
-export const RECEIPT_LAYOUTS = ['card', 'table', 'class', 'department'] as const
+export const RECEIPT_LAYOUTS = ['card', 'table', 'class', 'department', 'slip'] as const
 export type ReceiptLayout = (typeof RECEIPT_LAYOUTS)[number]
 
 export interface ReceiptText {
@@ -123,7 +126,24 @@ export interface ReceiptText {
    * total less it — what the card's bonus covered was recorded when it was sent to the card.
    */
   readonly redeemedHundredths?: number | null
+  /**
+   * A café's surcharge for service, «Հավելավճար 10%» (MOL-310): the lines make the total less it, and the total
+   * is what was paid. Only a model's reading names it.
+   */
+  readonly serviceHundredths?: number | null
   readonly lines: readonly ReceiptTextLine[]
+}
+
+/**
+ * What the lines of a reading come to by a total of it, in hundredths (MOL-289, MOL-310): the total less what a card
+ * sent to the card and less a café's service — the one rule of the check, the shop's memory and the model's reading,
+ * as `linesTotalOf` is of the money.
+ */
+export function linesTotalHundredths(
+  text: Pick<ReceiptText, 'cashbackHundredths' | 'serviceHundredths'>,
+  total: number,
+): number {
+  return total - (text.cashbackHundredths ?? 0) - (text.serviceHundredths ?? 0)
 }
 
 // «1 260,5» — what OCR printed — as a number; NaN for what is not one, as the prototype had it.

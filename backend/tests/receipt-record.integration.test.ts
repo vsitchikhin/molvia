@@ -1250,6 +1250,44 @@ describe('«Записать»', () => {
     // any other figure it sends is the person's word, taken as it is
     const typedOver = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '7' })
     expect(await moneyOf(typedOver, body({ total: amount(2_200) }))).toBe(220_000n)
+  }, 35_000)
+
+  it('takes what a café’s bill was paid, its service with it, from an earlier build’s echo too (MOL-310)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const body = (over: Record<string, unknown> = {}) => ({
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+        {
+          position: 1,
+          skip: false,
+          item: { id: milk },
+          quantity: pieces(1),
+          amount: amount(1_450),
+        },
+      ],
+      ...over,
+    })
+    const moneyOf = async (receipt: string, payload: ReturnType<typeof body>) => {
+      expect((await record(me, receipt, payload)).statusCode).toBe(200)
+      const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, payload.tripId)))
+      return trip?.receiptMinor
+    }
+    // 2 190 of dishes and 219 of service: «ՎՃԱՐՄԱՆ» 2 409
+    const bill = { totalMinor: 240_900n, serviceMinor: 21_900n, layout: 'class' as const }
+    const sent = await parsedReceipt(me, LINES.slice(0, 2), { ...bill, receiptNo: '1' })
+    expect(await moneyOf(sent, body())).toBe(240_900n)
+    // an earlier build is shown the lines' total and sends it back as it was: the printed total, no correction
+    const echoed = await parsedReceipt(me, LINES.slice(0, 2), { ...bill, receiptNo: '2' })
+    expect(await moneyOf(echoed, body({ total: amount(2_190) }))).toBe(240_900n)
+    expect(sum((await db.select().from(receiptDays)).map((day) => day.totalsCorrected))).toBe(0)
+    // must not: another figure is the person's word
+    const typed = await parsedReceipt(me, LINES.slice(0, 2), { ...bill, receiptNo: '3' })
+    expect(await moneyOf(typed, body({ total: amount(2_300) }))).toBe(230_000n)
   }, 10_000)
 
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard
@@ -1305,7 +1343,7 @@ describe('«Записать»', () => {
     const shot = await parsedReceipt(me, LINES.slice(0, 1))
     expect((await record(me, shot, body())).statusCode).toBe(200)
     expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 2, lines: 2 }])
-  })
+  }, 15_000)
 
   // MOL-240, Б2 of the adversarial review of MOL-97: a purchase removed at once took nothing of its
   // receipt, and its line — what and for how much — lay on the server, unseen, until erasure

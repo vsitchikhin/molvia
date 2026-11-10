@@ -65,11 +65,16 @@ function computedSum(line: ReceiptFigures, digits: number): Money | null {
 /**
  * What the lines of a receipt come to by its total (MOL-289): the total less what a card sent to the card
  * as a bonus — «Ереван Сити» prints the total without the card's discount, what left the card, and the
- * lines with it («Զեղչ գործարքից»). Every comparison of the lines with the total goes through it — the
- * sums recorded, the difference on the review, «Прочитали не всё» — and the trip's money never does.
+ * lines with it («Զեղչ գործարքից») — and less a café's service, no dish of the bill (MOL-310). Every
+ * comparison of the lines with the total goes through it — the sums recorded, the difference on the review,
+ * «Прочитали не всё» — and the trip's money never does.
  */
-export function linesTotalOf(total: Money | null, cashback: Money | null): Money | null {
-  return less(total, cashback)
+export function linesTotalOf(
+  total: Money | null,
+  cashback: Money | null,
+  service: Money | null = null,
+): Money | null {
+  return less(less(total, cashback), service)
 }
 
 /**
