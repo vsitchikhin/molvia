@@ -36,8 +36,21 @@ The detail behind the privacy lines of `CLAUDE.md`.
   and their checks after every operation that named one (MOL-115), the messages to the developer
   with the owner's replies (MOL-147), the sign-ins the bot has not told of yet (MOL-361), login requests by Telegram id
   — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
-  `erasures` for the week they appeared (MOL-91). Catalogue items the
-  person added stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
+  `erasures` for the week they appeared (MOL-91). **Catalogue items the person added go when nobody
+  else stands on them** (MOL-374, owner's В-5 «б» of MOL-362: «60 → erase → sign in again» left them in
+  everybody's search for good) — with their vector, the codes the person wrote to them and the person's
+  own words of the shops' memory about them (В-1 «а»: a receipt's «Записать» makes both the item and the
+  word, so their own word holding it would keep every name a receipt made). Someone stands on an item by
+  a purchase, a verdict (a withdrawn one too), a pick, a line of a receipt not recorded (В-2 «а»: its
+  «Записать» sends the item's id), a code or a word not the person's own, a merge either way, the
+  owner's «apart», and the seed's Armenian names or headings — only the seed writes them, on an item
+  someone proposed first; `ITEM_REFERENCES` holds every foreign key on `items` to that list. An item
+  another transaction holds is skipped (`skip locked`) and stays: erasure waits on nobody and cannot
+  deadlock with the merge night — the price, an item somebody writes to at that very moment stays
+  without its author. A write to an item gone meanwhile is the foreign key's 404, as an item never
+  there. Items left without an author before MOL-374 stay (В-6 «а»), and the copy and `erasures` are
+  as they were (В-3 «а»): the report and `make forget` name both counts. The items someone stands on
+  stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
   nulled (MOL-100), the words they gave the shops' memory stay with `actor_id` nulled and still count
   (MOL-126: a fact about the shop, never shown as anyone's; a shelf price in it reaches another person
   only with access and from three prices, their lower median), and **every place stays** (owner's decision 24.09.2026). People erase
@@ -82,7 +95,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   routes have no order of their own. **Cleaning expired requests skips locked rows** (Р-3): it runs
   under the one quota lock every login start takes, and waiting there for an erasure — or a dry
   run of one — holding a person's expired request closed the door to everybody. A dry run still
-  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items, the shops and the count of
+  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items others use, the shops and the count of
   `erasures` —
   and say that copies on the phone are out of the server's reach: nothing clears a device's
   storage for an owner the server no longer knows, since a 401 there is also an expired session.
@@ -104,8 +117,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   finds its row in the file** — found by walking the fields, not by a list, so a new reference
   without a section or a name in `catalogue` fails by itself (adversarial review 1, 2; review 11,
   15). **A new table or column that is a person's joins erasure and the copy in the
-  same commit.** Besides them: the catalogue items the person added (erasure keeps them, their
-  author is still this person), with barcodes, the codes the person wrote to any item
+  same commit.** Besides them: the catalogue items the person added (erasure keeps those someone
+  else stands on and deletes the rest, MOL-374 — their author is still this person either way), with barcodes, the codes the person wrote to any item
   (`addedBarcodes`, MOL-100 — they say the person held the package; `barcode`, not `code`, since
   `code` is the key the guard against secrets looks for), and — as a reference, not their data — the names of
   the items and places their rows point at, so the file reads; nobody else's author is in it.
