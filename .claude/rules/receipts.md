@@ -926,10 +926,42 @@ receipt's day — not «today», and never the open trip — at the rate of that
 (`tripRateOn`: the person's own, else the official one of that day, MOL-73's rule); the purchases with
 their own sums; new items through `createUnlessNamed` (MOL-12), one name on two lines one item; the
 person's words to the memory; the photo deleted; the receipt `recorded`, pointing at its trip. **The
-owner's lock of trips comes first**, then the receipt's row (review 7, В3): two shots of one receipt
-recorded at once meet there. New items are made before the purchases, in the order of their names'
-keys — each name is locked to the end of the transaction (review 6). The server works every figure out itself, the phone's are not
+person's row comes first** (MOL-373, `privacy.md`'s order: an erasure holds the account and waits for the
+receipt's row, so taken after that row it was a deadlock), **then the owner's lock of trips**, then the
+receipt's row (review 7, В3): two shots of one receipt recorded at once meet there. New items are made before
+the purchases, in the order of their names' keys — each name is locked to the end of the transaction (review
+6). The server works every figure out itself, the phone's are not
 trusted: the unit price is the purchase's own, and the lines are every line of the receipt once.
+
+**The new items of a person's records count in `RECEIPT_ITEMS_DAY_MAX` of their day** (MOL-373, owner's
+В-1…В-4 «а», 10.11.2026; adversarial А1 of MOL-362): «Записать» takes any name over every line read — up to
+500 — and up to `RECEIPT_ADDED_MAX` lines more, and each new name is an item of the catalogue everybody
+searches, so with no bound one receipt carried up to 600 and an account some 24 000 a day, 48 000–72 000 with
+a day header made up, one such record holding 600 names' locks for some 6 s. **Three hundred a day** — some
+eight of the bench's longest receipts with every line new (66 receipts: a median of 4 lines, 22 at the 90th
+percentile, 39 the longest). **Its own count, `actors.receipt_items_day` and `receipt_items_new`**, by the
+rules of the proposals' (`search.md`): the phone's day that only moves on, the person's row locked first, a
+count and not the rows of `items`; the proposals' sixty and these never take from each other. **Every new item
+of the record counts** (В-4 «а»), named by the reading or typed — Tesseract reads a receipt printed for it as
+well as a real one; an item chosen, a name already there or its trace's, one name of two lines a second time
+and a record sent again count nothing. **A record with more new names than the day has room for is refused
+whole, before the place, the trip and a name's lock** (`refuseBeyondDay`, adversarial А2): one read of which of
+its names the catalogue has, under the person's row — found only at its first new name, a refused record had
+locked every name before it, up to 599, some 3–6 s a refusal and again at will; now some 25 ms. That read takes no
+name's lock, so it is the bound and `createUnlessNamed` under the name's lock the truth. `429
+error.items_day_limited`, nothing written — no trip, no purchase, no item, no count — the receipt still `parsed`.
+**The proposals' code, never one of its own** (adversarial А1): a build reads only the codes of its own registry,
+and a code a build does not know is an answer off the contract its queue holds and sends again for good — the
+record at the queue's head, every receipt behind it waiting; `error.items_day_limited` every build since MOL-362
+knows. **The phone's queue sets it aside as any refusal** (В-3 «а»): the review's draft stays, the review says why
+in words of its own for that code on a record (`receipt.review.refused_items_day`, В-2 «а»: how many a day, a
+found item for the new lines or tomorrow, the edits kept), and «Записать» again sends it anew. **The prices,
+named:** a day header made up walks two or three days (MOL-360's А1), up to 900 a day; a name made by someone
+between the read and the record is counted new by the read, and the record refused so goes through when sent
+again; the count is the account's, as the proposals' is (MOL-362, В-4 «а»); a phone of a build between MOL-362
+and this one says the refusal in the proposals' words, «Сегодня добавлено уже много товаров. Новые — завтра»,
+until it takes the new version — and one of a build before MOL-362 (10.11.2026) holds the record at the head of
+its queue as above — the class of every code added after a build; before 0.2 only the owner is on production.
 
 **A receipt of food service is recorded as a shop's, with products, until 0.3** (MOL-226, owner's В-2 «а»
 after review 1): a venue and its dishes have no screen yet — «Оценки», the 19:00 reminder, «Что брать» and

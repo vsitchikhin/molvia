@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ERROR, itemSchema, proposedItemSchema } from '@molvia/model'
 import type { ItemOrigin, NewItem } from '@molvia/model'
-import type { ItemRepository, ProposalQuota } from '@/db/items-repository'
+import type { ItemRepository, NewItemsQuota } from '@/db/items-repository'
 import { proposeItem } from './propose-item'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -36,6 +36,7 @@ function fakeItems(overrides: Partial<ItemRepository> = {}): ItemRepository {
     byId: () => Promise.reject(new Error('byId was not expected')),
     byIds: () => Promise.reject(new Error('byIds was not expected')),
     createUnlessNamed: () => Promise.reject(new Error('createUnlessNamed was not expected')),
+    refuseBeyondDay: () => Promise.reject(new Error('refuseBeyondDay was not expected')),
     search: () => Promise.reject(new Error('search was not expected')),
     byBarcode: () => Promise.reject(new Error('byBarcode was not expected')),
     lockForRecord: () => Promise.resolve(),
@@ -52,7 +53,7 @@ describe('proposeItem', () => {
       NewItem,
       string | null,
       ItemOrigin | null | undefined,
-      ProposalQuota | undefined,
+      NewItemsQuota | undefined,
     ][] = []
     const items = fakeItems({
       createUnlessNamed: (item, createdBy, origin, quota) => {
@@ -64,7 +65,12 @@ describe('proposeItem', () => {
     const result = await proposeItem(items, NAMED_NOTHING, PROPOSER, input)
 
     expect(asked).toEqual([
-      [{ ...input, barcodes: [] }, ACTOR, null, { actorId: ACTOR, day: '2026-11-10' }],
+      [
+        { ...input, barcodes: [] },
+        ACTOR,
+        null,
+        { actorId: ACTOR, day: '2026-11-10', of: 'proposed' },
+      ],
     ])
     expect(result).toMatchObject({ created: true })
   })

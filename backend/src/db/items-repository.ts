@@ -6,6 +6,7 @@ import {
   ERROR,
   ITEM_BARCODES_MAX,
   ITEMS_PROPOSED_DAY_MAX,
+  RECEIPT_ITEMS_DAY_MAX,
   WORD_BREAK,
   barcodeTwins,
   itemSchema,
@@ -55,17 +56,29 @@ export interface ItemRepository {
    * `origin` marks a new item whose data may be Open Food Facts' (MOL-162); an item already there
    * keeps its own.
    *
-   * `quota` is given by «Предложить товар» alone (MOL-362): a new item then counts in
-   * `ITEMS_PROPOSED_DAY_MAX` of that person's day, the phone's, and one past it is refused with nothing
-   * written. A name already there and a code another item holds are answered whatever the count. The seed
-   * and a receipt's «Записать» give none, and count nothing.
+   * `quota` is the person's count a new item goes into, on their day, the phone's: «Предложить товар»'s
+   * `ITEMS_PROPOSED_DAY_MAX` (MOL-362) or a receipt's «Записать»'s `RECEIPT_ITEMS_DAY_MAX` (MOL-373), and
+   * one past it is refused with nothing written. A name already there and a code another item holds are
+   * answered whatever the count. The seed gives none, and counts nothing.
    */
   createUnlessNamed(
     input: NewItem,
     createdBy: string | null,
     origin?: ItemOrigin | null,
-    quota?: ProposalQuota,
+    quota?: NewItemsQuota,
   ): Promise<Proposal>
+  /**
+   * Refuses up front, before any name is locked or anything written, names of which more are new than
+   * the person's day has room for (MOL-373, adversarial А2): a record past its day found it only at its
+   * first new name, every name before it locked — up to 599 — some 3–6 s a refusal and again at will.
+   * Read with no lock on the names, so this is the bound and `createUnlessNamed` the truth: a name made
+   * by someone in between is counted new here, and the record refused so goes through when sent again.
+   */
+  refuseBeyondDay(
+    quota: NewItemsQuota,
+    kind: NewItem['kind'],
+    names: readonly string[],
+  ): Promise<void>
   /**
    * «Привязать код к ней?» (MOL-100): the code written to this item by this person, or the item
    * that already holds it or one of its twins — then nothing is written. The code already on this
@@ -112,10 +125,14 @@ export interface ItemRepository {
   nodes(language: ItemNameLanguage): Promise<CatalogueNode[]>
 }
 
-/** Whose day a proposal counts in, and which day that is — the phone's (MOL-362). */
-export interface ProposalQuota {
+/**
+ * Whose day a new item counts in, which day that is — the phone's — and by which way it came:
+ * «Предложить товар» (MOL-362) or «Записать» of a receipt (MOL-373), each a count of its own.
+ */
+export interface NewItemsQuota {
   readonly actorId: string
   readonly day: string
+  readonly of: 'proposed' | 'recorded'
 }
 
 /**
@@ -875,19 +892,41 @@ async function lockBarcodes(tx: Conn, forms: readonly string[]): Promise<void> {
 }
 
 /**
- * The person's count of the day's proposals (MOL-362), their row locked: two proposals of one person at
- * once take turns at the quota. `no key update`, the strength of the count's own `UPDATE`, as the
- * receipts' count takes it (MOL-360): a key share — the new item's own `created_by` — passes it. The day is
- * `countOfDay`'s. Erased while this waited, there is nobody to propose for.
+ * Each way into the catalogue a person's quota counts, by its columns and bound. One refusal for both,
+ * `error.items_day_limited` (adversarial А1 of MOL-373): a phone's build reads only the codes it knows, and
+ * a code of its own for «Записать» was, to every build before it, an answer off the contract its queue holds
+ * and sends again for good; this one every build since MOL-362 knows and sets aside.
  */
-async function proposalsOf(tx: Conn, quota: ProposalQuota) {
+const COUNTS = {
+  proposed: {
+    day: actors.itemsDay,
+    n: actors.itemsProposed,
+    max: ITEMS_PROPOSED_DAY_MAX,
+    set: (day: string, n: number) => ({ itemsDay: day, itemsProposed: n }),
+  },
+  recorded: {
+    day: actors.receiptItemsDay,
+    n: actors.receiptItemsNew,
+    max: RECEIPT_ITEMS_DAY_MAX,
+    set: (day: string, n: number) => ({ receiptItemsDay: day, receiptItemsNew: n }),
+  },
+} as const
+
+/**
+ * The person's count of the day's new items by one way (MOL-362, MOL-373), their row locked: two writes
+ * of one person at once take turns at the quota. `no key update`, the strength of the count's own
+ * `UPDATE`, as the receipts' count takes it (MOL-360): a key share — the new item's own `created_by` —
+ * passes it. The day is `countOfDay`'s. Erased while this waited, there is nobody to write for.
+ */
+async function countedOf(tx: Conn, quota: NewItemsQuota) {
+  const count = COUNTS[quota.of]
   const [account] = await tx
-    .select({ day: actors.itemsDay, n: actors.itemsProposed })
+    .select({ day: count.day, n: count.n })
     .from(actors)
     .where(eq(actors.id, quota.actorId))
     .for('no key update')
   if (account === undefined) throw new DomainError(ERROR.NO_ACTOR)
-  return { actorId: quota.actorId, ...countOfDay(account, quota.day) }
+  return { actorId: quota.actorId, count, ...countOfDay(account, quota.day) }
 }
 
 export function createItemRepository(db: Conn): ItemRepository {
@@ -1097,6 +1136,22 @@ export function createItemRepository(db: Conn): ItemRepository {
       }))
     },
 
+    async refuseBeyondDay(quota, kind, names) {
+      if (names.length === 0) return
+      const counted = await countedOf(db, quota)
+      const keys = [...new Set(names.map(toSearchKey))]
+      const rows = await db
+        .select({ name: items.name })
+        .from(items)
+        .where(and(eq(items.kind, kind), inArray(items.searchKey, keys)))
+      // by `nameIdentity`, as `createUnlessNamed` finds one — a trace's name is there too
+      const there = new Set(rows.map((row) => nameIdentity(row.name)))
+      const fresh = new Set(names.map(nameIdentity).filter((name) => !there.has(name)))
+      if (counted.n + fresh.size > counted.count.max) {
+        throw new DomainError(ERROR.ITEMS_DAY_LIMITED)
+      }
+    },
+
     createUnlessNamed(input, createdBy, origin = null, quota) {
       const key = toSearchKey(input.name)
       const wanted = nameIdentity(input.name)
@@ -1104,7 +1159,7 @@ export function createItemRepository(db: Conn): ItemRepository {
       return translateFailures(async () =>
         db.transaction(async (tx) => {
           // the person's row before the name's lock, as the account comes first everywhere (privacy.md)
-          const counted = quota === undefined ? null : await proposalsOf(tx, quota)
+          const counted = quota === undefined ? null : await countedOf(tx, quota)
           // Per kind and key rather than per name: every name that is the same by
           // `nameIdentity` has the same key — built so, and held by a property test — so they
           // all meet at this lock, and the lookup below is an equality the GIN index serves.
@@ -1133,10 +1188,10 @@ export function createItemRepository(db: Conn): ItemRepository {
           const claimed = await claim(tx, input.barcodes, null)
           if ('taken' in claimed) return holder(tx, claimed.taken)
           if (counted !== null) {
-            if (counted.n >= ITEMS_PROPOSED_DAY_MAX) throw new DomainError(ERROR.ITEMS_DAY_LIMITED)
+            if (counted.n >= counted.count.max) throw new DomainError(ERROR.ITEMS_DAY_LIMITED)
             await tx
               .update(actors)
-              .set({ itemsDay: counted.day, itemsProposed: counted.n + 1 })
+              .set(counted.count.set(counted.day, counted.n + 1))
               .where(eq(actors.id, counted.actorId))
           }
           return { item: await insert(tx, input, createdBy, origin), created: true }
