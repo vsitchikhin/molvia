@@ -1,7 +1,13 @@
 import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { ERROR, ITEMS_PROPOSED_DAY_MAX, toSearchKey } from '@molvia/model'
+import {
+  ERROR,
+  ITEMS_PROPOSED_DAY_MAX,
+  TODAY_HEADER,
+  toSearchKey,
+  yerevanDate,
+} from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { actors, itemBarcodes, items, receiptLines, receiptParts, receipts } from '@/db/schema'
 import { buildServer } from '@/server'
@@ -15,6 +21,13 @@ import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
 let app: FastifyInstance
+
+/**
+ * The phone's day, taken once for the file and sent with every proposal: counted by the server's clock, a
+ * midnight between two requests would start the count over under the test (review 1, №4). The hook takes it
+ * while it is today somewhere, a day past the Yerevan midnight at least.
+ */
+const TODAY = yerevanDate(new Date())
 
 beforeAll(async () => {
   app = buildServer({ db, receiptReader: null })
@@ -50,7 +63,7 @@ function propose(me: Owner, payload: Record<string, unknown>) {
   return app.inject({
     method: 'POST',
     url: '/catalogue/items',
-    headers: { cookie: me.cookie },
+    headers: { cookie: me.cookie, [TODAY_HEADER]: TODAY },
     payload,
   })
 }
@@ -66,10 +79,12 @@ async function count(me: Owner) {
   return row
 }
 
-/** Today's count put at `proposed`, on the day the server counts for this person now. */
+/** Today's count put at `proposed`, on the phone's day every proposal of the file names. */
 async function spent(me: Owner, proposed: number): Promise<void> {
-  expect((await propose(me, cheese(`Сыр ${randomUUID()}`))).statusCode).toBe(201)
-  await db.update(actors).set({ itemsProposed: proposed }).where(eq(actors.id, me.id))
+  await db
+    .update(actors)
+    .set({ itemsDay: TODAY, itemsProposed: proposed })
+    .where(eq(actors.id, me.id))
 }
 
 async function named(name: string) {
@@ -141,9 +156,7 @@ describe('the items of a day (MOL-362)', () => {
       .set({ itemsDay: '2000-01-01', itemsProposed: ITEMS_PROPOSED_DAY_MAX })
       .where(eq(actors.id, me.id))
     expect((await propose(me, cheese('Сыр Тушети'))).statusCode).toBe(201)
-    const today = await count(me)
-    expect(today.proposed).toBe(1)
-    expect(today.day).not.toBe('2000-01-01')
+    expect(await count(me)).toMatchObject({ day: TODAY, proposed: 1 })
 
     // a header made up, or a flight west: the day only moves on
     await db
