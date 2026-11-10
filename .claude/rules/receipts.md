@@ -2164,8 +2164,11 @@ service. Owner: «такие чеки надо научиться читать, 
   «Service 10%», «Обслуживание» — the card's `service`, read in any case and **only as the word alone, a percent after it, bare or in brackets (adversarial Б2),
   and nothing else** (`serviceWordOf`), one rule for a summary's label and a line of the model's (`serviceApart`): «Итого с
   обслуживанием» stays a total and «Салат Service» a dish (review №3, adversarial А4 — unanchored, a total naming the
-  word went to the surcharges and its subtotal «met» the lines). The line goes out of the lines where the surcharge is taken, or where the lines met the total without it — then it is
-  no dish of the total (adversarial Г1); else it stays the model's, for the foot's shortfall to show (review №5). The lines and it meeting
+  word went to the surcharges and its subtotal «met» the lines). The line goes out of the lines only where the surcharge is taken; else it stays the model's, for the foot's shortfall
+  to show (review №5). **Never where the lines met the total without it** (Р-2 by MOL-255, adversarial Г1, Д1): that
+  is a bill «not included» as often as a subtotal whose total with the service the model lost, and the second is a
+  wrong total. **The price, named:** a bill printing its service «not included» as a line, read right, says «Итог не
+  прочитали» where one total place prints it, the service line its lines' excess where two do — never a wrong figure. The lines and it meeting
   a total are MOL-244's first source — every line as read — so the bill is proven whole and its one-number lines shown.
   Kept as `receipts.service_minor` (0081), beside the cashback and by its path: `linesTotalOf(total, cashback,
 service)` for every comparison of the lines with the total, the trip's money the total. **Only where the total takes

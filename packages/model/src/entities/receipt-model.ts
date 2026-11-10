@@ -787,10 +787,11 @@ export function receiptTextOfModel(
   const apart = serviceApart(reading, whole)
   const apartLines = apart.answer.lines.map(lineOf)
   const tried = totalOf(reading, apart.answer, apartLines, apart.served)
-  // the service line goes out of the lines where the surcharge is taken, or where the lines met the total without it —
-  // then it is no dish of the total (adversarial Г1); else it stays the model's line, for the foot's shortfall to show
-  // (review №5)
-  const keptApart = apart.served.length === 0 || tried.service !== null || tried.met
+  // the service line goes out of the lines only where the surcharge is taken: else it stays the model's line, for the
+  // foot's shortfall to show (review №5). Never where the lines met the total without it (adversarial Г1, Д1): that is
+  // a bill «not included» as often as a subtotal whose total with the service the model lost, and a wrong total is worse
+  // than none (MOL-255, Р-2)
+  const keptApart = apart.served.length === 0 || tried.service !== null
   const answer = keptApart ? apart.answer : whole
   const copied = keptApart ? apartLines : whole.lines.map(lineOf)
   // the service decided against stays decided: its line a line, no service taken by a label or a vote — taken, it was
