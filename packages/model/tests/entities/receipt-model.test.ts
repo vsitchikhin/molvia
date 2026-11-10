@@ -1004,9 +1004,51 @@ describe('a café’s bill (MOL-310)', () => {
       ],
       served,
     )
-    // the service line is the lines' excess, said as it is
-    expect(shown(text).slice(0, 3)).toEqual([1_950_000, null, 'lines_over'])
+    // the service line stays a line, never as read: «проверьте», the bill not proven (adversarial Е2)
+    expect(shown(text).slice(0, 3)).toEqual([1_950_000, null, 'line_not_as_printed'])
     expect(text.lines).toHaveLength(4)
+  })
+
+  it('proves no bill whole by a service line left a line: two service amounts are a doubt (adversarial Е2)', () => {
+    const served = [
+      dish('Service 10%', '1.00', null, '1950.00'),
+      dish('Телятина по-мексикански', '1.00', null, '3800.00'),
+      dish('Тирамису', '2.00', null, '3000.00'),
+      dish('Салат с телятиной и хрустящими баклажанами', '1.00', null, '12700.00'),
+    ]
+    const text = bill(
+      [
+        ['Service 10%', '1960.00'],
+        ['Всего:', '21450.00'],
+        ['Итого к оплате:', '21450.00'],
+      ],
+      served,
+    )
+    const one = explainedReading(text, { byModel: true })
+    // «Всего» and «Итого к оплате» are one place: no total, and the service line «проверьте» — never a dish read
+    expect([text.serviceHundredths, one.receipt, one.lines[0]]).toEqual([
+      null,
+      'no_total',
+      'unsettled',
+    ])
+  })
+
+  it('holds the service to the percent printed beside it where only the vote vouches for the total (adversarial Е1)', () => {
+    const served = (sum: string) => [
+      dish('Service 10%', '1.00', null, sum),
+      dish('Телятина по-мексикански', '1.00', null, '3800.00'),
+      dish('Тирамису', '2.00', null, '3000.00'),
+      dish('Салат с телятиной и хрустящими баклажанами', '1.00', null, '12700.00'),
+    ]
+    const paid: [string, string][] = [
+      ['Всего:', '21450.00'],
+      ['Итого к оплате:', '21450.00'],
+      ['Վճարված է PosTerminal:', '21450.00'],
+    ]
+    // copied 1960 for 1950: not 10 % of the dishes, so no service — the line stays, «проверьте»
+    expect(bill(paid, served('1960.00')).serviceHundredths).toBeNull()
+    // as printed: 10 % of 19 500
+    expect(bill(paid, served('1950.00')).serviceHundredths).toBe(195_000)
   })
 
   it('shows no total a subtotal meets without the service line: the total with it may be lost (Р-2, adversarial Д1)', () => {

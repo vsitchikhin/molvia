@@ -245,6 +245,18 @@ const serviceWordOf = (reading: PhotoReading): RegExp =>
     'iu',
   )
 
+/** The percent a service's label or line prints beside its word — «Service 10%», «Հավելավճար (12,5%)» — or none. */
+function servicePercentOf(text: string): number | null {
+  const [, percent = ''] = /(\d{1,2}(?:[.,]\d+)?)\s*%/u.exec(text) ?? []
+  return percent === '' ? null : Number(percent.replace(',', '.'))
+}
+
+/** A service amount as printed, with the percent printed beside it, if any (MOL-310). */
+interface Served {
+  readonly sum: number | null
+  readonly percent: number | null
+}
+
 /**
  * A café's service the model copied as a line — «Service 10%  1.00  1950.00» (MOL-310). It is no dish: its sum goes
  * to the surcharge, and the line out of the lines — only where the surcharge is taken (`receiptTextOfModel`).
@@ -252,13 +264,16 @@ const serviceWordOf = (reading: PhotoReading): RegExp =>
 function serviceApart(
   reading: PhotoReading,
   answer: ModelReceipt,
-): { answer: ModelReceipt; served: (number | null)[] } {
+): { answer: ModelReceipt; served: Served[] } {
   const word = serviceWordOf(reading)
   const served = answer.lines.filter((line) => word.test(line.printed))
   if (served.length === 0) return { answer, served: [] }
   return {
     answer: { ...answer, lines: answer.lines.filter((line) => !word.test(line.printed)) },
-    served: served.map((line) => figureOf(line.sum, 2)),
+    served: served.map((line) => ({
+      sum: figureOf(line.sum, 2),
+      percent: servicePercentOf(line.printed),
+    })),
   }
 }
 
@@ -325,7 +340,7 @@ function totalOf(
    * The service's amounts the model copied as lines; `null` — the service was decided against already and its line
    * stays a line, so none is taken, by a label or a vote (review №9, adversarial В2, review №14).
    */
-  served: readonly (number | null)[] | null = [],
+  served: readonly Served[] | null = [],
 ): {
   total: number | null
   read: number | null
@@ -356,7 +371,8 @@ function totalOf(
     ['section', new Set()],
   ])
   const [sentToCard, taxed, spent] = [new Set<number>(), new Set<number>(), new Set<number>()]
-  const surcharges = new Set(served ?? [])
+  const surcharges = new Set((served ?? []).map((one) => one.sum))
+  const percents = (served ?? []).flatMap((one) => (one.percent === null ? [] : [one.percent]))
   // what the card's words do not name, and the prepayment slip's own sum (MOL-310, Р-1)
   const prepaid = new RegExp(`^${MARKS}(?:${w.prepayment})${MARKS}$`, 'u')
   const [slips, unnamed] = [new Set<number>(), new Set<number>()]
@@ -366,8 +382,11 @@ function totalOf(
     if (discount.test(label) && cashbacks.test(label)) sentToCard.add(hundredths)
     else if (redemption.test(label)) spent.add(hundredths)
     else if (taxedSum.test(label)) taxed.add(hundredths)
-    else if (service.test(label)) surcharges.add(hundredths)
-    else if (
+    else if (service.test(label)) {
+      surcharges.add(hundredths)
+      const percent = servicePercentOf(label)
+      if (percent !== null) percents.push(percent)
+    } else if (
       (total.test(label) || bill.test(label)) &&
       !discount.test(label) &&
       !sinceStart.test(label)
@@ -418,7 +437,19 @@ function totalOf(
     // a total voted by its places took the service: every bill seen prints it so — ZERO, Bakery, Аракс (owner's В-7
     // «а», adversarial Б1) — so the lines make it less the service, the font's swaps putting them right to that
     const voted = vote(places.values())
-    const service = voted !== null && surcharge !== null && surcharge < voted ? surcharge : null
+    // the service alone is one figure the model may copy 5↔6: where a percent is printed beside it, that is its second
+    // place — the percent of the dishes, to the dram (adversarial Е1); with none it stands as printed (В-7 «а»)
+    const service =
+      voted !== null &&
+      surcharge !== null &&
+      surcharge < voted &&
+      percents.every(
+        (percent) =>
+          Math.abs(((voted - surcharge) * percent) / 100 - surcharge) <=
+          PAYMENT_ROUNDING_HUNDREDTHS,
+      )
+        ? surcharge
+        : null
     const owed =
       voted === null
         ? null
@@ -793,7 +824,16 @@ export function receiptTextOfModel(
   // than none (MOL-255, Р-2)
   const keptApart = apart.served.length === 0 || tried.service !== null
   const answer = keptApart ? apart.answer : whole
-  const copied = keptApart ? apartLines : whole.lines.map(lineOf)
+  // a service line left among the lines is no dish read: «проверьте», never a line that proves the bill whole with the
+  // service in doubt (adversarial Е2)
+  const serviceWord = serviceWordOf(reading)
+  const copied = keptApart
+    ? apartLines
+    : whole.lines.map((line) =>
+        serviceWord.test(line.printed)
+          ? { ...lineOf(line), settled: false, asPrinted: false }
+          : lineOf(line),
+      )
   // the service decided against stays decided: its line a line, no service taken by a label or a vote — taken, it was
   // counted twice, as a line and as the surcharge (review №9, adversarial В2)
   const { total, read, met, owed, cashback, redeemed, service } = keptApart
