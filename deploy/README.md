@@ -811,6 +811,12 @@ deploy/backup/restore.sh --drill                  # latest copy into a throwaway
 deploy/backup/restore.sh --into-prod <copy>       # asks for the copy's name, stops api and bot, replaces
 ```
 
+**The drill compares every table but the ones the copy leaves out** (MOL-368, audit MOL-287 Ф-19):
+those it reads from `backup.sh`'s `--exclude-table-data`, one list, and each must come back empty —
+«excluded» on its row — or the drill fails: the copy carried photos or links `/privacy` promises it
+never keeps. Before, they always differed from the live database, and «counts differ» on every drill
+hid a real failure among them. Rows written since the copy still differ, as before.
+
 `--into-prod` holds rollouts while it runs (`deploy.hold`, «Deploys» above), so a merge meanwhile
 does not start an API on the empty database; it takes the hold off however it ends.
 

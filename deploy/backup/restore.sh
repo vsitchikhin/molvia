@@ -49,6 +49,11 @@ case "$mode" in
     ;;
 
   --drill)
+    # The tables backup.sh leaves out of the copy, read where they are written — one list (MOL-368).
+    # They are not compared with the live database: each must come back empty, or the copy carried
+    # what /privacy promises it never keeps. None read is a drill that proved nothing either.
+    excluded="$(grep -o -- '--exclude-table-data=[a-z_]*' "$(dirname "$0")/backup.sh" | cut -d= -f2 | sort -u | tr '\n' ' ')"
+    [[ -n "${excluded// /}" ]] || { echo "drill: no table excluded in backup.sh was read" >&2; exit 1; }
     [[ -n "$copy" ]] || copy="$(copies | tail -n 1)"
     [[ -n "$copy" ]] || { echo "the bucket holds no copy" >&2; exit 1; }
     echo "drill: $copy"
@@ -67,11 +72,25 @@ case "$mode" in
       exit 1
     fi
     echo "table · live · restored"
+    verdict=0
     join -a1 -a2 -e '—' -o '0,1.2,2.2' <(sort <<<"$live") <(sort <<<"$restored") \
-      | awk '{ mark = ($2 == $3) ? "" : "   ≠"; print $1 " · " $2 " · " $3 mark; bad += ($2 != $3) }
-             END { exit bad > 0 }' \
-      && echo "drill: every table matches" \
-      || { echo "drill: counts differ — rows written since the copy, or a copy that does not restore" >&2; exit 1; }
+      | awk -v excluded="$excluded" '
+          BEGIN { n = split(excluded, names, " "); for (i = 1; i <= n; i++) out["public." names[i]] = 1 }
+          $1 in out {
+            seen[$1] = 1
+            mark = ($3 == "0") ? "   excluded" : "   excluded, must be empty"
+            print $1 " · " $2 " · " $3 mark; leaked += ($3 != "0"); next
+          }
+          { mark = ($2 == $3) ? "" : "   ≠"; print $1 " · " $2 " · " $3 mark; bad += ($2 != $3) }
+          END {
+            for (name in out) if (!(name in seen)) { print name " · excluded in backup.sh, no such table"; leaked++ }
+            exit (leaked > 0) ? 2 : (bad > 0)
+          }' || verdict=$?
+    case $verdict in
+      0) echo "drill: every table matches, and every table excluded from the copy came back empty" ;;
+      2) echo "drill: a table excluded from the copy is not empty, or not there — see «excluded» above" >&2; exit 1 ;;
+      *) echo "drill: counts differ — rows written since the copy, or a copy that does not restore" >&2; exit 1 ;;
+    esac
     ;;
 
   --into-prod)
