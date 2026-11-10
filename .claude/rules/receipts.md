@@ -298,11 +298,16 @@ month — two processes at a rollout, a clock stepped back — counts in the new
 the old one at nought; its settling under the old month leaves its worst there. **One transaction a call, the
 account's lock first** (privacy.md): the share is taken in one statement, then the month; the share refusing leaves the
 month untouched and tells no stop, the cap refusing gives the share back. `settle` puts the call's own price in the
-share too, while the share still counts that month. **A cost not known goes to the month alone** (В-4 «а» on
-adversarial А1): a time out, a connection lost or a fault of ours keeps the worst in the month, which holds the money,
-and gives it back to the share, which holds the people apart — a receipt waiting ten minutes for the model away is
-reserved every minute, and an evening with no connection took 99 % of a share with not a cent billed. A process lost
-between the reserve and the answer still leaves the worst in both. **A brand's call is paid from the share of the
+share too, while the share still counts that month. **A request that never left costs nothing** (В-4 «а» on adversarial
+А1, narrowed by В-6 «а» on Б1): a connection that fails before a byte goes — no address, the port refused, no route, no
+connection in time (`NEVER_CONNECTED` in `model-reader.ts`, a closed list down the error's causes) — settles at nought
+in the month and the share; a receipt waiting ten minutes for the model away is reserved every minute, and an evening
+with no connection took 99 % of a share with not a cent billed. **Anything else in doubt is paid** — a time out, a
+connection reset under the request, an answer torn: the worst stays in both, since the request went and the queue asks
+it again every minute; given back to the share, a receipt the model answers past its 120 s put $2,15 a day of one
+person into the month with the share at nought (Б1). **A fault of ours goes to the month alone** (`settle` with no
+cost): once a receipt, and the owner hears of it. A process lost between the reserve and the answer still leaves the
+worst in both. **A brand's call is paid from the share of the
 receipt that asked it** (В-2 «а»): over it the brand waits for the next receipt that asks, whosever. Over the share
 Tesseract reads, as at the cap (`model_passed`, `brands_passed`: `share`), and the person is told nothing — their
 status is MOL-276's, in 0.3. **The owner hears of it once a person a month** (`model_share`, В-3 «а»,
@@ -310,7 +315,9 @@ status is MOL-276's, in 0.3. **The owner hears of it once a person a month** (`m
 nothing of which receipt, since a brand's call may be the one refused (self-review №1). Not a change of the row:
 `updated_at` does not see the three columns (0081); the copy carries them (version 30), erasure takes them with the
 row. **The prices, named:** the edge is held by the worst price, so the last receipt or two that would fit by their
-own price go to Tesseract; a time out Anthropic did bill is not in the share — some $0,009 a call, held by the month;
+own price go to Tesseract; a connection that breaks under the request in a poor network eats the share as a time out
+does, though nothing may have been billed; a fault of ours that Anthropic did bill is not in the share — once a
+receipt, some $0,009, held by the month;
 the share is reset at 04:00 of the 1st in Yerevan; one share for everybody — a tariff's own is MOL-275's, with the 100
 receipts a month.
 
