@@ -111,6 +111,17 @@ jobs:
           # left it until the base's digest moved.
           no-cache-filters: runtime
 
+  # trivy over the images just built (MOL-369), beside the rollout and never judging it (owner's В-2 «а»):
+  # a red here is a fix of ours to make, and a hotfix does not wait for a scanner.
+  scan:
+    name: scan the images
+    needs: images
+    permissions:
+      contents: read
+    uses: ./.github/workflows/scan.yml
+    with:
+      tag: ${{ needs.images.outputs.tag }}
+
   tag:
     name: name the images of a release tag
     if: github.event_name == 'push'

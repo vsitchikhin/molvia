@@ -37,11 +37,47 @@ jobs:
           --health-retries 10
 
     steps:
-      # The merge's first parent too: the time reporter turns red only for the files the pull request
-      # changes, `HEAD^1..HEAD` (MOL-266, В-4 «а»).
+      # The whole history: gitleaks reads the pull request's own commits, `HEAD^1..HEAD^2` of the merge,
+      # and the time reporter the files it changes, `HEAD^1..HEAD` (MOL-266, В-4 «а»).
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          fetch-depth: 2
+          fetch-depth: 0
+
+      # A secret in any commit of the pull request (MOL-369): its ref is public, so a commit removed later
+      # leaks all the same, and the step stays red until the secret is rotated and its fingerprint goes into
+      # `.gitleaksignore`. First, so it is red in seconds; `--redact`, since the log of a public repository
+      # is public too. A push to master needs none: master takes pull requests alone, read here.
+      - name: secrets in the pull request's commits
+        if: github.event_name == 'pull_request'
+        run: |
+          docker build --quiet --tag molvia-gitleaks .github/scanners/gitleaks
+          # `safe.directory` for a run where the checkout is not the container's uid — a copy on a Mac.
+          image() {
+            docker run --rm --volume "$PWD:/repo:ro" \
+              --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/repo \
+              "$@"
+          }
+          flags=(--config /repo/.gitleaks.toml --gitleaks-ignore-path /repo/.gitleaksignore
+            --ignore-gitleaks-allow --redact --verbose --no-banner)
+          # gitleaks says «no leaks found» and exits 0 when its git cannot read the range: the same git of
+          # the same image counts it first, and fails the step where it cannot.
+          commits="$(image --entrypoint git molvia-gitleaks -C /repo rev-list --count 'HEAD^1..HEAD^2')"
+          echo "the pull request's commits: $commits"
+          # A merge of master shows what it brought against the branch — a conflict resolved by hand
+          # included; without it `git log -p` shows a merge no diff (adversarial А1). `--text`: a file git
+          # calls binary — by a NUL, by `-diff` in `.gitattributes` — is read as well (А3).
+          found=0
+          image molvia-gitleaks git /repo "${flags[@]}" \
+            --log-opts='--text --diff-merges=first-parent HEAD^1..HEAD^2' || found=$?
+          # A commit's message is as public as its diff, and gitleaks reads only the diff (А6): a file per
+          # commit, so a finding's fingerprint names it.
+          messages="$(mktemp -d)"
+          for commit in $(git rev-list 'HEAD^1..HEAD^2'); do
+            git log -1 --format=%B "$commit" > "$messages/$commit"
+          done
+          image --volume "$messages:/messages:ro" molvia-gitleaks dir /messages "${flags[@]}" || found=$?
+          exit "$found"
+
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
@@ -51,6 +87,10 @@ jobs:
       - run: npm ci
         env:
           ONNXRUNTIME_NODE_INSTALL: skip
+
+      # What ships, high or critical, unless accepted with a day to look again (MOL-369, В-4 «б»).
+      - name: npm audit of what ships
+        run: node bin/npm-audit.mjs
 
       # The same generator every working copy uses, so CI cannot drift from local setup.
       - run: ./bin/init-env.sh 0

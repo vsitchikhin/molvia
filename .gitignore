@@ -31,6 +31,8 @@ dev-dist/
 playwright-report/
 test-results/
 blob-report/
+# trivy's database and reports, `bin/scan-images.mjs` (MOL-369).
+.trivy/
 .playwright/
 
 # os / editor
