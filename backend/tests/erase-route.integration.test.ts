@@ -10,8 +10,8 @@ import {
   aStrangersCookie,
   clearAll,
   insertActor,
-  insertItem,
   insertPlace,
+  insertSeedItem,
   insertSession,
   signIn,
   telegramId,
@@ -136,7 +136,7 @@ function eraseMine(cookie?: string, url = '/actors/me') {
 
 describe('DELETE /actors/me — «Удалить мои данные» в настройках (MOL-94)', () => {
   it('стирает ровно то же, что дверь бота: две одинаковые жизни, по одной каждой дверью', async () => {
-    const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
+    const shared = { itemId: await insertSeedItem(db), placeId: await insertPlace(db) }
     const byBot = telegramId()
     const bySettings = telegramId()
     const anna = await insertActor(db, { telegramUserId: byBot })
@@ -185,7 +185,7 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
   it('стирает владельца сессии со всей его жизнью, входами на всех устройствах и гасит cookie', async () => {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
-    const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
+    const shared = { itemId: await insertSeedItem(db), placeId: await insertPlace(db) }
     await aLife(db, anna, tg, shared)
     const phone = await signIn(db, anna)
     const laptop = await signIn(db, anna)
@@ -212,7 +212,7 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
   }, 10_000)
 
   it('не трогает другого человека — ни его строк, ни его входа', async () => {
-    const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
+    const shared = { itemId: await insertSeedItem(db), placeId: await insertPlace(db) }
     const annaTg = telegramId()
     const borisTg = telegramId()
     const anna = await insertActor(db, { telegramUserId: annaTg })

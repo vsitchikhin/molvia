@@ -3,6 +3,8 @@ import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { storeMemoryWords } from '@molvia/model'
 import { ACTOR_REFERENCES, ITEM_REFERENCES, createErasureRepository } from '@/db/erasure-repository'
+import type { ItemReference } from '@/db/erasure-repository'
+import { createItemEmbeddingRepository } from '@/db/item-embeddings-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createActorRepository } from '@/db/actors-repository'
 import { authTransactOn } from '@/db/auth-unit-of-work'
@@ -47,6 +49,7 @@ import {
   insertItem,
   insertLoginRequest,
   insertPlace,
+  insertSeedItem,
   insertTrip,
   telegramId,
 } from './fixtures'
@@ -166,7 +169,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
   it('после стирания о человеке не остаётся ни строки — ни в одной таблице базы', async () => {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
-    const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
+    const shared = { itemId: await insertSeedItem(db), placeId: await insertPlace(db) }
     const { exchangeId, incomeId, spendingId, accountId, receiptId, transferId } = await aLife(
       db,
       anna,
@@ -221,7 +224,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
   it('код, который человек дописал к позиции, остаётся в справочнике без автора (MOL-100)', async () => {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
-    const itemId = await insertItem(db)
+    const itemId = await insertSeedItem(db)
     await aLife(db, anna, tg, { itemId, placeId: await insertPlace(db) })
 
     await erasure.erase(tg, { dryRun: false })
@@ -235,7 +238,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const onlyHers = await insertPlace(db, { name: 'Рынок у дома' })
-    await aLife(db, anna, tg, { itemId: await insertItem(db), placeId: onlyHers })
+    await aLife(db, anna, tg, { itemId: await insertSeedItem(db), placeId: onlyHers })
 
     await erasure.erase(tg, { dryRun: false })
 
@@ -247,7 +250,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const boris = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const witness = await insertActor(db, { telegramUserId: boris })
-    const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
+    const shared = { itemId: await insertSeedItem(db), placeId: await insertPlace(db) }
     const { ownItem } = await aLife(db, anna, tg, shared)
     // Boris bought and rated what Anna added to the catalogue.
     await aLife(db, witness, boris, { ...shared, itemId: ownItem })
@@ -266,7 +269,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
   it('сухой прогон считает ровно то же и не меняет ни строки', async () => {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
-    await aLife(db, anna, tg, { itemId: await insertItem(db), placeId: await insertPlace(db) })
+    await aLife(db, anna, tg, { itemId: await insertSeedItem(db), placeId: await insertPlace(db) })
     const before = await snapshot(anna)
 
     const dry = await erasure.erase(tg, { dryRun: true })
@@ -547,7 +550,7 @@ describe('стирание оставляет одно число — сколь
 })
 
 describe('товары человека при стирании (MOL-374)', () => {
-  /** Anna, her item, and Boris with a trip of his own — the somebody else who may stand on it. */
+  /** Anna, her item, and Boris — the somebody else who may stand on it. */
   async function annaAndBoris() {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
@@ -603,7 +606,13 @@ describe('товары человека при стирании (MOL-374)', () =
 
     const report = await erasure.erase(tg, { dryRun: false })
 
-    expect(report).toMatchObject({ itemsErased: 1, itemsReleased: 0 })
+    // and what went with it is not reported as kept (review 1, №1; adversarial А3)
+    expect(report).toMatchObject({
+      itemsErased: 1,
+      itemsReleased: 0,
+      barcodesReleased: 0,
+      memoryReleased: 0,
+    })
     expect(await itemRow(item)).toBeUndefined()
     expect(await rowsMentioning(item)).toEqual([])
     expect(await itemRow(other)).toBeDefined()
@@ -619,92 +628,140 @@ describe('товары человека при стирании (MOL-374)', () =
   })
 
   type Holder = (who: { boris: string; item: string }) => Promise<unknown>
-  const holders: [string, Holder][] = [
-    [
-      'чужая покупка',
-      async ({ boris, item }) => {
-        const tripId = await insertTrip(db, { actorId: boris, placeId: await insertPlace(db) })
-        await db.insert(expenses).values({ id: randomUUID(), tripId, itemId: item })
-      },
+  /** A merge's journal, undone: the row stays for the record, the trace is no trace any more. */
+  const journal = (fromItem: string, intoItem: string) =>
+    db
+      .insert(catalogueMerges)
+      .values({ subject: 'item', fromItem, intoItem, by: 'hand', undoneAt: new Date() })
+
+  // A case for every key on `items` (review 1, №2): a key added to ITEM_REFERENCES without a case
+  // does not compile, and its case fails while `eraseLockedItems` has no `not exists` for it.
+  const HOLDERS: Record<ItemReference, readonly (readonly [string, Holder])[] | 'cascade'> = {
+    'catalogue_merges.from_item': [
+      [
+        'он сам — след склейки',
+        async ({ item }) => {
+          const survivor = await insertItem(db, { name: 'Лаваш', searchKey: 'lavash' })
+          await db.update(items).set({ mergedInto: survivor }).where(eq(items.id, item))
+          await db
+            .insert(catalogueMerges)
+            .values({ subject: 'item', fromItem: item, intoItem: survivor, by: 'hand' })
+        },
+      ],
+      [
+        'журнал отменённой склейки из него',
+        async ({ item }) =>
+          journal(item, await insertItem(db, { name: 'Лаваш', searchKey: 'lavash' })),
+      ],
     ],
-    [
-      'чужая снятая оценка',
-      ({ boris, item }) =>
-        db.insert(verdicts).values({
-          id: randomUUID(),
-          actorId: boris,
-          itemId: item,
-          itemKind: 'product',
-          score: 4,
-          ratedAt: new Date(Date.now() - 60_000),
-          deletedAt: new Date(),
-        }),
+    'catalogue_merges.into_item': [
+      [
+        'журнал отменённой склейки в него',
+        async ({ item }) =>
+          journal(
+            await insertItem(db, { name: 'Лаваш домашни', searchKey: 'lavash domashni' }),
+            item,
+          ),
+      ],
     ],
-    [
-      'чужой выбор в поиске',
-      ({ boris, item }) =>
-        db.insert(searchPicks).values({ actorId: boris, queryKey: 'lavash', itemId: item }),
+    'items.merged_into': [
+      [
+        'на него склеен след',
+        ({ item }) =>
+          insertItem(db, { name: 'Лаваш домашни', searchKey: 'lavash domashni', mergedInto: item }),
+      ],
     ],
-    [
-      'строка чужого незаписанного чека (В-2 «а»)',
-      async ({ boris, item }) => {
-        const receiptId = randomUUID()
-        const at = new Date()
-        await db.insert(receipts).values({
-          id: receiptId,
-          actorId: boris,
-          status: 'queued',
-          parts: 1,
-          country: 'AM',
-          language: 'ru',
-          currency: 'AMD',
-          capturedAt: at,
-          queuedAt: at,
-        })
-        await db.insert(receiptLines).values({
-          receiptId,
-          position: 0,
-          printed: 'Լավաշ տնական',
-          settled: false,
-          itemId: item,
-        })
-      },
+    'expenses.item_id': [
+      [
+        'чужая покупка',
+        async ({ boris, item }) => {
+          const tripId = await insertTrip(db, { actorId: boris, placeId: await insertPlace(db) })
+          await db.insert(expenses).values({ id: randomUUID(), tripId, itemId: item })
+        },
+      ],
     ],
-    [
-      'код, привязанный другим',
-      ({ boris, item }) =>
-        db.insert(itemBarcodes).values({ code: '4850007654321', itemId: item, addedBy: boris }),
+    'verdicts.item_id': [
+      [
+        'чужая снятая оценка',
+        ({ boris, item }) =>
+          db.insert(verdicts).values({
+            id: randomUUID(),
+            actorId: boris,
+            itemId: item,
+            itemKind: 'product',
+            score: 4,
+            ratedAt: new Date(Date.now() - 60_000),
+            deletedAt: new Date(),
+          }),
+      ],
     ],
-    [
-      'код уже стёртого автора',
-      ({ item }) =>
-        db.insert(itemBarcodes).values({ code: '4850007654321', itemId: item, addedBy: null }),
+    'search_picks.item_id': [
+      [
+        'чужой выбор в поиске',
+        ({ boris, item }) =>
+          db.insert(searchPicks).values({ actorId: boris, queryKey: 'lavash', itemId: item }),
+      ],
     ],
-    ['чужое слово памяти магазина', ({ boris, item }) => aWord(boris, item, 'Լավաշ')],
-    ['слово уже стёртого автора', ({ item }) => aWord(null, item, 'Լավաշ')],
-    [
-      'на него склеен след',
-      async ({ item }) => {
-        const twin = await insertItem(db, {
-          name: 'Лаваш домашни',
-          searchKey: 'lavash domashni',
-          mergedInto: item,
-        })
-        await db
-          .insert(catalogueMerges)
-          .values({ subject: 'item', fromItem: twin, intoItem: item, by: 'hand' })
-      },
+    'receipt_lines.item_id': [
+      [
+        'строка чужого незаписанного чека (В-2 «а»)',
+        async ({ boris, item }) => {
+          const receiptId = randomUUID()
+          const at = new Date()
+          await db.insert(receipts).values({
+            id: receiptId,
+            actorId: boris,
+            status: 'queued',
+            parts: 1,
+            country: 'AM',
+            language: 'ru',
+            currency: 'AMD',
+            capturedAt: at,
+            queuedAt: at,
+          })
+          await db.insert(receiptLines).values({
+            receiptId,
+            position: 0,
+            printed: 'Լավաշ տնական',
+            settled: false,
+            itemId: item,
+          })
+        },
+      ],
     ],
-    [
-      'он сам — след склейки',
-      async ({ item }) => {
-        const survivor = await insertItem(db, { name: 'Лаваш', searchKey: 'lavash' })
-        await db.update(items).set({ mergedInto: survivor }).where(eq(items.id, item))
-        await db
-          .insert(catalogueMerges)
-          .values({ subject: 'item', fromItem: item, intoItem: survivor, by: 'hand' })
-      },
+    'item_barcodes.item_id': [
+      [
+        'код, привязанный другим',
+        ({ boris, item }) =>
+          db.insert(itemBarcodes).values({ code: '4850007654321', itemId: item, addedBy: boris }),
+      ],
+      [
+        'код уже стёртого автора',
+        ({ item }) =>
+          db.insert(itemBarcodes).values({ code: '4850007654321', itemId: item, addedBy: null }),
+      ],
     ],
+    'store_memory.item_id': [
+      ['чужое слово памяти магазина', ({ boris, item }) => aWord(boris, item, 'Լավաշ')],
+      ['слово уже стёртого автора', ({ item }) => aWord(null, item, 'Լավաշ')],
+    ],
+    'item_names.item_id': [
+      [
+        'армянское имя сида',
+        ({ item }) => db.insert(itemNames).values({ itemId: item, language: 'hy', name: 'լավաշ' }),
+      ],
+    ],
+    'item_hs.item_id': [
+      [
+        'заголовок сида',
+        ({ item }) => db.insert(itemHeadings).values({ itemId: item, hs: '1905' }),
+      ],
+    ],
+    'item_embeddings.item_id': 'cascade',
+  }
+  const holders: (readonly [string, Holder])[] = [
+    ...Object.values(HOLDERS).flatMap((cases) => (cases === 'cascade' ? [] : cases)),
+    // no foreign key: the owner's word names its two ids in a pair of its own
     [
       'слово владельца «это разное»',
       async ({ item }) => {
@@ -716,11 +773,6 @@ describe('товары человека при стирании (MOL-374)', () =
         await db.insert(catalogueApart).values({ subject: 'item', a: a ?? item, b: b ?? other })
       },
     ],
-    [
-      'армянское имя сида',
-      ({ item }) => db.insert(itemNames).values({ itemId: item, language: 'hy', name: 'լավաշ' }),
-    ],
-    ['заголовок сида', ({ item }) => db.insert(itemHeadings).values({ itemId: item, hs: '1905' })],
   ]
 
   it.each(holders)('товар держит %s — остаётся без автора', async (_, hold) => {
@@ -739,30 +791,147 @@ describe('товары человека при стирании (MOL-374)', () =
     await db.insert(itemBarcodes).values({ code: '4850001234567', itemId: item, addedBy: anna })
     await aWord(anna, item, 'Լավաշ տնական')
 
-    await erasure.erase(tg, { dryRun: false })
+    const report = await erasure.erase(tg, { dryRun: false })
 
+    expect(report).toMatchObject({ barcodesReleased: 1, memoryReleased: 1 })
     const code = onlyRow(await db.select().from(itemBarcodes).where(eq(itemBarcodes.itemId, item)))
     expect(code?.addedBy).toBeNull()
     const word = onlyRow(await db.select().from(storeMemory).where(eq(storeMemory.itemId, item)))
     expect(word?.actorId).toBeNull()
   })
 
-  it('товар, который сейчас пишет чужая транзакция, остаётся без автора, и стирание её не ждёт', async () => {
-    const { tg, item } = await annaAndBoris()
-    const writer = connect()
+  // Adversarial А1: Boris's pick kept Anna's item at her erasure, and his own erasure looked only at the
+  // items he added — nobody's, standing on nothing, for good.
+  it('товар без автора уходит со стиранием последнего, кто на нём стоял', async () => {
+    const { tg, boris, item } = await annaAndBoris()
+    const borisTg = onlyRow(
+      await db.select({ tg: actors.telegramUserId }).from(actors).where(eq(actors.id, boris)),
+    )?.tg
+    if (borisTg === undefined) throw new Error('no Boris')
+    await db.insert(searchPicks).values({ actorId: boris, queryKey: 'lavash', itemId: item })
+    expect(await erasure.erase(tg, { dryRun: false })).toMatchObject({
+      itemsErased: 0,
+      itemsReleased: 1,
+    })
+
+    const report = await erasure.erase(borisTg, { dryRun: false })
+
+    expect(report).toMatchObject({ itemsErased: 1, itemsReleased: 0 })
+    expect(await itemRow(item)).toBeUndefined()
+  })
+
+  it('товар сида без автора остаётся, когда стёрт последний, кто его покупал', async () => {
+    const tg = telegramId()
+    const boris = await insertActor(db, { telegramUserId: tg })
+    const seeded = await insertItem(db, { name: 'Молоко', searchKey: 'moloko' })
+    await db.insert(itemNames).values({ itemId: seeded, language: 'hy', name: 'կաթ' })
+    await db.insert(searchPicks).values({ actorId: boris, queryKey: 'moloko', itemId: seeded })
+
+    const report = await erasure.erase(tg, { dryRun: false })
+
+    expect(report).toMatchObject({ itemsErased: 0, itemsReleased: 0 })
+    expect(await itemRow(seeded)).toBeDefined()
+  })
+
+  /** Resolves once some backend of this database waits on a lock: the erasure has reached the item. */
+  async function waitingOnLock(): Promise<void> {
+    const watcher = connect()
     try {
-      await writer.begin(async (tx) => {
-        // what a foreign key takes while somebody's purchase of it is being written
-        await tx`select 1 from items where id = ${item} for key share`
-        // Waiting on the lock, the erasure would never settle while this transaction stays open.
-        const report = await erasure.erase(tg, { dryRun: false })
-        expect(report).toMatchObject({ itemsErased: 0, itemsReleased: 1 })
+      for (let tries = 0; tries < 500; tries += 1) {
+        const row = onlyRow(
+          await watcher<{ n: number }[]>`
+            select count(*)::int as n from pg_stat_activity
+            where wait_event_type = 'Lock' and datname = current_database()`,
+        )
+        if ((row?.n ?? 0) > 0) return
+        await new Promise((resolve) => setTimeout(resolve, 10))
+      }
+      throw new Error('nobody waits on a lock')
+    } finally {
+      await watcher.end()
+    }
+  }
+
+  // Adversarial А2: an item skipped under somebody's lock stayed nobody's when that write came to nothing;
+  // erasure waits for it and decides by what it left.
+  it.each([
+    ['записалась — товар остаётся', true, { itemsErased: 0, itemsReleased: 1 }],
+    ['откатилась — товар уходит', false, { itemsErased: 1, itemsReleased: 0 }],
+  ] as const)(
+    'чужая покупка под замком товара %s',
+    async (_, commits, outcome) => {
+      const { tg, boris, item } = await annaAndBoris()
+      const tripId = await insertTrip(db, { actorId: boris, placeId: await insertPlace(db) })
+      const writer = connect()
+      let erasing: ReturnType<typeof erasure.erase> | undefined
+      try {
+        await writer
+          .begin(async (tx) => {
+            await tx`insert into expenses (id, trip_id, item_id) values (${randomUUID()}, ${tripId}, ${item})`
+            erasing = erasure.erase(tg, { dryRun: false })
+            await waitingOnLock()
+            if (!commits) throw new Error('rolled back')
+          })
+          .catch(() => undefined)
+      } finally {
+        await writer.end()
+      }
+
+      expect(await erasing).toMatchObject(outcome)
+    },
+    10_000,
+  )
+
+  it('ночь склейки, держащая товар, кончается первой: стирание её ждёт, взаимной блокировки нет', async () => {
+    const { tg, anna, item } = await annaAndBoris()
+    const survivor = await insertItem(db, { name: 'Лаваш', searchKey: 'lavash' })
+    await db.insert(searchPicks).values({ actorId: anna, queryKey: 'lava', itemId: item })
+    const night = connect()
+    let erasing: ReturnType<typeof erasure.erase> | undefined
+    try {
+      await night.begin(async (tx) => {
+        // `mergeItems`: both rows first, in the order of their ids; then the person's pick moves on
+        await tx`select id from items where id in (${item}, ${survivor}) order by id for update`
+        erasing = erasure.erase(tg, { dryRun: false })
+        await waitingOnLock()
+        await tx`update search_picks set item_id = ${survivor} where item_id = ${item}`
       })
     } finally {
-      await writer.end()
+      await night.end()
     }
-    expect((await itemRow(item))?.createdBy).toBeNull()
-  })
+
+    expect(await erasing).toMatchObject({ found: true, itemsErased: 1 })
+    expect(await db.select().from(actors).where(eq(actors.id, anna))).toEqual([])
+  }, 10_000)
+
+  // Adversarial А5: the writer of vectors read its batch, and one of its items went meanwhile.
+  it('писатель векторов ждёт стирание товара и пишет остальные', async () => {
+    const { item } = await annaAndBoris()
+    const kept = await insertItem(db, { name: 'Хлеб', searchKey: 'hleb' })
+    const vector = Array<number>(768).fill(0.1)
+    const erasing = connect()
+    let written: Promise<void> | undefined
+    try {
+      await erasing.begin(async (tx) => {
+        await tx`delete from items where id = ${item}`
+        written = createItemEmbeddingRepository(db).write('test', [
+          { itemId: item, embedding: vector },
+          { itemId: kept, embedding: vector },
+        ])
+        await waitingOnLock()
+      })
+    } finally {
+      await erasing.end()
+    }
+
+    await written
+    expect(
+      await db
+        .select({ id: itemEmbeddings.itemId })
+        .from(itemEmbeddings)
+        .orderBy(itemEmbeddings.itemId),
+    ).toEqual([{ id: kept }])
+  }, 10_000)
 })
 
 describe('страж схемы', () => {

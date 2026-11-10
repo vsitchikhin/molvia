@@ -35,6 +35,7 @@ import {
   expenses,
   incomes,
   itemBarcodes,
+  itemNames,
   items,
   loginRequests,
   marketRates,
@@ -111,6 +112,20 @@ export async function insertItem(
     defaultUnit: 'l',
     ...patch,
   })
+  return id
+}
+
+/**
+ * An item of the seed: no author, and its Armenian name, as every line of the seed has (MOL-126). An
+ * item with no author and no name of the seed is one whose author was erased, and goes with the last
+ * person standing on it (MOL-374) — so an item «everybody's» in a test of erasure is this one.
+ */
+export async function insertSeedItem(
+  db: Db,
+  patch: Partial<typeof items.$inferInsert> = {},
+): Promise<string> {
+  const id = await insertItem(db, patch)
+  await db.insert(itemNames).values({ itemId: id, language: 'hy', name: 'կաթ' })
   return id
 }
 
