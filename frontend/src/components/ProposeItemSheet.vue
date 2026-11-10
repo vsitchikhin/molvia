@@ -39,6 +39,11 @@
       <p v-if="failed" class="line failed" role="alert">
         {{ t('item.propose.failed') }}
       </p>
+      <!-- The day's quota (MOL-362): nothing was written, and pressing again changes nothing today.
+           A warning, as «… уже есть», not the red «Не получилось» that asks to try again. -->
+      <p v-if="limited" class="code warn limited" role="alert">
+        {{ t('item.propose.day_limited', { n: dayMax }, dayMax) }}
+      </p>
       <!-- Another item holds the code (MOL-100, Р-3): nothing was written, and that item is offered
            — the package in the hand is what the catalogue already knows it as. A warning, not an
            error (MOL-213, 5e). -->
@@ -71,7 +76,10 @@
 import { computed, defineComponent, nextTick, onUnmounted, ref, shallowRef, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { ApiError } from '@molvia/client'
 import {
+  ERROR,
+  ITEMS_PROPOSED_DAY_MAX,
   ITEM_NAME_MAX,
   ITEM_NOTE_MAX,
   decimalFromMilli,
@@ -166,6 +174,8 @@ export default defineComponent({
     const source = ref<string | null>(null)
     const sending = ref(false)
     const failed = ref(false)
+    /** The server refused a new item past the person's day (MOL-362). */
+    const limited = ref(false)
     // Read again as the app comes back into view too: an iOS PWA frozen in the background misses
     // `online`, and the button said «со связью» over a connection back (MOL-192, adversarial А2).
     const connected = useOnline()
@@ -214,6 +224,7 @@ export default defineComponent({
         size.value = null
         source.value = null
         failed.value = false
+        limited.value = false
         holder.value = null
         if (name.value === '' && props.hint !== null) fill(props.hint)
       },
@@ -310,6 +321,7 @@ export default defineComponent({
       const sentCode = props.code
       sending.value = true
       failed.value = false
+      limited.value = false
       try {
         const written = await api.proposeItem(parsed.data)
         if (mine !== opening) {
@@ -327,8 +339,16 @@ export default defineComponent({
           await nextTick()
           takeButton.value?.$el?.focus()
         } else emit('proposed', written.entry, written.created)
-      } catch {
+      } catch (caught) {
         if (mine !== opening) return
+        if (
+          caught instanceof ApiError &&
+          caught.answered &&
+          caught.code === ERROR.ITEMS_DAY_LIMITED
+        ) {
+          limited.value = true
+          return
+        }
         connected.value = navigator.onLine
         failed.value = connected.value
       } finally {
@@ -365,6 +385,8 @@ export default defineComponent({
       units,
       connected,
       failed,
+      limited,
+      dayMax: ITEMS_PROPOSED_DAY_MAX,
       holder,
       takeButton,
       ready,
@@ -439,7 +461,8 @@ export default defineComponent({
   color: var(--warn-ink);
 }
 
-.taken {
+.taken,
+.limited {
   margin-bottom: var(--space-3);
 }
 </style>

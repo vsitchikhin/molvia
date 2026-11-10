@@ -135,6 +135,8 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       silenceWarnedAt: at(7),
       receiptsDay: '2026-09-20',
       receiptsSent: 3,
+      itemsDay: '2026-09-21',
+      itemsProposed: 4,
     })
     .where(eq(actors.id, actorId))
   await insertSession(db, { actorId, deviceName: 'iPhone · Safari' })

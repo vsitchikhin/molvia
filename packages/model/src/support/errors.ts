@@ -140,6 +140,11 @@ export const ERROR = {
    */
   RECEIPTS_UNRECORDED_LIMITED: 'error.receipts_unrecorded_limited',
   /**
+   * A new item past `ITEMS_PROPOSED_DAY_MAX` of the person's day (MOL-362): nothing is written, and the
+   * sheet says to take a found one now or propose tomorrow.
+   */
+  ITEMS_DAY_LIMITED: 'error.items_day_limited',
+  /**
    * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
    * the text and says to send it tomorrow.
    */

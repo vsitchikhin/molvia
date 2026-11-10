@@ -25,6 +25,14 @@ const noteSchema = visibleLine(ITEM_NOTE_MAX)
  */
 export const ITEM_BARCODES_MAX = 20
 
+/**
+ * How many new items a person puts into the shared catalogue by «Предложить товар» on a day of their
+ * own (MOL-362, owner's В-10 «а» of the audit MOL-287): with no bound one account wrote some nine
+ * thousand an hour into everybody's search. A name already there answers whatever the count, and the
+ * items «Записать» of a receipt makes are not counted — the receipts' own quota holds them.
+ */
+export const ITEMS_PROPOSED_DAY_MAX = 60
+
 const barcodesSchema = z
   .array(barcodeSchema)
   .max(ITEM_BARCODES_MAX)

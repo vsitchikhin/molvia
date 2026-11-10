@@ -45,6 +45,7 @@ import type {
   TelegramUserId,
   TripReceiptSource,
 } from '@molvia/model'
+import { countOfDay } from './day-count'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
@@ -903,11 +904,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                 sql`${receipts.deletedAt} <= ${undoFrom()}`,
               ),
             )
-          // The day only moves on: a day the phone names before it counts in it (MOL-360, В-1 «а»). A header
-          // made up walks the days that are today somewhere — three at most, for two hours a day (review 1,
-          // В-1 «а», adversarial А1): a price. A removal never takes a place of the day back.
-          const day = account.day !== null && account.day > phoneDay ? account.day : phoneDay
-          const sent = account.day === day ? account.sent : 0
+          // the day only moves on (`countOfDay`, MOL-360, В-1 «а»); a removal never takes a place of it back
+          const { day, n: sent } = countOfDay({ day: account.day, n: account.sent }, phoneDay)
           // the same receipt sent again by the queue is answered below, whatever the quota
           const [known] = await tx
             .select({ id: receipts.id })

@@ -2170,7 +2170,7 @@ service. Owner: «такие чеки надо научиться читать, 
   wrong total. **The price, named:** a bill printing its service «not included» as a line, read right, says «Итог не
   прочитали» where one total place prints it, the service line its lines' excess where two do — never a wrong figure. The lines and it meeting
   a total are MOL-244's first source — every line as read — so the bill is proven whole and its one-number lines shown.
-  Kept as `receipts.service_minor` (0081), beside the cashback and by its path: `linesTotalOf(total, cashback,
+  Kept as `receipts.service_minor` (0082), beside the cashback and by its path: `linesTotalOf(total, cashback,
 service)` for every comparison of the lines with the total, the trip's money the total. **Only where the total takes
   it**: a bill whose lines meet the total without it records no service. **A total its places voted took the service**
   (owner's В-7 «а», adversarial Б1): every bill seen prints it so — ZERO, Bakery, Аракс — so where the lines did not meet

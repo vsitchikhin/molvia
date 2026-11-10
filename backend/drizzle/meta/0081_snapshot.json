@@ -1,5 +1,5 @@
 {
-  "id": "d43df9a2-4e10-48d1-9111-e6afc8553ee4",
+  "id": "cc794f96-55c8-4a92-a522-9f6c28cd538c",
   "prevId": "052aa54c-8ced-4250-b7f7-bb6f63e5460d",
   "version": "7",
   "dialect": "postgresql",
@@ -337,6 +337,19 @@
           "notNull": true,
           "default": 0
         },
+        "items_day": {
+          "name": "items_day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "items_proposed": {
+          "name": "items_proposed",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "rate_preference": {
           "name": "rate_preference",
           "type": "text",
@@ -496,6 +509,10 @@
         "actors_receipts_sent_not_negative": {
           "name": "actors_receipts_sent_not_negative",
           "value": "\"actors\".\"receipts_sent\" >= 0"
+        },
+        "actors_items_proposed_not_negative": {
+          "name": "actors_items_proposed_not_negative",
+          "value": "\"actors\".\"items_proposed\" >= 0"
         },
         "actors_consent_whole": {
           "name": "actors_consent_whole",
@@ -5717,12 +5734,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "service_minor": {
-          "name": "service_minor",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": false
-        },
         "read_partly": {
           "name": "read_partly",
           "type": "boolean",
@@ -5968,7 +5979,7 @@
         },
         "receipts_layout_known": {
           "name": "receipts_layout_known",
-          "value": "\"receipts\".\"layout\" is null or \"receipts\".\"layout\" in ('card', 'table', 'class', 'department', 'slip')"
+          "value": "\"receipts\".\"layout\" is null or \"receipts\".\"layout\" in ('card', 'table', 'class', 'department')"
         },
         "receipts_heard_known": {
           "name": "receipts_heard_known",
@@ -5989,10 +6000,6 @@
         "receipts_cashback_positive": {
           "name": "receipts_cashback_positive",
           "value": "\"receipts\".\"cashback_minor\" is null or \"receipts\".\"cashback_minor\" > 0"
-        },
-        "receipts_service_positive": {
-          "name": "receipts_service_positive",
-          "value": "\"receipts\".\"service_minor\" is null or \"receipts\".\"service_minor\" > 0"
         },
         "receipts_redeemed_positive": {
           "name": "receipts_redeemed_positive",
