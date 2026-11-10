@@ -61,6 +61,7 @@ describe('eraseSilent (MOL-239, Р-8)', () => {
     found,
     erased: {} as ErasureReport['erased'],
     itemsLeaving: 0,
+    leavingItems: [],
     itemsReleased: 0,
     barcodesReleased: 0,
     memoryReleased: 0,

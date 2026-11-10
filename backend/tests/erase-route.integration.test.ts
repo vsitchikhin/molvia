@@ -148,11 +148,12 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
     // What each erasure would take, counted by the dry run — the real run, rolled back.
     const before = await erasure.erase(byBot, { dryRun: true })
     const counted = await erasure.erase(bySettings, { dryRun: true })
-    // Boris has one session more, the one he asks with.
+    // Boris has one session more, the one he asks with; and items of his own, by their own ids.
     expect({
       ...counted,
       erased: { ...counted.erased, sessions: counted.erased.sessions - 1 },
-    }).toEqual(before)
+      leavingItems: counted.leavingItems.length,
+    }).toEqual({ ...before, leavingItems: before.leavingItems.length })
 
     expect((await erase({ telegramUserId: byBot })).statusCode).toBe(204)
     expect((await eraseMine(cookie)).statusCode).toBe(204)

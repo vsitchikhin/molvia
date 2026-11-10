@@ -2,12 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
 import { storeMemoryWords } from '@molvia/model'
-import {
-  ACTOR_REFERENCES,
-  ITEM_REFERENCES,
-  createErasureRepository,
-  sweepReleasedItems,
-} from '@/db/erasure-repository'
+import { ACTOR_REFERENCES, ITEM_REFERENCES, createErasureRepository } from '@/db/erasure-repository'
 import type { ItemReference } from '@/db/erasure-repository'
 import { createItemEmbeddingRepository } from '@/db/item-embeddings-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
@@ -19,6 +14,7 @@ import {
   actors,
   catalogueApart,
   catalogueMergeCandidates,
+  catalogueMergeMoves,
   catalogueMerges,
   erasures,
   events,
@@ -175,12 +171,8 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const shared = { itemId: await insertSeedItem(db), placeId: await insertPlace(db) }
-    const { exchangeId, incomeId, spendingId, accountId, receiptId, transferId } = await aLife(
-      db,
-      anna,
-      tg,
-      shared,
-    )
+    const { ownItem, exchangeId, incomeId, spendingId, accountId, receiptId, transferId } =
+      await aLife(db, anna, tg, shared)
 
     const report = await erasure.erase(tg, { dryRun: false })
 
@@ -210,6 +202,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
         actors: 1,
       },
       itemsLeaving: 1,
+      leavingItems: [ownItem],
       itemsReleased: 0,
       barcodesReleased: 1,
       memoryReleased: 0,
@@ -621,7 +614,7 @@ describe('товары человека при стирании (MOL-374)', () =
     })
     // erasure only marks it (В-7 «а»); the sweep takes it
     expect((await itemRow(item))?.releasedAt).not.toBeNull()
-    expect(await sweepReleasedItems(db)).toBe(1)
+    expect(await erasure.sweepReleased()).toBe(1)
     expect(await itemRow(item)).toBeUndefined()
     expect(await rowsMentioning(item)).toEqual([])
     expect(await itemRow(other)).toBeDefined()
@@ -785,7 +778,7 @@ describe('товары человека при стирании (MOL-374)', () =
     const report = await erasure.erase(tg, { dryRun: false })
 
     expect(report).toMatchObject({ itemsLeaving: 0, itemsReleased: 1 })
-    expect(await sweepReleasedItems(db)).toBe(0)
+    expect(await erasure.sweepReleased()).toBe(0)
     expect((await itemRow(item))?.createdBy).toBeNull()
   })
 
@@ -802,7 +795,7 @@ describe('товары человека при стирании (MOL-374)', () =
     await hold({ item })
 
     expect(await erasure.erase(tg, { dryRun: false })).toMatchObject({ itemsLeaving: 1 })
-    expect(await sweepReleasedItems(db)).toBe(1)
+    expect(await erasure.sweepReleased()).toBe(1)
     expect(await itemRow(item)).toBeUndefined()
   })
 
@@ -812,7 +805,7 @@ describe('товары человека при стирании (MOL-374)', () =
     await erasure.erase(borisTg, { dryRun: false })
 
     expect(await erasure.erase(tg, { dryRun: false })).toMatchObject({ itemsLeaving: 1 })
-    expect(await sweepReleasedItems(db)).toBe(1)
+    expect(await erasure.sweepReleased()).toBe(1)
     expect(await itemRow(item)).toBeUndefined()
   })
 
@@ -840,12 +833,12 @@ describe('товары человека при стирании (MOL-374)', () =
       itemsLeaving: 0,
       itemsReleased: 1,
     })
-    expect(await sweepReleasedItems(db)).toBe(0)
+    expect(await erasure.sweepReleased()).toBe(0)
 
     const report = await erasure.erase(borisTg, { dryRun: false })
 
     expect(report).toMatchObject({ itemsLeaving: 1, itemsReleased: 0 })
-    expect(await sweepReleasedItems(db)).toBe(1)
+    expect(await erasure.sweepReleased()).toBe(1)
     expect(await itemRow(item)).toBeUndefined()
   })
 
@@ -859,7 +852,7 @@ describe('товары человека при стирании (MOL-374)', () =
     const report = await erasure.erase(tg, { dryRun: false })
 
     expect(report).toMatchObject({ itemsLeaving: 0, itemsReleased: 0 })
-    await sweepReleasedItems(db)
+    expect(await erasure.sweepReleased()).toBe(0)
     expect(await itemRow(seeded)).toBeDefined()
   })
 
@@ -871,8 +864,97 @@ describe('товары человека при стирании (MOL-374)', () =
     await db.insert(searchPicks).values({ actorId: boris, queryKey: 'lavash', itemId: orphan })
 
     expect(await erasure.erase(tg, { dryRun: false })).toMatchObject({ itemsLeaving: 0 })
-    expect(await sweepReleasedItems(db)).toBe(0)
+    expect(await erasure.sweepReleased()).toBe(0)
     expect(await itemRow(orphan)).toBeDefined()
+  })
+
+  /** A pair the night merged: `trace` into `item`, its journal and one move of it. */
+  async function nightMerged(item: string, trace: string) {
+    await db.update(items).set({ mergedInto: item }).where(eq(items.id, trace))
+    const merge = onlyRow(
+      await db
+        .insert(catalogueMerges)
+        .values({ subject: 'item', fromItem: trace, intoItem: item, by: 'hand' })
+        .returning({ id: catalogueMerges.id }),
+    )
+    await db
+      .insert(catalogueMergeMoves)
+      .values({ mergeId: merge?.id ?? 0, what: 'item_name', key: { item: trace } })
+    return merge?.id ?? 0
+  }
+
+  // Adversarial Р3-А12, owner's В-8 «а»: twins the night merged by itself kept each other for good.
+  it('склеенную ночью пару стёртого автора уборка уносит целиком, с журналом', async () => {
+    const { tg, anna, item } = await annaAndBoris()
+    const twin = await insertItem(db, {
+      name: 'Лаваш-домашний',
+      searchKey: 'lavash domashnij 2',
+      createdBy: anna,
+    })
+    const merge = await nightMerged(item, twin)
+
+    expect(await erasure.erase(tg, { dryRun: false })).toMatchObject({ itemsLeaving: 2 })
+    expect(await erasure.sweepReleased()).toBe(2)
+
+    expect(await itemRow(item)).toBeUndefined()
+    expect(await itemRow(twin)).toBeUndefined()
+    expect(await db.select().from(catalogueMerges).where(eq(catalogueMerges.id, merge))).toEqual([])
+    expect(
+      await db.select().from(catalogueMergeMoves).where(eq(catalogueMergeMoves.mergeId, merge)),
+    ).toEqual([])
+  })
+
+  type GroupHold = (who: { boris: string; item: string; twin: string }) => Promise<unknown>
+  const groupHolds: [string, GroupHold][] = [
+    [
+      'на следе стоит живой',
+      ({ boris, twin }) =>
+        db.insert(searchPicks).values({ actorId: boris, queryKey: 'lavash', itemId: twin }),
+    ],
+    [
+      'выживший — товар сида',
+      ({ item }) => db.insert(itemNames).values({ itemId: item, language: 'hy', name: 'լավաշ' }),
+    ],
+    [
+      'склейку отменяли',
+      async ({ twin }) => {
+        await db.update(items).set({ mergedInto: null }).where(eq(items.id, twin))
+        await db.update(catalogueMerges).set({ undoneAt: new Date() })
+      },
+    ],
+  ]
+  it.each(groupHolds)('склеенная группа остаётся, если %s', async (_, hold) => {
+    const { tg, anna, boris, item } = await annaAndBoris()
+    const twin = await insertItem(db, {
+      name: 'Лаваш-домашний',
+      searchKey: 'lavash domashnij 2',
+      createdBy: anna,
+    })
+    await nightMerged(item, twin)
+    await hold({ boris, item, twin })
+
+    await erasure.erase(tg, { dryRun: false })
+
+    expect(await erasure.sweepReleased()).toBe(0)
+    expect(await itemRow(item)).toBeDefined()
+    expect(await itemRow(twin)).toBeDefined()
+  })
+
+  // Review 3, №11: a door sweeps only what its erasure released.
+  it('уборка двери берёт только товары своего стирания', async () => {
+    const { tg, item } = await annaAndBoris()
+    const other = await insertItem(db, {
+      name: 'Хлеб',
+      searchKey: 'hleb',
+      releasedAt: new Date(),
+    })
+
+    const report = await erasure.erase(tg, { dryRun: false })
+
+    expect(report.leavingItems).toEqual([item])
+    expect(await erasure.sweepReleased(report.leavingItems)).toBe(1)
+    expect(await itemRow(other)).toBeDefined()
+    expect(await erasure.sweepReleased()).toBe(1)
   })
 
   /** The writer's own rollback, and nothing else, is let through (review 2, №8). */
@@ -914,7 +996,7 @@ describe('товары человека при стирании (MOL-374)', () =
           .begin(async (tx) => {
             await tx`insert into expenses (id, trip_id, item_id) values (${randomUUID()}, ${tripId}, ${item})`
             // Waiting on the key share, the sweep would never settle while this transaction stays open.
-            expect(await sweepReleasedItems(db)).toBe(0)
+            expect(await erasure.sweepReleased()).toBe(0)
             if (!commits) throw ROLLED_BACK
           })
           .catch((error: unknown) => {
@@ -924,7 +1006,7 @@ describe('товары человека при стирании (MOL-374)', () =
         await writer.end()
       }
 
-      expect(await sweepReleasedItems(db)).toBe(later)
+      expect(await erasure.sweepReleased()).toBe(later)
     },
     10_000,
   )

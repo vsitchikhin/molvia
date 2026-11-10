@@ -17,7 +17,7 @@ export type ForgetExit = 0 | 1 | 2
  */
 export async function forget(
   argv: readonly string[],
-  erasure: ErasureRepository,
+  erasure: Pick<ErasureRepository, 'erase'>,
   write: (line: string) => void,
 ): Promise<ForgetExit> {
   const flags = argv.filter((argument) => argument.startsWith('-'))

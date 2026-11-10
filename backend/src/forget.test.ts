@@ -28,6 +28,7 @@ const REPORT: ErasureReport = {
     actors: 1,
   },
   itemsLeaving: 3,
+  leavingItems: [],
   itemsReleased: 1,
   barcodesReleased: 2,
   memoryReleased: 0,

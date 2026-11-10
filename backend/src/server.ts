@@ -212,7 +212,7 @@ import { NO_EMBEDDER } from '@/embeddings/embedder'
 import type { Embedder, EmbeddingLog } from '@/embeddings/embedder'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
-import { createErasureRepository, sweepReleasedItems } from '@/db/erasure-repository'
+import { createErasureRepository } from '@/db/erasure-repository'
 import { createSilenceRepository } from '@/db/silence-repository'
 import { createExportRepository } from '@/db/export-repository'
 import { createFeedbackRepository } from '@/db/feedback-repository'
@@ -518,14 +518,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     app.log,
     options.failureRecorded,
   )
-  // Both doors of erasure (MOL-58, MOL-94) sweep its items at once (MOL-374, В-7 «а»): the person
-  // asked for them to go, and the minute timer is only what takes the ones left behind. Its failure is
-  // the timer's to answer; the erasure has committed.
-  const eraseAndSweep = async (db: Db, telegramUserId: TelegramUserId): Promise<void> => {
-    await eraseMe(createErasureRepository(db), telegramUserId)
-    await sweepReleasedItems(db).catch((error: unknown) => {
-      failures.report(error, job('released-items'), 'released items sweep failed')
-    })
+  // A sweep that failed after an erasure committed (MOL-374): the minute timer takes the items left.
+  const sweepFailed = (error: unknown): void => {
+    failures.report(error, job('released-items'), 'released items sweep failed')
   }
 
   // The auth scopes set `no-store` on what their routes answer, but a path no route matches
@@ -708,14 +703,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       )
       // And the items whose author erased themselves, once nothing stands on them (MOL-374, В-7 «а»):
       // erasure only marks them, so it holds no lock on an item anybody else writes to.
-      stopReleasedSweep = startLoginCleanup(
-        async () => {
-          await sweepReleasedItems(db)
-        },
-        (error) => {
-          failures.report(error, job('released-items'), 'released items sweep failed')
-        },
-      )
+      const erasure = createErasureRepository(db)
+      stopReleasedSweep = startLoginCleanup(async () => {
+        await erasure.sweepReleased()
+      }, sweepFailed)
       // And for accounts without operations (MOL-115): deleted ten minutes on, whatever named one
       // meanwhile left without an account rather than lost (Р-17).
       stopAccountCleanup = startLoginCleanup(
@@ -1100,7 +1091,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       preview: (code) => previewLogin(loginRequests, code),
       confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
       decline: (code) => declineLogin(loginRequests, code),
-      erase: (telegramUserId) => eraseAndSweep(db, telegramUserId),
+      erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId, sweepFailed),
       // One person's claim that fails is logged by its kind and the others of the minute go on.
       claimReminders: () =>
         remindRatings(
@@ -1221,7 +1212,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),
       )
-      actorEraseRoute(guarded, (telegramUserId) => eraseAndSweep(db, telegramUserId))
+      actorEraseRoute(guarded, (telegramUserId) =>
+        eraseMe(createErasureRepository(db), telegramUserId, sweepFailed),
+      )
       const heavyFeedback = heavyFeedbackLimit()
       feedbackRoutes(
         guarded,
