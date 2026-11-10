@@ -1,4 +1,4 @@
-import { TOLERANCE_HUNDREDTHS } from '#model/entities/receipt-text'
+import { TOLERANCE_HUNDREDTHS, linesTotalHundredths } from '#model/entities/receipt-text'
 import type { ReceiptLayout, ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
 
 /**
@@ -107,8 +107,7 @@ function notWhole(text: ReceiptText): ReceiptReason | null {
     (line.asPrinted || line.repaired === true) && line.sumHundredths !== null
   if (!text.lines.every(asRead)) return 'line_not_as_printed'
   // a card that sends its discount to the card prints the total without it (MOL-289)
-  const total =
-    text.totalHundredths - (text.cashbackHundredths ?? 0) - (text.serviceHundredths ?? 0)
+  const total = linesTotalHundredths(text, text.totalHundredths)
   const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
   if (sum === total) return null
   return sum < total ? 'lines_lost' : 'lines_over'
@@ -140,12 +139,17 @@ function verifiedLine(
     return emptied(line.settled ? 'bent' : 'unsettled')
   }
   // a model's line of a bill that prints no price (MOL-310): its quantity and sum hold nothing up between them, so
-  // only a total they meet vouches for them — kept on a receipt proven whole, its price the sum by the quantity where
-  // that is a figure to the hundredth (owner's В-4 «а»), else none
-  if (byModel && price === null && discount === 0) {
+  // only a total they meet vouches for them — for the sums alone. Kept on a receipt proven whole, its price the sum by
+  // the quantity where that is a figure to the hundredth (owner's В-4 «а»), else none — under «проверьте», since no
+  // second source holds the quantity (owner's В-6 «а», adversarial А2): a count copied wrong is a price made up. A sum
+  // of nothing holds any total and goes the way of any other (review №4)
+  if (byModel && price === null && discount === 0 && sum > 0) {
     if (!proven) return emptied('no_price_unproven')
     const priced = (sum * 1_000) % qty === 0 ? (sum * 1_000) / qty : null
-    return { line: { ...line, priceHundredths: priced }, reason: null }
+    return {
+      line: { ...line, priceHundredths: priced, asPrinted: false, repaired: true },
+      reason: null,
+    }
   }
   // a gift — its whole price the discount — is nothing paid only where that holds to the hundredth
   // (review round 2, А7 «а»): «0 0» or a stray «0,00» holds any arithmetic

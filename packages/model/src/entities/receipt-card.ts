@@ -64,8 +64,8 @@ export interface ReceiptWords {
    */
   readonly service: string
   /**
-   * A café's bill's total in words no fiscal till prints (MOL-310): «ՎՃԱՐՄԱՆ», and a bill printed in Russian —
-   * «Всего», «Итого к оплате». Read in any case.
+   * A café's bill's total in words no fiscal till prints (MOL-310): «ՎՃԱՐՄԱՆ» alone on its row, and a bill printed in
+   * Russian — «Всего», «Итого к оплате». Read in any case.
    */
   readonly billTotal: string
   /**
@@ -191,8 +191,9 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
     prepayment: 'Կանխավճար',
     // «Հավելավճար 10%» — a surcharge — and «Սպասարկում», service, in Armenian; a bill in Russian or English
     service: 'Հավելավճար|Սպասարկում|Обслуживание|Service',
-    // «ՎՃԱՐՄԱՆ», to be paid; «Всего», «Итого к оплате»
-    billTotal: 'Վճարման|Всего|Итого|К оплате',
+    // «ՎՃԱՐՄԱՆ», to be paid — the word alone on its row: the model copies the payment «Վճարված է Առձեռն» as «Վճարման է
+    // Առնեմն», which is the payment's place (adversarial А1); «Всего», «Итого к оплате», «Итого с обслуживанием»
+    billTotal: '^[\\s:=/-]*Վճարման[\\s:=/-]*$|Всего|Итого|К оплате',
     slipTerminal: '\\b(?:TID|MID|RRN)\\b',
     // «Գումար:», the amount — never «Գումար/Զչ», a fiscal till's column, since a slip has no lines
     slipAmount: 'Գումար|Amount|Сумма',

@@ -162,7 +162,7 @@ function echoed(held: ReceiptToRecord, body: ReceiptRecordBody): ReceiptRecordBo
   const sent = body.total
   if (sent === undefined || total === null) return body
   const told = [linesTotalOf(total, cashback, service), linesTotalOf(total, null, service)]
-  return told.some((one) => one !== total && sameMoney(sent, one)) ? { ...body, total } : body
+  return told.some((one) => sameMoney(sent, one)) ? { ...body, total } : body
 }
 
 /**

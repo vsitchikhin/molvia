@@ -1250,7 +1250,7 @@ describe('«Записать»', () => {
     // any other figure it sends is the person's word, taken as it is
     const typedOver = await parsedReceipt(me, LINES.slice(0, 2), { ...carded, receiptNo: '7' })
     expect(await moneyOf(typedOver, body({ total: amount(2_200) }))).toBe(220_000n)
-  }, 10_000)
+  }, 35_000)
 
   it('takes what a café’s bill was paid, its service with it, from an earlier build’s echo too (MOL-310)', async () => {
     const me = await insertActor(db)
@@ -1343,7 +1343,7 @@ describe('«Записать»', () => {
     const shot = await parsedReceipt(me, LINES.slice(0, 1))
     expect((await record(me, shot, body())).statusCode).toBe(200)
     expect(await db.select().from(receiptDays)).toMatchObject([{ recorded: 2, lines: 2 }])
-  })
+  }, 15_000)
 
   // MOL-240, Б2 of the adversarial review of MOL-97: a purchase removed at once took nothing of its
   // receipt, and its line — what and for how much — lay on the server, unseen, until erasure

@@ -2161,26 +2161,37 @@ three bills and a bank slip — the model's reading right to the digit and the p
 service. Owner: «такие чеки надо научиться читать, хотя бы итог из них вытаскивать, таких много тут бывает».
 
 - **A café's service is no dish: the lines make the total less it** (owner's В-2 «а»): «Հավելավճար 10%», «Սպասարկում»,
-  «Service 10%», «Обслуживание» — the card's `service`, read in any case — a summary amount, or a line of the model's
-  that is its word alone with a percent at most (`serviceApart`; «Салат Service» stays a dish). The lines and it meeting
+  «Service 10%», «Обслуживание» — the card's `service`, read in any case and **only as the word alone, a percent after it
+  at most** (`serviceWordOf`), one rule for a summary's label and a line of the model's (`serviceApart`): «Итого с
+  обслуживанием» stays a total and «Салат Service» a dish (review №3, adversarial А4 — unanchored, a total naming the
+  word went to the surcharges and its subtotal «met» the lines). The line goes out of the lines only where the
+  surcharge is taken; else it stays the model's, for the foot's shortfall to show (review №5). The lines and it meeting
   a total are MOL-244's first source — every line as read — so the bill is proven whole and its one-number lines shown.
   Kept as `receipts.service_minor` (0081), beside the cashback and by its path: `linesTotalOf(total, cashback,
 service)` for every comparison of the lines with the total, the trip's money the total. **Only where the total takes
-  it**: a bill whose lines meet the total without it records no service. Two service amounts are a doubt, none taken.
-  **The price, named:** a total voted by two places with a service the lines did not meet shows the service and the
-  difference, and no font's swap puts a line right under it — whether that total took the service the lines did not say.
-  A card's cashback and a café's service on one paper have not been seen: the cashback's rule alone, no service.
-- **A bill's total in words no fiscal till prints** (`billTotal`, any case): «ՎՃԱՐՄԱՆ» in capitals, a bill in Russian
-  «Всего», «Итого», «К оплате» — a place of the total, as «Ընդամենը». am-25 of the bench (LooLoo's pre-bill) got its
-  total by it.
+  it**: a bill whose lines meet the total without it records no service, and **a total its places voted takes none**
+  (adversarial А3): whether it took one only the lines say, and a dish lost made a bill printed «not included» one «with
+  service», its lines set against the total less it. Two service amounts are a doubt, none taken. **The price, named:** a
+  bill whose service was included and a dish lost says the shortfall of the dish and the service together, and the
+  person who types the dish is left the service's difference; the trip is the total. A card's cashback and a café's
+  service on one paper have not been seen: the cashback's rule alone, no service.
+- **A bill's total in words no fiscal till prints** (`billTotal`, any case): «ՎՃԱՐՄԱՆ» **alone on its row** — the model
+  copies the payment «Վճարված է Առձեռն» as «Վճարման է Առնեմն» three times on the bench, and read as a total it made two
+  places one and lost master's total (adversarial А1) — and a bill in Russian «Всего», «Итого», «К оплате» — a place of
+  the total, as «Ընդամենը». am-25 of the bench (LooLoo's pre-bill) got its total by it.
 - **A bill that prints no price** — «Блюдо, Кол-во, Сумма» — is no line that fails its arithmetic: a model's line with a
   quantity and a sum and neither price nor discount is as printed (settled), and the check keeps it only on a receipt
-  proven whole, its price the sum by the quantity where that is a figure to the hundredth, else none (owner's В-4 «а»);
-  not proven, it is emptied with a reason of its own, `no_price_unproven` — one number with nothing to hold it, as
-  «1 × цена» is.
+  proven whole, its price the sum by the quantity where that is a figure to the hundredth, else none (owner's В-4 «а») —
+  **under «проверьте», never as read** (`repaired`, owner's В-6 «а», adversarial А2): the total vouches for the sums,
+  nothing for the count, and a count copied wrong — 1 for 2, the «8 հատ» of the name — is a price made up; so the shop's
+  memory takes no shelf price from it, an earlier build gets it empty, and the words are a repaired line's («Цифры
+  поправили — сверьте с бумагой», the price having been worked out). Not proven, it is emptied with a reason of its own,
+  `no_price_unproven`; a sum of nothing holds any total and goes the way of any other, `zero_not_gift` (review №4).
 - **A bank terminal's slip with no bill is a sum, read in one place** (owner's В-3 «а», the one exception to MOL-244's
-  two sources): no line, rows naming the terminal (`slipTerminal`: TID, MID, RRN) and one amount after `slipAmount`
-  («Գումար») — layout `slip`, never «переснимите», the total shown and the trip's money. The phone hears it by
+  two sources): no line, rows naming the terminal (`slipTerminal`: TID, MID, RRN) and **every amount of the answer under
+  `slipAmount`** («Գումար»), one of them — a fiscal receipt shot with its slip prints «Ընդամենը» beside it, and its
+  lines lost are «переснимите», never «no items» (adversarial А5) — layout `slip`, never «переснимите», the total shown
+  and the trip's money. The phone hears it by
   `RECEIPT_BILL_HEADER` (`slip: true`) and says «Это слип оплаты картой… сверьте её с бумагой» where «В чеке нет списка
   товаров» stands; an earlier build gets no total — a total read once would stand there as vouched for — and the person
   types it. **The prices, named:** the model's 5↔6 in that one sum is seen only by the eye the words send to the paper;

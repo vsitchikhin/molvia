@@ -907,6 +907,41 @@ describe('a café’s bill (MOL-310)', () => {
     expect(shown(text).slice(0, 3)).toEqual([null, null, 'no_total'])
   })
 
+  it('keeps a total that names the service a total: «Итого с обслуживанием» (review №3, adversarial А4)', () => {
+    const text = bill([
+      ['Итого:', '10600.00'],
+      ['Обслуживание 10%:', '1060.00'],
+      ['Итого с обслуживанием:', '11660.00'],
+    ])
+    expect(shown(text).slice(0, 3)).toEqual([1_166_000, 106_000, null])
+  })
+
+  it('reads «Վճարման» as a bill’s total alone on its row, never the payment the model copied so (adversarial А1)', () => {
+    // «Վճարված է Առձեռն» copied «Վճարման է Առնեմն»: the payment's place, the second of the total, as on master
+    // «Տոլմա» lost on a fold
+    const text = bill(
+      [
+        ['Ընդամենը', '10600'],
+        ['Վճարման է Առնեմն:', '10600'],
+      ],
+      dishes.slice(0, 2),
+    )
+    expect(shown(text).slice(0, 3)).toEqual([1_060_000, null, 'lines_lost'])
+  })
+
+  it('takes no service for a total its places voted: whether it took one the lines did not say (adversarial А3)', () => {
+    // a dish lost on a bill that prints its service apart: the shortfall is the dish, never the dish less the service
+    const text = bill(
+      [
+        ['Սպասարկում', '1060'],
+        ['Ընդամենը', '10600'],
+        ['Վճարված է PosTerminal:', '10600'],
+      ],
+      dishes.slice(0, 2),
+    )
+    expect(shown(text).slice(0, 3)).toEqual([1_060_000, null, 'lines_lost'])
+  })
+
   it('takes the service the model copied as a line out of the lines, never a dish that names the word', () => {
     const served = [dish('Service 10%', '1.00', null, '1060'), ...dishes]
     const text = bill([['Всего:', '11660.00']], served)
@@ -914,6 +949,19 @@ describe('a café’s bill (MOL-310)', () => {
     // must not: a dish is a dish, whatever word its name holds
     const salad = [dish('Салат Service', '1.00', '1060', '1060'), ...dishes]
     expect(bill([['Всего:', '11660.00']], salad).lines).toHaveLength(4)
+  })
+
+  it('leaves the service line among the lines where no surcharge is taken (review №5)', () => {
+    // two services are a doubt: the line stays the model's, for the foot's shortfall to show
+    const served = [dish('Service 10%', '1.00', null, '1060'), ...dishes]
+    const text = bill(
+      [
+        ['Սպասարկում', '1000'],
+        ['Всего:', '11660.00'],
+      ],
+      served,
+    )
+    expect([text.lines.length, text.serviceHundredths]).toEqual([4, null])
   })
 
   describe('a bill that prints no price — «Блюдо, Кол-во, Сумма» (owner’s В-4 «а»)', () => {
@@ -933,6 +981,18 @@ describe('a café’s bill (MOL-310)', () => {
         // 1 000 by 3 is no figure to the hundredth: the sum stays, the price is none
         [3_000, null, 100_000],
       ])
+      // the total vouches for the sums, nothing for the count: «проверьте», never as read (owner's В-6 «а», А2)
+      expect(shownLines.map((l) => [l.repaired, l.asPrinted])).toEqual([
+        [true, false],
+        [true, false],
+        [true, false],
+      ])
+    })
+
+    it('takes no sum of nothing for a line the total vouches for (review №4)', () => {
+      const zero = [...priceless, dish('Хлеб', '1.00', null, '0')]
+      const one = explainedReading(bill([['Всего:', '5700.00']], zero), { byModel: true })
+      expect(one.lines[3]).toBe('zero_not_gift')
     })
 
     it('empties every such line of a bill not proven whole, by a reason of its own', () => {
@@ -974,6 +1034,18 @@ describe('a bank terminal’s slip with no bill (MOL-310, owner’s В-3 «а»)
       }),
     )
     expect([two.layout, two.totalHundredths]).toEqual(['class', null])
+  })
+
+  it('is no slip where the paper prints a total beside it: a receipt shot with its slip, lines lost (adversarial А5)', () => {
+    const both = read(
+      slip({
+        totals: [
+          { label: 'Ընդամենը', amount: '4850.00' },
+          { label: 'Գումար', amount: '4850.00' },
+        ],
+      }),
+    )
+    expect([both.layout, needsReshoot(both)]).toEqual(['class', true])
   })
 
   it('is no slip where a line was read: the receipt with a slip under it reads as before', () => {
