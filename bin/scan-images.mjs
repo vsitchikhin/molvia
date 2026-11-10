@@ -2,8 +2,9 @@
 // fix. A module inside a Go binary — Caddy, Grafana, VictoriaMetrics, as their authors built them — waits for
 // their release, which Dependabot's `images` brings, and is said beside it (`security.md`, «What an image
 // carries»); everything else is ours and turns the run red — the distribution's packages and `node_modules`
-// today, and a kind no image holds yet too, since in doubt it is ours to look at. An image not scanned is red too: «could not check» is never
-// «clean». Run by `scan.yml`, after a release and daily on what production runs:
+// today, and a kind no image holds yet too, since in doubt it is ours to look at. An image not scanned is red
+// too: «could not check» is never «clean».
+// Run by `scan.yml`, after a release and daily on what production runs:
 //   node bin/scan-images.mjs sha-1a2b3c4
 import { spawnSync } from 'node:child_process'
 import { appendFileSync, mkdirSync, readFileSync } from 'node:fs'
