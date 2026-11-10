@@ -106,7 +106,8 @@ for byte. So it waits, up to twenty minutes, until `https://molvia.net/api/healt
 set right after a merge, that is CI, the build and the rollout. A commit production does not run — a
 rollout that rolled back, was held or stood aside for a newer one — is refused, and so is one whose
 three images are not all there; names go on all three or on none. Set it on the commit that runs.
-Only `vN.N.N` sets it off. `v0.2.0` marks the start of the 0.2 cohort.
+Only `vN.N.N` sets it off. `v0.2.0` marks the start of the 0.2 cohort: an annotated tag, set
+2026-11-11T01:22:39+04:00 on `4214c68e` (MOL-298) — a lightweight tag has no moment of its own.
 
 **Rolling back by hand:** Actions → Release → «Run workflow» on master, with a tag — `v0.1.2`,
 `sha-1a2b3c4`, or any image built before MOL-90 (`v0.1.1`). It only deploys; nothing is built.
@@ -386,8 +387,8 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod \
   exec backend node dist/gates.js --from 2026-10-05
 ```
 
-`--from` is where the cohort starts: for 0.2 the day of the tag `v0.2.0`, or its exact moment,
-`git log -1 --format=%cI v0.2.0` on the laptop. `--to` is optional and a day there is taken in
+`--from` is where the cohort starts: for 0.2 the moment of the tag `v0.2.0`, `2026-11-11T01:22:39+04:00` —
+`git tag -l v0.2.0 --format='%(taggerdate:iso-strict)'` on the laptop; `%cI` is the commit's time, not the tag's. `--to` is optional and a day there is taken in
 whole; without it, until now. A day is Yerevan's; a moment needs its offset.
 
 - **Every share stands beside its `n`.** The cohort is as many as we find, so «2 of 10» is two
