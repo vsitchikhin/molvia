@@ -326,7 +326,8 @@ export const actors = pgTable(
     itemsProposed: smallint('items_proposed').notNull().default(0),
     /**
      * What is counted of this person's share of the model this month (MOL-367, Ф-10 of MOL-287) — what a call
-     * cost, its worst while that is not known or never will be (adversarial Е1), so never less than was paid: the
+     * cost, its worst while that is not known or never will be (adversarial Е1), so it may be more than was paid —
+     * and less by a fault of ours, whose worst goes back to it (`keepInMonth`, self-review №11, adversarial Ж1): the
      * calendar month in UTC — `model_spend`'s, Anthropic's bill's — and its micro-dollars, a reading's and a
      * brand's alike (owner's В-2 «а»), held to `RECEIPT_MODEL_SHARE_MICRO_USD` as the month is to its cap.
      * A count, never the rows of `receipts`: a receipt removed would give its price back. A new month starts it
