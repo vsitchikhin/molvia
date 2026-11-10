@@ -300,14 +300,16 @@ account's lock first** (privacy.md): the share is taken in one statement, then t
 month untouched and tells no stop, the cap refusing gives the share back. `settle` puts the call's own price in the
 share too, while the share still counts that month. **A request that never left costs nothing** (В-4 «а» on adversarial
 А1, narrowed by В-6 «а» on Б1): a connection that fails before a byte goes — no address, the port refused, no route, no
-connection in time (`NEVER_CONNECTED` in `model-reader.ts`, a closed list down the error's causes) — settles at nought
+connection in time (`NEVER_CONNECTED` in `model-reader.ts`, a closed list down the error's causes, judged at `fetch`
+itself, since the client reads undici's «Connect Timeout Error» as its own time out with no cause — adversarial В1) —
+settles at nought
 in the month and the share; a receipt waiting ten minutes for the model away is reserved every minute, and an evening
 with no connection took 99 % of a share with not a cent billed. **Anything else in doubt is paid** — a time out, a
 connection reset under the request, an answer torn: the worst stays in both, since the request went and the queue asks
 it again every minute; given back to the share, a receipt the model answers past its 120 s put $2,15 a day of one
-person into the month with the share at nought (Б1). **A fault of ours goes to the month alone** (`settle` with no
-cost): once a receipt, and the owner hears of it. A process lost between the reserve and the answer still leaves the
-worst in both. **A brand's call is paid from the share of the
+person into the month with the share at nought (Б1). **A fault of ours goes to the month alone**
+(`keepInMonth`, never `settle`, which takes a price): once a receipt, and the owner hears of it. A process lost between
+the reserve and the answer still leaves the worst in both. **A brand's call is paid from the share of the
 receipt that asked it** (В-2 «а»): over it the brand waits for the next receipt that asks, whosever. Over the share
 Tesseract reads, as at the cap (`model_passed`, `brands_passed`: `share`), and the person is told nothing — their
 status is MOL-276's, in 0.3. **The owner hears of it once a person a month** (`model_share`, В-3 «а»,
