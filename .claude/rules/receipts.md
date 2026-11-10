@@ -286,7 +286,8 @@ console is set to the same (Р-10): a price wrong in the code is held there too.
 
 **Each person has a share of the month, held beside the cap** (MOL-367, Ф-10 of MOL-287, owner's В-1…В-3 «а»,
 10.11.2026): `RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD`, $2 — the price of a month of receipts (MOL-271), some 700
-receipts at the measured $0,0028 — never above the cap, or the API does not start. Without it one person granted
+receipts at the measured $0,0028 — the cap where it is above it, so lowering the cap to stop the spending stays one
+line (adversarial А3). Without it one person granted
 the model took the month from every other: the quota of receipts (MOL-360) holds their number, not their money — an
 answer not taken whose Tesseract is away is paid again every minute (below), and a brand is a call of its own.
 **The share is a count in the person's row**, `actors.model_month` and `model_spent_micro_usd`, never the rows of

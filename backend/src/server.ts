@@ -894,19 +894,17 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           PHONE_NOTICES_PER_SENDER,
           (count) => ({ kind: 'receipt_partial_muted', count }),
         )
+        const capMicroUsd =
+          options.receiptModelCapMicroUsd ??
+          Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000)
+        // a share above the cap is the cap: lowering the cap stays one line (MOL-367, adversarial А3)
+        const shareMicroUsd = Math.min(
+          options.receiptModelShareMicroUsd ??
+            Math.round(env.RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD * 1_000_000),
+          capMicroUsd,
+        )
         const modelDeps =
-          model === null
-            ? null
-            : {
-                reader: model,
-                spend: modelSpend,
-                capMicroUsd:
-                  options.receiptModelCapMicroUsd ??
-                  Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000),
-                shareMicroUsd:
-                  options.receiptModelShareMicroUsd ??
-                  Math.round(env.RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD * 1_000_000),
-              }
+          model === null ? null : { reader: model, spend: modelSpend, capMicroUsd, shareMicroUsd }
         const brandSpellings = createBrandSpellingRepository(db)
         // the brands of a receipt the model read, asked of it (MOL-326): counts and reasons only, never a brand
         const brandReport = (event: SpellReport): void => {
