@@ -268,10 +268,17 @@ function groupGoes(erasing: string | null): SQL {
 /**
  * A list of ids as one parameter, however long (adversarial Р4-А15): spelt a parameter an id, 32 767
  * items of one person passed the 65 534 a statement may carry, and nothing could erase them — the way
- * the writer of vectors sends its batch. A set to be asked `in`, so a long one is a hash, not a walk.
+ * the writer of vectors sends its batch.
  */
-const idsIn = (ids: readonly string[]): SQL =>
-  sql`(select unnest(string_to_array(${ids.join(' ')}, ' ')::uuid[]))`
+const idArray = (ids: readonly string[]): SQL => sql`string_to_array(${ids.join(' ')}, ' ')::uuid[]`
+
+/**
+ * The same list as a set to be asked `in`, for a list as long as a person's items: a hash, not a walk.
+ * A batch of the sweep asks `= any(idArray)` instead (adversarial Р5-А16): the marks are erasure's own,
+ * so the statistics never know them, and against the set the planner walked every marked item and
+ * unnested the list again for each — a door's sweep of 32 767 items took 15 s.
+ */
+const idsIn = (ids: readonly string[]): SQL => sql`(select unnest(${idArray(ids)}))`
 
 /** At most so many items a transaction of the sweep starts from: a loop goes on while one is full. */
 const SWEEP_BATCH = 200
@@ -291,7 +298,7 @@ async function sweepBatch(
     const starts = await tx.execute<{ id: string }>(sql`
       select i.id from items i
       where i.released_at is not null
-        ${only === undefined ? sql`` : sql`and i.id in ${idsIn(only)}`}
+        ${only === undefined ? sql`` : sql`and i.id = any(${idArray(only)})`}
         and ${groupGoes(null)}
       order by i.id
       limit ${SWEEP_BATCH}`)
@@ -299,15 +306,15 @@ async function sweepBatch(
     const locked = await tx.execute<{ id: string }>(sql`
       select m.id from items m
       where ${rootOf('m')} in (
-        select ${rootOf('s')} from items s where s.id in ${idsIn(starts.map((row) => row.id))})
+        select ${rootOf('s')} from items s where s.id = any(${idArray(starts.map((row) => row.id))}))
       order by m.id
       for update skip locked`)
-    const held = idsIn(locked.map((row) => row.id))
+    const held = idArray(locked.map((row) => row.id))
     const [row] = await tx.execute<{ n: number }>(sql`
       with gone as (
         delete from items i
-        where i.id in ${held} and ${groupGoes(null)}
-          and not exists (select 1 from items m where ${inGroup('m', rootOf('i'))} and m.id not in ${held})
+        where i.id = any(${held}) and ${groupGoes(null)}
+          and not exists (select 1 from items m where ${inGroup('m', rootOf('i'))} and m.id <> all(${held}))
         returning i.id
       ), merges as (
         delete from catalogue_merges g
