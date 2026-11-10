@@ -116,7 +116,7 @@ describe('0073: the last visit of everyone already there', () => {
     for (const entry of before) await apply(entry)
     const db = drizzle(sql, { schema })
     const place = await insertPlace(db)
-    // items by SQL: `items` has a column since (0084, MOL-374) the schema would name
+    // items by SQL: `items` has a column since (0085, MOL-374) the schema would name
     const milk = randomUUID()
     await sql`
       insert into items (id, kind, name, search_key, default_unit)

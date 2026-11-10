@@ -81,7 +81,7 @@ describe('0061: what a removed trip or purchase left of its receipt', () => {
     await sql`
       insert into actors (id, telegram_user_id, country, city, spend_currency, income_currency)
       values (${me}, ${telegramId()}, 'AM', 'Гюмри', 'AMD', 'RUB')`
-    // the item by SQL too: `items` has a column since (0084, MOL-374)
+    // the item by SQL too: `items` has a column since (0085, MOL-374)
     const milk = randomUUID()
     await sql`
       insert into items (id, kind, name, search_key, default_unit)

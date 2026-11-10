@@ -29,9 +29,13 @@ describe('стирание того, у кого товаров больше, ч
       from generate_series(1, 33000) g`)
 
     const report = await erasure.erase(tg, { dryRun: false })
-
-    // the door's sweep takes a batch's worth of the list at a time, so the list never reaches a statement
     expect(report).toMatchObject({ found: true, itemsLeaving: 33000 })
     expect(report.leavingItems).toHaveLength(33000)
-  }, 60_000)
+
+    // The sweep of the whole list — `make forget --yes`'s, a door's own being cut (Р5-А16) — goes a
+    // batch's worth at a time, so the list never reaches a statement (review 5, №20): some 6 s on a Mac.
+    expect(await erasure.sweepReleased(report.leavingItems)).toBe(33000)
+    const [left] = await db.execute<{ n: number }>(sql`select count(*)::int as n from items`)
+    expect(left?.n).toBe(0)
+  }, 180_000)
 })
