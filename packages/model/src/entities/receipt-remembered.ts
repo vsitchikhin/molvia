@@ -341,7 +341,7 @@ export function rememberedReading(
 ): ReceiptText {
   if (prices.size === 0 || text.lines.length === 0) return text
   const less = (total: number | null): number | null =>
-    total === null ? null : total - (text.cashbackHundredths ?? 0)
+    total === null ? null : total - (text.cashbackHundredths ?? 0) - (text.serviceHundredths ?? 0)
   const owed = less(text.totalHundredths)
   const asRead = text.lines.every((line) => line.asPrinted && line.sumHundredths !== null)
   const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)

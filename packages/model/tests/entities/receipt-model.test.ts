@@ -12,7 +12,7 @@ import {
   receiptTextOfModel,
   unparsedFigures,
 } from '#model/entities/receipt-model'
-import { verifiedReading } from '#model/entities/receipt-verify'
+import { explainedReading, verifiedReading } from '#model/entities/receipt-verify'
 import type { ModelReceipt } from '#model/entities/receipt-model'
 
 // a made-up head: the repository is public, and a receipt's own carries a customer's name
@@ -504,6 +504,8 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
   })
   // printed 3 × 185 − 5,56 = 549,44, copied 6,56 and 649,44
   const eggs = carded({ quantity: '3', unit_price: '185', discount: '6.56', sum: '649.44' })
+  // as read: 1 × 210 − 2,1 = 207,9 — no digit any swap takes, the bread's 287,1 reading by 3↔8 (MOL-310)
+  const plain = carded({ quantity: '1', unit_price: '210', discount: '2.1', sum: '207.9' })
   const owed = (amount: string) => [
     { label: 'Ընդամենը', amount },
     { label: 'Վճարված է Առձեռն', amount },
@@ -797,12 +799,13 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
       sum: '1',
     })
     const before = repairTries.count
-    const { text } = read2([bread, wide], owed('288.10'))
+    const { text } = read2([plain, wide], owed('208.90'))
     expect([repairTries.count - before, text.lines[1]?.repaired]).toEqual([0, undefined])
   })
 
-  it('puts no receipt right past the budget of its readings: 89 dear lines, and not 90', () => {
-    // printed 5,565 × 65 666,66 − 3 654,35, copied 6,565: 2 233 readings a line, 200 000 a receipt
+  it('puts no receipt right past the budget of its readings: 39 dear lines, and not 40', () => {
+    // printed 5,565 × 65 666,66 − 3 654,35, copied 6,565: 5 104 readings a line with 3↔8 (MOL-310), 200 000 a
+    // receipt
     const dear = carded({
       quantity: '6.565',
       unit: 'kg',
@@ -816,15 +819,15 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
       const { text } = read2([bread, ...Array.from({ length: n }, () => dear)], owed(total))
       return [text.lines.filter((l) => l.repaired === true).length, repairTries.count - before]
     }
-    expect(of(89)).toEqual([89, 198_737])
-    expect(of(90)).toEqual([0, 198_737])
+    expect(of(39)).toEqual([39, 199_057])
+    expect(of(40)).toEqual([0, 199_057])
   })
 
   it('walks no figure that is no number: three hundred fives of junk (review round 1, №1)', () => {
     const junk = '5'.repeat(300)
     const wild = carded({ quantity: junk, unit_price: junk, discount: junk, sum: junk })
     const before = repairTries.walked
-    const { text } = read2([bread, wild], owed('287.10'))
+    const { text } = read2([plain, wild], owed('207.90'))
     expect([repairTries.walked - before, text.lines[1]?.repaired]).toEqual([0, undefined])
   })
 
@@ -844,6 +847,256 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
     const repaired = read(answer({ lines: [bread, curd], totals: owed('811.80') }))
     const unproven = verifiedReading({ ...repaired, totalHundredths: null }, { byModel: true })
     expect(unproven.lines[1]).toMatchObject({ repaired: false, sumHundredths: null })
+  })
+})
+
+describe('a café’s bill (MOL-310)', () => {
+  // a made-up bill: dishes of one price column, the service under them, the total in capitals
+  const dish = (printed: string, quantity: string, price: string | null, sum: string): Line =>
+    line({ printed, code: null, article: null, unit: null, quantity, unit_price: price, sum })
+  const dishes = [
+    dish('Չիզբուրգեր', '1.00', '2200', '2200'),
+    dish('Tequila Sunrise', '2.00', '3000', '6000'),
+    dish('Տոլմա', '1.00', '2400', '2400'),
+  ]
+  const bill = (totals: [string, string][], lines = dishes) =>
+    read(answer({ lines, totals: totals.map(([label, amount]) => ({ label, amount })) }))
+  const shown = (text: ReturnType<typeof read>) => {
+    const one = explainedReading(text, { byModel: true })
+    return [text.totalHundredths, text.serviceHundredths, one.receipt, one.lines]
+  }
+
+  it('meets its total with the service, and the dishes of one price are kept: the bill is whole', () => {
+    const text = bill([
+      ['Հավելավճար 10%', '1060'],
+      ['ՎՃԱՐՄԱՆ', '11660'],
+    ])
+    expect(shown(text)).toEqual([1_166_000, 106_000, null, [null, null, null]])
+    expect(verifiedReading(text, { byModel: true }).lines[0]?.priceHundredths).toBe(220_000)
+  })
+
+  it('reads the service by any of its words, in any case', () => {
+    for (const word of ['Սպասարկում', 'ՍՊԱՍԱՐԿՈՒՄ', 'Service 10%', 'Обслуживание']) {
+      const text = bill([
+        [word, '1060'],
+        ['Ընդամենը', '11660'],
+      ])
+      expect(text.serviceHundredths, word).toBe(106_000)
+    }
+  })
+
+  it('reads a bill’s total in Russian, «Всего» and «Итого к оплате»', () => {
+    expect(bill([['Всего:', '10600.00']]).totalHundredths).toBe(1_060_000)
+    expect(bill([['Итого к оплате:', '10600.00']]).totalHundredths).toBe(1_060_000)
+  })
+
+  it('takes no service the total did not: a bill that prints it apart meets its total without it', () => {
+    const text = bill([
+      ['Սպասարկում', '1060'],
+      ['Ընդամենը', '10600'],
+    ])
+    expect(shown(text).slice(0, 3)).toEqual([1_060_000, null, null])
+  })
+
+  it('takes two services apart for a doubt: nothing meets the total, and nothing is shown of it', () => {
+    const text = bill([
+      ['Սպասարկում', '1060'],
+      ['Հավելավճար', '1000'],
+      ['Ընդամենը', '11660'],
+    ])
+    expect(shown(text).slice(0, 3)).toEqual([null, null, 'no_total'])
+  })
+
+  it('takes the service the model copied as a line out of the lines, never a dish that names the word', () => {
+    const served = [dish('Service 10%', '1.00', null, '1060'), ...dishes]
+    const text = bill([['Всего:', '11660.00']], served)
+    expect([text.lines.length, text.serviceHundredths, text.balanced]).toEqual([3, 106_000, true])
+    // must not: a dish is a dish, whatever word its name holds
+    const salad = [dish('Салат Service', '1.00', '1060', '1060'), ...dishes]
+    expect(bill([['Всего:', '11660.00']], salad).lines).toHaveLength(4)
+  })
+
+  describe('a bill that prints no price — «Блюдо, Кол-во, Сумма» (owner’s В-4 «а»)', () => {
+    const priceless = [
+      dish('Тирамису', '2.00', null, '3000.00'),
+      dish('Смузи', '1.00', null, '1700.00'),
+      dish('Чай', '3.00', null, '1000.00'),
+    ]
+
+    it('prices a line of a whole bill by its sum and quantity, where that is a figure to the hundredth', () => {
+      const shownLines = verifiedReading(bill([['Всего:', '5700.00']], priceless), {
+        byModel: true,
+      }).lines
+      expect(shownLines.map((l) => [l.quantityMilli, l.priceHundredths, l.sumHundredths])).toEqual([
+        [2_000, 150_000, 300_000],
+        [1_000, 170_000, 170_000],
+        // 1 000 by 3 is no figure to the hundredth: the sum stays, the price is none
+        [3_000, null, 100_000],
+      ])
+    })
+
+    it('empties every such line of a bill not proven whole, by a reason of its own', () => {
+      const one = explainedReading(bill([['Всего:', '5800.00']], priceless), { byModel: true })
+      expect(one.lines).toEqual(['no_price_unproven', 'no_price_unproven', 'no_price_unproven'])
+      expect(one.shown.lines.every((l) => l.sumHundredths === null)).toBe(true)
+    })
+  })
+})
+
+describe('a bank terminal’s slip with no bill (MOL-310, owner’s В-3 «а»)', () => {
+  const slip = (over: Partial<ModelReceipt> = {}) =>
+    answer({
+      shop: 'Սրճարան',
+      id_rows: ['TID: 10000001', 'MID: 20000002', 'Անդորրագիր 12345'],
+      totals: [{ label: 'Գումար', amount: '11660.00' }],
+      ...over,
+    })
+
+  it('is a sum to record, the one amount after its word, with nothing to reshoot', () => {
+    const text = read(slip())
+    expect([text.layout, text.totalHundredths, text.balanced, needsReshoot(text)]).toEqual([
+      'slip',
+      1_166_000,
+      false,
+      false,
+    ])
+  })
+
+  it('is no slip without the terminal’s rows, nor with two amounts: a reading of nothing, as before', () => {
+    const bare = read(slip({ id_rows: ['Անդորրագիր 12345'] }))
+    expect([bare.layout, bare.totalHundredths, needsReshoot(bare)]).toEqual(['class', null, true])
+    const two = read(
+      slip({
+        totals: [
+          { label: 'Գումար', amount: '11660.00' },
+          { label: 'Գումար', amount: '11600.00' },
+        ],
+      }),
+    )
+    expect([two.layout, two.totalHundredths]).toEqual(['class', null])
+  })
+
+  it('is no slip where a line was read: the receipt with a slip under it reads as before', () => {
+    const lined = read(slip({ lines: [line()] }))
+    expect(lined.layout).not.toBe('slip')
+  })
+})
+
+describe('a cashback the model copied under another word (MOL-310, Р-1)', () => {
+  const carded = [
+    line({ quantity: '2', unit_price: '370', discount: '7.4', sum: '732.6' }),
+    line({ quantity: '1', unit_price: '960', discount: '9.6', sum: '950.4' }),
+  ]
+  const of = (totals: [string, string][]) =>
+    read(answer({ lines: carded, totals: totals.map(([label, amount]) => ({ label, amount })) }))
+  // the prepayment slip over the receipt, and the total that left the card
+  const head: [string, string][] = [
+    ['Կանխավճար', '17.00'],
+    ['Ընդամենը', '17.00'],
+    ['Ընդամենը:', '1700.00'],
+    ['Վճարված է PosTerminal:', '1700.00'],
+  ]
+
+  it('takes the slip’s sum where the same sum stands under another word below the total', () => {
+    const text = of([...head, ['կանխավճարին ավել. մանր:', '17.00']])
+    expect([text.cashbackHundredths, text.totalHundredths, text.balanced]).toEqual([
+      1_700,
+      170_000,
+      true,
+    ])
+  })
+
+  it('takes the slip’s sum where a total less the sum taxed with VAT is it', () => {
+    const text = of([...head, ['/ԱԱՀ-ով հարկվող/ =', '1683.00']])
+    expect([text.cashbackHundredths, text.balanced]).toEqual([1_700, true])
+  })
+
+  it('takes no slip’s sum on its own, nor two so vouched', () => {
+    expect(of(head).cashbackHundredths).toBeNull()
+    const two = of([
+      ...head,
+      ['Կանխավճար', '18.00'],
+      ['կանխավճարին ավել. մանր:', '17.00'],
+      ['Մանր:', '18.00'],
+    ])
+    expect(two.cashbackHundredths).toBeNull()
+  })
+})
+
+describe('a model’s slips of copying the total puts right (MOL-310, owner’s В-5 «а»)', () => {
+  const carded = (over: Partial<Line>) => line({ code: '0401', ...over })
+  // as read: 1 × 210 − 2,1 = 207,9 — no digit any swap takes
+  const plain = carded({
+    quantity: '1',
+    unit: 'pcs',
+    unit_price: '210',
+    discount: '2.1',
+    sum: '207.9',
+  })
+  const owed = (amount: string) => [
+    { label: 'Ընդամենը', amount },
+    { label: 'Վճարված է Առձեռն', amount },
+  ]
+  const put = (copied: Line, total: string) => {
+    const text = read(answer({ lines: [plain, copied], totals: owed(total) }))
+    const one = text.lines[1]
+    return [one?.repaired, one?.quantityMilli, one?.priceHundredths, one?.sumHundredths]
+  }
+
+  it('drops the 4 the model made of «կ» in «0,65կգ», where the total confirms the weight', () => {
+    // printed 0,65 × 2 090 − 13,58 = 1 344,92
+    const fish = carded({
+      quantity: '0.654',
+      unit: 'kg',
+      unit_price: '2090',
+      discount: '13.58',
+      sum: '1344.92',
+    })
+    expect(put(fish, '1552.82')).toEqual([true, 650, 209_000, 134_492])
+    // must not: a weight whose 4 is its own, the arithmetic holding as copied, is left as read
+    const own = carded({
+      quantity: '0.324',
+      unit: 'kg',
+      unit_price: '265',
+      discount: '0.86',
+      sum: '85',
+    })
+    expect(put(own, '292.90')[0]).toBeUndefined()
+  })
+
+  it('reads a count the model took from the name — «10հտ» bought once — as one', () => {
+    // printed 1 × 830 − 8,3 = 821,7, the pack of ten in the name
+    const eggs = carded({
+      printed: 'Հավկիթ «Ոսկեհատ» 10հտ',
+      quantity: '10',
+      unit: 'pcs',
+      unit_price: '830',
+      discount: '8.3',
+      sum: '821.7',
+    })
+    expect(put(eggs, '1029.60')).toEqual([true, 1_000, 83_000, 82_170])
+    // must not: a count no name prints stays as copied
+    expect(put({ ...eggs, printed: 'Հավկիթ «Ոսկեհատ»' }, '1029.60')[0]).toBeUndefined()
+  })
+
+  it('puts a 3 copied for an 8 right on the model’s line, by the total alone', () => {
+    // printed 1 × 650 − 68,25 = 581,75 (a card of 10,5 %), copied 531,75
+    const wipes = carded({
+      quantity: '1',
+      unit: 'pcs',
+      unit_price: '650',
+      discount: '68.25',
+      sum: '531.75',
+    })
+    const tissue = carded({
+      quantity: '1',
+      unit: 'pcs',
+      unit_price: '200',
+      discount: '21',
+      sum: '179',
+    })
+    const text = read(answer({ lines: [tissue, wipes], totals: owed('760.75') }))
+    expect([text.lines[1]?.repaired, text.lines[1]?.sumHundredths]).toEqual([true, 58_175])
   })
 })
 

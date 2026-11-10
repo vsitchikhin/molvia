@@ -49,6 +49,8 @@ export const RECEIPT_LINE_REASONS = [
   'zero_not_gift',
   /** «1 × цена = сумма», one number twice, on a receipt not proven whole (MOL-255, В-2 «а»). */
   'one_alike_unproven',
+  /** A bill's quantity and sum with no price printed, on a receipt not proven whole (MOL-310). */
+  'no_price_unproven',
   /** The sum kept, the price taken off: quantity × price is not the sum and the discount. */
   'price_dropped',
 ] as const
@@ -105,7 +107,8 @@ function notWhole(text: ReceiptText): ReceiptReason | null {
     (line.asPrinted || line.repaired === true) && line.sumHundredths !== null
   if (!text.lines.every(asRead)) return 'line_not_as_printed'
   // a card that sends its discount to the card prints the total without it (MOL-289)
-  const total = text.totalHundredths - (text.cashbackHundredths ?? 0)
+  const total =
+    text.totalHundredths - (text.cashbackHundredths ?? 0) - (text.serviceHundredths ?? 0)
   const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
   if (sum === total) return null
   return sum < total ? 'lines_lost' : 'lines_over'
@@ -135,6 +138,14 @@ function verifiedLine(
   if (!read) {
     if (line.repaired === true) return emptied('repaired_unproven')
     return emptied(line.settled ? 'bent' : 'unsettled')
+  }
+  // a model's line of a bill that prints no price (MOL-310): its quantity and sum hold nothing up between them, so
+  // only a total they meet vouches for them — kept on a receipt proven whole, its price the sum by the quantity where
+  // that is a figure to the hundredth (owner's В-4 «а»), else none
+  if (byModel && price === null && discount === 0) {
+    if (!proven) return emptied('no_price_unproven')
+    const priced = (sum * 1_000) % qty === 0 ? (sum * 1_000) / qty : null
+    return { line: { ...line, priceHundredths: priced }, reason: null }
   }
   // a gift — its whole price the discount — is nothing paid only where that holds to the hundredth
   // (review round 2, А7 «а»): «0 0» or a stray «0,00» holds any arithmetic

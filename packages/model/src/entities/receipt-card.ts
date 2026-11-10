@@ -52,6 +52,28 @@ export interface ReceiptWords {
   readonly taxed: string
   /** The card's bonus this receipt is partly paid with, «Կանխավճարի մարում» (MOL-289). */
   readonly redeemed: string
+  /**
+   * The prepayment slip «Ереван Сити» prints over a receipt whose discount goes to the card, «Կանխավճար … Ընդամենը»
+   * (MOL-289): its sum is the cashback, a second place of it where the model copied the cashback under another word
+   * (MOL-310). Its word alone on its row.
+   */
+  readonly prepayment: string
+  /**
+   * A café's surcharge for service — «Հավելավճար 10%», «Սպասարկում», «Service 10%» (MOL-310): no dish, printed
+   * under the dishes or among them, and the lines make the total less it. Read in any case.
+   */
+  readonly service: string
+  /**
+   * A café's bill's total in words no fiscal till prints (MOL-310): «ՎՃԱՐՄԱՆ», and a bill printed in Russian —
+   * «Всего», «Итого к оплате». Read in any case.
+   */
+  readonly billTotal: string
+  /**
+   * A bank terminal's slip, a café's only paper where it gives no bill (MOL-310): its rows name the terminal
+   * («TID», «MID», «RRN»), and its one amount is printed after `slipAmount` («Գումար»).
+   */
+  readonly slipTerminal: string
+  readonly slipAmount: string
   /** The payment, in cash or by card. */
   readonly paid: readonly string[]
   /**
@@ -112,6 +134,12 @@ export interface PhotoReading {
    * `swaps` are its own, and a pair joins here with a measure of its own.
    */
   readonly modelSwaps: Readonly<Record<string, string>>
+  /**
+   * Digits a model was seen to confuse only where the total put its line right (MOL-310, owner's В-5 «а»): the
+   * repair of MOL-290 tries them beside `modelSwaps`, and nothing else does — the shop's memory doubts by
+   * `modelSwaps` alone. Each kept while the bench shows no value made up by it.
+   */
+  readonly modelRepairSwaps: Readonly<Record<string, string>>
   /** Letters Tesseract puts where the font has digits, before a digit or a point. */
   readonly digitLike: Readonly<Record<string, string>>
   /**
@@ -145,6 +173,8 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
   swaps: { 5: '6', 6: '5', 1: '4', 4: '1', 3: '8', 8: '3', 0: '9', 9: '0' },
   // «Ереван Сити»'s «5» has a flat top: am-44's six lines the model lost, am-34 faded
   modelSwaps: { 5: '6', 6: '5' },
+  // «Ереван Сити»'s 581,75 copied 531,75 (MOL-310, 44185f32)
+  modelRepairSwaps: { 3: '8', 8: '3' },
   digitLike: { Յ: '3', З: '3', б: '6', О: '0', O: '0', o: '0' },
   // «23-10-26 14:06» of the terminal (MOL-227), «04.10.2026 16:23» of the tills
   dateOrder: 'day-first',
@@ -158,6 +188,14 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
     cashback: 'գործարք',
     taxed: 'հարկվող',
     redeemed: 'մարում',
+    prepayment: 'Կանխավճար',
+    // «Հավելավճար 10%» — a surcharge — and «Սպասարկում», service, in Armenian; a bill in Russian or English
+    service: 'Հավելավճար|Սպասարկում|Обслуживание|Service',
+    // «ՎՃԱՐՄԱՆ», to be paid; «Всего», «Итого к оплате»
+    billTotal: 'Վճարման|Всего|Итого|К оплате',
+    slipTerminal: '\\b(?:TID|MID|RRN)\\b',
+    // «Գումար:», the amount — never «Գումար/Զչ», a fiscal till's column, since a slip has no lines
+    slipAmount: 'Գումար|Amount|Сумма',
     // «Առձեռն» as OCR reads it, «Կանխիկ», «Անկանխիկ», «Վճարված»
     paid: ['ձեռն', 'ձեոն', 'ձեդն', 'Կանխիկ', 'Անկանխ', 'Վճար'],
     // «Վճարված է Առձեռն» — in hand — a whole word «Առ…ն» as OCR and the model make of it, its third letter what

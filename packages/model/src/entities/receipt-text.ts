@@ -87,9 +87,10 @@ export interface ReceiptTextLine {
 
 /**
  * How the lines were found: «Ереван Сити»'s card, Dog City's table, the class code (MOL-226) — or a
- * till's section with no items printed at all, the sole trader's receipt (MOL-227).
+ * till's section with no items printed at all, the sole trader's receipt (MOL-227), or a bank terminal's
+ * slip with no bill beside it, its total printed once (MOL-310).
  */
-export const RECEIPT_LAYOUTS = ['card', 'table', 'class', 'department'] as const
+export const RECEIPT_LAYOUTS = ['card', 'table', 'class', 'department', 'slip'] as const
 export type ReceiptLayout = (typeof RECEIPT_LAYOUTS)[number]
 
 export interface ReceiptText {
@@ -123,6 +124,11 @@ export interface ReceiptText {
    * total less it — what the card's bonus covered was recorded when it was sent to the card.
    */
   readonly redeemedHundredths?: number | null
+  /**
+   * A café's surcharge for service, «Հավելավճար 10%» (MOL-310): the lines make the total less it, and the total
+   * is what was paid. Only a model's reading names it.
+   */
+  readonly serviceHundredths?: number | null
   readonly lines: readonly ReceiptTextLine[]
 }
 
