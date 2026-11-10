@@ -29,9 +29,19 @@ export const ITEM_BARCODES_MAX = 20
  * How many new items a person puts into the shared catalogue by «Предложить товар» on a day of their
  * own (MOL-362, owner's В-10 «а» of the audit MOL-287): with no bound one account wrote some nine
  * thousand an hour into everybody's search. A name already there answers whatever the count, and the
- * items «Записать» of a receipt makes are not counted — the receipts' own quota holds them.
+ * items «Записать» of a receipt makes count in `RECEIPT_ITEMS_DAY_MAX` instead.
  */
 export const ITEMS_PROPOSED_DAY_MAX = 60
+
+/**
+ * How many new items a person puts into the shared catalogue by «Записать» of their receipts on a day of
+ * their own (MOL-373, owner's В-1 «а»): a record takes any name over every line and up to
+ * `RECEIPT_ADDED_MAX` more, so with no bound one receipt carried up to 600 new names and an account some
+ * 24 000 a day. Every new item of a record counts — named by the reading or typed (В-4 «а»); an item
+ * chosen, a name already there and a record sent again count nothing. Some eight of the bench's longest
+ * receipts, every line new. Its own count, apart from `ITEMS_PROPOSED_DAY_MAX`.
+ */
+export const RECEIPT_ITEMS_DAY_MAX = 300
 
 const barcodesSchema = z
   .array(barcodeSchema)

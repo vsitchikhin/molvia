@@ -145,6 +145,12 @@ export const ERROR = {
    */
   ITEMS_DAY_LIMITED: 'error.items_day_limited',
   /**
+   * «Записать» of a receipt whose new item would be past `RECEIPT_ITEMS_DAY_MAX` of the person's day
+   * (MOL-373): nothing of the record is written, the queue sets it aside with the review's draft kept,
+   * and the review says to take found items for the new lines or record it tomorrow.
+   */
+  RECEIPT_ITEMS_DAY_LIMITED: 'error.receipt_items_day_limited',
+  /**
    * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
    * the text and says to send it tomorrow.
    */

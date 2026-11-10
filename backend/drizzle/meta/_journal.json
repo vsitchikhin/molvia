@@ -582,6 +582,13 @@
       "when": 1794308927063,
       "tag": "0082_actor_model_share",
       "breakpoints": true
+    },
+    {
+      "idx": 83,
+      "version": "7",
+      "when": 1794321256812,
+      "tag": "0083_actor_receipt_items",
+      "breakpoints": true
     }
   ]
 }

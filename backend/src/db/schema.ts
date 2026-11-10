@@ -325,6 +325,14 @@ export const actors = pgTable(
     itemsDay: date('items_day'),
     itemsProposed: smallint('items_proposed').notNull().default(0),
     /**
+     * The items «Записать» of the person's receipts put into the shared catalogue on their day (MOL-373,
+     * owner's В-1 «а»): the phone's day of the last such item and how many that day, by the same rules —
+     * a count of its own, so the proposals' sixty and these never take from each other. Not a change of
+     * the row (0083).
+     */
+    receiptItemsDay: date('receipt_items_day'),
+    receiptItemsNew: smallint('receipt_items_new').notNull().default(0),
+    /**
      * What is counted of this person's share of the model this month (MOL-367, Ф-10 of MOL-287) — what a call
      * cost, its worst while that is not known or never will be (adversarial Е1), so it may be more than was paid —
      * and less by a fault of ours, whose worst goes back to it (`keepInMonth`, self-review №11, adversarial Ж1): the
@@ -443,6 +451,7 @@ export const actors = pgTable(
     check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
     check('actors_receipts_sent_not_negative', sql`${table.receiptsSent} >= 0`),
     check('actors_items_proposed_not_negative', sql`${table.itemsProposed} >= 0`),
+    check('actors_receipt_items_new_not_negative', sql`${table.receiptItemsNew} >= 0`),
     check('actors_model_spent_not_negative', sql`${table.modelSpentMicroUsd} >= 0`),
     // A version without its moment, or a moment of no version, is a consent nobody can show.
     check(
