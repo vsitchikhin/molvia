@@ -75,6 +75,8 @@ support types, the shared integration tests, the migrations.
 
 - `backend/drizzle/` — The migrations: numbered SQL files and drizzle's journal, applied in order when the API starts.
 - `backend/src/db/columns.ts` — Column pairs to domain values and back: money, quantity and the rate snapshot, assembled in one place.
+- `backend/src/db/day-count.ts` — The count a quota keeps on the person's own day, one rule for the receipts' and the proposals' (MOL-360, MOL-362): the day only moves on, a later one starts over. Tests: `backend/src/db/day-count.test.ts`.
+- `backend/src/db/day-count.test.ts` — Unit test: a day before the one counted counts in it, a later one starts over.
 - `backend/src/db/digest.ts` — `sha256Hex`: the one digest a secret is stored as in the database.
 - `backend/src/db/index.ts` — The database connection: lazy postgres client and drizzle instance, `Db` and `Conn` types, the reachability probe.
 - `backend/src/db/rows.ts` — Row helpers: `theRow` for a write that must return one, `idOrNull` for a malformed id, `rowLimit`.

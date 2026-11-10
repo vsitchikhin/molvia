@@ -48,10 +48,8 @@ export async function proposeItem(
     return written.code
   })
   const origin = (await hints.named(barcodes)) ? 'open_food_facts' : null
-  return items.createUnlessNamed(
-    { ...input, barcodes },
-    proposer.actorId,
-    origin,
-    todayOf(proposer, now),
-  )
+  return items.createUnlessNamed({ ...input, barcodes }, proposer.actorId, origin, {
+    actorId: proposer.actorId,
+    day: todayOf(proposer, now),
+  })
 }

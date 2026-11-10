@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { ERROR, itemSchema, proposedItemSchema } from '@molvia/model'
 import type { ItemOrigin, NewItem } from '@molvia/model'
-import type { ItemRepository } from '@/db/items-repository'
+import type { ItemRepository, ProposalQuota } from '@/db/items-repository'
 import { proposeItem } from './propose-item'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
@@ -48,25 +48,32 @@ function fakeItems(overrides: Partial<ItemRepository> = {}): ItemRepository {
 
 describe('proposeItem', () => {
   it('asks for the item in the name of the owner it was given, with no barcodes', async () => {
-    const asked: [NewItem, string | null, ItemOrigin | null | undefined, string | undefined][] = []
+    const asked: [
+      NewItem,
+      string | null,
+      ItemOrigin | null | undefined,
+      ProposalQuota | undefined,
+    ][] = []
     const items = fakeItems({
-      createUnlessNamed: (item, createdBy, origin, proposedOn) => {
-        asked.push([item, createdBy, origin, proposedOn])
+      createUnlessNamed: (item, createdBy, origin, quota) => {
+        asked.push([item, createdBy, origin, quota])
         return Promise.resolve({ item: { ...existing, createdBy }, created: true })
       },
     })
 
     const result = await proposeItem(items, NAMED_NOTHING, PROPOSER, input)
 
-    expect(asked).toEqual([[{ ...input, barcodes: [] }, ACTOR, null, '2026-11-10']])
+    expect(asked).toEqual([
+      [{ ...input, barcodes: [] }, ACTOR, null, { actorId: ACTOR, day: '2026-11-10' }],
+    ])
     expect(result).toMatchObject({ created: true })
   })
 
   it('counts the quota by the day of Yerevan for a caller that names none (MOL-362)', async () => {
     const days: (string | undefined)[] = []
     const items = fakeItems({
-      createUnlessNamed: (_item, _createdBy, _origin, proposedOn) => {
-        days.push(proposedOn)
+      createUnlessNamed: (_item, _createdBy, _origin, quota) => {
+        days.push(quota?.day)
         return Promise.resolve({ item: existing, created: true })
       },
     })
