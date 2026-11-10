@@ -56,8 +56,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // `overwrittenVerdicts`, one's own verdict written over after a merge by its twin's id, kept for the undo
 // (MOL-299). 28: `loginNotices`, the sign-ins the bot has not told of yet — the session, the device and
 // when (MOL-361). 29: the account's `receiptsDay` and `receiptsSent`, the receipts sent on the person's day,
-// which the day's quota counts (MOL-360).
-export const EXPORT_VERSION = 29
+// which the day's quota counts (MOL-360). 30: the account's `itemsDay` and `itemsProposed`, the items put into
+// the shared catalogue by «Предложить товар» on the person's day, which its quota counts (MOL-362).
+export const EXPORT_VERSION = 30
 
 const day = z.iso.date()
 
@@ -146,6 +147,8 @@ const accountSchema = z.strictObject({
   silenceWarnedAt: isoDate.nullable(),
   receiptsDay: day.nullable(),
   receiptsSent: z.int(),
+  itemsDay: day.nullable(),
+  itemsProposed: z.int(),
   createdAt: isoDate,
   updatedAt: isoDate,
 })

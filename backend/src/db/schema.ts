@@ -317,6 +317,14 @@ export const actors = pgTable(
     receiptsDay: date('receipts_day'),
     receiptsSent: smallint('receipts_sent').notNull().default(0),
     /**
+     * The items the person put into the shared catalogue by «Предложить товар» on their day (MOL-362,
+     * owner's В-10 «а» of MOL-287): the phone's day of the last new item and how many that day, by the
+     * rules of the receipts' count above. A count, never the rows of `items`: an item a receipt's
+     * «Записать» made is one of them too, and only the proposals count. Not a change of the row (0081).
+     */
+    itemsDay: date('items_day'),
+    itemsProposed: smallint('items_proposed').notNull().default(0),
+    /**
      * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own, from their
      * exchanges, when there is one for the pair, and the official one otherwise — or always
      * `official`. Beside the settings rather than among them: it is switched on the screen of
@@ -421,6 +429,7 @@ export const actors = pgTable(
     ),
     check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
     check('actors_receipts_sent_not_negative', sql`${table.receiptsSent} >= 0`),
+    check('actors_items_proposed_not_negative', sql`${table.itemsProposed} >= 0`),
     // A version without its moment, or a moment of no version, is a consent nobody can show.
     check(
       'actors_consent_whole',
