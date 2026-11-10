@@ -708,9 +708,13 @@ error.items_day_limited` with nothing written. The seed and a receipt's «Зап
   three — ~180 in place of 60 (MOL-360's А1); an item merged away by the night gives no place back; **the
   count is the account's, not the person's** (adversarial А3 of MOL-362, owner's В-4 «а»): «Удалить мои
   данные» takes it with the row and leaves the items with no author (MOL-58), so the same Telegram signed in
-  again has sixty more that day — a loop bounded by the login's five starts a minute from an address and a
-  confirmation in Telegram for each, some 18 000 an hour with the confirmations automated; remembering
-  anything of the erased would undo the erasure; and **«Записать» takes any name** — typed over every line
+  again has sixty more that day — a loop bounded by a confirmation in Telegram for each login and by the
+  login's quota (MOL-359), never by one address: five starts a minute an address, an IPv6 one by its `/48`,
+  three hundred from everybody. With the confirmations automated, one `/48` is some 18 000 items an hour,
+  every `/48` more as many again — a free tunnel hands out whole ones — and the three hundred of everybody
+  bound it at some 18 000 a minute, the door shut for everyone else meanwhile (adversarial Б1 of MOL-362:
+  six rounds in one minute from two `/48`, 360 items with no author): MOL-359's price of a botnet, which the
+  owner accepted for the login; remembering anything of the erased would undo the erasure; and **«Записать» takes any name** — typed over every line
   read, up to 500, and up to `RECEIPT_ADDED_MAX` lines added — so one receipt carries up to 600 new names:
   Tesseract's reading has no ceiling of lines, the 300 of `MODEL_RECEIPT_LINES_MAX` is the model's alone
   (adversarial А1 of MOL-362, where the plan had said 300). Forty receipts a day are some 24 000 new names
