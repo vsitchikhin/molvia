@@ -83,8 +83,8 @@ export const ru = {
     'Удалить все свои данные — /delete.',
   /**
    * The person erasing themselves (MOL-58). What stays is named as plainly as what goes: the
-   * catalogue keeps the items they added and every shop they named (adversarial О-5), and
-   * hearing that afterwards would feel like a lie. What goes is «everything», not a list: a
+   * catalogue keeps the items others stand on (MOL-374) and every shop they named (adversarial
+   * О-5), and hearing that afterwards would feel like a lie. What goes is «everything», not a list: a
    * list of four left out the search picks and the visit marks the privacy page names.
    */
   'erase.prompt':
@@ -92,9 +92,10 @@ export const ru = {
     'Уйдёт всё, что Molvia о вас знает: покупки, траты и их категории, обмены денег, доходы, ' +
     'счета и сверки, ' +
     'оценки и отзывы, выбор в ' +
-    'поиске, отметки о визитах, настройки и входы на всех устройствах. Товары, магазины и ' +
-    'штрихкоды, которые вы добавили в общий справочник, и память магазинов — какой товар стоит за ' +
-    'строкой чека и цена с полки — останутся без вашего имени. Останется и одно ' +
+    'поиске, отметки о визитах, настройки и входы на всех устройствах. Ваши товары в общем ' +
+    'справочнике удалятся, если ими никто больше не пользуется. Те, что уже купил, оценил или ' +
+    'выбрал в поиске кто-то ещё, останутся без вашего имени — как и магазины, штрихкоды и память ' +
+    'магазинов — какой товар стоит за строкой чека и цена с полки. Останется и одно ' +
     'число — сколько человек, пришедших в ту же неделю, удалили свои данные.\n\n' +
     'Отменить это нельзя.',
   'erase.confirm': 'Удалить навсегда',
