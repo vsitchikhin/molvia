@@ -1631,26 +1631,23 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               ),
             ),
           ]
-          const live = new Set(
-            bound.length === 0
-              ? []
-              : (
-                  await tx.execute<{ id: string }>(sql`
-                    select id from items
-                    where id in (${sql.join(
-                      bound.map((item) => sql`${item}::uuid`),
-                      sql`, `,
-                    )})
-                    order by id
-                    for key share`)
-                ).map((row) => row.id),
-          )
-          const bindingOf = (position: number) => {
-            const binding = outcome.bindings[position]
-            if (binding === undefined || binding.itemId === null || live.has(binding.itemId))
-              return binding
-            return { ...binding, itemId: null, match: 'new' as const }
+          const live = new Set<string>()
+          if (bound.length > 0) {
+            const rows = await tx.execute<{ id: string }>(sql`
+              select id from items
+              where id in (${sql.join(
+                bound.map((item) => sql`${item}::uuid`),
+                sql`, `,
+              )})
+              order by id
+              for key share`)
+            for (const row of rows) live.add(row.id)
           }
+          const bindings = outcome.bindings.map((binding) =>
+            binding.itemId === null || live.has(binding.itemId)
+              ? binding
+              : { ...binding, itemId: null, match: 'new' as const },
+          )
           await tx.insert(receiptLines).values(
             outcome.lines.map((line, position) => ({
               receiptId: id,
@@ -1666,10 +1663,10 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               settled: line.settled,
               repaired: line.repaired === true,
               remembered: outcome.remembered?.[position] === true,
-              itemId: bindingOf(position)?.itemId ?? null,
-              match: bindingOf(position)?.match ?? null,
-              translation: bindingOf(position)?.translation ?? null,
-              spelled: bindingOf(position)?.spelled === true,
+              itemId: bindings[position]?.itemId ?? null,
+              match: bindings[position]?.match ?? null,
+              translation: bindings[position]?.translation ?? null,
+              spelled: bindings[position]?.spelled === true,
               gtin: outcome.codes?.[position] ?? null,
             })),
           )
