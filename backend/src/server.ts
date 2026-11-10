@@ -236,6 +236,7 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.FEEDBACK_PICTURE_TOO_LARGE]: 413,
   [ERROR.CLIENT_ERRORS_RATE_LIMITED]: 429,
   [ERROR.RECEIPTS_DAY_LIMITED]: 429,
+  [ERROR.ITEMS_DAY_LIMITED]: 429,
   [ERROR.RECEIPTS_UNRECORDED_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
@@ -1233,8 +1234,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       })
       catalogueRoutes(guarded, {
         search: (actorId, query) => searchCatalogue({ items, embedder }, actorId, query),
-        propose: async (actorId, input) => {
-          const proposal = await proposeItem(items, hints, actorId, input)
+        propose: async (proposer, input) => {
+          const proposal = await proposeItem(items, hints, proposer, input)
           if ('created' in proposal && proposal.created) itemEmbedding?.nudge()
           return proposal
         },

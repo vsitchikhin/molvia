@@ -316,7 +316,7 @@ Tesseract reads, as at the cap (`model_passed`, `brands_passed`: `share`), and t
 status is MOL-276's, in 0.3. **The owner hears of it once a person a month** (`model_share`, В-3 «а»,
 `actors.model_share_told`), the month and the share, nobody named, and never of a month older than one told; it says
 nothing of which receipt, since a brand's call may be the one refused (self-review №1). Not a change of the row:
-`updated_at` does not see the three columns (0081); the copy carries them (version 30), erasure takes them with the
+`updated_at` does not see the three columns (0082); the copy carries them (version 31), erasure takes them with the
 row. **The prices, named:** the edge is held by the worst price, so the last receipt or two that would fit by their
 own price go to Tesseract; a connection that breaks under the request in a poor network eats the share as a time out
 does, though nothing may have been billed; a fault of ours that Anthropic did bill is not in the share — once a

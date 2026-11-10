@@ -135,6 +135,8 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       silenceWarnedAt: at(7),
       receiptsDay: '2026-09-20',
       receiptsSent: 3,
+      itemsDay: '2026-09-21',
+      itemsProposed: 4,
       modelMonth: '2026-09-01',
       modelSpentMicroUsd: 41_250,
       modelShareTold: '2026-09-01',

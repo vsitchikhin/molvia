@@ -1,5 +1,5 @@
 {
-  "id": "fc6a4fe1-df10-412f-94db-4d763e6d6542",
+  "id": "cc794f96-55c8-4a92-a522-9f6c28cd538c",
   "prevId": "052aa54c-8ced-4250-b7f7-bb6f63e5460d",
   "version": "7",
   "dialect": "postgresql",
@@ -337,24 +337,18 @@
           "notNull": true,
           "default": 0
         },
-        "model_month": {
-          "name": "model_month",
+        "items_day": {
+          "name": "items_day",
           "type": "date",
           "primaryKey": false,
           "notNull": false
         },
-        "model_spent_micro_usd": {
-          "name": "model_spent_micro_usd",
-          "type": "bigint",
+        "items_proposed": {
+          "name": "items_proposed",
+          "type": "smallint",
           "primaryKey": false,
           "notNull": true,
           "default": 0
-        },
-        "model_share_told": {
-          "name": "model_share_told",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
         },
         "rate_preference": {
           "name": "rate_preference",
@@ -516,9 +510,9 @@
           "name": "actors_receipts_sent_not_negative",
           "value": "\"actors\".\"receipts_sent\" >= 0"
         },
-        "actors_model_spent_not_negative": {
-          "name": "actors_model_spent_not_negative",
-          "value": "\"actors\".\"model_spent_micro_usd\" >= 0"
+        "actors_items_proposed_not_negative": {
+          "name": "actors_items_proposed_not_negative",
+          "value": "\"actors\".\"items_proposed\" >= 0"
         },
         "actors_consent_whole": {
           "name": "actors_consent_whole",
@@ -4478,7 +4472,7 @@
       "checkConstraints": {
         "owner_notices_kind_known": {
           "name": "owner_notices_kind_known",
-          "value": "\"owner_notices\".\"kind\" in ('failure', 'failure_count', 'failure_muted', 'feedback', 'feedback_continued', 'catalogue_merged', 'model_spend', 'model_share', 'receipt_partial', 'receipt_partial_muted', 'silence')"
+          "value": "\"owner_notices\".\"kind\" in ('failure', 'failure_count', 'failure_muted', 'feedback', 'feedback_continued', 'catalogue_merged', 'model_spend', 'receipt_partial', 'receipt_partial_muted', 'silence')"
         },
         "owner_notices_feedback_named": {
           "name": "owner_notices_feedback_named",

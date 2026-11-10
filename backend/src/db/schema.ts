@@ -317,12 +317,20 @@ export const actors = pgTable(
     receiptsDay: date('receipts_day'),
     receiptsSent: smallint('receipts_sent').notNull().default(0),
     /**
+     * The items the person put into the shared catalogue by «Предложить товар» on their day (MOL-362,
+     * owner's В-10 «а» of MOL-287): the phone's day of the last new item and how many that day, by the
+     * rules of the receipts' count above. A count, never the rows of `items`: an item a receipt's
+     * «Записать» made is one of them too, and only the proposals count. Not a change of the row (0081).
+     */
+    itemsDay: date('items_day'),
+    itemsProposed: smallint('items_proposed').notNull().default(0),
+    /**
      * What the model has cost reading this person's receipts this month (MOL-367, Ф-10 of MOL-287): the
      * calendar month in UTC — `model_spend`'s, Anthropic's bill's — and its micro-dollars, a reading's and a
      * brand's alike (owner's В-2 «а»), held to `RECEIPT_MODEL_SHARE_MICRO_USD` as the month is to its cap.
      * A count, never the rows of `receipts`: a receipt removed would give its price back. A new month starts it
      * at nought. `model_share_told` is the month the owner heard this person reached it (В-3 «а»), once. Not a
-     * change of the row: `updated_at` does not see it.
+     * change of the row: `updated_at` does not see it (0082).
      */
     modelMonth: date('model_month'),
     modelSpentMicroUsd: bigint('model_spent_micro_usd', { mode: 'number' }).notNull().default(0),
@@ -432,6 +440,7 @@ export const actors = pgTable(
     ),
     check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
     check('actors_receipts_sent_not_negative', sql`${table.receiptsSent} >= 0`),
+    check('actors_items_proposed_not_negative', sql`${table.itemsProposed} >= 0`),
     check('actors_model_spent_not_negative', sql`${table.modelSpentMicroUsd} >= 0`),
     // A version without its moment, or a moment of no version, is a consent nobody can show.
     check(
