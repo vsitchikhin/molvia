@@ -179,13 +179,13 @@ class ConnectionNotMade extends Error {
 
 /** `fetch` whose failures to connect at all come out as `ConnectionNotMade`, anything else as it was. */
 function judgingConnection(base: typeof fetch): typeof fetch {
-  return (async (input, init) => {
+  return async (input, init) => {
     try {
       return await base(input, init)
     } catch (error) {
       throw neverConnected(error) ? new ConnectionNotMade() : error
     }
-  }) as typeof fetch
+  }
 }
 
 /**
