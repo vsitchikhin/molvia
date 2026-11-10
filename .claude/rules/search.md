@@ -705,10 +705,18 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
 error.items_day_limited` with nothing written. The seed and a receipt's «Записать» pass none. **The sheet
   says it in its own words**, a warning over the button (owner's В-2 «а»), never «Не получилось», which asks
   to try again. **The prices, named:** a day header made up walks the days that are today somewhere, some
-  three — ~180 in place of 60 (MOL-360's А1); an item merged away by the night gives no place back; and
-  **«Записать» takes any name** — typed over every line read and up to `RECEIPT_ADDED_MAX` lines added — so
-  forty receipts a day carry some 4 000 new names, up to ~16 000 with receipts of 300 lines, past this quota
-  (owner's В-1 «а»: the receipts' quota holds them, a photo the reader took for each).
+  three — ~180 in place of 60 (MOL-360's А1); an item merged away by the night gives no place back; **the
+  count is the account's, not the person's** (adversarial А3 of MOL-362, owner's В-4 «а»): «Удалить мои
+  данные» takes it with the row and leaves the items with no author (MOL-58), so the same Telegram signed in
+  again has sixty more that day — a loop bounded by the login's five starts a minute from an address and a
+  confirmation in Telegram for each, some 18 000 an hour with the confirmations automated; remembering
+  anything of the erased would undo the erasure; and **«Записать» takes any name** — typed over every line
+  read, up to 500, and up to `RECEIPT_ADDED_MAX` lines added — so one receipt carries up to 600 new names:
+  Tesseract's reading has no ceiling of lines, the 300 of `MODEL_RECEIPT_LINES_MAX` is the model's alone
+  (adversarial А1 of MOL-362, where the plan had said 300). Forty receipts a day are some 24 000 new names
+  past this quota, 48 000–72 000 with a day header made up, and one such record held 600 names' locks for
+  some 6 s on a Mac (owner's В-1 «а», В-3 «в»: the receipts' quota holds them, a photo the reader took for
+  each; a ceiling of its own is MOL-373).
 
 - **«Предложить товар» says why it waits, on its one button** (MOL-213, Ф-6, frames 5a–5h): the kit's
   not now, in the focus order, named by the reason — «Предложить можно со связью», then «Напишите название»,
