@@ -139,8 +139,10 @@ const base64Bytes = (part: Buffer): number => Math.ceil(part.length / 3) * 4
 
 /**
  * What a connection fails with before a byte of the request leaves (MOL-367, owner's В-6 «а» on adversarial Б1): no
- * address for the host, the port refused, no route, no connection made in time. A closed list — anything else, a
- * connection reset or closed under the request included, may have carried it, and is paid in doubt.
+ * address for the host, the port refused, no route, no connection made in time. A closed list, and beside it one rule:
+ * `ETIMEDOUT` of the `connect` call (adversarial Г1), a code judged by its call, since an open socket's time out has it
+ * too. Anything else — a connection reset or closed under the request included — may have carried it, and is paid in
+ * doubt.
  */
 const NEVER_CONNECTED = new Set([
   'ENOTFOUND',
@@ -152,8 +154,8 @@ const NEVER_CONNECTED = new Set([
 ])
 
 /**
- * Whether a failure of `fetch` is one of those, down its causes — `fetch`'s wraps the socket's — and, for an attempt at
- * every address of the host (`AggregateError`), of every one of them.
+ * Whether a failure of `fetch` is one of those or a time out of `connect`, down its causes — `fetch`'s wraps the
+ * socket's — and, for an attempt at every address of the host (`AggregateError`), of every one of them.
  */
 function neverConnected(error: unknown, depth = 0): boolean {
   if (depth > 4 || typeof error !== 'object' || error === null) return false
