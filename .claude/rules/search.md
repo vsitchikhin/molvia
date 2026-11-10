@@ -714,7 +714,10 @@ error.items_day_limited` with nothing written. The seed and a receipt's «Зап
   every `/48` more as many again — a free tunnel hands out whole ones — and the three hundred of everybody
   bound it at some 18 000 a minute, the door shut for everyone else meanwhile (adversarial Б1 of MOL-362:
   six rounds in one minute from two `/48`, 360 items with no author): MOL-359's price of a botnet, which the
-  owner accepted for the login; remembering anything of the erased would undo the erasure; and **«Записать» takes any name** — typed over every line
+  owner accepted for the login — **but here it outlives the attack** (adversarial round 3, owner's В-5 «б»):
+  no path of the code removes an item, so what the loop left stays in everybody's search until the owner
+  deletes it by hand in `psql`; erasure taking the person's items nobody else stands on is MOL-374.
+  Remembering anything of the erased would undo the erasure; and **«Записать» takes any name** — typed over every line
   read, up to 500, and up to `RECEIPT_ADDED_MAX` lines added — so one receipt carries up to 600 new names:
   Tesseract's reading has no ceiling of lines, the 300 of `MODEL_RECEIPT_LINES_MAX` is the model's alone
   (adversarial А1 of MOL-362, where the plan had said 300). Forty receipts a day are some 24 000 new names
