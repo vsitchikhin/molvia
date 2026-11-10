@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { ERROR, ISSUE } from '@molvia/model'
+import { ERROR, ISSUE, catalogueEntryCodec, catalogueSearchResponseSchema } from '@molvia/model'
 import { buildServer } from '@/server'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { actors, erasures, items, sessions, verdicts } from '@/db/schema'
@@ -100,6 +100,33 @@ describe('POST /internal/actors/erase — удаление самим челов
 
     expect(response.statusCode).toBe(401)
     await closed.close()
+  })
+})
+
+describe('петля «предложить → стереть → войти» (MOL-374)', () => {
+  it('товары стёртого, на которые никто не опирается, больше не находит никто', async () => {
+    const tg = telegramId()
+    const boris = await insertActor(db, { telegramUserId: tg })
+    const proposed = await app.inject({
+      method: 'POST',
+      url: '/catalogue/items',
+      headers: { cookie: await signIn(db, boris) },
+      payload: { kind: 'product', name: 'Мусорвадзе 1', defaultUnit: 'piece' },
+    })
+    expect(proposed.statusCode).toBe(201)
+    const { id } = catalogueEntryCodec.parse(JSON.parse(proposed.body))
+
+    expect((await erase({ telegramUserId: tg })).statusCode).toBe(204)
+
+    const anna = await insertActor(db)
+    const found = await app.inject({
+      method: 'GET',
+      url: `/catalogue/search?q=${encodeURIComponent('Мусорвадзе')}`,
+      headers: { cookie: await signIn(db, anna) },
+    })
+    expect(found.statusCode).toBe(200)
+    expect(catalogueSearchResponseSchema.parse(JSON.parse(found.body)).items).toEqual([])
+    expect(await db.select().from(items).where(eq(items.id, id))).toEqual([])
   })
 })
 

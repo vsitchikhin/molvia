@@ -1,7 +1,8 @@
 import { randomBytes, randomUUID } from 'node:crypto'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { ACTOR_REFERENCES, createErasureRepository } from '@/db/erasure-repository'
+import { storeMemoryWords } from '@molvia/model'
+import { ACTOR_REFERENCES, ITEM_REFERENCES, createErasureRepository } from '@/db/erasure-repository'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createActorRepository } from '@/db/actors-repository'
 import { authTransactOn } from '@/db/auth-unit-of-work'
@@ -9,11 +10,18 @@ import { completeLogin } from '@/usecases/complete-login'
 import { lockTelegramAccount } from '@/db/telegram-lock'
 import {
   actors,
+  catalogueApart,
+  catalogueMergeCandidates,
+  catalogueMerges,
   erasures,
   events,
   exchanges,
   incomes,
+  expenses,
   itemBarcodes,
+  itemEmbeddings,
+  itemHeadings,
+  itemNames,
   items,
   loginRequests,
   moneyAccountChecks,
@@ -22,9 +30,12 @@ import {
   budgetPlans,
   feedback,
   places,
+  receiptLines,
+  receipts,
   searchPicks,
   spendingCategories,
   spendings,
+  storeMemory,
   verdicts,
 } from '@/db/schema'
 import { connect, connectDrizzle } from './db'
@@ -36,6 +47,7 @@ import {
   insertItem,
   insertLoginRequest,
   insertPlace,
+  insertTrip,
   telegramId,
 } from './fixtures'
 import { onlyRow, sorted } from './rows'
@@ -189,7 +201,8 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
         login_requests: 2,
         actors: 1,
       },
-      itemsReleased: 1,
+      itemsErased: 1,
+      itemsReleased: 0,
       barcodesReleased: 1,
       memoryReleased: 0,
       counted: true,
@@ -204,21 +217,6 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     expect(await rowsMentioning(incomeId)).toEqual([])
     expect(await rowsMentioning(transferId)).toEqual([])
   }, 15_000)
-
-  it('товар, который человек завёл, остаётся в справочнике без автора', async () => {
-    const tg = telegramId()
-    const anna = await insertActor(db, { telegramUserId: tg })
-    const { ownItem } = await aLife(db, anna, tg, {
-      itemId: await insertItem(db),
-      placeId: await insertPlace(db),
-    })
-
-    await erasure.erase(tg, { dryRun: false })
-
-    const item = onlyRow(await db.select().from(items).where(eq(items.id, ownItem)))
-    expect(item?.createdBy).toBeNull()
-    expect(item?.name).toBe('Рынок-сыр')
-  }, 10_000)
 
   it('код, который человек дописал к позиции, остаётся в справочнике без автора (MOL-100)', async () => {
     const tg = telegramId()
@@ -548,7 +546,243 @@ describe('стирание оставляет одно число — сколь
   })
 })
 
+describe('товары человека при стирании (MOL-374)', () => {
+  /** Anna, her item, and Boris with a trip of his own — the somebody else who may stand on it. */
+  async function annaAndBoris() {
+    const tg = telegramId()
+    const anna = await insertActor(db, { telegramUserId: tg })
+    const boris = await insertActor(db, { telegramUserId: telegramId() })
+    const item = await insertItem(db, {
+      name: 'Лаваш домашний',
+      searchKey: 'lavash domashnij',
+      createdBy: anna,
+    })
+    return { tg, anna, boris, item }
+  }
+
+  async function itemRow(id: string) {
+    return onlyRow(await db.select().from(items).where(eq(items.id, id)))
+  }
+
+  async function aWord(actorId: string | null, itemId: string, printed: string) {
+    const [said] = storeMemoryWords({ printed, sku: null })
+    if (said === undefined) throw new Error('a line with letters says a word')
+    await db
+      .insert(storeMemory)
+      .values({ id: randomUUID(), tin: '01282006', ...said, actorId, itemId })
+  }
+
+  it('товар, на который опирался только он сам, уходит с вектором, его кодом и его словом', async () => {
+    const { tg, anna, item } = await annaAndBoris()
+    // everything Anna's own: a purchase, a withdrawn verdict, a pick, a code, a word of the shops' memory
+    const tripId = await insertTrip(db, { actorId: anna, placeId: await insertPlace(db) })
+    await db.insert(expenses).values({ id: randomUUID(), tripId, itemId: item })
+    await db.insert(verdicts).values({
+      id: randomUUID(),
+      actorId: anna,
+      itemId: item,
+      itemKind: 'product',
+      score: 2,
+      ratedAt: new Date(Date.now() - 60_000),
+      deletedAt: new Date(),
+    })
+    await db.insert(searchPicks).values({ actorId: anna, queryKey: 'lavash', itemId: item })
+    await db.insert(itemBarcodes).values({ code: '4850001234567', itemId: item, addedBy: anna })
+    await aWord(anna, item, 'Լավաշ տնական')
+    await db
+      .insert(itemEmbeddings)
+      .values({ itemId: item, model: 'test', embedding: Array<number>(768).fill(0.1) })
+    const other = await insertItem(db, { name: 'Лаваш армянский', searchKey: 'lavash armyanskij' })
+    const [a, b] = [item, other].toSorted()
+    await db.insert(catalogueMergeCandidates).values({
+      subject: 'item',
+      a: a ?? item,
+      b: b ?? other,
+      namedOn: '2026-11-10',
+    })
+
+    const report = await erasure.erase(tg, { dryRun: false })
+
+    expect(report).toMatchObject({ itemsErased: 1, itemsReleased: 0 })
+    expect(await itemRow(item)).toBeUndefined()
+    expect(await rowsMentioning(item)).toEqual([])
+    expect(await itemRow(other)).toBeDefined()
+  }, 10_000)
+
+  it('сухой прогон называет удаляемый товар и оставляет его на месте', async () => {
+    const { tg, item } = await annaAndBoris()
+
+    const dry = await erasure.erase(tg, { dryRun: true })
+
+    expect(dry).toMatchObject({ itemsErased: 1, itemsReleased: 0 })
+    expect(await itemRow(item)).toBeDefined()
+  })
+
+  type Holder = (who: { boris: string; item: string }) => Promise<unknown>
+  const holders: [string, Holder][] = [
+    [
+      'чужая покупка',
+      async ({ boris, item }) => {
+        const tripId = await insertTrip(db, { actorId: boris, placeId: await insertPlace(db) })
+        await db.insert(expenses).values({ id: randomUUID(), tripId, itemId: item })
+      },
+    ],
+    [
+      'чужая снятая оценка',
+      ({ boris, item }) =>
+        db.insert(verdicts).values({
+          id: randomUUID(),
+          actorId: boris,
+          itemId: item,
+          itemKind: 'product',
+          score: 4,
+          ratedAt: new Date(Date.now() - 60_000),
+          deletedAt: new Date(),
+        }),
+    ],
+    [
+      'чужой выбор в поиске',
+      ({ boris, item }) =>
+        db.insert(searchPicks).values({ actorId: boris, queryKey: 'lavash', itemId: item }),
+    ],
+    [
+      'строка чужого незаписанного чека (В-2 «а»)',
+      async ({ boris, item }) => {
+        const receiptId = randomUUID()
+        const at = new Date()
+        await db.insert(receipts).values({
+          id: receiptId,
+          actorId: boris,
+          status: 'queued',
+          parts: 1,
+          country: 'AM',
+          language: 'ru',
+          currency: 'AMD',
+          capturedAt: at,
+          queuedAt: at,
+        })
+        await db.insert(receiptLines).values({
+          receiptId,
+          position: 0,
+          printed: 'Լավաշ տնական',
+          settled: false,
+          itemId: item,
+        })
+      },
+    ],
+    [
+      'код, привязанный другим',
+      ({ boris, item }) =>
+        db.insert(itemBarcodes).values({ code: '4850007654321', itemId: item, addedBy: boris }),
+    ],
+    [
+      'код уже стёртого автора',
+      ({ item }) =>
+        db.insert(itemBarcodes).values({ code: '4850007654321', itemId: item, addedBy: null }),
+    ],
+    ['чужое слово памяти магазина', ({ boris, item }) => aWord(boris, item, 'Լավաշ')],
+    ['слово уже стёртого автора', ({ item }) => aWord(null, item, 'Լավաշ')],
+    [
+      'на него склеен след',
+      async ({ item }) => {
+        const twin = await insertItem(db, {
+          name: 'Лаваш домашни',
+          searchKey: 'lavash domashni',
+          mergedInto: item,
+        })
+        await db
+          .insert(catalogueMerges)
+          .values({ subject: 'item', fromItem: twin, intoItem: item, by: 'hand' })
+      },
+    ],
+    [
+      'он сам — след склейки',
+      async ({ item }) => {
+        const survivor = await insertItem(db, { name: 'Лаваш', searchKey: 'lavash' })
+        await db.update(items).set({ mergedInto: survivor }).where(eq(items.id, item))
+        await db
+          .insert(catalogueMerges)
+          .values({ subject: 'item', fromItem: item, intoItem: survivor, by: 'hand' })
+      },
+    ],
+    [
+      'слово владельца «это разное»',
+      async ({ item }) => {
+        const other = await insertItem(db, {
+          name: 'Лаваш армянский',
+          searchKey: 'lavash armyanskij',
+        })
+        const [a, b] = [item, other].toSorted()
+        await db.insert(catalogueApart).values({ subject: 'item', a: a ?? item, b: b ?? other })
+      },
+    ],
+    [
+      'армянское имя сида',
+      ({ item }) => db.insert(itemNames).values({ itemId: item, language: 'hy', name: 'լավաշ' }),
+    ],
+    ['заголовок сида', ({ item }) => db.insert(itemHeadings).values({ itemId: item, hs: '1905' })],
+  ]
+
+  it.each(holders)('товар держит %s — остаётся без автора', async (_, hold) => {
+    const { tg, boris, item } = await annaAndBoris()
+    await hold({ boris, item })
+
+    const report = await erasure.erase(tg, { dryRun: false })
+
+    expect(report).toMatchObject({ itemsErased: 0, itemsReleased: 1 })
+    expect((await itemRow(item))?.createdBy).toBeNull()
+  })
+
+  it('его код и его слово на товаре, который остаётся, остаются без автора', async () => {
+    const { tg, anna, boris, item } = await annaAndBoris()
+    await db.insert(searchPicks).values({ actorId: boris, queryKey: 'lavash', itemId: item })
+    await db.insert(itemBarcodes).values({ code: '4850001234567', itemId: item, addedBy: anna })
+    await aWord(anna, item, 'Լավաշ տնական')
+
+    await erasure.erase(tg, { dryRun: false })
+
+    const code = onlyRow(await db.select().from(itemBarcodes).where(eq(itemBarcodes.itemId, item)))
+    expect(code?.addedBy).toBeNull()
+    const word = onlyRow(await db.select().from(storeMemory).where(eq(storeMemory.itemId, item)))
+    expect(word?.actorId).toBeNull()
+  })
+
+  it('товар, который сейчас пишет чужая транзакция, остаётся без автора, и стирание её не ждёт', async () => {
+    const { tg, item } = await annaAndBoris()
+    const writer = connect()
+    try {
+      await writer.begin(async (tx) => {
+        // what a foreign key takes while somebody's purchase of it is being written
+        await tx`select 1 from items where id = ${item} for key share`
+        // Waiting on the lock, the erasure would never settle while this transaction stays open.
+        const report = await erasure.erase(tg, { dryRun: false })
+        expect(report).toMatchObject({ itemsErased: 0, itemsReleased: 1 })
+      })
+    } finally {
+      await writer.end()
+    }
+    expect((await itemRow(item))?.createdBy).toBeNull()
+  })
+})
+
 describe('страж схемы', () => {
+  it('каждый внешний ключ на items известен стиранию (MOL-374)', async () => {
+    const references = await db.execute<{ reference: string }>(sql`
+      select distinct kcu.table_name || '.' || kcu.column_name as reference
+      from information_schema.referential_constraints rc
+      join information_schema.key_column_usage kcu
+        on kcu.constraint_name = rc.constraint_name and kcu.constraint_schema = rc.constraint_schema
+      join information_schema.constraint_column_usage ccu
+        on ccu.constraint_name = rc.unique_constraint_name
+       and ccu.constraint_schema = rc.unique_constraint_schema
+      where ccu.table_name = 'items' and ccu.column_name = 'id' and kcu.column_name <> 'item_kind'
+        and kcu.constraint_schema = 'public'
+      order by 1`)
+
+    // Red here is a new table that points at an item: erasure must decide whether it holds one.
+    expect(references.map((row) => row.reference)).toEqual([...ITEM_REFERENCES].sort())
+  })
+
   it('каждый внешний ключ на actors известен стиранию', async () => {
     const references = await db.execute<{ reference: string }>(sql`
       select kcu.table_name || '.' || kcu.column_name as reference

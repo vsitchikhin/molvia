@@ -3,7 +3,7 @@ import { telegramUserIdSchema } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
 import { cursorAtOrBelow } from './broadcasts-repository'
 import { silentErasable } from './silence-repository'
-import type { Db } from './index'
+import type { Conn, Db } from './index'
 import { lockTelegramAccount } from './telegram-lock'
 import { yerevanWeek } from './yerevan-week'
 
@@ -38,7 +38,36 @@ export const ACTOR_REFERENCES = [
   'verdicts.actor_id',
 ] as const
 
-/** What erasure removes, in the order it removes it. `items` is kept and only loses its author. */
+/**
+ * Every column in the schema that points at `items`, as `table.column` (MOL-374). Erasure deletes a
+ * person's item only where nothing but their own rows stood on it, so it has to know each of them: a
+ * test compares this list with `information_schema`, and a new table that points at an item cannot join
+ * the schema without deciding here whether it holds the item — one that does not cascade and is not
+ * asked would fail every erasure of the item's author on its foreign key.
+ */
+export const ITEM_REFERENCES = [
+  // held: someone else's
+  'catalogue_merges.from_item',
+  'catalogue_merges.into_item',
+  'expenses.item_id',
+  'items.merged_into',
+  'receipt_lines.item_id',
+  'search_picks.item_id',
+  'verdicts.item_id',
+  // held where not the person's own; their own go with the item by the cascade
+  'item_barcodes.item_id',
+  'store_memory.item_id',
+  // held: only the seed writes them (MOL-126)
+  'item_hs.item_id',
+  'item_names.item_id',
+  // gone with the item by the cascade: nobody's
+  'item_embeddings.item_id',
+] as const
+
+/**
+ * What erasure removes, in the order it removes it. `items` is not among them: the person's items nobody
+ * else stands on go (MOL-374), the rest only lose their author, and the copy holds them all either way.
+ */
 export const ERASED_TABLES = [
   'login_notices',
   'sessions',
@@ -69,7 +98,12 @@ export interface ErasureReport {
   /** Whether an owner with this Telegram id existed. Login requests are erased either way. */
   readonly found: boolean
   readonly erased: Readonly<Record<ErasedTable, number>>
-  /** Catalogue items this person added: they stay, with `created_by` nulled. */
+  /**
+   * Catalogue items this person added that nothing else stood on (MOL-374): deleted, with their vector,
+   * the codes the person wrote to them and the person's own words of the shops' memory about them.
+   */
+  readonly itemsErased: number
+  /** Catalogue items this person added that someone else stands on: they stay, with `created_by` nulled. */
   readonly itemsReleased: number
   /** Codes this person wrote to items (MOL-100): they stay, with `added_by` nulled. */
   readonly barcodesReleased: number
@@ -143,11 +177,75 @@ function nobody(): ErasureReport {
   return {
     found: false,
     erased: noneErased(),
+    itemsErased: 0,
     itemsReleased: 0,
     barcodesReleased: 0,
     memoryReleased: 0,
     counted: false,
   }
+}
+
+/**
+ * The person's items nobody else stands on, deleted (MOL-374, owner's В-5 «б» of MOL-362): «Удалить мои
+ * данные» left every one of them to the catalogue, so «60 → erase → sign in again» filled everybody's
+ * search for good. Run after the person's own rows are gone and before their owner row, whose deletion
+ * nulls `created_by` — so a row still pointing at an item here is somebody else's, and holds it: a
+ * purchase, a verdict (a withdrawn one too — the gate counts it), a pick, a line of a receipt not recorded
+ * yet (В-2 «а»: its «Записать» sends the item by its id), a code or a word of the shops' memory not the
+ * person's own (В-1 «а»: their own go with the item, or a receipt's «Записать», which makes both, would
+ * keep every name it made), a merge either way, the owner's «apart», and the seed's names or headings — the
+ * seed alone writes them, on an item someone proposed first. A candidate of the merge that names a deleted
+ * item goes with it; its vector by the cascade.
+ *
+ * **Never waited on** (Р-2): an item another transaction holds — a purchase being written takes a key
+ * share of it — is skipped and stays without its author, as every item did before. So erasure waits on
+ * nobody's transaction and cannot deadlock with the merge night, which holds items and moves people's rows.
+ * Locked by id, after the owner, as the order of locks says.
+ */
+async function eraseItemsOf(
+  tx: Conn,
+  actorId: string,
+): Promise<{ itemsErased: number; itemsReleased: number }> {
+  const [all] = await tx.execute<{ n: number }>(
+    sql`select count(*)::int as n from items where created_by = ${actorId}`,
+  )
+  const locked = await tx.execute<{ id: string }>(sql`
+    select id from items where created_by = ${actorId} order by id for update skip locked`)
+  const ids = locked.map((row) => row.id)
+  if (ids.length === 0) return { itemsErased: 0, itemsReleased: all?.n ?? 0 }
+  const lockedIds = sql`array[${sql.join(
+    ids.map((id) => sql`${id}::uuid`),
+    sql`, `,
+  )}]`
+  const gone = await tx.execute<{ id: string }>(sql`
+    select i.id from items i
+    where i.id = any(${lockedIds})
+      and i.merged_into is null
+      and not exists (select 1 from items t where t.merged_into = i.id)
+      and not exists (select 1 from catalogue_merges g where i.id in (g.from_item, g.into_item))
+      and not exists (select 1 from catalogue_apart a where a.subject = 'item' and i.id in (a.a, a.b))
+      and not exists (select 1 from expenses e where e.item_id = i.id)
+      and not exists (select 1 from verdicts v where v.item_id = i.id)
+      and not exists (select 1 from search_picks p where p.item_id = i.id)
+      and not exists (select 1 from receipt_lines l where l.item_id = i.id)
+      and not exists (
+        select 1 from item_barcodes b where b.item_id = i.id and b.added_by is distinct from ${actorId})
+      and not exists (
+        select 1 from store_memory m where m.item_id = i.id and m.actor_id is distinct from ${actorId})
+      and not exists (select 1 from item_names n where n.item_id = i.id)
+      and not exists (select 1 from item_hs h where h.item_id = i.id)
+    order by i.id`)
+  if (gone.length > 0) {
+    const goneIds = sql`array[${sql.join(
+      gone.map((row) => sql`${row.id}::uuid`),
+      sql`, `,
+    )}]`
+    await tx.execute(sql`
+      delete from catalogue_merge_candidates
+      where subject = 'item' and (a = any(${goneIds}) or b = any(${goneIds}))`)
+    await tx.execute(sql`delete from items where id = any(${goneIds})`)
+  }
+  return { itemsErased: gone.length, itemsReleased: (all?.n ?? 0) - gone.length }
 }
 
 export function createErasureRepository(db: Db): ErasureRepository {
@@ -189,15 +287,12 @@ export function createErasureRepository(db: Db): ErasureRepository {
           if (silentAt !== undefined && owner[0]?.silent !== true) return nobody()
 
           const erased = noneErased()
+          let itemsErased = 0
           let itemsReleased = 0
           let barcodesReleased = 0
           let memoryReleased = 0
 
           if (actorId !== null) {
-            const [released] = await tx.execute<{ n: number }>(
-              sql`select count(*)::int as n from items where created_by = ${actorId}`,
-            )
-            itemsReleased = released?.n ?? 0
             const [codes] = await tx.execute<{ n: number }>(
               sql`select count(*)::int as n from item_barcodes where added_by = ${actorId}`,
             )
@@ -289,6 +384,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
             erased.money_accounts = await count(
               sql`delete from money_accounts where actor_id = ${actorId} returning 1`,
             )
+            ;({ itemsErased, itemsReleased } = await eraseItemsOf(tx, actorId))
           }
           // No foreign key reaches these — on a first login the owner does not exist yet — so
           // no cascade does either. A person who began a login and never finished has only this.
@@ -315,8 +411,8 @@ export function createErasureRepository(db: Db): ErasureRepository {
               sql`select 1 from broadcasts where cursor <= ${actorId}::uuid order by id for update`,
             )
             // `items.created_by`, `item_barcodes.added_by` and `store_memory.actor_id` are `ON DELETE
-            // SET NULL`: the catalogue keeps what was added, the codes written to it, and the shops'
-            // memory the words it was given (MOL-126).
+            // SET NULL`: the catalogue keeps what was added and someone stands on (MOL-374), the codes
+            // written to it, and the shops' memory the words it was given (MOL-126).
             erased.actors = await count(sql`delete from actors where id = ${actorId} returning 1`)
             // A broadcast that has got to this person keeps its place without their id (MOL-237):
             // the nearest live id below leaves the same people after it.
@@ -328,6 +424,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
           const report: ErasureReport = {
             found: actorId !== null,
             erased,
+            itemsErased,
             itemsReleased,
             barcodesReleased,
             memoryReleased,
