@@ -164,6 +164,26 @@ describe('heard in the app', () => {
     expect(await claimed()).toEqual([expect.objectContaining({ receiptId: parsed })])
   })
 
+  it('must not mark what another site or a link asked for — 404, and «Чек разобран» still goes (MOL-368)', async () => {
+    // `Lax` sends the cookie on a link from any site, and a link another app hands the browser — a
+    // chat, a letter — comes as `none` with `navigate` (Chrome, measured 10.11.2026, adversarial А1).
+    const me = await owner()
+    const parsed = await receipt(me.id, 'parsed')
+    for (const headers of [
+      { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' },
+      { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' },
+    ]) {
+      const asked = await app.inject({
+        method: 'GET',
+        url: '/receipts?shown=1',
+        headers: { cookie: me.cookie, ...headers },
+      })
+      expect(asked.statusCode).toBe(404)
+    }
+    expect(await heardOf(parsed)).toEqual({ heard: null, heardAt: null })
+    expect(await claimed()).toEqual([expect.objectContaining({ receiptId: parsed })])
+  })
+
   it('refuses a query that is not `shown=1`', async () => {
     const me = await owner()
     expect((await get(me, '/receipts?shown=yes')).statusCode).toBe(400)

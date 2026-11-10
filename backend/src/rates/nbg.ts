@@ -1,5 +1,5 @@
 import { PUBLISHED, RATE_DIGITS, RATE_SCALE, divideRounded, scaledFromDecimal } from '@molvia/model'
-import { FeedError, published, request } from './feed'
+import { FeedError, published, request, textOf } from './feed'
 import type { Published, RateFeed } from './feed'
 
 export const NBG_URL = 'https://nbg.gov.ge/gw/api/ct/monetarypolicy/currencies/en/json/'
@@ -86,7 +86,7 @@ export interface NbgFeed extends RateFeed {
 export function nbgFeed(url = NBG_URL): NbgFeed {
   const read = async (query: string) => {
     const response = await request('nbg', `${url}${query}`)
-    return parseNbg(await response.text())
+    return parseNbg(await textOf('nbg', response))
   }
   return {
     provider: 'nbg',

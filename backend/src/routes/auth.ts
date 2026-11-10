@@ -20,13 +20,10 @@ import type { CompletedLogin } from '@/usecases/complete-login'
 import type { StartedLogin } from '@/usecases/start-login'
 import { addressOf } from './address'
 import { refuseAnyBody } from './empty-body'
+import { fromAnotherSite } from './fetch-site'
 
 function browserOnly(request: FastifyRequest): Promise<void> {
-  const site = request.headers['sec-fetch-site']
-  if (
-    request.headers[LOGIN_HEADER.toLowerCase()] !== '1' ||
-    (site !== undefined && site !== 'same-origin' && site !== 'none')
-  ) {
+  if (request.headers[LOGIN_HEADER.toLowerCase()] !== '1' || fromAnotherSite(request)) {
     throw new DomainError(ERROR.LOGIN_FORBIDDEN)
   }
   return Promise.resolve()

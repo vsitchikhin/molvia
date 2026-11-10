@@ -1,11 +1,11 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cbaFeed, parseCba } from './cba'
-import { parseCbr } from './cbr'
-import { parseErapi } from './erapi'
+import { cbrFeed, parseCbr } from './cbr'
+import { erapiFeed, parseErapi } from './erapi'
 import { parseNbg } from './nbg'
 import { listIdOf, nbsFeed, parseNbs } from './nbs'
-import { FEED_TIMEOUT_MS, FOREIGN, FeedError, request } from './feed'
+import { FEED_MAX_BYTES, FEED_TIMEOUT_MS, FOREIGN, FeedError, request } from './feed'
 
 // Answers recorded from the providers on 19.09.2026 (a Saturday), byte for byte.
 function fixture(name: string): string {
@@ -434,6 +434,27 @@ describe('транспорт', () => {
         }) as unknown,
         body: expect.stringContaining('<ExchangeRatesLatest') as unknown,
       }),
+    )
+  })
+})
+
+describe('ответ больше FEED_MAX_BYTES (MOL-368)', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('целиком не читается: источник молчит, как при любом сбое, — текстом и байтами', async () => {
+    const huge = 'x'.repeat(FEED_MAX_BYTES + 1)
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(huge))),
+    )
+
+    await expect(erapiFeed('https://erapi.test').fetchLatest()).rejects.toThrow(
+      new FeedError('erapi', 'too large'),
+    )
+    await expect(cbrFeed('https://cbr.test').fetchLatest()).rejects.toThrow(
+      new FeedError('cbr', 'too large'),
     )
   })
 })

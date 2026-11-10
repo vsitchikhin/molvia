@@ -1,5 +1,5 @@
 import { randomInt } from 'node:crypto'
-import { DomainError, ERROR, ZONE_HEADER, isTimeZone, telegramUserIdSchema } from '@molvia/model'
+import { ZONE_HEADER, isTimeZone, telegramUserIdSchema } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
 import type { FastifyInstance, FastifyRequest } from 'fastify'
 import { answerWithActor } from '@/routes/actors'
@@ -10,6 +10,7 @@ import {
   setSessionCookie,
 } from '@/cookie'
 import { refuseAnyBody } from './empty-body'
+import { refuseAnotherSite } from './fetch-site'
 import type { SignedIn } from '@/usecases/sign-in'
 import { deviceName } from '@/device-name'
 
@@ -39,50 +40,6 @@ import { deviceName } from '@/device-name'
  */
 
 /**
- * Documented as having no body, so a body is refused rather than dropped in silence: accepting
- * `{"country":"RU"}` and answering «AM» tells the caller their input was understood when it was
- * discarded. A declared `content-type` counts as a body even with nothing behind it: otherwise
- * an empty payload announced as JSON slipped past here and was refused a step later, by the
- * parser, in different words — the one difference this hook exists to remove.
- *
- * Decided on `onRequest`, by the headers, and that placement is the whole point. Read off
- * `request.body` it ran **after** the body had been buffered and parsed, so a megabyte came
- * back 400 and two megabytes came back 413 — what a caller learned depended on how much they
- * sent rather than on the rule. That property used to be held by `withInvite`, which also stood
- * on `onRequest`; it was lost when the door went (adversarial А9). The same placement catches
- * the other half: a body of literal `null` is a valid JSON document, and read off `request.body`
- * it was indistinguishable from no body at all and quietly wrote a row.
- *
- * Refused through the body seam, which is what turns it into a 400 naming the field — the route
- * assigns no status itself.
- */
-/**
- * A seam that hands out a session must not be reachable from somebody else's page (MOL-53, А5).
- *
- * `SameSite=Lax` does not help here, and the difference is easy to miss: it governs whether a
- * cookie is **sent**, not whether one may be **set**. A cross-site `fetch(url, {method: 'POST',
- * mode: 'no-cors'})` needs no preflight when it carries no body — and this handle is documented
- * as carrying none — so any page could make a developer's browser log in as a brand-new owner,
- * writing over the session they were working with and leaving that account unreachable. It also
- * wrote a row into `actors` each time, which is the denominator of the 0.2 gate.
- *
- * `Sec-Fetch-Site` is set by the browser and cannot be written by the page that triggers the
- * request, so it is the right thing to read. `same-origin` is the PWA and its proxy; `none` is
- * the address bar; absent is `curl`, the tests, and browsers older than the header — refusing
- * those would break the very people this seam exists for.
- *
- * **404, not 403**, and through the registry like everything else: to a caller that has no
- * business here the address simply does not exist — the same answer production gives, where the
- * module is not in the bundle at all.
- */
-function refuseCrossSite(request: FastifyRequest): Promise<void> {
-  const site = request.headers['sec-fetch-site']
-  if (site === undefined || site === 'same-origin' || site === 'none') return Promise.resolve()
-
-  throw new DomainError(ERROR.NOT_FOUND)
-}
-
-/**
  * The Telegram account this browser was given before, or nothing.
  *
  * Exactly one cookie of that name, for the same reason the session insists on one (А2): two mean
@@ -105,7 +62,7 @@ export function devLoginRoute(
 ): void {
   app.post(
     '/dev/login',
-    { onRequest: [refuseCrossSite, refuseAnyBody] },
+    { onRequest: [refuseAnotherSite, refuseAnyBody] },
     async (request, reply) => {
       // The account this browser came back by, if it has one. A number it could not have been
       // given is treated as none at all: the cookie is ours to write, so a value outside the

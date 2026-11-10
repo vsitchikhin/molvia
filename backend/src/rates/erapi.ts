@@ -1,5 +1,5 @@
 import { PUBLISHED, RATE_SCALE, divideRounded, scaledFromDecimal, yerevanDate } from '@molvia/model'
-import { FeedError, published, request } from './feed'
+import { FeedError, published, request, textOf } from './feed'
 import type { Published, RateFeed } from './feed'
 
 export const ERAPI_URL = 'https://open.er-api.com/v6/latest/AMD'
@@ -58,7 +58,7 @@ export function erapiFeed(url = ERAPI_URL): RateFeed {
     provider: 'erapi',
     async fetchLatest() {
       const response = await request('erapi', url)
-      return parseErapi(await response.text())
+      return parseErapi(await textOf('erapi', response))
     },
   }
 }
