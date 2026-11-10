@@ -198,6 +198,46 @@ The shape worth knowing here:
   and the commit, `v0.1.5-81-g0f371828` (MOL-371): a release is a commit of master's first line, each a pull
   request merged, by a merge or a squash, and rolled out; `git describe --long` counted every commit of the
   branches merged too — 1282 for those 81. The form is `describe`'s, `-g<sha>` what the tag's job looks for.
+- **One release a day, through `release/<name>` (MOL-376, owner's decisions of 11.11.2026).** A merge into
+  master is still the rollout; what changed is what may merge there. **Why:** each rollout puts «Обновить»
+  in front of every installed app (MOL-132), and a day of agents closes up to ten tasks — ten updates a day
+  for a person at the shelf. The day's tasks now gather in one branch and reach people once.
+  - **Master takes `release/<name>` and `hotfix/<name>-<number>` only.** A task branches from the current
+    release branch and its pull request goes back into it; CI runs on it as on any pull request, and the
+    owner's word merges it, as before.
+  - **The release is the pull request `release/<name>` → master**, merged by a merge commit. The tag
+    `v0.2.<n>-<name>` goes on that commit once production's `/health` names it (the rule of `v0.1.N`,
+    owner's В-4: a tag is the build that runs). The `v` stays: every earlier tag has it, and
+    `describe --match 'v[0-9]*'` and the rollback find tags by it.
+  - **When:** on the owner's word «выпускай», or by itself at 03:00 Yerevan time when no release went out in
+    the 24 hours before and the branch holds a commit master does not (owner's В-10: the word and the
+    schedule together). A red CI on the release branch stops the night release and tells the owner.
+  - **Right after a release the next branch is cut from master.** Three `release/*` stay — the next, the
+    one just out and the one before it, so a rollback has its source; older ones are deleted.
+  - **A hotfix mends the release that is out**, never the next one: `hotfix/<that release's name>-<k>`, `k`
+    from 1, cut from master, merged into master, tagged `v0.2.<n>-<name>-<k>` with the release's own `n`;
+    then master is merged into the next release branch, so the fix does not vanish with the next release.
+    The next full release takes its own name and `n + 1`. A hotfix is not «the day's release» for the 03:00
+    rule: one fix would otherwise hold the day's features back a day.
+  - **Names rotate through three themes — a stone, a wind, a river — each in alphabetical order** (owner's В-9,
+    11.11.2026): `v0.2.1-agate`, `v0.2.2-alize`, `v0.2.3-amazon`, `v0.2.4-amethyst`… One word in Latin, lower
+    case, from the lists below; a list at its end starts over, and the number `n` keeps the tags apart. A
+    hotfix takes its release's name, never the next one.
+    - stones: agate, amethyst, azurite, beryl, calcite, cinnabar, citrine, diopside, dolomite, emerald,
+      epidote, feldspar, fluorite, galena, garnet, gypsum, hematite, howlite, iolite, jade, jasper, kunzite,
+      kyanite, labradorite, lazurite, magnetite, malachite, nephrite, obsidian, onyx, opal, peridot, pyrite,
+      quartz, rhodonite, ruby, sapphire, sodalite, spinel, topaz, tourmaline, turquoise, unakite, variscite,
+      wulfenite, xenotime, zircon, zoisite;
+    - winds: alize, berg, bora, brickfielder, buran, chergui, chinook, elephanta, etesian, foehn, gregale,
+      haboob, harmattan, karaburan, khamsin, kona, levante, leveche, libeccio, marin, meltemi, mistral, ostro,
+      pampero, papagayo, simoom, sirocco, solano, sukhovey, tramontane, vendaval, williwaw, zonda;
+    - rivers: amazon, amur, araks, brahmaputra, congo, danube, debed, dnieper, don, drina, ebro, elbe,
+      euphrates, fraser, ganges, hrazdan, hudson, indus, irtysh, jordan, kura, lena, loire, mekong,
+      mississippi, morava, niger, nile, ob, oder, orinoco, po, rhine, rhone, sava, seine, shannon, tagus,
+      thames, tigris, ural, vistula, volga, yangtze, yenisei, yukon, zambezi.
+  - **Until MOL-381 lands it is done by hand**: a session cuts the release on the owner's word. MOL-381
+    brings the ruleset that refuses any other branch into master, the 03:00 release, the cut of the next
+    branch, the deletion of old ones and the tag pattern of `release.yml` (it matches `vX.Y.Z` only).
 - **Production is watched from outside, never from the machine (MOL-142; MOL-149, В-4).** A watch on
   the same machine does not notice the machine is down. **The Worker `molvia-watch` on Cloudflare**
   (`deploy/watch`, MOL-221) asks every five minutes for `/api/health` and the page and pings the

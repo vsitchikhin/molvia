@@ -858,8 +858,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Migrations run when the API starts. A merged migration is never rewritten**; before the merge
   a task's migrations may be folded, and every database that ran the old file is brought into
   line by hand.
-- **A merge is a deploy** (MOL-90); a failed deploy puts the previous image back, not the schema,
-  **so a migration that drops or renames goes out in two merges**.
+- **A merge into master is a deploy** (MOL-90), and only a release or a hotfix merges there (MOL-376):
+  a failed deploy puts the previous image back, not the schema, **so a migration that drops or renames goes
+  out in two releases**.
 - **The Postgres image is an exact tag and part of the contract** (MOL-105): ICU, `vector` and
   glibc; a tag that moves glibc or ICU comes with a migration that rebuilds the text indexes, as
   `0038`. **A migration skipped by its stamp stops the boot** (`assertEveryMigrationApplied`).
@@ -1269,12 +1270,50 @@ in the rules «before 0.2 only the owner is on production» were paid then and s
 the catalogue`. The tracker is a separate system, and the key in the subject is the only
   thing linking a commit to the task it belongs to. After the subject, a blank line, then
   an optional bullet list of what was done — points, not prose.
-- **Branches:** `MOL-<n>-<short-description>`, e.g. `MOL-6-schema`.
+- **Branches:** `MOL-<n>-<short-description>`, e.g. `MOL-6-schema`, cut from the current
+  `release/<name>` and merged back into it — never into master (see «Releases» below).
 - **Never a force push — no exceptions, under no circumstances** (owner's absolute rule, MOL-220):
   no `--force`, no `--force-with-lease`, no `+refspec`, no amend or rebase of anything already
   pushed. A pushed commit is corrected by a new one, a branch is brought up to date by a merge, and
   the push is a plain `git push`. `.claude/hooks/no-force-push.py` refuses the command before it
   runs; it is never worked around. GitHub refuses it too (ruleset «no force push» on every branch).
+
+### Releases: one a day, through `release/<name>` (MOL-376)
+
+Owner's decisions of 11.11.2026, after `v0.2.0`. Every merge into master is a rollout, and every rollout is
+a «Обновить» on every installed phone (MOL-132): ten tasks a day were ten updates. Now a day's tasks reach
+people as one release. The mechanics and their reasons are in `.claude/rules/deploy.md`.
+
+- **Master takes only two kinds of branch: `release/<name>` and `hotfix/<name>-<number>`.** A task's branch
+  starts from the current `release/<name>` and its pull request goes there, merged on the owner's word as
+  before; CI runs on that pull request as on any other.
+- **A release is the pull request `release/<name>` → master**, and its merge is the rollout. Its tag is
+  `v0.2.<n>-<name>` on the merge commit, `n` one above the last release's.
+- **It goes out on the owner's word «выпускай», or by itself at 03:00 Yerevan time** if no release went out
+  in the 24 hours before and the branch holds something new. At most one release a day.
+- **Right after a release the next `release/<name>` is cut from master.** Three release branches live: the
+  next, the one just released and the one before it, to roll back to; older ones are deleted.
+- **A hotfix mends the release that is out:** `hotfix/<name of that release>-<number>`, numbered from 1,
+  cut from master, merged into master, tagged `v0.2.<n>-<name>-<number>` with the same `n`; master is then
+  merged into the next release branch so the fix is not lost. The next full release takes its own name and
+  `n + 1`, with no number. A hotfix does not count as the day's release for the 03:00 rule.
+- **Names rotate a stone, a wind, a river, each theme in alphabetical order** (`v0.2.1-agate`,
+  `v0.2.2-alize`, `v0.2.3-amazon`…), one word in Latin, from the lists in `.claude/rules/deploy.md`.
+- **Until MOL-381 lands, the release is cut by hand**: the ruleset that refuses other branches into master,
+  the 03:00 release, the cut of the next branch and the deletion of old ones are its automation.
+
+### Feature flags — «фф» (MOL-376)
+
+0.3 ships openly (owner's В-1 «в»): a finished feature reaches people with its release. **An фф closes only
+a thing people should not see yet** — a chain not whole (venues before «Что заказать»), a channel not live
+(payment before the bank) — and is taken off by a task once it is on. The mechanism is MOL-382.
+
+### Talking to the owner
+
+**Since `v0.2.0` all communication with the owner is in English** (owner, MOL-376, 11.11.2026, В-11): the
+chat, lavish artifacts, questions, reports and pull request descriptions. Jira, Confluence, `.scratch`,
+commit messages and `docs/` stay Russian, and so does the app's own text. Code, its comments and this file
+were English already.
 
 ### Estimating (story points)
 
