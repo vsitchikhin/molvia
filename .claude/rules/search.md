@@ -693,6 +693,23 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   «Milo» — and is proposed by hand, since «Предложить товар» compares names (review К, С-9). A line
   left out costs a proposal; a twin written would be there for good, since the seed only adds.
 
+- **«Предложить товар» puts at most sixty new items a day of the person's own into the catalogue**
+  (`ITEMS_PROPOSED_DAY_MAX`, MOL-362, owner's В-10 «а» of the audit MOL-287): with no bound one account wrote
+  some nine thousand an hour, and everybody's search ranks every candidate with no ceiling. **A count, never
+  the rows of `items`**: `actors.items_day` and `items_proposed`, the phone's day (`TODAY_HEADER`) that only
+  moves on, by the rules of the receipts' count (`receipts.md`, MOL-360) — an item «Записать» of a receipt
+  made is a row of `items` all the same, and only the proposals count. **The quota is the proposal's, passed
+  by it alone** (`createUnlessNamed(…, proposedOn)`): the person's row locked first, as the account comes
+  first everywhere, then the name's lock; a name already there — its trace's too — and a code another item
+  holds are answered whatever the count, and count nothing; the sixty-first new one is `429
+error.items_day_limited` with nothing written. The seed and a receipt's «Записать» pass none. **The sheet
+  says it in its own words**, a warning over the button (owner's В-2 «а»), never «Не получилось», which asks
+  to try again. **The prices, named:** a day header made up walks the days that are today somewhere, some
+  three — ~180 in place of 60 (MOL-360's А1); an item merged away by the night gives no place back; and
+  **«Записать» takes any name** — typed over every line read and up to `RECEIPT_ADDED_MAX` lines added — so
+  forty receipts a day carry some 4 000 new names, up to ~16 000 with receipts of 300 lines, past this quota
+  (owner's В-1 «а»: the receipts' quota holds them, a photo the reader took for each).
+
 - **«Предложить товар» says why it waits, on its one button** (MOL-213, Ф-6, frames 5a–5h): the kit's
   not now, in the focus order, named by the reason — «Предложить можно со связью», then «Напишите название»,
   then «Выберите единицу» (5f: an empty name and no unit ask for the name), else «Добавить в справочник»;
