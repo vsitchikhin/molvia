@@ -944,16 +944,24 @@ rules of the proposals' (`search.md`): the phone's day that only moves on, the p
 count and not the rows of `items`; the proposals' sixty and these never take from each other. **Every new item
 of the record counts** (В-4 «а»), named by the reading or typed — Tesseract reads a receipt printed for it as
 well as a real one; an item chosen, a name already there or its trace's, one name of two lines a second time
-and a record sent again count nothing. **One past the day refuses the record whole**: `429
-error.receipt_items_day_limited` at the first name past it, nothing written — no trip, no purchase, no item,
-no count — the receipt still `parsed`. **The phone's queue sets it aside as any refusal** (В-3 «а»): the
-review's draft stays, the review says why in words of its own (`receipt.review.refused_items_day`, В-2 «а»:
-how many a day, a found item for the new lines or tomorrow, the edits kept), and «Записать» again sends it
-anew. **The prices, named:** a day header made up walks two or three days (MOL-360's А1), up to 900 a day; a
-refused record still makes what was left of the day's names before it rolls back — up to some 3 s of 300
-names' locks — and may be sent again at will, one at a time a person (the owner's lock); the count is the
-account's, as the proposals' is (MOL-362, В-4 «а»); and a phone of a build before it shows the refusal by its
-code until it takes the new version.
+and a record sent again count nothing. **A record with more new names than the day has room for is refused
+whole, before the place, the trip and a name's lock** (`refuseBeyondDay`, adversarial А2): one read of which of
+its names the catalogue has, under the person's row — found only at its first new name, a refused record had
+locked every name before it, up to 599, some 3–6 s a refusal and again at will; now some 25 ms. That read takes no
+name's lock, so it is the bound and `createUnlessNamed` under the name's lock the truth. `429
+error.items_day_limited`, nothing written — no trip, no purchase, no item, no count — the receipt still `parsed`.
+**The proposals' code, never one of its own** (adversarial А1): a build reads only the codes of its own registry,
+and a code a build does not know is an answer off the contract its queue holds and sends again for good — the
+record at the queue's head, every receipt behind it waiting; `error.items_day_limited` every build since MOL-362
+knows. **The phone's queue sets it aside as any refusal** (В-3 «а»): the review's draft stays, the review says why
+in words of its own for that code on a record (`receipt.review.refused_items_day`, В-2 «а»: how many a day, a
+found item for the new lines or tomorrow, the edits kept), and «Записать» again sends it anew. **The prices,
+named:** a day header made up walks two or three days (MOL-360's А1), up to 900 a day; a name made by someone
+between the read and the record is counted new by the read, and the record refused so goes through when sent
+again; the count is the account's, as the proposals' is (MOL-362, В-4 «а»); a phone of a build between MOL-362
+and this one says the refusal in the proposals' words, «Сегодня добавлено уже много товаров. Новые — завтра»,
+until it takes the new version — and one of a build before MOL-362 (10.11.2026) holds the record at the head of
+its queue as above — the class of every code added after a build; before 0.2 only the owner is on production.
 
 **A receipt of food service is recorded as a shop's, with products, until 0.3** (MOL-226, owner's В-2 «а»
 after review 1): a venue and its dishes have no screen yet — «Оценки», the 19:00 reminder, «Что брать» and

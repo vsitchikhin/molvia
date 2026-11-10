@@ -698,12 +698,12 @@ finished_at)`, then the id) — for the trip going on the last finished one, for
   some nine thousand an hour, and everybody's search ranks every candidate with no ceiling. **A count, never
   the rows of `items`**: `actors.items_day` and `items_proposed`, the phone's day (`TODAY_HEADER`) that only
   moves on, by the rules of the receipts' count (`receipts.md`, MOL-360) — an item «Записать» of a receipt
-  made is a row of `items` all the same, and only the proposals count. **The quota is the proposal's, passed
-  by it alone** (`createUnlessNamed(…, quota)`, `of: 'proposed'`): the person's row locked first, as the account comes
-  first everywhere, then the name's lock; a name already there — its trace's too — and a code another item
+  made is a row of `items` all the same, and only the proposals count in it. **The quota is passed by the way
+  an item comes, each a count of its own** (`createUnlessNamed(…, quota)`, `of`): «Предложить товар» passes
+  `proposed`, a receipt's «Записать» `recorded` — three hundred a day (MOL-373, `receipts.md`), the seed none.
+  The person's row is locked first, as the account comes first everywhere, then the name's lock; a name already there — its trace's too — and a code another item
   holds are answered whatever the count, and count nothing; the sixty-first new one is `429
-error.items_day_limited` with nothing written. The seed passes none; a receipt's «Записать» passes a count of
-  its own, three hundred a day (MOL-373, `receipts.md`). **The sheet
+error.items_day_limited` with nothing written. **The sheet
   says it in its own words**, a warning over the button (owner's В-2 «а»), never «Не получилось», which asks
   to try again. **The prices, named:** a day header made up walks the days that are today somewhere, some
   three — ~180 in place of 60 (MOL-360's А1); an item merged away by the night gives no place back; **the
