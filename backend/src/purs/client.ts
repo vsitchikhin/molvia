@@ -114,10 +114,11 @@ export interface PursOptions {
   /** Why the service did not answer — never the link: it may carry the buyer's tax id. */
   readonly onFailure?: (reason: string) => void
   /**
-   * The answer no longer reads — not JSON, or JSON of another shape (review 4): the tax office changed
-   * it, and every Serbian receipt would wait its two days and fail as `missing` for a reason that is
-   * not the till's. The owner's to hear of, as a contract no longer read (`observability.md`); a 5xx or
-   * a timeout is the weather and the log's alone. The error says its kind only, never the answer.
+   * The answer no longer reads — not JSON, JSON of another shape (review 4), or one past
+   * `PURS_MAX_BYTES` (MOL-368): the tax office changed it, and every Serbian receipt would wait its two
+   * days and fail as `missing` for a reason that is not the till's. The owner's to hear of, as a
+   * contract no longer read (`observability.md`); a 5xx or a timeout is the weather and the log's alone.
+   * The error says its kind only, never the answer.
    */
   readonly onBroken?: (error: PursError) => void
   /**

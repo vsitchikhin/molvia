@@ -12,8 +12,7 @@ export async function boundedBody(
   maxBytes: number,
   tooLarge: () => Error,
 ): Promise<ArrayBuffer> {
-  const length = Number(response.headers.get('content-length'))
-  if (Number.isFinite(length) && length > maxBytes) {
+  if (lengthPast(response.headers, maxBytes)) {
     await response.body?.cancel()
     throw tooLarge()
   }
@@ -38,6 +37,12 @@ export async function boundedBody(
     at += chunk.byteLength
   }
   return bytes.buffer
+}
+
+/** A length the headers name past the ceiling — of an answer, or of a `HEAD` before one. */
+export function lengthPast(headers: Headers, maxBytes: number): boolean {
+  const length = Number(headers.get('content-length'))
+  return Number.isFinite(length) && length > maxBytes
 }
 
 /** `boundedBody` as text, decoded as `response.text()` decodes it: UTF-8, a byte order mark dropped. */

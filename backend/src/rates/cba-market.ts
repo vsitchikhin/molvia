@@ -1,6 +1,6 @@
 import { MARKET_CURRENCIES } from '@molvia/model'
 import type { MarketChannel, MarketCurrency, MarketRate, MarketSide } from '@molvia/model'
-import { boundedBody } from '@/bounded-body'
+import { boundedBody, lengthPast } from '@/bounded-body'
 import { FeedError, reach } from './feed'
 import { readSheet, scaledFromCell } from './xlsx'
 import type { Sheet } from './xlsx'
@@ -245,12 +245,6 @@ function versionOf(headers: Headers): string | null {
   return parts.some((part) => part !== null) ? parts.map((part) => part ?? '').join(' | ') : null
 }
 
-/** A length the bank says is past the ceiling, before a byte of it is taken. */
-function tooLong(headers: Headers): boolean {
-  const length = Number(headers.get('content-length'))
-  return Number.isFinite(length) && length > MAX_BYTES
-}
-
 /**
  * A file downloaded only if it changed since `version`. The bank's server ignores `If-None-Match`
  * and `If-Modified-Since` alike and answers 200 with the whole file (measured 30.09.2026, adversarial
@@ -266,7 +260,7 @@ function marketFile(file: keyof typeof MARKET_SHEETS, base = BASE): MarketFile {
       if (!head.ok) throw refuse(file, `HTTP ${String(head.status)}`)
       const version = versionOf(head.headers)
       if (version !== null && version === known) return 'unchanged'
-      if (tooLong(head.headers)) throw refuse(file, 'too large')
+      if (lengthPast(head.headers, MAX_BYTES)) throw refuse(file, 'too large')
       const response = await reach('cba', url)
       if (!response.ok) throw refuse(file, `HTTP ${String(response.status)}`)
       const bytes = await boundedBody(response, MAX_BYTES, () => refuse(file, 'too large'))
