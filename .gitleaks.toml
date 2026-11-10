@@ -16,13 +16,14 @@ regex = '''hc-ping\.com/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a
 keywords = ["hc-ping.com"]
 
 # A Telegram bot's token by its shape alone: the default rule wants `telegr…` in the name beside it, and a
-# token pasted as `const TOKEN = '…'` passed it. Its colon is out of the generic rule's reach too. Bounded by
-# what cannot stand beside it rather than `\b`: in Bot API's address it follows `…/bot`, and its last sign
-# may be `-` (adversarial А4, А5).
+# token pasted as `const TOKEN = '…'` passed it. Its colon is out of the generic rule's reach too. Bounded on
+# the left by what is no digit rather than `\b` — in Bot API's address it follows `…/bot` (adversarial А4) —
+# and not on the right: its last sign may be `-` (А5), and a bound there, with no lookahead in Go's regexp,
+# took the comma a second token stands after and left that one unfound and unredacted (В1).
 [[rules]]
 id = "telegram-bot-token-bare"
 description = "Telegram bot token, whatever it is called"
-regex = '''(?:^|[^0-9])(\d{8,10}:AA[0-9A-Za-z_-]{33})(?:[^0-9A-Za-z_-]|$)'''
+regex = '''(?:^|[^0-9])(\d{8,10}:AA[0-9A-Za-z_-]{33})'''
 secretGroup = 1
 keywords = [":aa"]
 
