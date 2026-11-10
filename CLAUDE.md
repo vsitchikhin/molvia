@@ -438,7 +438,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **«Выйти» erases this device's drawer after the server's `204`, never on the tap** (MOL-57); a
   lost `204` is settled by the server's next answer; offline there is no way out.
 
-### Security: quotas, outgoing requests, secrets, the edges, the headers — `.claude/rules/security.md`
+### Security: quotas, outgoing requests, secrets, the scanners, the edges, the headers — `.claude/rules/security.md`
 
 - **A write that grows what everybody shares, or what the server keeps on disk, has a quota per person**
   (MOL-287, В-3 «а»: one request without a session or one account in a minute bringing the service down is a
@@ -458,6 +458,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `USER` (`check-pins`); the volumes of a service moved off root are given by its own one-shot service
   (`frontend-volumes`, `victoria-volumes`) at every `up`, by numbers; `runtime` brings its distribution's packages
   up to date and the release builds it afresh (`no-cache-filters`).
+- **CI scans what pins cannot hold** (MOL-369): gitleaks over every commit of a pull request — a secret found is
+  rotated and its fingerprint goes to `.gitleaksignore`, a test's value to the allowlist by its value, never by its
+  path; `npm audit` of what ships, red for a high not accepted with a day in `bin/npm-audit-accepted.json`; trivy over
+  the images after a release and daily, red only for ours, never judging a rollout. The scanners are images by digest.
 - **`/internal/*` is closed twice** — Caddy's 404 and `BOT_API_SECRET` in constant time; a bot's route goes in
   that scope only. **A finding is a probe on a copy** (`.scratch/tasks/security/MOL-287/probes/`), never prod.
 - **The page's CSP is a meta the build puts first in `index.html`, never Caddy's header** (MOL-363): the worker
