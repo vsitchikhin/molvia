@@ -1490,6 +1490,7 @@
     "receipts_day_limited": "Many receipts already sent today. Send the receipt tomorrow",
     "receipts_unrecorded_limited": "Many receipts are waiting to be recorded. Record or delete them",
     "items_day_limited": "Many items added today already. New ones tomorrow",
+    "receipt_items_day_limited": "Many new items added from receipts today already. New ones tomorrow",
     "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow",
     "feedback_picture_invalid": "The picture would not do — choose another one",
     "feedback_picture_too_large": "The picture is too large — choose another one",
@@ -2408,6 +2409,7 @@
       "cancel_record_offline": "You can cancel once online: the record may already have reached the server",
       "cancel_record_failed": "The server did not answer — try cancelling again",
       "refused": "Not saved: {reason}. Fix it and save again",
+      "refused_items_day": "This receipt has more new items than the catalogue takes today: up to {max} a day from receipts. Pick similar items from the search for the new lines, or save the receipt tomorrow — your edits are kept",
       "offline": "Offline · receipt from this phone. Line edits are kept here",
       "unanswered": "The server did not answer · receipt from this phone. Line edits are kept here",
       "error": {

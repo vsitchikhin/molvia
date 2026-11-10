@@ -5,7 +5,13 @@ import { createPinia, setActivePinia } from 'pinia'
 import { defineComponent, h } from 'vue'
 import { RouterView, createRouter, createWebHistory } from 'vue-router'
 import { ApiError } from '@molvia/client'
-import { ERROR, RECEIPT_ADDED_MAX, parseMoney, parseQuantity } from '@molvia/model'
+import {
+  ERROR,
+  RECEIPT_ADDED_MAX,
+  RECEIPT_ITEMS_DAY_MAX,
+  parseMoney,
+  parseQuantity,
+} from '@molvia/model'
 import type {
   Currency,
   MoneyAccountView,
@@ -667,6 +673,23 @@ describe('ReceiptView (MOL-127)', () => {
     window.dispatchEvent(new Event('offline'))
     await flushPromises()
     expect(view.text()).not.toContain(ru.receipt.review.cancel_record_failed)
+  })
+
+  it('a record past the day’s new items says why and the way out, the draft kept (MOL-373, В-2 «а»)', async () => {
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.RECEIPT_ITEMS_DAY_LIMITED, 'x'))
+    const { view } = await render()
+    useReceiptDraftsStore().setTotal(ID, parseMoney('900', 'AMD'))
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+
+    const refused = view.get('.refused')
+    expect(refused.attributes('role')).toBe('alert')
+    expect(refused.text()).toBe(
+      ru.receipt.review.refused_items_day.replace('{max}', String(RECEIPT_ITEMS_DAY_MAX)),
+    )
+    expect(refused.text()).not.toContain('Поправьте и запишите ещё раз')
+    expect(useReceiptDraftsStore().draftOf(ID)?.total).toEqual(parseMoney('900', 'AMD'))
+    expect(button(view, 'Записать 2 покупки').exists()).toBe(true)
   })
 
   it('«Покупки» let go of a receipt the server says is recorded: its refusal, photos and draft (MOL-169, review 1, А2)', async () => {
