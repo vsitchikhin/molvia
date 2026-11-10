@@ -1,5 +1,6 @@
 import type { SpecificationItem } from '@molvia/model'
 import { z } from 'zod'
+import { boundedText } from '@/bounded-body'
 
 /**
  * The tax office's check of a Serbian receipt (MOL-232): the link of a receipt's QR code asked for
@@ -18,6 +19,12 @@ export const PURS_TIMEOUT_MS = 10_000
  * but the next one in the round waits for it, and the codes are a gift — a page answers in half a second.
  */
 export const PURS_SPECIFICATION_TIMEOUT_MS = 3_000
+
+/**
+ * Any one answer — the journal, the page, the specification — past this is no receipt (MOL-368): read
+ * whole, a gigabyte within the timeout was a gigabyte in the API's memory.
+ */
+export const PURS_MAX_BYTES = 1024 * 1024
 
 /**
  * Asked at most this often a minute, a third of it by one person (`pursShare`, MOL-232, Р-3): the
@@ -124,7 +131,7 @@ export interface PursOptions {
 
 /** A failure of the tax office's check, by its kind: `code` is the fingerprint's, the message the log's. */
 export class PursError extends Error {
-  readonly code: 'NOT_JSON' | 'UNKNOWN_ANSWER' | 'HTTP'
+  readonly code: 'NOT_JSON' | 'UNKNOWN_ANSWER' | 'HTTP' | 'TOO_LARGE'
 
   constructor(reason: string, code: PursError['code']) {
     super(`tax office: ${reason}`)
@@ -132,6 +139,9 @@ export class PursError extends Error {
     this.code = code
   }
 }
+
+/** An answer past `PURS_MAX_BYTES`, said by which of the three it was. */
+const tooLarge = (what: string) => () => new PursError(`${what} too large`, 'TOO_LARGE')
 
 /** The page's own script hands these to `/specifications` (MOL-223, `live-probe.sh`). */
 const PAGE_NUMBER = /viewModel\.InvoiceNumber\('([^']{1,100})'\)/u
@@ -200,9 +210,10 @@ export function purs(options: PursOptions): Purs {
       // a receipt it does not show yet: just printed — no failure of the service, no pause
       if (response.status === 404) return { kind: 'not_yet' }
       if (response.status !== 200) throw new PursError(`HTTP ${String(response.status)}`, 'HTTP')
+      const text = await boundedText(response, PURS_MAX_BYTES, tooLarge('answer'))
       let json: unknown
       try {
-        json = JSON.parse(await response.text())
+        json = JSON.parse(text)
       } catch {
         throw new PursError('not json', 'NOT_JSON')
       }
@@ -241,7 +252,7 @@ export function purs(options: PursOptions): Purs {
         signal,
       })
       if (page.status !== 200) throw new PursError(`page HTTP ${String(page.status)}`, 'HTTP')
-      const html = await page.text()
+      const html = await boundedText(page, PURS_MAX_BYTES, tooLarge('page'))
       const pageNumber = PAGE_NUMBER.exec(html)?.[1]
       const token = PAGE_TOKEN.exec(html)?.[1]
       if (pageNumber === undefined || token === undefined) {
@@ -263,9 +274,10 @@ export function purs(options: PursOptions): Purs {
       if (response.status !== 200) {
         throw new PursError(`specification HTTP ${String(response.status)}`, 'HTTP')
       }
+      const text = await boundedText(response, PURS_MAX_BYTES, tooLarge('specification'))
       let json: unknown
       try {
-        json = JSON.parse(await response.text())
+        json = JSON.parse(text)
       } catch {
         throw new PursError('specification not json', 'NOT_JSON')
       }

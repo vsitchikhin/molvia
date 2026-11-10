@@ -1,5 +1,5 @@
 import { PUBLISHED, RATE_DIGITS, divideRounded, scaledFromDecimal } from '@molvia/model'
-import { FeedError, published, request } from './feed'
+import { FeedError, published, request, textOf } from './feed'
 import type { Published, RateFeed } from './feed'
 
 export const CBA_URL = 'https://api.cba.am/exchangerates.asmx'
@@ -54,7 +54,7 @@ export function cbaFeed(url = CBA_URL): RateFeed {
         },
         body: ENVELOPE,
       })
-      return parseCba(await response.text())
+      return parseCba(await textOf('cba', response))
     },
   }
 }

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import {
+  PURS_MAX_BYTES,
   PURS_PAUSE_MS,
   PURS_PER_MINUTE,
   PURS_SPECIFICATION_TIMEOUT_MS,
@@ -150,6 +151,25 @@ describe('the client of the Serbian tax office’s check of a receipt', () => {
       { code: 'UNKNOWN_ANSWER', message: 'tax office: unknown answer' },
     ])
     expect(JSON.stringify(broken)).not.toContain('vl=')
+  })
+
+  it('an answer past PURS_MAX_BYTES is never held whole: «not yet», a pause, and the owner hears its kind (MOL-368)', async () => {
+    const broken: string[] = []
+    answering('x'.repeat(PURS_MAX_BYTES + 1))
+
+    const c = purs({
+      url: 'https://purs.test',
+      userAgent: 'Molvia/test (owner@example.com)',
+      onFailure: (reason) => failures.push(reason),
+      onBroken: (error) => broken.push(error.code),
+      now,
+    })
+
+    expect(await c.receipt(LINK, ANNA)).toEqual({ kind: 'not_yet' })
+    expect(broken).toEqual(['TOO_LARGE'])
+    expect(failures).toEqual(['tax office: answer too large'])
+    // the pause of any failure of the service: the next ask waits for it
+    expect(await c.receipt(LINK, BORIS)).toEqual({ kind: 'skipped' })
   })
 
   it('a timeout and a dropped connection log the error’s name, never its text with the link', async () => {
@@ -314,6 +334,18 @@ describe('the specification of a receipt — its lines’ codes (MOL-234, owner�
     expect(await client().specification(LINK, NUMBER, ANNA)).toEqual({ kind: 'failed' })
     expect(refused.join(' ')).not.toContain('vl=')
     expect(refused).toContain('TimeoutError')
+    expect(failures).toEqual([])
+    expect(broken).toBe(0)
+  })
+
+  it('a page or a specification past PURS_MAX_BYTES is no specification (MOL-368)', async () => {
+    const huge = 'x'.repeat(PURS_MAX_BYTES + 1)
+    answering([huge, 200])
+    expect(await client().specification(LINK, NUMBER, ANNA)).toEqual({ kind: 'failed' })
+    answering([PAGE, 200], [huge, 200])
+    expect(await client().specification(LINK, NUMBER, ANNA)).toEqual({ kind: 'failed' })
+
+    expect(refused).toEqual(['tax office: page too large', 'tax office: specification too large'])
     expect(failures).toEqual([])
     expect(broken).toBe(0)
   })

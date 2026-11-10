@@ -1,5 +1,6 @@
 import { MARKET_CURRENCIES } from '@molvia/model'
 import type { MarketChannel, MarketCurrency, MarketRate, MarketSide } from '@molvia/model'
+import { boundedBody } from '@/bounded-body'
 import { FeedError, reach } from './feed'
 import { readSheet, scaledFromCell } from './xlsx'
 import type { Sheet } from './xlsx'
@@ -251,35 +252,6 @@ function tooLong(headers: Headers): boolean {
 }
 
 /**
- * The body, cut off at the ceiling: the whole of it is never held when it runs past, whatever the
- * length the headers named (adversarial review В).
- */
-async function bodyOf(response: Response, file: string): Promise<ArrayBuffer> {
-  if (tooLong(response.headers)) throw refuse(file, 'too large')
-  const reader: ReadableStreamDefaultReader<Uint8Array> | undefined = response.body?.getReader()
-  if (!reader) return new ArrayBuffer(0)
-  const chunks: Uint8Array[] = []
-  let size = 0
-  for (;;) {
-    const { done, value } = await reader.read()
-    if (done) break
-    size += value.byteLength
-    if (size > MAX_BYTES) {
-      await reader.cancel()
-      throw refuse(file, 'too large')
-    }
-    chunks.push(value)
-  }
-  const bytes = new Uint8Array(size)
-  let at = 0
-  for (const chunk of chunks) {
-    bytes.set(chunk, at)
-    at += chunk.byteLength
-  }
-  return bytes.buffer
-}
-
-/**
  * A file downloaded only if it changed since `version`. The bank's server ignores `If-None-Match`
  * and `If-Modified-Since` alike and answers 200 with the whole file (measured 30.09.2026, adversarial
  * review Б), so its `HEAD` is asked first — the same tag and moment, no body — and the file only
@@ -297,7 +269,7 @@ function marketFile(file: keyof typeof MARKET_SHEETS, base = BASE): MarketFile {
       if (tooLong(head.headers)) throw refuse(file, 'too large')
       const response = await reach('cba', url)
       if (!response.ok) throw refuse(file, `HTTP ${String(response.status)}`)
-      const bytes = await bodyOf(response, file)
+      const bytes = await boundedBody(response, MAX_BYTES, () => refuse(file, 'too large'))
       return {
         version: versionOf(response.headers) ?? version,
         rates: await parseMarketFile(file, bytes),
