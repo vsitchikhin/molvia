@@ -759,6 +759,20 @@ describe('ReceiptView (MOL-127)', () => {
     expect(foot).toMatch(/≈ 202/)
   })
 
+  // MOL-310: a café's service is no dish — the lines make the total less it
+  it('sets the lines against the total less a café’s service, and says it at the foot', async () => {
+    const bill = detail()
+    receipt.mockResolvedValue({
+      ...bill,
+      receipt: { ...bill.receipt, total: amd('990') },
+      service: amd('90'),
+    })
+    const { view } = await render()
+    expect(view.find('.partly').exists()).toBe(false)
+    expect(view.find('.difference').exists()).toBe(false)
+    expect(view.get('.total').text()).toMatch(/Обслуживание\s*90\s֏/)
+  })
+
   // MOL-329, adversarial Ж1: the rate's day names its year when it is not the screen's — December seen in January.
   it('names the year of a rate of another year at the foot', async () => {
     const shown = detail()
@@ -937,6 +951,16 @@ describe('ReceiptView (MOL-127)', () => {
         lines: [],
       }
     }
+
+    it('says a terminal’s slip is one, its sum read in one place to check (MOL-310, В-3 «а»)', async () => {
+      receipt.mockResolvedValue({ ...noItems('11660'), slip: true })
+      const { view } = await render()
+      expect(view.get('.no-items').text()).toContain(ru.receipt.review.slip)
+      expect(view.get('.no-items').text()).not.toContain(ru.receipt.review.no_items)
+      expect(button(view, ru.receipt.review.record_sum).attributes('aria-disabled')).not.toBe(
+        'true',
+      )
+    })
 
     it('says there is no list of items, shows the total alone and records the sum', async () => {
       receipt.mockResolvedValue(noItems('1700'))

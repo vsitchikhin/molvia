@@ -11,6 +11,11 @@
         <span>{{ t('receipt.review.cashback') }}</span>
         <span class="figure">{{ cashbackText }}</span>
       </div>
+      <!-- A café's service (MOL-310): no dish, the lines make the total less it, as a cashback. -->
+      <div v-if="serviceText" class="line">
+        <span>{{ t('receipt.review.service') }}</span>
+        <span class="figure">{{ serviceText }}</span>
+      </div>
       <hr class="rule" />
     </template>
     <!-- The total is a button (Р-8): OCR misses it on half the receipts, and the trip's money is the
@@ -64,6 +69,8 @@ export default defineComponent({
     /** What a card sent to the card, and the bonus spent on the receipt (MOL-289). */
     cashback: { type: Object as PropType<Money | null>, default: null },
     redeemed: { type: Object as PropType<Money | null>, default: null },
+    /** A café's service (MOL-310). */
+    service: { type: Object as PropType<Money | null>, default: null },
     rate: { type: Object as PropType<ExchangeRate | null>, default: null },
     /** The day the rate is of: the receipt's. */
     day: { type: String, required: true },
@@ -112,6 +119,7 @@ export default defineComponent({
       linesText: computed(() => money(props.balance.lines)),
       totalText: computed(() => money(props.total)),
       cashbackText: computed(() => (props.noItems ? null : money(props.cashback))),
+      serviceText: computed(() => (props.noItems ? null : money(props.service))),
       redeemedText: computed(() => money(props.redeemed)),
       approx,
       difference,

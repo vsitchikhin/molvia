@@ -680,6 +680,57 @@ describe('what the model read', () => {
     expect(reports.find((r) => r.kind === 'read')).toMatchObject({ partly: false })
   }, 30_000)
 
+  it('keeps a café’s service, the bill whole by its lines and it (MOL-310)', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    // the lines make 1 027,10, the service 102,90: «ՎՃԱՐՄԱՆ» 1 130,00, in capitals as a café prints it
+    const totals = [
+      { label: 'Հավելավճար 10%', amount: '102.90' },
+      { label: 'ՎՃԱՐՄԱՆ', amount: '1130.00' },
+    ]
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({
+          kind: 'read',
+          answer: { ...ANSWER, totals },
+          costMicroUsd: 1_000,
+          tokens: TOKENS,
+        }),
+      ),
+    )
+    expect(await receiptOf(id)).toMatchObject({
+      status: 'parsed',
+      totalMinor: 113_000n,
+      serviceMinor: 10_290n,
+      balanced: true,
+      readPartly: false,
+    })
+  }, 30_000)
+
+  it('reads a terminal’s slip with no bill as its sum, never «переснимите» (MOL-310, В-3 «а»)', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const slip = {
+      ...ANSWER,
+      id_rows: ['TID: 10000001', 'MID: 20000002', 'Անդորրագիր 12345'],
+      lines: [],
+      totals: [{ label: 'Գումար', amount: '11660.00' }],
+    }
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({ kind: 'read', answer: slip, costMicroUsd: 1_000, tokens: TOKENS }),
+      ),
+    )
+    expect(await receiptOf(id)).toMatchObject({
+      status: 'parsed',
+      layout: 'slip',
+      totalMinor: 1_166_000n,
+      balanced: false,
+    })
+  }, 30_000)
+
   it('keeps a line the font’s swaps put right, the receipt whole by it, never as read (MOL-290)', async () => {
     const me = await person(LATER)
     const id = await queued(me)

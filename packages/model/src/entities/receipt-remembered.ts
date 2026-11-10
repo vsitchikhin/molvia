@@ -1,4 +1,5 @@
 import type { PhotoReading } from '#model/entities/receipt-card'
+import { linesTotalHundredths } from '#model/entities/receipt-text'
 import type { LineFigures, ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
 
 /**
@@ -341,7 +342,7 @@ export function rememberedReading(
 ): ReceiptText {
   if (prices.size === 0 || text.lines.length === 0) return text
   const less = (total: number | null): number | null =>
-    total === null ? null : total - (text.cashbackHundredths ?? 0)
+    total === null ? null : linesTotalHundredths(text, total)
   const owed = less(text.totalHundredths)
   const asRead = text.lines.every((line) => line.asPrinted && line.sumHundredths !== null)
   const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)

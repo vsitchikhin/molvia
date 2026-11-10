@@ -100,8 +100,12 @@ function amountsOf(detail: ReceiptDetail, draft: ReceiptDraft | null) {
     total,
     ...detail.lines.flatMap((line) => [line.price, line.sum, line.discount]),
   ])
-  // the lines make the total less what a card sent to the card (MOL-289)
-  return recordedSums(figures, linesTotalOf(total, detail.cashback ?? null), digits)
+  // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
+  return recordedSums(
+    figures,
+    linesTotalOf(total, detail.cashback ?? null, detail.service ?? null),
+    digits,
+  )
 }
 
 /** The quantity the review shows a line at before any edit: the purchase its package makes (MOL-264). */
@@ -233,7 +237,11 @@ export function reviewBalance(
 ): ReceiptBalance {
   return receiptBalance(
     lines.map((one) => ({ printed: one.line.sum, amount: one.amount, skip: one.skip })),
-    linesTotalOf(draft?.total ?? detail.receipt.total, detail.cashback ?? null),
+    linesTotalOf(
+      draft?.total ?? detail.receipt.total,
+      detail.cashback ?? null,
+      detail.service ?? null,
+    ),
     receiptCard(detail.receipt.country).currency,
   )
 }

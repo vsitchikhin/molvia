@@ -169,6 +169,7 @@ export const en: Dictionary = {
   'owner.receipt.line.bent': 'held only by swaps',
   'owner.receipt.line.zero_not_gift': '0, no gift',
   'owner.receipt.line.one_alike_unproven': '«1 × price» on a receipt not whole',
+  'owner.receipt.line.no_price_unproven': 'a sum with no price on a receipt not whole',
   'owner.receipt.line.price_dropped': 'price taken off',
   'feedback.frame': 'A reply to your message of {date}:',
   'feedback.howToAnswer': 'To answer, reply to this message.',

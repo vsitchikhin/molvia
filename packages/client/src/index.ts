@@ -5,6 +5,7 @@ import {
   EXPORT_FORMAT,
   LOGIN_HEADER,
   RECEIPT_CASHBACK_HEADER,
+  RECEIPT_BILL_HEADER,
   RECEIPT_CODES_HEADER,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
@@ -479,7 +480,8 @@ export interface MolviaClient {
    * (`RECEIPT_CASHBACK_HEADER`, MOL-289), and which lines the font's swaps put right
    * (`RECEIPT_REPAIRED_HEADER`, MOL-290), and which new names spell a word in letters
    * (`RECEIPT_SPELLED_HEADER`, MOL-293), and what one piece of a line holds (`RECEIPT_PACK_HEADER`, MOL-264),
-   * and how it was paid (`RECEIPT_PAID_BY_HEADER`, MOL-312).
+   * and how it was paid (`RECEIPT_PAID_BY_HEADER`, MOL-312), and a café's service and a terminal's slip
+   * (`RECEIPT_BILL_HEADER`, MOL-310).
    */
   receipt(id: string, options?: { readonly shown?: boolean }): Promise<ReceiptDetail>
   /** `retake` — «Переснять» replaced it (`RECEIPT_RETAKE_HEADER`, MOL-309): its review stays. */
@@ -1038,6 +1040,7 @@ export function createClient(options: ClientOptions): MolviaClient {
           [RECEIPT_SPELLED_HEADER]: '1',
           [RECEIPT_PACK_HEADER]: '1',
           [RECEIPT_PAID_BY_HEADER]: '1',
+          [RECEIPT_BILL_HEADER]: '1',
         }),
       }),
     receiptSettled: (id) => request(`/receipts/${segment(id)}/settled`, receiptSettledCodec),

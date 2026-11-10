@@ -132,6 +132,8 @@ export interface ReceiptHead {
    */
   readonly cashbackMinor?: bigint | null
   readonly redeemedMinor?: bigint | null
+  /** A café's service (MOL-310): only a model's reading names it. */
+  readonly serviceMinor?: bigint | null
   /** How it was paid, as its words of payment say (MOL-312); a receipt by its link has none. */
   readonly paidBy?: ReceiptPaidBy | null
   readonly balanced: boolean
@@ -255,12 +257,16 @@ export interface StoredReceipt {
   readonly cashback: Money | null
   /** The bonus the receipt is partly paid with: the trip's money is the total less it (MOL-289). */
   readonly redeemed: Money | null
+  /** A café's service: the lines make the total less it (MOL-310). */
+  readonly service: Money | null
   /** Read in part, of the lines as read before the check (MOL-255, А6 «а»); `null` — read before it. */
   readonly readPartly: boolean | null
   /** How it was paid, as its words say (MOL-312); `null` — it does not say, or read before it. */
   readonly paidBy: ReceiptPaidBy | null
   /** The model read it (MOL-272), by its `reader_version` as the measure of 0.2 counts it; Tesseract, a link, none. */
   readonly byModel: boolean
+  /** A bank terminal's slip with no bill, its total read in one place (MOL-310, В-3 «а»). */
+  readonly slip: boolean
 }
 
 /**
@@ -313,6 +319,8 @@ export interface ReceiptToRecord {
   /** What a card sent to the card, and the bonus the receipt is partly paid with (MOL-289). */
   readonly cashback: Money | null
   readonly redeemed: Money | null
+  /** A café's service (MOL-310). */
+  readonly service: Money | null
   readonly city: ReceiptCity | null
   /** The trip it was recorded as; `null` — not recorded: a trip removed for good takes it (MOL-240). */
   readonly tripId: string | null
@@ -774,9 +782,11 @@ function toStored(found: SummaryRow): StoredReceipt {
     readTotal: cashOf(found.row.readTotalMinor, found.row.currency),
     cashback: cashOf(found.row.cashbackMinor, found.row.currency),
     redeemed: cashOf(found.row.redeemedMinor, found.row.currency),
+    service: cashOf(found.row.serviceMinor, found.row.currency),
     readPartly: found.row.readPartly,
     paidBy: found.row.paidBy,
     byModel: byModel(found.row.readerVersion),
+    slip: found.row.layout === 'slip',
   }
 }
 
@@ -1156,6 +1166,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         total: row.totalMinor === null ? null : { minor: row.totalMinor, currency: row.currency },
         cashback: cashOf(row.cashbackMinor, row.currency),
         redeemed: cashOf(row.redeemedMinor, row.currency),
+        service: cashOf(row.serviceMinor, row.currency),
         city: row.city,
         tripId: row.tripId,
         tripAlive,
@@ -1577,6 +1588,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                   readTotalMinor: head.readTotalMinor,
                   cashbackMinor: head.cashbackMinor ?? null,
                   redeemedMinor: head.redeemedMinor ?? null,
+                  serviceMinor: head.serviceMinor ?? null,
                   paidBy: head.paidBy ?? null,
                   balanced: head.balanced,
                   city: head.city,

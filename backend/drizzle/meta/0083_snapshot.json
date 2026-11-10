@@ -1,5 +1,5 @@
 {
-  "id": "f7f9a753-bda7-44c6-ba07-ece931dcba2d",
+  "id": "6c1fbf5d-d213-4811-8b4e-97f2bda2d868",
   "prevId": "02a1b8bc-a4b5-4fa9-a8d6-6b40c16dcdf6",
   "version": "7",
   "dialect": "postgresql",
@@ -350,19 +350,6 @@
           "notNull": true,
           "default": 0
         },
-        "receipt_items_day": {
-          "name": "receipt_items_day",
-          "type": "date",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "receipt_items_new": {
-          "name": "receipt_items_new",
-          "type": "smallint",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "model_month": {
           "name": "model_month",
           "type": "date",
@@ -545,10 +532,6 @@
         "actors_items_proposed_not_negative": {
           "name": "actors_items_proposed_not_negative",
           "value": "\"actors\".\"items_proposed\" >= 0"
-        },
-        "actors_receipt_items_new_not_negative": {
-          "name": "actors_receipt_items_new_not_negative",
-          "value": "\"actors\".\"receipt_items_new\" >= 0"
         },
         "actors_model_spent_not_negative": {
           "name": "actors_model_spent_not_negative",
@@ -5774,6 +5757,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "service_minor": {
+          "name": "service_minor",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
         "read_partly": {
           "name": "read_partly",
           "type": "boolean",
@@ -6019,7 +6008,7 @@
         },
         "receipts_layout_known": {
           "name": "receipts_layout_known",
-          "value": "\"receipts\".\"layout\" is null or \"receipts\".\"layout\" in ('card', 'table', 'class', 'department')"
+          "value": "\"receipts\".\"layout\" is null or \"receipts\".\"layout\" in ('card', 'table', 'class', 'department', 'slip')"
         },
         "receipts_heard_known": {
           "name": "receipts_heard_known",
@@ -6040,6 +6029,10 @@
         "receipts_cashback_positive": {
           "name": "receipts_cashback_positive",
           "value": "\"receipts\".\"cashback_minor\" is null or \"receipts\".\"cashback_minor\" > 0"
+        },
+        "receipts_service_positive": {
+          "name": "receipts_service_positive",
+          "value": "\"receipts\".\"service_minor\" is null or \"receipts\".\"service_minor\" > 0"
         },
         "receipts_redeemed_positive": {
           "name": "receipts_redeemed_positive",
