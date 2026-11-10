@@ -50,6 +50,7 @@ updates:
       - /deploy/victoria
       # The scanners of CI (MOL-369): images of their own authors, moved here with the rest.
       - /.github/scanners/gitleaks
+      - /.github/scanners/trivy
     schedule:
       interval: weekly
       day: monday

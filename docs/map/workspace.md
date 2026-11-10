@@ -60,6 +60,7 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `.githooks/pre-commit` — Git hook: refuses a commit whose files are not formatted by Prettier; every other check is CI's.
 - `.github/dependabot.yml` — Dependabot: weekly grouped npm updates and base images, monthly GitHub Actions updates.
 - `.github/scanners/gitleaks/Dockerfile` — gitleaks of CI (MOL-369): its official image by tag and digest as `runtime`, `USER 1001` the runner's uid, nothing of ours built — here so that Dependabot's `images` moves it and `bin/check-pins.mjs` holds it; `ci.yml` builds and runs it.
+- `.github/scanners/trivy/Dockerfile` — trivy of the release and the daily scan (MOL-369): its official image by tag and digest as `runtime`, `USER 1001`, nothing of ours built — moved by Dependabot's `images`, held by `bin/check-pins.mjs`; `bin/scan-images.mjs` builds and runs it.
 - `.github/workflows/ci.yml` — CI on push and pull request: format check, lint, types and tests against Postgres, the receipt reader's image and its live test, and end-to-end in a phone browser, in the image of Playwright of the lockfile's version (MOL-295) — the only place any check runs unasked; both jobs gate a merge.
 - `.gitignore` — Ignored files: env files, the `.scratch` and `.lavish` links, dependencies, builds, certificates, Playwright output.
 - `.gitleaks.toml` — gitleaks' rules (MOL-369): its defaults, a ping URL of healthchecks.io, and the tests' values let go for the generic rule alone, by value — ids, builds, the session token of the tests, a draft's key, the model's sha256 in `model.json` only.
@@ -85,6 +86,9 @@ under `packages/model/tests/`, is covered by the source's entry.
 - `bin/npm-audit-accepted.json` — The advisories `npm-audit.mjs` lets pass: a GHSA, the reason and the day to look again.
 - `bin/npm-audit.d.mts` — Types of the audit's verdict for its test: the script is plain JS.
 - `bin/npm-audit.test.ts` — Test: high and critical taken once and moderate left, no report is red, a high not accepted is red, an accepted one passes up to its day and is red after it, a line no longer needed is said, a line without its GHSA, reason or day is refused.
+- `bin/scan-images.mjs` — trivy over the six images of a tag (MOL-369, В-2 «а»): HIGH and CRITICAL with a fix, from ghcr with no pull; the distribution's packages and `node_modules` are ours and red, a module inside a Go binary of another's release is said beside; an image not scanned is red; the table goes to the run's summary; run by `scan.yml`.
+- `bin/scan-images.d.mts` — Types of the scan's classification for its test: the script is plain JS.
+- `bin/scan-images.test.ts` — Test: the distribution and `node_modules` are ours and a Go binary another's, an image with nothing found is empty, the summary counts both, names an image not scanned and lists ours first.
 - `bin/design-md.mjs` — The token block of `frontend/DESIGN.md` from `_tokens.scss`, through Prettier: `--write` in `npm run format`, `--check` in `npm run lint`.
 - `bin/init-env.sh` — Generates this copy's `.env` from its index: ports — the receipt reader's too — databases, compose project; keeps bot settings across `--force`; the databases' host and port from `MOLVIA_PG_HOST`/`MOLVIA_PG_PORT` where given (CI's container, MOL-295).
 - `bin/fetch-model.mjs` — Fetches the pinned embedding model (MOL-105) into `.models/` or a given directory, file by file against its sha256, with the notice of its terms; `make model`, CI and the API's image.

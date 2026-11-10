@@ -1,0 +1,59 @@
+name: Scan
+
+# trivy over the six images (MOL-369): after every release, by `release.yml`, and daily over what production
+# runs (owner's В-3 «а») — a fix of Alpine or Debian, or an advisory against a package we ship, comes without
+# a commit of ours. Red only for what is ours to bring up to date; a module inside a Go binary of another's
+# release is said in the summary and waits for that release (owner's В-2 «а», `bin/scan-images.mjs`). Never
+# a judge of a rollout: the release runs this beside its rollout, not before it. «Run workflow» scans a tag
+# by hand.
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_call:
+    inputs:
+      tag:
+        description: 'Image tag to scan: sha-<7 hex> or v<N>.<N>.<N>'
+        type: string
+        required: true
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag to scan; empty is what production runs'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    name: HIGH and CRITICAL with a fix
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The images production runs are the commit `/api/health` names, tagged `sha-<7 hex>` by the release —
+      # a rollback by hand to an older one included. Not reached is red: the scan would be of nothing.
+      - name: the tag
+        id: tag
+        env:
+          GIVEN: ${{ inputs.tag }}
+        run: |
+          tag="$GIVEN"
+          if [[ -z "$tag" ]]; then
+            version="$(curl -fsS -m 10 https://molvia.net/api/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')" || version=""
+            sha="$(sed -n 's/.*-g\([0-9a-f]\{7\}\)[0-9a-f]*$/\1/p' <<<"$version")"
+            if [[ -z "$sha" ]]; then
+              echo "::error::production names no commit (${version:-no answer}) — nothing to scan"
+              exit 1
+            fi
+            tag="sha-$sha"
+          fi
+          echo "tag=$tag" >>"$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      - run: node bin/scan-images.mjs "$TAG"
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
