@@ -34,6 +34,18 @@ same machine and the same network; only Caddy is reachable from outside.
    `pg_hba.conf`, «Metrics», «Where it is set» (MOL-366, owner's В-5 «б»). The file lives in the database's
    volume: a new machine, or a volume lost, has none of them.
 
+7. **No X11 over ssh** (MOL-368, audit MOL-287 Ф-15): Ubuntu's `sshd_config` says
+   `X11Forwarding yes`, and nothing here draws a window. A file of its own in `sshd_config.d`, which
+   the main file includes at its top — the first value is the one `sshd` takes:
+
+   ```bash
+   printf 'X11Forwarding no\n' | sudo tee /etc/ssh/sshd_config.d/10-molvia.conf
+   sudo sshd -t && sudo systemctl reload ssh
+   sudo sshd -T | grep -i x11forwarding   # x11forwarding no
+   ```
+
+   The session it is typed in stays open until a new one is seen to come in.
+
 ## Deploys (MOL-90)
 
 A merge into master is a deploy. When CI passes on master, `release.yml` builds the three images

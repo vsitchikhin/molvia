@@ -151,6 +151,17 @@ is in `bot.md`.
   `DELETE /actors/me`, ending one's own session — used to send the fresh term and the clearing line
   after it. Fastify appends, so `clearSessionCookie` takes back the session's line set earlier in
   the same answer and keeps any other cookie's.
+- **A request with a session from another site's page is a 404, before the session is looked up**
+  (audit MOL-287 Ф-13, MOL-368, owner's В-1 «а»; `routes/fetch-site.ts`). `Lax` sends the cookie on
+  a top-level `GET` from any site, so a link on a foreign page was the person's request, and a `GET`
+  that writes wrote: the visit of gate 0.3, a read receipt «heard» so the bot kept «Чек разобран»
+  back, a removal made final before its «Вернуть» ran out. The guarded scope refuses by
+  `Sec-Fetch-Site` as the login's routes and `dev-login` do — `same-site` and `cross-site` refused,
+  `same-origin`, `none` and no header let through — so a `GET` that writes one day is closed already.
+  **404, never the 401 of no session**: ours puts the cookie out, and a foreign link would sign the
+  person out. Before the lookup, so neither the term nor `last_seen_at` moves. **The price, named:**
+  a browser extension that rewrites the header gets a 404 on its own request; a browser that sends
+  none passes as `curl` does — below the floor of the build, where the app does not start.
 - **What a secret may look like is one rule, in `backend/src/secret.ts`** — RFC 6265's
   `cookie-octet`, because the only thing a session token or a login request's secret ever travels
   in is a cookie. It was two rules once, and they drifted by four characters: a token holding
