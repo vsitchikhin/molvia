@@ -12,7 +12,7 @@ Rules: `.claude/rules/privacy.md`. A test beside its source, or mirroring it und
 ## backend · usecases
 
 - `backend/src/usecases/export-mine.ts` — Use case of «Скачать мои данные» (MOL-93): the owner's own snapshot, dated with the file's format and version; an owner erased meanwhile is «no owner».
-- `backend/src/usecases/erase-me.ts` — Use case of erasing oneself, behind the bot's `/delete` and «Удалить мои данные» (MOL-94): erase the owner behind a Telegram id; nobody to erase is not an error. Tests: `backend/tests/erase-route.integration.test.ts`.
+- `backend/src/usecases/erase-me.ts` — Use case of erasing oneself, behind the bot's `/delete` and «Удалить мои данные» (MOL-94): erase the owner behind a Telegram id; nobody to erase is not an error; then sweeps the items this erasure released (MOL-374). Tests: `backend/src/usecases/erase-me.test.ts`, `backend/tests/erase-route.integration.test.ts`.
 - `backend/src/usecases/consent.ts` — Use cases of the consent (MOL-95): the edition the owner accepted, and accepting the one the screen showed — never lowering the one on the row.
 
 ## backend · routes

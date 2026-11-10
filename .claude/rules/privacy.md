@@ -41,8 +41,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   everybody's search for good) — **erasure only marks them, a sweep deletes them** (owner's В-7 «а», after
   two rounds of review in which every lock erasure took on an item met another path's in a deadlock):
   `items.released_at` is set as the author goes, and `sweepReleasedItems` deletes a marked item nothing
-  stands on any more — right after each door's erasure and every minute on the cleanups' timer, a batch a
-  transaction, `for update skip locked`, asked again as it deletes. So erasure locks no item anybody
+  stands on any more (`ErasureRepository.sweepReleased`) — right after each door's erasure and every minute
+  on the cleanups' timer, a batch a transaction, `for update skip locked`, asked again as it deletes. So erasure locks no item anybody
   else writes to — the person's own, marked right after the owner and in the order of their ids with a
   lock a key share passes, the traces last with the cascade that updates them anyway (Р2-А9) — and an
   item somebody is writing a purchase of is left to a later minute, which decides by what that write
@@ -50,16 +50,26 @@ The detail behind the privacy lines of `CLAUDE.md`.
   too), a pick, a line of a receipt not recorded (В-2 «а»: its «Записать» sends the item's id), a code
   or a word of the shops' memory on it — an erased person's code or word has no author left and holds
   nothing (Р2-А7), nor do the person's own, which go with the item (В-1 «а»: a receipt's «Записать» makes
-  both the item and the word) — and while a merge either way, the owner's «apart» or the seed's Armenian
-  names or headings hold it; `nobodyStandsOn` is the one test, `ITEM_REFERENCES` holds every foreign key
-  on `items`, and the test of the holders takes a case for each key (review 1, №2). **An item the
+  both the item and the word) — and while the owner's «apart» or the seed's Armenian names or headings
+  hold it. **A merged group goes whole or not at all** (owner's В-8 «а», adversarial Р3-А12: twins the
+  night merged by itself kept each other for good): the survivor and its traces, every one of them
+  released and standing on nothing, their journal inside the group and never undone — then the sweep
+  deletes the group with its `catalogue_merges` and their moves; an item merged into the seed's or a
+  living person's stays its second name (А4). `standsAlone` and `groupGoes` are the one test,
+  `ITEM_REFERENCES` holds every foreign key on `items`, and the test of the holders takes a case for each
+  key (review 1, №2). **An item the
   author's erasure left because someone stood on it goes when the last of them does** (adversarial А1):
   it is marked, and the sweep asks again. The seed and the items left without an author before MOL-374
   carry no mark and are never swept (В-6 «а», Р2-А8, Р2-А11). Two writers by an item's id with no person
   to answer — the queue of receipts writing a reading (А6) and the writer of vectors (А5) — take a key
   share of the items first, so an item swept meanwhile makes its line a new one and leaves its vector
   out, never refusing the whole; anybody else's write to an item gone is the foreign key's 404, as an
-  item never there. The copy and `erasures` are as they were (В-3 «а»): the report and `make forget`
+  item never there. **The price, named** (owner's В-9 «а», adversarial Р3-А13): an item can go long after
+  its author did — the last living person standing on it deletes their purchase, as correcting an item
+  does — and that person's phone still offers it in «Часто берёте»; written again from there it is that
+  404, and the queue keeps the purchase with its reason in «Покупки» to be put right. **A door sweeps only
+  what its erasure released** (review 3, №11): `eraseMe` erases, then `sweepReleased(leavingItems)`, a
+  failure of it the caller's to report; the minute timer sweeps everyone's. The copy and `erasures` are as they were (В-3 «а»): the report and `make forget`
   name the items the sweep will take and those that stay. The items someone stands on
   stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
   nulled (MOL-100), the words they gave the shops' memory stay with `actor_id` nulled and still count

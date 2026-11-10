@@ -717,7 +717,7 @@ error.items_day_limited` with nothing written. The seed and a receipt's «Зап
   owner accepted for the login — and until MOL-374 it outlived the attack (adversarial round 3, owner's
   В-5 «б»). **Erasure now marks the person's items and a sweep deletes those no living person stands on**
   (MOL-374, `privacy.md`), so the loop leaves nothing behind it once its accounts are gone, in whichever
-  order they go (adversarial А1, Р2-А7 of MOL-374). What is left of the price: an item somebody still
+  order they go and whether the night merged their twins (adversarial А1, Р2-А7, Р3-А12 of MOL-374). What is left of the price: an item somebody still
   alive bought, rated, picked or coded stays, as it should.
   Remembering anything of the erased would undo the erasure; and **«Записать» takes any name** — typed over every line
   read, up to 500, and up to `RECEIPT_ADDED_MAX` lines added — so one receipt carries up to 600 new names:
