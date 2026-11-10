@@ -40,9 +40,9 @@ file holds what belongs to no single area, and what the audit found missing.
   is a person's** (Ф-2, MOL-360): forty a day of their own and twenty not recorded at once — one account had
   filled some 12 GB an hour against 51 GB free — `receipts.md`. **«Предложить товар»'s is a person's**
   (Ф-4, MOL-362): sixty new items a day of their own, a name already there free — one account wrote some nine
-  thousand names an hour into everybody's search — `search.md`; the names a receipt's «Записать» makes are
-  held by the receipts' quota alone, up to 600 a receipt and some 24 000 a day an account (MOL-373), and the
-  count goes with an erased account — prices named there. **What the model costs is a person's share of the month**
+  thousand names an hour into everybody's search — `search.md`; **«Записать»'s new items are a person's**
+  (MOL-373): three hundred a day of their own, a count of its own, the record refused whole past it —
+  `receipts.md`; both counts go with an erased account — prices named there. **What the model costs is a person's share of the month**
   (Ф-10, MOL-367): $2 of the $200 cap, so one person granted the model never takes it from the others —
   `receipts.md`. **A new write path names its
   quota in its task**, or says why it needs none. **A person's own rows of money have none either, and

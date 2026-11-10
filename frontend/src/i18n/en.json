@@ -1737,7 +1737,7 @@
       },
       "items": {
         "term": "Items in the catalogue",
-        "text": "Items you added with «Suggest an item», and the new items of a receipt you recorded — named as the reading proposed or as you typed it yourself — are in the shared catalogue: everyone searches by them, but whose they are is shown to nobody. So put nothing personal in an item's name. We also keep how many items you added with «Suggest an item» on your own day: at most 60 — so the catalogue is not flooded. If you delete your data, an item goes with it when nobody else uses it (see «Delete everything»)."
+        "text": "Items you added with «Suggest an item», and the new items of a receipt you recorded — named as the reading proposed or as you typed it yourself — are in the shared catalogue: everyone searches by them, but whose they are is shown to nobody. So put nothing personal in an item's name. We also keep how many new items you added on your own day — with «Suggest an item» (at most 60) and from receipts you recorded (at most 300) — so the catalogue is not flooded. If you delete your data, an item goes with it when nobody else uses it (see «Delete everything»)."
       },
       "places": {
         "term": "Shops",
@@ -2410,6 +2410,7 @@
       "cancel_record_offline": "You can cancel once online: the record may already have reached the server",
       "cancel_record_failed": "The server did not answer — try cancelling again",
       "refused": "Not saved: {reason}. Fix it and save again",
+      "refused_items_day": "This receipt has more new items than the catalogue takes today: up to {max} a day from receipts. Pick similar items from the search for the new lines, or save the receipt tomorrow — your edits are kept",
       "offline": "Offline · receipt from this phone. Line edits are kept here",
       "unanswered": "The server did not answer · receipt from this phone. Line edits are kept here",
       "error": {

@@ -1,5 +1,5 @@
 {
-  "id": "a0797064-5736-4667-bd12-a5cc0e495213",
+  "id": "43fcc52c-ea06-4ab6-8526-7f1a185e0e0d",
   "prevId": "6c1fbf5d-d213-4811-8b4e-97f2bda2d868",
   "version": "7",
   "dialect": "postgresql",
@@ -350,6 +350,19 @@
           "notNull": true,
           "default": 0
         },
+        "receipt_items_day": {
+          "name": "receipt_items_day",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "receipt_items_new": {
+          "name": "receipt_items_new",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
         "model_month": {
           "name": "model_month",
           "type": "date",
@@ -532,6 +545,10 @@
         "actors_items_proposed_not_negative": {
           "name": "actors_items_proposed_not_negative",
           "value": "\"actors\".\"items_proposed\" >= 0"
+        },
+        "actors_receipt_items_new_not_negative": {
+          "name": "actors_receipt_items_new_not_negative",
+          "value": "\"actors\".\"receipt_items_new\" >= 0"
         },
         "actors_model_spent_not_negative": {
           "name": "actors_model_spent_not_negative",
@@ -3268,12 +3285,6 @@
           "type": "uuid",
           "primaryKey": false,
           "notNull": false
-        },
-        "released_at": {
-          "name": "released_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": false
         }
       },
       "indexes": {
@@ -3291,22 +3302,6 @@
           "isUnique": false,
           "concurrently": false,
           "method": "gin",
-          "with": {}
-        },
-        "items_released_idx": {
-          "name": "items_released_idx",
-          "columns": [
-            {
-              "expression": "released_at",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "where": "\"items\".\"released_at\" is not null",
-          "concurrently": false,
-          "method": "btree",
           "with": {}
         },
         "items_merged_into_idx": {

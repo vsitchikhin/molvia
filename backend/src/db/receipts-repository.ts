@@ -584,6 +584,12 @@ export interface ReceiptRepository {
   noticesOf(actorId: string): Promise<{ off: boolean; blocked: boolean }>
   /** «Сообщать, что чек разобран» on the tap; what is stored after it. */
   chooseNotices(actorId: string, off: boolean): Promise<{ off: boolean; blocked: boolean }>
+  /**
+   * The person's row, locked before anything else of «Записать» (MOL-373): its new items count in the
+   * person's day, and the account comes first everywhere (`privacy.md`) — taken after the receipt, it met
+   * an erasure holding the account and waiting for that receipt. Erased while this waited — `error.no_actor`.
+   */
+  lockActorRow(actorId: string): Promise<void>
   /** The owner's receipt, locked for recording: `null` for a missing, removed or someone else's one. */
   lockForRecord(actorId: string, id: string): Promise<ReceiptToRecord | null>
   /**
@@ -1117,6 +1123,10 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         .where(eq(actors.id, actorId))
         .returning({ off: actors.receiptNoticesOff, blockedAt: actors.botBlockedAt })
       return { off: row?.off ?? off, blocked: (row?.blockedAt ?? null) !== null }
+    },
+
+    async lockActorRow(actorId) {
+      await lockedAccount(db, actorId)
     },
 
     async lockForRecord(actorId, id) {

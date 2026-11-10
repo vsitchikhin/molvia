@@ -396,6 +396,7 @@ import { ApiError } from '@molvia/client'
 import {
   ERROR,
   RECEIPT_ADDED_MAX,
+  RECEIPT_ITEMS_DAY_MAX,
   formatMoney,
   linesTotalOf,
   parseMoney,
@@ -701,7 +702,12 @@ export default defineComponent({
       const refusal = queue.rejected.find(
         (item) => item.write.kind === 'record' && item.write.id === id.value,
       )
-      return refusal ? t('receipt.review.refused', { reason: t(refusal.code) }) : null
+      if (!refusal) return null
+      // past the day's new items (MOL-373, В-2 «а»): why, the number, and the way out — a found item or tomorrow
+      if (refusal.code === ERROR.ITEMS_DAY_LIMITED) {
+        return t('receipt.review.refused_items_day', { max: RECEIPT_ITEMS_DAY_MAX })
+      }
+      return t('receipt.review.refused', { reason: t(refusal.code) })
     })
     /** «Отменить запись» (MOL-169, В-5): any record still waiting, never the one a send carries. */
     const cancellable = computed(
