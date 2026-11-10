@@ -40,8 +40,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   living stands on them** (MOL-374, owner's В-5 «б» of MOL-362: «60 → erase → sign in again» left them in
   everybody's search for good) — **erasure only marks them, a sweep deletes them** (owner's В-7 «а», after
   two rounds of review in which every lock erasure took on an item met another path's in a deadlock):
-  `items.released_at` is set as the author goes, and `sweepReleasedItems` deletes a marked item nothing
-  stands on any more (`ErasureRepository.sweepReleased`) — right after each door's erasure and every minute
+  `items.released_at` is set as the author goes, and the sweep (`ErasureRepository.sweepReleased`) deletes a
+  marked item nothing stands on any more — right after each door's erasure and every minute
   on the cleanups' timer, a batch a transaction, `for update skip locked`, asked again as it deletes. So erasure locks no item anybody
   else writes to — the person's own, marked right after the owner and in the order of their ids with a
   lock a key share passes, the traces last with the cascade that updates them anyway (Р2-А9) — and an
@@ -69,10 +69,15 @@ The detail behind the privacy lines of `CLAUDE.md`.
   does — and that person's phone still offers it in «Часто берёте»; written again from there it is that
   404, and the queue keeps the purchase with its reason in «Покупки» to be put right. **A door sweeps only
   what its erasure released** (review 3, №11): `eraseMe` erases, then `sweepReleased(leavingItems)`, a
-  failure of it the caller's to report; `make forget --yes` does the same and prints what it swept
-  (review 4, №19); the minute timer sweeps everyone's. **A list of ids goes as one parameter, asked as a
+  failure of it the caller's to report — **at most `DOOR_SWEEP_ITEMS` (2 000) of them before it answers**
+  (adversarial Р5-А16: a sweep goes some 0.15 ms an item, and a spammer's 32 767 held `/delete` 6.6 s against
+  the bot's 5 s of waiting — erased, and told «не получилось»), the minute timer taking the rest; `make forget --yes`, waited for by nobody, sweeps the whole list and
+  prints what it swept (review 4, №19); the minute timer sweeps everyone's. **A list of ids goes as one parameter, asked as a
   set** (adversarial Р4-А15): spelt a parameter an id, 32 767 items of one person passed the 65 534 a
-  statement may carry and nothing could erase them; a door's list is swept a batch's worth at a time. The copy and `erasures` are as they were (В-3 «а»): the report and `make forget`
+  statement may carry and nothing could erase them; a door's list is swept a batch's worth at a time.
+  **A batch asks its list `= any(…)`, the long lists of erasure `in` a set** (adversarial Р5-А16): the marks
+  are erasure's own, so the statistics never know them, and against a set the planner walked every marked
+  item for each id of the batch. The copy and `erasures` are as they were (В-3 «а»): the report and `make forget`
   name the items the sweep will take and those that stay. The items someone stands on
   stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
   nulled (MOL-100), the words they gave the shops' memory stay with `actor_id` nulled and still count
