@@ -160,8 +160,11 @@ function neverConnected(error: unknown, depth = 0): boolean {
   if (error instanceof AggregateError && error.errors.length > 0) {
     return error.errors.every((one) => neverConnected(one, depth + 1))
   }
-  const code: unknown = (error as { code?: unknown }).code
+  const { code, syscall } = error as { code?: unknown; syscall?: unknown }
   if (typeof code === 'string' && NEVER_CONNECTED.has(code)) return true
+  // an address that never answered while the host's addresses are tried in turn (adversarial Г1): a time out of the
+  // connecting itself, never one of a socket that was open
+  if (code === 'ETIMEDOUT' && syscall === 'connect') return true
   return neverConnected((error as { cause?: unknown }).cause, depth + 1)
 }
 

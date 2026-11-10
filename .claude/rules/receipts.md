@@ -301,7 +301,8 @@ month untouched and tells no stop, the cap refusing gives the share back. `settl
 share too, while the share still counts that month. **A request that never left costs nothing** (В-4 «а» on adversarial
 А1, narrowed by В-6 «а» on Б1): a connection that fails before a byte goes — no address, the port refused, no route, no
 connection in time (`NEVER_CONNECTED` in `model-reader.ts`, a closed list down the error's causes, judged at `fetch`
-itself, since the client reads undici's «Connect Timeout Error» as its own time out with no cause — adversarial В1) —
+itself, since the client reads undici's «Connect Timeout Error» as its own time out with no cause — adversarial В1 —
+and a time out of the connecting alone, `ETIMEDOUT` of `connect`, the host's addresses tried in turn — Г1) —
 settles at nought
 in the month and the share; a receipt waiting ten minutes for the model away is reserved every minute, and an evening
 with no connection took 99 % of a share with not a cent billed. **Anything else in doubt is paid** — a time out, a

@@ -195,6 +195,20 @@ describe('the model that reads receipts (MOL-272)', () => {
     await expect(model(failing(everyAddress)).read([jpeg(10, 10)])).rejects.toMatchObject({
       costMicroUsd: 0,
     })
+    // the host's addresses tried in turn, the first silent, the second refused (adversarial Г1): no connection
+    const silent = Object.assign(socket('ETIMEDOUT'), { syscall: 'connect' })
+    const silentThenRefused = Object.assign(
+      new AggregateError([silent, Object.assign(socket('ECONNREFUSED'), { syscall: 'connect' })]),
+      { code: 'ETIMEDOUT' },
+    )
+    await expect(model(failing(silentThenRefused)).read([jpeg(10, 10)])).rejects.toMatchObject({
+      costMicroUsd: 0,
+    })
+    // a socket that was open and timed out reading: the request may have gone
+    const readTimeout = Object.assign(socket('ETIMEDOUT'), { syscall: 'read' })
+    await expect(model(failing(readTimeout)).read([jpeg(10, 10)])).rejects.toMatchObject({
+      costMicroUsd: null,
+    })
     // one address reached and reset under the request: it may have gone
     const oneReached = new AggregateError([socket('ECONNREFUSED'), socket('ECONNRESET')])
     for (const cause of [socket('ECONNRESET'), socket('UND_ERR_SOCKET'), oneReached, undefined]) {
