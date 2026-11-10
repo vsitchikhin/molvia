@@ -328,7 +328,7 @@ export const actors = pgTable(
      * The items «Записать» of the person's receipts put into the shared catalogue on their day (MOL-373,
      * owner's В-1 «а»): the phone's day of the last such item and how many that day, by the same rules —
      * a count of its own, so the proposals' sixty and these never take from each other. Not a change of
-     * the row (0083).
+     * the row (0084).
      */
     receiptItemsDay: date('receipt_items_day'),
     receiptItemsNew: smallint('receipt_items_new').notNull().default(0),
