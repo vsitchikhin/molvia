@@ -42,7 +42,7 @@
       <!-- The day's quota (MOL-362): nothing was written, and pressing again changes nothing today.
            A warning, as «… уже есть», not the red «Не получилось» that asks to try again. -->
       <p v-if="limited" class="code warn limited" role="alert">
-        {{ t('item.propose.day_limited', { max: dayMax }) }}
+        {{ t('item.propose.day_limited', { n: dayMax }, dayMax) }}
       </p>
       <!-- Another item holds the code (MOL-100, Р-3): nothing was written, and that item is offered
            — the package in the hand is what the catalogue already knows it as. A warning, not an

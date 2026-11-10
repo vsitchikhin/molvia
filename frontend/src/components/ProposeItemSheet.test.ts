@@ -310,7 +310,10 @@ describe('«Suggest an item»', () => {
 
     await submitButton(sheet).trigger('click')
 
-    const said = en.item.propose.day_limited.replace('{max}', String(ITEMS_PROPOSED_DAY_MAX))
+    const said = (en.item.propose.day_limited.split(' | ')[1] ?? '').replace(
+      '{n}',
+      String(ITEMS_PROPOSED_DAY_MAX),
+    )
     await vi.waitFor(() => {
       expect(sheet.get('[role="alert"]').text()).toBe(said)
     })

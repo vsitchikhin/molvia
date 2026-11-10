@@ -357,7 +357,7 @@
       "taken": "This code already belongs to «{name}»",
       "take": "Take «{name}»",
       "name_taken": "«{name}» is already there — name the item differently, with its brand for instance",
-      "day_limited": "You have added {max} items to the catalogue today — new ones tomorrow. For now, take a similar one from the search."
+      "day_limited": "You have added {n} item to the catalogue today — new ones tomorrow. For now, take a similar one from the search. | You have added {n} items to the catalogue today — new ones tomorrow. For now, take a similar one from the search."
     },
     "error": {
       "title": "The server did not answer",
@@ -1737,7 +1737,7 @@
       },
       "items": {
         "term": "Items in the catalogue",
-        "text": "Items you added with «Suggest an item» are in the shared catalogue: everyone searches by them, but whose they are is shown to nobody. We also keep how many items you added on your own day: at most 60 — so the catalogue is not flooded."
+        "text": "Items you added with «Suggest an item», and the new items of a receipt you recorded — named as the reading proposed or as you typed it yourself — are in the shared catalogue: everyone searches by them, but whose they are is shown to nobody. So put nothing personal in an item's name. We also keep how many items you added with «Suggest an item» on your own day: at most 60 — so the catalogue is not flooded."
       },
       "places": {
         "term": "Shops",
