@@ -65,7 +65,8 @@ export interface ReceiptWords {
   readonly service: string
   /**
    * A café's bill's total in words no fiscal till prints (MOL-310): «ՎՃԱՐՄԱՆ» alone on its row, and a bill printed in
-   * Russian — «Всего», «Итого к оплате». Read in any case.
+   * Russian — «Всего», «Итого к оплате». Read in any case. Its first form is anchored itself (`^…$`, a label of that
+   * word alone): the pattern built of it must keep the fragment whole in its own group, as every word's is.
    */
   readonly billTotal: string
   /**

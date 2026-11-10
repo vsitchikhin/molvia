@@ -231,6 +231,9 @@ function lineOf(line: ModelReceipt['lines'][number]): ReceiptTextLine {
   }
 }
 
+/** What a label prints around its word: spaces, a colon, «=», a slash, a dash. */
+const MARKS = '[\\s:=/-]*'
+
 /**
  * A café's service by its word alone, a percent after it at most — «Service 10%», «Հավելավճար 10%:» (MOL-310): one
  * rule for a line and a summary's label, so «Итого с обслуживанием», a total that names the word, stays a total
@@ -238,7 +241,7 @@ function lineOf(line: ModelReceipt['lines'][number]): ReceiptTextLine {
  */
 const serviceWordOf = (reading: PhotoReading): RegExp =>
   new RegExp(
-    `^[\\s:=/-]*(?:${reading.words.service})[\\s:=/-]*(?:\\d{1,2}(?:[.,]\\d+)?\\s*%)?[\\s:=/-]*$`,
+    `^${MARKS}(?:${reading.words.service})${MARKS}(?:\\(?\\d{1,2}(?:[.,]\\d+)?\\s*%\\)?)?${MARKS}$`,
     'iu',
   )
 
@@ -351,7 +354,7 @@ function totalOf(
   const [sentToCard, taxed, spent] = [new Set<number>(), new Set<number>(), new Set<number>()]
   const surcharges = new Set(served)
   // what the card's words do not name, and the prepayment slip's own sum (MOL-310, Р-1)
-  const prepaid = new RegExp(`^[\\s:=/-]*(?:${w.prepayment})[\\s:=/-]*$`, 'u')
+  const prepaid = new RegExp(`^${MARKS}(?:${w.prepayment})${MARKS}$`, 'u')
   const [slips, unnamed] = [new Set<number>(), new Set<number>()]
   for (const { label, amount } of answer.totals) {
     const hundredths = figureOf(amount, 2)
@@ -408,10 +411,12 @@ function totalOf(
     }
     const met = asPrinted && totals.includes(sum)
     if (met) return { total: sum, read, met, owed: sum, cashback, redeemed: null, service: null }
-    // a total voted by its places takes no service: whether it took one is what only the lines say, and a dish lost
-    // made a bill «with service» of one printed without (adversarial А3) — the shortfall says the lost dish whole
+    // a total voted by its places took the service: every bill seen prints it so — ZERO, Bakery, Аракс (owner's В-7
+    // «а», adversarial Б1) — so the lines make it less the service, the font's swaps putting them right to that
     const voted = vote(places.values())
-    return { total: voted, read, met, owed: voted, cashback, redeemed: null, service: null }
+    const service = voted !== null && surcharge !== null && surcharge < voted ? surcharge : null
+    const owed = voted === null ? null : voted - (service ?? 0)
+    return { total: voted, read, met, owed, cashback, redeemed: null, service }
   }
   // what the lines make: a total less what went to the card
   const owed = new Set(totals.map((one) => one - cashback).filter((one) => one > 0))
@@ -782,7 +787,8 @@ export function receiptTextOfModel(
   const copied = keptApart ? apartLines : whole.lines.map(lineOf)
   const { total, read, met, owed, cashback, redeemed, service } = keptApart
     ? tried
-    : totalOf(reading, whole, copied)
+    : // the same service amounts: which surcharge is taken is the amounts' to say, never the lines' (review №9)
+      totalOf(reading, whole, copied, apart.served)
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
   // a total two places vouch for that the lines do not meet: put right by the font's swaps, or not. The total first,
   // and on its own (MOL-291): a line it vouches for as copied is no doubt of the memory's, nor are the lines it put
@@ -855,7 +861,9 @@ function slipAmountOf(reading: PhotoReading, answer: ModelReceipt): number | nul
   const word = new RegExp(`(?:${reading.words.slipAmount})`, 'iu')
   // every amount the slip's: a fiscal receipt shot with its slip prints «Ընդամենը» beside it, and lines lost there are
   // «переснимите», never a slip with no items (adversarial А5)
-  if (!answer.totals.every(({ label }) => word.test(label))) return null
+  // an amount of nothing says nothing — tips of 0 on a slip (adversarial Б3)
+  const said = answer.totals.filter(({ amount }) => (figureOf(amount, 2) ?? 0) > 0)
+  if (!said.every(({ label }) => word.test(label))) return null
   const amounts = new Set(
     answer.totals
       .map(({ amount }) => figureOf(amount, 2))

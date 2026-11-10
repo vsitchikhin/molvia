@@ -929,17 +929,34 @@ describe('a café’s bill (MOL-310)', () => {
     expect(shown(text).slice(0, 3)).toEqual([1_060_000, null, 'lines_lost'])
   })
 
-  it('takes no service for a total its places voted: whether it took one the lines did not say (adversarial А3)', () => {
-    // a dish lost on a bill that prints its service apart: the shortfall is the dish, never the dish less the service
-    const text = bill(
-      [
-        ['Սպասարկում', '1060'],
-        ['Ընդամենը', '10600'],
-        ['Վճարված է PosTerminal:', '10600'],
-      ],
-      dishes.slice(0, 2),
-    )
-    expect(shown(text).slice(0, 3)).toEqual([1_060_000, null, 'lines_lost'])
+  it('takes the service a total its places voted took: every bill seen prints it so (owner’s В-7 «а», adversarial Б1)', () => {
+    // Bakery's figures: dishes 17 800 + «Սպասարկում» 1 780 = «Ընդամենը» 19 580, paid by the terminal
+    const bakery = [
+      dish('Հավի մսով եվ ավոկադոյով', '2', '3900', '7800'),
+      dish('Հավ Բորդոլե Բեկոնով', '1', '4600', '4600'),
+      dish('Ռաֆ Սուրճ', '2', '1800', '3600'),
+      dish('Ցիտրուսային', '1', '1800', '1800'),
+    ]
+    const paid: [string, string][] = [
+      ['Սպասարկում', '1780'],
+      ['Ընդամենը', '19580'],
+      ['Վճարված է PosTerminal:', '19580'],
+    ]
+    // a dish lost: the shortfall is the dish alone
+    const lost = bill(paid, bakery.slice(0, 3))
+    expect(shown(lost).slice(0, 3)).toEqual([1_958_000, 178_000, 'lines_lost'])
+    // a price copied 1300 for 1800 (3↔8): put right to the total less the service, the bill whole
+    const swapped = bill(paid, [
+      bakery[0]!,
+      bakery[1]!,
+      dish('Ռաֆ Սուրճ', '2', '1300', '3600'),
+      bakery[3]!,
+    ])
+    expect([
+      swapped.serviceHundredths,
+      swapped.balanced,
+      swapped.lines[2]?.priceHundredths,
+    ]).toEqual([178_000, true, 180_000])
   })
 
   it('takes the service the model copied as a line out of the lines, never a dish that names the word', () => {
@@ -949,6 +966,35 @@ describe('a café’s bill (MOL-310)', () => {
     // must not: a dish is a dish, whatever word its name holds
     const salad = [dish('Салат Service', '1.00', '1060', '1060'), ...dishes]
     expect(bill([['Всего:', '11660.00']], salad).lines).toHaveLength(4)
+  })
+
+  it('counts the service once where it is a doubt: the line stays a line, and no label’s amount is taken (review №9)', () => {
+    // dishes 9 000, the model's line «Service 10% · 900» and a label «Սպասարկում 1 000»: two amounts, a doubt either way
+    const served = [
+      dish('Service 10%', '1.00', null, '900'),
+      dish('Չիզբուրգեր', '1.00', '3000', '3000'),
+      dish('Tequila Sunrise', '2.00', '3000', '6000'),
+    ]
+    const text = bill(
+      [
+        ['Սպասարկում', '1000'],
+        ['Всего:', '10900.00'],
+      ],
+      served,
+    )
+    expect([text.lines.length, text.serviceHundredths, text.totalHundredths]).toEqual([
+      3,
+      null,
+      null,
+    ])
+  })
+
+  it('reads a service whose percent is in brackets: «Հավելավճար (10%)» (adversarial Б2)', () => {
+    const text = bill([
+      ['Հավելավճար (10%)', '1060'],
+      ['ՎՃԱՐՄԱՆ', '11660'],
+    ])
+    expect(shown(text).slice(0, 3)).toEqual([1_166_000, 106_000, null])
   })
 
   it('leaves the service line among the lines where no surcharge is taken (review №5)', () => {
@@ -1034,6 +1080,18 @@ describe('a bank terminal’s slip with no bill (MOL-310, owner’s В-3 «а»)
       }),
     )
     expect([two.layout, two.totalHundredths]).toEqual(['class', null])
+  })
+
+  it('is a slip with an amount of nothing beside its sum: tips of 0 say nothing (adversarial Б3)', () => {
+    const tipped = read(
+      slip({
+        totals: [
+          { label: 'Գումար', amount: '11660.00' },
+          { label: 'Թեյավճար', amount: '0.00' },
+        ],
+      }),
+    )
+    expect([tipped.layout, tipped.totalHundredths]).toEqual(['slip', 1_166_000])
   })
 
   it('is no slip where the paper prints a total beside it: a receipt shot with its slip, lines lost (adversarial А5)', () => {
