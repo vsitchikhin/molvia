@@ -415,7 +415,7 @@ describe('запрос с сессией с чужой страницы или �
   // чужой странице — запрос человека, и GET, который пишет, писал (аудит MOL-287, Ф-13). Ссылку из
   // чата или письма другое приложение отдаёт браузеру как `none` с `navigate` (Chrome, 10.11.2026,
   // адверсариальное А1): само приложение в API не переходит никогда, только `fetch`.
-  const FOREIGN = [
+  const OUTSIDE_THE_APP = [
     { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' },
     { 'sec-fetch-site': 'same-site', 'sec-fetch-mode': 'cors' },
     { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' },
@@ -434,7 +434,7 @@ describe('запрос с сессией с чужой страницы или �
     await db.update(actors).set({ lastSeenAt: stale }).where(eq(actors.id, actorId))
     const before = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
 
-    for (const headers of FOREIGN) {
+    for (const headers of OUTSIDE_THE_APP) {
       const refused = await askWith('GET', '/actors/me', cookie, headers)
 
       expect(refused.statusCode).toBe(404)

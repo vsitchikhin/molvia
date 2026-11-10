@@ -7,7 +7,8 @@ import type { FastifyRequest } from 'fastify'
  * The browser sets the header and the page that triggers the request cannot write it, so it is the
  * right thing to read. `same-origin` is the PWA and its proxy; `none` is a navigation no page started —
  * the address bar, and a link another app handed the browser too (`refuseOutsideTheApp`); absent is
- * `curl`, the tests, the bot — none of which carries anybody's cookie but its own. Every browser of the build's floor sends it (Safari learned it in 16.4, the floor itself).
+ * `curl`, the tests, the bot — none of which carries anybody's cookie but its own. Every browser of
+ * the build's floor sends it (Safari learned it in 16.4, the floor itself).
  */
 export function fromAnotherSite(request: FastifyRequest): boolean {
   const site = request.headers['sec-fetch-site']
