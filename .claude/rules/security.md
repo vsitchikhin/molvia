@@ -166,8 +166,9 @@ file holds what belongs to no single area, and what the audit found missing.
 
 ## The edges
 
-- **Nothing another site's page starts reaches a route with a session** (audit Ф-13, MOL-368): 404 by
-  `Sec-Fetch-Site` before the session is looked up — the rule and its reasons are `auth.md`.
+- **Nothing another site's page starts, nor any navigation, reaches a route with a session** (audit
+  Ф-13, MOL-368): 404 by the fetch metadata before the session is looked up — a chat's link is `none` —
+  the rule and its reasons are `auth.md`.
 - **`/internal/*` is closed twice**: Caddy answers 404 for `/api/internal` and below, and the API asks
   `BOT_API_SECRET` — 43 characters, compared in constant time — of every route in its scope. A new route
   of the bot goes into that scope, never beside it. The audit's seventeen spellings of the path (`//`,

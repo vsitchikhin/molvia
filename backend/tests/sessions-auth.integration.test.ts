@@ -410,11 +410,23 @@ describe('шов входа не слушается чужой страницы'
   })
 })
 
-describe('запрос с сессией с чужой страницы (MOL-368)', () => {
+describe('запрос с сессией с чужой страницы или по ссылке (MOL-368)', () => {
   // `SameSite=Lax` отдаёт cookie на переход верхнего уровня с любого сайта, так что ссылка на
-  // чужой странице — запрос человека, и GET, который пишет, писал (аудит MOL-287, Ф-13).
-  const fromAnotherSite = (method: 'GET' | 'DELETE', url: string, cookie: string, site: string) =>
-    app.inject({ method, url, headers: { cookie, 'sec-fetch-site': site } })
+  // чужой странице — запрос человека, и GET, который пишет, писал (аудит MOL-287, Ф-13). Ссылку из
+  // чата или письма другое приложение отдаёт браузеру как `none` с `navigate` (Chrome, 10.11.2026,
+  // адверсариальное А1): само приложение в API не переходит никогда, только `fetch`.
+  const FOREIGN = [
+    { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate' },
+    { 'sec-fetch-site': 'same-site', 'sec-fetch-mode': 'cors' },
+    { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document' },
+    { 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'navigate' },
+  ]
+  const askWith = (
+    method: 'GET' | 'DELETE',
+    url: string,
+    cookie: string,
+    headers: Record<string, string>,
+  ) => app.inject({ method, url, headers: { cookie, ...headers } })
 
   it('не доходит до сессии: 404, срок и последний визит на месте, cookie не погашен', async () => {
     const { actorId, id, cookie } = await signedIn(SESSION_TOUCH_AFTER_HOURS + 1)
@@ -422,8 +434,8 @@ describe('запрос с сессией с чужой страницы (MOL-368
     await db.update(actors).set({ lastSeenAt: stale }).where(eq(actors.id, actorId))
     const before = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
 
-    for (const site of ['cross-site', 'same-site']) {
-      const refused = await fromAnotherSite('GET', '/actors/me', cookie, site)
+    for (const headers of FOREIGN) {
+      const refused = await askWith('GET', '/actors/me', cookie, headers)
 
       expect(refused.statusCode).toBe(404)
       expect(JSON.parse(refused.body) as unknown).toEqual({ code: ERROR.NOT_FOUND })
@@ -438,29 +450,26 @@ describe('запрос с сессией с чужой страницы (MOL-368
     expect(owner?.lastSeenAt).toEqual(stale)
   })
 
-  it('и не пишет: «услышанный» чек и удаление своей сессии — тоже 404', async () => {
+  it('не только GET: удаление своей сессии с чужой страницы — 404, сессия жива', async () => {
     const { id, cookie } = await signedIn()
 
-    expect(
-      (await fromAnotherSite('GET', '/receipts?shown=1', cookie, 'cross-site')).statusCode,
-    ).toBe(404)
-    const ended = await fromAnotherSite('DELETE', `/sessions/${id}`, cookie, 'cross-site')
+    const ended = await askWith('DELETE', `/sessions/${id}`, cookie, {
+      'sec-fetch-site': 'cross-site',
+      'sec-fetch-mode': 'cors',
+    })
 
     expect(ended.statusCode).toBe(404)
     expect(await db.select().from(sessions).where(eq(sessions.id, id))).toHaveLength(1)
   })
 
-  it('контроль: своё приложение, адресная строка и curl проходят', async () => {
+  it('контроль: своё приложение и curl проходят', async () => {
     const { cookie } = await signedIn()
 
-    for (const headers of [{ 'sec-fetch-site': 'same-origin' }, { 'sec-fetch-site': 'none' }, {}]) {
-      const allowed = await app.inject({
-        method: 'GET',
-        url: '/actors/me',
-        headers: { cookie, ...headers },
-      })
-
-      expect(allowed.statusCode).toBe(200)
+    for (const headers of [
+      { 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'cors', 'sec-fetch-dest': 'empty' },
+      {},
+    ]) {
+      expect((await askWith('GET', '/actors/me', cookie, headers)).statusCode).toBe(200)
     }
   })
 })
