@@ -2178,7 +2178,10 @@ service)` for every comparison of the lines with the total, the trip's money the
   them right to that. **A percent printed beside the service is its second place** (adversarial Е1, Ж1), in either way the total is vouched
   for — the lines met with it, or the vote: the service is taken only as that percent of the dishes, to the dram — «Service 10% 1960» copied for 1950 is no service, never a
   wrong one with every dish emptied for it; with no percent printed (Bakery's «Սպասարկում») it stands as copied, a price
-  named. Two service amounts are a doubt, none taken — the label's and a line's alike — and **a service
+  named. **The price, named** (adversarial Ж2): the percent is one figure too, and to the dram — a till that rounds the service
+  to the tens (2 300 for 10 % of 22 950) or a percent copied 5↔6 («16%» for «15%») refuses a right service, and a bill
+  read right says «Прочитали не всё» short by the service where two places vouch for its total, «Итог не прочитали»
+  where one does — unread, never wrong (MOL-255); loosened, the tolerance would take a service copied 5↔6 again (Е1). Two service amounts are a doubt, none taken — the label's and a line's alike — and **a service
   decided against stays decided**: its line stays a line, and no label or vote takes a service in the second reading
   (review №9, adversarial В2: taken there, it was counted twice, as the line and as the surcharge). **The price, named** (adversarial А3 of round 1): a bill that prints its service «not
   included», a dish lost, says a shortfall smaller by the service, and the person who types the dish is left the
