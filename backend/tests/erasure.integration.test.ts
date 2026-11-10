@@ -919,7 +919,10 @@ describe('товары человека при стирании (MOL-374)', () =
       'склейку отменяли',
       async ({ twin }) => {
         await db.update(items).set({ mergedInto: null }).where(eq(items.id, twin))
-        await db.update(catalogueMerges).set({ undoneAt: new Date() })
+        await db
+          .update(catalogueMerges)
+          .set({ undoneAt: new Date() })
+          .where(eq(catalogueMerges.fromItem, twin))
       },
     ],
   ]

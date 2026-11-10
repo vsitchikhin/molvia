@@ -41,7 +41,7 @@ export const ACTOR_REFERENCES = [
 
 /**
  * Every column in the schema that points at `items`, as `table.column` (MOL-374). The sweep deletes an
- * item whose author is gone only where nothing stands on it (`standsAlone`, `groupGoes`), so it has to know each of
+ * item whose author is gone only where nothing stands on it (`releasedAndFree`, `groupGoes`), so it has to know each of
  * them: a test compares this list with `information_schema`, and the test of the holders takes a case for
  * every key — a row of it that holds the item, or `cascade` — so a key added here without its `not exists`
  * fails it. One that does not cascade and is not asked would fail the sweep on its foreign key; one that
@@ -203,16 +203,27 @@ function nobody(): ErasureReport {
   }
 }
 
+/** The aliases the fragments below name `items` by: a closed list, since each goes in by `sql.raw`. */
+type ItemAlias = 'i' | 'm' | 's' | 'gm'
+
+/** The survivor of the merged group of the row `alias`: itself, or what it was merged into (one step). */
+const rootOf = (alias: ItemAlias): SQL => sql.raw(`coalesce(${alias}.merged_into, ${alias}.id)`)
+
+/** The row `alias` is in the group of `root`: the survivor, or one of its traces (MOL-106). */
+const inGroup = (alias: ItemAlias, root: SQL): SQL =>
+  sql`(${sql.raw(alias)}.id = ${root} or ${sql.raw(alias)}.merged_into = ${root})`
+
 /**
- * Nothing stands on the item `alias` by itself (MOL-374): no living person's purchase, verdict — a
- * withdrawn one too, the gate counts it — pick, line of a receipt not recorded yet (В-2 «а»: its
- * «Записать» sends the item by its id), code or word of the shops' memory; no «apart» of the owner, no
- * name or heading of the seed — the seed alone writes them, and every line of it has them. The rows of
- * an erased person are gone or have lost their author, so a code or a word with none holds nothing
- * (adversarial Р2-А7); `erasing` — the person erasure is taking, whose own codes and words lose their
- * author only as its transaction ends. A merge is the group's to answer (`groupGoes`).
+ * The item `alias` is released (its author erased, `released_at`) and nothing stands on it by itself
+ * (MOL-374): no living person's purchase, verdict — a withdrawn one too, the gate counts it — pick, line
+ * of a receipt not recorded yet (В-2 «а»: its «Записать» sends the item by its id), code or word of the
+ * shops' memory; no «apart» of the owner, no name or heading of the seed — the seed alone writes them,
+ * and every line of it has them. Not released, an item of a living author or of the seed holds its whole
+ * group. The rows of an erased person are gone or have lost their author, so a code or a word with none
+ * holds nothing (adversarial Р2-А7); `erasing` — the person erasure is taking, whose own codes and words
+ * lose their author only as its transaction ends. A merge is the group's to answer (`groupGoes`).
  */
-function standsAlone(alias: string, erasing: string | null): SQL {
+function releasedAndFree(alias: ItemAlias, erasing: string | null): SQL {
   const x = sql.raw(alias)
   const notTheirs = (column: SQL) =>
     erasing === null
@@ -232,12 +243,11 @@ function standsAlone(alias: string, erasing: string | null): SQL {
     and not exists (select 1 from item_hs h where h.item_id = ${x}.id)`
 }
 
-/** The ids of the merged group of `i` — its survivor and the survivor's traces (one step, MOL-106). */
-const groupOf = sql`select m.id from items m
-  where m.id = coalesce(i.merged_into, i.id) or m.merged_into = coalesce(i.merged_into, i.id)`
+/** The ids of the merged group of the row `i` — its survivor and the survivor's traces. */
+const groupOf = sql`select gm.id from items gm where ${inGroup('gm', rootOf('i'))}`
 
 /**
- * The item `i` goes with its merged group, and the group goes whole (MOL-374, owner's В-8 «а»): every
+ * The row `i` goes with its merged group, and the group goes whole (MOL-374, owner's В-8 «а»): every
  * item of it released and standing on nothing by itself, and its journal of merges inside the group and
  * never undone — an undo is the owner's hand, and an item merged into the seed's or a living person's
  * stays a second name of it (adversarial А4). Twins the night merged by itself kept a loop alive by the
@@ -246,8 +256,7 @@ const groupOf = sql`select m.id from items m
 function groupGoes(erasing: string | null): SQL {
   return sql`not exists (
       select 1 from items m
-      where (m.id = coalesce(i.merged_into, i.id) or m.merged_into = coalesce(i.merged_into, i.id))
-        and not (${standsAlone('m', erasing)}))
+      where ${inGroup('m', rootOf('i'))} and not (${releasedAndFree('m', erasing)}))
     and not exists (
       select 1 from catalogue_merges g
       where g.subject = 'item'
@@ -256,11 +265,13 @@ function groupGoes(erasing: string | null): SQL {
           or g.from_item not in (${groupOf}) or g.into_item not in (${groupOf})))`
 }
 
-const uuids = (ids: readonly string[]): SQL =>
-  sql`array[${sql.join(
-    ids.map((id) => sql`${id}::uuid`),
-    sql`, `,
-  )}]::uuid[]`
+/**
+ * A list of ids as one parameter, however long (adversarial Р4-А15): spelt a parameter an id, 32 767
+ * items of one person passed the 65 534 a statement may carry, and nothing could erase them — the way
+ * the writer of vectors sends its batch. A set to be asked `in`, so a long one is a hash, not a walk.
+ */
+const idsIn = (ids: readonly string[]): SQL =>
+  sql`(select unnest(string_to_array(${ids.join(' ')}, ' ')::uuid[]))`
 
 /** At most so many items a transaction of the sweep starts from: a loop goes on while one is full. */
 const SWEEP_BATCH = 200
@@ -280,27 +291,23 @@ async function sweepBatch(
     const starts = await tx.execute<{ id: string }>(sql`
       select i.id from items i
       where i.released_at is not null
-        ${only === undefined ? sql`` : sql`and i.id = any(${uuids(only)})`}
+        ${only === undefined ? sql`` : sql`and i.id in ${idsIn(only)}`}
         and ${groupGoes(null)}
       order by i.id
       limit ${SWEEP_BATCH}`)
     if (starts.length === 0) return { started: 0, gone: 0 }
     const locked = await tx.execute<{ id: string }>(sql`
       select m.id from items m
-      where coalesce(m.merged_into, m.id) in (
-        select coalesce(s.merged_into, s.id) from items s
-        where s.id = any(${uuids(starts.map((row) => row.id))}))
+      where ${rootOf('m')} in (
+        select ${rootOf('s')} from items s where s.id in ${idsIn(starts.map((row) => row.id))})
       order by m.id
       for update skip locked`)
-    const held = uuids(locked.map((row) => row.id))
+    const held = idsIn(locked.map((row) => row.id))
     const [row] = await tx.execute<{ n: number }>(sql`
       with gone as (
         delete from items i
-        where i.id = any(${held}) and ${groupGoes(null)}
-          and not exists (
-            select 1 from items m
-            where (m.id = coalesce(i.merged_into, i.id) or m.merged_into = coalesce(i.merged_into, i.id))
-              and m.id <> all(${held}))
+        where i.id in ${held} and ${groupGoes(null)}
+          and not exists (select 1 from items m where ${inGroup('m', rootOf('i'))} and m.id not in ${held})
         returning i.id
       ), merges as (
         delete from catalogue_merges g
@@ -320,10 +327,17 @@ async function sweepBatch(
 export function createErasureRepository(db: Db): ErasureRepository {
   return {
     async sweepReleased(only) {
-      if (only?.length === 0) return 0
       let swept = 0
+      if (only !== undefined) {
+        // A door's own list, a batch's worth at a time: asked whole, every batch would hash all of it
+        // again (adversarial Р4-А15).
+        for (let start = 0; start < only.length; start += SWEEP_BATCH) {
+          swept += (await sweepBatch(db, only.slice(start, start + SWEEP_BATCH))).gone
+        }
+        return swept
+      }
       for (;;) {
-        const { started, gone } = await sweepBatch(db, only)
+        const { started, gone } = await sweepBatch(db, undefined)
         swept += gone
         if (started < SWEEP_BATCH || gone === 0) return swept
       }
@@ -490,7 +504,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
             // that goes goes with it (review 1, №1). The doors sweep these at once (review 3, №11).
             const going = await tx.execute<{ id: string; own: boolean }>(sql`
               select i.id, i.created_by is not null as own from items i
-              where (i.created_by = ${actorId} or i.id = any(${uuids(stoodOn)}))
+              where (i.created_by = ${actorId} or i.id in ${idsIn(stoodOn)})
                 and ${groupGoes(actorId)}
               order by i.id`)
             leavingItems = going.map((row) => row.id)
@@ -498,9 +512,9 @@ export function createErasureRepository(db: Db): ErasureRepository {
               select
                 (select count(*) from items where created_by = ${actorId})::int as own,
                 (select count(*) from item_barcodes
-                  where added_by = ${actorId} and item_id <> all(${uuids(leavingItems)}))::int as codes,
+                  where added_by = ${actorId} and item_id not in ${idsIn(leavingItems)})::int as codes,
                 (select count(*) from store_memory
-                  where actor_id = ${actorId} and item_id <> all(${uuids(leavingItems)}))::int as words`)
+                  where actor_id = ${actorId} and item_id not in ${idsIn(leavingItems)})::int as words`)
             items = {
               itemsLeaving: leavingItems.length,
               itemsReleased: (counts?.own ?? 0) - going.filter((row) => row.own).length,
