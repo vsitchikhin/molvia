@@ -152,8 +152,8 @@ const NEVER_CONNECTED = new Set([
 ])
 
 /**
- * Whether a failure of the connection is one of those, down its causes — the client wraps `fetch`'s, which wraps the
- * socket's — and, for an attempt at every address of the host (`AggregateError`), of every one of them.
+ * Whether a failure of `fetch` is one of those, down its causes — `fetch`'s wraps the socket's — and, for an attempt at
+ * every address of the host (`AggregateError`), of every one of them.
  */
 function neverConnected(error: unknown, depth = 0): boolean {
   if (depth > 4 || typeof error !== 'object' || error === null) return false
@@ -163,6 +163,29 @@ function neverConnected(error: unknown, depth = 0): boolean {
   const code: unknown = (error as { code?: unknown }).code
   if (typeof code === 'string' && NEVER_CONNECTED.has(code)) return true
   return neverConnected((error as { cause?: unknown }).cause, depth + 1)
+}
+
+/**
+ * A request `fetch` never sent, told at `fetch` itself (adversarial В1 of MOL-367): the client reads a failure whose
+ * text or cause says «timeout» as its own time out, with no cause — and undici's `Connect Timeout Error`, packets lost
+ * on the way, says it. So the cause is judged before the client sees it, and handed on with no word of time.
+ */
+class ConnectionNotMade extends Error {
+  constructor() {
+    super('no connection was made')
+    this.name = 'ConnectionNotMade'
+  }
+}
+
+/** `fetch` whose failures to connect at all come out as `ConnectionNotMade`, anything else as it was. */
+function judgingConnection(base: typeof fetch): typeof fetch {
+  return (async (input, init) => {
+    try {
+      return await base(input, init)
+    } catch (error) {
+      throw neverConnected(error) ? new ConnectionNotMade() : error
+    }
+  }) as typeof fetch
 }
 
 /**
@@ -180,7 +203,7 @@ export function receiptModel(options: {
   const timeoutMs = options.timeoutMs ?? MODEL_TIMEOUT_MS
   const client = new Anthropic({
     apiKey: options.apiKey,
-    ...(options.fetch === undefined ? {} : { fetch: options.fetch }),
+    fetch: judgingConnection(options.fetch ?? globalThis.fetch),
     ...(options.workspaceId === undefined
       ? {}
       : { defaultHeaders: { 'anthropic-workspace-id': options.workspaceId } }),
@@ -244,7 +267,10 @@ export function receiptModel(options: {
       // no answer, or one torn under its head or its body (adversarial А3): the request may have gone, and
       // been paid (review №2) — unless no connection was ever made, and then nothing was (В-6 «а»)
       if (error instanceof APIConnectionError) {
-        throw new ModelUnavailable('unreachable', neverConnected(error) ? 0 : null)
+        throw new ModelUnavailable(
+          'unreachable',
+          error.cause instanceof ConnectionNotMade ? 0 : null,
+        )
       }
       throw new ModelUnavailable('dropped', null, error)
     }

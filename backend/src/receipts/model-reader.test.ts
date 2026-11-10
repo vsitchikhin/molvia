@@ -179,6 +179,17 @@ describe('the model that reads receipts (MOL-272)', () => {
         costMicroUsd: 0,
       })
     }
+    // packets lost on the way: undici's own words say «Timeout», which the client reads as its time out (А1, В1)
+    const connectTimeout = Object.assign(
+      new Error(
+        'Connect Timeout Error (attempted address: api.anthropic.com:443, timeout: 10000ms)',
+      ),
+      { name: 'ConnectTimeoutError', code: 'UND_ERR_CONNECT_TIMEOUT' },
+    )
+    await expect(model(failing(connectTimeout)).read([jpeg(10, 10)])).rejects.toMatchObject({
+      reason: 'unreachable',
+      costMicroUsd: 0,
+    })
     // every address of the host refused: no connection either
     const everyAddress = new AggregateError([socket('ECONNREFUSED'), socket('ENETUNREACH')])
     await expect(model(failing(everyAddress)).read([jpeg(10, 10)])).rejects.toMatchObject({
