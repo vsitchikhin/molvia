@@ -229,7 +229,9 @@ function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
  * every figure itself; the phone's are not trusted.
  *
  * Sent again with the same trip — the same answer; with another — a 409. The same receipt recorded
- * before, its purchases still there — `error.receipt_recorded_before`.
+ * before, its purchases still there — `error.receipt_recorded_before`. Its new items count in
+ * `RECEIPT_ITEMS_DAY_MAX` of the person's day, their row locked before anything else (MOL-373): a record
+ * with more new names than the day has room for is `error.items_day_limited`, nothing written.
  */
 export async function recordReceipt(
   transact: Transact,
@@ -241,7 +243,7 @@ export async function recordReceipt(
   return transact(async (repositories) => {
     const { receipts, places, items, trips, expenses, storeMemory } = repositories
     // the account before all, as everywhere (privacy.md): the new items count in the person's day (MOL-373)
-    await receipts.lockAccount(actor.id)
+    await receipts.lockActorRow(actor.id)
     // the owner, then the receipt (the plan's order): two shots of one receipt recorded at once meet here,
     // and the second sees the first recorded (review 7, В3)
     await trips.lockOwner(actor.id)
@@ -278,6 +280,17 @@ export async function recordReceipt(
       throw new DomainError(ERROR.CONFLICT)
     }
     if (body.purchasedOn > latestDay(now)) throw new DomainError(ERROR.RECEIPT_IN_FUTURE)
+
+    // every new item of the record counts, read or typed (MOL-373, В-4 «а»): a record past the day is refused
+    // here, before the place, the trip and a name's lock (adversarial А2), and `createUnlessNamed` holds it
+    const quota = { actorId: actor.id, day: todayOf(actor, now), of: 'recorded' } as const
+    await items.refuseBeyondDay(
+      quota,
+      'product',
+      [...body.lines, ...(body.added ?? [])].flatMap((line) =>
+        'item' in line && 'name' in line.item ? [line.item.name] : [],
+      ),
+    )
 
     // `trace`: a trace's name answered with its survivor (MOL-299, Б3)
     const place: Awaited<ReturnType<typeof places.ensure>> | null =
@@ -401,8 +414,7 @@ export async function recordReceipt(
         },
         actor.id,
         null,
-        // every new item of the record counts, read or typed (MOL-373, В-4 «а»); one past the day's refuses it all
-        { actorId: actor.id, day: todayOf(actor, now), of: 'recorded' },
+        quota,
       )
       // the item is made with no codes, so none of them can be another item's
       if ('taken' in proposal) throw new DomainError(ERROR.CONFLICT)

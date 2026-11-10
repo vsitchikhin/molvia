@@ -140,16 +140,12 @@ export const ERROR = {
    */
   RECEIPTS_UNRECORDED_LIMITED: 'error.receipts_unrecorded_limited',
   /**
-   * A new item past `ITEMS_PROPOSED_DAY_MAX` of the person's day (MOL-362): nothing is written, and the
-   * sheet says to take a found one now or propose tomorrow.
+   * A new item past `ITEMS_PROPOSED_DAY_MAX` of the person's day (MOL-362), or a receipt's «Записать» with
+   * more new items than `RECEIPT_ITEMS_DAY_MAX` has room for (MOL-373): nothing is written. The sheet says to
+   * take a found one now or propose tomorrow; the queue sets the record aside, and the review says its own.
+   * One code for both, so every build since MOL-362 reads the record's refusal (adversarial А1 of MOL-373).
    */
   ITEMS_DAY_LIMITED: 'error.items_day_limited',
-  /**
-   * «Записать» of a receipt whose new item would be past `RECEIPT_ITEMS_DAY_MAX` of the person's day
-   * (MOL-373): nothing of the record is written, the queue sets it aside with the review's draft kept,
-   * and the review says to take found items for the new lines or record it tomorrow.
-   */
-  RECEIPT_ITEMS_DAY_LIMITED: 'error.receipt_items_day_limited',
   /**
    * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
    * the text and says to send it tomorrow.

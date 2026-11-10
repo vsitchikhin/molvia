@@ -704,7 +704,7 @@ export default defineComponent({
       )
       if (!refusal) return null
       // past the day's new items (MOL-373, В-2 «а»): why, the number, and the way out — a found item or tomorrow
-      if (refusal.code === ERROR.RECEIPT_ITEMS_DAY_LIMITED) {
+      if (refusal.code === ERROR.ITEMS_DAY_LIMITED) {
         return t('receipt.review.refused_items_day', { max: RECEIPT_ITEMS_DAY_MAX })
       }
       return t('receipt.review.refused', { reason: t(refusal.code) })

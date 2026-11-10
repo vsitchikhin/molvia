@@ -589,7 +589,7 @@ export interface ReceiptRepository {
    * person's day, and the account comes first everywhere (`privacy.md`) — taken after the receipt, it met
    * an erasure holding the account and waiting for that receipt. Erased while this waited — `error.no_actor`.
    */
-  lockAccount(actorId: string): Promise<void>
+  lockActorRow(actorId: string): Promise<void>
   /** The owner's receipt, locked for recording: `null` for a missing, removed or someone else's one. */
   lockForRecord(actorId: string, id: string): Promise<ReceiptToRecord | null>
   /**
@@ -1125,7 +1125,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
       return { off: row?.off ?? off, blocked: (row?.blockedAt ?? null) !== null }
     },
 
-    async lockAccount(actorId) {
+    async lockActorRow(actorId) {
       await lockedAccount(db, actorId)
     },
 

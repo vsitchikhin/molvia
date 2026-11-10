@@ -24,6 +24,7 @@ function fakeItems(byBarcode: ItemRepository['byBarcode']): ItemRepository {
     byId: () => Promise.reject(new Error('byId was not expected')),
     byIds: () => Promise.reject(new Error('byIds was not expected')),
     createUnlessNamed: () => Promise.reject(new Error('createUnlessNamed was not expected')),
+    refuseBeyondDay: () => Promise.reject(new Error('refuseBeyondDay was not expected')),
     search: () => Promise.reject(new Error('search was not expected')),
     byBarcode,
     lockForRecord: () => Promise.resolve(),

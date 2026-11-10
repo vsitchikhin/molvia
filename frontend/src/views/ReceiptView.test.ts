@@ -676,7 +676,7 @@ describe('ReceiptView (MOL-127)', () => {
   })
 
   it('a record past the day’s new items says why and the way out, the draft kept (MOL-373, В-2 «а»)', async () => {
-    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.RECEIPT_ITEMS_DAY_LIMITED, 'x'))
+    recordReceipt.mockRejectedValueOnce(new ApiError(ERROR.ITEMS_DAY_LIMITED, 'x'))
     const { view } = await render()
     useReceiptDraftsStore().setTotal(ID, parseMoney('900', 'AMD'))
     await button(view, 'Записать 2 покупки').trigger('click')

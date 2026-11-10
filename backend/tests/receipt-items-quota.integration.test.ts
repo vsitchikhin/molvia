@@ -13,6 +13,7 @@ import type { FastifyInstance } from 'fastify'
 import type { Sql } from 'postgres'
 import { createActorRepository } from '@/db/actors-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
+import { lockItemKey } from '@/db/items-repository'
 import { actors, items, receiptLines, receiptParts, receipts, trips } from '@/db/schema'
 import { transactOn } from '@/db/unit-of-work'
 import { buildServer } from '@/server'
@@ -181,7 +182,7 @@ describe('the new items of a day’s records (MOL-373)', () => {
       bodyOf([{ id: lori }, { name: 'Сыр Чанах' }], [], tripId),
     )
     expect(refused.statusCode).toBe(429)
-    expect(refused.json()).toMatchObject({ code: ERROR.RECEIPT_ITEMS_DAY_LIMITED })
+    expect(refused.json()).toMatchObject({ code: ERROR.ITEMS_DAY_LIMITED })
     expect(await named('Сыр Чанах')).toHaveLength(0)
     expect(await db.select({ id: trips.id }).from(trips).where(eq(trips.id, tripId))).toHaveLength(
       0,
@@ -194,6 +195,46 @@ describe('the new items of a day’s records (MOL-373)', () => {
     expect(again.statusCode).toBe(200)
     expect(await statusOf(second)).toBe('recorded')
   })
+
+  it('refuses a record past its day before any of its names is locked, and takes one of names there (adversarial А2)', async () => {
+    const me = await owner()
+    await spent(me, RECEIPT_ITEMS_DAY_MAX)
+    await insertItem(db, { name: 'Сыр Лори', searchKey: toSearchKey('Сыр Лори') })
+    const receiptId = await parsedReceipt(me.id, 2)
+
+    // the name already there locked elsewhere — «Предложить товар» of another person on that very name: a record
+    // that locked its names before it met its new one would wait here, and the test would run out of time
+    const holder = connectDrizzle()
+    let letGo: () => void = () => undefined
+    const gate = new Promise<void>((resolve) => (letGo = resolve))
+    let locked: () => void = () => undefined
+    const lockTaken = new Promise<void>((resolve) => (locked = resolve))
+    const holding = holder.db.transaction(async (tx) => {
+      await lockItemKey(tx, 'product', toSearchKey('Сыр Лори'))
+      locked()
+      await gate
+    })
+    try {
+      await lockTaken
+      const refused = await record(
+        me,
+        receiptId,
+        bodyOf([{ name: 'Сыр Лори' }, { name: 'Сыр Чанах' }]),
+      )
+      expect(refused.statusCode).toBe(429)
+      expect(refused.json()).toMatchObject({ code: ERROR.ITEMS_DAY_LIMITED })
+    } finally {
+      letGo()
+      await holding
+      await holder.close()
+    }
+
+    // names already there are no new items: the full day takes them
+    const taken = await record(me, receiptId, bodyOf([{ name: 'Сыр Лори' }, { name: 'сыр  лори' }]))
+    expect(taken.statusCode).toBe(200)
+    expect(await named('Сыр Чанах')).toHaveLength(0)
+    expect((await count(me)).n).toBe(RECEIPT_ITEMS_DAY_MAX)
+  }, 30_000)
 
   it('counts a name typed on a line added as any other new item', async () => {
     const me = await owner()
