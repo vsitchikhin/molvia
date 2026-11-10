@@ -5,9 +5,14 @@ export interface Advisory {
   title: string
   severity: string
 }
-export declare function seriousAdvisories(report: unknown): Advisory[] | null
+/** The lockfile's packages by their path, as `package-lock.json` holds them. */
+export interface Lock {
+  packages: Record<string, { dev?: boolean }>
+}
+export declare function seriousAdvisories(report: unknown, lock?: Lock): Advisory[] | null
 export declare function auditVerdict(
   report: unknown,
   accepted: unknown,
   today: string,
+  lock?: Lock,
 ): { problems: string[]; notes: string[] }

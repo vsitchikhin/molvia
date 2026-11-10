@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { auditVerdict, seriousAdvisories } from './npm-audit.mjs'
+import { auditVerdict, seriousAdvisories, type Lock } from './npm-audit.mjs'
 
 const TODAY = '2026-11-10'
 
@@ -37,6 +38,70 @@ describe('seriousAdvisories', () => {
       `${HIGH} high`,
       `${CRITICAL} critical`,
     ])
+  })
+
+  // The whole tree is audited, so the lockfile says what ships: development's is Dependabot's, but the
+  // runtime of workbox the PWA's build copies into `sw.js` (adversarial Б1).
+  it('leaves out what only development needs, and keeps workbox, a path that ships and one unknown', () => {
+    const lock: Lock = {
+      packages: {
+        'node_modules/vitest': { dev: true },
+        'node_modules/workbox-build': { dev: true },
+        'node_modules/workbox-precaching': { dev: true },
+        'node_modules/glob': { dev: true },
+        'node_modules/exceljs/node_modules/glob': {},
+      },
+    }
+    const ids = ['GHSA-aaaa-0000-0001', 'GHSA-aaaa-0000-0002', 'GHSA-aaaa-0000-0003']
+    const found = seriousAdvisories(
+      {
+        auditReportVersion: 2,
+        vulnerabilities: {
+          vitest: {
+            via: [advisory('GHSA-dddd-0000-0001', 'high', 'vitest')],
+            nodes: ['node_modules/vitest'],
+          },
+          'workbox-build': {
+            via: [advisory('GHSA-dddd-0000-0002', 'high', 'workbox-build')],
+            nodes: ['node_modules/workbox-build'],
+          },
+          'workbox-precaching': {
+            via: [advisory(ids[0] ?? '', 'high', 'workbox-precaching')],
+            nodes: ['node_modules/workbox-precaching'],
+          },
+          glob: {
+            via: [advisory(ids[1] ?? '', 'high', 'glob')],
+            nodes: ['node_modules/glob', 'node_modules/exceljs/node_modules/glob'],
+          },
+          'fast-uri': {
+            via: [advisory(ids[2] ?? '', 'critical')],
+            nodes: ['node_modules/fast-uri'],
+          },
+        },
+      },
+      lock,
+    )
+    expect(found?.map(({ id }) => id)).toEqual(ids)
+  })
+
+  it('reads the lockfile of the repository as the rule means: workbox ships, its builder does not', () => {
+    const lock = JSON.parse(readFileSync('package-lock.json', 'utf8')) as Lock
+    const shipped = (name: string) =>
+      (seriousAdvisories(
+        {
+          auditReportVersion: 2,
+          vulnerabilities: {
+            [name]: { via: [advisory(HIGH, 'high', name)], nodes: [`node_modules/${name}`] },
+          },
+        },
+        lock,
+      )?.length ?? 0) > 0
+    expect(lock.packages['node_modules/workbox-precaching']?.dev).toBe(true)
+    expect(
+      ['workbox-core', 'workbox-precaching', 'workbox-routing', 'workbox-strategies'].map(shipped),
+    ).toEqual([true, true, true, true])
+    expect(['workbox-build', 'vitest', 'eslint'].map(shipped)).toEqual([false, false, false])
+    expect(shipped('exceljs')).toBe(true)
   })
 
   it('is null for what is not a report — the registry not answering', () => {
@@ -94,6 +159,16 @@ describe('auditVerdict', () => {
       TODAY,
     )
     expect(problems).toHaveLength(3)
+  })
+
+  it('refuses a day not of the calendar, and one past a year ahead', () => {
+    const lines = [accept(HIGH, '2026-02-30'), accept(CRITICAL, '9999-12-31')]
+    const { problems } = auditVerdict(report(), lines, TODAY)
+    expect(problems).toEqual([
+      expect.stringContaining(`${HIGH} — "until" is the day to look again`),
+      expect.stringContaining(`${CRITICAL} — "until" is a year ahead at most, 2027-11-11`),
+    ])
+    expect(auditVerdict(report(), [accept(HIGH, '2027-11-11')], TODAY).problems).toEqual([])
   })
 
   it('is red when there was no report: could not check is never clean', () => {
