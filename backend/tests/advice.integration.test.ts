@@ -516,6 +516,32 @@ describe('журнал событий', () => {
     expect(await viewsOf(nobody)).toHaveLength(0)
   })
 
+  it('ссылка с чужой страницы не пишет просмотра — для неё адреса нет (MOL-368)', async () => {
+    // `SameSite=Lax` отдаёт cookie на переход верхнего уровня с любого сайта: ссылка на
+    // `/api/advice` была визитом ворот 0.3, которого человек не делал (аудит MOL-287, Ф-13).
+    const actorId = await insertCounted(db)
+    await grantAccess(actorId)
+    const cookie = await signIn(db, actorId)
+
+    for (const site of ['cross-site', 'same-site']) {
+      const forced = await app.inject({
+        method: 'GET',
+        url: '/advice',
+        headers: { cookie, 'sec-fetch-site': site, 'sec-fetch-mode': 'navigate' },
+      })
+      expect(forced.statusCode).toBe(404)
+    }
+    expect(await viewsOf(actorId)).toHaveLength(0)
+
+    const own = await app.inject({
+      method: 'GET',
+      url: '/advice',
+      headers: { cookie, 'sec-fetch-site': 'same-origin' },
+    })
+    expect(own.statusCode).toBe(200)
+    expect(await viewsOf(actorId)).toHaveLength(1)
+  })
+
   it('не пишет просмотр тому, кого нет', async () => {
     // Чужая cookie, а не чужой uuid: назвать владельца снаружи больше нечем (MOL-53).
     await app.inject({ method: 'GET', url: '/advice', headers: { cookie: aStrangersCookie() } })

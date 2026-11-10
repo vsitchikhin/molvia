@@ -410,6 +410,61 @@ describe('шов входа не слушается чужой страницы'
   })
 })
 
+describe('запрос с сессией с чужой страницы (MOL-368)', () => {
+  // `SameSite=Lax` отдаёт cookie на переход верхнего уровня с любого сайта, так что ссылка на
+  // чужой странице — запрос человека, и GET, который пишет, писал (аудит MOL-287, Ф-13).
+  const fromAnotherSite = (method: 'GET' | 'DELETE', url: string, cookie: string, site: string) =>
+    app.inject({ method, url, headers: { cookie, 'sec-fetch-site': site } })
+
+  it('не доходит до сессии: 404, срок и последний визит на месте, cookie не погашен', async () => {
+    const { actorId, id, cookie } = await signedIn(SESSION_TOUCH_AFTER_HOURS + 1)
+    const stale = new Date(Date.now() - 2 * SESSION_TOUCH_AFTER_HOURS * HOUR)
+    await db.update(actors).set({ lastSeenAt: stale }).where(eq(actors.id, actorId))
+    const before = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
+
+    for (const site of ['cross-site', 'same-site']) {
+      const refused = await fromAnotherSite('GET', '/actors/me', cookie, site)
+
+      expect(refused.statusCode).toBe(404)
+      expect(JSON.parse(refused.body) as unknown).toEqual({ code: ERROR.NOT_FOUND })
+      // Наш 401 погасил бы cookie, и чужая ссылка выкидывала бы человека из приложения.
+      expect(refused.headers['set-cookie']).toBeUndefined()
+    }
+
+    const after = onlyRow(await db.select().from(sessions).where(eq(sessions.id, id)))
+    expect(after?.lastSeenAt).toEqual(before?.lastSeenAt)
+    expect(after?.expiresAt).toEqual(before?.expiresAt)
+    const owner = onlyRow(await db.select().from(actors).where(eq(actors.id, actorId)))
+    expect(owner?.lastSeenAt).toEqual(stale)
+  })
+
+  it('и не пишет: «услышанный» чек и удаление своей сессии — тоже 404', async () => {
+    const { id, cookie } = await signedIn()
+
+    expect(
+      (await fromAnotherSite('GET', '/receipts?shown=1', cookie, 'cross-site')).statusCode,
+    ).toBe(404)
+    const ended = await fromAnotherSite('DELETE', `/sessions/${id}`, cookie, 'cross-site')
+
+    expect(ended.statusCode).toBe(404)
+    expect(await db.select().from(sessions).where(eq(sessions.id, id))).toHaveLength(1)
+  })
+
+  it('контроль: своё приложение, адресная строка и curl проходят', async () => {
+    const { cookie } = await signedIn()
+
+    for (const headers of [{ 'sec-fetch-site': 'same-origin' }, { 'sec-fetch-site': 'none' }, {}]) {
+      const allowed = await app.inject({
+        method: 'GET',
+        url: '/actors/me',
+        headers: { cookie, ...headers },
+      })
+
+      expect(allowed.statusCode).toBe(200)
+    }
+  })
+})
+
 describe('два входа одним Telegram-аккаунтом', () => {
   it('одновременно — это один владелец и две сессии, а не CONFLICT', async () => {
     // Двойное нажатие кнопки в боте или повторная доставка апдейта (MOL-53, А4). Чтение и
