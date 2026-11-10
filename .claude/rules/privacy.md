@@ -70,15 +70,19 @@ The detail behind the privacy lines of `CLAUDE.md`.
   404, and the queue keeps the purchase with its reason in «Покупки» to be put right. **A door sweeps only
   what its erasure released** (review 3, №11): `eraseMe` erases, then `sweepReleased(leavingItems)`, a
   failure of it the caller's to report — **at most `DOOR_SWEEP_ITEMS` (2 000) of them before it answers**
-  (adversarial Р5-А16: a sweep goes some 0.15 ms an item, and a spammer's 32 767 held `/delete` 6.6 s against
-  the bot's 5 s of waiting — erased, and told «не получилось»), the minute timer taking the rest; `make forget --yes`, waited for by nobody, sweeps the whole list and
-  prints what it swept (review 4, №19); the minute timer sweeps everyone's. **A list of ids goes as one parameter, asked as a
-  set** (adversarial Р4-А15): spelt a parameter an id, 32 767 items of one person passed the 65 534 a
-  statement may carry and nothing could erase them; a door's list is swept a batch's worth at a time.
-  **A batch asks its list `= any(…)`, the long lists of erasure `in` a set** (adversarial Р5-А16): the marks
-  are erasure's own, so the statistics never know them, and against a set the planner walked every marked
-  item for each id of the batch. The copy and `erasures` are as they were (В-3 «а»): the report and `make forget`
-  name the items the sweep will take and those that stay. The items someone stands on
+  (adversarial Р5-А16: a sweep goes some 0.15 ms an item, and a spammer's 32 767 held `/delete` 6.6 s
+  against the bot's 5 s of waiting — erased, and told «не получилось»), the minute timer taking the rest;
+  `make forget --yes`, waited for by nobody, sweeps the whole list and prints what it swept (review 4,
+  №19); the minute timer sweeps everyone's. **A list of ids is one parameter, asked `in` a set where it
+  is erasure's long one and `= any(…)` in a batch of the sweep**: spelt a parameter an id, 32 767 items of
+  one person passed the 65 534 a statement may carry and nothing could erase them (adversarial Р4-А15);
+  asked as a set in a batch, the planner — whose statistics never know the marks erasure has just set —
+  walked every marked item for each id of it (Р5-А16). **The price, named** (adversarial round 6, Н1, Н2):
+  the minute's first statement, `order by id limit 200` over every marked item, is as blind to the marks,
+  so the rest a door left of 30 767 items took the timer 16 s, nobody waiting on it; and `items` has no
+  index on `created_by`, so every erasure reads the whole catalogue — some 0.4 s at 200 000 items.
+  The copy and `erasures` are as they were (В-3 «а»): the report and `make forget` name the items the sweep
+  will take and those that stay. The items someone stands on
   stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
   nulled (MOL-100), the words they gave the shops' memory stay with `actor_id` nulled and still count
   (MOL-126: a fact about the shop, never shown as anyone's; a shelf price in it reaches another person

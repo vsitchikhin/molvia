@@ -4,7 +4,7 @@ import type { ErasureRepository } from '@/db/erasure-repository'
 /**
  * How many of its items a door sweeps before it answers (adversarial Р5-А16): a sweep goes about 0.15 ms
  * an item, so a spammer's 32 767 held `/delete` 6.6 s against the bot's 5 s of waiting — erased, and told
- * «не получилось». Ten batches are a person's whole catalogue many times over and some 0.3 s.
+ * «не получилось». A person's whole catalogue many times over, and some 0.3 s.
  */
 export const DOOR_SWEEP_ITEMS = 2_000
 
