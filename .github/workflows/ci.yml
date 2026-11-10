@@ -66,6 +66,10 @@ jobs:
         env:
           ONNXRUNTIME_NODE_INSTALL: skip
 
+      # What ships, high or critical, unless accepted with a day to look again (MOL-369, В-4 «б»).
+      - name: npm audit of what ships
+        run: node bin/npm-audit.mjs
+
       # The same generator every working copy uses, so CI cannot drift from local setup.
       - run: ./bin/init-env.sh 0
 
