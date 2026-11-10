@@ -916,7 +916,7 @@ make down        # stop the stack, keeping the data
 make psql        # psql inside this copy's database
 make db-reset    # drop this copy's volume and start clean (DESTRUCTIVE)
 make seed        # the common names into the catalogue; YES=1 writes, without it a dry run
-make gates FROM=2026-10-05  # read gates 0.2 and 0.3; TO= optional, a day taken in whole
+make gates FROM=2026-11-11T01:22:39+04:00  # gates 0.2 and 0.3 from the tag v0.2.0; TO= optional, a day taken in whole
 make dev         # run api, pwa and bot
 make e2e         # end-to-end tests in a phone-sized browser
 make reader      # this copy's receipt reader (Tesseract), on the API's band +3
@@ -1250,6 +1250,11 @@ duty: the machine carries several copies, and CI repeats all of it on every push
 
 If a decision changed along the way — **update the product plan in Confluence immediately.**
 A plan that diverges from the code is worthless, and here the plan matters more than the code.
+
+**Since `v0.2.0` strangers are on production, so nothing half-done ships** (MOL-298, owner's В-2 «а»): until the tag
+only the owner was there, and a merge could leave an intermediate state for a neighbour task to finish. The tag is
+2026-11-11T01:22:39+04:00, the start of the 0.2 cohort (`make gates FROM=2026-11-11T01:22:39+04:00`). Prices named
+in the rules «before 0.2 only the owner is on production» were paid then and stay as written.
 
 ### Commits
 
