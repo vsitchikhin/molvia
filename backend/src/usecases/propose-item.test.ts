@@ -5,6 +5,8 @@ import type { ItemRepository } from '@/db/items-repository'
 import { proposeItem } from './propose-item'
 
 const ACTOR = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
+/** Who proposes, on the phone's day. */
+const PROPOSER = { actorId: ACTOR, today: '2026-11-10' }
 
 /** The cache of Open Food Facts that named none of the codes. */
 const NAMED_NOTHING = { named: () => Promise.resolve(false) }
@@ -46,18 +48,39 @@ function fakeItems(overrides: Partial<ItemRepository> = {}): ItemRepository {
 
 describe('proposeItem', () => {
   it('asks for the item in the name of the owner it was given, with no barcodes', async () => {
-    const asked: [NewItem, string | null, ItemOrigin | null | undefined][] = []
+    const asked: [NewItem, string | null, ItemOrigin | null | undefined, string | undefined][] = []
     const items = fakeItems({
-      createUnlessNamed: (item, createdBy, origin) => {
-        asked.push([item, createdBy, origin])
+      createUnlessNamed: (item, createdBy, origin, proposedOn) => {
+        asked.push([item, createdBy, origin, proposedOn])
         return Promise.resolve({ item: { ...existing, createdBy }, created: true })
       },
     })
 
-    const result = await proposeItem(items, NAMED_NOTHING, ACTOR, input)
+    const result = await proposeItem(items, NAMED_NOTHING, PROPOSER, input)
 
-    expect(asked).toEqual([[{ ...input, barcodes: [] }, ACTOR, null]])
+    expect(asked).toEqual([[{ ...input, barcodes: [] }, ACTOR, null, '2026-11-10']])
     expect(result).toMatchObject({ created: true })
+  })
+
+  it('counts the quota by the day of Yerevan for a caller that names none (MOL-362)', async () => {
+    const days: (string | undefined)[] = []
+    const items = fakeItems({
+      createUnlessNamed: (_item, _createdBy, _origin, proposedOn) => {
+        days.push(proposedOn)
+        return Promise.resolve({ item: existing, created: true })
+      },
+    })
+
+    // 22:30 UTC of the 9th is already the 10th in Yerevan
+    await proposeItem(
+      items,
+      NAMED_NOTHING,
+      { actorId: ACTOR },
+      input,
+      new Date('2026-11-09T22:30:00.000Z'),
+    )
+
+    expect(days).toEqual(['2026-11-10'])
   })
 
   it('passes on the item already there, and that it was already there', async () => {
@@ -65,7 +88,7 @@ describe('proposeItem', () => {
       createUnlessNamed: () => Promise.resolve({ item: existing, created: false }),
     })
 
-    await expect(proposeItem(items, NAMED_NOTHING, ACTOR, input)).resolves.toEqual({
+    await expect(proposeItem(items, NAMED_NOTHING, PROPOSER, input)).resolves.toEqual({
       item: existing,
       created: false,
     })
@@ -80,7 +103,7 @@ describe('proposeItem', () => {
       },
     })
 
-    await proposeItem(items, NAMED_NOTHING, ACTOR, {
+    await proposeItem(items, NAMED_NOTHING, PROPOSER, {
       ...input,
       barcodes: ['012345678905', '96385074'],
     })
@@ -92,7 +115,7 @@ describe('proposeItem', () => {
     const items = fakeItems()
 
     await expect(
-      proposeItem(items, NAMED_NOTHING, ACTOR, { ...input, barcodes: ['4850000000003'] }),
+      proposeItem(items, NAMED_NOTHING, PROPOSER, { ...input, barcodes: ['4850000000003'] }),
     ).rejects.toMatchObject({ code: ERROR.BARCODE_CHECK_DIGIT })
   })
 
@@ -100,7 +123,7 @@ describe('proposeItem', () => {
     const items = fakeItems({ createUnlessNamed: () => Promise.resolve({ taken: existing }) })
 
     await expect(
-      proposeItem(items, NAMED_NOTHING, ACTOR, { ...input, barcodes: ['4850000000007'] }),
+      proposeItem(items, NAMED_NOTHING, PROPOSER, { ...input, barcodes: ['4850000000007'] }),
     ).resolves.toEqual({ taken: existing })
   })
 
@@ -120,7 +143,7 @@ describe('proposeItem', () => {
       },
     }
 
-    await proposeItem(items, hints, ACTOR, { ...input, barcodes: ['012345678905'] })
+    await proposeItem(items, hints, PROPOSER, { ...input, barcodes: ['012345678905'] })
 
     expect(asked).toEqual([['0012345678905']])
     expect(origins).toEqual(['open_food_facts'])
@@ -135,7 +158,7 @@ describe('proposeItem', () => {
       },
     })
 
-    await proposeItem(items, NAMED_NOTHING, ACTOR, input)
+    await proposeItem(items, NAMED_NOTHING, PROPOSER, input)
 
     expect(origins).toEqual([null])
   })

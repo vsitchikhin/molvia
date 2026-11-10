@@ -15,13 +15,14 @@ import {
 import type { AppLocale, BarcodeHint, Item, ProposedItem } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import type { Attached } from '@/usecases/attach-barcode'
-import type { Proposal } from '@/usecases/propose-item'
+import type { Proposal, Proposer } from '@/usecases/propose-item'
 import { parseBody, parseQuery, resourceId } from '@/parse'
 
 export interface CatalogueApi {
   /** The use case, already bound to its repositories by the composition point. */
   search(actorId: string, query: string): Promise<{ items: Item[]; near: boolean }>
-  propose(actorId: string, input: ProposedItem): Promise<Proposal>
+  /** The quota counts the proposer's own day (MOL-362): «today» is the phone's (MOL-121). */
+  propose(proposer: Proposer, input: ProposedItem): Promise<Proposal>
   byBarcode(code: string): Promise<Item | null>
   hint(actorId: string, code: string, locale: AppLocale): Promise<BarcodeHint | null>
   attachBarcode(actorId: string, itemId: string, code: string): Promise<Attached>
@@ -95,11 +96,19 @@ export function catalogueRoutes(app: FastifyInstance, api: CatalogueApi): void {
    * «Предложить товар». 201 for a new item, 200 for one the catalogue already held: the
    * request succeeded either way, and the status is how the screen tells «added» from «it was
    * already there». The answer is the same entry the search returns, so the screen opens the
-   * sheet on it exactly as it would after picking a row.
+   * sheet on it exactly as it would after picking a row. A new item past the person's day is a
+   * `429` (MOL-362).
    */
   app.post('/catalogue/items', async (request, reply) => {
     const input = parseBody(proposedItemSchema, request.body)
-    const proposal = await api.propose(request.actorId, input)
+    const proposal = await api.propose(
+      {
+        actorId: request.actorId,
+        today: request.today,
+        ...(request.zone ? { zone: request.zone } : {}),
+      },
+      input,
+    )
     if ('taken' in proposal) return taken(reply, proposal.taken)
 
     return reply
