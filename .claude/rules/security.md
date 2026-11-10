@@ -192,26 +192,46 @@ by itself; the owner's decisions are В-1…В-5 in `.scratch/tasks/plans/MOL-36
   public. A push to master is not read: master takes pull requests alone. **gitleaks says «no leaks found» and
   exits 0 when its git cannot read the range** (seen on a worktree whose `.git` the container did not have), so the
   same git of the same image counts the range first and fails the step where it cannot — a run that is no merge
-  included. **Its rules are its defaults and ours** (`.gitleaks.toml`): a ping URL of healthchecks.io, and a
+  included. **A merge of master in the branch is read by what it brought** (adversarial А1): `git log -p` shows a
+  merge no diff, and a conflict resolved by hand is exactly where a token is typed — so `--diff-merges=first-parent`,
+  master's changes read again with the hand's; `--remerge-diff`, the hand's alone, writes objects into a checkout
+  mounted read-only. **A file git calls binary is read as text** (`--text`, А3): a NUL or `-diff` in a
+  `.gitattributes` of the same pull request hid a `.env`. **A commit's message is read too** (А6), as public as its
+  diff and out of gitleaks' git mode: a file per commit through `gitleaks dir`, its fingerprint
+  `/messages/<commit>:<rule>:<line>`. **`gitleaks:allow` in a line silences nothing** (`--ignore-gitleaks-allow`,
+  А2): a comment in code is no change of the configuration review watches. **Its rules are its defaults and ours** (`.gitleaks.toml`): a ping URL of healthchecks.io, and a
   Telegram bot's token by its shape alone — the default wants `telegr…` in the name beside it, and the local check
-  of the red path passed `const TOKEN = '…'` until this rule. **A test's value is
+  of the red path passed `const TOKEN = '…'` until this rule — bounded by what cannot stand beside it, not `\b`:
+  Bot API's address puts it after `…/bot`, and its last sign may be `-` (А4, А5). **A test's value is
   let go by its value, for the generic rule alone** (Р-2): a path such as `*.test.ts` would pass a real token
   pasted into a test, and a pattern given to every rule would silence the ping URL, whose path is a uuid. On
   10.11.2026 the history of master held sixteen such findings and every branch the audit's thirty-three: none
-  after the allowlist. **The price, named:** the configuration is the pull request's own, so a pull request may
-  loosen it for itself — a change of `.gitleaks.toml` is review's; and only what a rule knows is found.
-- **`npm audit --omit=dev` is judged by `bin/npm-audit.mjs`** in `check` (owner's В-4 «б»): a high or critical
+  after the allowlist. **The prices, named:** the configuration is the pull request's own, so a pull request may
+  loosen it for itself — a change of `.gitleaks.toml`, `.gitleaksignore` or `.gitattributes` is review's; only what
+  a rule knows is found, and a binary's text only where it lies bare (a zip or an xlsx is compressed); a merge of
+  master reads what master brought again, so a secret rotated and left in a file reddens every branch merging it
+  — the secret goes out of the file with its rotation.
+- **`npm audit` of what ships is judged by `bin/npm-audit.mjs`** in `check` (owner's В-4 «б»): a high or critical
   advisory is red unless `bin/npm-audit-accepted.json` accepts it — its GHSA, the reason and the day to look again,
-  red once more the day after. npm has no list of its own, and `--audit-level=high` alone would hold every pull
+  a day of the calendar a year ahead at most (adversarial Б2), red once more the day after. **What ships is read
+  from the lockfile, not `--omit=dev`** (adversarial Б1): the whole tree is audited and a package counts where a
+  path of it is not `dev`, or where it is workbox's runtime — `generateSW` copies it into `sw.js`, which runs on
+  every request of the page, and the lockfile calls it development's; its builder `workbox-build` does not ship.
+  In doubt — no lockfile, a path it does not know — a package ships. **The price, named:** the few lines Vite and
+  `@vitejs/plugin-vue` put into the bundle (`modulepreload`, `_export_sfc`) stay development's — every advisory of
+  either is of the dev server. npm has no list of its own, and `--audit-level=high` alone would hold every pull
   request, a hotfix included, on the day an advisory comes with no fix. A report that did not come — the registry
   down — is red: «could not check» is never «clean». A line no advisory needs is said, to be taken out.
   Development's alerts stay Dependabot's.
 - **trivy reads the six images of a release beside its rollout, and daily what production runs** (`scan.yml`,
-  `bin/scan-images.mjs`, owner's В-2 «а», В-3 «а»): HIGH and CRITICAL with a fix, from ghcr with no pull. **Ours is
-  red**: the distribution's packages and `node_modules` — the stage `runtime` brings the first up to date at every
-  release, so a fix of Alpine or Debian shows red the day it comes out and goes with the next merge. **A module
+  `bin/scan-images.mjs`, owner's В-2 «а», В-3 «а»): HIGH and CRITICAL with a fix, from ghcr with no pull. **A module
   inside a Go binary is said, never red**: Caddy, Grafana and VictoriaMetrics as their authors built them wait for
-  their release, which Dependabot's `images` brings — red, every merge until Monday would have been. **It never
+  their release, which Dependabot's `images` brings — were it red, every merge would be red until Monday's update.
+  **Everything else is ours, and red** (review №3): the distribution's packages and `node_modules` today — the stage
+  `runtime` brings the first up to date at every release, so a fix of Alpine or Debian shows red the day it comes
+  out and goes with the next merge — and a kind of package no image holds yet, which in doubt is ours to look at.
+  **The list of images is `release.yml`'s matrix**, which `scan-images.test.ts` holds `IMAGES` to: an image built
+  and not scanned would be green by silence. **It never
   judges a rollout**: a hotfix does not wait for a scanner, and a red run on master comes by GitHub's e-mail. The
   daily run takes the commit `/api/health` names, `sha-<7 hex>`; production not answering, or an image not
   scanned — the database of trivy not downloaded — is red. On 10.11.2026, production's `sha-a557664`: none ours,

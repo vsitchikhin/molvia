@@ -458,10 +458,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `USER` (`check-pins`); the volumes of a service moved off root are given by its own one-shot service
   (`frontend-volumes`, `victoria-volumes`) at every `up`, by numbers; `runtime` brings its distribution's packages
   up to date and the release builds it afresh (`no-cache-filters`).
-- **CI scans what pins cannot hold** (MOL-369): gitleaks over every commit of a pull request — a secret found is
+- **CI scans what pins cannot hold** (MOL-369): gitleaks over every commit of a pull request, its merges, binaries and
+  messages too — a secret found is
   rotated and its fingerprint goes to `.gitleaksignore`, a test's value to the allowlist by its value, never by its
   path; `npm audit` of what ships, red for a high not accepted with a day in `bin/npm-audit-accepted.json`; trivy over
-  the images after a release and daily, red only for ours, never judging a rollout. The scanners are images by digest.
+  the images after a release and daily, red for all but a Go binary's, never judging a rollout. The scanners are images by digest.
 - **`/internal/*` is closed twice** — Caddy's 404 and `BOT_API_SECRET` in constant time; a bot's route goes in
   that scope only. **A finding is a probe on a copy** (`.scratch/tasks/security/MOL-287/probes/`), never prod.
 - **The page's CSP is a meta the build puts first in `index.html`, never Caddy's header** (MOL-363): the worker
