@@ -15,6 +15,14 @@ description = "healthchecks.io ping URL"
 regex = '''hc-ping\.com/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9_-]{22}/[a-z0-9-]+)'''
 keywords = ["hc-ping.com"]
 
+# A Telegram bot's token by its shape alone: the default rule wants `telegr…` in the name beside it, and a
+# token pasted as `const TOKEN = '…'` passed it. Its colon is out of the generic rule's reach too.
+[[rules]]
+id = "telegram-bot-token-bare"
+description = "Telegram bot token, whatever it is called"
+regex = '''\b\d{8,10}:AA[0-9A-Za-z_-]{33}\b'''
+keywords = [":aa"]
+
 # The values of the tests, by their value and for the generic rule alone (owner's Р-2): a path such as
 # `*.test.ts` would pass a real token pasted into a test, and a pattern given to every rule would
 # silence the one above, whose URL holds a uuid.

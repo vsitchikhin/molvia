@@ -51,11 +51,19 @@ jobs:
         if: github.event_name == 'pull_request'
         run: |
           docker build --quiet --tag molvia-gitleaks .github/scanners/gitleaks
-          docker run --rm --volume "$PWD:/repo:ro" \
-            --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/repo \
-            molvia-gitleaks git /repo --config /repo/.gitleaks.toml \
+          image() {
+            docker run --rm --volume "$PWD:/repo:ro" \
+              --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/repo \
+              "$@"
+          }
+          # gitleaks says «no leaks found» and exits 0 when its git cannot read the range: the same git of
+          # the same image counts it first, and fails the step where it cannot.
+          commits="$(image --entrypoint git molvia-gitleaks -C /repo rev-list --count 'HEAD^1..HEAD^2')"
+          echo "the pull request's commits: $commits"
+          image molvia-gitleaks git /repo --config /repo/.gitleaks.toml \
             --gitleaks-ignore-path /repo/.gitleaksignore --log-opts='HEAD^1..HEAD^2' \
             --redact --verbose --no-banner
+
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: .nvmrc
