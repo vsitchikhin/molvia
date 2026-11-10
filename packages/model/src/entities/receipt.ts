@@ -495,13 +495,14 @@ export const RECEIPT_PAGE_MODES = [4, 6] as const
 
 /**
  * «Переснимите» (MOL-222, owner, 04.10.2026): not one item line was found, and the receipt is no section
- * printed with no items (MOL-227). Every receipt with a line in
+ * printed with no items (MOL-227) nor a terminal's slip (MOL-310). Every receipt with a line in
  * it is read and goes to the review — «читать надо все кассы, все чеки» — however little of it was
  * read: the person's corrections are what the hypothesis of 0.2 counts, and a till read badly is one to
  * learn. What was «переснимите» before (В-4 of MOL-125) is `readPartly`, a hint on the review.
  */
 export function needsReshoot(text: ReceiptText): boolean {
-  return text.lines.length === 0 && text.layout !== 'department'
+  // a bank terminal's slip has no items to find either: its sum is the paper (MOL-310)
+  return text.lines.length === 0 && text.layout !== 'department' && text.layout !== 'slip'
 }
 
 /**

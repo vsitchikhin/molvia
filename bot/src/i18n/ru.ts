@@ -296,6 +296,7 @@ export const ru = {
   'owner.receipt.line.bent': 'сошлась только подменой',
   'owner.receipt.line.zero_not_gift': '0 — не подарок',
   'owner.receipt.line.one_alike_unproven': '«1 × цена» на нецелом чеке',
+  'owner.receipt.line.no_price_unproven': 'сумма без цены на нецелом чеке',
   'owner.receipt.line.price_dropped': 'цена убрана',
   /**
    * «Написать разработчику» in the bot (MOL-148). The frame is what the person gets around the

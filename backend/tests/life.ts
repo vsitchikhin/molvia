@@ -172,6 +172,8 @@ export async function aLife(
       // the card's 1 % sent to the card, a bonus spent on it (MOL-289)
       cashbackMinor: 740n,
       redeemedMinor: 1_000n,
+      // a café's service (MOL-310): a field of the copy, filled in some row
+      serviceMinor: 500n,
       paidBy: 'card',
       balanced: true,
       recordedAt: at,

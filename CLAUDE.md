@@ -732,6 +732,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   again as printed, a table too — two places shown included (В-2 «а»). Read in one place it is
   `read_total_minor`, what «Прочитали не всё» measures by alone, sent only to a phone that asks
   (`RECEIPT_READ_TOTAL_HEADER`).
+- **A café's service is no dish, and a bank slip with no bill is its sum** (MOL-310): the lines make the total less
+  «Հավելավճար 10%» as they make it less a cashback (`service_minor`, `linesTotalOf`), the trip the total; a slip — no
+  line, the terminal's rows — shows its one «Գումար» for the eye to check, the one total no second place vouches for
+  (В-3 «а»), and an earlier build gets none.
 - **A card that sends its discount to the card** (MOL-289): the lines meet «Ընդամենը» less «Զեղչ գործարքից»
   (`linesTotalOf`), its second place «ԱԱՀ-ով հարկվող»; the total shown is what left the card, and the trip's money that
   less a bonus spent (`receiptPaidOf`); a model's reading only. «Ընդամենը ամվա սկզբից» is never a total (MOL-288).
