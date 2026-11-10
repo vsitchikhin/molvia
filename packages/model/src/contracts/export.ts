@@ -58,8 +58,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // when (MOL-361). 29: the account's `receiptsDay` and `receiptsSent`, the receipts sent on the person's day,
 // which the day's quota counts (MOL-360). 30: the account's `itemsDay` and `itemsProposed`, the items put into
 // the shared catalogue by «Предложить товар» on the person's day, which its quota counts (MOL-362).
-// 31: the account's `modelMonth`, `modelSpentMicroUsd` and `modelShareTold`, what the model cost reading the
-// person's receipts this month and whether the owner heard they reached their share (MOL-367).
+// 31: the account's `modelMonth`, `modelSpentMicroUsd` and `modelShareTold`, how much of the person's share of the
+// model is counted this month — a call whose price is not known at its highest — and whether the owner heard they
+// reached it (MOL-367).
 export const EXPORT_VERSION = 31
 
 const day = z.iso.date()
