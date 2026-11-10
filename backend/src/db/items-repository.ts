@@ -887,7 +887,7 @@ async function proposalsOf(tx: Conn, quota: ProposalQuota) {
     .where(eq(actors.id, quota.actorId))
     .for('no key update')
   if (account === undefined) throw new DomainError(ERROR.NO_ACTOR)
-  return countOfDay(account, quota.day)
+  return { actorId: quota.actorId, ...countOfDay(account, quota.day) }
 }
 
 export function createItemRepository(db: Conn): ItemRepository {
@@ -1104,7 +1104,7 @@ export function createItemRepository(db: Conn): ItemRepository {
       return translateFailures(async () =>
         db.transaction(async (tx) => {
           // the person's row before the name's lock, as the account comes first everywhere (privacy.md)
-          const today = quota === undefined ? null : await proposalsOf(tx, quota)
+          const counted = quota === undefined ? null : await proposalsOf(tx, quota)
           // Per kind and key rather than per name: every name that is the same by
           // `nameIdentity` has the same key — built so, and held by a property test — so they
           // all meet at this lock, and the lookup below is an equality the GIN index serves.
@@ -1132,12 +1132,12 @@ export function createItemRepository(db: Conn): ItemRepository {
 
           const claimed = await claim(tx, input.barcodes, null)
           if ('taken' in claimed) return holder(tx, claimed.taken)
-          if (quota !== undefined && today !== null) {
-            if (today.n >= ITEMS_PROPOSED_DAY_MAX) throw new DomainError(ERROR.ITEMS_DAY_LIMITED)
+          if (counted !== null) {
+            if (counted.n >= ITEMS_PROPOSED_DAY_MAX) throw new DomainError(ERROR.ITEMS_DAY_LIMITED)
             await tx
               .update(actors)
-              .set({ itemsDay: today.day, itemsProposed: today.n + 1 })
-              .where(eq(actors.id, quota.actorId))
+              .set({ itemsDay: counted.day, itemsProposed: counted.n + 1 })
+              .where(eq(actors.id, counted.actorId))
           }
           return { item: await insert(tx, input, createdBy, origin), created: true }
         }),
