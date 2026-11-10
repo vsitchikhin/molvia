@@ -162,10 +162,17 @@ describe('auditVerdict', () => {
   })
 
   it('refuses a day not of the calendar, and one past a year ahead', () => {
-    const lines = [accept(HIGH, '2026-02-30'), accept(CRITICAL, '9999-12-31')]
+    const lines = [
+      accept(HIGH, '2026-02-30'),
+      accept(HIGH, '2026-13-01'),
+      accept(HIGH, '2026-00-10'),
+      accept(CRITICAL, '9999-12-31'),
+    ]
     const { problems } = auditVerdict(report(), lines, TODAY)
     expect(problems).toEqual([
-      expect.stringContaining(`${HIGH} — "until" is the day to look again`),
+      expect.stringContaining(`[0]: ${HIGH} — "until" is the day to look again`),
+      expect.stringContaining(`[1]: ${HIGH} — "until" is the day to look again`),
+      expect.stringContaining(`[2]: ${HIGH} — "until" is the day to look again`),
       expect.stringContaining(`${CRITICAL} — "until" is a year ahead at most, 2027-11-11`),
     ])
     expect(auditVerdict(report(), [accept(HIGH, '2027-11-11')], TODAY).problems).toEqual([])

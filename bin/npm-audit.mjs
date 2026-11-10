@@ -1,10 +1,10 @@
-// `npm audit` of what ships (MOL-369, owner's В-4 «б»): the dependencies of the lockfile less the
-// development ones — those are Dependabot's — but workbox's runtime, which the PWA's build copies into
-// `sw.js` (`SHIPPED_FROM_DEVELOPMENT`). A high or critical advisory turns CI red unless
-// `bin/npm-audit-accepted.json` accepts it: its GHSA, the reason, and the day to look again — a year ahead
-// at most — after which it is red once more. npm has no list of its own, and `--audit-level=high` alone would hold
-// every pull request on the day an advisory comes with no fix — a hotfix included. A report that did not
-// come — the registry down — is red too: «could not check» is never «clean».
+// `npm audit` of what ships (MOL-369, owner's В-4 «б»): the dependencies of the lockfile less the development
+// ones — those are Dependabot's — but workbox's runtime, which the PWA's build copies into `sw.js`
+// (`SHIPPED_FROM_DEVELOPMENT`). A high or critical advisory turns CI red unless `bin/npm-audit-accepted.json`
+// accepts it: its GHSA, the reason, and the day to look again — a year ahead at most — after which it is red
+// once more. npm has no list of its own, and `--audit-level=high` alone would hold every pull request on the
+// day an advisory comes with no fix — a hotfix included. A report that did not come — the registry down — is
+// red too: «could not check» is never «clean».
 import { spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
@@ -46,9 +46,11 @@ export function seriousAdvisories(report, lock) {
   return [...found.values()]
 }
 
-/** The day `days` after a day, YYYY-MM-DD. */
-const dayAfter = (day, days) =>
-  new Date(Date.parse(`${day}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10)
+/** The day `days` after a day, YYYY-MM-DD; null where the day is none — a month 13 is no time at all. */
+function dayAfter(day, days) {
+  const time = Date.parse(`${day}T00:00:00Z`)
+  return Number.isNaN(time) ? null : new Date(time + days * 86_400_000).toISOString().slice(0, 10)
+}
 
 /** What is wrong with one line of the accepted list, or null. */
 function entryProblem(entry, index, today) {
