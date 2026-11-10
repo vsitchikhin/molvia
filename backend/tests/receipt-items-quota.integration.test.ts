@@ -25,6 +25,8 @@ import { onlyRow } from './rows'
 // MOL-373 — «Записать» of a receipt takes any name over every line, so the new items it puts into the
 // catalogue everybody searches count in `RECEIPT_ITEMS_DAY_MAX` of the person's day, a count of their own.
 // The count is set by SQL where a test stands at the edge, as for the proposals (MOL-362).
+// The tests that record carry 15 s of their own (MOL-266): the slowest took 509 ms on CI, twenty times that rounded
+// up to 5 s, as the time reporter advises.
 
 const { db, close } = connectDrizzle()
 let app: FastifyInstance
@@ -194,7 +196,7 @@ describe('the new items of a day’s records (MOL-373)', () => {
     const again = await record(me, second, bodyOf([{ id: lori }, { id: lori }], [], tripId))
     expect(again.statusCode).toBe(200)
     expect(await statusOf(second)).toBe('recorded')
-  })
+  }, 15_000)
 
   it('refuses a record past its day before any of its names is locked, and takes one of names there (adversarial А2)', async () => {
     const me = await owner()
@@ -255,7 +257,7 @@ describe('the new items of a day’s records (MOL-373)', () => {
     expect(refused.statusCode).toBe(429)
     expect(await named('Сыр Тушети')).toHaveLength(0)
     expect(await named('Пакет фасовочный')).toHaveLength(0)
-  })
+  }, 15_000)
 
   it('counts no item chosen, no name already there nor its trace’s, and one name of two lines once', async () => {
     const me = await owner()
@@ -280,7 +282,7 @@ describe('the new items of a day’s records (MOL-373)', () => {
     expect(recorded.statusCode).toBe(200)
     expect(await named('Пакет фасовочный')).toHaveLength(1)
     expect(await count(me)).toMatchObject({ day: TODAY, n: 1, updatedAt: before })
-  })
+  }, 15_000)
 
   it('answers a record sent again with its trip whatever the count', async () => {
     const me = await owner()
@@ -295,7 +297,7 @@ describe('the new items of a day’s records (MOL-373)', () => {
     expect(again.statusCode).toBe(200)
     expect(again.json()).toMatchObject({ tripId: payload.tripId })
     expect((await count(me)).n).toBe(RECEIPT_ITEMS_DAY_MAX)
-  })
+  }, 15_000)
 
   it('starts a new day over, and counts a day the phone names before the one begun in it', async () => {
     const me = await owner()
@@ -315,7 +317,7 @@ describe('the new items of a day’s records (MOL-373)', () => {
     const later = await parsedReceipt(me.id, 1)
     expect((await record(me, later, bodyOf([{ name: 'Сыр Чечил' }]))).statusCode).toBe(429)
     expect(await count(me)).toMatchObject({ day: '2999-12-31', n: RECEIPT_ITEMS_DAY_MAX })
-  })
+  }, 15_000)
 
   it('keeps its count apart from «Предложить товар»: a full one lets the other through', async () => {
     const me = await owner()
@@ -330,7 +332,7 @@ describe('the new items of a day’s records (MOL-373)', () => {
 
     expect(proposed.statusCode).toBe(201)
     expect(await count(me)).toMatchObject({ n: RECEIPT_ITEMS_DAY_MAX, proposed: 1 })
-  })
+  }, 15_000)
 })
 
 /** Until `n` statements of this database wait on a lock: a step of a race seen, never a time. */
