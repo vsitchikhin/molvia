@@ -26,6 +26,11 @@ export function ownerText(notice: OwnerNotice): string {
   if (notice.kind === 'feedback_continued') return continuedText(notice)
   if (notice.kind === 'catalogue_merged') return mergedText(notice)
   if (notice.kind === 'model_spend') return spendText(notice)
+  if (notice.kind === 'model_share')
+    return t(undefined, 'owner.model.share', {
+      month: notice.month.slice(0, 7),
+      share: dollars(notice.shareMicroUsd),
+    })
   if (notice.kind === 'receipt_partial') return partialText(notice)
   if (notice.kind === 'receipt_partial_muted')
     return t(undefined, 'owner.receipt.muted', { count: notice.count })
