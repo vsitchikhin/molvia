@@ -201,8 +201,9 @@ by itself; the owner's decisions are В-1…В-5 in `.scratch/tasks/plans/MOL-36
   **`gitleaks:allow` in a line silences nothing** (`--ignore-gitleaks-allow`, А2): a comment in code is no change of
   the configuration review watches. **Its rules are its defaults and ours** (`.gitleaks.toml`): a ping URL of
   healthchecks.io, and a Telegram bot's token by its shape alone — the default wants `telegr…` in the name beside
-  it, and the local check of the red path passed `const TOKEN = '…'` until this rule — bounded by what cannot stand
-  beside it, not `\b`: Bot API's address puts it after `…/bot`, and its last sign may be `-` (А4, А5). **A test's
+  it, and the local check of the red path passed `const TOKEN = '…'` until this rule — bounded on the left alone, by
+  what is no digit, not `\b`: Bot API's address puts it after `…/bot` (А4), its last sign may be `-` (А5), and a
+  bound on the right took the comma before a second token, which then went unfound and unredacted (В1). **A test's
   value is let go by its value, for the generic rule alone** (Р-2): a path such as `*.test.ts` would pass a real
   token pasted into a test, and a pattern given to every rule would silence the ping URL, whose path is a uuid. On
   10.11.2026 the history of master held sixteen such findings and every branch the audit's thirty-three: none after
