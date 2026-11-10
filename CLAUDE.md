@@ -445,7 +445,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   blocker) — the login's start by its address, five a minute and three hundred in all (MOL-359); a receipt by its
   person, forty a day of their own — a count «Удалить» never gives back — and twenty not recorded at once
   (MOL-360); a new item of «Предложить товар» by its person, sixty a day of their own, a name already there
-  free (MOL-362); a new write path names its quota in its task. What answers without a session counts by the address Caddy names (`addressOf`), in memory.
+  free (MOL-362); what the model costs by its person, $2 of the month's cap (MOL-367); a new write path names its
+  quota in its task. What answers without a session counts by the address Caddy names (`addressOf`), in memory.
 - **A host the server asks is the code's, never the request's**, with a timeout (SSRF) and a ceiling of
   bytes on another's server's answer (`boundedBody`, MOL-368) — our own services aside.
 - **Every secret of production is a row of «Rotating the secrets» in `deploy/README.md`**, and a new one comes
