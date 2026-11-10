@@ -1,5 +1,6 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { findingsOf, summaryOf } from './scan-images.mjs'
+import { IMAGES, findingsOf, summaryOf } from './scan-images.mjs'
 
 const vulnerability = (id: string, name: string) => ({
   VulnerabilityID: id,
@@ -31,15 +32,34 @@ const report = {
       Vulnerabilities: [vulnerability('CVE-3', 'golang.org/x/net')],
     },
     { Target: 'debian 13', Class: 'os-pkgs', Type: 'debian' },
+    {
+      Target: 'usr/lib/python3/dist-packages',
+      Class: 'lang-pkgs',
+      Type: 'python-pkg',
+      Vulnerabilities: [vulnerability('CVE-4', 'requests')],
+    },
   ],
 }
 
+describe('IMAGES', () => {
+  // An image the release builds and the scan does not know would be green by silence (review №1).
+  it('is the matrix of the release, in its order', () => {
+    const release = readFileSync('.github/workflows/release.yml', 'utf8')
+    const built = [...release.matchAll(/^ {10}- \{ name: ([\w-]+), dockerfile: /gm)].map(
+      (match) => match[1],
+    )
+    expect(built.length).toBeGreaterThan(0)
+    expect(IMAGES).toEqual(built)
+  })
+})
+
 describe('findingsOf', () => {
-  it('takes the distribution and node_modules as ours, a Go binary as another release', () => {
+  it('takes a Go binary as another release, and everything else as ours — a kind no image holds yet too', () => {
     expect(findingsOf('frontend', report).map(({ id, ours }) => `${id} ${String(ours)}`)).toEqual([
       'CVE-1 true',
       'CVE-2 true',
       'CVE-3 false',
+      'CVE-4 true',
     ])
   })
 
@@ -54,7 +74,7 @@ describe('summaryOf', () => {
     const found = findingsOf('frontend', report)
     const summary = summaryOf(
       'sha-1a2b3c4',
-      [...found.slice(2), ...found.slice(0, 2)],
+      [...found.slice(2, 3), ...found.slice(0, 2)],
       [{ image: 'grafana', reason: 'TOOMANYREQUESTS' }],
     )
     expect(summary).toContain('2 ours, 1 inside Go binaries')

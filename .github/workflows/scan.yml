@@ -30,6 +30,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # From the release, the commit whose images it scans: `github.sha` of its workflow_run is whatever
+          # master points at by now, which may be the next merge with another list of images.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       # The images production runs are the commit `/api/health` names, tagged `sha-<7 hex>` by the release —
       # a rollback by hand to an older one included. Not reached is red: the scan would be of nothing.
