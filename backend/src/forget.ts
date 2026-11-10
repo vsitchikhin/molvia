@@ -17,7 +17,7 @@ export type ForgetExit = 0 | 1 | 2
  */
 export async function forget(
   argv: readonly string[],
-  erasure: Pick<ErasureRepository, 'erase'>,
+  erasure: Pick<ErasureRepository, 'erase' | 'sweepReleased'>,
   write: (line: string) => void,
 ): Promise<ForgetExit> {
   const flags = argv.filter((argument) => argument.startsWith('-'))
@@ -46,13 +46,26 @@ export async function forget(
   write(report.found ? 'owner found' : 'no owner with this Telegram id')
   for (const table of ERASED_TABLES) write(`  ${table.padEnd(20)}${String(report.erased[table])}`)
   write(
-    `  ${'items leaving'.padEnd(20)}${String(report.itemsLeaving)} (nobody alive stands on them: swept)`,
+    `  ${'items leaving'.padEnd(20)}${String(report.itemsLeaving)} (nobody alive stands on them)`,
   )
   write(`  ${'items kept'.padEnd(20)}${String(report.itemsReleased)} (author removed)`)
   write(`  ${'codes kept'.padEnd(20)}${String(report.barcodesReleased)} (author removed)`)
   write(`  ${'shop memory kept'.padEnd(20)}${String(report.memoryReleased)} (author removed)`)
   if (report.counted)
     write(`  ${'erasures'.padEnd(20)}+1 (a count by week of arrival, no id — the gates read it)`)
-  write(dryRun ? 'dry run: nothing changed. Run again with --yes to erase.' : 'erased.')
+  if (dryRun) {
+    write('dry run: nothing changed. Run again with --yes to erase.')
+    return 0
+  }
+  // The items leaving go at once, as by either door (MOL-374, review 4, №19); the erasure has
+  // committed whatever the sweep does, and the API's minute takes what it leaves.
+  try {
+    const swept = await erasure.sweepReleased(report.leavingItems)
+    write(`  ${'items swept'.padEnd(20)}${String(swept)}`)
+  } catch (error) {
+    const failure = describeFailure(error)
+    write(`  sweep failed: ${failure.code ?? failure.errorName} — the API's minute takes them`)
+  }
+  write('erased.')
   return 0
 }
