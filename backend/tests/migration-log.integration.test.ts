@@ -135,7 +135,7 @@ describe('соединение оборвано посреди миграции 
     await sql.end()
   })
 
-  it('процесс выходит с кодом 1 и строкой лога с CONNECTION_CLOSED, а не со стеком postgres.js', async () => {
+  it('процесс выходит с кодом 1 и строкой лога с кодом сервера 57P01, а не со стеком postgres.js', async () => {
     const folder = mkdtempSync(join(tmpdir(), 'mol153-cut-'))
     mkdirSync(join(folder, 'meta'))
     writeFileSync(
@@ -173,7 +173,9 @@ describe('соединение оборвано посреди миграции 
     expect(run.stderr).not.toContain('postgres/src/connection.js')
     expect(run.exit).toBe(1)
     const line = JSON.parse(run.stdout.trim()) as Record<string, unknown>
-    expect(line).toMatchObject({ msg: 'migrations failed', code: 'CONNECTION_CLOSED' })
+    // postgres 4.1 reads the server's FATAL before the socket closes, so a terminated backend is
+    // `57P01` (admin shutdown, as a restart of Postgres says it), not 4.0's `CONNECTION_CLOSED`.
+    expect(line).toMatchObject({ msg: 'migrations failed', code: '57P01' })
   }, 55_000)
 })
 
