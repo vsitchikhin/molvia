@@ -140,7 +140,7 @@ export const en: Dictionary = {
   'owner.model.stop':
     '🛑 Receipts by the model in {month}: ${spent} spent, a receipt did not fit under the ${cap} cap and was read by Tesseract. From now on the model reads only what still fits, Tesseract the rest.',
   'owner.model.share':
-    '✋ Receipts by the model in {month}: one person reached their ${share} share — their receipt was read by Tesseract. From now on the model reads theirs only while it still fits the share; everyone else’s as before.',
+    '✋ Receipts by the model in {month}: one person reached their ${share} share. From now on the model reads theirs only while it still fits the share, Tesseract the rest; everyone else’s as before.',
   'owner.receipt.partial': '🧾 A receipt not read whole · {receipt} · model · {country}',
   'owner.receipt.partialUnkept':
     '🧾 A receipt not read whole · model · {country} · not kept: edition 4 not accepted',

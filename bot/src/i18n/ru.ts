@@ -256,10 +256,10 @@ export const ru = {
     '🛑 Чеки моделью за {month}: потрачено ${spent}, чек не влез под потолок ${cap} и прочитан Tesseract. Дальше модель читает только то, что ещё влезает, остальное — Tesseract.',
   /**
    * One person reached their share of the month (MOL-367, В-3 «а»): once a person a month, nobody named — who it is,
-   * `psql` says.
+   * `psql` says. A reading or a brand's call may be the one refused, so nothing is said of which receipt.
    */
   'owner.model.share':
-    '✋ Чеки моделью за {month}: один человек выбрал свою долю ${share} — его чек прочитан Tesseract. Дальше модель читает ему только то, что ещё влезает в долю; остальным — как прежде.',
+    '✋ Чеки моделью за {month}: один человек выбрал свою долю ${share}. Дальше модель читает ему только то, что ещё влезает в долю, остальное — Tesseract; остальным — как прежде.',
   /**
    * A receipt the model read not whole, told to the developer (MOL-309): which, by its id's first characters,
    * and why by kind — no name, no sum, no shop. Russian always, as every notice to the owner.
