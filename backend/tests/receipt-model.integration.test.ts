@@ -262,6 +262,11 @@ async function readAll(
   return reports
 }
 
+const spentOf = async (me: Person) =>
+  onlyRow(
+    await db.select({ spent: actors.modelSpentMicroUsd }).from(actors).where(eq(actors.id, me.id)),
+  )?.spent
+
 const receiptOf = async (id: string) =>
   onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
 const month = () => spend.month(spendMonthOf(new Date()))
@@ -558,6 +563,8 @@ describe('a failure of the model’s own client (review №4)', () => {
     expect((await receiptOf(id))?.readerVersion).toBe('tesseract 5.5.0 · test')
     expect(reports.some((r) => r.kind === 'error')).toBe(true)
     expect((await month())?.spentMicroUsd).toBe(9_000)
+    // never in the person's share: the fault is ours (MOL-367, В-4 «а»)
+    expect(await spentOf(me)).toBe(0)
   }, 30_000)
 })
 
@@ -598,12 +605,24 @@ describe('the model away (Р-9)', () => {
     expect(reports).toContainEqual({ kind: 'model_unavailable', reason: 'status 529' })
   }, 30_000)
 
-  it('keeps the worst counted for a time out, whose price is not known', async () => {
+  it('keeps the worst counted for a time out, whose price is not known — in the month, never the share', async () => {
     const me = await person(LATER)
     await queued(me)
     const model = fakeModel(() => Promise.reject(new ModelUnavailable('timeout', null)))
     await readAll(benchReader(), model)
     expect((await month())?.spentMicroUsd).toBe(9_000)
+    // a person chooses no outage of the network (MOL-367, owner's В-4 «а» on adversarial А1)
+    expect(await spentOf(me)).toBe(0)
+  }, 30_000)
+
+  it('takes nothing of the share for every minute a receipt waits with no connection (MOL-367, А1)', async () => {
+    const me = await person(LATER)
+    await queued(me)
+    const model = fakeModel(() => Promise.reject(new ModelUnavailable('unreachable', null)))
+    for (let minute = 0; minute < 3; minute += 1) await readAll(benchReader(), model)
+    expect(model.asked).toBe(3)
+    expect((await month())?.spentMicroUsd).toBe(3 * 9_000)
+    expect(await spentOf(me)).toBe(0)
   }, 30_000)
 
   it('leaves it to Tesseract once it waited past the wait, not a millisecond before', async () => {

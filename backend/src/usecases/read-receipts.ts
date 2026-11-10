@@ -272,10 +272,8 @@ async function readByModel(
     reading = await model.read(parts)
   } catch (error) {
     if (error instanceof ModelUnavailable) {
-      // a time out may have been paid: its worst stays counted
-      if (error.costMicroUsd !== null) {
-        await spend.settle(month, worst, error.costMicroUsd, call, now())
-      }
+      // a time out may have been paid: its worst stays in the month, and goes back to the person's share (В-4 «а»)
+      await spend.settle(month, worst, error.costMicroUsd, call, now())
       report({ kind: 'model_unavailable', reason: error.reason })
       if (error.broken !== undefined) report({ kind: 'model_broken', error: error.broken })
       const waited = now().getTime() - (claimed.queuedAt ?? now()).getTime()
@@ -290,8 +288,9 @@ async function readByModel(
       return null
     }
     // anything else is ours, and the receipt is not at fault: the owner hears of it, Tesseract reads, and the
-    // worst stays counted — whether it was paid is not known (review №4)
+    // worst stays in the month — whether it was paid is not known (review №4) — never in the person's share
     report({ kind: 'error', error })
+    await spend.settle(month, worst, null, call, now())
     return null
   }
   const paid: ModelPaid = { costMicroUsd: reading.costMicroUsd, tokens: reading.tokens }

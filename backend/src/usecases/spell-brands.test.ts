@@ -130,7 +130,8 @@ describe('the brands of a receipt the model read, asked of it (MOL-326, В-1 «�
   it('keeps the worst counted of a call whose price is not known, and settles one refused before the model', async () => {
     const away = harness(() => Promise.reject(new ModelUnavailable('timeout', null)))
     expect(await spelledBrands(away.deps, [FELIX], ASK)).toEqual(new Map())
-    expect(away.settle).not.toHaveBeenCalled()
+    // the month keeps the worst, the share has it back (MOL-367, В-4 «а»)
+    expect(away.settle).toHaveBeenCalledWith('2026-10-01', expect.any(Number), null, CALL, NOW)
     expect(away.reports).toEqual([{ kind: 'brands_unavailable', reason: 'timeout' }])
 
     const busy = harness(() => Promise.reject(new ModelUnavailable('status 429', 0)))

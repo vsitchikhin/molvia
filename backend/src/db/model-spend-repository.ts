@@ -36,12 +36,14 @@ export interface ModelSpendRepository {
   reserve(month: string, worstMicroUsd: number, call: ModelCall, at: Date): Promise<ModelReserved>
   /**
    * Puts what the call cost in place of its worst — in the person's share while it still counts that month — and
-   * tells the owner of a share of the cap passed.
+   * tells the owner of a share of the cap passed. **A cost not known** (`null`: a time out, a connection lost, a
+   * fault of ours) keeps the worst in the month, which holds the money, and gives it back to the share, which holds
+   * the people apart (MOL-367, owner's В-4 «а» on adversarial А1): a person chooses no outage of the network.
    */
   settle(
     month: string,
     worstMicroUsd: number,
-    costMicroUsd: number,
+    costMicroUsd: number | null,
     call: ModelCall,
     at: Date,
   ): Promise<void>
@@ -143,8 +145,9 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
         // nothing — the new month began at nought — or the worst of a call reserved after it began, kept (А4)
         await tx.execute(sql`
           update ${actors}
-          set model_spent_micro_usd = greatest(${actors.modelSpentMicroUsd} - ${worstMicroUsd}::bigint + ${costMicroUsd}::bigint, 0)
+          set model_spent_micro_usd = greatest(${actors.modelSpentMicroUsd} - ${worstMicroUsd}::bigint + ${costMicroUsd ?? 0}::bigint, 0)
           where ${actors.id} = ${actorId} and ${actors.modelMonth} = ${month}::date`)
+        if (costMicroUsd === null) return
         const settled = await tx.execute<{ spent: string; noticed: number }>(sql`
           update ${modelSpend}
           set spent_micro_usd = greatest(${modelSpend.spentMicroUsd} - ${worstMicroUsd}::bigint + ${costMicroUsd}::bigint, 0)

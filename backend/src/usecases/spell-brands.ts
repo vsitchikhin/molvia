@@ -90,10 +90,8 @@ export async function spelledBrands(
     answer = await reader.spellBrands(brands)
   } catch (error) {
     if (error instanceof ModelUnavailable) {
-      // a time out may have been paid: its worst stays counted
-      if (error.costMicroUsd !== null) {
-        await spend.settle(month, worst, error.costMicroUsd, call, now())
-      }
+      // a time out may have been paid: its worst stays in the month, and goes back to the person's share (В-4 «а»)
+      await spend.settle(month, worst, error.costMicroUsd, call, now())
       report({ kind: 'brands_unavailable', reason: error.reason })
       return taken
     }
@@ -102,8 +100,9 @@ export async function spelledBrands(
       report({ kind: 'brands_rejected', error })
       return taken
     }
-    // ours, and the receipt is not at fault: its brands are spelt in letters, the worst stays counted
+    // ours, and the receipt is not at fault: its brands are spelt in letters, the worst stays in the month alone
     report({ kind: 'error', error })
+    await spend.settle(month, worst, null, call, now())
     return taken
   }
   const paid: ModelPaid = { costMicroUsd: answer.costMicroUsd, tokens: answer.tokens }
