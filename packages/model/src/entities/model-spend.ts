@@ -78,6 +78,14 @@ export function worstCallMicroUsd(inputTokens: number): number {
 }
 
 /**
+ * What the model may cost reading one person's receipts in a month (MOL-367, owner's В-1 «а»): $2, the price of a month
+ * of receipts (MOL-271), so one person never takes the cap from the others. **A constant, never the environment**
+ * (В-5 «а»): the privacy page names it, so a change is a change of the code and a revision of the page in one pull
+ * request, as `RECEIPTS_DAY_MAX` is. Above the month's cap it is the cap.
+ */
+export const RECEIPT_MODEL_SHARE_MICRO_USD = 2_000_000
+
+/**
  * The shares of the month's cap the owner hears of, each once a month (В-2 «а»): half, nine tenths, and
  * the stop — the first call that would not fit under the cap. It stops that call, not the month: the model
  * reads up to the last call that still fits (В-2 «а»), and a smaller receipt after it may (adversarial А1).

@@ -85,11 +85,15 @@ export const RECEIPT_MODEL_WAIT_MS = 10 * 60 * 1000
 /** What a call of the model cost and used. */
 export type ModelPaid = Pick<ModelReading, 'costMicroUsd' | 'tokens'>
 
-/** The model that reads receipts, and its month's spending under the cap (MOL-272). */
+/**
+ * The model that reads receipts, and its month's spending under the cap (MOL-272) and each person's share of it
+ * (MOL-367).
+ */
 export interface ReceiptModelDeps {
   readonly reader: ReceiptModel
   readonly spend: ModelSpendRepository
   readonly capMicroUsd: number
+  readonly shareMicroUsd: number
 }
 
 export interface ReadReceiptsDeps {
@@ -159,7 +163,7 @@ export type ReadReport =
    */
   | {
       readonly kind: 'model_passed'
-      readonly reason: 'cap' | 'size' | 'refused' | 'cut' | 'invalid' | 'away'
+      readonly reason: 'cap' | 'share' | 'size' | 'refused' | 'cut' | 'invalid' | 'away'
       /** What an answer not taken cost and used: paid all the same (review №6). */
       readonly paid?: ModelPaid
     }
@@ -243,7 +247,7 @@ async function readOne(
  */
 async function readByModel(
   deps: ReadReceiptsDeps,
-  { reader: model, spend, capMicroUsd }: ReceiptModelDeps,
+  { reader: model, spend, capMicroUsd, shareMicroUsd }: ReceiptModelDeps,
   claimed: ClaimedReceipt,
   photoReading: PhotoReading,
 ): Promise<{ outcome: ReadOutcome; paid: ModelPaid; unparsed: number } | 'wait' | null> {
@@ -257,8 +261,11 @@ async function readByModel(
   }
   const worst = worstCallMicroUsd(input)
   const month = spendMonthOf(now())
-  if (!(await spend.reserve(month, worst, capMicroUsd, now()))) {
-    report({ kind: 'model_passed', reason: 'cap' })
+  // the receipt's owner pays from their share, whatever the model is asked for them (MOL-367)
+  const call = { actorId: claimed.actorId, capMicroUsd, shareMicroUsd }
+  const reserved = await spend.reserve(month, worst, call, now())
+  if (reserved !== 'reserved') {
+    report({ kind: 'model_passed', reason: reserved })
     return null
   }
   let reading
@@ -266,9 +273,10 @@ async function readByModel(
     reading = await model.read(parts)
   } catch (error) {
     if (error instanceof ModelUnavailable) {
-      // a time out may have been paid: its worst stays counted
+      // a time out may have been paid: its worst stays counted, in the month and the person's share alike — a request
+      // that never left costs nothing (MOL-367, В-6 «а» on adversarial Б1)
       if (error.costMicroUsd !== null) {
-        await spend.settle(month, worst, error.costMicroUsd, capMicroUsd, now())
+        await spend.settle(month, worst, error.costMicroUsd, call, now())
       }
       report({ kind: 'model_unavailable', reason: error.reason })
       if (error.broken !== undefined) report({ kind: 'model_broken', error: error.broken })
@@ -279,17 +287,18 @@ async function readByModel(
     }
     if (error instanceof ModelRejected) {
       // refused for what it is, before the model: nothing paid
-      await spend.settle(month, worst, 0, capMicroUsd, now())
+      await spend.settle(month, worst, 0, call, now())
       report({ kind: 'model_rejected', error })
       return null
     }
     // anything else is ours, and the receipt is not at fault: the owner hears of it, Tesseract reads, and the
-    // worst stays counted — whether it was paid is not known (review №4)
+    // worst stays in the month — whether it was paid is not known (review №4) — never in the person's share
     report({ kind: 'error', error })
+    await spend.keepInMonth(month, worst, call)
     return null
   }
   const paid: ModelPaid = { costMicroUsd: reading.costMicroUsd, tokens: reading.tokens }
-  await spend.settle(month, worst, reading.costMicroUsd, capMicroUsd, now())
+  await spend.settle(month, worst, reading.costMicroUsd, call, now())
   if (reading.kind !== 'read') {
     report({ kind: 'model_passed', reason: reading.kind, paid })
     return null

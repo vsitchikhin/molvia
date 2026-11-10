@@ -44,6 +44,9 @@ const file: ExportFile = {
     receiptsSent: 3,
     itemsDay: '2026-09-21',
     itemsProposed: 4,
+    modelMonth: null,
+    modelSpentMicroUsd: 0,
+    modelShareTold: null,
     createdAt: at,
     updatedAt: at,
   },
@@ -432,7 +435,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(31)
+    expect(wire.version).toBe(32)
     expect(wire.account.lastSeenAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.silenceWarning).toBe(7)
     expect(wire.account.silenceWarnedAt).toBe('2026-09-20T10:00:00.000Z')

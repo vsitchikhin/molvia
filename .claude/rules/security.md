@@ -42,7 +42,9 @@ file holds what belongs to no single area, and what the audit found missing.
   (Ф-4, MOL-362): sixty new items a day of their own, a name already there free — one account wrote some nine
   thousand names an hour into everybody's search — `search.md`; the names a receipt's «Записать» makes are
   held by the receipts' quota alone, up to 600 a receipt and some 24 000 a day an account (MOL-373), and the
-  count goes with an erased account — prices named there. **A new write path names its
+  count goes with an erased account — prices named there. **What the model costs is a person's share of the month**
+  (Ф-10, MOL-367): $2 of the $200 cap, so one person granted the model never takes it from the others —
+  `receipts.md`. **A new write path names its
   quota in its task**, or says why it needs none. **A person's own rows of money have none either, and
   that is a price, not a reason** (self-review №5): the bodies are small and bounded, but nothing bounds
   their number, and how fast one account fills the disk with them was not measured — the disk alarm of
