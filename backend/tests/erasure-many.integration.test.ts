@@ -3,6 +3,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, telegramId } from './fixtures'
+import { onlyRow } from './rows'
 
 // A file of its own: 33 000 items are a catalogue's worth, and clearing them after the other tests of
 // erasure took past a hook's 10 s on that connection, while on a fresh one it takes about 1.5 s. Its
@@ -35,7 +36,7 @@ describe('стирание того, у кого товаров больше, ч
     // The sweep of the whole list — `make forget --yes`'s, a door's own being cut (Р5-А16) — goes a
     // batch's worth at a time, so the list never reaches a statement (review 5, №20): some 6 s on a Mac.
     expect(await erasure.sweepReleased(report.leavingItems)).toBe(33000)
-    const [left] = await db.execute<{ n: number }>(sql`select count(*)::int as n from items`)
+    const left = onlyRow(await db.execute<{ n: number }>(sql`select count(*)::int as n from items`))
     expect(left?.n).toBe(0)
   }, 180_000)
 })
