@@ -99,8 +99,9 @@ file holds what belongs to no single area, and what the audit found missing.
   rotated, never rewritten out. gitleaks over the whole history found none (MOL-287); a guard in CI is
   MOL-369.
 - **CI's secrets stand in the environment `production`, which admits `master` alone**, and a job holding
-  one has `permissions: contents: read` — all but `HC_CERT_URL` of `watch.yml`, a repository secret to be
-  moved there (MOL-368).
+  one has `permissions: contents: read` or none — `HC_CERT_URL` of `watch.yml` too, moved there from the
+  repository (MOL-368), with `deployment: false`: the environment's secrets and rule of branches, and no
+  record of a deployment for an hourly check.
 
 ## What CI runs is pinned
 

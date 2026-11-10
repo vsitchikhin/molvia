@@ -507,8 +507,12 @@ on GitHub, hourly: its check waits a day and an hour.
   two in the shell: `make watcher`. A commit master has moved past stands aside, and the next green
   one rolls out. An account that never opened Workers & Pages in the dashboard has no `workers.dev`
   subdomain, and Cloudflare refuses the cron until it has one — opening the page once makes it.
-- `molvia-cert`'s ping URL is the repository secret `HC_CERT_URL` (`gh secret set …`). Without it,
-  every run is red.
+- `molvia-cert`'s ping URL is the secret `HC_CERT_URL` of the environment `production`
+  (`gh secret set HC_CERT_URL --env production`), never of the repository (MOL-368, audit MOL-287
+  Ф-18): a repository secret is handed to any workflow of any branch, the environment's to `master`
+  alone. The job takes the environment with `deployment: false` — its secrets and its rule of
+  branches, and no record of a deployment: an hourly check would write 24 a day into
+  `production`'s history of rollouts. Without the secret every run is red.
 - `molvia-bot`'s ping URL is `BOT_PULSE_URL` in `~/molvia/.env.prod`, handed to the bot by
   `docker-compose.prod.yml`. **The line is required**: without it compose refuses to start, since
   a check that never got a ping stays «new» and never raises an alarm — a forgotten line would go
@@ -849,7 +853,7 @@ written as their documentation has them and not drilled.
 | `BOT_PULSE_URL`, `ALERTS_PULSE_URL`    | `.env.prod`, healthchecks.io                       | none                                         |
 | `HC_URL` (the copies' ping)            | `backup.env`, healthchecks.io                      | none                                         |
 | `HC_UP_URL`                            | the Worker's secret, healthchecks.io               | none                                         |
-| `HC_CERT_URL`                          | GitHub repository secret, healthchecks.io          | none                                         |
+| `HC_CERT_URL`                          | GitHub secret of `production`, healthchecks.io     | none                                         |
 | `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` | GitHub environment `production`, `authorized_keys` | none                                         |
 | `CLOUDFLARE_API_TOKEN`                 | GitHub environment `production`, Cloudflare        | none                                         |
 | GHCR token                             | `~/.docker/config.json` of `deploy`, GitHub        | none — the images are public                 |
@@ -913,9 +917,9 @@ written as their documentation has them and not drilled.
   healthchecks.io with the Telegram integration, its URL where the old one was — `.env.prod` and
   `$C up -d bot` / `grafana`; `HC_URL` of `backup.env`, seen by
   `sudo systemctl start molvia-backup.service`; the Worker's secret (Signals, «Where it is set»);
-  `gh secret set HC_CERT_URL` — and the old check deleted. See the new one turn green before
-  deleting the old. Whoever holds a ping URL can say «alive» while it is not, so a leaked server
-  changes all five.
+  `gh secret set HC_CERT_URL --env production` — and the old check deleted. See the new one turn
+  green before deleting the old. Whoever holds a ping URL can say «alive» while it is not, so a
+  leaked server changes all five.
 - **`DEPLOY_SSH_KEY`**: a new pair as in «Once: the deploy key», its line appended to
   `~/.ssh/authorized_keys` with the same `restrict,command=…` before the old one is removed, the
   environment's secret replaced, one rollout seen green, then the old line removed.
