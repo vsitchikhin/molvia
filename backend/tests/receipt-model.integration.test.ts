@@ -485,13 +485,7 @@ describe('the month’s cap (Т-4, В-2 «а»)', () => {
       fakeModel(() => read()),
       { cap: WORST - 1 },
     )
-    const mine = onlyRow(
-      await db
-        .select({ spent: actors.modelSpentMicroUsd })
-        .from(actors)
-        .where(eq(actors.id, me.id)),
-    )
-    expect(mine?.spent).toBe(0)
+    expect(await spentOf(me)).toBe(0)
   }, 30_000)
 
   it('leaves to Tesseract a call a micro-dollar past the cap, asking nothing', async () => {
