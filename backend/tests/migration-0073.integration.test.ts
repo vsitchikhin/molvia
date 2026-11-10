@@ -5,7 +5,7 @@ import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
-import { insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
+import { insertPlace, insertTrip, telegramId } from './fixtures'
 import { MIGRATIONS } from '@/db/migrate'
 import * as schema from '@/db/schema'
 import { expenses } from '@/db/schema'
@@ -116,7 +116,11 @@ describe('0073: the last visit of everyone already there', () => {
     for (const entry of before) await apply(entry)
     const db = drizzle(sql, { schema })
     const place = await insertPlace(db)
-    const milk = await insertItem(db)
+    // items by SQL: `items` has a column since (0085, MOL-374) the schema would name
+    const milk = randomUUID()
+    await sql`
+      insert into items (id, kind, name, search_key, default_unit)
+      values (${milk}, 'product', 'Молоко «Ашхар»', 'moloko ashar', 'l')`
 
     // a session used on the 20th, a trip started before it: the session
     const withSession = await owner()
@@ -166,12 +170,10 @@ describe('0073: the last visit of everyone already there', () => {
         '2026-10-16T08:00:00.000Z')`
     // signed out everywhere, then proposed an item on the 17th, or bound a code to one on the 18th
     const proposed = await owner()
-    await insertItem(db, {
-      name: 'Сыр «Лори»',
-      searchKey: 'syr lori',
-      createdBy: proposed,
-      createdAt: new Date('2026-10-17T08:00:00.000Z'),
-    })
+    await sql`
+      insert into items (id, kind, name, search_key, default_unit, created_by, created_at)
+      values (${randomUUID()}, 'product', 'Сыр «Лори»', 'syr lori', 'l', ${proposed},
+        '2026-10-17T08:00:00.000Z')`
     const bound = await owner()
     await sql`
       insert into item_barcodes (code, item_id, added_by, added_at)

@@ -518,6 +518,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     app.log,
     options.failureRecorded,
   )
+  // A sweep that failed after an erasure committed (MOL-374): the minute timer takes the items left.
+  const sweepFailed = (error: unknown): void => {
+    failures.report(error, job('released-items'), 'released items sweep failed')
+  }
 
   // The auth scopes set `no-store` on what their routes answer, but a path no route matches
   // and a URL Fastify cannot decode are answered before any scope is entered (adversarial А4).
@@ -643,6 +647,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopIncomeCleanup: (() => Promise<void>) | undefined
     let stopSpendingCleanup: (() => Promise<void>) | undefined
     let stopTripCleanup: (() => Promise<void>) | undefined
+    let stopReleasedSweep: (() => Promise<void>) | undefined
     let stopAccountCleanup: (() => Promise<void>) | undefined
     let stopTransferCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
@@ -696,6 +701,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           failures.report(error, job('trip-cleanup'), 'removed trip cleanup failed')
         },
       )
+      // And the items whose author erased themselves, once nothing stands on them (MOL-374, В-7 «а»):
+      // erasure only marks them, so it holds no lock on an item anybody else writes to.
+      const erasure = createErasureRepository(db)
+      stopReleasedSweep = startLoginCleanup(async () => {
+        await erasure.sweepReleased()
+      }, sweepFailed)
       // And for accounts without operations (MOL-115): deleted ten minutes on, whatever named one
       // meanwhile left without an account rather than lost (Р-17).
       stopAccountCleanup = startLoginCleanup(
@@ -1032,6 +1043,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopIncomeCleanup?.()
       await stopSpendingCleanup?.()
       await stopTripCleanup?.()
+      await stopReleasedSweep?.()
       await stopTransferCleanup?.()
       await stopAccountCleanup?.()
       await stopSessionCleanup?.()
@@ -1079,7 +1091,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       preview: (code) => previewLogin(loginRequests, code),
       confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
       decline: (code) => declineLogin(loginRequests, code),
-      erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId),
+      erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId, sweepFailed),
       // One person's claim that fails is logged by its kind and the others of the minute go on.
       claimReminders: () =>
         remindRatings(
@@ -1201,7 +1213,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         exportMine(createExportRepository(db), actorId, sessionId),
       )
       actorEraseRoute(guarded, (telegramUserId) =>
-        eraseMe(createErasureRepository(db), telegramUserId),
+        eraseMe(createErasureRepository(db), telegramUserId, sweepFailed),
       )
       const heavyFeedback = heavyFeedbackLimit()
       feedbackRoutes(

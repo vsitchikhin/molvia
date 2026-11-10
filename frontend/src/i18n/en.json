@@ -1297,7 +1297,7 @@
   "erase": {
     "title": "Delete all your data?",
     "goes": "Everything Molvia knows about you goes: purchases, spendings and their categories, currency exchanges, incomes, accounts and checks, ratings and reviews, search picks, visit marks, settings and sign-ins on every device.",
-    "stays": "The items, shops and barcodes you added to the shared catalogue, and the shops’ memory — which item stands behind a receipt line and the shelf price — stay, without your name. One number stays too: how many people who came in the same week deleted their data.",
+    "stays": "Your items in the shared catalogue are deleted if nobody else uses them. Those someone else has already bought, rated or picked in search stay, without your name — as do the shops, the barcodes and the shops’ memory — which item stands behind a receipt line and the shelf price. One number stays too: how many people who came in the same week deleted their data.",
     "devices": "What is saved on this device is erased. Copies on other devices stay until the app or the site data is deleted there.",
     "final": "This cannot be undone. You can download a copy first: «Download my data».",
     "confirm": "Delete for good",
@@ -1737,7 +1737,7 @@
       },
       "items": {
         "term": "Items in the catalogue",
-        "text": "Items you added with «Suggest an item», and the new items of a receipt you recorded — named as the reading proposed or as you typed it yourself — are in the shared catalogue: everyone searches by them, but whose they are is shown to nobody. So put nothing personal in an item's name. We also keep how many new items you added on your own day — with «Suggest an item» (at most 60) and from receipts you recorded (at most 300) — so the catalogue is not flooded."
+        "text": "Items you added with «Suggest an item», and the new items of a receipt you recorded — named as the reading proposed or as you typed it yourself — are in the shared catalogue: everyone searches by them, but whose they are is shown to nobody. So put nothing personal in an item's name. We also keep how many new items you added on your own day — with «Suggest an item» (at most 60) and from receipts you recorded (at most 300) — so the catalogue is not flooded. If you delete your data, an item goes with it when nobody else uses it (see «Delete everything»)."
       },
       "places": {
         "term": "Shops",
@@ -1853,7 +1853,7 @@
     },
     "erase": {
       "title": "Delete everything",
-      "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they, the items you added to the shared catalogue, the barcodes you linked and the shops’ memory — which item stands behind a receipt line and the shelf price — stay, without your name. Deletion does not reach the receipt photos the Claude model read: at Anthropic they and the model’s answers live their own term — up to 30 days, up to 2 years if its check flagged them, the check’s score up to 7 years (see «Who the data goes to»). Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site's data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data, and how many of those accounts were deleted by themselves, after two years without a visit. It is there so that whether Molvia gets used is counted honestly."
+      "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they stay, without your name. The items you added to the shared catalogue go, with the barcodes you linked to them and the shops’ memory of them, if nobody else stands on them: nobody else bought, rated or picked them in search, linked a barcode to them or is reading them on a receipt, they were never merged with another item of the catalogue and are not in its common list of names. A merged item stays as a second name of the one it was merged with. Your other items, the barcodes you linked and the shops’ memory — which item stands behind a receipt line and the shelf price — stay, without your name. Deletion does not reach the receipt photos the Claude model read: at Anthropic they and the model’s answers live their own term — up to 30 days, up to 2 years if its check flagged them, the check’s score up to 7 years (see «Who the data goes to»). Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site's data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data, and how many of those accounts were deleted by themselves, after two years without a visit. It is there so that whether Molvia gets used is counted honestly."
     },
     "inactive": {
       "title": "An inactive account",
@@ -1892,7 +1892,7 @@
     },
     "catalogue": {
       "title": "The shared catalogue",
-      "text": "The items and barcodes you add become part of the shared catalogue and stay in it without your name, even if you delete your account."
+      "text": "The items and barcodes you add become part of the shared catalogue. If you delete your account, those others already use stay in it without your name; the rest are deleted."
     },
     "ads": {
       "title": "No advertising",

@@ -1630,6 +1630,34 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           return { keptUntil }
         }
         if (outcome.lines.length > 0) {
+          // The items the lines found, held while the lines are written (MOL-374, adversarial А6): one
+          // erasure took meanwhile — its author gone, nothing standing on it yet — makes its line a new one
+          // rather than refuse the whole reading on the foreign key. A key share waits for an erasure in
+          // flight and then finds the row gone; held first, it is a line erasure sees standing on the item.
+          const bound = [
+            ...new Set(
+              outcome.bindings.flatMap((binding) =>
+                binding.itemId === null ? [] : [binding.itemId],
+              ),
+            ),
+          ]
+          const live = new Set<string>()
+          if (bound.length > 0) {
+            const rows = await tx.execute<{ id: string }>(sql`
+              select id from items
+              where id in (${sql.join(
+                bound.map((item) => sql`${item}::uuid`),
+                sql`, `,
+              )})
+              order by id
+              for key share`)
+            for (const row of rows) live.add(row.id)
+          }
+          const bindings = outcome.bindings.map((binding) =>
+            binding.itemId === null || live.has(binding.itemId)
+              ? binding
+              : { ...binding, itemId: null, match: 'new' as const },
+          )
           await tx.insert(receiptLines).values(
             outcome.lines.map((line, position) => ({
               receiptId: id,
@@ -1645,10 +1673,10 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               settled: line.settled,
               repaired: line.repaired === true,
               remembered: outcome.remembered?.[position] === true,
-              itemId: outcome.bindings[position]?.itemId ?? null,
-              match: outcome.bindings[position]?.match ?? null,
-              translation: outcome.bindings[position]?.translation ?? null,
-              spelled: outcome.bindings[position]?.spelled === true,
+              itemId: bindings[position]?.itemId ?? null,
+              match: bindings[position]?.match ?? null,
+              translation: bindings[position]?.translation ?? null,
+              spelled: bindings[position]?.spelled === true,
               gtin: outcome.codes?.[position] ?? null,
             })),
           )

@@ -1,7 +1,7 @@
 import { randomBytes } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { ERROR, ISSUE } from '@molvia/model'
+import { ERROR, ISSUE, catalogueEntryCodec, catalogueSearchResponseSchema } from '@molvia/model'
 import { buildServer } from '@/server'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { actors, erasures, items, sessions, verdicts } from '@/db/schema'
@@ -10,8 +10,8 @@ import {
   aStrangersCookie,
   clearAll,
   insertActor,
-  insertItem,
   insertPlace,
+  insertSeedItem,
   insertSession,
   signIn,
   telegramId,
@@ -103,13 +103,40 @@ describe('POST /internal/actors/erase — удаление самим челов
   })
 })
 
+describe('петля «предложить → стереть → войти» (MOL-374)', () => {
+  it('товары стёртого, на которые никто не опирается, больше не находит никто', async () => {
+    const tg = telegramId()
+    const boris = await insertActor(db, { telegramUserId: tg })
+    const proposed = await app.inject({
+      method: 'POST',
+      url: '/catalogue/items',
+      headers: { cookie: await signIn(db, boris) },
+      payload: { kind: 'product', name: 'Мусорвадзе 1', defaultUnit: 'piece' },
+    })
+    expect(proposed.statusCode).toBe(201)
+    const { id } = catalogueEntryCodec.parse(JSON.parse(proposed.body))
+
+    expect((await erase({ telegramUserId: tg })).statusCode).toBe(204)
+
+    const anna = await insertActor(db)
+    const found = await app.inject({
+      method: 'GET',
+      url: `/catalogue/search?q=${encodeURIComponent('Мусорвадзе')}`,
+      headers: { cookie: await signIn(db, anna) },
+    })
+    expect(found.statusCode).toBe(200)
+    expect(catalogueSearchResponseSchema.parse(JSON.parse(found.body)).items).toEqual([])
+    expect(await db.select().from(items).where(eq(items.id, id))).toEqual([])
+  })
+})
+
 function eraseMine(cookie?: string, url = '/actors/me') {
   return app.inject({ method: 'DELETE', url, headers: cookie === undefined ? {} : { cookie } })
 }
 
 describe('DELETE /actors/me — «Удалить мои данные» в настройках (MOL-94)', () => {
   it('стирает ровно то же, что дверь бота: две одинаковые жизни, по одной каждой дверью', async () => {
-    const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
+    const shared = { itemId: await insertSeedItem(db), placeId: await insertPlace(db) }
     const byBot = telegramId()
     const bySettings = telegramId()
     const anna = await insertActor(db, { telegramUserId: byBot })
@@ -121,11 +148,12 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
     // What each erasure would take, counted by the dry run — the real run, rolled back.
     const before = await erasure.erase(byBot, { dryRun: true })
     const counted = await erasure.erase(bySettings, { dryRun: true })
-    // Boris has one session more, the one he asks with.
+    // Boris has one session more, the one he asks with; and items of his own, by their own ids.
     expect({
       ...counted,
       erased: { ...counted.erased, sessions: counted.erased.sessions - 1 },
-    }).toEqual(before)
+      leavingItems: counted.leavingItems.length,
+    }).toEqual({ ...before, leavingItems: before.leavingItems.length })
 
     expect((await erase({ telegramUserId: byBot })).statusCode).toBe(204)
     expect((await eraseMine(cookie)).statusCode).toBe(204)
@@ -158,7 +186,7 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
   it('стирает владельца сессии со всей его жизнью, входами на всех устройствах и гасит cookie', async () => {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
-    const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
+    const shared = { itemId: await insertSeedItem(db), placeId: await insertPlace(db) }
     await aLife(db, anna, tg, shared)
     const phone = await signIn(db, anna)
     const laptop = await signIn(db, anna)
@@ -185,7 +213,7 @@ describe('DELETE /actors/me — «Удалить мои данные» в нас
   }, 10_000)
 
   it('не трогает другого человека — ни его строк, ни его входа', async () => {
-    const shared = { itemId: await insertItem(db), placeId: await insertPlace(db) }
+    const shared = { itemId: await insertSeedItem(db), placeId: await insertPlace(db) }
     const annaTg = telegramId()
     const borisTg = telegramId()
     const anna = await insertActor(db, { telegramUserId: annaTg })

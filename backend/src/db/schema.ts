@@ -510,9 +510,18 @@ export const items = pgTable(
      * item that is itself merged is refused, and the traces of an item merged on follow it.
      */
     mergedInto: uuid('merged_into').references((): AnyPgColumn => items.id),
+    /**
+     * When its author erased themselves (MOL-374, owner's В-7 «а»): erasure marks the item and the
+     * sweep of the minute timer deletes it once no living person stands on it. Null for an item of a
+     * living author, of the seed, and of an author erased before the mark (В-6 «а»: those are left).
+     */
+    releasedAt: timestamp('released_at', { withTimezone: true }),
   },
   (table) => [
     index('items_search_key_trgm_idx').using('gin', table.searchKey.op('gin_trgm_ops')),
+    index('items_released_idx')
+      .on(table.releasedAt)
+      .where(sql`${table.releasedAt} is not null`),
     index('items_merged_into_idx')
       .on(table.mergedInto)
       .where(sql`${table.mergedInto} is not null`),

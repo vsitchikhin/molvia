@@ -36,8 +36,54 @@ The detail behind the privacy lines of `CLAUDE.md`.
   and their checks after every operation that named one (MOL-115), the messages to the developer
   with the owner's replies (MOL-147), the sign-ins the bot has not told of yet (MOL-361), login requests by Telegram id
   — they carry no foreign key, so no cascade reaches them — and the owner, adding one to
-  `erasures` for the week they appeared (MOL-91). Catalogue items the
-  person added stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
+  `erasures` for the week they appeared (MOL-91). **Catalogue items the person added go when nobody
+  living stands on them** (MOL-374, owner's В-5 «б» of MOL-362: «60 → erase → sign in again» left them in
+  everybody's search for good) — **erasure only marks them, a sweep deletes them** (owner's В-7 «а», after
+  two rounds of review in which every lock erasure took on an item met another path's in a deadlock):
+  `items.released_at` is set as the author goes, and the sweep (`ErasureRepository.sweepReleased`) deletes a
+  marked item nothing stands on any more — right after each door's erasure and every minute
+  on the cleanups' timer, a batch a transaction, `for update skip locked`, asked again as it deletes. So erasure locks no item anybody
+  else writes to — the person's own, marked right after the owner and in the order of their ids with a
+  lock a key share passes, the traces last with the cascade that updates them anyway (Р2-А9) — and an
+  item somebody is writing a purchase of is left to a later minute, which decides by what that write
+  left. Something stands on an item while a living person has a purchase, a verdict (a withdrawn one
+  too), a pick, a line of a receipt not recorded (В-2 «а»: its «Записать» sends the item's id), a code
+  or a word of the shops' memory on it — an erased person's code or word has no author left and holds
+  nothing (Р2-А7), nor do the person's own, which go with the item (В-1 «а»: a receipt's «Записать» makes
+  both the item and the word) — and while the owner's «apart» or the seed's Armenian names or headings
+  hold it. **A merged group goes whole or not at all** (owner's В-8 «а», adversarial Р3-А12: twins the
+  night merged by itself kept each other for good): the survivor and its traces, every one of them
+  released and standing on nothing, their journal inside the group and never undone — then the sweep
+  deletes the group with its `catalogue_merges` and their moves; an item merged into the seed's or a
+  living person's stays its second name (А4). `releasedAndFree` and `groupGoes` are the one test,
+  `ITEM_REFERENCES` holds every foreign key on `items`, and the test of the holders takes a case for each
+  key (review 1, №2). **An item the
+  author's erasure left because someone stood on it goes when the last of them does** (adversarial А1):
+  it is marked, and the sweep asks again. The seed and the items left without an author before MOL-374
+  carry no mark and are never swept (В-6 «а», Р2-А8, Р2-А11). Two writers by an item's id with no person
+  to answer — the queue of receipts writing a reading (А6) and the writer of vectors (А5) — take a key
+  share of the items first, so an item swept meanwhile makes its line a new one and leaves its vector
+  out, never refusing the whole; anybody else's write to an item gone is the foreign key's 404, as an
+  item never there. **The price, named** (owner's В-9 «а», adversarial Р3-А13): an item can go long after
+  its author did — the last living person standing on it deletes their purchase, as correcting an item
+  does — and that person's phone still offers it in «Часто берёте»; written again from there it is that
+  404, and the queue keeps the purchase with its reason in «Покупки» to be put right. **A door sweeps only
+  what its erasure released** (review 3, №11): `eraseMe` erases, then `sweepReleased(leavingItems)`, a
+  failure of it the caller's to report — **at most `DOOR_SWEEP_ITEMS` (2 000) of them before it answers**
+  (adversarial Р5-А16: a sweep goes some 0.15 ms an item, and a spammer's 32 767 held `/delete` 6.6 s
+  against the bot's 5 s of waiting — erased, and told «не получилось»), the minute timer taking the rest;
+  `make forget --yes`, waited for by nobody, sweeps the whole list and prints what it swept (review 4,
+  №19); the minute timer sweeps everyone's. **A list of ids is one parameter, asked `in` a set where it
+  is erasure's long one and `= any(…)` in a batch of the sweep**: spelt a parameter an id, 32 767 items of
+  one person passed the 65 534 a statement may carry and nothing could erase them (adversarial Р4-А15);
+  asked as a set in a batch, the planner — whose statistics never know the marks erasure has just set —
+  walked every marked item for each id of it (Р5-А16). **The price, named** (adversarial round 6, Н1, Н2):
+  the minute's first statement, `order by id limit 200` over every marked item, is as blind to the marks,
+  so the rest a door left of 30 767 items took the timer 16 s, nobody waiting on it; and `items` has no
+  index on `created_by`, so every erasure reads the whole catalogue — some 0.4 s at 200 000 items.
+  The copy and `erasures` are as they were (В-3 «а»): the report and `make forget` name the items the sweep
+  will take and those that stay. The items someone stands on
+  stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
   nulled (MOL-100), the words they gave the shops' memory stay with `actor_id` nulled and still count
   (MOL-126: a fact about the shop, never shown as anyone's; a shelf price in it reaches another person
   only with access and from three prices, their lower median), and **every place stays** (owner's decision 24.09.2026). People erase
@@ -82,7 +128,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   routes have no order of their own. **Cleaning expired requests skips locked rows** (Р-3): it runs
   under the one quota lock every login start takes, and waiting there for an erasure — or a dry
   run of one — holding a person's expired request closed the door to everybody. A dry run still
-  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items, the shops and the count of
+  holds that one account's lock for as long as it runs. **The page and the bot name what stays in full** — the items others use, the shops and the count of
   `erasures` —
   and say that copies on the phone are out of the server's reach: nothing clears a device's
   storage for an owner the server no longer knows, since a 401 there is also an expired session.
@@ -104,8 +150,8 @@ The detail behind the privacy lines of `CLAUDE.md`.
   finds its row in the file** — found by walking the fields, not by a list, so a new reference
   without a section or a name in `catalogue` fails by itself (adversarial review 1, 2; review 11,
   15). **A new table or column that is a person's joins erasure and the copy in the
-  same commit.** Besides them: the catalogue items the person added (erasure keeps them, their
-  author is still this person), with barcodes, the codes the person wrote to any item
+  same commit.** Besides them: the catalogue items the person added (erasure keeps those someone
+  else stands on and deletes the rest, MOL-374 — their author is still this person either way), with barcodes, the codes the person wrote to any item
   (`addedBarcodes`, MOL-100 — they say the person held the package; `barcode`, not `code`, since
   `code` is the key the guard against secrets looks for), and — as a reference, not their data — the names of
   the items and places their rows point at, so the file reads; nobody else's author is in it.

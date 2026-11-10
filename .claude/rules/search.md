@@ -715,9 +715,11 @@ error.items_day_limited` with nothing written. **The sheet
   every `/48` more as many again — a free tunnel hands out whole ones — and the three hundred of everybody
   bound it at some 18 000 a minute, the door shut for everyone else meanwhile (adversarial Б1 of MOL-362:
   six rounds in one minute from two `/48`, 360 items with no author): MOL-359's price of a botnet, which the
-  owner accepted for the login — **but here it outlives the attack** (adversarial round 3, owner's В-5 «б»):
-  no path of the code removes an item, so what the loop left stays in everybody's search until the owner
-  deletes it by hand in `psql`; erasure taking the person's items nobody else stands on is MOL-374.
+  owner accepted for the login — and until MOL-374 it outlived the attack (adversarial round 3, owner's
+  В-5 «б»). **Erasure now marks the person's items and a sweep deletes those no living person stands on**
+  (MOL-374, `privacy.md`), so the loop leaves nothing behind it once its accounts are gone, in whichever
+  order they go and whether the night merged their twins (adversarial А1, Р2-А7, Р3-А12 of MOL-374). What
+  is left of the price: an item somebody still alive bought, rated, picked or coded stays, as it should.
   Remembering anything of the erased would undo the erasure. **«Записать» takes any name** — typed over every
   line read, up to 500, and up to `RECEIPT_ADDED_MAX` lines added — so one receipt carried up to 600 new names
   and an account some 24 000 a day past this quota (adversarial А1 of MOL-362); since MOL-373 they count in a
