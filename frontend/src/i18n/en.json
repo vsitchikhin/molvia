@@ -1738,7 +1738,7 @@
       },
       "items": {
         "term": "Items in the catalogue",
-        "text": "Items you added with «Suggest an item», and the new items of a receipt you recorded — named as the reading proposed or as you typed it yourself — are in the shared catalogue: everyone searches by them, but whose they are is shown to nobody. So put nothing personal in an item's name. We also keep how many items you added with «Suggest an item» on your own day: at most 60 — so the catalogue is not flooded."
+        "text": "Items you added with «Suggest an item», and the new items of a receipt you recorded — named as the reading proposed or as you typed it yourself — are in the shared catalogue: everyone searches by them, but whose they are is shown to nobody. So put nothing personal in an item's name. We also keep how many new items you added on your own day — with «Suggest an item» (at most 60) and from receipts you recorded (at most 300) — so the catalogue is not flooded."
       },
       "places": {
         "term": "Shops",
