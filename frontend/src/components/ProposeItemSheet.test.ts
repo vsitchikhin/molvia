@@ -4,7 +4,7 @@ import { defineComponent, h, nextTick, ref } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { ApiError } from '@molvia/client'
 import type { CatalogueWrite } from '@molvia/client'
-import { ERROR, ISSUE, ITEM_NAME_MAX, ITEM_NOTE_MAX } from '@molvia/model'
+import { ERROR, ISSUE, ITEMS_PROPOSED_DAY_MAX, ITEM_NAME_MAX, ITEM_NOTE_MAX } from '@molvia/model'
 import type { BarcodeHint, CatalogueEntry, ProposedItem } from '@molvia/model'
 import en from '@/i18n/en.json'
 import { createAppI18n } from '@/i18n'
@@ -299,6 +299,32 @@ describe('«Suggest an item»', () => {
     })
     expect(sheet.emitted('proposed')).toBeUndefined()
     expect(notNow(sheet)).toBe(false)
+  })
+
+  it('says the day’s quota is spent in its own words, never «did not work» (MOL-362)', async () => {
+    proposeItem.mockRejectedValueOnce(
+      new ApiError(ERROR.ITEMS_DAY_LIMITED, undefined, true, 429, { fromApi: true }),
+    )
+    const sheet = await render()
+    await chooseUnit(sheet, en.item.unit_l)
+
+    await submitButton(sheet).trigger('click')
+
+    const said = en.item.propose.day_limited.replace('{max}', String(ITEMS_PROPOSED_DAY_MAX))
+    await vi.waitFor(() => {
+      expect(sheet.get('[role="alert"]').text()).toBe(said)
+    })
+    expect(sheet.findAll('[role="alert"]')).toHaveLength(1)
+    expect(sheet.get('[role="alert"]').classes()).toContain('warn')
+    expect(sheet.emitted('proposed')).toBeUndefined()
+
+    // pressed again, the line is the answer of that try alone
+    proposeItem.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL, 'transport'))
+    await submitButton(sheet).trigger('click')
+    await vi.waitFor(() => {
+      expect(sheet.get('[role="alert"]').text()).toBe(en.item.propose.failed)
+    })
+    expect(sheet.findAll('[role="alert"]')).toHaveLength(1)
   })
 
   it('waits for the connection offline rather than failing, and says so on the button', async () => {
