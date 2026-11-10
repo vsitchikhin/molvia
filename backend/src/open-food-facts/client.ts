@@ -1,3 +1,4 @@
+import { boundedText } from '@/bounded-body'
 import { OFF_FIELDS, OffError, parseProduct } from './product'
 import type { OffAnswer } from './product'
 
@@ -16,6 +17,9 @@ export const OFF_TIMEOUT_MS = 2_500
  * the API's process — there is one; a second would need a count they share.
  */
 export const OFF_PER_MINUTE = 12
+
+/** A product of five fields is some 200 bytes; an answer past this is no product (MOL-368). */
+export const OFF_MAX_BYTES = 1024 * 1024
 
 /**
  * A person's share of the minute (MOL-162, owner's decision В-6): a third of it — four of twelve. At
@@ -123,7 +127,9 @@ export function openFoodFacts(options: OpenFoodFactsOptions): OpenFoodFacts {
       if (response.status !== 200 && response.status !== 404) {
         throw new OffError(`HTTP ${String(response.status)}`)
       }
-      return parseProduct(await response.text())
+      return parseProduct(
+        await boundedText(response, OFF_MAX_BYTES, () => new OffError('too large')),
+      )
     } catch (error) {
       pausedUntil = now() + OFF_PAUSE_MS
       options.onFailure?.(reasonOf(error))

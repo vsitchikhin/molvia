@@ -34,6 +34,18 @@ same machine and the same network; only Caddy is reachable from outside.
    `pg_hba.conf`, «Metrics», «Where it is set» (MOL-366, owner's В-5 «б»). The file lives in the database's
    volume: a new machine, or a volume lost, has none of them.
 
+7. **No X11 over ssh** (MOL-368, audit MOL-287 Ф-15): Ubuntu's `sshd_config` says
+   `X11Forwarding yes`, and nothing here draws a window. A file of its own in `sshd_config.d`, which
+   the main file includes at its top — the first value is the one `sshd` takes:
+
+   ```bash
+   printf 'X11Forwarding no\n' | sudo tee /etc/ssh/sshd_config.d/10-molvia.conf
+   sudo sshd -t && sudo systemctl reload ssh
+   sudo sshd -T | grep -i x11forwarding   # x11forwarding no
+   ```
+
+   The session it is typed in stays open until a new one is seen to come in.
+
 ## Deploys (MOL-90)
 
 A merge into master is a deploy. When CI passes on master, `release.yml` builds the three images
@@ -510,8 +522,12 @@ on GitHub, hourly: its check waits a day and an hour.
   two in the shell: `make watcher`. A commit master has moved past stands aside, and the next green
   one rolls out. An account that never opened Workers & Pages in the dashboard has no `workers.dev`
   subdomain, and Cloudflare refuses the cron until it has one — opening the page once makes it.
-- `molvia-cert`'s ping URL is the repository secret `HC_CERT_URL` (`gh secret set …`). Without it,
-  every run is red.
+- `molvia-cert`'s ping URL is the secret `HC_CERT_URL` of the environment `production`
+  (`gh secret set HC_CERT_URL --env production`), never of the repository (MOL-368, audit MOL-287
+  Ф-18): a repository secret is handed to any workflow of any branch, the environment's to `master`
+  alone. The job takes the environment with `deployment: false` — its secrets and its rule of
+  branches, and no record of a deployment: an hourly check would write 24 a day into
+  `production`'s history of rollouts. Without the secret every run is red.
 - `molvia-bot`'s ping URL is `BOT_PULSE_URL` in `~/molvia/.env.prod`, handed to the bot by
   `docker-compose.prod.yml`. **The line is required**: without it compose refuses to start, since
   a check that never got a ping stays «new» and never raises an alarm — a forgotten line would go
@@ -810,6 +826,17 @@ deploy/backup/restore.sh --drill                  # latest copy into a throwaway
 deploy/backup/restore.sh --into-prod <copy>       # asks for the copy's name, stops api and bot, replaces
 ```
 
+**The drill compares every table but the ones the copy leaves out** (MOL-368, audit MOL-287 Ф-19):
+those it reads from `backup.sh`'s `--exclude-table-data`, one list, and each must come back empty —
+«excluded» on its row — or the drill fails: the copy carried photos or links `/privacy` promises it
+never keeps. Before, they always differed from the live database, and «counts differ» on every drill
+hid a real failure among them. **Rows written since the copy still differ, as before — a price**
+(adversarial А3): the copy is taken at 04:00 and a drill in the day finds the tables that write
+themselves grown — the rates hourly, the counters by day, the timers' cleanups — and «counts differ»
+can then not tell them from a restore that lost rows. Read the `≠` rows; the drill that matches every
+table is one right after a copy with writes stopped («The Postgres image is part of the contract»).
+What is exact in either is the excluded tables' verdict.
+
 `--into-prod` holds rollouts while it runs (`deploy.hold`, «Deploys» above), so a merge meanwhile
 does not start an API on the empty database; it takes the hold off however it ends.
 
@@ -852,7 +879,7 @@ written as their documentation has them and not drilled.
 | `BOT_PULSE_URL`, `ALERTS_PULSE_URL`    | `.env.prod`, healthchecks.io                       | none                                         |
 | `HC_URL` (the copies' ping)            | `backup.env`, healthchecks.io                      | none                                         |
 | `HC_UP_URL`                            | the Worker's secret, healthchecks.io               | none                                         |
-| `HC_CERT_URL`                          | GitHub repository secret, healthchecks.io          | none                                         |
+| `HC_CERT_URL`                          | GitHub secret of `production`, healthchecks.io     | none                                         |
 | `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` | GitHub environment `production`, `authorized_keys` | none                                         |
 | `CLOUDFLARE_API_TOKEN`                 | GitHub environment `production`, Cloudflare        | none                                         |
 | GHCR token                             | `~/.docker/config.json` of `deploy`, GitHub        | none — the images are public                 |
@@ -916,9 +943,9 @@ written as their documentation has them and not drilled.
   healthchecks.io with the Telegram integration, its URL where the old one was — `.env.prod` and
   `$C up -d bot` / `grafana`; `HC_URL` of `backup.env`, seen by
   `sudo systemctl start molvia-backup.service`; the Worker's secret (Signals, «Where it is set»);
-  `gh secret set HC_CERT_URL` — and the old check deleted. See the new one turn green before
-  deleting the old. Whoever holds a ping URL can say «alive» while it is not, so a leaked server
-  changes all five.
+  `gh secret set HC_CERT_URL --env production` — and the old check deleted. See the new one turn
+  green before deleting the old. Whoever holds a ping URL can say «alive» while it is not, so a
+  leaked server changes all five.
 - **`DEPLOY_SSH_KEY`**: a new pair as in «Once: the deploy key», its line appended to
   `~/.ssh/authorized_keys` with the same `restrict,command=…` before the old one is removed, the
   environment's secret replaced, one rollout seen green, then the old line removed.

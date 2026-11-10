@@ -62,7 +62,12 @@ file holds what belongs to no single area, and what the audit found missing.
 - **A host the server asks is the code's, never the request's** (SSRF): a Serbian receipt's link is
   checked and rebuilt on `SERBIAN_RECEIPT_HOST`, a code is asked of Open Food Facts as digits, the banks'
   addresses are constants. A new outgoing request keeps the same shape — the input is a parameter, never a
-  URL — and has a timeout. The size of an answer is not limited yet (MOL-368).
+  URL — and has a timeout. **And a ceiling of bytes** (audit Ф-17, MOL-368): an answer is read through
+  `boundedBody` (`backend/src/bounded-body.ts`) — a length past the ceiling refused before a byte, a body
+  with none cut off at it — never `response.text()` whole: a gigabyte within the timeout was a gigabyte in
+  the API's memory. The tax office and Open Food Facts 1 MiB, the banks 4 MiB (`FEED_MAX_BYTES`), the
+  market's files 20 MB; past it, the client's own failure. Our own services — the reader, the source maps
+  of `failures.ts` — and Anthropic's client are not held by it.
 
 ## What an image carries (MOL-365)
 
@@ -101,8 +106,9 @@ file holds what belongs to no single area, and what the audit found missing.
   rotated, never rewritten out. gitleaks over the whole history found none (MOL-287); a guard in CI is
   MOL-369.
 - **CI's secrets stand in the environment `production`, which admits `master` alone**, and a job holding
-  one has `permissions: contents: read` — all but `HC_CERT_URL` of `watch.yml`, a repository secret to be
-  moved there (MOL-368).
+  one has `permissions: contents: read` or none — `HC_CERT_URL` of `watch.yml` too, moved there from the
+  repository (MOL-368), with `deployment: false`: the environment's secrets and rule of branches, and no
+  record of a deployment for an hourly check.
 
 ## What CI runs is pinned
 
@@ -162,6 +168,9 @@ file holds what belongs to no single area, and what the audit found missing.
 
 ## The edges
 
+- **Nothing another site's page starts, nor any navigation, reaches a route with a session** (audit
+  Ф-13, MOL-368): 404 by the fetch metadata before the session is looked up — a chat's link is `none` —
+  the rule and its reasons are `auth.md`.
 - **`/internal/*` is closed twice**: Caddy answers 404 for `/api/internal` and below, and the API asks
   `BOT_API_SECRET` — 43 characters, compared in constant time — of every route in its scope. A new route
   of the bot goes into that scope, never beside it. The audit's seventeen spellings of the path (`//`,
