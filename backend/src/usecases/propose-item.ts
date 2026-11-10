@@ -2,8 +2,13 @@ import { DomainError, writtenBarcode } from '@molvia/model'
 import type { ProposedItem } from '@molvia/model'
 import type { ItemRepository, Proposal } from '@/db/items-repository'
 import type { OpenFoodFactsRepository } from '@/db/open-food-facts-repository'
+import { todayOf } from './today'
+import type { Today } from './today'
 
 export type { Proposal }
+
+/** Who proposes, with the phone's today (`TODAY_HEADER`, MOL-121): the quota counts their day. */
+export type Proposer = { readonly actorId: string } & Today
 
 /**
  * «Предложить товар» — the one way a person grows the catalogue.
@@ -26,12 +31,16 @@ export type { Proposal }
  *
  * The owner comes from the caller, never from the input, so an item cannot be added in someone
  * else's name, and neither can a code.
+ *
+ * A new item counts in `ITEMS_PROPOSED_DAY_MAX` of the person's own day (MOL-362), which the repository
+ * holds under the person's lock; a name already there, or a code another item holds, counts nothing.
  */
 export async function proposeItem(
   items: ItemRepository,
   hints: Pick<OpenFoodFactsRepository, 'named'>,
-  actorId: string,
+  proposer: Proposer,
   input: ProposedItem,
+  now: Date = new Date(),
 ): Promise<Proposal> {
   const barcodes = input.barcodes.map((code) => {
     const written = writtenBarcode(code)
@@ -39,5 +48,8 @@ export async function proposeItem(
     return written.code
   })
   const origin = (await hints.named(barcodes)) ? 'open_food_facts' : null
-  return items.createUnlessNamed({ ...input, barcodes }, actorId, origin)
+  return items.createUnlessNamed({ ...input, barcodes }, proposer.actorId, origin, {
+    actorId: proposer.actorId,
+    day: todayOf(proposer, now),
+  })
 }

@@ -566,6 +566,7 @@ describe('словарь: плюральные формы', () => {
       'purchases.reasons.unrecorded_limit',
       'item.results_announced',
       'item.far_announced',
+      'item.propose.day_limited',
       'advice.ratings_count',
       'verdict.pending_count',
       'spending.unsent',
@@ -733,6 +734,20 @@ describe('русская плюрализация', () => {
     expect(t('purchases.reasons.unrecorded_limit', 20)).toBe('20 чеков ждут записи')
     expect(t('purchases.reasons.day_limit', 22)).toBe('сегодня отправлено уже 22 чека')
     expect(t('purchases.reasons.day_limit', 40)).toBe('сегодня отправлено уже 40 чеков')
+  })
+
+  it('число квоты товаров — в своей форме, не «51 товаров» (MOL-362, ревью 1, №1)', () => {
+    const t = russian().t
+    const tail = ' — новые можно будет завтра. Пока возьмите похожий из поиска.'
+    expect(t('item.propose.day_limited', { n: 51 }, 51)).toBe(
+      `Сегодня вы добавили в справочник уже 51 товар${tail}`,
+    )
+    expect(t('item.propose.day_limited', { n: 52 }, 52)).toBe(
+      `Сегодня вы добавили в справочник уже 52 товара${tail}`,
+    )
+    expect(t('item.propose.day_limited', { n: 60 }, 60)).toBe(
+      `Сегодня вы добавили в справочник уже 60 товаров${tail}`,
+    )
   })
 
   it('держит второй десяток: 11–14 всегда третья форма', () => {
