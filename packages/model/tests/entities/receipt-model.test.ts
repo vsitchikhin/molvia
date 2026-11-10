@@ -989,6 +989,26 @@ describe('a café’s bill (MOL-310)', () => {
     ])
   })
 
+  it('takes no service by the vote once the service line stayed a line: never counted twice (adversarial В2)', () => {
+    // «Service 10%» a line not in the total: the dishes alone are 19 500, paid by the terminal
+    const served = [
+      dish('Service 10%', '1.00', null, '1950.00'),
+      dish('Телятина по-мексикански', '1.00', null, '3800.00'),
+      dish('Тирамису', '2.00', null, '3000.00'),
+      dish('Салат с телятиной и хрустящими баклажанами', '1.00', null, '12700.00'),
+    ]
+    const text = bill(
+      [
+        ['Ընդամենը', '19500'],
+        ['Վճարված է PosTerminal:', '19500'],
+      ],
+      served,
+    )
+    // the service line is the lines' excess, said as it is
+    expect(shown(text).slice(0, 3)).toEqual([1_950_000, null, 'lines_over'])
+    expect(text.lines).toHaveLength(4)
+  })
+
   it('reads a service whose percent is in brackets: «Հավելավճար (10%)» (adversarial Б2)', () => {
     const text = bill([
       ['Հավելավճար (10%)', '1060'],
@@ -1092,6 +1112,18 @@ describe('a bank terminal’s slip with no bill (MOL-310, owner’s В-3 «а»)
       }),
     )
     expect([tipped.layout, tipped.totalHundredths]).toEqual(['slip', 1_166_000])
+  })
+
+  it('is no slip where another label’s amount was not read: it may be the receipt’s total (review №12)', () => {
+    const misread = read(
+      slip({
+        totals: [
+          { label: 'Գումար', amount: '4850.00' },
+          { label: 'Ընդամենը', amount: '4 85O' },
+        ],
+      }),
+    )
+    expect([misread.layout, needsReshoot(misread)]).toEqual(['class', true])
   })
 
   it('is no slip where the paper prints a total beside it: a receipt shot with its slip, lines lost (adversarial А5)', () => {

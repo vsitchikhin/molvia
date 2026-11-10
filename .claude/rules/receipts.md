@@ -2172,10 +2172,12 @@ service)` for every comparison of the lines with the total, the trip's money the
   it**: a bill whose lines meet the total without it records no service. **A total its places voted took the service**
   (owner's В-7 «а», adversarial Б1): every bill seen prints it so — ZERO, Bakery, Аракс — so where the lines did not meet
   it, a dish lost or a figure copied wrong, they are set against the total less the service, and the font's swaps put
-  them right to that. Two service amounts are a doubt, none taken — the label's and a line's alike, in either reading of
-  the lines (review №9). **The price, named** (adversarial А3 of round 1): a bill that prints its service «not
+  them right to that. Two service amounts are a doubt, none taken — the label's and a line's alike — and **a service
+  decided against stays decided**: its line stays a line, and no label or vote takes a service in the second reading
+  (review №9, adversarial В2: taken there, it was counted twice, as the line and as the surcharge). **The price, named** (adversarial А3 of round 1): a bill that prints its service «not
   included», a dish lost, says a shortfall smaller by the service, and the person who types the dish is left the
-  service's difference; such a bill has not been seen, and the trip is the total. A card's cashback and a café's
+  service's difference; and a dish lost on it that costs the service exactly is taken for the service, the bill shown
+  whole (adversarial В1). Such a bill has not been seen, and the trip is the total. A card's cashback and a café's
   service on one paper have not been seen: the cashback's rule alone, no service.
 - **A bill's total in words no fiscal till prints** (`billTotal`, any case): «ՎՃԱՐՄԱՆ» **alone on its row** — the model
   copies the payment «Վճարված է Առձեռն» as «Վճարման է Առնեմն» three times on the bench, and read as a total it made two
@@ -2191,7 +2193,8 @@ service)` for every comparison of the lines with the total, the trip's money the
   поправили — сверьте с бумагой», the price having been worked out). Not proven, it is emptied with a reason of its own,
   `no_price_unproven`; a sum of nothing holds any total and goes the way of any other, `zero_not_gift` (review №4).
 - **A bank terminal's slip with no bill is a sum, read in one place** (owner's В-3 «а», the one exception to MOL-244's
-  two sources): no line, rows naming the terminal (`slipTerminal`: TID, MID, RRN) and **every amount above nothing under `slipAmount`** («Գումար»), one of them — tips of 0 say nothing (adversarial Б3) — a fiscal receipt shot with its slip prints «Ընդամենը» beside it, and its
+  two sources): no line, rows naming the terminal (`slipTerminal`: TID, MID, RRN) and **every amount above nothing under `slipAmount`** («Գումար»), one of them — tips read as 0 say nothing (adversarial Б3),
+  while an amount not read at all may be any label's total and keeps it no slip (review №12) — a fiscal receipt shot with its slip prints «Ընդամենը» beside it, and its
   lines lost are «переснимите», never «no items» (adversarial А5) — layout `slip`, never «переснимите», the total shown
   and the trip's money. The phone hears it by
   `RECEIPT_BILL_HEADER` (`slip: true`) and says «Это слип оплаты картой… сверьте её с бумагой» where «В чеке нет списка

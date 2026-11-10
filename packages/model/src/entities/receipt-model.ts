@@ -322,6 +322,8 @@ function totalOf(
   answer: ModelReceipt,
   lines: readonly ReceiptTextLine[],
   served: readonly (number | null)[] = [],
+  /** `false` — the service was decided against already, and its line stays a line: none is taken (review №9, В2). */
+  takesService = true,
 ): {
   total: number | null
   read: number | null
@@ -394,7 +396,7 @@ function totalOf(
   }
   // a café's service, one amount read wherever it is printed (MOL-310); two, or one not read, are a doubt
   const fee = surcharges.size === 1 ? ([...surcharges][0] ?? null) : null
-  const surcharge = fee !== null && fee > 0 ? fee : null
+  const surcharge = takesService && fee !== null && fee > 0 ? fee : null
   if (cashback === null) {
     // the service counts only where the total takes it: a bill that prints it apart, «not included», meets its
     // total without it, and the trip is what was paid
@@ -415,7 +417,10 @@ function totalOf(
     // «а», adversarial Б1) — so the lines make it less the service, the font's swaps putting them right to that
     const voted = vote(places.values())
     const service = voted !== null && surcharge !== null && surcharge < voted ? surcharge : null
-    const owed = voted === null ? null : voted - (service ?? 0)
+    const owed =
+      voted === null
+        ? null
+        : linesTotalHundredths({ cashbackHundredths: null, serviceHundredths: service }, voted)
     return { total: voted, read, met, owed, cashback, redeemed: null, service }
   }
   // what the lines make: a total less what went to the card
@@ -785,10 +790,11 @@ export function receiptTextOfModel(
   const keptApart = apart.served.length === 0 || tried.service !== null
   const answer = keptApart ? apart.answer : whole
   const copied = keptApart ? apartLines : whole.lines.map(lineOf)
+  // the service decided against stays decided: its line a line, no service taken by a label or a vote — taken, it was
+  // counted twice, as a line and as the surcharge (review №9, adversarial В2)
   const { total, read, met, owed, cashback, redeemed, service } = keptApart
     ? tried
-    : // the same service amounts: which surcharge is taken is the amounts' to say, never the lines' (review №9)
-      totalOf(reading, whole, copied, apart.served)
+    : totalOf(reading, whole, copied, [], false)
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
   // a total two places vouch for that the lines do not meet: put right by the font's swaps, or not. The total first,
   // and on its own (MOL-291): a line it vouches for as copied is no doubt of the memory's, nor are the lines it put
@@ -861,11 +867,12 @@ function slipAmountOf(reading: PhotoReading, answer: ModelReceipt): number | nul
   const word = new RegExp(`(?:${reading.words.slipAmount})`, 'iu')
   // every amount the slip's: a fiscal receipt shot with its slip prints «Ընդամենը» beside it, and lines lost there are
   // «переснимите», never a slip with no items (adversarial А5)
-  // an amount of nothing says nothing — tips of 0 on a slip (adversarial Б3)
-  const said = answer.totals.filter(({ amount }) => (figureOf(amount, 2) ?? 0) > 0)
+  // an amount read as nothing says nothing — tips of 0 (adversarial Б3); one not read at all may be any label's total
+  // (review №12)
+  const said = answer.totals.filter(({ amount }) => figureOf(amount, 2) !== 0)
   if (!said.every(({ label }) => word.test(label))) return null
   const amounts = new Set(
-    answer.totals
+    said
       .map(({ amount }) => figureOf(amount, 2))
       .filter((amount): amount is number => amount !== null && amount > 0),
   )
