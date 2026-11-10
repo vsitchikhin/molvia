@@ -32,153 +32,167 @@ export const ownerTelegramIdSchema = z
  */
 export const metricsDbPasswordSchema = z.string().regex(/^[\x21-\x7e]{24,}$/)
 
-const envSchema = z.object({
-  API_PORT: z.coerce.number().int().positive().default(3300),
-  /**
-   * The port `/metrics` answers on (MOL-145, В-1): its own, inside the compose network, never the
-   * API's — Caddy proxies only that. Unset in a copy and in end-to-end: nobody scrapes them, and no
-   * port is opened. Empty is unset, as compose passes a variable it was not given.
-   */
-  METRICS_PORT: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    z.coerce.number().int().positive().optional(),
-  ),
-  DATABASE_URL: z.string().min(1),
-  /**
-   * The password the API gives `molvia_metrics` at its start (MOL-366): production's alone, where the
-   * exporter runs. Unset or empty in a copy, end-to-end and CI, and the role is left as it is.
-   */
-  METRICS_DB_PASSWORD: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    metricsDbPasswordSchema.optional(),
-  ),
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  /**
-   * The hourly refresh of official rates (MOL-39), which goes out to the central banks. On by
-   * default, so production cannot forget it; end-to-end runs switch it off, because a test that
-   * depends on a foreign server answering is a test that fails for someone else's reasons.
-   */
-  RATES_REFRESH: z.enum(['on', 'off']).default('on'),
-  /**
-   * The nightly merge of twins in the catalogue (MOL-106): `on` merges, `report` only says what it
-   * would, `off` does not look. Off by default — a copy, CI and the tests never merge by a timer;
-   * production passes `report` until MOL-358 says `on` (В-3, MOL-299).
-   */
-  CATALOGUE_MERGE: catalogueMergeModeSchema.default('off'),
-  /**
-   * The build `/health` names (MOL-90): the last tag, the releases since it and the commit the image
-   * was built from — `v0.1.5-81-g0f371828`, `-0-` on the tag's own commit (MOL-371, `release.yml`). The image carries it; outside one it
-   * is `dev`. What the deploy compares with to know the new containers are the ones answering.
-   */
-  APP_VERSION: z.string().min(1).default(UNNAMED_BUILD),
-  /**
-   * The address Open Food Facts may reach us at, sent in every request's User-Agent (MOL-162, В-4):
-   * the base asks for one and may ban a client without it. Without it the hint is off — so copies,
-   * CI and the tests never ask the real base; production sets it in its `.env`. Empty is unset, as
-   * compose passes a variable it was not given. Printable ASCII only: it goes into a header.
-   */
-  OPEN_FOOD_FACTS_CONTACT: z
-    .string()
-    .regex(/^[\x20-\x7e]*$/)
-    .optional()
-    .transform((contact) => (contact === '' ? undefined : contact)),
-  /**
-   * The address the Serbian tax office may reach us at, sent in every ask of its check of a receipt
-   * (MOL-232, Р-6), as Open Food Facts'. Without it receipts by their link are taken and wait — copies,
-   * CI and the tests never ask the real tax office; production sets it in its `.env`.
-   */
-  PURS_CONTACT: z
-    .string()
-    .regex(/^[\x20-\x7e]*$/)
-    .optional()
-    .transform((contact) => (contact === '' ? undefined : contact)),
-  /**
-   * The search by meaning (MOL-105): its model is loaded at boot and the writer fills the vectors.
-   * On by default, so production cannot forget it; end-to-end switches it off — the search must
-   * hold without it, and that run is the proof.
-   */
-  EMBEDDINGS: z.enum(['on', 'off']).default('on'),
-  /**
-   * Where the model's files are. In a working copy `.models/` beside the repository, which
-   * `make model` fills; the image names its own. Files missing are not an error: the search is
-   * by letters then, and the boot says so once.
-   */
-  EMBEDDINGS_DIR: z
-    .string()
-    .min(1)
-    .default(fileURLToPath(new URL(`../../.models/${model.name}`, import.meta.url))),
-  /**
-   * The receipt reader's address (MOL-125): `services/receipt-reader` on the compose network, a copy's
-   * own on its band with `make reader`. Unset or empty, receipts are taken and wait in the queue.
-   */
-  RECEIPT_READER_URL: z
-    .union([z.literal(''), z.url({ protocol: /^https?$/ })])
-    .optional()
-    .transform((url) => (url === '' ? undefined : url)),
-  /**
-   * The key of the model that reads receipts (MOL-272, Т-7): in the API's environment alone — never the
-   * repository, a log or an answer. Unset or empty, Tesseract reads every receipt, as before.
-   */
-  CLAUDE_API_KEY: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    z.string().min(1).optional(),
-  ),
-  /**
-   * The workspace a person's key is named with (`anthropic-workspace-id`): a key made inside a workspace
-   * needs none, a person's key is refused without it.
-   */
-  CLAUDE_WORKSPACE_ID: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    z.string().min(1).optional(),
-  ),
-  /**
-   * What the model may cost a calendar month, in dollars (MOL-272, owner's decision 19.10.2026): $200.
-   * The console's limit of the workspace holds the same from the other side (Р-10).
-   */
-  RECEIPT_MODEL_MONTHLY_CAP_USD: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    z.coerce.number().positive().max(100_000).default(200),
-  ),
-  /**
-   * Whom the bot writes about failures (MOL-143, Р-9 of MOL-149): the owner's Telegram id. Set in
-   * production only — without it nothing is queued for anyone, so a copy's failures go to its table
-   * and stay there. Empty is unset, as compose passes a variable it was not given.
-   */
-  OWNER_TELEGRAM_ID: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    ownerTelegramIdSchema.optional(),
-  ),
-  /**
-   * Where the PWA is served — production's site — for `make failures` to read the phone's frames
-   * through the maps published beside the build (MOL-144). Unset in a copy: its frames are the
-   * development server's, already the source's.
-   */
-  APP_BASE_URL: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    z.url({ protocol: /^https?$/ }).optional(),
-  ),
-  /** Where the base is asked; end-to-end points it at a fake of its own. */
-  OPEN_FOOD_FACTS_URL: z.url({ protocol: /^https?$/ }).optional(),
-  /**
-   * Questions a minute to the base — end-to-end only, whose fake has no limit; production keeps
-   * `OFF_PER_MINUTE`, the base's own limit less a reserve, and never sets it.
-   */
-  OPEN_FOOD_FACTS_PER_MINUTE: z.preprocess(
-    // Empty is unset, as for the contact: `z.coerce` made it 0, and the API would not start.
-    (value) => (value === '' ? undefined : value),
-    z.coerce.number().int().positive().optional(),
-  ),
-  /** Where the tax office's check is asked; end-to-end points it at a fake of its own (MOL-232). */
-  PURS_URL: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    z.url({ protocol: /^https?$/ }).optional(),
-  ),
-  /** Asks a minute of the tax office — end-to-end only, as `OPEN_FOOD_FACTS_PER_MINUTE`. */
-  PURS_PER_MINUTE: z.preprocess(
-    (value) => (value === '' ? undefined : value),
-    z.coerce.number().int().positive().optional(),
-  ),
-})
+const envSchema = z
+  .object({
+    API_PORT: z.coerce.number().int().positive().default(3300),
+    /**
+     * The port `/metrics` answers on (MOL-145, В-1): its own, inside the compose network, never the
+     * API's — Caddy proxies only that. Unset in a copy and in end-to-end: nobody scrapes them, and no
+     * port is opened. Empty is unset, as compose passes a variable it was not given.
+     */
+    METRICS_PORT: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce.number().int().positive().optional(),
+    ),
+    DATABASE_URL: z.string().min(1),
+    /**
+     * The password the API gives `molvia_metrics` at its start (MOL-366): production's alone, where the
+     * exporter runs. Unset or empty in a copy, end-to-end and CI, and the role is left as it is.
+     */
+    METRICS_DB_PASSWORD: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      metricsDbPasswordSchema.optional(),
+    ),
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    /**
+     * The hourly refresh of official rates (MOL-39), which goes out to the central banks. On by
+     * default, so production cannot forget it; end-to-end runs switch it off, because a test that
+     * depends on a foreign server answering is a test that fails for someone else's reasons.
+     */
+    RATES_REFRESH: z.enum(['on', 'off']).default('on'),
+    /**
+     * The nightly merge of twins in the catalogue (MOL-106): `on` merges, `report` only says what it
+     * would, `off` does not look. Off by default — a copy, CI and the tests never merge by a timer;
+     * production passes `report` until MOL-358 says `on` (В-3, MOL-299).
+     */
+    CATALOGUE_MERGE: catalogueMergeModeSchema.default('off'),
+    /**
+     * The build `/health` names (MOL-90): the last tag, the releases since it and the commit the image
+     * was built from — `v0.1.5-81-g0f371828`, `-0-` on the tag's own commit (MOL-371, `release.yml`). The image carries it; outside one it
+     * is `dev`. What the deploy compares with to know the new containers are the ones answering.
+     */
+    APP_VERSION: z.string().min(1).default(UNNAMED_BUILD),
+    /**
+     * The address Open Food Facts may reach us at, sent in every request's User-Agent (MOL-162, В-4):
+     * the base asks for one and may ban a client without it. Without it the hint is off — so copies,
+     * CI and the tests never ask the real base; production sets it in its `.env`. Empty is unset, as
+     * compose passes a variable it was not given. Printable ASCII only: it goes into a header.
+     */
+    OPEN_FOOD_FACTS_CONTACT: z
+      .string()
+      .regex(/^[\x20-\x7e]*$/)
+      .optional()
+      .transform((contact) => (contact === '' ? undefined : contact)),
+    /**
+     * The address the Serbian tax office may reach us at, sent in every ask of its check of a receipt
+     * (MOL-232, Р-6), as Open Food Facts'. Without it receipts by their link are taken and wait — copies,
+     * CI and the tests never ask the real tax office; production sets it in its `.env`.
+     */
+    PURS_CONTACT: z
+      .string()
+      .regex(/^[\x20-\x7e]*$/)
+      .optional()
+      .transform((contact) => (contact === '' ? undefined : contact)),
+    /**
+     * The search by meaning (MOL-105): its model is loaded at boot and the writer fills the vectors.
+     * On by default, so production cannot forget it; end-to-end switches it off — the search must
+     * hold without it, and that run is the proof.
+     */
+    EMBEDDINGS: z.enum(['on', 'off']).default('on'),
+    /**
+     * Where the model's files are. In a working copy `.models/` beside the repository, which
+     * `make model` fills; the image names its own. Files missing are not an error: the search is
+     * by letters then, and the boot says so once.
+     */
+    EMBEDDINGS_DIR: z
+      .string()
+      .min(1)
+      .default(fileURLToPath(new URL(`../../.models/${model.name}`, import.meta.url))),
+    /**
+     * The receipt reader's address (MOL-125): `services/receipt-reader` on the compose network, a copy's
+     * own on its band with `make reader`. Unset or empty, receipts are taken and wait in the queue.
+     */
+    RECEIPT_READER_URL: z
+      .union([z.literal(''), z.url({ protocol: /^https?$/ })])
+      .optional()
+      .transform((url) => (url === '' ? undefined : url)),
+    /**
+     * The key of the model that reads receipts (MOL-272, Т-7): in the API's environment alone — never the
+     * repository, a log or an answer. Unset or empty, Tesseract reads every receipt, as before.
+     */
+    CLAUDE_API_KEY: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().min(1).optional(),
+    ),
+    /**
+     * The workspace a person's key is named with (`anthropic-workspace-id`): a key made inside a workspace
+     * needs none, a person's key is refused without it.
+     */
+    CLAUDE_WORKSPACE_ID: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.string().min(1).optional(),
+    ),
+    /**
+     * What the model may cost a calendar month, in dollars (MOL-272, owner's decision 19.10.2026): $200.
+     * The console's limit of the workspace holds the same from the other side (Р-10).
+     */
+    RECEIPT_MODEL_MONTHLY_CAP_USD: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce.number().positive().max(100_000).default(200),
+    ),
+    /**
+     * What the model may cost reading one person's receipts in that month, in dollars (MOL-367, owner's В-1 «а»):
+     * $2, the price of a month of receipts (MOL-271) — one person never takes the cap from the others. Never above
+     * the month's cap.
+     */
+    RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce.number().positive().max(100_000).default(2),
+    ),
+    /**
+     * Whom the bot writes about failures (MOL-143, Р-9 of MOL-149): the owner's Telegram id. Set in
+     * production only — without it nothing is queued for anyone, so a copy's failures go to its table
+     * and stay there. Empty is unset, as compose passes a variable it was not given.
+     */
+    OWNER_TELEGRAM_ID: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      ownerTelegramIdSchema.optional(),
+    ),
+    /**
+     * Where the PWA is served — production's site — for `make failures` to read the phone's frames
+     * through the maps published beside the build (MOL-144). Unset in a copy: its frames are the
+     * development server's, already the source's.
+     */
+    APP_BASE_URL: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.url({ protocol: /^https?$/ }).optional(),
+    ),
+    /** Where the base is asked; end-to-end points it at a fake of its own. */
+    OPEN_FOOD_FACTS_URL: z.url({ protocol: /^https?$/ }).optional(),
+    /**
+     * Questions a minute to the base — end-to-end only, whose fake has no limit; production keeps
+     * `OFF_PER_MINUTE`, the base's own limit less a reserve, and never sets it.
+     */
+    OPEN_FOOD_FACTS_PER_MINUTE: z.preprocess(
+      // Empty is unset, as for the contact: `z.coerce` made it 0, and the API would not start.
+      (value) => (value === '' ? undefined : value),
+      z.coerce.number().int().positive().optional(),
+    ),
+    /** Where the tax office's check is asked; end-to-end points it at a fake of its own (MOL-232). */
+    PURS_URL: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.url({ protocol: /^https?$/ }).optional(),
+    ),
+    /** Asks a minute of the tax office — end-to-end only, as `OPEN_FOOD_FACTS_PER_MINUTE`. */
+    PURS_PER_MINUTE: z.preprocess(
+      (value) => (value === '' ? undefined : value),
+      z.coerce.number().int().positive().optional(),
+    ),
+  })
+  .refine((env) => env.RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD <= env.RECEIPT_MODEL_MONTHLY_CAP_USD, {
+    path: ['RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD'],
+    message: 'a person’s share of the model is above the month’s cap',
+  })
 
 export const env = envSchema.parse(process.env)
 export const VERSION = env.APP_VERSION

@@ -75,6 +75,7 @@ services:
       CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
       CLAUDE_WORKSPACE_ID: ${CLAUDE_WORKSPACE_ID:-}
       RECEIPT_MODEL_MONTHLY_CAP_USD: ${RECEIPT_MODEL_MONTHLY_CAP_USD:-200}
+      RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD: ${RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD:-2}
       # Whom the bot tells of a new failure (MOL-143): the owner's Telegram id, digits only. Required
       # and filled since MOL-145 — the alarms of the metrics go to it too, so empty is no longer a way
       # to tell nobody: compose refuses to start (review №3).

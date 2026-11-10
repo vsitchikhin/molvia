@@ -26,7 +26,7 @@ export type SpellReport =
     }
   | {
       readonly kind: 'brands_passed'
-      readonly reason: 'cap' | 'size' | 'refused' | 'cut' | 'invalid'
+      readonly reason: 'cap' | 'share' | 'size' | 'refused' | 'cut' | 'invalid'
       readonly paid?: ModelPaid
     }
   | { readonly kind: 'brands_unavailable'; readonly reason: string }
@@ -50,11 +50,13 @@ export interface SpellBrandsDeps {
  * brand is spelt in letters meanwhile, as before. **What was said is read for every receipt**, Tesseract's too — one
  * brand, one spelling, whoever read the line (self-review №3) — and **the model is asked only where `ask` says the
  * receipt is its own**: a receipt Tesseract read sends nothing to anybody, the person may not have accepted edition 5.
+ * **The call is paid from the share of the receipt's owner** (`actorId`, MOL-367, owner's В-2 «а»): over it the
+ * brands wait for the next receipt that asks, whosever it is.
  */
 export async function spelledBrands(
   { spellings, model, report, now = () => new Date() }: SpellBrandsDeps,
   asked: readonly BrandAsked[],
-  { ask }: { readonly ask: boolean },
+  { ask, actorId }: { readonly ask: boolean; readonly actorId: string },
 ): Promise<Map<string, string>> {
   const byKey = new Map<string, BrandAsked>()
   for (const one of asked) {
@@ -67,7 +69,7 @@ export async function spelledBrands(
   for (const [key, spelling] of said) if (spelling !== null) taken.set(key, spelling)
   const missing = [...byKey].filter(([key]) => !said.has(key)).slice(0, BRANDS_A_CALL)
   if (missing.length === 0 || !ask || model === null) return taken
-  const { reader, spend, capMicroUsd } = model
+  const { reader, spend, capMicroUsd, shareMicroUsd } = model
 
   const brands = missing.map(([, one]) => one)
   const input = reader.brandsInputTokensMax(brands)
@@ -77,8 +79,10 @@ export async function spelledBrands(
   }
   const worst = modelCallMicroUsd({ input_tokens: input, output_tokens: BRANDS_OUTPUT_MAX })
   const month = spendMonthOf(now())
-  if (!(await spend.reserve(month, worst, capMicroUsd, now()))) {
-    report({ kind: 'brands_passed', reason: 'cap' })
+  const call = { actorId, capMicroUsd, shareMicroUsd }
+  const reserved = await spend.reserve(month, worst, call, now())
+  if (reserved !== 'reserved') {
+    report({ kind: 'brands_passed', reason: reserved })
     return taken
   }
   let answer
@@ -88,13 +92,13 @@ export async function spelledBrands(
     if (error instanceof ModelUnavailable) {
       // a time out may have been paid: its worst stays counted
       if (error.costMicroUsd !== null) {
-        await spend.settle(month, worst, error.costMicroUsd, capMicroUsd, now())
+        await spend.settle(month, worst, error.costMicroUsd, call, now())
       }
       report({ kind: 'brands_unavailable', reason: error.reason })
       return taken
     }
     if (error instanceof ModelRejected) {
-      await spend.settle(month, worst, 0, capMicroUsd, now())
+      await spend.settle(month, worst, 0, call, now())
       report({ kind: 'brands_rejected', error })
       return taken
     }
@@ -103,7 +107,7 @@ export async function spelledBrands(
     return taken
   }
   const paid: ModelPaid = { costMicroUsd: answer.costMicroUsd, tokens: answer.tokens }
-  await spend.settle(month, worst, answer.costMicroUsd, capMicroUsd, now())
+  await spend.settle(month, worst, answer.costMicroUsd, call, now())
   if (answer.kind !== 'read') {
     report({ kind: 'brands_passed', reason: answer.kind, paid })
     return taken
