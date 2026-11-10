@@ -169,6 +169,56 @@ describe('the model that reads receipts (MOL-272)', () => {
     expect(asked).toBe(1)
   })
 
+  it('costs nothing where no connection was ever made, and is in doubt where one broke (MOL-367, В-6 «а»)', async () => {
+    const failing = (cause: unknown) =>
+      (() => Promise.reject(new TypeError('fetch failed', { cause }))) as typeof fetch
+    const socket = (code: string) => Object.assign(new Error(`socket ${code}`), { code })
+    for (const code of ['ENOTFOUND', 'EAI_AGAIN', 'ECONNREFUSED', 'ENETUNREACH', 'EHOSTUNREACH']) {
+      await expect(model(failing(socket(code))).read([jpeg(10, 10)])).rejects.toMatchObject({
+        reason: 'unreachable',
+        costMicroUsd: 0,
+      })
+    }
+    // packets lost on the way: undici's own words say «Timeout», which the client reads as its time out (А1, В1)
+    const connectTimeout = Object.assign(
+      new Error(
+        'Connect Timeout Error (attempted address: api.anthropic.com:443, timeout: 10000ms)',
+      ),
+      { name: 'ConnectTimeoutError', code: 'UND_ERR_CONNECT_TIMEOUT' },
+    )
+    await expect(model(failing(connectTimeout)).read([jpeg(10, 10)])).rejects.toMatchObject({
+      reason: 'unreachable',
+      costMicroUsd: 0,
+    })
+    // every address of the host refused: no connection either
+    const everyAddress = new AggregateError([socket('ECONNREFUSED'), socket('ENETUNREACH')])
+    await expect(model(failing(everyAddress)).read([jpeg(10, 10)])).rejects.toMatchObject({
+      costMicroUsd: 0,
+    })
+    // the host's addresses tried in turn, the first silent, the second refused (adversarial Г1): no connection
+    const silent = Object.assign(socket('ETIMEDOUT'), { syscall: 'connect' })
+    const silentThenRefused = Object.assign(
+      new AggregateError([silent, Object.assign(socket('ECONNREFUSED'), { syscall: 'connect' })]),
+      { code: 'ETIMEDOUT' },
+    )
+    await expect(model(failing(silentThenRefused)).read([jpeg(10, 10)])).rejects.toMatchObject({
+      costMicroUsd: 0,
+    })
+    // a socket that was open and timed out reading: the request may have gone
+    const readTimeout = Object.assign(socket('ETIMEDOUT'), { syscall: 'read' })
+    await expect(model(failing(readTimeout)).read([jpeg(10, 10)])).rejects.toMatchObject({
+      costMicroUsd: null,
+    })
+    // one address reached and reset under the request: it may have gone
+    const oneReached = new AggregateError([socket('ECONNREFUSED'), socket('ECONNRESET')])
+    for (const cause of [socket('ECONNRESET'), socket('UND_ERR_SOCKET'), oneReached, undefined]) {
+      await expect(model(failing(cause)).read([jpeg(10, 10)])).rejects.toMatchObject({
+        reason: 'unreachable',
+        costMicroUsd: null,
+      })
+    }
+  })
+
   const hung = (count: { asked: number }) =>
     ((_input: unknown, init?: RequestInit) => {
       count.asked += 1

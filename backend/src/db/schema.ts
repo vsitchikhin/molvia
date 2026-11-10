@@ -325,6 +325,19 @@ export const actors = pgTable(
     itemsDay: date('items_day'),
     itemsProposed: smallint('items_proposed').notNull().default(0),
     /**
+     * What is counted of this person's share of the model this month (MOL-367, Ф-10 of MOL-287) — what a call
+     * cost, its worst while that is not known or never will be (adversarial Е1), so it may be more than was paid —
+     * and less by a fault of ours, whose worst goes back to it (`keepInMonth`, self-review №11, adversarial Ж1): the
+     * calendar month in UTC — `model_spend`'s, Anthropic's bill's — and its micro-dollars, a reading's and a
+     * brand's alike (owner's В-2 «а»), held to `RECEIPT_MODEL_SHARE_MICRO_USD` as the month is to its cap.
+     * A count, never the rows of `receipts`: a receipt removed would give its price back. A new month starts it
+     * at nought. `model_share_told` is the month the owner heard this person reached it (В-3 «а»), once. Not a
+     * change of the row: `updated_at` does not see it (0082).
+     */
+    modelMonth: date('model_month'),
+    modelSpentMicroUsd: bigint('model_spent_micro_usd', { mode: 'number' }).notNull().default(0),
+    modelShareTold: date('model_share_told'),
+    /**
      * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own, from their
      * exchanges, when there is one for the pair, and the official one otherwise — or always
      * `official`. Beside the settings rather than among them: it is switched on the screen of
@@ -430,6 +443,7 @@ export const actors = pgTable(
     check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
     check('actors_receipts_sent_not_negative', sql`${table.receiptsSent} >= 0`),
     check('actors_items_proposed_not_negative', sql`${table.itemsProposed} >= 0`),
+    check('actors_model_spent_not_negative', sql`${table.modelSpentMicroUsd} >= 0`),
     // A version without its moment, or a moment of no version, is a consent nobody can show.
     check(
       'actors_consent_whole',

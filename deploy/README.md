@@ -192,7 +192,10 @@ in the queue until it is set.
 Tesseract reads every receipt, as before. A person's key (`sk-ant-usr-…`) is refused without
 `CLAUDE_WORKSPACE_ID`; a key made inside a workspace needs none. `RECEIPT_MODEL_MONTHLY_CAP_USD`,
 200 by default, is what the model may cost a calendar month in UTC; the workspace's monthly limit in
-the Anthropic console is set to the same, so a price the code got wrong is held there too. Granting
+the Anthropic console is set to the same, so a price the code got wrong is held there too.
+One person's receipts may cost $2 of it a month (MOL-367, `RECEIPT_MODEL_SHARE_MICRO_USD` in the code, since the
+privacy page names it): past it Tesseract reads theirs, and the owner hears of it once. Above the month's cap the share
+is the cap, so lowering the cap to stop the spending is one line. Granting
 the model is one statement, as access is:
 `update actors set receipts_model_until = '2027-01-01' where telegram_user_id = …`.
 

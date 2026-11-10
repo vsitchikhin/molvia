@@ -14,3 +14,17 @@ export const modelSpendNoticeSchema = z.strictObject({
   capMicroUsd: z.int().positive(),
 })
 export type ModelSpendNotice = z.infer<typeof modelSpendNoticeSchema>
+
+/**
+ * One person's receipts reached their share of the month (MOL-367, owner's В-3 «а»): the first call of theirs that
+ * would not fit under it — a reading, read by Tesseract instead, or a brand's, spelt in letters (self-review №1) —
+ * once a person a month. Like the stop, it stops that call: a smaller one after it may still fit. The month and the
+ * share, never who: nobody's, as every notice of money.
+ */
+export const modelShareNoticeSchema = z.strictObject({
+  kind: z.literal('model_share'),
+  /** The month in UTC, its first day: `2026-10-01`. */
+  month: z.iso.date(),
+  shareMicroUsd: z.int().positive(),
+})
+export type ModelShareNotice = z.infer<typeof modelShareNoticeSchema>

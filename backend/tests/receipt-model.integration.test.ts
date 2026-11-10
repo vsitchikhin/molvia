@@ -229,11 +229,13 @@ async function readAll(
   model: ReceiptModel | null,
   {
     cap = CAP,
+    share = CAP,
     now,
     told,
     receipts = repository,
   }: {
     cap?: number
+    share?: number
     now?: () => Date
     told?: ReadReceiptsDeps['told']
     receipts?: ReadReceiptsDeps['receipts']
@@ -252,13 +254,18 @@ async function readAll(
         claimed.language,
         lines,
       ),
-    model: model === null ? null : { reader: model, spend, capMicroUsd: cap },
+    model: model === null ? null : { reader: model, spend, capMicroUsd: cap, shareMicroUsd: share },
     storeMemory: memory,
     ...(now === undefined ? {} : { now }),
     ...(told === undefined ? {} : { told }),
   })
   return reports
 }
+
+const spentOf = async (me: Person) =>
+  onlyRow(
+    await db.select({ spent: actors.modelSpentMicroUsd }).from(actors).where(eq(actors.id, me.id)),
+  )?.spent
 
 const receiptOf = async (id: string) =>
   onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
@@ -470,6 +477,17 @@ describe('the month’s cap (Т-4, В-2 «а»)', () => {
     expect(told.map((row) => (row.payload as { step: number }).step)).toEqual([90, 100])
   }, 30_000)
 
+  it('leaves the share of a person whose call the cap refused as it was (MOL-367)', async () => {
+    const me = await person(LATER)
+    await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+      { cap: WORST - 1 },
+    )
+    expect(await spentOf(me)).toBe(0)
+  }, 30_000)
+
   it('leaves to Tesseract a call a micro-dollar past the cap, asking nothing', async () => {
     const me = await person(LATER)
     await queued(me)
@@ -539,6 +557,8 @@ describe('a failure of the model’s own client (review №4)', () => {
     expect((await receiptOf(id))?.readerVersion).toBe('tesseract 5.5.0 · test')
     expect(reports.some((r) => r.kind === 'error')).toBe(true)
     expect((await month())?.spentMicroUsd).toBe(9_000)
+    // never in the person's share: the fault is ours (MOL-367, В-4 «а»)
+    expect(await spentOf(me)).toBe(0)
   }, 30_000)
 })
 
@@ -579,12 +599,25 @@ describe('the model away (Р-9)', () => {
     expect(reports).toContainEqual({ kind: 'model_unavailable', reason: 'status 529' })
   }, 30_000)
 
-  it('keeps the worst counted for a time out, whose price is not known', async () => {
+  it('keeps the worst counted for a time out, whose price is not known — in the month and the share alike', async () => {
     const me = await person(LATER)
     await queued(me)
     const model = fakeModel(() => Promise.reject(new ModelUnavailable('timeout', null)))
-    await readAll(benchReader(), model)
-    expect((await month())?.spentMicroUsd).toBe(9_000)
+    for (let minute = 0; minute < 3; minute += 1) await readAll(benchReader(), model)
+    expect(model.asked).toBe(3)
+    // asked again every minute, each may have been paid: the share holds them (MOL-367, В-6 «а» on adversarial Б1)
+    expect((await month())?.spentMicroUsd).toBe(3 * 9_000)
+    expect(await spentOf(me)).toBe(3 * 9_000)
+  }, 30_000)
+
+  it('takes nothing for a request that never left, however long the receipt waits (MOL-367, А1, В-6 «а»)', async () => {
+    const me = await person(LATER)
+    await queued(me)
+    const model = fakeModel(() => Promise.reject(new ModelUnavailable('unreachable', 0)))
+    for (let minute = 0; minute < 3; minute += 1) await readAll(benchReader(), model)
+    expect(model.asked).toBe(3)
+    expect((await month())?.spentMicroUsd).toBe(0)
+    expect(await spentOf(me)).toBe(0)
   }, 30_000)
 
   it('leaves it to Tesseract once it waited past the wait, not a millisecond before', async () => {
@@ -1807,4 +1840,37 @@ describe('the brands and the font of a receipt the model read, and of no other (
       expect(lines.map((line) => line.translation).join(' ')).toMatch(/«Игит»/u)
     }
   }, 60_000)
+})
+
+describe('a person’s share of the month (MOL-367, owner’s В-1…В-3 «а»)', () => {
+  // 10 000 tokens in and the whole output: 1 000 + 8 000 micro-dollars
+  const WORST = 9_000
+  // one clock, mid-month: the month the share counts is the test's, never a real midnight's
+  const now = () => new Date('2026-11-10T12:00:00Z')
+
+  it('leaves to Tesseract a person past their share, while another granted is read by the model', async () => {
+    const boris = await person(LATER)
+    const anna = await person(LATER)
+    await queued(boris)
+    const model = fakeModel(() => read(WORST))
+    await readAll(benchReader(), model, { share: WORST, now })
+    expect(model.asked).toBe(1)
+
+    const his = await queued(boris)
+    const hers = await queued(anna)
+    const reports = await readAll(benchReader(), model, { share: WORST, now })
+    expect(model.asked).toBe(2)
+    expect((await receiptOf(his))?.readerVersion).toBe('tesseract 5.5.0 · test')
+    expect((await receiptOf(hers))?.readerVersion).toBe('claude-haiku-5-5@v5')
+    expect(reports).toContainEqual({ kind: 'model_passed', reason: 'share' })
+    // the month counts both read by the model, and nothing of the one refused
+    expect((await spend.month('2026-11-01'))?.spentMicroUsd).toBe(2 * WORST)
+    const told = await db
+      .select({ payload: ownerNotices.payload })
+      .from(ownerNotices)
+      .orderBy(ownerNotices.id)
+    expect(told.map((row) => row.payload)).toEqual([
+      { kind: 'model_share', month: '2026-11-01', shareMicroUsd: WORST },
+    ])
+  }, 30_000)
 })

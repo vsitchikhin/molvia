@@ -12,6 +12,7 @@ import {
   ISSUE,
   LOGIN_ADDRESS_LIMIT,
   LOGIN_WINDOW_LIMIT,
+  RECEIPT_MODEL_SHARE_MICRO_USD,
   VERSION_HEADER,
   errorResponseSchema,
   isWireCode,
@@ -398,6 +399,8 @@ export interface ServerOptions {
   readonly receiptModel?: ReceiptModel | null
   /** The month's cap of the model in micro-dollars; absent, `RECEIPT_MODEL_MONTHLY_CAP_USD`'s. */
   readonly receiptModelCapMicroUsd?: number
+  /** A person's share of it in micro-dollars (MOL-367); absent, `RECEIPT_MODEL_SHARE_MICRO_USD`. */
+  readonly receiptModelShareMicroUsd?: number
   /**
    * The owner's Telegram id the failures are queued for (MOL-143). Absent, it is the environment's
    * — set in production only; a test names one, or `null` for none.
@@ -894,16 +897,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           PHONE_NOTICES_PER_SENDER,
           (count) => ({ kind: 'receipt_partial_muted', count }),
         )
+        const capMicroUsd =
+          options.receiptModelCapMicroUsd ??
+          Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000)
+        // a share above the cap is the cap: lowering the cap stays one line (MOL-367, adversarial А3)
+        const shareMicroUsd = Math.min(
+          options.receiptModelShareMicroUsd ?? RECEIPT_MODEL_SHARE_MICRO_USD,
+          capMicroUsd,
+        )
         const modelDeps =
-          model === null
-            ? null
-            : {
-                reader: model,
-                spend: modelSpend,
-                capMicroUsd:
-                  options.receiptModelCapMicroUsd ??
-                  Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000),
-              }
+          model === null ? null : { reader: model, spend: modelSpend, capMicroUsd, shareMicroUsd }
         const brandSpellings = createBrandSpellingRepository(db)
         // the brands of a receipt the model read, asked of it (MOL-326): counts and reasons only, never a brand
         const brandReport = (event: SpellReport): void => {
@@ -950,12 +953,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                     namesMissing: (error) => {
                       failures.report(error, job('receipt-binding'), 'catalogue has no till names')
                     },
-                    // what the model said of a brand before, for every receipt; asked of it for its own only
+                    // what the model said of a brand before, for every receipt; asked of it for its own only, from
+                    // its owner's share (MOL-367)
                     spellings: (asked: readonly BrandAsked[], { ask }: { readonly ask: boolean }) =>
                       spelledBrands(
                         { spellings: brandSpellings, model: modelDeps, report: brandReport },
                         asked,
-                        { ask },
+                        { ask, actorId: claimed.actorId },
                       ),
                   },
                   claimed.actorId,

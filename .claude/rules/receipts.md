@@ -284,6 +284,53 @@ may go, and the bot says so rather than «until the month ends». The workspace'
 console is set to the same (Р-10): a price wrong in the code is held there too. **Nobody's**: no key to
 `actors`, so neither erasure nor the copy reaches it.
 
+**Each person has a share of the month, held beside the cap** (MOL-367, Ф-10 of MOL-287, owner's В-1…В-5 «а»,
+10.11.2026): $2 — the price of a month of receipts (MOL-271), some 700 receipts at the measured $0,0028. **A constant
+of the domain, never the environment** (`RECEIPT_MODEL_SHARE_MICRO_USD`, В-5 «а»): the privacy page names it, so a
+change is code and a revision of the page in one pull request, as `RECEIPTS_DAY_MAX` is. Above the month's cap it is
+the cap, so lowering the cap to stop the spending stays one line (adversarial А3). Without it one person granted the
+model took the month from every other: the quota of receipts (MOL-360) holds their number, not their money, and a
+brand is a call of its own. **The share is a count in the person's row**, `actors.model_month` and
+`model_spent_micro_usd`, never the rows of `receipts`: a receipt removed would give its price back. Its month is the
+cap's, UTC — the queue has no phone's day, and the money is one bill — and a new month starts it at nought. **The
+month only moves on** (adversarial А4): a call whose month was taken before midnight and reserved after one of the new
+month — two processes at a rollout, a clock stepped back — counts in the new month and never sets the share back to
+the old one at nought; its settling under the old month leaves its worst there. **One transaction a call, the
+account's lock first** (privacy.md): the share is taken in one statement, then the month; the share refusing leaves the
+month untouched and tells no stop, the cap refusing gives the share back. `settle` puts the call's own price in the
+share too, while the share still counts that month. **A request known not to have left costs nothing** (В-4 «а» on adversarial
+А1, narrowed by В-6 «а» on Б1): a connection that fails in one of the ways of a closed list — no address, the port
+refused, no route, no connection in time (`NEVER_CONNECTED` in `model-reader.ts`, down the error's causes, judged at
+`fetch` itself, since the client reads undici's «Connect Timeout Error» as its own time out with no cause — adversarial
+В1 — and beside it a time out of the connecting alone, `ETIMEDOUT` of `connect`, the host's addresses tried in turn —
+Г1) — settles at nought in the month and the share; a receipt waiting ten minutes for the model away is reserved every
+minute, and an evening with no connection took 99 % of a share with not a cent billed. **The list is closed, never a
+promise for every failure before a byte goes** (owner's В-7 «а» after round 5, Д1: five rounds found one more form
+each). **Anything else is paid in doubt** — a time out, a connection reset under the request, an answer torn, and any
+failure the list does not name, a request that never left included: the worst stays in both, since the request may have
+gone and the queue asks it again every minute; given back to the share, a receipt the model answers past its 120 s put
+$2,15 a day of one person into the month with the share at nought (Б1). **The price, named as a class:** a TLS handshake
+that fails — the server's clock months off, a proxy taking TLS apart — a local firewall (`EPERM`), a network down
+(`ENETDOWN`), the ephemeral ports run out (`EADDRNOTAVAIL`), and any other form outside the list cost the share some
+$0,009 a minute a waiting receipt while they last, as before В-4; an outage that wide breaks the rates and the bot too,
+and is seen. A form found outside the list is the owner's to add, never a fix of its own. **A fault of ours goes to the month alone**
+(`keepInMonth`, never `settle`, which takes a price): once a receipt, and the owner hears of it. A process lost between
+the reserve and the answer still leaves the worst in both. **A brand's call is paid from the share of the
+receipt that asked it** (В-2 «а»): over it the brand waits for the next receipt that asks, whosever. Over the share
+Tesseract reads, as at the cap (`model_passed`, `brands_passed`: `share`), and the person is told nothing — their
+status is MOL-276's, in 0.3. **The owner hears of it once a person a month** (`model_share`, В-3 «а»,
+`actors.model_share_told`), the month and the share, nobody named, and never of a month older than one told; it says
+nothing of which receipt, since a brand's call may be the one refused (self-review №1). Not a change of the row:
+`updated_at` does not see the three columns (0082); the copy carries them (version 31), erasure takes them with the
+row. **The share is what is counted, never what was paid** (adversarial Е1): the page and the copy call it so —
+«сколько из вашей доли учтено», the worst where a call's price is not known, so it may be more than was billed.
+**The prices, named:** the edge is held by the worst price, so the last receipt or two that would fit by their
+own price go to Tesseract; a connection that breaks under the request in a poor network eats the share as a time out
+does, though nothing may have been billed; a fault of ours that Anthropic did bill is not in the share — once a
+receipt, some $0,009, held by the month;
+the share is reset at 04:00 of the 1st in Yerevan; one share for everybody — a tariff's own is MOL-275's, with the 100
+receipts a month.
+
 **When the model is not the one to read, Tesseract reads, as before** (В-1 «а»): the cap, photos past the
 price, a refusal of the model, an answer cut by its length or of no schema — each paid — a request the API
 refuses for what it is (4xx, `ModelRejected`, paid nothing, a failure the owner hears of as
