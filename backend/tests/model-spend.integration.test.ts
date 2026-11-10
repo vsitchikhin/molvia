@@ -170,6 +170,32 @@ describe('a person’s share (MOL-367, owner’s В-1…В-3 «а»)', () => {
     expect(await share(boris.actorId)).toMatchObject({ month: '2026-11-01', spent: SHARE })
   })
 
+  it('never moves the month back: a call of the old month reserved after the new one counts in the new (А4)', async () => {
+    const boris = await callOf()
+    expect(await spend.reserve('2026-11-01', SHARE, boris, at)).toBe('reserved')
+    expect(await spend.reserve(MONTH, 9_000, boris, at)).toBe('share')
+    expect(await spend.reserve('2026-11-01', 1, boris, at)).toBe('share')
+    expect(await share(boris.actorId)).toMatchObject({ month: '2026-11-01', spent: SHARE })
+
+    const anna = await callOf()
+    await spend.reserve('2026-11-01', SHARE - 9_000, anna, at)
+    expect(await spend.reserve(MONTH, 9_000, anna, at)).toBe('reserved')
+    // its settling under the old month leaves its worst where it was counted
+    await spend.settle(MONTH, 9_000, 2_180, anna, at)
+    expect(await share(anna.actorId)).toMatchObject({ month: '2026-11-01', spent: SHARE })
+  })
+
+  it('tells a month once, and never a month older than one told (А4б)', async () => {
+    const boris = await callOf()
+    await spend.reserve('2026-11-01', SHARE, boris, at)
+    expect(await spend.reserve('2026-11-01', 1, boris, at)).toBe('share')
+    expect(await spend.reserve(MONTH, SHARE + 1, boris, at)).toBe('share')
+    expect(await spend.reserve('2026-11-01', 1, boris, at)).toBe('share')
+    expect(await told()).toEqual([
+      { kind: 'model_share', month: '2026-11-01', shareMicroUsd: SHARE },
+    ])
+  })
+
   it('puts what a call cost in place of its worst in the share, and keeps the worst of one never settled', async () => {
     const boris = await callOf()
     await spend.reserve(MONTH, 8_200, boris, at)

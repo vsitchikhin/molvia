@@ -60,7 +60,10 @@ async function tell(
 
 /**
  * The person's share of the month taken, in one statement under their row's lock: a new month starts it at nought.
- * `false` where the call would not fit — or the person is gone, erased while their receipt was read.
+ * **The month only moves on** (adversarial А4): a call whose month was taken before midnight, reserved after a call of
+ * the new one — two processes at a rollout, a clock stepped back — counts in the new month's share, never sets it back
+ * to the old one and its spending to nought. `false` where the call would not fit — or the person is gone, erased while
+ * their receipt was read.
  */
 async function takeShare(
   tx: Conn,
@@ -68,10 +71,11 @@ async function takeShare(
   worstMicroUsd: number,
   { actorId, shareMicroUsd }: ModelCall,
 ): Promise<boolean> {
-  const spent = sql`(case when ${actors.modelMonth} = ${month}::date then ${actors.modelSpentMicroUsd} else 0 end)`
+  const spent = sql`(case when ${actors.modelMonth} >= ${month}::date then ${actors.modelSpentMicroUsd} else 0 end)`
   const taken = await tx.execute(sql`
     update ${actors}
-    set model_month = ${month}::date, model_spent_micro_usd = ${spent} + ${worstMicroUsd}::bigint
+    set model_month = greatest(${actors.modelMonth}, ${month}::date),
+        model_spent_micro_usd = ${spent} + ${worstMicroUsd}::bigint
     where ${actors.id} = ${actorId} and ${spent} + ${worstMicroUsd}::bigint <= ${shareMicroUsd}::bigint
     returning 1`)
   return taken.length > 0
@@ -84,9 +88,11 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
       return db.transaction(async (tx) => {
         // the account first, as every lock is taken (privacy.md)
         if (!(await takeShare(tx, month, worstMicroUsd, call))) {
+          // once a month, and never again for a month told before a later one (adversarial А4б)
           const reached = await tx.execute(sql`
             update ${actors} set model_share_told = ${month}::date
-            where ${actors.id} = ${actorId} and ${actors.modelShareTold} is distinct from ${month}::date
+            where ${actors.id} = ${actorId}
+              and (${actors.modelShareTold} is null or ${actors.modelShareTold} < ${month}::date)
             returning 1`)
           if (reached.length > 0) {
             await tell(tx, owner, { kind: 'model_share', month, shareMicroUsd }, at)
@@ -133,7 +139,8 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
 
     async settle(month, worstMicroUsd, costMicroUsd, { actorId, capMicroUsd }, at) {
       await db.transaction(async (tx) => {
-        // the account first; a share a new month started since keeps nothing of the old one's call
+        // the account first. A share whose month moved on is left: what it holds of the old month's call is either
+        // nothing — the new month began at nought — or the worst of a call reserved after it began, kept (А4)
         await tx.execute(sql`
           update ${actors}
           set model_spent_micro_usd = greatest(${actors.modelSpentMicroUsd} - ${worstMicroUsd}::bigint + ${costMicroUsd}::bigint, 0)
