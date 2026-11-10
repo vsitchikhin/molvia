@@ -1033,6 +1033,25 @@ describe('a café’s bill (MOL-310)', () => {
     ])
   })
 
+  it('holds the service to its percent where the lines met the total with it too (adversarial Ж1)', () => {
+    // a bill «not included», the bread lost: 500 is 11,1 % of the 4 500 read, not the 10 % printed — no service
+    const read = [
+      dish('Չիզբուրգեր', '1', '2200', '2200'),
+      dish('Mojito', '1', '1800', '1800'),
+      dish('Թեյ', '1', '500', '500'),
+    ]
+    const label = bill(
+      [
+        ['Սպասարկում 10%', '500'],
+        ['Ընդամենը', '5000'],
+      ],
+      read,
+    )
+    expect(shown(label).slice(0, 3)).toEqual([null, null, 'no_total'])
+    const line = bill([['Ընդամենը', '5000']], [dish('Service 10%', '1', null, '500'), ...read])
+    expect([line.serviceHundredths, line.balanced]).toEqual([null, false])
+  })
+
   it('holds the service to the percent printed beside it where only the vote vouches for the total (adversarial Е1)', () => {
     const served = (sum: string) => [
       dish('Service 10%', '1.00', null, sum),

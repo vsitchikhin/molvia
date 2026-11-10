@@ -264,18 +264,27 @@ interface Served {
 function serviceApart(
   reading: PhotoReading,
   answer: ModelReceipt,
-): { answer: ModelReceipt; served: Served[] } {
+): { answer: ModelReceipt; served: Served[]; isService: readonly boolean[] } {
   const word = serviceWordOf(reading)
-  const served = answer.lines.filter((line) => word.test(line.printed))
-  if (served.length === 0) return { answer, served: [] }
+  // which of the model's lines are the service, marked once (review №16)
+  const isService = answer.lines.map((line) => word.test(line.printed))
+  const served = answer.lines.filter((_, i) => isService[i])
+  if (served.length === 0) return { answer, served: [], isService }
   return {
-    answer: { ...answer, lines: answer.lines.filter((line) => !word.test(line.printed)) },
+    answer: { ...answer, lines: answer.lines.filter((_, i) => !isService[i]) },
     served: served.map((line) => ({
       sum: figureOf(line.sum, 2),
       percent: servicePercentOf(line.printed),
     })),
+    isService,
   }
 }
+
+/**
+ * How far a service may stand from the percent printed beside it (MOL-310): to the dram, as a till rounds it —
+ * 10 % of 19 500 is 1 950, of 22 899,50 is 2 290.
+ */
+const SERVICE_PERCENT_ROUNDING_HUNDREDTHS = 50
 
 /** What a till rounds a card's payment by: to the dram, «19 098,00» paid for 19 097,86. */
 const PAYMENT_ROUNDING_HUNDREDTHS = 50
@@ -417,11 +426,23 @@ function totalOf(
   }
   // a café's service, one amount read wherever it is printed (MOL-310); two, or one not read, are a doubt
   const fee = surcharges.size === 1 ? ([...surcharges][0] ?? null) : null
+  // a percent printed beside the service is its second place, in either way the total is vouched for: the service is
+  // that percent of the dishes, to the dram, or no service (adversarial Е1, Ж1); with none printed it stands as copied
+  const percentHolds = (dishes: number, service: number): boolean =>
+    percents.every(
+      (percent) =>
+        Math.abs((dishes * percent) / 100 - service) <= SERVICE_PERCENT_ROUNDING_HUNDREDTHS,
+    )
   const surcharge = served !== null && fee !== null && fee > 0 ? fee : null
   if (cashback === null) {
     // the service counts only where the total takes it: a bill that prints it apart, «not included», meets its
     // total without it, and the trip is what was paid
-    if (asPrinted && surcharge !== null && totals.includes(sum + surcharge)) {
+    if (
+      asPrinted &&
+      surcharge !== null &&
+      totals.includes(sum + surcharge) &&
+      percentHolds(sum, surcharge)
+    ) {
       return {
         total: sum + surcharge,
         read,
@@ -443,11 +464,7 @@ function totalOf(
       voted !== null &&
       surcharge !== null &&
       surcharge < voted &&
-      percents.every(
-        (percent) =>
-          Math.abs(((voted - surcharge) * percent) / 100 - surcharge) <=
-          PAYMENT_ROUNDING_HUNDREDTHS,
-      )
+      percentHolds(voted - surcharge, surcharge)
         ? surcharge
         : null
     const owed =
@@ -826,11 +843,10 @@ export function receiptTextOfModel(
   const answer = keptApart ? apart.answer : whole
   // a service line left among the lines is no dish read: «проверьте», never a line that proves the bill whole with the
   // service in doubt (adversarial Е2)
-  const serviceWord = serviceWordOf(reading)
   const copied = keptApart
     ? apartLines
-    : whole.lines.map((line) =>
-        serviceWord.test(line.printed)
+    : whole.lines.map((line, i) =>
+        apart.isService[i] === true
           ? { ...lineOf(line), settled: false, asPrinted: false }
           : lineOf(line),
       )
