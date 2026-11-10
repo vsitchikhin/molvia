@@ -1,9 +1,10 @@
 import { sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { telegramUserIdSchema } from '@molvia/model'
 import type { TelegramUserId } from '@molvia/model'
 import { cursorAtOrBelow } from './broadcasts-repository'
 import { silentErasable } from './silence-repository'
-import type { Conn, Db } from './index'
+import type { Db } from './index'
 import { lockTelegramAccount } from './telegram-lock'
 import { yerevanWeek } from './yerevan-week'
 
@@ -39,12 +40,12 @@ export const ACTOR_REFERENCES = [
 ] as const
 
 /**
- * Every column in the schema that points at `items`, as `table.column` (MOL-374). Erasure deletes a
- * person's item only where nothing but their own rows stood on it, so it has to know each of them: a
- * test compares this list with `information_schema`, and the test of the holders takes a case for every
- * key — a row of it that holds the item, or `cascade` — so a key added here without its `not exists` in
- * `eraseLockedItems` fails it. One that does not cascade and is not asked would fail every erasure of the
- * item's author on its foreign key; one that cascades would take somebody's rows in silence.
+ * Every column in the schema that points at `items`, as `table.column` (MOL-374). The sweep deletes an
+ * item whose author is gone only where nothing stands on it (`nobodyStandsOn`), so it has to know each of
+ * them: a test compares this list with `information_schema`, and the test of the holders takes a case for
+ * every key — a row of it that holds the item, or `cascade` — so a key added here without its `not exists`
+ * fails it. One that does not cascade and is not asked would fail the sweep on its foreign key; one that
+ * cascades would take somebody's rows in silence.
  */
 export const ITEM_REFERENCES = [
   // held: someone else's
@@ -55,7 +56,7 @@ export const ITEM_REFERENCES = [
   'receipt_lines.item_id',
   'search_picks.item_id',
   'verdicts.item_id',
-  // held where not the person's own; their own go with the item by the cascade
+  // held while their author lives; the erased person's own and the authorless go by the cascade
   'item_barcodes.item_id',
   'store_memory.item_id',
   // held: only the seed writes them (MOL-126)
@@ -68,8 +69,9 @@ export const ITEM_REFERENCES = [
 export type ItemReference = (typeof ITEM_REFERENCES)[number]
 
 /**
- * What erasure removes, in the order it removes it. `items` is not among them: the person's items nobody
- * else stands on go (MOL-374), the rest only lose their author, and the copy holds them all either way.
+ * What erasure removes, in the order it removes it. `items` is not among them: the person's items lose
+ * their author and are marked, the sweep deletes those nothing stands on (MOL-374), and the copy holds
+ * them all either way.
  */
 export const ERASED_TABLES = [
   'login_notices',
@@ -102,12 +104,15 @@ export interface ErasureReport {
   readonly found: boolean
   readonly erased: Readonly<Record<ErasedTable, number>>
   /**
-   * Catalogue items deleted (MOL-374): this person's own that nothing else stood on, and items whose
-   * author was gone already that only this person still stood on — with their vectors, the codes the
-   * person wrote to them and the person's own words of the shops' memory about them.
+   * Catalogue items the sweep takes once this erasure commits (MOL-374, В-7 «а»): this person's own that
+   * no living person stands on, and items whose author was gone already that only this person still
+   * stood on — with their vectors, the codes written to them and the words of the shops' memory.
    */
-  readonly itemsErased: number
-  /** Catalogue items this person added that someone else stands on: they stay, with `created_by` nulled. */
+  readonly itemsLeaving: number
+  /**
+   * Catalogue items this person added that someone stands on: they stay, with `created_by` nulled and
+   * marked `released_at`, until the last one standing on them goes.
+   */
   readonly itemsReleased: number
   /** Codes this person wrote to items that stay (MOL-100): they stay too, with `added_by` nulled. */
   readonly barcodesReleased: number
@@ -181,7 +186,7 @@ function nobody(): ErasureReport {
   return {
     found: false,
     erased: noneErased(),
-    itemsErased: 0,
+    itemsLeaving: 0,
     itemsReleased: 0,
     barcodesReleased: 0,
     memoryReleased: 0,
@@ -189,91 +194,79 @@ function nobody(): ErasureReport {
   }
 }
 
-/** What erasure decides about items: which it locked, and how many of them the person added. */
-interface LockedItems {
-  readonly ids: readonly string[]
-  readonly own: number
+/**
+ * Nothing stands on the item `i` (MOL-374): no living person's purchase, verdict — a withdrawn one too,
+ * the gate counts it — pick, line of a receipt not recorded yet (В-2 «а»: its «Записать» sends the item
+ * by its id), code or word of the shops' memory; no merge either way, no «apart» of the owner, no name or
+ * heading of the seed — the seed alone writes them, and every line of it has them. The rows of an erased
+ * person are gone or have lost their author, so a code or a word with none holds nothing (adversarial
+ * Р2-А7); `erasing` — the person erasure is taking, whose own codes and words lose their author only as
+ * its transaction ends. `ITEM_REFERENCES` and the test of the holders keep it whole.
+ */
+function nobodyStandsOn(erasing: string | null): SQL {
+  const notTheirs = (column: SQL) =>
+    erasing === null
+      ? sql`${column} is not null`
+      : sql`${column} is not null and ${column} <> ${erasing}::uuid`
+  return sql`i.merged_into is null
+    and not exists (select 1 from items t where t.merged_into = i.id)
+    and not exists (select 1 from catalogue_merges g where i.id in (g.from_item, g.into_item))
+    and not exists (select 1 from catalogue_apart a where a.subject = 'item' and i.id in (a.a, a.b))
+    and not exists (select 1 from expenses e where e.item_id = i.id)
+    and not exists (select 1 from verdicts v where v.item_id = i.id)
+    and not exists (select 1 from search_picks p where p.item_id = i.id)
+    and not exists (select 1 from receipt_lines l where l.item_id = i.id)
+    and not exists (
+      select 1 from item_barcodes b where b.item_id = i.id and ${notTheirs(sql`b.added_by`)})
+    and not exists (
+      select 1 from store_memory m where m.item_id = i.id and ${notTheirs(sql`m.actor_id`)})
+    and not exists (select 1 from item_names n where n.item_id = i.id)
+    and not exists (select 1 from item_hs h where h.item_id = i.id)`
 }
 
-/**
- * The items erasure may take (MOL-374, owner's В-5 «б» of MOL-362): «Удалить мои данные» left every one of
- * them to the catalogue, so «60 → erase → sign in again» filled everybody's search for good. The person's
- * own, and an item whose author is gone that the person still stands on (adversarial А1: erased after the
- * author, the last one standing on it left it nobody's for good) — whether anything else stands on it is
- * decided after the person's rows are gone (`eraseLockedItems`).
- *
- * **Locked right after the owner, before anything of the person is deleted**, in the order of their ids,
- * waiting on whoever holds one (А2): `delete from actors` updates the rows anyway by the cascade of
- * `created_by`. Taken this early, the merge night holding an item finishes first — moving the person's
- * pick, a row erasure has not touched yet — and a write that comes later waits, then finds the item kept
- * or answers the foreign key's 404. A write of the person's own that holds their item and waits on their
- * account (`attachBarcode`, `added_by`) still meets erasure in a deadlock and one of the two fails, as
- * the cascade did before — the price, named in `privacy.md`.
- */
-async function lockItemsOf(tx: Conn, actorId: string): Promise<LockedItems> {
-  const rows = await tx.execute<{ id: string; own: boolean }>(sql`
-    select id, created_by is not null as own from items
-    where created_by = ${actorId}
-       or (created_by is null and id in (
-         select e.item_id from expenses e join trips t on t.id = e.trip_id where t.actor_id = ${actorId}
-         union select item_id from verdicts where actor_id = ${actorId}
-         union select item_id from search_picks where actor_id = ${actorId}
-         union select item_id from item_barcodes where added_by = ${actorId}
-         union select item_id from store_memory where actor_id = ${actorId}
-         union select l.item_id from receipt_lines l join receipts r on r.id = l.receipt_id
-               where r.actor_id = ${actorId}))
-    order by id
-    for update`)
-  return { ids: rows.map((row) => row.id), own: rows.filter((row) => row.own).length }
-}
-
-/**
- * The locked items nothing else stands on, deleted. Run after the person's own rows are gone and before
- * their owner row, whose deletion nulls `created_by` — so a row still pointing at an item here is
- * somebody else's, and holds it: a purchase, a verdict (a withdrawn one too — the gate counts it), a pick,
- * a line of a receipt not recorded yet (В-2 «а»: its «Записать» sends the item by its id), a code or a
- * word of the shops' memory not the person's own (В-1 «а»: their own go with the item, or a receipt's
- * «Записать», which makes both, would keep every name it made), a merge either way, the owner's «apart»,
- * and the seed's names or headings — the seed alone writes them, on an item someone proposed first, and
- * every line of the seed has them. A candidate of the merge that names a deleted item goes with it; its
- * vector by the cascade.
- */
-async function eraseLockedItems(
-  tx: Conn,
-  actorId: string,
-  locked: LockedItems,
-): Promise<{ readonly itemsErased: number; readonly itemsReleased: number }> {
-  if (locked.ids.length === 0) return { itemsErased: 0, itemsReleased: 0 }
-  const ids = sql`array[${sql.join(
-    locked.ids.map((id) => sql`${id}::uuid`),
+const uuids = (ids: readonly string[]): SQL =>
+  sql`array[${sql.join(
+    ids.map((id) => sql`${id}::uuid`),
     sql`, `,
-  )}]`
-  const [row] = await tx.execute<{ erased: number; own: number }>(sql`
-    with gone as (
-      delete from items i
-      where i.id = any(${ids})
-        and i.merged_into is null
-        and not exists (select 1 from items t where t.merged_into = i.id)
-        and not exists (select 1 from catalogue_merges g where i.id in (g.from_item, g.into_item))
-        and not exists (select 1 from catalogue_apart a where a.subject = 'item' and i.id in (a.a, a.b))
-        and not exists (select 1 from expenses e where e.item_id = i.id)
-        and not exists (select 1 from verdicts v where v.item_id = i.id)
-        and not exists (select 1 from search_picks p where p.item_id = i.id)
-        and not exists (select 1 from receipt_lines l where l.item_id = i.id)
-        and not exists (
-          select 1 from item_barcodes b where b.item_id = i.id and b.added_by is distinct from ${actorId})
-        and not exists (
-          select 1 from store_memory m where m.item_id = i.id and m.actor_id is distinct from ${actorId})
-        and not exists (select 1 from item_names n where n.item_id = i.id)
-        and not exists (select 1 from item_hs h where h.item_id = i.id)
-      returning i.id, i.created_by
-    ), candidates as (
-      delete from catalogue_merge_candidates c
-      where c.subject = 'item' and (c.a in (select id from gone) or c.b in (select id from gone))
-    )
-    select count(*)::int as erased, (count(*) filter (where created_by is not null))::int as own
-    from gone`)
-  return { itemsErased: row?.erased ?? 0, itemsReleased: locked.own - (row?.own ?? 0) }
+  )}]::uuid[]`
+
+/** At most so many items a transaction of the sweep takes: a loop of the minute goes on while it is full. */
+const SWEEP_BATCH = 200
+
+/**
+ * Deletes the items whose author is gone (`released_at`) and on which nothing stands any more (MOL-374,
+ * owner's В-7 «а»), by the minute timer of the cleanups. A batch a transaction, each item `for update
+ * skip locked` — one somebody is writing to is taken by a later minute — and asked again as it goes,
+ * since a purchase may have come between the two statements. A candidate of the merge naming one goes
+ * with it, its vector by the cascade. It holds no person's row, so it waits on nobody's erasure.
+ */
+export async function sweepReleasedItems(db: Db): Promise<number> {
+  let swept = 0
+  for (;;) {
+    const { taken, gone } = await db.transaction(async (tx) => {
+      const locked = await tx.execute<{ id: string }>(sql`
+        select i.id from items i
+        where i.released_at is not null and ${nobodyStandsOn(null)}
+        order by i.id
+        limit ${SWEEP_BATCH}
+        for update skip locked`)
+      if (locked.length === 0) return { taken: 0, gone: 0 }
+      const ids = uuids(locked.map((row) => row.id))
+      const [row] = await tx.execute<{ n: number }>(sql`
+        with gone as (
+          delete from items i
+          where i.id = any(${ids}) and ${nobodyStandsOn(null)}
+          returning i.id
+        ), candidates as (
+          delete from catalogue_merge_candidates c
+          where c.subject = 'item' and (c.a in (select id from gone) or c.b in (select id from gone))
+        )
+        select count(*)::int as n from gone`)
+      return { taken: locked.length, gone: row?.n ?? 0 }
+    })
+    swept += gone
+    if (taken < SWEEP_BATCH) return swept
+  }
 }
 
 export function createErasureRepository(db: Db): ErasureRepository {
@@ -315,12 +308,37 @@ export function createErasureRepository(db: Db): ErasureRepository {
           if (silentAt !== undefined && owner[0]?.silent !== true) return nobody()
 
           const erased = noneErased()
-          let items = { itemsErased: 0, itemsReleased: 0 }
+          let items = { itemsLeaving: 0, itemsReleased: 0 }
           let barcodesReleased = 0
           let memoryReleased = 0
-
           if (actorId !== null) {
-            const locked = await lockItemsOf(tx, actorId)
+            // The items released before on which this person still stands (MOL-374, adversarial А1):
+            // read before their rows go, so the report can say which the sweep will take.
+            const stoodOn = (
+              await tx.execute<{ id: string }>(sql`
+                select id from items
+                where released_at is not null and id in (
+                  select e.item_id from expenses e join trips t on t.id = e.trip_id
+                  where t.actor_id = ${actorId}
+                  union select item_id from verdicts where actor_id = ${actorId}
+                  union select item_id from search_picks where actor_id = ${actorId}
+                  union select item_id from item_barcodes where added_by = ${actorId}
+                  union select item_id from store_memory where actor_id = ${actorId}
+                  union select l.item_id from receipt_lines l join receipts r on r.id = l.receipt_id
+                        where r.actor_id = ${actorId})
+                order by id`)
+            ).map((row) => row.id)
+            // The person's items marked as their author leaving (В-7 «а»), right after the owner and in
+            // the order of their ids, before anything of theirs is deleted: the merge night holding one
+            // finishes first — moving the person's pick, a row not deleted yet — and a reading of their
+            // receipt holding a key share of one passes, since this lock is no key update. A trace is
+            // marked last, with the cascade that updates it anyway: the night moves a trace while it
+            // holds the trace's survivor (adversarial Р2-А9).
+            await tx.execute(sql`
+              update items set released_at = now()
+              where id in (
+                select id from items where created_by = ${actorId} and merged_into is null
+                order by id for no key update)`)
             // A sign-in the bot has not told of yet (MOL-361): which device, and when.
             erased.login_notices = await count(
               sql`delete from login_notices where actor_id = ${actorId} returning 1`,
@@ -404,16 +422,37 @@ export function createErasureRepository(db: Db): ErasureRepository {
             erased.money_accounts = await count(
               sql`delete from money_accounts where actor_id = ${actorId} returning 1`,
             )
-            items = await eraseLockedItems(tx, actorId, locked)
-            // Counted once the items that went took their codes and words with them: what is left stays.
-            const [codes] = await tx.execute<{ n: number }>(
-              sql`select count(*)::int as n from item_barcodes where added_by = ${actorId}`,
-            )
-            barcodesReleased = codes?.n ?? 0
-            const [words] = await tx.execute<{ n: number }>(
-              sql`select count(*)::int as n from store_memory where actor_id = ${actorId}`,
-            )
-            memoryReleased = words?.n ?? 0
+            await tx.execute(sql`
+              update items set released_at = now()
+              where created_by = ${actorId} and released_at is null`)
+            // What the sweep will take once this commits, and what stays: a code or a word on an item
+            // that goes goes with it (review 1, №1).
+            const [counts] = await tx.execute<{
+              leaving: number
+              ownLeaving: number
+              own: number
+              codes: number
+              words: number
+            }>(sql`
+              with going as (
+                select i.id, i.created_by from items i
+                where (i.created_by = ${actorId} or i.id = any(${uuids(stoodOn)}))
+                  and ${nobodyStandsOn(actorId)}
+              )
+              select
+                (select count(*) from going)::int as leaving,
+                (select count(*) from going where created_by = ${actorId})::int as "ownLeaving",
+                (select count(*) from items where created_by = ${actorId})::int as own,
+                (select count(*) from item_barcodes
+                  where added_by = ${actorId} and item_id not in (select id from going))::int as codes,
+                (select count(*) from store_memory
+                  where actor_id = ${actorId} and item_id not in (select id from going))::int as words`)
+            items = {
+              itemsLeaving: counts?.leaving ?? 0,
+              itemsReleased: (counts?.own ?? 0) - (counts?.ownLeaving ?? 0),
+            }
+            barcodesReleased = counts?.codes ?? 0
+            memoryReleased = counts?.words ?? 0
           }
           // No foreign key reaches these — on a first login the owner does not exist yet — so
           // no cascade does either. A person who began a login and never finished has only this.

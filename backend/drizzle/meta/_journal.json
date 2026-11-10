@@ -589,6 +589,13 @@
       "when": 1794318961359,
       "tag": "0083_receipt_service",
       "breakpoints": true
+    },
+    {
+      "idx": 84,
+      "version": "7",
+      "when": 1794329223263,
+      "tag": "0084_item_released",
+      "breakpoints": true
     }
   ]
 }

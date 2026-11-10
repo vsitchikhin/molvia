@@ -16,7 +16,7 @@ import {
 } from '@molvia/model'
 import am05 from '@molvia/model/testing/receipt-text.am-05.json'
 import type { FastifyInstance } from 'fastify'
-import { createErasureRepository } from '@/db/erasure-repository'
+import { createErasureRepository, sweepReleasedItems } from '@/db/erasure-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
@@ -893,11 +893,10 @@ describe('the item a line found, erased before the reading is written (MOL-374, 
           claimed.language,
           lines,
         )
-        // the matcher found Anna's item for the first line, and Anna is erased while the queue reads on:
-        // nothing stood on her item yet
-        expect(await createErasureRepository(db).erase(annaTg, { dryRun: false })).toMatchObject({
-          itemsErased: 1,
-        })
+        // the matcher found Anna's item for the first line, and Anna is erased and her item swept while
+        // the queue reads on: nothing stood on it yet
+        await createErasureRepository(db).erase(annaTg, { dryRun: false })
+        expect(await sweepReleasedItems(db)).toBe(1)
         return bindings.map((binding, position) =>
           position === 0 ? { ...binding, itemId: annas, match: 'search' as const } : binding,
         )

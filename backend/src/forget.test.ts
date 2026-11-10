@@ -27,7 +27,7 @@ const REPORT: ErasureReport = {
     login_requests: 1,
     actors: 1,
   },
-  itemsErased: 3,
+  itemsLeaving: 3,
   itemsReleased: 1,
   barcodesReleased: 2,
   memoryReleased: 0,
@@ -93,7 +93,7 @@ describe('forget — стирание вручную', () => {
     const { exit, lines } = run(['184467331'])
     await exit
     expect(lines).toContain('  verdicts            3')
-    expect(lines).toContain('  items erased        3 (nobody else stood on them)')
+    expect(lines).toContain('  items leaving       3 (nobody alive stands on them: swept)')
     expect(lines).toContain('  items kept          1 (author removed)')
     expect(lines).toContain('  codes kept          2 (author removed)')
     expect(lines).toContain(

@@ -212,7 +212,7 @@ import { NO_EMBEDDER } from '@/embeddings/embedder'
 import type { Embedder, EmbeddingLog } from '@/embeddings/embedder'
 import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
-import { createErasureRepository } from '@/db/erasure-repository'
+import { createErasureRepository, sweepReleasedItems } from '@/db/erasure-repository'
 import { createSilenceRepository } from '@/db/silence-repository'
 import { createExportRepository } from '@/db/export-repository'
 import { createFeedbackRepository } from '@/db/feedback-repository'
@@ -518,6 +518,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     app.log,
     options.failureRecorded,
   )
+  // Both doors of erasure (MOL-58, MOL-94) sweep its items at once (MOL-374, В-7 «а»): the person
+  // asked for them to go, and the minute timer is only what takes the ones left behind. Its failure is
+  // the timer's to answer; the erasure has committed.
+  const eraseAndSweep = async (db: Db, telegramUserId: TelegramUserId): Promise<void> => {
+    await eraseMe(createErasureRepository(db), telegramUserId)
+    await sweepReleasedItems(db).catch((error: unknown) => {
+      failures.report(error, job('released-items'), 'released items sweep failed')
+    })
+  }
 
   // The auth scopes set `no-store` on what their routes answer, but a path no route matches
   // and a URL Fastify cannot decode are answered before any scope is entered (adversarial А4).
@@ -643,6 +652,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopIncomeCleanup: (() => Promise<void>) | undefined
     let stopSpendingCleanup: (() => Promise<void>) | undefined
     let stopTripCleanup: (() => Promise<void>) | undefined
+    let stopReleasedSweep: (() => Promise<void>) | undefined
     let stopAccountCleanup: (() => Promise<void>) | undefined
     let stopTransferCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
@@ -694,6 +704,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         () => removedTrips.purgeStale(),
         (error) => {
           failures.report(error, job('trip-cleanup'), 'removed trip cleanup failed')
+        },
+      )
+      // And the items whose author erased themselves, once nothing stands on them (MOL-374, В-7 «а»):
+      // erasure only marks them, so it holds no lock on an item anybody else writes to.
+      stopReleasedSweep = startLoginCleanup(
+        async () => {
+          await sweepReleasedItems(db)
+        },
+        (error) => {
+          failures.report(error, job('released-items'), 'released items sweep failed')
         },
       )
       // And for accounts without operations (MOL-115): deleted ten minutes on, whatever named one
@@ -1032,6 +1052,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopIncomeCleanup?.()
       await stopSpendingCleanup?.()
       await stopTripCleanup?.()
+      await stopReleasedSweep?.()
       await stopTransferCleanup?.()
       await stopAccountCleanup?.()
       await stopSessionCleanup?.()
@@ -1079,7 +1100,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       preview: (code) => previewLogin(loginRequests, code),
       confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
       decline: (code) => declineLogin(loginRequests, code),
-      erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId),
+      erase: (telegramUserId) => eraseAndSweep(db, telegramUserId),
       // One person's claim that fails is logged by its kind and the others of the minute go on.
       claimReminders: () =>
         remindRatings(
@@ -1200,9 +1221,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),
       )
-      actorEraseRoute(guarded, (telegramUserId) =>
-        eraseMe(createErasureRepository(db), telegramUserId),
-      )
+      actorEraseRoute(guarded, (telegramUserId) => eraseAndSweep(db, telegramUserId))
       const heavyFeedback = heavyFeedbackLimit()
       feedbackRoutes(
         guarded,

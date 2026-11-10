@@ -599,6 +599,7 @@ export const EXPORT_COLUMNS: Readonly<
       search_key: 'made from the name, never typed',
       origin: "the catalogue's licence mark (MOL-162), not anything the person entered",
       merged_into: 'the catalogue’s own merge of twins (MOL-106), not anything the person entered',
+      released_at: 'set as the author is erased (MOL-374), so never while the copy has an author',
     },
   },
   // Read twice: the codes of the items the person added, whoever wrote them, and every code the
