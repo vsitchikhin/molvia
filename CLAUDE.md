@@ -422,6 +422,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   an accepted price; the cookie is sent after commit, only once.
 - **`backend/src/cookie.ts` is the only module that touches a cookie**: `__Host-`, `HttpOnly`,
   `Secure` always, `SameSite=Lax`, `Max-Age`; setting it and saying `no-store` are one act.
+- **A request with a session from another site's page, or by a navigation, is a 404 before the session**
+  (MOL-368): `Lax` sends the cookie on a foreign link, a chat's link comes as `none`, and a `GET` that
+  writes wrote; the app reaches the API by `fetch` alone; never the 401 that puts the cookie out.
 - **What a secret may look like is one rule, in `backend/src/secret.ts`**; more than one cookie of
   that name is refused, and the refusal clears nothing.
 - **The term slides, moved by one write a day**; four refusals give one answer, `401 error.no_actor`.
@@ -443,7 +446,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   person, forty a day of their own — a count «Удалить» never gives back — and twenty not recorded at once
   (MOL-360); a new item of «Предложить товар» by its person, sixty a day of their own, a name already there
   free (MOL-362); a new write path names its quota in its task. What answers without a session counts by the address Caddy names (`addressOf`), in memory.
-- **A host the server asks is the code's, never the request's**, with a timeout (SSRF).
+- **A host the server asks is the code's, never the request's**, with a timeout (SSRF) and a ceiling of
+  bytes on another's server's answer (`boundedBody`, MOL-368) — our own services aside.
 - **Every secret of production is a row of «Rotating the secrets» in `deploy/README.md`**, and a new one comes
   with its row and its line in `.env.prod.example`; the database's password lives in its volume too and takes only
   what a URL takes bare. A secret never goes on a command line. The images are public on ghcr: nothing secret in a

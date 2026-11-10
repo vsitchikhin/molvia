@@ -30,6 +30,11 @@ jobs:
     name: production from outside
     # Never in a fork: it has no secret, and nothing of its own to watch.
     if: github.repository == 'vsitchikhin/molvia'
+    # The ping URL is the environment's secret, which admits master alone (MOL-368): a repository
+    # secret is any branch's. No deployment is recorded — an hourly check is no rollout.
+    environment:
+      name: production
+      deployment: false
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:

@@ -1,5 +1,6 @@
 import { PUBLISHED, RATE_MAX, RATE_MIN, currencySchema, isRateDay } from '@molvia/model'
 import type { AmdRate, RateProvider } from '@molvia/model'
+import { boundedBody, boundedText } from '@/bounded-body'
 
 /** What one provider published in one answer: every currency it publishes (`PUBLISHED`), for one day. */
 export interface Published {
@@ -30,6 +31,12 @@ export const FOREIGN: readonly AmdRate['currency'][] = currencySchema.options.fi
  * seconds to answer on 19.09.2026.
  */
 export const FEED_TIMEOUT_MS = 30_000
+
+/**
+ * A feed's answer past this is no list of rates (MOL-368): the largest, the CBA's archive since 2022,
+ * was half a megabyte in 2026 and grows by some 130 KB a year. The market's files have their own.
+ */
+export const FEED_MAX_BYTES = 4 * 1024 * 1024
 
 export class FeedError extends Error {
   constructor(provider: RateProvider, reason: string) {
@@ -96,4 +103,14 @@ export async function request(
   const response = await reach(provider, url, init)
   if (!response.ok) throw new FeedError(provider, `HTTP ${String(response.status)}`)
   return response
+}
+
+/** A feed's answer as bytes, never past `FEED_MAX_BYTES`: past it, the provider is down. */
+export function bytesOf(provider: RateProvider, response: Response): Promise<ArrayBuffer> {
+  return boundedBody(response, FEED_MAX_BYTES, () => new FeedError(provider, 'too large'))
+}
+
+/** A feed's answer as text, never past `FEED_MAX_BYTES`: past it, the provider is down. */
+export function textOf(provider: RateProvider, response: Response): Promise<string> {
+  return boundedText(response, FEED_MAX_BYTES, () => new FeedError(provider, 'too large'))
 }
