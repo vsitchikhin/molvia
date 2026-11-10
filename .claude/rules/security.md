@@ -38,7 +38,9 @@ file holds what belongs to no single area, and what the audit found missing.
   account within a minute — is a blocker of the release). **The login's is an address's** (Ф-1,
   MOL-359): five starts a minute from an address, three hundred from everybody — `auth.md`. **A receipt's
   is a person's** (Ф-2, MOL-360): forty a day of their own and twenty not recorded at once — one account had
-  filled some 12 GB an hour against 51 GB free — `receipts.md`. **One has none yet, a blocker of
+  filled some 12 GB an hour against 51 GB free — `receipts.md`. **What the model costs is a person's share of the
+  month** (Ф-10, MOL-367): $2 of the $200 cap, so one person granted the model never takes it from the others —
+  `receipts.md`. **One has none yet, a blocker of
   `v0.2.0`**: «Предложить товар», and some nine thousand names an hour go into everybody's search
   (Ф-4, MOL-362: sixty a day). Each task, merged, rewrites its line here. **A new write path names its
   quota in its task**, or says why it needs none. **A person's own rows of money have none either, and

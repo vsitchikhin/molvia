@@ -284,6 +284,26 @@ may go, and the bot says so rather than «until the month ends». The workspace'
 console is set to the same (Р-10): a price wrong in the code is held there too. **Nobody's**: no key to
 `actors`, so neither erasure nor the copy reaches it.
 
+**Each person has a share of the month, held beside the cap** (MOL-367, Ф-10 of MOL-287, owner's В-1…В-3 «а»,
+10.11.2026): `RECEIPT_MODEL_PERSON_MONTHLY_CAP_USD`, $2 — the price of a month of receipts (MOL-271), some 700
+receipts at the measured $0,0028 — never above the cap, or the API does not start. Without it one person granted
+the model took the month from every other: the quota of receipts (MOL-360) holds their number, not their money — an
+answer not taken whose Tesseract is away is paid again every minute (below), and a brand is a call of its own.
+**The share is a count in the person's row**, `actors.model_month` and `model_spent_micro_usd`, never the rows of
+`receipts`: a receipt removed would give its price back. Its month is the cap's, UTC — the queue has no phone's day,
+and the money is one bill — and a new month starts it at nought. **One transaction a call, the account's lock first**
+(privacy.md): the share is taken in one statement, then the month; the share refusing leaves the month untouched and
+tells no stop, the cap refusing gives the share back. `settle` puts the call's own price in the share too, while the
+share still counts that month; a process lost in between leaves the worst there as in the month. **A brand's call
+is paid from the share of the receipt that asked it** (В-2 «а»): over it the brand waits for the next receipt that
+asks, whosever. Over the share Tesseract reads, as at the cap (`model_passed`, `brands_passed`: `share`), and the
+person is told nothing — their status is MOL-276's, in 0.3. **The owner hears of it once a person a month**
+(`model_share`, В-3 «а», `actors.model_share_told`), the month and the share, nobody named. Not a change of the
+row: `updated_at` does not see the three columns (0081); the copy carries them (version 30), erasure takes them with
+the row. **The prices, named:** the edge is held by the worst price, so the last receipt or two that would fit by
+their own price go to Tesseract; the share is reset at 04:00 of the 1st in Yerevan; one share for everybody — a
+tariff's own is MOL-275's, with the 100 receipts a month.
+
 **When the model is not the one to read, Tesseract reads, as before** (В-1 «а»): the cap, photos past the
 price, a refusal of the model, an answer cut by its length or of no schema — each paid — a request the API
 refuses for what it is (4xx, `ModelRejected`, paid nothing, a failure the owner hears of as
