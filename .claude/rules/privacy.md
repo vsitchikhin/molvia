@@ -55,7 +55,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   night merged by itself kept each other for good): the survivor and its traces, every one of them
   released and standing on nothing, their journal inside the group and never undone — then the sweep
   deletes the group with its `catalogue_merges` and their moves; an item merged into the seed's or a
-  living person's stays its second name (А4). `standsAlone` and `groupGoes` are the one test,
+  living person's stays its second name (А4). `releasedAndFree` and `groupGoes` are the one test,
   `ITEM_REFERENCES` holds every foreign key on `items`, and the test of the holders takes a case for each
   key (review 1, №2). **An item the
   author's erasure left because someone stood on it goes when the last of them does** (adversarial А1):
@@ -69,7 +69,10 @@ The detail behind the privacy lines of `CLAUDE.md`.
   does — and that person's phone still offers it in «Часто берёте»; written again from there it is that
   404, and the queue keeps the purchase with its reason in «Покупки» to be put right. **A door sweeps only
   what its erasure released** (review 3, №11): `eraseMe` erases, then `sweepReleased(leavingItems)`, a
-  failure of it the caller's to report; the minute timer sweeps everyone's. The copy and `erasures` are as they were (В-3 «а»): the report and `make forget`
+  failure of it the caller's to report; `make forget --yes` does the same and prints what it swept
+  (review 4, №19); the minute timer sweeps everyone's. **A list of ids goes as one parameter, asked as a
+  set** (adversarial Р4-А15): spelt a parameter an id, 32 767 items of one person passed the 65 534 a
+  statement may carry and nothing could erase them; a door's list is swept a batch's worth at a time. The copy and `erasures` are as they were (В-3 «а»): the report and `make forget`
   name the items the sweep will take and those that stay. The items someone stands on
   stay with `created_by` nulled, the codes they wrote to items stay with `added_by`
   nulled (MOL-100), the words they gave the shops' memory stay with `actor_id` nulled and still count
