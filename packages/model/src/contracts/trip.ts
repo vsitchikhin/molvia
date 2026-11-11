@@ -345,6 +345,23 @@ export const tripReceiptBodySchema = z.strictObject({
 export type TripReceiptBody = z.output<typeof tripReceiptBodySchema>
 
 /**
+ * `PUT /trips/:id/category` (MOL-400): the category «Деньги» count the trip's money in — chosen at
+ * «Закончить» and changed in «Траты». Whole each time, so the queue may send it twice. One the person
+ * has not got is «Продукты», never a refusal: the write came from a queue.
+ */
+export const tripCategoryBodySchema = z.strictObject({ categoryId: z.uuid() })
+export type TripCategoryBody = z.output<typeof tripCategoryBodySchema>
+
+/**
+ * `GET /trips/place-categories` (MOL-400, Р-6): the category of the person's last finished trip at
+ * each place that has one — what the phone starts a receipt and a record by hand on at that place.
+ */
+export const placeCategoriesCodec = z.strictObject({
+  places: z.array(z.strictObject({ placeId: z.uuid(), categoryId: z.uuid() })),
+})
+export type PlaceCategories = z.output<typeof placeCategoriesCodec>
+
+/**
  * «Считать по новому курсу / по прежнему / по своему» (MOL-39, Р-19, Р-21). Repeatable: the same
  * choice twice is one. The own rate travels as the decimal a person types — `parseRate` reads it.
  */

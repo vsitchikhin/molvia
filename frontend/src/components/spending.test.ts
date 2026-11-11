@@ -572,6 +572,7 @@ describe('a line of the journal as its row says it', () => {
     key: TRIP,
     tripId: TRIP,
     placeName: 'Ереван Сити',
+    categoryId: null,
     items: 9,
     amount: amd('11280'),
     counted: null,
@@ -644,6 +645,11 @@ describe('a line of the journal as its row says it', () => {
       'Открыть покупки:',
     ])
     expect(row(trip, null).tint).toBe('var(--cat-groceries)')
+  })
+
+  it('a trip in a category of its own stands in that category’s circle and words (MOL-400)', () => {
+    const value = row({ ...trip, categoryId: beauty.id }, beauty)
+    expect([value.meta, value.tint]).toEqual(['Красота · 9 позиций', 'var(--cat-beauty)'])
   })
 
   it('a trip with money and no purchase is the receipt’s sum, never «0 позиций» (MOL-227)', () => {

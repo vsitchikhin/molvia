@@ -371,6 +371,8 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     { id: own, actorId, name: 'Такси', colour: 3, icon: 'taxi', archivedAt: at(16) },
     { id: randomUUID(), actorId, preset: 'groceries' },
   ])
+  // The trip's own category (MOL-400), once the category is there.
+  await db.update(trips).set({ categoryId: own }).where(eq(trips.id, tripId))
   await db.insert(spendings).values({
     id: randomUUID(),
     actorId,

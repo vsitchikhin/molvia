@@ -341,7 +341,10 @@ export default defineComponent({
       () => categories.value.find((category) => category.preset === 'groceries') ?? null,
     )
     function categoryOf(row: JournalRow): SpendingCategoryView | null {
-      if (row.kind === 'trip') return groceries.value
+      if (row.kind === 'trip')
+        return (
+          categories.value.find((category) => category.id === row.categoryId) ?? groceries.value
+        )
       return categories.value.find((category) => category.id === row.spending.categoryId) ?? null
     }
     function categoryNameOf(row: JournalRow): string {

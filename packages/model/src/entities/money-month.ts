@@ -56,7 +56,7 @@ export function lastDayOf(month: Month): string {
 
 /**
  * One finished trip's purchases in one currency (handoff 06): a trip enters the month when it is
- * finished, on the day it was finished on the device, one line per currency, in the groceries. Its
+ * finished, on the day it was finished on the device, one line per currency, in its category. Its
  * sum is read from the purchases each time — nothing is copied, so amending a purchase, the trip's
  * receipt sum of MOL-78 or its removal of MOL-76 move the month by themselves.
  */
@@ -72,18 +72,23 @@ export interface TripLine {
   readonly finishedOn: string
   readonly finishedAt: Date
   readonly amount: Money
+  /** The trip's own category (MOL-400); `null` — «Продукты», as every trip was before it. */
+  readonly categoryId: string | null
 }
 
 export type MonthEntry =
   | { readonly kind: 'manual'; readonly spending: Spending; readonly counted: Money | null }
   | { readonly kind: 'trip'; readonly trip: TripLine; readonly counted: Money | null }
 
-/** The category a line of the month is counted in: its own, or a trip's «Продукты» (handoff 06). */
+/**
+ * The category a line of the month is counted in: its own — a trip's chosen at «Записать», «Закончить»
+ * or in «Траты» (MOL-400) — else a trip's «Продукты» (handoff 06).
+ */
 export function categoryOfEntry(
   entry: MonthEntry,
   groceries: string | undefined,
 ): string | undefined {
-  return entry.kind === 'manual' ? entry.spending.categoryId : groceries
+  return entry.kind === 'manual' ? entry.spending.categoryId : (entry.trip.categoryId ?? groceries)
 }
 
 export interface MonthDay {

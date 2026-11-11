@@ -14,7 +14,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `packages/model/src/entities/money-charts.ts` — What every chart shares: levels, the ring's sectors (`donutSlices`), months of a period, means and changes, and the exchanges by exchanger of «Обмен денег».
 - `packages/model/src/entities/money-chart-month.ts` — «Графики → Месяц» from counted months: the usual month of up to twelve closed ones from three, against the usual by category, the pace by day, the ring with «Остальные» named; the day of comparison (`comparedDay`) and the month before to it (`previousToDay`) of «Деньги» too.
 - `packages/model/src/entities/money-chart-year.ts` — «Графики → Год» from counted months: twelve months with what each is to the bars, the year's ring by each month's rate, the usual month of «Месяц» as its dashed line, «Разница» of the year, categories by month.
-- `packages/model/src/entities/spending-category.ts` — Spending category entity: the thirteen presets and their order, the trip's category, name limit, palette colour, the icons one's own may take (MOL-285), the order of the list (`categoryOrder`), the chips' frequent ones over 90 days (`frequentCategories`, MOL-198).
+- `packages/model/src/entities/spending-category.ts` — Spending category entity: the thirteen presets and their order, a trip's «Продукты» and the guess of its category by place and receipt (`guessedTripCategory`, `servesFood`, MOL-400), name limit, palette colour, the icons one's own may take (MOL-285), the order of the list (`categoryOrder`), the chips' frequent ones over 90 days (`frequentCategories`, MOL-198).
 - `packages/model/src/entities/spending.ts` — Spending entity: money spent outside a trip, its text limits, undo window and its amount in the spending currency.
 
 ## backend · routes
@@ -30,6 +30,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `backend/src/usecases/money.test.ts` — Use-case test: day rates, a spending's rate snapshot on record and amend, and month freezing hold on fake repositories.
 - `backend/src/usecases/today.ts` — `todayOf`: «today» of money for a request — the phone's day it named (`TODAY_HEADER`, MOL-121), or Yerevan's. Tests: `backend/tests/money-accounts.integration.test.ts`.
 - `backend/src/usecases/spendings.ts` — Use cases of spendings and categories: record, amend, remove, restore a spending; list (with the chips' frequent ones, MOL-198), add, amend and archive a category.
+- `backend/src/usecases/trip-category.ts` — Use cases of a trip's category (MOL-400): the owner's own or «Продукты» (`ownCategory`, read by «Записать» too), `PUT /trips/:id/category`, the last category at each place. Tests: `backend/tests/trip-category.integration.test.ts`.
 
 ## backend · db
 
@@ -46,6 +47,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `backend/tests/money-chart-year.integration.test.ts` — Integration test: every month of «Графики → Год» equals its month of «Деньги» and the year is their sum, what is frozen, the average from three, privacy, 404.
 - `backend/tests/salary-shift.integration.test.ts` — Integration test: «Зарплата — в следующий месяц» is set and cleared per owner, bounded, and moves a salary into next month's «Пришло».
 - `backend/tests/spendings.integration.test.ts` — Integration test: categories, spendings and the month over HTTP — repeats, undo, rates of the day, freezing and thawing, journal pages.
+- `backend/tests/trip-category.integration.test.ts` — Integration test: a trip's category (MOL-400) moves its money in the month, the field only by its header, a removed own category taken and a stranger's «Продукты», one 404, the account's journal, the last category at each place.
 
 ## frontend · views
 
@@ -69,7 +71,8 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/ChartsSkeleton.vue` — Loading of «Графики» in the shape of the answer: the ring's card, then the lines of «Против обычного» or the twelve bars of «Год».
 - `frontend/src/components/ChartsYear.vue` — «Графики → Год» (MOL-160): «‹ 2026 ›», the year's ring, twelve months against the usual, in and out with the year's «Разница», a category by month chosen by a sector of the ring too.
 - `frontend/src/components/CategoryChips.vue` — Category chips of a spending (MOL-198): two rows by the browser's measure of the chips, «Ещё…» last in the second, the radios only of the chips shown, nothing preselected.
-- `frontend/src/components/CategoryPickerSheet.vue` — «Категория» over the spending sheet (MOL-198): every category in the chips' order on `ListRow` with its dot, a tap chooses and goes back, «+ Своя» last.
+- `frontend/src/components/CategoryPickerSheet.vue` — «Категория» over the spending sheet (MOL-198): every category in the chips' order on `ListRow` with its dot, a tap chooses and goes back, «+ Своя» last — none over a trip's (`addable`, MOL-400).
+- `frontend/src/components/TripCategoryRow.vue` — «Категория ›» of a trip (MOL-400): a field's `NavRow` with the category's icon on the receipt's review, in «Закончить» and in the summary of «Траты», opening `CategoryPickerSheet` with no «+ Своя»; none chosen — «Продукты».
 - `frontend/src/components/CategorySheet.vue` — «Новая категория» over the spending sheet — from «Ещё…», taking the list with it when made (`closes`, MOL-198) — or from «Категории», and one's own amended (MOL-285): a name, an icon of the set, a colour of the palette, through the queue; a preset's name refused; «Убрать категорию» in the footer of one's own.
 - `frontend/src/components/ExchangeLosses.vue` — «Обмены против рынка» card on top of «Обмен денег» (MOL-152, MOL-159): exchangers worst first, a bar from the centre line, no «≈ ₽».
 - `frontend/src/components/MoneyAccountsNow.vue` — «На счетах сейчас» over the switcher of «Деньги» (MOL-183): the live accounts now in the income currency, «можно тратить», the count, the one way into «Счета».
@@ -94,6 +97,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 
 ## frontend · stores
 
+- `frontend/src/stores/placeCategories.ts` — The category of the last trip at each place (MOL-400, Р-6): the server's answer laid over what this phone recorded since, per owner; what the guess of a receipt and «Закончить» starts from.
 - `frontend/src/stores/spendingHandoff.ts` — Store: a record with no purchases handed over to «Деньги» as a spending (MOL-78, В-1), taken once by the sheet.
 - `frontend/src/stores/spendingQueue.ts` — Store: the on-device queue of every spending and category write, folded while waiting, sent one window at a time.
 
