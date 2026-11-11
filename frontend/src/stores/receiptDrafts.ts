@@ -117,6 +117,12 @@ export interface PaymentDraft {
 const paymentCodec = z.strictObject({ accountId: z.uuid().nullable(), debited: z.string() })
 
 /**
+ * The category chosen on the review (MOL-400): beside the drafts, never inside, for `PAYMENT_KEY`'s reason.
+ * None — the guess of the place and the receipt stands (`guessedTripCategory`).
+ */
+const CATEGORY_KEY = 'molvia.receipt-category'
+
+/**
  * The lines the reader lost and the person typed on the review (MOL-273), in the order typed. **Beside the
  * drafts, never inside**, as `SHOWN_KEY`: a draft is read strictly by the build before, which would drop the
  * whole receipt's edits for them.
@@ -186,6 +192,25 @@ function recallPayments(owner: string | null): Record<string, PaymentDraft> {
   )
 }
 
+/** One broken entry is dropped alone, as a payment's is. */
+function recallCategories(owner: string | null): Record<string, string> {
+  if (!owner) return {}
+  const raw = read(`${CATEGORY_KEY}.${owner}`)
+  if (!raw) return {}
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return {}
+  }
+  if (!isRecord(parsed)) return {}
+  return Object.fromEntries(
+    Object.entries(parsed).flatMap(([id, value]) =>
+      z.uuid().safeParse(value).success ? [[id, value as string]] : [],
+    ),
+  )
+}
+
 function recall(owner: string | null): Record<string, ReceiptDraft> {
   if (!owner) return {}
   const raw = read(`${KEY}.${owner}`)
@@ -235,6 +260,7 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
   const drafts = ref<Record<string, ReceiptDraft>>(recall(actor.id))
   const shown = ref<Shown>(recallShown(actor.id))
   const payments = ref<Record<string, PaymentDraft>>(recallPayments(actor.id))
+  const categories = ref<Record<string, string>>(recallCategories(actor.id))
   const added = ref<Record<string, readonly AddedLineDraft[]>>(recallAdded(actor.id))
 
   watch(
@@ -243,6 +269,7 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
       drafts.value = recall(id)
       shown.value = recallShown(id)
       payments.value = recallPayments(id)
+      categories.value = recallCategories(id)
       added.value = recallAdded(id)
     },
   )
@@ -251,6 +278,8 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
     if (actor.id && event.key === `${SHOWN_KEY}.${actor.id}`) shown.value = recallShown(actor.id)
     if (actor.id && event.key === `${PAYMENT_KEY}.${actor.id}`)
       payments.value = recallPayments(actor.id)
+    if (actor.id && event.key === `${CATEGORY_KEY}.${actor.id}`)
+      categories.value = recallCategories(actor.id)
     if (actor.id && event.key === `${ADDED_KEY}.${actor.id}`) added.value = recallAdded(actor.id)
   })
 
@@ -285,6 +314,13 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
     if (!owner) return
     payments.value = edit(recallPayments(owner))
     write(`${PAYMENT_KEY}.${owner}`, JSON.stringify(payments.value))
+  }
+
+  function keepCategories(edit: (all: Record<string, string>) => Record<string, string>): void {
+    const owner = actor.id
+    if (!owner) return
+    categories.value = edit(recallCategories(owner))
+    write(`${CATEGORY_KEY}.${owner}`, JSON.stringify(categories.value))
   }
 
   function keepShown(edit: (all: Shown) => Shown): void {
@@ -358,6 +394,11 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
     setPayment(receiptId: string, payment: PaymentDraft): void {
       keepPayments((all) => ({ ...all, [receiptId]: payment }))
     },
+    /** The category chosen on the review (MOL-400); `null` — none chosen, the guess stands. */
+    categoryOf: (receiptId: string): string | null => categories.value[receiptId] ?? null,
+    setCategory(receiptId: string, categoryId: string): void {
+      keepCategories((all) => ({ ...all, [receiptId]: categoryId }))
+    },
     /** The lines typed on the review (MOL-273), in the order typed. */
     addedOf: (receiptId: string): readonly AddedLineDraft[] => added.value[receiptId] ?? [],
     /** A line typed, or one typed before put right — by its key. */
@@ -389,6 +430,11 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
           Object.fromEntries(Object.entries(all).filter(([id]) => id !== receiptId)),
         )
       }
+      if (receiptId in recallCategories(actor.id)) {
+        keepCategories((all) =>
+          Object.fromEntries(Object.entries(all).filter(([id]) => id !== receiptId)),
+        )
+      }
       drafts.value = recall(actor.id)
       if (!(receiptId in drafts.value)) return
       drafts.value = Object.fromEntries(
@@ -405,6 +451,11 @@ export const useReceiptDraftsStore = defineStore('receiptDrafts', () => {
       }
       if (Object.keys(recallPayments(actor.id)).some((id) => !receiptIds.has(id))) {
         keepPayments((all) =>
+          Object.fromEntries(Object.entries(all).filter(([id]) => receiptIds.has(id))),
+        )
+      }
+      if (Object.keys(recallCategories(actor.id)).some((id) => !receiptIds.has(id))) {
+        keepCategories((all) =>
           Object.fromEntries(Object.entries(all).filter(([id]) => receiptIds.has(id))),
         )
       }

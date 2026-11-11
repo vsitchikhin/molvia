@@ -255,6 +255,8 @@ describe('какие ключи приложение пишет на устро�
       'molvia.own-prices',
       'molvia.payment-accounts',
       'molvia.places',
+      // Категория последнего похода в каждом месте — умолчание чека и «Закончить» (MOL-400, Р-6).
+      'molvia.place-categories',
       'molvia.recent',
       // Коды, по которым найдены недавние позиции, — поиск по коду офлайн (MOL-99).
       'molvia.recent-codes',
@@ -262,6 +264,8 @@ describe('какие ключи приложение пишет на устро�
       'molvia.receipt',
       // Строки, дописанные на просмотре чека, — рядом с черновиком (MOL-273).
       'molvia.receipt-added',
+      // Категория, выбранная на просмотре чека, — рядом с черновиком (MOL-400).
+      'molvia.receipt-category',
       // Чеки, все части которых доставил этот телефон, — пока список не скажет, где они (MOL-127).
       'molvia.receipt-delivered',
       // Правки строк чека до записи — на телефоне, без связи (MOL-127, Т-9).
@@ -287,6 +291,9 @@ describe('какие ключи приложение пишет на устро�
       'molvia.spending-queue',
       'molvia.spending-rejected',
       'molvia.trip',
+      // Категория похода, своим ключом: прежняя версия её не читает и теряет из очереди (MOL-400).
+      'molvia.trip-categories',
+      'molvia.trip-categories-rejected',
       'molvia.trip-gone',
       'molvia.trip-history',
       // Момент последнего ответа истории — полоса «Покупок» со временем; своим ключом по той же
