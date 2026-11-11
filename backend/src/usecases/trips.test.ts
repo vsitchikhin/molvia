@@ -126,6 +126,8 @@ function fakeRepositories(
       recordFinished: unexpected('trips.recordFinished'),
       lockOwner: unexpected('trips.lockOwner'),
       byId: unexpected('trips.byId'),
+      setCategory: unexpected('trips.setCategory'),
+      placeCategories: unexpected('trips.placeCategories'),
       lock: unexpected('trips.lock'),
       latestUnfinishedFor: unexpected('trips.latestUnfinishedFor'),
       listFor: unexpected('trips.listFor'),

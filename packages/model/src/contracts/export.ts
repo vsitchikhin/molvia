@@ -62,8 +62,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // model is counted this month — a call whose price is not known at its highest — and whether the owner heard they
 // reached it (MOL-367). 32: a receipt's `service`, a café's service the lines make the total less (MOL-310). 33: the
 // account's `receiptItemsDay` and `receiptItemsNew`, the items put into the shared catalogue by «Записать» of the
-// person's receipts on their day, which its own quota counts (MOL-373).
-export const EXPORT_VERSION = 33
+// person's receipts on their day, which its own quota counts (MOL-373). 34: a trip's `categoryId`, the category
+// «Деньги» count it in, chosen at «Записать», «Закончить» or in «Траты» (MOL-400).
+export const EXPORT_VERSION = 34
 
 const day = z.iso.date()
 
@@ -210,6 +211,8 @@ const tripSchema = z.strictObject({
   receipt: signedMoneyCodec.nullable(),
   receiptSetAt: isoDate.nullable(),
   receiptFirstAt: isoDate.nullable(),
+  // The category «Деньги» count it in (MOL-400); none — «Продукты».
+  categoryId: z.uuid().nullable(),
   removedAt: isoDate.nullable(),
 })
 

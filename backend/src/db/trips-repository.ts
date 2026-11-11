@@ -68,6 +68,8 @@ export interface RecordedTrip {
   /** The account it was paid from and «списано», as `paymentOf` settled them (MOL-312). */
   readonly accountId: string | null
   readonly debited: Money | null
+  /** The category «Деньги» count it in (MOL-400): the owner's own, `null` — «Продукты». */
+  readonly categoryId: string | null
   /** The place's trace the phone named by its id or name, when the place is its survivor (MOL-299). */
   readonly placeAsked?: string
 }
@@ -119,6 +121,16 @@ export interface TripRepository {
     receipt: Money | null,
   ): Promise<Trip>
   byId(id: string, actorId: string): Promise<Trip | null>
+  /**
+   * The category «Деньги» count the trip in (MOL-400), whole — `null` is «Продукты». `false` for a
+   * stranger's, a missing or a removed trip. The category is the caller's to have checked as the owner's.
+   */
+  setCategory(actorId: string, tripId: string, categoryId: string | null): Promise<boolean>
+  /**
+   * The category of the owner's last finished trip at each place that has one (MOL-400, Р-6): what a
+   * receipt and a record by hand start on there. Last by the moment the phone finished it.
+   */
+  placeCategories(actorId: string): Promise<readonly { placeId: string; categoryId: string }[]>
   /**
    * The trip, locked until the caller's transaction ends — `null` for a stranger's or a missing
    * one. Every write to a trip's rows takes it first, so two of them run one after the other:
@@ -455,6 +467,7 @@ export function createTripRepository(db: Conn): TripRepository {
               debitedMinor: input.debited?.minor ?? null,
               debitedCurrency: input.debited?.currency ?? null,
               accountSetAt: input.accountId === null ? null : sql`now()`,
+              categoryId: input.categoryId,
             })
             .onConflictDoNothing({ target: trips.id })
             .returning()
@@ -476,6 +489,32 @@ export function createTripRepository(db: Conn): TripRepository {
 
       const [row] = await db.select().from(trips).where(ownedBy(id, actorId)).limit(1)
       return row ? toTrip(row) : null
+    },
+
+    async setCategory(actorId, tripId, categoryId) {
+      const own = idOrNull(tripId)
+      if (own === null) return false
+      return translateFailures(async () => {
+        const updated = await db
+          .update(trips)
+          .set({ categoryId })
+          .where(ownedBy(own, actorId))
+          .returning({ id: trips.id })
+        return updated.length > 0
+      })
+    },
+
+    async placeCategories(actorId) {
+      const rows = await db.execute<{ place_id: string; category_id: string }>(sql`
+        select distinct on (t.place_id) t.place_id, t.category_id
+          from trips t
+         where t.actor_id = ${actorId}
+           and t.finished_at is not null
+           and t.deleted_at is null
+           and t.category_id is not null
+         order by t.place_id, coalesce(t.finished_on_device_at, t.finished_at) desc, t.id desc
+      `)
+      return rows.map((row) => ({ placeId: row.place_id, categoryId: row.category_id }))
     },
 
     async lock(id, actorId) {

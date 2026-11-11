@@ -339,6 +339,11 @@ export const receiptRecordBodySchema = z.strictObject({
    * a phone of an earlier build, or «без счёта» — the trip is on no account.
    */
   account: tripPaymentBodySchema.optional(),
+  /**
+   * The category «Деньги» count the trip in (MOL-400), chosen on the review: one the person has not got
+   * is «Продукты», never a refusal. Absent — a phone of an earlier build — the trip is «Продукты», as before.
+   */
+  categoryId: z.uuid().optional(),
 })
 export type ReceiptRecordBody = z.output<typeof receiptRecordBodySchema>
 
