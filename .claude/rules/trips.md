@@ -172,6 +172,11 @@ The detail behind the trip lines of `CLAUDE.md`.
   a check that came out even moves the balance with no reason the check can name, as a removed
   spending does.
 
+**A trip's category is a write of its own** (`category`, `PUT /trips/:id/category`, MOL-400): from «Закончить»,
+before the finish, and from the summary in «Траты»; whole each time, 404 done. It moves no money, so a later one
+takes the earlier one's place while it waits. Mirrored under `molvia.trip-categories(-rejected)`: every build
+before it drops the kind.
+
 ## «Брали здесь в прошлый раз» (MOL-209)
 
 **`GET /trips/:tripId/previous-items` and `TripRepository.previousPurchases` are read by «Что взяли?»**, and

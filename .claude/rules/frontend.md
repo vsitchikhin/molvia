@@ -828,7 +828,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   **On `ListRow`, by two things the kit gained**: `tint`, the icon of 24 in a circle of 40
   (`--row-circle`) in a category's colour on `--cat-tint-share`, or `muted` (`surface-2`,
   `text-muted`) for an income, an exchange, a spending whose category the phone does not know —
-  never the accent, which is «press here» (Ф-4): purchases take the circle of «Продукты»; and `#below`,
+  never the accent, which is «press here» (Ф-4): purchases take the circle of their category, «Продукты» where they name none (MOL-400); and `#below`,
   the tag under the meta, since in the meta it would be cut with it. **The chevron is on every row** —
   every one opens a sheet to go on with — so the amounts end in one column; a sum over the rows stands
   in it by `--space-tail` (the card's hairline, the row's inset, the chevron and the gap: the day's sum
