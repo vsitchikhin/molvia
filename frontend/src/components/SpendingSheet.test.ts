@@ -1182,6 +1182,36 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: CAFE })
   })
 
+  // Ревью №9: слово шторки глушит повтор — та же категория, пока первая запись в пути, не ставит вторую: её
+  // очередь заменила бы на месте под новым ключом, и после ответа ушёл бы второй запрос
+  it('must not fire: the same category again while the first choice is on its way sends nothing more', async () => {
+    let land: () => void = () => undefined
+    categorizeTrip.mockReset()
+    categorizeTrip.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        land = resolve
+      }),
+    )
+    categorizeTrip.mockResolvedValue(undefined)
+    const view = await summary(CAFE)
+    const choose = async (name: string) => {
+      await row(view).trigger('click')
+      await risen()
+      const option = [
+        ...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]'),
+      ].find((one) => one.textContent.includes(name))
+      if (!option) throw new Error(`no «${name}» in the list`)
+      option.click()
+      await flushPromises()
+    }
+    await choose('pets')
+    await choose('pets')
+    land()
+    await flushPromises()
+    expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
+    expect(useTripQueueStore().pending).toEqual([])
+  })
+
   // Строка месяца может отставать от сервера — выбор ушёл из шторки другого экрана, журнал не перечитан
   // (адверсариальная В2): выбор, равный строке, уходит; повтор целиком ничего не двигает
   it('the category the month’s row shows goes when chosen: the row may be older than the server', async () => {
