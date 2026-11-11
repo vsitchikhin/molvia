@@ -91,7 +91,12 @@ function spending(
   }
 }
 
-function trip(amount: string, on: string, at = `${on}T15:00:00Z`): TripLine {
+function trip(
+  amount: string,
+  on: string,
+  at = `${on}T15:00:00Z`,
+  category: string | null = null,
+): TripLine {
   return {
     tripId: nextId(),
     placeName: 'Ереван Сити',
@@ -99,6 +104,7 @@ function trip(amount: string, on: string, at = `${on}T15:00:00Z`): TripLine {
     finishedOn: on,
     finishedAt: new Date(at),
     amount: toMoney(amount),
+    categoryId: category,
   }
 }
 
@@ -287,6 +293,32 @@ describe('the month of «Деньги»', () => {
     )
     const result = month({ categories: archived, trips: [trip('500 AMD', '2026-09-02')] })
     expect(result.byCategory[0]?.categoryId).toBe(categoryId('groceries'))
+  })
+
+  it('counts a trip in its own category, and one with none in the groceries (MOL-400)', () => {
+    const cafe = categoryId('cafe')
+    const result = month({
+      trips: [
+        trip('12400 AMD', '2026-09-24', '2026-09-24T15:00:00Z', cafe),
+        trip('8940 AMD', '2026-09-24'),
+      ],
+    })
+    expect(result.byCategory).toEqual([
+      { categoryId: cafe, amount: toMoney('12400 AMD') },
+      { categoryId: categoryId('groceries'), amount: toMoney('8940 AMD') },
+    ])
+  })
+
+  it('counts a trip in a category taken out of the choice since (MOL-400)', () => {
+    const archived = presets.map((category) =>
+      category.preset === 'pets' ? { ...category, archivedAt: new Date() } : category,
+    )
+    const pets = categoryId('pets')
+    const result = month({
+      categories: archived,
+      trips: [trip('4500 AMD', '2026-09-02', '2026-09-02T15:00:00Z', pets)],
+    })
+    expect(result.byCategory).toEqual([{ categoryId: pets, amount: toMoney('4500 AMD') }])
   })
 
   it('orders the journal newest day first, and newest first within a day', () => {

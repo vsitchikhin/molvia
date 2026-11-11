@@ -70,6 +70,7 @@ function trip(major: number, on: string): TripLine {
     finishedOn: on,
     finishedAt: new Date(`${on}T15:00:00Z`),
     amount: money(BigInt(major) * 100n, 'AMD'),
+    categoryId: null,
   }
 }
 

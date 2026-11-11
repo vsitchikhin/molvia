@@ -906,6 +906,9 @@ export const trips = pgTable(
     // hint of «сколько было до обмена» dates the receipt by, as a purchase by the moment it was
     // written, so a typo fixed after an exchange does not move the whole receipt past it (review 2).
     receiptFirstAt: timestamp('receipt_first_at', { withTimezone: true }),
+    // The category «Деньги» count the trip's money in (MOL-400): chosen at «Записать» and «Закончить»,
+    // changed in «Траты». Empty — «Продукты», as every trip was before (MOL-73, handoff 06).
+    categoryId: uuid('category_id'),
     // «Удалить поход» (MOL-76): marked, not deleted, by the money rule — «Вернуть» for ten
     // minutes, then the minute timer, and every reader but erasure and that timer filters it
     // out. A mark also keeps a start sent again from the queue from writing the trip anew.
@@ -1014,6 +1017,12 @@ export const trips = pgTable(
       'trips_receipt_first_with_sum',
       sql`(${table.receiptMinor} is null) = (${table.receiptFirstAt} is null)`,
     ),
+    // The category is the owner's own: the pair, not the id alone — as a spending's.
+    foreignKey({
+      name: 'trips_category_is_owners',
+      columns: [table.categoryId, table.actorId],
+      foreignColumns: [spendingCategories.id, spendingCategories.actorId],
+    }),
     ...paidFrom('trips', table),
   ],
 )
