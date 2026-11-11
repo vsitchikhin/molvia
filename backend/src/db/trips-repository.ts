@@ -122,10 +122,10 @@ export interface TripRepository {
   ): Promise<Trip>
   byId(id: string, actorId: string): Promise<Trip | null>
   /**
-   * The category «Деньги» count the trip in (MOL-400), whole — `null` is «Продукты». `false` for a
-   * stranger's, a missing or a removed trip. The category is the caller's to have checked as the owner's.
+   * The category «Деньги» count the trip in (MOL-400). `false` for a stranger's, a missing or a removed
+   * trip. The category is the caller's to have checked as the owner's.
    */
-  setCategory(actorId: string, tripId: string, categoryId: string | null): Promise<boolean>
+  setCategory(actorId: string, tripId: string, categoryId: string): Promise<boolean>
   /**
    * The category of the owner's last finished trip at each place that has one (MOL-400, Р-6): what a
    * receipt and a record by hand start on there. Last by the moment the phone finished it.

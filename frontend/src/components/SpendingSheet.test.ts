@@ -1033,7 +1033,8 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
   const TRIP = 'bbbbbbbb-0000-4000-8000-000000000002'
   const GROCERIES = 'c0000000-0000-4000-8000-000000000011'
   const PETS = 'c0000000-0000-4000-8000-000000000012'
-  const preset = (id: string, key: 'groceries' | 'pets') =>
+  const CAFE = 'c0000000-0000-4000-8000-000000000013'
+  const preset = (id: string, key: 'groceries' | 'pets' | 'cafe') =>
     ({ id, preset: key, name: null, colour: null, icon: null, archived: false }) as const
 
   async function summary(categoryId: string | null): Promise<VueWrapper> {
@@ -1063,7 +1064,7 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
             counted: null,
           },
         },
-        categories: [preset(GROCERIES, 'groceries'), preset(PETS, 'pets')],
+        categories: [preset(GROCERIES, 'groceries'), preset(PETS, 'pets'), preset(CAFE, 'cafe')],
         nameOf: (one: { preset: string | null }) => one.preset ?? '',
         spendCurrency: 'AMD',
       },
@@ -1086,8 +1087,8 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     const view = await summary(null)
     await row(view).trigger('click')
     await risen()
-    const pets = [...document.querySelectorAll<HTMLElement>('[role="radio"]')].find((one) =>
-      one.textContent.includes('pets'),
+    const pets = [...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]')].find(
+      (one) => one.textContent.includes('pets'),
     )
     if (!pets) throw new Error('no «pets» in the list')
     pets.click()
@@ -1100,12 +1101,36 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     expect(row(view).text()).toContain('pets')
   })
 
+  // Дошедший выбор не уступает строке месяца, с которой шторка открылась (ревью №1, адверсариальная А2)
+  it('a choice that landed stays in the row, and the old one chosen again is sent', async () => {
+    categorizeTrip.mockReset()
+    categorizeTrip.mockResolvedValue(undefined)
+    const view = await summary(CAFE)
+    const choose = async (name: string) => {
+      await row(view).trigger('click')
+      await risen()
+      const option = [
+        ...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]'),
+      ].find((one) => one.textContent.includes(name))
+      if (!option) throw new Error(`no «${name}» in the list`)
+      option.click()
+      await flushPromises()
+    }
+    await choose('pets')
+    expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
+    expect(useTripQueueStore().pending).toEqual([])
+    expect(row(view).text()).toContain('pets')
+    await choose('cafe')
+    expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: CAFE })
+    expect(row(view).text()).toContain('cafe')
+  })
+
   it('must not fire: the category the trip has already sends nothing', async () => {
     const view = await summary(PETS)
     await row(view).trigger('click')
     await risen()
-    const pets = [...document.querySelectorAll<HTMLElement>('[role="radio"]')].find((one) =>
-      one.textContent.includes('pets'),
+    const pets = [...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]')].find(
+      (one) => one.textContent.includes('pets'),
     )
     pets?.click()
     await flushPromises()

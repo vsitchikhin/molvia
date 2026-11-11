@@ -29,6 +29,7 @@ import { useActorStore } from '@/stores/actor'
 import { useItemEntryStore } from '@/stores/itemEntry'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 import { useTripStore } from '@/stores/trip'
+import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import TripNotices from '@/components/TripNotices.vue'
@@ -70,6 +71,7 @@ vi.mock('@/api', () => ({
     spendingCategories: () => spendingCategories(),
     placeCategories: () => placeCategories(),
     categorizeTrip: () => new Promise(() => undefined),
+    addSpendingCategory: () => new Promise(() => undefined),
     // «Тут дешевле» on the purchase sheet (MOL-92): never answered here.
     ownPrices: () => new Promise(() => undefined),
   },
@@ -1711,6 +1713,63 @@ describe('TripView', () => {
       expect(JSON.parse(localStorage.getItem(`molvia.place-categories.${ME}`) ?? '{}')).toEqual({
         [PLACE]: PETS,
       })
+    })
+
+    // Ответ сервера приходит, пока шторка открыта, и двигает догадку (ревью №2, адверсариальная А3 «а»)
+    it('ответ сервера о прошлой записи в месте, пришедший после открытия, двигает догадку', async () => {
+      let answer: (value: unknown) => void = () => undefined
+      placeCategories.mockReturnValue(
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+      )
+      const { view, queue } = await render()
+      await docked(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+      const sheetRow = () => openSheets()[0]?.querySelector('.nav-row')?.textContent ?? ''
+      expect(sheetRow()).toContain(ru.spending.category.groceries)
+      answer({ places: [{ placeId: PLACE, categoryId: PETS }] })
+      await flushPromises()
+      expect(sheetRow()).toContain(ru.spending.category.pets)
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending[0]).toMatchObject({ kind: 'category', body: { categoryId: PETS } })
+    })
+
+    // Категория, ещё ждущая в очереди трат, походу не предлагается (адверсариальная А1)
+    it('своя категория, ещё не дошедшая до сервера, в списке не стоит', async () => {
+      const PHARMACY = 'cc000000-0000-4000-8000-000000000003'
+      const { view } = await render()
+      useSpendingQueueStore().addCategory({ id: PHARMACY, name: 'Аптека' })
+      await flushPromises()
+      await docked(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+      openSheets()[0]?.querySelector<HTMLButtonElement>('.nav-row')?.click()
+      await flushPromises()
+      const names = [...(openSheets().at(-1)?.querySelectorAll('[role="radio"]') ?? [])].map(
+        (one) => one.textContent,
+      )
+      expect(names.some((name) => name.includes(ru.spending.category.pets))).toBe(true)
+      expect(names.some((name) => name.includes('Аптека'))).toBe(false)
+    })
+
+    // Без связи, «Деньги» на телефоне не открывались: список — последний ответ, сохранённый здесь (А3 «б»)
+    it('без связи берёт список категорий, сохранённый с прошлого ответа, и память места', async () => {
+      localStorage.setItem(
+        `molvia.own-categories.${ME}`,
+        JSON.stringify({
+          categories: [preset(GROCERIES, 'groceries'), preset(PETS, 'pets')],
+          frequent: [],
+        }),
+      )
+      localStorage.setItem(`molvia.place-categories.${ME}`, JSON.stringify({ [PLACE]: PETS }))
+      spendingCategories.mockRejectedValue(new TypeError('Failed to fetch'))
+      placeCategories.mockRejectedValue(new TypeError('Failed to fetch'))
+      const { view, queue } = await render()
+      await finishWith(view)
+      expect(queue.pending[0]).toMatchObject({ kind: 'category', body: { categoryId: PETS } })
     })
 
     it('начинает с категории прошлой записи в этом месте', async () => {

@@ -656,25 +656,27 @@ export default defineComponent({
     })
 
     /**
-     * The trip's category (MOL-400): a choice still in the queue is the newest word of it, else the month's
-     * row — `null`, «Продукты».
+     * The trip's category (MOL-400): a choice still in the queue is the newest word of it, then the one made in
+     * this sheet — the row is the month as it was when the sheet opened, and a choice that landed must not give
+     * way to it (review №1, adversarial А2) — else the month's row, `null` being «Продукты».
      */
+    const pickedCategory = ref<{ tripId: string; categoryId: string } | null>(null)
     const tripCategoryId = computed(() => {
       if (props.target.kind !== 'trip') return null
       const tripId = props.target.row.tripId
       const queued = trips.pending.findLast(
         (write) => write.kind === 'category' && write.tripId === tripId,
       )
-      return queued?.kind === 'category' ? queued.body.categoryId : props.target.row.categoryId
+      if (queued?.kind === 'category') return queued.body.categoryId
+      const picked = pickedCategory.value
+      return picked?.tripId === tripId ? picked.categoryId : props.target.row.categoryId
     })
     /** Chosen in the summary: at once, through the trip's queue, as its account (6h). */
     function categorizeTrip(categoryId: string): void {
       if (props.target.kind !== 'trip' || categoryId === tripCategoryId.value) return
-      trips.enqueue({
-        kind: 'category',
-        tripId: props.target.row.tripId,
-        body: { categoryId },
-      })
+      const tripId = props.target.row.tripId
+      pickedCategory.value = { tripId, categoryId }
+      trips.enqueue({ kind: 'category', tripId, body: { categoryId } })
       const chosen = props.categories.find((category) => category.id === categoryId)
       if (chosen)
         announce?.(t('spending.sheet.trip_category_saved', { name: props.nameOf(chosen) }))

@@ -1,12 +1,35 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import type { ComputedRef } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { SpendingCategoryView } from '@molvia/model'
+import { spendingCategoriesResponseCodec } from '@molvia/model'
+import type { SpendingCategoriesResponse, SpendingCategoryView } from '@molvia/model'
 import { api } from '@/api'
 import { categoriesWith } from '@/components/spending'
 import { recallCategories, recallFrequent } from '@/composables/useMoneyMonth'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
+import { read, write } from '@/stores/storage'
+
+/**
+ * The list as the server last answered it here (MOL-400, adversarial А3 «б»): a trip's category is chosen at the
+ * shelf with no connection, on a phone where «Деньги» — the other memory of the list — may never have been
+ * opened. `molvia.own-categories.<owner>`, gone with «Выйти» as the owner's other drawers.
+ */
+const KEY = 'molvia.own-categories'
+
+function recallOwn(owner: string): SpendingCategoriesResponse | null {
+  const raw = read(`${KEY}.${owner}`)
+  if (!raw) return null
+  try {
+    const parsed = spendingCategoriesResponseCodec.safeParse(JSON.parse(raw))
+    return parsed.success ? parsed.data : null
+  } catch {
+    return null
+  }
+}
+
+const keptCategories = (owner: string) => recallOwn(owner)?.categories ?? recallCategories(owner)
+const keptFrequent = (owner: string) => recallOwn(owner)?.frequent ?? recallFrequent(owner)
 
 export interface OwnCategories {
   readonly categories: ComputedRef<SpendingCategoryView[]>
@@ -28,8 +51,8 @@ export function useOwnCategories(): OwnCategories {
   const { t } = useI18n()
   const actor = useActorStore()
   const queue = useSpendingQueueStore()
-  const server = ref<SpendingCategoryView[]>(actor.id ? recallCategories(actor.id) : [])
-  const serverFrequent = ref<readonly string[]>(actor.id ? recallFrequent(actor.id) : [])
+  const server = ref<SpendingCategoryView[]>(actor.id ? keptCategories(actor.id) : [])
+  const serverFrequent = ref<readonly string[]>(actor.id ? keptFrequent(actor.id) : [])
   // When the list was asked for; none for one recalled from a month kept on the phone.
   const askedAt = ref<Date | null>(null)
 
@@ -43,9 +66,11 @@ export function useOwnCategories(): OwnCategories {
     const asked = new Date()
     const mine = ++sent
     try {
-      const { categories, frequent } = await api.spendingCategories()
+      const answer = await api.spendingCategories()
+      const { categories, frequent } = answer
       if (actor.id !== owner || mine < laid) return
       laid = mine
+      write(`${KEY}.${owner}`, JSON.stringify(spendingCategoriesResponseCodec.encode(answer)))
       server.value = categories
       serverFrequent.value = frequent
       askedAt.value = asked
@@ -63,8 +88,8 @@ export function useOwnCategories(): OwnCategories {
   watch(
     () => actor.id,
     (id) => {
-      server.value = id ? recallCategories(id) : []
-      serverFrequent.value = id ? recallFrequent(id) : []
+      server.value = id ? keptCategories(id) : []
+      serverFrequent.value = id ? keptFrequent(id) : []
       askedAt.value = null
       void load()
     },

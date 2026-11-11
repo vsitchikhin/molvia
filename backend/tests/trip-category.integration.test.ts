@@ -134,7 +134,7 @@ describe('PUT /trips/:id/category (MOL-400)', () => {
     expect(earlier.view.byCategory[0]?.categoryId).toBe(pets)
   })
 
-  it('takes a removed category of the owner’s, and someone else’s as «Продукты»', async () => {
+  it('takes a removed category of the owner’s, and one not the owner’s moves nothing (А1)', async () => {
     const me = await owner()
     const stranger = await owner()
     const place = await insertPlace(db, { name: `Кафе ${randomUUID()}` })
@@ -148,9 +148,11 @@ describe('PUT /trips/:id/category (MOL-400)', () => {
     expect((await categorize(me, tripId, cafe)).statusCode).toBe(204)
     expect(await categoryOf(tripId)).toBe(cafe)
 
+    // someone else's, or one still on its way in the spendings' queue: the trip keeps «Кафе»
     const theirs = await presetId(stranger, 'cafe')
     expect((await categorize(me, tripId, theirs)).statusCode).toBe(204)
-    expect(await categoryOf(tripId)).toBeNull()
+    expect((await categorize(me, tripId, randomUUID())).statusCode).toBe(204)
+    expect(await categoryOf(tripId)).toBe(cafe)
   })
 
   it('answers a stranger’s, a missing and a removed trip as one 404', async () => {
@@ -164,6 +166,8 @@ describe('PUT /trips/:id/category (MOL-400)', () => {
 
     for (const tripId of [theirs, mine, randomUUID(), 'not-a-trip']) {
       expect((await categorize(me, tripId, cafe)).statusCode, tripId).toBe(404)
+      // a category not the owner's on a trip not the owner's is the same 404
+      expect((await categorize(me, tripId, randomUUID())).statusCode, tripId).toBe(404)
     }
     expect(await categoryOf(theirs)).toBeNull()
     expect((await categorize(me, mine, 'not-an-id')).statusCode).toBe(400)

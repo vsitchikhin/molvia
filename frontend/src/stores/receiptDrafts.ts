@@ -172,10 +172,17 @@ function recallAdded(owner: string | null): Record<string, readonly AddedLineDra
   )
 }
 
-/** One broken entry is dropped alone, as a draft is: the others are somebody's choices (adversarial А6). */
-function recallPayments(owner: string | null): Record<string, PaymentDraft> {
+/**
+ * A choice kept beside the drafts, per receipt (the account, MOL-312; the category, MOL-400). One broken entry is
+ * dropped alone, as a draft is: the others are somebody's choices (adversarial А6).
+ */
+function recallBeside<T>(
+  key: string,
+  owner: string | null,
+  codec: z.ZodType<T>,
+): Record<string, T> {
   if (!owner) return {}
-  const raw = read(`${PAYMENT_KEY}.${owner}`)
+  const raw = read(`${key}.${owner}`)
   if (!raw) return {}
   let parsed: unknown
   try {
@@ -186,30 +193,14 @@ function recallPayments(owner: string | null): Record<string, PaymentDraft> {
   if (!isRecord(parsed)) return {}
   return Object.fromEntries(
     Object.entries(parsed).flatMap(([id, value]) => {
-      const entry = paymentCodec.safeParse(value)
+      const entry = codec.safeParse(value)
       return entry.success ? [[id, entry.data]] : []
     }),
   )
 }
 
-/** One broken entry is dropped alone, as a payment's is. */
-function recallCategories(owner: string | null): Record<string, string> {
-  if (!owner) return {}
-  const raw = read(`${CATEGORY_KEY}.${owner}`)
-  if (!raw) return {}
-  let parsed: unknown
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return {}
-  }
-  if (!isRecord(parsed)) return {}
-  return Object.fromEntries(
-    Object.entries(parsed).flatMap(([id, value]) =>
-      z.uuid().safeParse(value).success ? [[id, value as string]] : [],
-    ),
-  )
-}
+const recallPayments = (owner: string | null) => recallBeside(PAYMENT_KEY, owner, paymentCodec)
+const recallCategories = (owner: string | null) => recallBeside(CATEGORY_KEY, owner, z.uuid())
 
 function recall(owner: string | null): Record<string, ReceiptDraft> {
   if (!owner) return {}

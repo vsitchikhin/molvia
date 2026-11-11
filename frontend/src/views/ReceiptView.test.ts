@@ -1559,6 +1559,19 @@ describe('ReceiptView — the category of the purchases (MOL-400)', () => {
     expect(row(view).text()).toContain(name('pets'))
   })
 
+  // Пока «Записать» в пути, строка — «не сейчас», как счёт под ней (ревью №3)
+  it('while «Записать» is on its way, the row is not now and opens nothing', async () => {
+    recordReceipt.mockReturnValue(new Promise(() => undefined))
+    const { view } = await render()
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    expect(row(view).attributes('aria-disabled')).toBe('true')
+    expect(row(view).find('.chevron').exists()).toBe(false)
+    await row(view).trigger('click')
+    await flushPromises()
+    expect(sheet()).toBeNull()
+  })
+
   it('records the category chosen, kept through a reload of the review', async () => {
     const { view } = await render()
     await row(view).trigger('click')

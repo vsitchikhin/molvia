@@ -157,13 +157,13 @@
       />
       <!-- The category «Деньги» count it in (MOL-400): the place's last, else «Продукты»; it goes through
            the queue before the finish, as the account does. -->
-      <div v-if="!finishingEmpty" class="account">
+      <div v-if="!finishingEmpty" class="category">
         <TripCategoryRow
           :categories="ownCategories"
           :frequent="ownFrequent"
           :name-of="categoryName"
           :selected="finishCategory"
-          @pick="finishCategory = $event"
+          @pick="pickedCategory = $event"
         />
       </div>
       <!-- The account it was paid from (MOL-312, В-3 «б»): finished is paid, so it is chosen here and
@@ -536,7 +536,7 @@ export default defineComponent({
       if (id && receipt) queue.enqueue({ kind: 'receipt', tripId: id, body: { receipt } })
       // the category likewise (MOL-400): sent only when it says more than what the trip holds
       const category = finishingEmpty.value ? null : finishCategory.value
-      if (id && category && category !== heldCategory) {
+      if (id && category && category !== heldCategory.value) {
         queue.enqueue({ kind: 'category', tripId: id, body: { categoryId: category } })
       }
       rememberPlaceCategory(actor.id, trip.value?.place.id ?? null, category)
@@ -592,21 +592,13 @@ export default defineComponent({
       debited.value = heldPayment?.debited ? typedMoney(heldPayment.debited) : ''
       debitedBad.value = false
       followDefault()
-      // The category (MOL-400, Р-6): a choice still in the queue — made in «Траты» meanwhile — else the place's
-      // last, else «Продукты». A trip view carries none, so a category set on the server elsewhere is not known
-      // here: the guess stands, and is sent only where it differs from the queue's word.
+      // The category (MOL-400, Р-6): a choice still in the queue — made in «Траты» meanwhile — is where the sheet
+      // opens; otherwise the guess, which follows the answers until the person chooses (`finishCategory`).
       const queued = queue.pending.findLast(
         (write) => write.kind === 'category' && write.tripId === tripId.value,
       )
-      heldCategory = queued?.kind === 'category' ? queued.body.categoryId : null
-      finishCategory.value =
-        heldCategory ??
-        guessedTripCategory(ownCategoryList.categories.value, {
-          placeId: trip.value?.place.id ?? null,
-          lastAt: placeCategoriesOf(actor.id),
-          food: false,
-        })
-      void refreshPlaceCategories(actor.id)
+      heldCategory.value = queued?.kind === 'category' ? queued.body.categoryId : null
+      pickedCategory.value = null
       // «Счета» read when the sheet opens, never with every opening of «Покупки» (review Р1-2)
       void accounts.refresh()
       finishing.value = true
@@ -618,9 +610,32 @@ export default defineComponent({
      * is not the record's; a purchase in a third currency is the summary's to cover, as before.
      */
     const ownCategoryList = useOwnCategories()
-    const finishCategory = ref<string | null>(null)
+    /** The place's last category, the server's laid over this phone's (Р-6), read again as the record opens. */
+    const placesAt = ref(placeCategoriesOf(actor.id))
+    onMounted(() => {
+      void refreshPlaceCategories(actor.id).then(() => {
+        placesAt.value = placeCategoriesOf(actor.id)
+      })
+    })
+    /** Chosen in «Закончить»; `null` — the guess stands. */
+    const pickedCategory = ref<string | null>(null)
     /** The category still in the queue when «Закончить» was asked: sent again, it moves nothing. */
-    let heldCategory: string | null = null
+    const heldCategory = ref<string | null>(null)
+    /**
+     * What «Закончить» sends: the person's choice, else the queue's word, else the guess — a computed one, so an
+     * answer of the server or of the categories that comes while the sheet is up moves it (review №2, adversarial
+     * А3), as on the receipt's review.
+     */
+    const finishCategory = computed(
+      () =>
+        pickedCategory.value ??
+        heldCategory.value ??
+        guessedTripCategory(ownCategoryList.categories.value, {
+          placeId: trip.value?.place.id ?? null,
+          lastAt: placesAt.value,
+          food: false,
+        }),
+    )
 
     const accounts = useAccountsStore()
     const accountId = ref<string | null>(null)
@@ -816,6 +831,7 @@ export default defineComponent({
       ownFrequent: ownCategoryList.frequent,
       categoryName: ownCategoryList.nameOf,
       finishCategory,
+      pickedCategory,
       charged,
       debited,
       debitedBad,
@@ -853,6 +869,8 @@ export default defineComponent({
   margin-bottom: var(--space-2);
 }
 
+/* The category and the account of «Закончить», each a field of its own (MOL-400, MOL-312). */
+.category,
 .account {
   display: flex;
   flex-direction: column;
