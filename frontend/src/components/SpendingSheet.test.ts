@@ -16,6 +16,7 @@ import en from '@/i18n/en.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
+import { useTripQueueStore } from '@/stores/tripQueue'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
 import MoneySpendingsView from '@/views/MoneySpendingsView.vue'
 import MoneyView from '@/views/MoneyView.vue'
@@ -25,9 +26,11 @@ const moneyMonth = vi.fn<(month: string, cursor?: JournalKey) => Promise<MoneyMo
 const recordSpending = vi.fn<(body: SpendingBody) => Promise<unknown>>()
 const amendSpending = vi.fn<(id: string, body: unknown) => Promise<unknown>>()
 const trip = vi.fn<(id: string) => Promise<unknown>>()
+const categorizeTrip = vi.fn<(id: string, body: unknown) => Promise<void>>()
 vi.mock('@/api', () => ({
   api: {
     trip: (id: string) => trip(id),
+    categorizeTrip: (id: string, body: unknown) => categorizeTrip(id, body),
     moneyMonth: (month: string, cursor?: JournalKey) => moneyMonth(month, cursor),
     recordSpending: (body: SpendingBody) => recordSpending(body),
     amendSpending: (id: string, body: unknown) => amendSpending(id, body),
@@ -941,6 +944,7 @@ describe('SpendingSheet: the items of a trip’s summary (MOL-199, Ф-13, Ф-15)
             key: TRIP,
             tripId: TRIP,
             placeName: 'SAS',
+            categoryId: null,
             items: 2,
             amount: amd('850'),
             counted: null,
@@ -1022,5 +1026,89 @@ describe('SpendingSheet: the items of a trip’s summary (MOL-199, Ф-13, Ф-15)
     const view = await summary()
     expect(view.text()).toContain(en.spending.sheet.trip_items_offline)
     expect(view.find('.state').exists()).toBe(false)
+  })
+})
+
+describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () => {
+  const TRIP = 'bbbbbbbb-0000-4000-8000-000000000002'
+  const GROCERIES = 'c0000000-0000-4000-8000-000000000011'
+  const PETS = 'c0000000-0000-4000-8000-000000000012'
+  const preset = (id: string, key: 'groceries' | 'pets') =>
+    ({ id, preset: key, name: null, colour: null, icon: null, archived: false }) as const
+
+  async function summary(categoryId: string | null): Promise<VueWrapper> {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const actor = useActorStore()
+    actor.id = ACTOR
+    actor.state = 'ready'
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/money/spendings')
+    trip.mockReturnValue(new Promise(() => undefined))
+    const view = mount(SpendingSheet, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        target: {
+          kind: 'trip',
+          day: '2026-09-25',
+          row: {
+            kind: 'trip',
+            key: TRIP,
+            tripId: TRIP,
+            placeName: 'Зоомагазин',
+            categoryId,
+            items: 1,
+            amount: amd('4500'),
+            counted: null,
+          },
+        },
+        categories: [preset(GROCERIES, 'groceries'), preset(PETS, 'pets')],
+        nameOf: (one: { preset: string | null }) => one.preset ?? '',
+        spendCurrency: 'AMD',
+      },
+      global: { plugins: [pinia, router, createAppI18n('en')] },
+    })
+    views.push(view)
+    await risen()
+    return view
+  }
+
+  const row = (view: VueWrapper) => view.get('.summary .nav-row')
+
+  it('says «Продукты» for a trip with none, and its own for one that has it', async () => {
+    expect(row(await summary(null)).text()).toContain('groceries')
+    expect(row(await summary(PETS)).text()).toContain('pets')
+  })
+
+  it('a choice goes into the trip’s queue at once and the row says it', async () => {
+    categorizeTrip.mockReturnValue(new Promise(() => undefined))
+    const view = await summary(null)
+    await row(view).trigger('click')
+    await risen()
+    const pets = [...document.querySelectorAll<HTMLElement>('[role="radio"]')].find((one) =>
+      one.textContent.includes('pets'),
+    )
+    if (!pets) throw new Error('no «pets» in the list')
+    pets.click()
+    await flushPromises()
+    expect(useTripQueueStore().pending).toContainEqual({
+      kind: 'category',
+      tripId: TRIP,
+      body: { categoryId: PETS },
+    })
+    expect(row(view).text()).toContain('pets')
+  })
+
+  it('must not fire: the category the trip has already sends nothing', async () => {
+    const view = await summary(PETS)
+    await row(view).trigger('click')
+    await risen()
+    const pets = [...document.querySelectorAll<HTMLElement>('[role="radio"]')].find((one) =>
+      one.textContent.includes('pets'),
+    )
+    pets?.click()
+    await flushPromises()
+    expect(useTripQueueStore().pending.some((write) => write.kind === 'category')).toBe(false)
   })
 })

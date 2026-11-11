@@ -134,6 +134,7 @@ export default defineComponent({
             items: operation.items ?? 0,
             amount,
             counted: null,
+            categoryId: operation.categoryId,
           },
         }
       if (operation.kind !== 'spending' || !operation.categoryId || operation.transferId !== null)
