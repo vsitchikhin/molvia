@@ -95,7 +95,9 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   «Деньги» is the list** (adversarial Б1): taken first whatever its age, it hid «Аптека» made in «Деньги» since.
   **A choice made in a sheet stays its word for that opening** (review №1, А2, Б2): the summary of «Траты» holds the
   month's row as it was when opened, and a choice that landed gave way to it; kept past the opening, it hid a change
-  made in another window since. A transfer's fee stays «Прочее» (В-4
+  made in another window since. **Only the sheet's own word keeps a choice from going**: the month's row of a trip
+  it changed may not be read again yet, so a choice equal to it goes anyway (В1) — a write of the category is
+  whole, and a repeat moves nothing. A transfer's fee stays «Прочее» (В-4
   «а»). Accounting only: no item, price, verdict or memory of a shop moves, and a café's receipt is still recorded
   as a shop's (MOL-226). **The prices, named:** until «Обновить» a phone of an earlier build draws every trip as
   «Продукты» and records a receipt so; a category made in «Категории» with no connection is offered to a trip once
