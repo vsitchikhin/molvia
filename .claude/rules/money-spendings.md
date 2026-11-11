@@ -76,20 +76,28 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   **One for the whole trip** (В-1 «а»): one receipt, one category; a line of its own is not in it. **Chosen where the
   account is** (MOL-312's places): the receipt's review — sent in «Записать» — «Закончить» of a record by hand — a
   write `category` of the trip's queue before the finish — and the summary of «Траты», at once through the queue.
-  **One the person has not got is «Продукты», never a refusal**, a removed one of theirs taken: the write came from a
-  queue. **The month reads it by one seam**, `categoryOfEntry`, so «Бюджет» and both «Графики» follow with no
-  second count; the line of the month carries it only to a phone that asks (`MONEY_TRIP_CATEGORY_HEADER`), since the
-  month's answer is strict. **The default is a guess** (В-2 «а», «some algorithm that assumes»,
-  `guessedTripCategory`): the category of the person's last trip at that place (`GET /trips/place-categories`, every
-  phone's, laid over what this one recorded since), else «Кафе» for a receipt of food service — a line of the class
-  56 or a café's service (`servesFood`) — else «Продукты»; a category taken out of the choice is passed over. **No
-  «+ Своя» in a trip's list**: a category made there goes through the spendings' queue and the trip through its own,
-  and the trip could land first naming a category the server has not got. A transfer's fee stays «Прочее» (В-4
+  **A category the person has not got is never a refusal, and moves nothing** (adversarial А1): the write came
+  from a queue; on a new trip of «Записать» it is «Продукты», and `PUT /trips/:id/category` leaves the trip with the
+  one it has — written as «Продукты», a category still on its way in the spendings' queue took the choice before it
+  with it. A removed one of theirs is taken. **So the list of a trip offers no category still waiting in the
+  spendings' queue**, nor «+ Своя»: the two queues send apart, and the trip could land first. **The month reads it
+  by one seam**, `categoryOfEntry`, so «Бюджет» and both «Графики» follow with no second count; the line of the
+  month carries it only to a phone that asks (`MONEY_TRIP_CATEGORY_HEADER`), since the month's answer is strict.
+  **The default is a guess** (В-2 «а», «some algorithm that assumes», `guessedTripCategory`): the category of the
+  person's last trip at that place (`GET /trips/place-categories`, every phone's, laid over what this one recorded
+  since), else «Кафе» for a receipt of food service — a line of the class 56 or a café's service (`servesFood`) —
+  else «Продукты»; a category taken out of the choice is passed over. **It follows the answers until the person
+  chooses** — on the review and in «Закончить» alike (review №2, А3): one taken once as the sheet opened missed the
+  server's answer that came a moment later. **The list is kept as the server last answered it**
+  (`molvia.own-categories`, А3 «б»): at the shelf with no connection, on a phone where «Деньги» was never opened,
+  the list was empty. **A choice made in a sheet stays its word** (review №1, А2): the summary of «Траты» holds the
+  month's row as it was when opened, and a choice that landed gave way to it. A transfer's fee stays «Прочее» (В-4
   «а»). Accounting only: no item, price, verdict or memory of a shop moves, and a café's receipt is still recorded
   as a shop's (MOL-226). **The prices, named:** until «Обновить» a phone of an earlier build draws every trip as
-  «Продукты» and records a receipt so; a choice made here and not landed gives way to the server's older answer
-  of the place until it lands; a trip view carries no category, so «Закончить» of a record whose category was set
-  in «Траты» before it is finished starts on the guess and writes it over.
+  «Продукты» and records a receipt so; a category made in «Категории» with no connection is offered to a trip once
+  it has landed; a choice made here and not landed gives way to the server's older answer of the place until it
+  lands; a trip view carries no category, so «Закончить» of a record whose category was set in «Траты» before it is
+  finished starts on the guess and writes it over.
 - **A closed month is counted in the income currency by the rate of its last day, frozen the first
   time it is read** (`money_month_rates`): a new exchange today does not move August. **A fact of
   August amended later does** (owner's decision В-6): writing, amending, removing or bringing back

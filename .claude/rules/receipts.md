@@ -1026,7 +1026,8 @@ drawn yet (self-review Р1-3: held for the answer, a record at the shelf with no
 is kept as chosen even where it was the default, which moves with the next receipt recorded (adversarial А5).
 
 **The trip of «Записать» is in the category the review chose** (MOL-400, `money-spendings.md`): `categoryId` of the
-body, one the person has not got «Продукты», never a refusal; absent — an earlier build — «Продукты». The review's
+body, one the person has not got «Продукты», never a refusal; absent — an earlier build — «Продукты». The row is
+not now while «Записать» is on its way, as the account under it (`NavRow`'s `inactive`). The review's
 row «Категория ›» starts on the guess of the place and the receipt (a line of the class 56, a café's service); the
 choice is a draft beside the review's (`molvia.receipt-category`), as the account's is. A repeat moves no category
 chosen since in «Траты».

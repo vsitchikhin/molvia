@@ -304,9 +304,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A spending makes no item, feeds no price and no verdict** (MOL-73); a purchase at a shop is
   still entered in «Покупки».
 - **A trip is counted in its own category** (MOL-400): one for the whole trip, chosen at «Записать» and
-  «Закончить», changed in «Траты»; empty is «Продукты»; one the person has not got is «Продукты», never a refusal;
-  the month reads it by `categoryOfEntry` alone, and the default is a guess — the place's last, a café's by its
-  receipt, else «Продукты».
+  «Закончить», changed in «Траты»; empty is «Продукты»; one the person has not got is never a refusal and moves
+  nothing — so a trip's list offers no category still in the spendings' queue; the month reads it by
+  `categoryOfEntry` alone, and the default is a guess — the place's last, a café's by its receipt, else «Продукты».
 - **A category is removed by archiving**, never erased; a spending in another currency keeps the
   rate of its own day, written with it and never recomputed.
 - **The month is counted by the server**; a closed month is frozen at the rate of its last day,
