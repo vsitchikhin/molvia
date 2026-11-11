@@ -657,10 +657,18 @@ export default defineComponent({
 
     /**
      * The trip's category (MOL-400): a choice still in the queue is the newest word of it, then the one made in
-     * this sheet — the row is the month as it was when the sheet opened, and a choice that landed must not give
-     * way to it (review №1, adversarial А2) — else the month's row, `null` being «Продукты».
+     * this opening of the sheet — the row is the month as it was when the sheet opened, and a choice that landed
+     * must not give way to it (review №1, adversarial А2) — else the month's row, `null` being «Продукты».
      */
     const pickedCategory = ref<{ tripId: string; categoryId: string } | null>(null)
+    // One sheet serves every opening of «Траты»: a new one starts on the month's row as it is now (adversarial
+    // Б2), or a choice made here hid a change made in another window since.
+    watch(
+      () => props.open,
+      (open) => {
+        if (open) pickedCategory.value = null
+      },
+    )
     const tripCategoryId = computed(() => {
       if (props.target.kind !== 'trip') return null
       const tripId = props.target.row.tripId

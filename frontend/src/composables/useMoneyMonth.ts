@@ -113,6 +113,25 @@ export function recallFrequent(owner: string): MoneyMonthView['frequent'] {
   return newestKept(owner)?.answer.frequent ?? []
 }
 
+/**
+ * The categories of the newest month kept, its chips' order and when that read set out (MOL-400, adversarial Б1):
+ * the list another screen kept is laid beside it, and the later of the two is the list.
+ */
+export function recallKeptList(owner: string): {
+  readonly categories: MoneyMonthView['categories']
+  readonly frequent: MoneyMonthView['frequent']
+  readonly askedAt: Date
+} | null {
+  const kept = newestKept(owner)
+  return kept
+    ? {
+        categories: kept.answer.categories,
+        frequent: kept.answer.frequent,
+        askedAt: kept.askedAt ?? kept.fetchedAt,
+      }
+    : null
+}
+
 /** The rate of the running month as last answered — only a month read while it was running. */
 function recallTodayRate(owner: string): MoneyMonthView['rate'] {
   const today = monthOf(localDay())

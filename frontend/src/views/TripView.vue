@@ -599,8 +599,14 @@ export default defineComponent({
       )
       heldCategory.value = queued?.kind === 'category' ? queued.body.categoryId : null
       pickedCategory.value = null
-      // «Счета» read when the sheet opens, never with every opening of «Покупки» (review Р1-2)
+      // «Счета», the categories and the places' last ones read when the sheet opens, never with every opening of
+      // «Покупки» (review Р1-2, MOL-400 review №6): an answer that comes while it is up moves the guess
       void accounts.refresh()
+      void ownCategoryList.refresh()
+      const owner = actor.id
+      void refreshPlaceCategories(owner).then(() => {
+        if (actor.id === owner) placesAt.value = placeCategoriesOf(owner)
+      })
       finishing.value = true
     }
 
@@ -609,14 +615,9 @@ export default defineComponent({
      * `PUT /trips/:id/payment`, as the summary in «Траты» sends it. «Списано» where the account's currency
      * is not the record's; a purchase in a third currency is the summary's to cover, as before.
      */
-    const ownCategoryList = useOwnCategories()
-    /** The place's last category, the server's laid over this phone's (Р-6), read again as the record opens. */
+    const ownCategoryList = useOwnCategories({ lazy: true })
+    /** The place's last category, the server's laid over this phone's (Р-6), read again as «Закончить» opens. */
     const placesAt = ref(placeCategoriesOf(actor.id))
-    onMounted(() => {
-      void refreshPlaceCategories(actor.id).then(() => {
-        placesAt.value = placeCategoriesOf(actor.id)
-      })
-    })
     /** Chosen in «Закончить»; `null` — the guess stands. */
     const pickedCategory = ref<string | null>(null)
     /** The category still in the queue when «Закончить» was asked: sent again, it moves nothing. */

@@ -114,6 +114,18 @@ export default defineComponent({
   }
 }
 
+/* Not now is the kit's whole (MOL-174, review №7 of MOL-400): no pointer and no light under it, a list's row as
+   a field; the field keeps its well. */
+.nav-inactive {
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .nav-row.nav-inactive:not(.nav-field):hover {
+    background: none;
+  }
+}
+
 /* A field's well, as `AccountRow`: under the pointer the tint, where muted text is under 4.5:1 (MOL-172). */
 .nav-field {
   padding-inline: var(--space-3) var(--space-2);
@@ -136,8 +148,6 @@ export default defineComponent({
   }
 
   &.nav-inactive {
-    cursor: default;
-
     .value {
       font-weight: var(--weight-medium);
     }

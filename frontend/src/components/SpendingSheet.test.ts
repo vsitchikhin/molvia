@@ -1125,6 +1125,34 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     expect(row(view).text()).toContain('cafe')
   })
 
+  // Новое открытие той же шторки — строка месяца как есть, а не выбор прошлого (адверсариальная Б2): категорию
+  // вернули в другом окне, месяц перечитан
+  it('opened again, the row is the month’s as it is now, and the choice of the last opening is sent anew', async () => {
+    categorizeTrip.mockReset()
+    categorizeTrip.mockResolvedValue(undefined)
+    const view = await summary(CAFE)
+    const choose = async (name: string) => {
+      await row(view).trigger('click')
+      await risen()
+      const option = [
+        ...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]'),
+      ].find((one) => one.textContent.includes(name))
+      if (!option) throw new Error(`no «${name}» in the list`)
+      option.click()
+      await flushPromises()
+    }
+    await choose('pets')
+    expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
+    await view.setProps({ open: false })
+    await flushPromises()
+    await view.setProps({ open: true })
+    await risen()
+    expect(row(view).text()).toContain('cafe')
+    await choose('pets')
+    expect(categorizeTrip).toHaveBeenCalledTimes(2)
+    expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: PETS })
+  })
+
   it('must not fire: the category the trip has already sends nothing', async () => {
     const view = await summary(PETS)
     await row(view).trigger('click')

@@ -1760,8 +1760,11 @@ describe('TripView', () => {
       localStorage.setItem(
         `molvia.own-categories.${ME}`,
         JSON.stringify({
-          categories: [preset(GROCERIES, 'groceries'), preset(PETS, 'pets')],
-          frequent: [],
+          askedAt: '2026-11-09T10:00:00.000Z',
+          answer: {
+            categories: [preset(GROCERIES, 'groceries'), preset(PETS, 'pets')],
+            frequent: [],
+          },
         }),
       )
       localStorage.setItem(`molvia.place-categories.${ME}`, JSON.stringify({ [PLACE]: PETS }))
@@ -1770,6 +1773,20 @@ describe('TripView', () => {
       const { view, queue } = await render()
       await finishWith(view)
       expect(queue.pending[0]).toMatchObject({ kind: 'category', body: { categoryId: PETS } })
+    })
+
+    // Ревью №6: категории и память мест нужны только «Закончить» — их читают, когда шторка открывается
+    it('«Покупки» открылись — ни категорий, ни памяти мест; «Закончить» — оба', async () => {
+      spendingCategories.mockClear()
+      placeCategories.mockClear()
+      const { view } = await render()
+      await flushPromises()
+      expect(spendingCategories).not.toHaveBeenCalled()
+      expect(placeCategories).not.toHaveBeenCalled()
+      await docked(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      expect(spendingCategories).toHaveBeenCalledTimes(1)
+      expect(placeCategories).toHaveBeenCalledTimes(1)
     })
 
     it('начинает с категории прошлой записи в этом месте', async () => {
