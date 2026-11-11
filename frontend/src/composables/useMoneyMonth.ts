@@ -104,12 +104,12 @@ function newestKept(owner: string): Remembered | undefined {
 }
 
 /** The categories of the newest month kept for the owner — any month names all of them. */
-export function recallCategories(owner: string): MoneyMonthView['categories'] {
+function recallCategories(owner: string): MoneyMonthView['categories'] {
   return newestKept(owner)?.answer.categories ?? []
 }
 
 /** The chips' frequent ones of the newest month kept for the owner (MOL-198), as its categories. */
-export function recallFrequent(owner: string): MoneyMonthView['frequent'] {
+function recallFrequent(owner: string): MoneyMonthView['frequent'] {
   return newestKept(owner)?.answer.frequent ?? []
 }
 

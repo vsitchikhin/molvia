@@ -1153,6 +1153,35 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: PETS })
   })
 
+  // Открыта снова раньше, чем месяц перечитан: строка — прежняя «Кафе», а сервер держит «Животные» (адверсариальная
+  // В1) — выбор «Кафе» уходит; внутри открытия своё слово по-прежнему не шлётся дважды
+  it('opened again over a month not read yet, the category shown is sent when chosen', async () => {
+    categorizeTrip.mockReset()
+    categorizeTrip.mockResolvedValue(undefined)
+    const view = await summary(CAFE)
+    const choose = async (name: string) => {
+      await row(view).trigger('click')
+      await risen()
+      const option = [
+        ...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]'),
+      ].find((one) => one.textContent.includes(name))
+      if (!option) throw new Error(`no «${name}» in the list`)
+      option.click()
+      await flushPromises()
+    }
+    await choose('pets')
+    await choose('pets')
+    expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
+    await view.setProps({ open: false })
+    await flushPromises()
+    await view.setProps({ open: true })
+    await risen()
+    expect(row(view).text()).toContain('cafe')
+    await choose('cafe')
+    expect(categorizeTrip).toHaveBeenCalledTimes(2)
+    expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: CAFE })
+  })
+
   it('must not fire: the category the trip has already sends nothing', async () => {
     const view = await summary(PETS)
     await row(view).trigger('click')
