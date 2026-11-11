@@ -407,8 +407,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   its sides are 8 and it stands 8 into the row's padding at the right, so beside a circle of 40 a word of
   a name fits at 320 under the widest word of the tail (adversarial А2: «Развлечения» broke in its middle
   at 16; Б1: under «Вернуть» with the sides alone). `NavRow` without `to` is a button that opens a sheet and says so
-  (`aria-haspopup="dialog"`); `inactive` is the kit's not now — `aria-disabled`, no chevron, the tap going nowhere
-  (MOL-400, as `AccountRow`). **Among the fields of a form it is drawn as one** (`field`, MOL-199):
+  (`aria-haspopup="dialog"`); `inactive` is the kit's not now — `aria-disabled`, no chevron, the tap going nowhere, no
+  pointer and no light under it, a list's row as a field (MOL-400, as `AccountRow`). **Among the fields of a form it is drawn as one** (`field`, MOL-199):
   the well of `AccountRow` — `--surface-2`, a `border-strong` edge, the tint under the pointer — since a
   list's row, with no fill and no edge, read in a form as plain text; `invalid` marks a field behind it
   that holds an error (a `--bad` edge, `aria-invalid`). **Their classes are the kit's own words**

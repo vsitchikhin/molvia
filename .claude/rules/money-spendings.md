@@ -88,10 +88,14 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   since), else «Кафе» for a receipt of food service — a line of the class 56 or a café's service (`servesFood`) —
   else «Продукты»; a category taken out of the choice is passed over. **It follows the answers until the person
   chooses** — on the review and in «Закончить» alike (review №2, А3): one taken once as the sheet opened missed the
-  server's answer that came a moment later. **The list is kept as the server last answered it**
-  (`molvia.own-categories`, А3 «б»): at the shelf with no connection, on a phone where «Деньги» was never opened,
-  the list was empty. **A choice made in a sheet stays its word** (review №1, А2): the summary of «Траты» holds the
-  month's row as it was when opened, and a choice that landed gave way to it. A transfer's fee stays «Прочее» (В-4
+  server's answer that came a moment later. «Закончить» reads the list and the places' last ones as it opens, never
+  with every opening of «Покупки» (review №6, as «Счета», MOL-312 Р1-2). **The list is kept as the server last
+  answered it** (`molvia.own-categories`, А3 «б»): at the shelf with no connection, on a phone where «Деньги» was
+  never opened, the list was empty — **with when its read set out, and the later of it and the newest month of
+  «Деньги» is the list** (adversarial Б1): taken first whatever its age, it hid «Аптека» made in «Деньги» since.
+  **A choice made in a sheet stays its word for that opening** (review №1, А2, Б2): the summary of «Траты» holds the
+  month's row as it was when opened, and a choice that landed gave way to it; kept past the opening, it hid a change
+  made in another window since. A transfer's fee stays «Прочее» (В-4
   «а»). Accounting only: no item, price, verdict or memory of a shop moves, and a café's receipt is still recorded
   as a shop's (MOL-226). **The prices, named:** until «Обновить» a phone of an earlier build draws every trip as
   «Продукты» and records a receipt so; a category made in «Категории» with no connection is offered to a trip once
