@@ -1182,7 +1182,11 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: CAFE })
   })
 
-  it('must not fire: the category the trip has already sends nothing', async () => {
+  // Строка месяца может отставать от сервера — выбор ушёл из шторки другого экрана, журнал не перечитан
+  // (адверсариальная В2): выбор, равный строке, уходит; повтор целиком ничего не двигает
+  it('the category the month’s row shows goes when chosen: the row may be older than the server', async () => {
+    categorizeTrip.mockReset()
+    categorizeTrip.mockReturnValue(new Promise(() => undefined))
     const view = await summary(PETS)
     await row(view).trigger('click')
     await risen()
@@ -1191,6 +1195,10 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     )
     pets?.click()
     await flushPromises()
-    expect(useTripQueueStore().pending.some((write) => write.kind === 'category')).toBe(false)
+    expect(useTripQueueStore().pending).toContainEqual({
+      kind: 'category',
+      tripId: TRIP,
+      body: { categoryId: PETS },
+    })
   })
 })

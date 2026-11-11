@@ -683,22 +683,15 @@ export default defineComponent({
       return ownCategoryWord(props.target.row.tripId) ?? props.target.row.categoryId
     })
     /**
-     * Trips a choice of this sheet went out for: their month's row may be older than what the server holds — the
-     * month read again after the choice landed is still on its way, or failed (adversarial В1).
-     */
-    const sentFor = new Set<string>()
-    /**
-     * Chosen in the summary: at once, through the trip's queue, as its account (6h). The category shown is taken
-     * as the trip's only where the sheet's own word says it, or the month's row of a trip this sheet changed none
-     * of; else the same choice goes again — a write of the category is whole, and a repeat moves nothing.
+     * Chosen in the summary: at once, through the trip's queue, as its account (6h). Only the sheet's own word —
+     * the queue's, this opening's — keeps a choice from going: the month's row may be older than what the server
+     * holds, a choice landed while the month was not read again, on this screen or another (adversarial В1, В2),
+     * so a choice equal to it goes anyway — a write of the category is whole, and a repeat moves nothing.
      */
     function categorizeTrip(categoryId: string): void {
       if (props.target.kind !== 'trip') return
       const tripId = props.target.row.tripId
-      const known =
-        ownCategoryWord(tripId) ?? (sentFor.has(tripId) ? null : props.target.row.categoryId)
-      if (categoryId === known) return
-      sentFor.add(tripId)
+      if (categoryId === ownCategoryWord(tripId)) return
       pickedCategory.value = { tripId, categoryId }
       trips.enqueue({ kind: 'category', tripId, body: { categoryId } })
       const chosen = props.categories.find((category) => category.id === categoryId)
