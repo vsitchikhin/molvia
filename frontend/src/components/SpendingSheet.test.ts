@@ -1077,6 +1077,18 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
 
   const row = (view: VueWrapper) => view.get('.summary .nav-row')
 
+  /** Opens «Категория ›» of the summary and chooses the category named. */
+  async function choose(view: VueWrapper, name: string): Promise<void> {
+    await row(view).trigger('click')
+    await risen()
+    const option = [...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]')].find(
+      (one) => one.textContent.includes(name),
+    )
+    if (!option) throw new Error(`no «${name}» in the list`)
+    option.click()
+    await flushPromises()
+  }
+
   it('says «Продукты» for a trip with none, and its own for one that has it', async () => {
     expect(row(await summary(null)).text()).toContain('groceries')
     expect(row(await summary(PETS)).text()).toContain('pets')
@@ -1106,21 +1118,11 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     categorizeTrip.mockReset()
     categorizeTrip.mockResolvedValue(undefined)
     const view = await summary(CAFE)
-    const choose = async (name: string) => {
-      await row(view).trigger('click')
-      await risen()
-      const option = [
-        ...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]'),
-      ].find((one) => one.textContent.includes(name))
-      if (!option) throw new Error(`no «${name}» in the list`)
-      option.click()
-      await flushPromises()
-    }
-    await choose('pets')
+    await choose(view, 'pets')
     expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
     expect(useTripQueueStore().pending).toEqual([])
     expect(row(view).text()).toContain('pets')
-    await choose('cafe')
+    await choose(view, 'cafe')
     expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: CAFE })
     expect(row(view).text()).toContain('cafe')
   })
@@ -1131,24 +1133,14 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     categorizeTrip.mockReset()
     categorizeTrip.mockResolvedValue(undefined)
     const view = await summary(CAFE)
-    const choose = async (name: string) => {
-      await row(view).trigger('click')
-      await risen()
-      const option = [
-        ...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]'),
-      ].find((one) => one.textContent.includes(name))
-      if (!option) throw new Error(`no «${name}» in the list`)
-      option.click()
-      await flushPromises()
-    }
-    await choose('pets')
+    await choose(view, 'pets')
     expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
     await view.setProps({ open: false })
     await flushPromises()
     await view.setProps({ open: true })
     await risen()
     expect(row(view).text()).toContain('cafe')
-    await choose('pets')
+    await choose(view, 'pets')
     expect(categorizeTrip).toHaveBeenCalledTimes(2)
     expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: PETS })
   })
@@ -1159,25 +1151,15 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     categorizeTrip.mockReset()
     categorizeTrip.mockResolvedValue(undefined)
     const view = await summary(CAFE)
-    const choose = async (name: string) => {
-      await row(view).trigger('click')
-      await risen()
-      const option = [
-        ...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]'),
-      ].find((one) => one.textContent.includes(name))
-      if (!option) throw new Error(`no «${name}» in the list`)
-      option.click()
-      await flushPromises()
-    }
-    await choose('pets')
-    await choose('pets')
+    await choose(view, 'pets')
+    await choose(view, 'pets')
     expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
     await view.setProps({ open: false })
     await flushPromises()
     await view.setProps({ open: true })
     await risen()
     expect(row(view).text()).toContain('cafe')
-    await choose('cafe')
+    await choose(view, 'cafe')
     expect(categorizeTrip).toHaveBeenCalledTimes(2)
     expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: CAFE })
   })
@@ -1194,18 +1176,8 @@ describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () =>
     )
     categorizeTrip.mockResolvedValue(undefined)
     const view = await summary(CAFE)
-    const choose = async (name: string) => {
-      await row(view).trigger('click')
-      await risen()
-      const option = [
-        ...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]'),
-      ].find((one) => one.textContent.includes(name))
-      if (!option) throw new Error(`no «${name}» in the list`)
-      option.click()
-      await flushPromises()
-    }
-    await choose('pets')
-    await choose('pets')
+    await choose(view, 'pets')
+    await choose(view, 'pets')
     land()
     await flushPromises()
     expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
