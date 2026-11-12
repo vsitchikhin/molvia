@@ -14,31 +14,12 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    name: format, lint, types, tests
+  static:
+    name: format, lint, types
     runs-on: ubuntu-latest
 
-    # Integration tests run against a real Postgres: pg_trgm and unaccent cannot be
-    # faked, and they are exactly what catalogue search will stand on. The port and the
-    # credentials match what bin/init-env.sh writes, so CI and a working copy agree.
-    services:
-      postgres:
-        image: pgvector/pgvector:0.8.7-pg17-bookworm
-        env:
-          POSTGRES_DB: molvia_0
-          POSTGRES_USER: molvia
-          POSTGRES_PASSWORD: molvia
-        ports:
-          - 5500:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
     steps:
-      # The whole history: gitleaks reads the pull request's own commits, `HEAD^1..HEAD^2` of the merge,
-      # and the time reporter the files it changes, `HEAD^1..HEAD` (MOL-266, В-4 «а»).
+      # The whole history: gitleaks reads the pull request's own commits, `HEAD^1..HEAD^2` of the merge.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -92,6 +73,57 @@ jobs:
       - name: npm audit of what ships
         run: node bin/npm-audit.mjs
 
+      # `make format` mutates files, so CI checks instead of fixing: a diff must fail,
+      # not be silently repaired.
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+
+      # The receipt reader (MOL-125, В-6): its image built as the release builds it, and one live
+      # read of a receipt the test draws itself — Tesseract and its language files are what no fake
+      # of the API's tests can stand for. Here, not in `tests`: it needs no Postgres, and `tests` is the
+      # longer path to green already (MOL-375).
+      - run: docker build -f services/receipt-reader/Dockerfile -t molvia-receipt-reader:ci .
+      - run: docker run --rm molvia-receipt-reader:ci python3 selftest.py
+
+  tests:
+    name: unit and integration tests
+    runs-on: ubuntu-latest
+
+    # Integration tests run against a real Postgres: pg_trgm and unaccent cannot be
+    # faked, and they are exactly what catalogue search will stand on. The port and the
+    # credentials match what bin/init-env.sh writes, so CI and a working copy agree.
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg17-bookworm
+        env:
+          POSTGRES_DB: molvia_0
+          POSTGRES_USER: molvia
+          POSTGRES_PASSWORD: molvia
+        ports:
+          - 5500:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      # The merge's first parent too: the time reporter turns red only for the files the pull request
+      # changes, `HEAD^1..HEAD` (MOL-266, В-4 «а»).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # onnxruntime-node fetches CUDA and TensorRT on linux/x64 by default (MOL-105): the API runs
+      # on the CPU, and the package carries the CPU build in itself.
+      - run: npm ci
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
+
       # The same generator every working copy uses, so CI cannot drift from local setup.
       - run: ./bin/init-env.sh 0
 
@@ -104,26 +136,51 @@ jobs:
           key: models-${{ hashFiles('backend/src/embeddings/model.json') }}
       - run: node bin/fetch-model.mjs
 
-      # `make format` mutates files, so CI checks instead of fixing: a diff must fail,
-      # not be silently repaired.
-      - run: npm run format:check
-      - run: npm run lint
-      - run: npm run typecheck
       - run: npm run test
 
-      # The receipt reader (MOL-125, В-6): its image built as the release builds it, and one live
-      # read of a receipt the test draws itself — Tesseract and its language files are what no fake
-      # of the API's tests can stand for.
-      - run: docker build -f services/receipt-reader/Dockerfile -t molvia-receipt-reader:ci .
-      - run: docker run --rm molvia-receipt-reader:ci python3 selftest.py
-
-  e2e:
-    name: end-to-end
+  # The name the ruleset of master requires (MOL-164), over the two jobs it was split into (MOL-375):
+  # `always()`, since a required job skipped counts as passed, and red unless both succeeded — failed,
+  # cancelled and skipped alike. No result at all is `none`, red: a gate whose `needs:` went would
+  # otherwise loop over nothing and pass at once (adversarial Б1).
+  check:
+    name: format, lint, types, tests
+    needs: [static, tests]
+    if: always()
     runs-on: ubuntu-latest
-    # A run is 13–18 minutes. A step that hangs is otherwise held for six hours (MOL-295, В-2).
-    # The job's limit cancels it; the tests' own limit, below, fails the step first while the steps
-    # before it are quick, and the traces go up either way.
-    timeout-minutes: 40
+    steps:
+      # Both gates' form first, so a gate whose `if: always()` went is named by the other, which runs
+      # (adversarial В1): skipped, it would pass. Two files, on the runner's own Node.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github/workflows/ci.yml
+            bin/check-ci-gates.mjs
+          sparse-checkout-cone-mode: false
+      - run: node bin/check-ci-gates.mjs
+      - name: both jobs succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "static, tests: $RESULTS"
+          for result in ${RESULTS:-none}; do [ "$result" = success ] || exit 1; done
+
+  # Four shards side by side (MOL-375, В-1 «а»): on one runner the suite took 21–23 minutes. Playwright
+  # splits by the count of tests, in the order of the projects, and never splits a project others depend on:
+  # `pwa`, with `pwa-update.spec` in series, runs whole in each shard holding `csp-built`, on that shard's
+  # own build. Every shard has its own database and stack. One red shard cancels no other: their flakes
+  # and traces are wanted too. The count of shards is written once, the matrix: the total is its count of
+  # legs, `strategy.job-total`, and the first step holds that each leg is its place in it.
+  e2e:
+    name: end-to-end shard ${{ matrix.shard }}/${{ strategy.job-total }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    # A shard took 5.3–7.9 minutes in three runs (MOL-375). A step that hangs is otherwise held for six
+    # hours (MOL-295, В-2). The job's limit cancels it; the tests' own limit, below, fails the step first
+    # while the steps before it are quick, and the traces go up either way.
+    timeout-minutes: 25
 
     # The browsers and every system package they need come in the image (MOL-295): `playwright install
     # --with-deps` put 181 packages through apt on every run, and on a slow mirror that took 17 to 60
@@ -152,6 +209,18 @@ jobs:
           --health-retries 10
 
     steps:
+      # A matrix of `[1, 2, 2, 4]` would run shard 2 twice and shard 3 nowhere, every leg green
+      # (adversarial А1): a leg runs the shard of its own place, `[1, 2, …, N]`, or fails in seconds.
+      - name: the shard is the leg's place in the matrix
+        env:
+          SHARD: ${{ matrix.shard }}
+          INDEX: ${{ strategy.job-index }}
+        run: |
+          if [ "$SHARD" != "$((INDEX + 1))" ]; then
+            echo "leg $((INDEX + 1)) of the matrix names shard $SHARD"
+            exit 1
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The image's Node is 24; ours is .nvmrc's.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -168,18 +237,41 @@ jobs:
           MOLVIA_PG_PORT: 5432
 
       # Its own limit, so a hung run ends red as failed rather than as cancelled, which reads as a newer
-      # push: the job's 40 minutes less the image, `npm ci` and the upload (adversarial А5). Killed, it
+      # push: the job's 25 minutes less the image, `npm ci` and the upload (adversarial А5). Killed, it
       # prints no summary.
-      - run: npm run test:e2e
-        timeout-minutes: 35
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
+        timeout-minutes: 20
 
       # The traces CI records — a retry's, and the first attempt's where a spec asks for it (MOL-217):
       # the `github` reporter writes no `playwright-report/`, so a flake left nothing here but its message.
-      # Cancelled too: a slow pull leaves the tests less than their 35 minutes, and the job's limit
+      # Cancelled too: a slow pull leaves the tests less than their 20 minutes, and the job's limit
       # cancels them first (adversarial Б2). A run a newer push cancels uploads what it wrote as well.
+      # A name per shard: one run takes no two artifacts of one name.
       - if: failure() || cancelled()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: playwright-traces
+          name: playwright-traces-${{ matrix.shard }}
           path: test-results/
           retention-days: 7
+
+  # The name the ruleset of master requires (MOL-164), over the shards (MOL-375): as `check`, run always,
+  # holding both gates' form and red unless every shard succeeded — a matrix's result is all its legs'.
+  e2e-gate:
+    name: end-to-end
+    needs: [e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github/workflows/ci.yml
+            bin/check-ci-gates.mjs
+          sparse-checkout-cone-mode: false
+      - run: node bin/check-ci-gates.mjs
+      - name: every shard succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "shards: $RESULTS"
+          for result in ${RESULTS:-none}; do [ "$result" = success ] || exit 1; done
