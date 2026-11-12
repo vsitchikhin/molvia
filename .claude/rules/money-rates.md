@@ -746,7 +746,14 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   сравнения», no sum; the note is the kit's quiet empty state inside the card (`ScreenState inline`, review №11).
 - **One choice for the screen, both ways** (adversarial А4): a bar chooses its exchange on the line of the rate — a new
   choice each time (`choice`), so the bar already chosen comes back after a dot chosen there — and a dot chosen there
-  chooses its bar. The plate under the bars is no live region: the radio says it (review №8).
+  chooses its bar; **one action is one choice** (review №16): a tap and a key are the radio's `click`, the field takes
+  a slide only. **Until anything is chosen both stand on the latest exchange of the twelve months**, compared or not —
+  the line's own default (MOL-161), named by the screen to both (adversarial Б2: the bars took the latest compared,
+  and an exchange of today, its market still to come, parted them). The plate under the bars is no live region: the
+  radio says it (review №8).
+- **A label of «мой — ЦБ РА» stands at its dot's end of the line**, wrapping within the card, never centred on the dot
+  (adversarial Б1: centred on 850, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 %); `large-text.spec`
+  gives the answer a line, since end to end has no rate of the central bank.
 - **The new fields go only to a phone that asks** (`EXCHANGE_SCREEN_HEADER`): `bars`, `walletTrack`, a currency's
   `track` — an installed app of an earlier build reads the answer strictly. Without them the screen stands the lines as
   they came, with no dots, and no line beside «Мой курс».
