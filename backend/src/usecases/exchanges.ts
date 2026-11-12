@@ -22,6 +22,7 @@ import {
   marketQuotesToday,
   marketRateOf,
   marketSideOf,
+  marketTrack,
   officialDifference,
   ownRates,
   pickOfficialRate,
@@ -32,6 +33,8 @@ import {
   receiptDay,
   resourceIdOf,
   uprightOf,
+  vsMarketBars,
+  walletTrack,
   yerevanDate,
 } from '@molvia/model'
 import type {
@@ -180,30 +183,34 @@ export function marketTodayOf(
     const bestBuys = bestQuote(fresh(buys), 'bankBuys')
     const bestSells = bestQuote(fresh(sells), 'bankSells')
     const channels = [...new Set([...buys, ...sells].map((quote) => quote.channel))]
+    const bank = freshOfficialRate(
+      currency,
+      'AMD',
+      official.filter((row) => row.provider === 'cba'),
+      today,
+    )
+    const quotes = channels.flatMap((channel) => {
+      const buy = buys.find((quote) => quote.channel === channel) ?? null
+      const sell = sells.find((quote) => quote.channel === channel) ?? null
+      const basis = buy?.basis ?? sell?.basis
+      if (basis === undefined) return []
+      return [
+        {
+          channel,
+          basis,
+          buys: buy ? marketRateOf(buy, currency) : null,
+          sells: sell ? marketRateOf(sell, currency) : null,
+          bestBuys: bestBuys?.channel === channel,
+          bestSells: bestSells?.channel === channel,
+        },
+      ]
+    })
+    const track = marketTrack({ currency, official: bank, quotes })
     return {
       currency,
-      official: freshOfficialRate(
-        currency,
-        'AMD',
-        official.filter((row) => row.provider === 'cba'),
-        today,
-      ),
-      quotes: channels.flatMap((channel) => {
-        const buy = buys.find((quote) => quote.channel === channel) ?? null
-        const sell = sells.find((quote) => quote.channel === channel) ?? null
-        const basis = buy?.basis ?? sell?.basis
-        if (basis === undefined) return []
-        return [
-          {
-            channel,
-            basis,
-            buys: buy ? marketRateOf(buy, currency) : null,
-            sells: sell ? marketRateOf(sell, currency) : null,
-            bestBuys: bestBuys?.channel === channel,
-            bestSells: bestSells?.channel === channel,
-          },
-        ]
-      }),
+      official: bank,
+      quotes,
+      track: { official: track.official, sell: [...track.sell], buy: [...track.buy] },
     }
   })
 }
@@ -610,6 +617,7 @@ export async function exchangesOverview(
   const views = viewsOf(money.exchanges, money.cached, history, market, exchangersThrough, today)
   const measures = marketMeasuresOf(views, money.cached, owner.spendCurrency, today)
   const chart = await rateChartOf(repositories, views, measures, owner.incomeCurrency, today)
+  const marketToday = marketTodayOf(latest, official, today)
   return {
     preference: money.preference,
     pair: base === quote ? null : { base, quote },
@@ -620,10 +628,44 @@ export async function exchangesOverview(
     baseSince: money.baseSince,
     exchanges: views,
     receipts: [...money.receipts],
-    marketToday: marketTodayOf(latest, official, today),
+    marketToday,
     losses: marketLossesOf(measures, owner.spendCurrency),
     rateCharts: chart,
+    bars: barsOf(views, measures),
+    walletTrack: rates.wallet && walletTrackOf(rates.wallet.rate, marketToday),
   }
+}
+
+/**
+ * «Обмены против рынка» as a bar an exchange (MOL-348): the very measures of the sum, and the sign of
+ * the card's own money beside each (MOL-190).
+ */
+function barsOf(
+  views: readonly ExchangeView[],
+  measures: ReadonlyMap<string, ExchangeLossInput>,
+): NonNullable<ExchangesResponse['bars']> {
+  return vsMarketBars(
+    views.flatMap((view) => {
+      const measure = measures.get(view.id)
+      if (!measure) return []
+      const card = view.market?.own ?? view.market?.best ?? null
+      return [{ ...measure, id: view.id, cardDifference: card?.difference.minor ?? null }]
+    }),
+  )
+}
+
+/**
+ * The person's rate beside the central bank's of today (MOL-348): the bank's figure of the block
+ * «Курсы по данным ЦБ РА», so the line names «ЦБ РА» truly — a pair that block has not got, none.
+ */
+function walletTrackOf(
+  own: ExchangeRate,
+  marketToday: readonly MarketToday[],
+): ExchangesResponse['walletTrack'] {
+  const foreign = own.base === 'AMD' ? own.quote : own.quote === 'AMD' ? own.base : null
+  const bank = marketToday.find((one) => one.currency === foreign)?.official ?? null
+  const track = bank && walletTrack(own, bank)
+  return bank && track ? { official: bank, own: track.own, officialAt: track.official } : null
 }
 
 /**

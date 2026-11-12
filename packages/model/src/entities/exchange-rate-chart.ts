@@ -286,7 +286,7 @@ export function rateScale(lowest: bigint, highest: bigint): [bigint, bigint] {
 }
 
 /** A rate kept with the dram as its quote — drams per unit, the side every figure here is on. */
-function inDrams(rate: ExchangeRate, currency: ForeignCurrency): bigint | null {
+export function inDrams(rate: ExchangeRate, currency: ForeignCurrency): bigint | null {
   if (rate.base === currency && rate.quote === 'AMD') return rate.scaled
   if (rate.base === 'AMD' && rate.quote === currency) {
     return divideRounded(RATE_SCALE * RATE_SCALE, rate.scaled)

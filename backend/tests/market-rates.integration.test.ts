@@ -1,6 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { exchangesResponseCodec, parseRate, ratePeriodFrom, yerevanDate } from '@molvia/model'
+import {
+  EXCHANGE_SCREEN_HEADER,
+  exchangesResponseCodec,
+  parseRate,
+  ratePeriodFrom,
+  yerevanDate,
+} from '@molvia/model'
 import type { CachedRate, ExchangesResponse, MarketRate } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createMarketRateRepository } from '@/db/market-rates-repository'
@@ -482,6 +488,88 @@ describe('«Обмены против рынка» на «Обмене дене�
     })
     expect(overviewOf(back.json()).losses?.total.minor).toBe(-123_212n)
     expect((await read(stranger.cookie)).losses).toBeNull()
+  })
+})
+
+describe('«Обмен денег» картинкой: столбики, дорожки, черта (MOL-348)', () => {
+  const day = daysAgo(1)
+
+  beforeEach(async () => {
+    await rates.upsert([official('4.3187', day)])
+    await market.upsert([
+      figure('bankCash', '4.110180', day),
+      figure('bankNoncash', '4.221606', day),
+      figure('bankCash', '4.347948', day, 'bankSells'),
+      figure('bankNoncash', '4.361759', day, 'bankSells'),
+    ])
+  })
+
+  const get = (cookie: string, asks: boolean) =>
+    app.inject({
+      method: 'GET',
+      url: '/exchanges',
+      headers: { cookie, ...(asks ? { [EXCHANGE_SCREEN_HEADER]: '1' } : {}) },
+    })
+
+  it('телефон прежней сборки читает ответ строго — ему ни столбиков, ни дорожек, ни черты', async () => {
+    const { cookie } = await owner()
+    await record(cookie, { note: 'ВТБ' })
+    const body = (await get(cookie, false)).json<Record<string, unknown>>()
+    expect(Object.keys(body)).not.toContain('bars')
+    expect(Object.keys(body)).not.toContain('walletTrack')
+    const rows = body.marketToday as Record<string, unknown>[]
+    expect(rows.flatMap((row) => Object.keys(row))).not.toContain('track')
+    expect(() => overviewOf(body)).not.toThrow()
+  })
+
+  it('столбик на обмен — мерой его карточки, по порядку записи, высота от самого далёкого', async () => {
+    const { cookie } = await owner()
+    await record(cookie, { note: 'ВТБ' })
+    await record(cookie, { note: 'Ардшинбанк', channel: 'bankCash' })
+    const { bars } = overviewOf((await get(cookie, true)).json())
+    // −1 232,12 ֏ against non-cash, +996,40 ֏ against cash: 99 640 / 123 212 of the furthest.
+    expect(
+      bars?.map(({ place, difference, sign, level }) => [place, difference?.minor, sign, level]),
+    ).toEqual([
+      ['ВТБ', -123_212n, -1, -1000],
+      ['Ардшинбанк', 99_640n, 1, 809],
+    ])
+  })
+
+  it('пара без драма — столбик «без сравнения» на линии, без знака', async () => {
+    const { cookie } = await owner()
+    await record(cookie, { received: { amount: '250', currency: 'USD' } })
+    const { bars } = overviewOf((await get(cookie, true)).json())
+    expect(bars).toEqual([expect.objectContaining({ difference: null, sign: null, level: 0 })])
+  })
+
+  it('дорожка рубля — общая для «продать» и «купить» и ЦБ РА, выгодный первым', async () => {
+    const { cookie } = await owner()
+    const { marketToday } = overviewOf((await get(cookie, true)).json())
+    // 4,110180 … 4,361759 ֏ for a rouble.
+    expect(marketToday.find((row) => row.currency === 'RUB')?.track).toEqual({
+      official: 829,
+      sell: [
+        { channel: 'bankNoncash', at: 443 },
+        { channel: 'bankCash', at: 0 },
+      ],
+      buy: [
+        { channel: 'bankCash', at: 945 },
+        { channel: 'bankNoncash', at: 1000 },
+      ],
+    })
+  })
+
+  it('черта «мой — ЦБ РА сегодня»: мой 4,16 левее ЦБ РА 4,3187; без обменов черты нет', async () => {
+    const { cookie } = await owner()
+    expect(overviewOf((await get(cookie, true)).json()).walletTrack).toBeNull()
+    await record(cookie, {})
+    const { walletTrack } = overviewOf((await get(cookie, true)).json())
+    expect(walletTrack).toMatchObject({
+      official: { base: 'RUB', quote: 'AMD', scaled: 4_318_700n },
+      own: 150,
+      officialAt: 850,
+    })
   })
 })
 

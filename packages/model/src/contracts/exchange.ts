@@ -115,6 +115,9 @@ const marketQuoteCodec = z.strictObject({
   difference: signedMoneyCodec,
 })
 
+const trackLevel = z.int().min(0).max(CHART_LEVEL)
+const trackRowCodec = z.strictObject({ channel: exchangeChannelSchema, at: trackLevel })
+
 /**
  * One currency of «Курсы по данным ЦБ РА» (MOL-137, В-1): the official rate against the dram, and
  * each channel's latest figures on both sides, each dated by its own rate — the exchange offices
@@ -134,6 +137,17 @@ export const marketTodayCodec = z.strictObject({
       bestSells: z.boolean(),
     }),
   ),
+  /**
+   * The currency's one track (MOL-348, `marketTrack`): where each figure and the central bank stand,
+   * each list best first. Sent only to a phone that asks (`EXCHANGE_SCREEN_HEADER`).
+   */
+  track: z
+    .strictObject({
+      official: trackLevel.nullable(),
+      sell: z.array(trackRowCodec),
+      buy: z.array(trackRowCodec),
+    })
+    .optional(),
 })
 export type MarketToday = z.output<typeof marketTodayCodec>
 
@@ -428,5 +442,38 @@ export const exchangesResponseCodec = z.strictObject({
    * reads.
    */
   rateCharts: exchangeRateChartCodec.nullable().default(null),
+  /**
+   * «Обмены против рынка» drawn as a bar an exchange (MOL-348, `vsMarketBars`): the twelve months,
+   * oldest first. Sent only to a phone that asks (`EXCHANGE_SCREEN_HEADER`).
+   */
+  bars: z
+    .array(
+      z.strictObject({
+        id: z.uuid(),
+        exchangedOn: exchangeDaySchema,
+        place: z.string().nullable(),
+        difference: signedMoneyCodec.nullable(),
+        /** Hundredths of a percent: −721 is «−7,21 %». */
+        percent: z.int().nullable(),
+        sign: z.union([z.literal(-1), z.literal(0), z.literal(1)]).nullable(),
+        level: z.int().min(-CHART_LEVEL).max(CHART_LEVEL),
+      }),
+    )
+    .optional(),
+  /**
+   * «Мой курс» beside the central bank's of today on one line, with no tone (MOL-348, `walletTrack`):
+   * null with no wallet, no rate of the bank today or a pair the block of the market does not have.
+   * Sent only to a phone that asks (`EXCHANGE_SCREEN_HEADER`).
+   */
+  walletTrack: z
+    .strictObject({ official: rateCodec, own: trackLevel, officialAt: trackLevel })
+    .nullable()
+    .optional(),
 })
 export type ExchangesResponse = z.output<typeof exchangesResponseCodec>
+
+/**
+ * The phone draws «Обмен денег» of MOL-348 and reads `bars`, `walletTrack` and a currency's `track`:
+ * an installed app of an earlier build reads the answer strictly and would refuse them.
+ */
+export const EXCHANGE_SCREEN_HEADER = 'X-Molvia-Exchange-Screen'
