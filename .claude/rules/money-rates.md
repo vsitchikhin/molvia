@@ -719,19 +719,42 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
 (`.lavish/mol-348-check.html`); where the two parted, the rules held (Р-11…Р-19 of the plan).
 
 - **Every height, place and order is the server's, as on the line of the rate** (Р-12, `exchange-screen.ts`):
-  `vsMarketBars` — a bar an exchange of the twelve months, oldest first, two of a day in the order made, its level the
-  drams of «Обмены против рынка» against the furthest, its sign the card's money (MOL-190) — an exchange the sum leaves
-  out is a bar «без сравнения» on the line, never one by the central bank; `marketTrack` — each currency's one track
-  from its lowest figure to its highest, the central bank on it, «продать» by the highest the bank buys at first,
-  «купить» by the lowest it sells at first; `walletTrack` — «мой — ЦБ РА сегодня» by the printed figures, the lower
-  left, only for a pair the block of the market has. The handoff had the markup work them out of percents and rates.
+  `vsMarketBars` — a bar an exchange of the twelve months, oldest first, two of a day in the order made (`made`, its
+  place in the list, never the list's order taken on trust), its level the money of «Обмены против рынка» in the
+  spending currency against the furthest, its sign the card's money (MOL-190) — **an exchange the sum leaves out is a
+  bar «без сравнения» on the line, by the sum's own rule** (`countedLosses`, review №7: a sum past what money holds
+  too), never one by the central bank; `marketTrack` — each currency's one track from its lowest figure to its
+  highest, the central bank on it, **each list the star first, then the rest of the day the star was chosen among, by
+  figure, then the older figures, by figure** (review №2, adversarial А3: sorted by figure alone, last week's exchange
+  office stood first, unstarred, over the star — the usual day, its file ten days late); `walletTrack` — «мой — ЦБ РА
+  сегодня» **by the figures as printed** (`printedRate`, the very rounding of `formatRate`, adversarial А2: compared
+  by six digits, «4,87» and «4,87» stood at either end), two that print the same in the middle, the lower left, only
+  for a pair the block of the market has. The handoff had the markup work them out of percents and rates.
+- **What an exchange is measured by is one function**, `cardMeasureOf` — its own channel, else the best (MOL-152):
+  the sum, a bar, a point of the line and the row of the list read it (review №6); four copies of `own ?? best` stood
+  before.
+- **The bars are drawn on one scale** (review №3): the line stands where the furthest bar up and the furthest down
+  share the height, each half as tall as its furthest bar, and the values stand in room the field keeps over and
+  under the bars. Each half stretched to its own furthest, with the line held at a third, drew +100 beside −1000 as
+  one to two. Every bar on the line — none measured — is a short field of frames.
+- **The bars are radios, and the whole field is the finger's target** (review №5, adversarial А5: twelve bars of a year
+  are 21 px each on a phone of 320, a finger covers two): as the bars of «Графики» (MOL-156) — one stop of Tab, the
+  arrows, a finger choosing the bar under it on lifting or sliding sideways (`useChartPointer`), `pan-y` leaving the
+  page its scroll. **The price, named:** a bar narrower than a finger is reached by sliding, not by aiming.
+- **«Обменов пока нет» only with no exchange at all** (review №1, adversarial А1): exchanges of the twelve months none
+  of them measured — roubles into dollars, the dinar, a day with no market — are their bars on the line and «N без
+  сравнения», no sum; the note is the kit's quiet empty state inside the card (`ScreenState inline`, review №11).
+- **One choice for the screen, both ways** (adversarial А4): a bar chooses its exchange on the line of the rate — a new
+  choice each time (`choice`), so the bar already chosen comes back after a dot chosen there — and a dot chosen there
+  chooses its bar. The plate under the bars is no live region: the radio says it (review №8).
 - **The new fields go only to a phone that asks** (`EXCHANGE_SCREEN_HEADER`): `bars`, `walletTrack`, a currency's
   `track` — an installed app of an earlier build reads the answer strictly. Without them the screen stands the lines as
   they came, with no dots, and no line beside «Мой курс».
 - **«Ровно» is a zero of money, as before** (Р-13): the handoff's |%| < 0,05 was a new rule and was not taken.
 - **The line of the rate is still named all bank clients** (Р-11, MOL-161 Р-3), and its marks to the market stay
   (В-1 of MOL-161); the dot takes the money's tone, the chosen one a terracotta ring around it, and a bar chosen on
-  «Обмены против рынка» chooses the same exchange there, its pair with it.
+  «Обмены против рынка» chooses the same exchange there, its pair with it. The legend of the bars names no currency
+  — «вверх — получили больше» (review №12, adversarial А6): bought with drams, up is more of the currency received.
 - **«Удалить обмен?» stays** (Р-16, В-5): the handoff took it away on the word that «Перевод» removes at once, which
   it does not.
 - **One currency of «Курсы по данным ЦБ РА» at a time** (Р-18), the latest exchange's first; the figures always seen.
