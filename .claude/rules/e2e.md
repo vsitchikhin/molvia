@@ -40,7 +40,9 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   runner's four cores with the browsers (the login under load, below). **The prices, named:** eight jobs a run
   where there were two — GitHub's free plan runs twenty at once for the account, so copies pushing together
   queue; each shard pays the image, `npm ci` and the stack again; the split is by count, not time, so the
-  heaviest shard — shard 4, with WebKit, the full Chromium and the build — sets the pace.
+  heaviest shard sets the pace. **Measured** on one commit, three runs of 12.11.2026 (run 43180391496): green
+  in 7:57, 8:33 and 8:23 against 23–24 minutes in the twelve runs before; the shards 5.3–7.9 minutes, no flake;
+  the tests' job 6.5–8.4 minutes, in two of the three the longest path.
 
 - **CI runs end-to-end in the image of Playwright, `mcr.microsoft.com/playwright:v<version>-noble`**
   (MOL-295). Until then the job installed the browsers with `--with-deps` on every run: the browsers
