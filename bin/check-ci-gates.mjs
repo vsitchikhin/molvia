@@ -3,7 +3,8 @@
 // skipped where a job it waits for fails, and the pull request merges red; one that waits for no job
 // passes at once; a job no gate waits for is required by nobody; a step of it that may fail and leave
 // the job green — `continue-on-error`, or skipped by an `if:` of its own — lets it pass red too
-// (adversarial Г1). Each gate runs this first and reads both, so the one whose `if: always()` went is
+// (adversarial Г1), and so does a job of `continue-on-error`, whose failure reaches its gate as
+// `success` (Д1). Each gate runs this first and reads both, so the one whose `if: always()` went is
 // named by the other, which runs.
 //
 //   node bin/check-ci-gates.mjs
@@ -68,12 +69,17 @@ export function gateProblems(workflow) {
       )
     }
     if (!gate.text.includes(SELF)) problems.push(`«${name}» does not run \`${COMMAND}\``)
-    if (/^ +(?:- +)?continue-on-error:/m.test(gate.text) || /^ {5,}(?:- +)?if:/m.test(gate.text)) {
+    if (/^ {6,}(?:- +)?(?:continue-on-error|if):/m.test(gate.text)) {
       problems.push(
         `«${name}» has a step that may fail or be skipped and leave it green: ` +
           'no `continue-on-error`, no `if:` of a step',
       )
     }
+  }
+  for (const job of jobs.filter((job) => /^ {4}continue-on-error:/m.test(job.text))) {
+    problems.push(
+      `\`${job.key}\` runs with \`continue-on-error\`: failed, it reaches its gate as success`,
+    )
   }
   const gateKeys = new Set(gates.map((gate) => gate.key))
   for (const gate of gates) {
