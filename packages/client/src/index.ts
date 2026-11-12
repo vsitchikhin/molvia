@@ -60,6 +60,7 @@ import {
   tripCategoryBodySchema,
   placeCategoriesCodec,
   MONEY_TRIP_CATEGORY_HEADER,
+  EXCHANGE_SCREEN_HEADER,
   unassignedOperationsCodec,
   budgetPlanBodySchema,
   moneyBudgetCodec,
@@ -212,6 +213,11 @@ export type CatalogueWrite =
 
 /** «Занят» comes with a 409 and is read only there; a 2xx is read only as the entry (review И). */
 const TAKEN = { 409: barcodeTakenSchema } as const
+
+/** «Обмен денег» of MOL-348: this phone reads `bars`, `walletTrack` and a currency's `track`. */
+function screenHeaders(): Headers {
+  return new Headers({ [EXCHANGE_SCREEN_HEADER]: '1' })
+}
 
 function writeOf(
   status: number,
@@ -888,11 +894,13 @@ export function createClient(options: ClientOptions): MolviaClient {
         ...(finish ? { body: encode(restoreTripBodySchema, { finish }) } : {}),
       }),
 
-    exchanges: () => request('/exchanges', exchangesResponseCodec),
+    // the figures of «Обмен денег» of MOL-348: only a phone that asks is told them
+    exchanges: () => request('/exchanges', exchangesResponseCodec, { headers: screenHeaders() }),
 
     recordExchange: async (body) => {
       const { status, data } = await exchange('/exchanges', exchangesResponseCodec, {
         method: 'POST',
+        headers: screenHeaders(),
         body: encode(exchangeBodySchema, body),
       })
       return { exchanges: data, created: status === 201 }
@@ -901,18 +909,26 @@ export function createClient(options: ClientOptions): MolviaClient {
     amendExchange: async (id, body) =>
       request(`/exchanges/${segment(id)}`, exchangesResponseCodec, {
         method: 'PUT',
+        headers: screenHeaders(),
         body: encode(exchangeAmendBodySchema, body),
       }),
 
     removeExchange: async (id) =>
-      request(`/exchanges/${segment(id)}`, exchangesResponseCodec, { method: 'DELETE' }),
+      request(`/exchanges/${segment(id)}`, exchangesResponseCodec, {
+        method: 'DELETE',
+        headers: screenHeaders(),
+      }),
 
     restoreExchange: async (id) =>
-      request(`/exchanges/${segment(id)}/restore`, exchangesResponseCodec, { method: 'POST' }),
+      request(`/exchanges/${segment(id)}/restore`, exchangesResponseCodec, {
+        method: 'POST',
+        headers: screenHeaders(),
+      }),
 
     chooseRatePreference: async (preference) =>
       request('/actors/me/rate-preference', exchangesResponseCodec, {
         method: 'PUT',
+        headers: screenHeaders(),
         body: encode(ratePreferenceBodySchema, { preference }),
       }),
 

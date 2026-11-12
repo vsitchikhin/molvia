@@ -613,8 +613,8 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     `AppField size="entry"` and its sign shrink together to the field, by «figure + 0.8 × sign» (`entryWidth`,
     32 to 40) — beside a sign of its own size «125403,50» was 12.9 px at 200 %; an amount of the body's size
     (`kind="decimal"`) shrinks to its own box (`.control-box`, `display: contents` in every other field) beside the
-    currency of a plan or an account; the sum and its currency of an exchange and an income stand one under the
-    other below 15rem — side by side at 200 % the sum read «1254» and the currency had 0 px; and with large text a
+    currency of a plan, an account or an exchange (its currency in the sum's well since MOL-348); the sum and its
+    currency of an income stand one under the other below 15rem — side by side at 200 % the sum read «1254» and the currency had 0 px; and with large text a
     select's chosen option is drawn as words that wrap (`.chosen-words`), the select over them unseen and still
     the one tapped, focused and read out — «Армянский драм · AMD» had 92 px and showed «Армя». A tile's figure
     («Пришло», «Можно тратить», «Сбережения»), an operation's amount, the day's sum of «Траты» and the figure of

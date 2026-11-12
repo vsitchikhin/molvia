@@ -2,8 +2,8 @@
 paths:
   - 'packages/model/src/values/{rates,money,market-rates}.ts'
   - 'packages/model/src/{entities,contracts}/{exchange,income}.ts'
-  - 'packages/model/src/entities/exchange-rate-chart.ts'
-  - 'packages/model/tests/{values,entities,contracts}/{rates,money,market-rates,exchange,exchange-rate-chart,income}.test.ts'
+  - 'packages/model/src/entities/{exchange-rate-chart,exchange-screen}.ts'
+  - 'packages/model/tests/{values,entities,contracts}/{rates,money,market-rates,exchange,exchange-rate-chart,exchange-screen,income}.test.ts'
   - 'backend/src/rates/**'
   - 'backend/src/db/{rates,market-rates,exchanges,incomes}-repository.ts'
   - 'backend/src/usecases/{exchanges,incomes,refresh-official-rates,refresh-market-rates,choose-trip-rate,money-rates,start-trip}*.ts'
@@ -537,7 +537,8 @@ rate exactly as before.
   named the central bank (review П-3). The best is marked among the figures of the latest day still
   fresh today — an exchange office of last week is shown, not starred beside today's banks, as a card
   sets it only beside its own day (review П-5). The server marks it; the phone compares nothing.
-- **On the card the market comes first and the central bank under it, a step quieter** (Р-5).
+- **On the card the market comes first and the central bank under it, a step quieter** (Р-5) — since MOL-348 on
+  the plate of the amendment's sheet (`ExchangeComparison`): the list's row says only the difference with the market.
 - **Against the market the difference takes its tone, its sign and a word; against the central bank
   it stays neutral** (MOL-187, Ф-30 of MOL-118, owner's В-11). The rule of MOL-81, «the difference is
   neutral always», is withdrawn for the market: there a minus is an exchange worse than one could
@@ -709,6 +710,76 @@ rate exactly as before.
   note is the person's, and what they see of it is not the chart's to decide. **The price, named:** a
   plate in the page for each exchange of the period, unseen — some fifty in a year of weekly ones —
   and another period may stand the chart a line higher or lower, a change of the screen's own query.
+
+## «Обмен денег» drawn (MOL-348)
+
+**The screen answers «хорошо ли я меняю» with a picture, never a table** (owner, 31.10 and 12.11.2026: the screen
+«сложный и перегруженный», the table of rates and the card of an exchange the worst of it, «Обмены против рынка» not
+understood). The design is Claude Design's handoff `design_handoff_mol_348`, checked against these rules
+(`.lavish/mol-348-check.html`); where the two parted, the rules held (Р-11…Р-19 of the plan).
+
+- **Every height, place and order is the server's, as on the line of the rate** (Р-12, `exchange-screen.ts`):
+  `vsMarketBars` — a bar an exchange of the twelve months, oldest first, two of a day in the order made (`made`, its
+  place in the list, never the list's order taken on trust), its level the money of «Обмены против рынка» in the
+  spending currency against the furthest, its sign the card's money (MOL-190) — **an exchange the sum leaves out is a
+  bar «без сравнения» on the line, by the sum's own rule** (`countedLosses`, review №7: a sum past what money holds
+  too), never one by the central bank; `marketTrack` — each currency's one track from its lowest figure to its
+  highest, the central bank on it, **each list the star first, then the rest of the day the star was chosen among, by
+  figure, then the older figures, by figure** (review №2, adversarial А3: sorted by figure alone, last week's exchange
+  office stood first, unstarred, over the star — the usual day, its file ten days late); `walletTrack` — «мой — ЦБ РА
+  сегодня» **by the figures as printed** (`printedRate`, the very rounding of `formatRate`, adversarial А2: compared
+  by six digits, «4,87» and «4,87» stood at either end), two that print the same in the middle, the lower left, only
+  for a pair the block of the market has. The handoff had the markup work them out of percents and rates.
+- **What an exchange is measured by is one function**, `cardMeasureOf` — its own channel, else the best (MOL-152):
+  the sum, a bar, a point of the line and the row of the list read it (review №6); four copies of `own ?? best` stood
+  before.
+- **The bars are drawn on one scale** (review №3): the line stands where the furthest bar up and the furthest down
+  share the height, each half as tall as its furthest bar, and the values stand in room the field keeps over and
+  under the bars. Each half stretched to its own furthest, with the line held at a third, drew +100 beside −1000 as
+  one to two. Every bar on the line — none measured — is a short field of frames.
+- **The bars are radios, and the whole field is the finger's target** (review №5, adversarial А5: twelve bars of a year
+  are 21 px each on a phone of 320, a finger covers two): as the bars of «Графики» (MOL-156) — one stop of Tab, the
+  arrows, a finger choosing the bar under it on lifting or sliding sideways (`useChartPointer`), `pan-y` leaving the
+  page its scroll. **The price, named:** a bar narrower than a finger is reached by sliding, not by aiming.
+- **«Обменов пока нет» only with no exchange at all** (review №1, adversarial А1): exchanges of the twelve months none
+  of them measured — roubles into dollars, the dinar, a day with no market — are their bars on the line and «N без
+  сравнения», no sum; the note is the kit's quiet empty state inside the card (`ScreenState inline`, review №11).
+- **One exchange on the screen: the line stands on no exchange but the bars'** (adversarial Е1, Ж1, З1, И1, review
+  №23 — each a way in where the line kept an exchange of its own; one rule worked out in `chosenIndex` replaced them).
+  A bar chooses its exchange on the line — a new choice each time (`choice`, adversarial А4), its pair with it, the
+  period's else the year's — and a dot chosen there chooses its bar; **one action is one choice** (review №16): a tap
+  and a key are the radio's `click`, the field takes a slide only. A step of the line chosen there is kept by its day
+  and tells the bars nothing. **Where the line does not draw the bars' exchange it stands on nothing and the reading
+  says why** — «Выбранного обмена за месяц нет» for another period, «…на этой линии нет» for another pair or none
+  (roubles into dollars, the other side of a pair) — never on its own latest. **Until anything is chosen both stand on
+  one default, named by the screen to both** (`defaultExchange`, review №19): the latest exchange of the twelve months
+  the line draws in its year, compared or not, else the latest bar (adversarial Б2, В1). **Another currency of the
+  line is a choice** (Г1): the line stands on the bars' exchange if that pair draws it, else on the pair's latest of
+  the period, told to the bars; with none in the period, on nothing. **Another period is not** — the line's answer
+  under its own switch; nothing above it moves (review №20, MOL-136). **The plate under the bars holds the tallest of
+  theirs**, as the line's reading does: a choice made on the line moves nothing under the finger. **A choice gone from
+  the twelve months** — removed, here or on another phone, amended out of the year — **gives way to the default for
+  both at once** (adversarial Д1). **Standing on nothing, the reading keeps the place of its day and figure**, unseen
+  — the latest step's, as the plates are held (adversarial round 10: without them a dot tapped then pushed the plot
+  down under the finger). The plate under the bars is no live region: the radio says it (review №8).
+- **A label of «мой — ЦБ РА» stands at its dot's end of the line**, wrapping within the card, never centred on the dot
+  (adversarial Б1: centred on 850, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 %); `large-text.spec`
+  gives the answer a line, since end to end has no rate of the central bank.
+- **The new fields go only to a phone that asks** (`EXCHANGE_SCREEN_HEADER`): `bars`, `walletTrack`, a currency's
+  `track` — an installed app of an earlier build reads the answer strictly. Without them the screen stands the lines as
+  they came, with no dots, and no line beside «Мой курс».
+- **«Ровно» is a zero of money, as before** (Р-13): the handoff's |%| < 0,05 was a new rule and was not taken.
+- **The line of the rate is still named all bank clients** (Р-11, MOL-161 Р-3), and its marks to the market stay
+  (В-1 of MOL-161); the dot takes the money's tone, the chosen one a terracotta ring around it, and a bar chosen on
+  «Обмены против рынка» chooses the same exchange there, its pair with it. The legend of the bars names no currency
+  — «вверх — получили больше» (review №12, adversarial А6): bought with drams, up is more of the currency received.
+- **«Удалить обмен?» stays** (Р-16, В-5): the handoff took it away on the word that «Перевод» removes at once, which
+  it does not.
+- **One currency of «Курсы по данным ЦБ РА» at a time** (Р-18), the latest exchange's first; the figures always seen.
+- **The amount and its currency are one well** of the sheet (`CurrencySelect` in the field's `#suffix`), its account
+  under it; «Как меняли» says what the exchange will be set beside; «Подставить» puts the focus in the field
+  (MOL-338 п. 2). An exchange is still written with a connection only (Р-15), «Было ֏ до обмена» still decided by
+  `receipts` and `heldEstimates` (Р-14).
 
 ## Incomes
 

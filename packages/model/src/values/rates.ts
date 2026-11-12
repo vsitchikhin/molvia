@@ -127,16 +127,35 @@ export function readingOf(rate: ExchangeRate): { of: Currency; per: Currency; sc
 export function formatRate(rate: ExchangeRate, locale = 'ru-RU'): string {
   // The decimal itself, as every other formatter of the domain does it: a rate is six digits, and
   // a float on the way to the screen is a float in the one value that multiplies every amount.
-  const upright = rate.scaled >= RATE_SCALE
-  const decimal = upright
-    ? decimalFromRate(rate.scaled)
-    : decimalFromScaled(divideRounded(100n * RATE_SCALE, rate.scaled), 2)
+  const { of, per, hundredths } = printedRate(rate)
   const number = new Intl.NumberFormat(locale, {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(decimal)
-  const [of, per] = upright ? [rate.quote, rate.base] : [rate.base, rate.quote]
+  }).format(decimalFromScaled(hundredths, 2))
   return `${number} ${currencySign(of, locale)}/${currencySign(per, locale)}`
+}
+
+/**
+ * The figure `formatRate` prints, before the locale's words: `hundredths` of `of` for one `per`, on
+ * the side whose number is at least one, rounded once from the six digits. Two rates read the same
+ * when these are the same (MOL-348, adversarial А2: «4,87» and «4,87» stood on two ends of a line).
+ */
+export function printedRate(rate: ExchangeRate): {
+  of: Currency
+  per: Currency
+  hundredths: bigint
+} {
+  return rate.scaled >= RATE_SCALE
+    ? {
+        of: rate.quote,
+        per: rate.base,
+        hundredths: divideRounded(rate.scaled, RATE_SCALE / 100n),
+      }
+    : {
+        of: rate.base,
+        per: rate.quote,
+        hundredths: divideRounded(100n * RATE_SCALE, rate.scaled),
+      }
 }
 
 /**
