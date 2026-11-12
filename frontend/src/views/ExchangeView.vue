@@ -179,7 +179,12 @@
 
         <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
 
-        <MarketRatesCard class="market-rates" :rows="overview.marketToday" />
+        <MarketRatesCard
+          class="market-rates"
+          :rows="overview.marketToday"
+          :first="latestForeign"
+          :today="today"
+        />
 
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
         <section v-if="overview.exchanges.length > 0" class="exchanges">
@@ -342,6 +347,15 @@ export default defineComponent({
     const today = useLocalDay()
     /** The exchange chosen on «Обмены против рынка» (MOL-348); null — the card's own default. */
     const chosenExchange = ref<string | null>(null)
+    /** The currency of the latest exchange against the dram, which «Курсы по данным ЦБ РА» shows first. */
+    const latestForeign = computed<Currency | null>(() => {
+      for (const exchange of exchanges.overview.value?.exchanges ?? []) {
+        const { given, received } = exchange
+        if (given.currency === 'AMD') return received.currency
+        if (received.currency === 'AMD') return given.currency
+      }
+      return null
+    })
     const sheetOpen = ref(false)
     // The exchange the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -546,6 +560,7 @@ export default defineComponent({
 
     return {
       chosenExchange,
+      latestForeign,
       figureChars,
       t,
       ...exchanges,

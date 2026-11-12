@@ -1625,19 +1625,22 @@ describe('ExchangeView: against the market of the day (MOL-137)', () => {
     const view = await render()
     const block = view.get('.market')
     expect(block.get('h2').text()).toBe(en.exchange.market.title)
-    // A currency the bank said nothing of is not drawn at all.
-    expect(block.findAll('table')).toHaveLength(1)
-    expect(block.get('caption').text()).toContain(en.spending.currency_name.RUB)
-    const rows = block.findAll('tbody tr')
-    expect(rows.map((one) => one.get('th').text())).toEqual([
-      'Banks, cash on Sep 29',
-      'Exchange offices on Sep 20',
+    // A currency the bank said nothing of is not drawn at all — and with one left, no switch.
+    expect(block.find('fieldset').exists()).toBe(false)
+    const [sell, buy] = block.findAll('[role="table"]')
+    expect(sell?.attributes('aria-label')).toBe('Sell roubles')
+    expect(sell?.findAll('[role="rowheader"]').map((one) => one.text())).toEqual([
+      'Bank, cash Sep 29',
+      'Exchange offices Sep 20',
     ])
-    const best = rows[0]?.findAll('td')[1]
-    expect(best?.classes()).toContain('best')
-    expect(best?.find('svg').exists()).toBe(true)
-    expect(best?.text()).toContain(en.exchange.market.best_mark)
-    expect(rows[1]?.findAll('.best')).toHaveLength(0)
+    // The best of buying is starred, bold and said; selling has none here.
+    const best = buy?.get('.line.best')
+    expect(best?.get('[role="rowheader"]').text()).toContain('Bank, cash')
+    expect(best?.find('svg.star').exists()).toBe(true)
+    expect(best?.get('[role="cell"]').text()).toContain(en.exchange.market.best_mark.trim())
+    expect(sell?.findAll('.best')).toHaveLength(0)
+    // A server before MOL-348 sends no track: the lines stand as they came, with no dots.
+    expect(block.find('.dot').exists()).toBe(false)
   })
 })
 
