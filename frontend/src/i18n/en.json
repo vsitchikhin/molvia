@@ -1010,7 +1010,6 @@
       "meta": "What you gave and what you got — the rate is worked out for you",
       "given": "Gave",
       "received": "Got",
-      "currency": "Currency",
       "same_currency": "The same currency on both sides is not an exchange",
       "day": "Day of the exchange",
       "held": "{currency} held before the exchange",
@@ -1042,7 +1041,15 @@
       "channel_none": "Not said",
       "channel_bankCash": "Bank, cash",
       "channel_bankNoncash": "Non-cash",
-      "channel_exchanger": "Exchange office"
+      "channel_exchanger": "Exchange office",
+      "currency_given": "Currency you gave",
+      "currency_received": "Currency you got",
+      "compared": {
+        "none": "Compared with the best market rate of the day",
+        "bankCash": "Compared with banks’ cash rate of the day",
+        "bankNoncash": "Compared with banks’ non-cash rate of the day",
+        "exchanger": "Compared with exchange offices’ rate of the day"
+      }
     },
     "edit_on": "Amend the exchange of {date}:",
     "card_given": "Gave",
@@ -1071,13 +1078,7 @@
     },
     "market": {
       "title": "Rates from the Central Bank of Armenia",
-      "hint": "Average rates of the day's deals of banks and exchange offices with people. The best for you is starred",
-      "official": "Central bank on {date}: {rate}",
-      "sell": "Sell",
-      "buy": "Buy",
-      "where": "Where to change",
-      "best_mark": "best",
-      "row_date": "on {date}",
+      "best_mark": ", the best for you",
       "best": "Best rate on {date}: {channel}",
       "own": "{channel} on {date}",
       "worse": "{amount} · worse than {where}",
@@ -1087,17 +1088,45 @@
       "where_bankNoncash": "at banks non-cash",
       "where_banksAll": "at banks (all clients)",
       "where_exchanger": "at exchange offices",
-      "pending": "The central bank publishes exchange offices of this day later — the line will update itself"
+      "pending": "The central bank publishes exchange offices of this day later — the line will update itself",
+      "currency": "Currency",
+      "tab": "{sign} {name}",
+      "cb": "Central bank {rate}",
+      "sell_title": "Sell {currency}",
+      "buy_title": "Buy {currency}",
+      "unit": "֏ for 1 {sign}",
+      "legend": "{unit} · ★ the best for you · dashed — the central bank",
+      "legend_no_cb": "{unit} · ★ the best for you · no central bank rate today",
+      "legend_no_best": "{unit} · rates over a week old — no best marked",
+      "channel_noncash": "Bank, non-cash",
+      "plural": {
+        "RUB": "roubles",
+        "USD": "dollars",
+        "EUR": "euros"
+      }
     },
     "vs_market": {
-      "title": "Exchanges against the market",
-      "note": "Over 12 months, each exchange against the market of its day by the Central Bank of Armenia: its own channel when named, else the best rate. Minus — you gave more than the market",
-      "uncounted": "Not compared: {n} exchange — no market or rate for that day | Not compared: {n} exchanges — no market or rate for those days",
-      "count": "{n} exchange | {n} exchanges",
+      "title": "Exchanges against the market · 12 months",
+      "uncounted": "? — {n} exchange not compared: no market or rate for that day | ? — {n} exchanges not compared: no market or rate for those days",
       "no_place": "No place",
       "worse": "worse than the market",
       "better": "better than the market",
-      "count_word": "{count} · {word}"
+      "even": "the same as the market",
+      "word_better": "more than the market would have given",
+      "word_worse": "less than the market would have given",
+      "count_one": "the exchange beat that day’s market",
+      "count_all": "all {n} beat that day’s market",
+      "count_better": "{n} better",
+      "count_worse": "{n} worse",
+      "count_even": "{n} the same",
+      "legend_up": "up — got more",
+      "legend_line": "as at that day’s market",
+      "legend_down": "down — less",
+      "bars_legend": "Exchange by exchange",
+      "places": "Where you exchanged",
+      "place_count": "× {n}",
+      "none_said": "not compared · no market or rate for that day",
+      "incomes_only": "Record the first — and this will show whether you beat the market or not"
     },
     "rate_chart": {
       "title": {
@@ -1134,6 +1163,8 @@
       "none": "No exchanges that week",
       "none_day": "No exchanges that day",
       "none_period": "No exchanges in {period}",
+      "chosen_away": "The chosen exchange is not on this line",
+      "chosen_out": "The chosen exchange is not in {period}",
       "spoken_market": "market {rate}",
       "spoken_no_market": "no market",
       "spoken": "Week to {day}: {market}",
@@ -1143,7 +1174,17 @@
       "note_week_bankBuys": "The line is the market: what banks paid all clients for the currency at the end of each week, by the Central Bank of Armenia. Dots are your exchanges: above the line — you got more drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a week",
       "note_day_bankBuys": "The line is the market: what banks paid all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday's. Dots are your exchanges: above the line — you got more drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day",
       "note_week_bankSells": "The line is the market: what banks charged all clients for the currency at the end of each week, by the Central Bank of Armenia. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a week",
-      "note_day_bankSells": "The line is the market: what banks charged all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday's. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day"
+      "note_day_bankSells": "The line is the market: what banks charged all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday's. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day",
+      "y_hint": "↑ higher — more ֏ for 1 {sign}"
+    },
+    "list": {
+      "pending_tag": "exchange offices — later",
+      "no_place": "no place"
+    },
+    "my_rate_line": {
+      "mine": "mine {rate}",
+      "cb_today": "central bank today {rate}",
+      "aria": "My rate {rate}, the central bank today {cb}"
     }
   },
   "income": {

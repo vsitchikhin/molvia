@@ -30,17 +30,42 @@
       @update:model-value="choosePeriod"
     />
 
+    <!-- What «higher» means, on the chart itself (MOL-348, handoff 03): the owner could not tell. -->
+    <p class="hint" aria-hidden="true">
+      {{ t('exchange.rate_chart.y_hint', { sign: currencySign(pair.currency, locale) }) }}
+    </p>
+
     <!-- The reading is not a live region: the radio chosen says the same (Р-6 of MOL-157). -->
     <div class="reading">
       <p v-if="!period" class="none">
         {{ t('exchange.rate_chart.no_market_period', { period: periodIn }) }}
       </p>
-      <template v-if="chosenStep">
-        <p class="week">
-          {{ t(`exchange.rate_chart.${step}`, { day: shortDay(chosenStep.day) }) }}
+      <!-- Standing on nothing, the day and the figure keep their place unseen: a dot tapped then puts
+           them back without moving the chart under the finger (adversarial round 10). -->
+      <template v-if="readStep">
+        <p
+          class="week"
+          :class="{ held: !chosenStep }"
+          :aria-hidden="chosenStep ? undefined : 'true'"
+        >
+          {{ t(`exchange.rate_chart.${step}`, { day: shortDay(readStep.day) }) }}
         </p>
-        <p v-if="chosenStep.rate" class="figure">{{ rateOf(chosenStep.rate) }}</p>
-        <p v-else class="figure missing">{{ t(words.noMarket) }}</p>
+        <p
+          v-if="readStep.rate"
+          class="figure"
+          :class="{ held: !chosenStep }"
+          :aria-hidden="chosenStep ? undefined : 'true'"
+        >
+          {{ rateOf(readStep.rate) }}
+        </p>
+        <p
+          v-else
+          class="figure missing"
+          :class="{ held: !chosenStep }"
+          :aria-hidden="chosenStep ? undefined : 'true'"
+        >
+          {{ t(words.noMarket) }}
+        </p>
       </template>
       <!-- Every plate of the period in one cell, the chosen one seen: the tallest holds the place, so a
            week with no exchange leaves the chart under the finger where it was (adversarial А2, Б1). -->
@@ -55,13 +80,7 @@
             }}</span>
           </span>
         </p>
-        <p v-else class="none">
-          {{
-            period.exchanges.length === 0
-              ? t('exchange.rate_chart.none_period', { period: periodIn })
-              : t(words.none)
-          }}
-        </p>
+        <p v-else class="none">{{ noneWords }}</p>
         <p v-for="plate in plates" :key="plate.id" class="plate ghost" aria-hidden="true">
           <span class="plate-dot"></span>
           <span class="plate-text">
@@ -157,11 +176,14 @@
               </template>
             </template>
             <!-- A dot is a zero-length round-capped line: stretched with the plot, still round. -->
+            <!-- The dot in the money's tone (MOL-190, MOL-348), the chosen one ringed in terracotta. -->
             <template v-for="point in period.exchanges" :key="point.id">
               <line
-                v-for="part in ['halo', 'point']"
+                v-for="part in chosen?.exchange?.id === point.id
+                  ? ['ring', 'halo', 'point']
+                  : ['halo', 'point']"
                 :key="part"
-                :class="[part, { chosen: chosen?.exchange?.id === point.id }]"
+                :class="[part === 'ring' ? 'chosen-ring' : part, toneOf(point)]"
                 :x1="point.x"
                 :y1="yOf(point.level)"
                 :x2="point.x"
@@ -285,15 +307,28 @@ export default defineComponent({
   props: {
     chart: { type: Object as PropType<ExchangeRateChartView>, required: true },
     months: { type: Number as PropType<RateChartMonths>, default: 12 },
+    /**
+     * An exchange chosen elsewhere — a bar of «Обмены против рынка» (MOL-348) — chosen here too. A new
+     * object for every choice, so the same bar chosen again comes again after a dot chosen here
+     * (adversarial А4: watched by its id, it did not).
+     */
+    choice: { type: Object as PropType<{ readonly id: string } | null>, default: null },
   },
   emits: {
     'update:months': (months: RateChartMonths) => RATE_CHART_MONTHS.includes(months),
+    /** An exchange chosen here, by a finger or the keys — so the bars choose it too. */
+    choose: (id: string) => typeof id === 'string',
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
     const area = ref<HTMLElement | null>(null)
     const currency = ref<Pair['currency'] | null>(null)
     const chosenKey = ref<string | null>(null)
+    /**
+     * The exchange the screen stands on — the bars' — chosen here or there; null only for a line with no
+     * screen around it (an answer before `bars`).
+     */
+    const screenId = ref<string | null>(null)
 
     const pair = computed<Pair | null>(
       () =>
@@ -420,13 +455,46 @@ export default defineComponent({
       return all.length - 1
     }
 
-    // A new answer and another period keep the choice while they still have it — an exchange by its
-    // id, a step by its day (Р-6 of MOL-168); another pair starts afresh.
+    const drawnIn = (months: RateChartMonths, id: string) =>
+      props.chart.pairs.find((one) =>
+        one.periods[months]?.exchanges.some((point) => point.id === id),
+      )
+
+    /**
+     * **The line stands on no exchange but the screen's** — the one rule that keeps the two blocks on one
+     * exchange, worked out here rather than kept by each way in (adversarial Е1, Ж1, З1, И1 and review
+     * №23 were each a way in that kept another). A step chosen here is kept by its day, an exchange chosen
+     * here is the screen's at once (it is told up); else the screen's exchange where the period draws it,
+     * and where it does not — another pair, another period, off the line — nothing, said in the reading
+     * (`noneWords`). A new answer and another period keep a step while they still have it (Р-6 of MOL-168).
+     * With no screen around the line, its own latest exchange, else its latest step.
+     */
     const chosenIndex = computed(() => {
-      const found = items.value.findIndex((item) => item.key === chosenKey.value)
-      return found === -1 ? defaultIndex() : found
+      const all = items.value
+      const screen = screenId.value
+      const kept = all.findIndex(
+        (item) =>
+          item.key === chosenKey.value && (item.exchange === null || item.exchange.id === screen),
+      )
+      if (kept !== -1) return kept
+      if (screen === null) return defaultIndex()
+      return all.findIndex((item) => item.exchange?.id === screen)
     })
     const chosen = computed(() => items.value[chosenIndex.value] ?? null)
+    /** The reading with nothing of the screen's to stand on: why, else no exchange that step. */
+    const noneWords = computed(() => {
+      if (period.value?.exchanges.length === 0) {
+        return t('exchange.rate_chart.none_period', { period: periodIn.value })
+      }
+      const screen = screenId.value
+      if (screen !== null && chosenIndex.value === -1) {
+        const inYear = pair.value?.periods[12]?.exchanges.some((point) => point.id === screen)
+        return inYear
+          ? t('exchange.rate_chart.chosen_out', { period: periodIn.value })
+          : t('exchange.rate_chart.chosen_away')
+      }
+      return t(words.value.none)
+    })
     const chosenPlate = computed(() =>
       chosen.value?.exchange ? plateOf(chosen.value.exchange) : null,
     )
@@ -434,17 +502,39 @@ export default defineComponent({
     const chosenStep = computed(
       () => (chosen.value ? period.value?.steps[chosen.value.step] : null) ?? null,
     )
+    /** What the reading's day and figure stand for: the step chosen, else the latest, held unseen. */
+    const readStep = computed(() => chosenStep.value ?? period.value?.steps.at(-1) ?? null)
     const cursorX = computed(() => chosen.value?.exchange?.x ?? chosenStep.value?.x ?? 0)
 
     /** The spot taps go round on: the centre of the dot the round began with, and its dots. */
     let round: { x: number; y: number; keys: string[] } | null = null
 
+    // Another pair — by hand, by a bar, by an answer without the one shown — starts afresh (review №27): a step
+    // of one line is no step of another.
     watch(
       () => pair.value?.currency,
       () => {
         chosenKey.value = null
         round = null
       },
+    )
+    /** The screen's exchange, chosen on the bars: its pair with it — the period's, else the year's. */
+    function follow(id: string): void {
+      screenId.value = id
+      chosenKey.value = null
+      const owner = drawnIn(props.months, id) ?? drawnIn(12, id)
+      if (owner) currency.value = owner.currency
+      round = null
+    }
+
+    // A bar of «Обмены против рынка» chooses its exchange here, and its pair with it (MOL-348).
+    watch(
+      () => props.choice,
+      (choice) => {
+        if (choice) follow(choice.id)
+      },
+      // The screen's choice as the line comes up too: the default it names for both blocks (Б2).
+      { immediate: true },
     )
     // A new answer or another period moves the dots — a scale grown with a new rate, another span
     // — and a round of the old places would turn over dots no longer under the finger (adversarial Р).
@@ -454,7 +544,11 @@ export default defineComponent({
 
     function choose(index: number): void {
       const item = items.value[index]
-      if (item) chosenKey.value = item.key
+      if (!item) return
+      chosenKey.value = item.key
+      if (!item.exchange) return
+      screenId.value = item.exchange.id
+      emit('choose', item.exchange.id)
     }
 
     function chooseKey(key: string | undefined): void {
@@ -462,8 +556,20 @@ export default defineComponent({
       if (index !== -1) choose(index)
     }
 
+    /**
+     * Another currency by the person's hand is a choice (adversarial Г1): the line stands on the screen's
+     * exchange if this pair draws it in the period, else on the pair's latest there, told to the bars;
+     * with none of the pair in the period it stands on nothing, and the bars keep theirs. A period is no
+     * choice of an exchange (review №20, MOL-136): nothing above its switch moves.
+     */
     function choosePair(value: string): void {
       currency.value = props.chart.pairs.find((one) => one.currency === value)?.currency ?? null
+      chosenKey.value = null
+      round = null
+      const all = items.value
+      if (all.some((item) => item.exchange !== null && item.exchange.id === screenId.value)) return
+      const latest = defaultIndex()
+      if (all[latest]?.exchange) choose(latest)
     }
 
     function choosePeriod(value: string): void {
@@ -723,6 +829,8 @@ export default defineComponent({
 
     return {
       t,
+      locale,
+      currencySign,
       headingId: useId(),
       name: useId(),
       area,
@@ -732,7 +840,9 @@ export default defineComponent({
       chosenPlate,
       plates,
       chosenIndex,
+      noneWords,
       chosenStep,
+      readStep,
       step,
       period,
       title,
@@ -771,6 +881,13 @@ export default defineComponent({
   padding: var(--space-4);
 }
 
+.hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
+}
+
 .legend {
   display: flex;
   flex-wrap: wrap;
@@ -805,6 +922,10 @@ export default defineComponent({
   align-content: start;
   gap: var(--space-1);
   min-height: 6rem;
+}
+
+.held {
+  visibility: hidden;
 }
 
 .week,
@@ -1002,20 +1123,26 @@ export default defineComponent({
 .halo {
   stroke: var(--surface);
   stroke-width: 14;
-
-  &.chosen {
-    stroke-width: 17;
-  }
 }
 
+/* The chosen one's ring, terracotta — the chosen one's and the cursor's alone (Ф-4) — round its dot. */
+.chosen-ring {
+  stroke: var(--accent);
+  stroke-width: 20;
+  stroke-linecap: round;
+}
+
+/* The dot takes the money's tone (MOL-190, MOL-348); with no comparison or nothing at all, `--text`. */
 .point {
   stroke: var(--text);
   stroke-width: 10;
 
-  /* Terracotta is the chosen one's and the cursor's alone (Ф-4). */
-  &.chosen {
-    stroke: var(--accent);
-    stroke-width: 13;
+  &.bad {
+    stroke: var(--bad);
+  }
+
+  &.good {
+    stroke: var(--good);
   }
 }
 

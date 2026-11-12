@@ -9,6 +9,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 - `packages/model/src/contracts/income.ts` — Wire schemas of «Доходы»: the income body and amendment, one income's view, the answer grouped by month.
 - `packages/model/src/entities/exchange.ts` — Exchange entity and the wallet: currency costs along the chain, own rates, difference from the official rate, the «сколько было до» hint.
 - `packages/model/src/entities/exchange-rate-chart.ts` — «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168): the periods and their first day, the days of the month and the weeks of half a year and the year, a step's figure of all bank clients, the pairs and the side of their line, each exchange with its percent and the market it was measured by, the round ticks of each period's axis.
+- `packages/model/src/entities/exchange-screen.ts` — The figures of «Обмен денег» drawn anew (MOL-348): a bar per exchange of «Обмены против рынка», each currency's track of «Курсы по данным ЦБ РА» with its lists best first, the line «мой — ЦБ РА» — every height, place and order the server's.
 - `packages/model/src/entities/income.ts` — Income entity: the closed list of sources, the undo window, and the per-month sums per currency.
 - `packages/model/src/values/market-rates.ts` — Market-rate value (MOL-137): the currencies of the files (MOL-110), channels, the bank's side of an exchange, a day's figure per channel, the best for the person, «exchange offices still to come», the figures of today, the band of a factor of two.
 - `packages/model/src/values/rates.ts` — Exchange-rate value: six-digit scale, sources and providers, what each provider publishes and in which base (`PUBLISHED`, `RATE_BASE`, MOL-230), the pair's own bank (`homeBankOf`, MOL-110, MOL-230), jump rule, Yerevan days, `latestDay` — the latest day on Earth, the bound of «not in the future» (MOL-121) —, freshness, picking the official rate, `formatRate`.
@@ -74,16 +75,20 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 
 ## frontend · components
 
-- `frontend/src/components/ExchangeCard.vue` — Card of one exchange, one button into its amendment: the day, what was given and received, the rate plate against the market of its day and the central bank, the note.
+- `frontend/src/components/ExchangeComparison.vue` — An exchange beside the market of its day and the central bank, on a plate in the sheet of its amendment (MOL-348; the card's plate before): the rate, the best of the day, the own channel, the bank a step quieter.
+- `frontend/src/components/ExchangeVsMarket.vue` — «Обмены против рынка» on top of «Обмен денег» (MOL-348; MOL-152 before): the total of twelve months, a bar an exchange from the line «как по рынку дня», radios with the whole field as the target, that chooses it there and on the line of the rate, the plate of the one chosen, the places as bars — every height the server's, on one scale.
 - `frontend/src/components/ExchangeRateChart.vue` — «Курс рубля за месяц, 6 и 12 месяцев» on «Обмен денег» (MOL-161, MOL-168): the market of all bank clients by day or week, the exchanges as dots with a mark to the market each was measured by, the reading above, the pairs and the period, hidden radios.
 - `frontend/src/components/ExchangeRemoveSheet.vue` — «Удалить обмен?» sheet over the amendment («‹», no ×): the exchange's amounts and day, and what removing does to the rate of new trips.
+- `frontend/src/components/ExchangeRow.vue` — One exchange in the list of «Обмен денег» (MOL-348): its sign in a circle, «отдал → получил», the day and the place, the difference with the market of its day and its word in the tail; the whole row opens the amendment.
 - `frontend/src/components/ExchangeSheet.vue` — «Записать обмен» sheet: given, received, day, how it was changed, «сколько было до» where it weighs; also amends an exchange with its versions, and removes it where the screen offers «Вернуть».
 - `frontend/src/components/IncomeCard.vue` — Card of one income, one button into its amendment: the day, the source and amount, the note on a plate below.
 - `frontend/src/components/IncomeRemoveSheet.vue` — «Удалить доход?» sheet over the amendment («‹», no ×): the income's amount, source and day, and what removing may do to the rate.
 - `frontend/src/components/IncomeSheet.vue` — «Записать доход» sheet: amount, currency, source, day, «сколько было до» where it weighs; also amends an income, and removes it where the screen offers «Вернуть».
-- `frontend/src/components/MarketRatesCard.vue` — «Курсы по данным ЦБ РА» on «Обмен денег» (MOL-137): per currency the official rate and each channel's latest figures to sell and to buy, dated, the best starred and said.
-- `frontend/src/components/OperationCardHead.vue` — Head of an exchange or income card: the day, «исправлен …» and the chevron, inside the card's one button.
-- `frontend/src/components/OperationSkeleton.vue` — Loading placeholder drawn in `ScreenSkeleton`'s slot so the list does not jump: the cards of exchanges or incomes, each in its own card's geometry (`form`) and with the lines of its plate (`plates`, MOL-188) (the rows of an operation are `SkeletonPart`'s, MOL-178).
+- `frontend/src/components/MarketRatesCard.vue` — «Курсы по данным ЦБ РА» on «Обмен денег» (MOL-137; drawn anew in MOL-348): one currency at a time, «Продать / Купить» best first, starred and bold, a dot on the currency's one track and the central bank's dashed line — the order and places the server's — each line dated, the figure always seen.
+- `frontend/src/components/OperationCardHead.vue` — Head of an income card: the day, «исправлен …» and the chevron, inside the card's one button.
+- `frontend/src/components/OperationSkeleton.vue` — Loading placeholder drawn in `ScreenSkeleton`'s slot so the list does not jump: the cards of incomes in their card's geometry, with the lines of each plate (`plates`, MOL-188) (the rows of an operation are `SkeletonPart`'s, MOL-178).
+- `frontend/src/components/TrackSpot.vue` — A mark on a track at the server's place in thousandths, centred on it with no width of its own — for «Курсы по данным ЦБ РА» and the line «мой — ЦБ РА» (MOL-348).
+- `frontend/src/components/WalletRateLine.vue` — «мой — ЦБ РА сегодня» under «Мой курс» (MOL-348): two dots on one line with their labels, where the server placed them, no tone.
 
 ## frontend · composables
 

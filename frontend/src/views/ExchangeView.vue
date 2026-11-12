@@ -58,7 +58,9 @@
       </AppCard>
       <SkeletonPart kind="figure" plate />
       <SkeletonPart kind="caption" :width="20" />
-      <OperationSkeleton />
+      <!-- The rows of the list (MOL-348): a sign in a circle, the amounts and the place, the
+           difference and its word under it. -->
+      <SkeletonPart kind="rows" lead="circle" tail under next />
     </ScreenSkeleton>
 
     <template v-else-if="phase !== 'idle'">
@@ -92,17 +94,27 @@
       />
 
       <template v-else-if="overview">
-        <!-- First under the strips (handoff MOL-157 05): what the exchanges of a year gave against
-             the market, by place — moved here from «Графики» (MOL-159, MOL-152). No card when
-             nothing of the twelve months was measured. -->
-        <ExchangeLosses v-if="overview.losses" :losses="overview.losses" />
+        <!-- First under the strips (MOL-348, handoff 02): the answer to «хорошо ли я меняю» — the
+             total of twelve months and a bar an exchange from the line «как по рынку дня». Incomes
+             alone and no exchange — the card's quiet note. -->
+        <ExchangeVsMarket
+          v-if="overview.losses || overview.bars?.length || overview.exchanges.length === 0"
+          :chosen="chosenExchange ?? defaultExchange"
+          :losses="overview.losses"
+          :bars="overview.bars ?? []"
+          :exchanges="overview.exchanges"
+          :today="today"
+          @update:chosen="chooseExchange"
+        />
         <!-- Under it (handoff MOL-157 05): when the exchanges were made, against the market of all
              bank clients by day or week (MOL-161), the period from the address (MOL-168). -->
         <ExchangeRateChart
           v-if="overview.rateCharts"
           :chart="overview.rateCharts"
           :months="chartMonths"
+          :choice="chartChoice"
           @update:months="chooseChartMonths"
+          @choose="chosenExchange = $event"
         />
 
         <AppCard class="rate">
@@ -119,6 +131,12 @@
             <p v-if="overview.wallet.estimated" class="meta">
               {{ t('exchange.estimated', { bank }) }}
             </p>
+            <!-- Where my rate stands beside the central bank's of today (MOL-348, handoff 04, Р-19). -->
+            <WalletRateLine
+              v-if="overview.walletTrack"
+              :own="overview.wallet.rate"
+              :track="overview.walletTrack"
+            />
           </template>
           <!-- Exchanges of the spending currency are there, its cost is not: the words say why, not
                «no exchanges yet» above a list of them (review С-4). -->
@@ -166,23 +184,32 @@
             @update:model-value="choose"
           />
           <p v-if="overview.pair" class="meta">{{ t('exchange.preference_hint', { bank }) }}</p>
+          <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
         </AppCard>
 
-        <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
-
-        <MarketRatesCard class="market-rates" :rows="overview.marketToday" />
+        <MarketRatesCard
+          class="market-rates"
+          :rows="overview.marketToday"
+          :first="latestForeign"
+          :today="today"
+        />
 
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
         <section v-if="overview.exchanges.length > 0" class="exchanges">
           <SectionCaption>{{ t('exchange.list_title') }}</SectionCaption>
-          <!-- A list, so a screen reader says how many and moves item by item (review Т-5). -->
-          <ul class="cards">
+          <!-- A list, so a screen reader says how many and moves item by item (review Т-5); a row an
+               exchange, its sign, its amounts and its difference with the market (MOL-348, handoff 06). -->
+          <AppCard as="ul" list class="rows">
             <AppReveal group>
-              <li v-for="exchange in overview.exchanges" :key="exchange.id">
-                <ExchangeCard :exchange="exchange" :today="today" @edit="edit" />
-              </li>
+              <ExchangeRow
+                v-for="exchange in overview.exchanges"
+                :key="exchange.id"
+                :exchange="exchange"
+                :today="today"
+                @edit="edit"
+              />
             </AppReveal>
-          </ul>
+          </AppCard>
         </section>
       </template>
     </template>
@@ -267,13 +294,12 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
-import ExchangeCard from '@/components/ExchangeCard.vue'
-import ExchangeLosses from '@/components/ExchangeLosses.vue'
 import ExchangeRateChart from '@/components/ExchangeRateChart.vue'
+import ExchangeRow from '@/components/ExchangeRow.vue'
+import ExchangeVsMarket from '@/components/ExchangeVsMarket.vue'
 import MarketRatesCard from '@/components/MarketRatesCard.vue'
 import ExchangeRemoveSheet from '@/components/ExchangeRemoveSheet.vue'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
-import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
@@ -281,6 +307,7 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
+import WalletRateLine from '@/components/WalletRateLine.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchangeWords } from '@/composables/useExchangeWords'
 import { useExchanges } from '@/composables/useExchanges'
@@ -303,15 +330,14 @@ export default defineComponent({
     AppCard,
     AppReveal,
     AppScreen,
-    ExchangeCard,
-    ExchangeLosses,
     ExchangeRateChart,
+    ExchangeRow,
+    ExchangeVsMarket,
     ExchangeRemoveSheet,
     ExchangeSheet,
     IconCheck,
     IconPlus,
     MarketRatesCard,
-    OperationSkeleton,
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
@@ -319,6 +345,7 @@ export default defineComponent({
     SkeletonPart,
     StatusStrip,
     UndoStrip,
+    WalletRateLine,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -328,6 +355,26 @@ export default defineComponent({
     const { rateOf, day, amountsOf, rateLineOf } = useExchangeWords()
     // «Сегодня» of the cards, asked again when the app comes back into view (MOL-121, adversarial Н).
     const today = useLocalDay()
+    /**
+     * The exchange chosen on the screen (MOL-348): a bar chooses it on the line of the rate as well — a
+     * new `chartChoice` each time, so the same bar again comes back after a dot chosen there (А4) — and a
+     * dot chosen there chooses its bar. Until anything is chosen, both stand on `defaultExchange` (below).
+     */
+    const chosenExchange = ref<string | null>(null)
+    const chartChoice = ref<{ readonly id: string } | null>(null)
+    function chooseExchange(id: string): void {
+      chosenExchange.value = id
+      chartChoice.value = { id }
+    }
+    /** The currency of the latest exchange against the dram, which «Курсы по данным ЦБ РА» shows first. */
+    const latestForeign = computed<Currency | null>(() => {
+      for (const exchange of exchanges.overview.value?.exchanges ?? []) {
+        const { given, received } = exchange
+        if (given.currency === 'AMD') return received.currency
+        if (received.currency === 'AMD') return given.currency
+      }
+      return null
+    })
     const sheetOpen = ref(false)
     // The exchange the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -524,6 +571,46 @@ export default defineComponent({
     const chartMonths = computed<RateChartMonths>(
       () => RATE_CHART_MONTHS.find((months) => String(months) === route.query.months) ?? 12,
     )
+    /**
+     * The one exchange both blocks stand on until anything is chosen, named here for both (review №19): the
+     * latest of the twelve months the line of the rate draws — the line's own default (MOL-161) — else the
+     * latest bar. A bar of roubles into dollars has no dot on the line (В-4): taken as the default, the line
+     * stayed on its own and the screen stood on two exchanges (adversarial В1), as it did when the bars took
+     * the latest compared (Б2). Read by the year, the bars' own window (MOL-168), never by the period shown:
+     * the period is the line's switch, under the bars, and moves nothing above it (review №20, MOL-136).
+     * **The price, named:** a period without the exchange chosen shows the line's own latest of it, and
+     * the bars stay on theirs.
+     */
+    const defaultExchange = computed(() => {
+      const overview = exchanges.overview.value
+      const bars = overview?.bars ?? []
+      const drawn = new Set(
+        overview?.rateCharts?.pairs.flatMap((pair) =>
+          pair.periods[12].exchanges.map(({ id }) => id),
+        ) ?? [],
+      )
+      return (bars.findLast(({ id }) => drawn.has(id)) ?? bars.at(-1))?.id ?? null
+    })
+    watch(
+      defaultExchange,
+      (id) => {
+        if (chosenExchange.value === null && id !== null) chartChoice.value = { id }
+      },
+      { immediate: true },
+    )
+    // A choice gone from the twelve months — removed here or on another phone, amended out of the year —
+    // gives way to the default, for both blocks at once (adversarial Д1: each fell back by a rule of its
+    // own, and the screen stood on two exchanges). An answer with no bars (a server before them) says
+    // nothing of it.
+    watch(
+      () => exchanges.overview.value?.bars,
+      (bars) => {
+        const chosen = chosenExchange.value
+        if (chosen === null || !bars || bars.some(({ id }) => id === chosen)) return
+        chosenExchange.value = null
+        if (defaultExchange.value !== null) chartChoice.value = { id: defaultExchange.value }
+      },
+    )
     function chooseChartMonths(months: RateChartMonths): void {
       void router.replace({
         query: { ...route.query, months: months === 12 ? undefined : String(months) },
@@ -531,6 +618,11 @@ export default defineComponent({
     }
 
     return {
+      chosenExchange,
+      defaultExchange,
+      chartChoice,
+      chooseExchange,
+      latestForeign,
       figureChars,
       t,
       ...exchanges,
@@ -593,9 +685,9 @@ export default defineComponent({
 
 // Each space has one owner, the group above it: with no rates of the central bank a margin of
 // «Обмены» on top of the note's made 48.
-.losses,
+.vs-market,
 .rate-chart,
-.frozen,
+.rate,
 .market-rates {
   margin-bottom: var(--space-6);
 }
@@ -603,7 +695,6 @@ export default defineComponent({
 .rate {
   /* The figure measures itself against the card (`figure-fit`, MOL-321). */
   container-type: inline-size;
-  margin-bottom: var(--space-2);
 }
 
 .rate-caption {
@@ -641,7 +732,7 @@ export default defineComponent({
   align-items: flex-start;
   gap: var(--space-2);
   padding: var(--space-3);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   font-size: var(--text-footnote);
 
   svg {
@@ -651,9 +742,9 @@ export default defineComponent({
   }
 }
 
-// A note, not «хорошо»: nothing good is reported here (Ф-4).
+// A note, not «хорошо»: nothing good is reported here (Ф-4). Inside «Мой курс» since MOL-348.
 .frozen {
-  margin-top: 0;
+  margin: var(--space-4) 0 0;
   background: var(--surface-2);
   color: var(--text-muted);
 }
@@ -705,14 +796,5 @@ export default defineComponent({
 .ghost-area {
   height: 11.25rem;
   border-radius: var(--radius-sm);
-}
-
-.cards {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 </style>

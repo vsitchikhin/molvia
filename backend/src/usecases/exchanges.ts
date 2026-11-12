@@ -6,6 +6,7 @@ import {
   OFFICIAL_RATE_FRESH_DAYS,
   RATE_SCALE,
   bestQuote,
+  cardMeasureOf,
   convertAcross,
   convertSigned,
   currencySchema,
@@ -22,6 +23,7 @@ import {
   marketQuotesToday,
   marketRateOf,
   marketSideOf,
+  marketTrack,
   officialDifference,
   ownRates,
   pickOfficialRate,
@@ -32,6 +34,8 @@ import {
   receiptDay,
   resourceIdOf,
   uprightOf,
+  vsMarketBars,
+  walletTrack,
   yerevanDate,
 } from '@molvia/model'
 import type {
@@ -177,34 +181,44 @@ export function marketTodayOf(
       const newest = recent.reduce((day, quote) => (quote.date > day ? quote.date : day), '')
       return recent.filter((quote) => quote.date === newest)
     }
-    const bestBuys = bestQuote(fresh(buys), 'bankBuys')
-    const bestSells = bestQuote(fresh(sells), 'bankSells')
+    const latestBuys = fresh(buys)
+    const latestSells = fresh(sells)
+    const bestBuys = bestQuote(latestBuys, 'bankBuys')
+    const bestSells = bestQuote(latestSells, 'bankSells')
     const channels = [...new Set([...buys, ...sells].map((quote) => quote.channel))]
-    return {
+    const bank = freshOfficialRate(
       currency,
-      official: freshOfficialRate(
-        currency,
-        'AMD',
-        official.filter((row) => row.provider === 'cba'),
-        today,
-      ),
-      quotes: channels.flatMap((channel) => {
-        const buy = buys.find((quote) => quote.channel === channel) ?? null
-        const sell = sells.find((quote) => quote.channel === channel) ?? null
-        const basis = buy?.basis ?? sell?.basis
-        if (basis === undefined) return []
-        return [
-          {
-            channel,
-            basis,
-            buys: buy ? marketRateOf(buy, currency) : null,
-            sells: sell ? marketRateOf(sell, currency) : null,
-            bestBuys: bestBuys?.channel === channel,
-            bestSells: bestSells?.channel === channel,
-          },
-        ]
-      }),
-    }
+      'AMD',
+      official.filter((row) => row.provider === 'cba'),
+      today,
+    )
+    const quotes = channels.flatMap((channel) => {
+      const buy = buys.find((quote) => quote.channel === channel) ?? null
+      const sell = sells.find((quote) => quote.channel === channel) ?? null
+      const basis = buy?.basis ?? sell?.basis
+      if (basis === undefined) return []
+      return [
+        {
+          channel,
+          basis,
+          buys: buy ? marketRateOf(buy, currency) : null,
+          sells: sell ? marketRateOf(sell, currency) : null,
+          bestBuys: bestBuys?.channel === channel,
+          bestSells: bestSells?.channel === channel,
+        },
+      ]
+    })
+    // The star and the order of the lists are one rule: the star first, the latest day after it.
+    const track = marketTrack({
+      currency,
+      official: bank,
+      quotes: quotes.map((quote) => ({
+        ...quote,
+        latestBuys: latestBuys.some(({ channel }) => channel === quote.channel),
+        latestSells: latestSells.some(({ channel }) => channel === quote.channel),
+      })),
+    })
+    return { currency, official: bank, quotes, track }
   })
 }
 
@@ -312,7 +326,7 @@ function marketMeasureOf(
 ): ExchangeLossInput {
   const { note, exchangedOn, received } = view
   const unknown = { note, exchangedOn, difference: null, expected: null }
-  const measure = view.market?.own ?? view.market?.best
+  const measure = cardMeasureOf(view.market)
   if (!measure) return unknown
   const { difference } = measure
   // What the market would have given for the same money: what came, less what came beyond it.
@@ -610,6 +624,7 @@ export async function exchangesOverview(
   const views = viewsOf(money.exchanges, money.cached, history, market, exchangersThrough, today)
   const measures = marketMeasuresOf(views, money.cached, owner.spendCurrency, today)
   const chart = await rateChartOf(repositories, views, measures, owner.incomeCurrency, today)
+  const marketToday = marketTodayOf(latest, official, today)
   return {
     preference: money.preference,
     pair: base === quote ? null : { base, quote },
@@ -620,10 +635,46 @@ export async function exchangesOverview(
     baseSince: money.baseSince,
     exchanges: views,
     receipts: [...money.receipts],
-    marketToday: marketTodayOf(latest, official, today),
+    marketToday,
     losses: marketLossesOf(measures, owner.spendCurrency),
     rateCharts: chart,
+    bars: barsOf(views, measures),
+    walletTrack: rates.wallet && walletTrackOf(rates.wallet.rate, marketToday),
   }
+}
+
+/**
+ * «Обмены против рынка» as a bar an exchange (MOL-348): the very measures of the sum, and the sign of
+ * the card's own money beside each (MOL-190).
+ */
+function barsOf(
+  views: readonly ExchangeView[],
+  measures: ReadonlyMap<string, ExchangeLossInput>,
+): NonNullable<ExchangesResponse['bars']> {
+  // The list comes newest first; the bars are given it in the order the sum counts it, each with its
+  // place in the order the exchanges were made.
+  return vsMarketBars(
+    views.flatMap((view, index) => {
+      const measure = measures.get(view.id)
+      if (!measure) return []
+      const cardDifference = cardMeasureOf(view.market)?.difference.minor ?? null
+      return [{ ...measure, id: view.id, made: views.length - index, cardDifference }]
+    }),
+  )
+}
+
+/**
+ * The person's rate beside the central bank's of today (MOL-348): the bank's figure of the block
+ * «Курсы по данным ЦБ РА», so the line names «ЦБ РА» truly — a pair that block has not got, none.
+ */
+function walletTrackOf(
+  own: ExchangeRate,
+  marketToday: readonly MarketToday[],
+): ExchangesResponse['walletTrack'] {
+  const foreign = own.base === 'AMD' ? own.quote : own.quote === 'AMD' ? own.base : null
+  const bank = marketToday.find((one) => one.currency === foreign)?.official ?? null
+  const track = bank && walletTrack(own, bank)
+  return bank && track ? { official: bank, own: track.own, officialAt: track.official } : null
 }
 
 /**

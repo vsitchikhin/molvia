@@ -210,19 +210,40 @@ The shape worth knowing here:
     owner's В-4: a tag is the build that runs). The `v` stays: every earlier tag has it, and
     `describe --match 'v[0-9]*'` and the rollback find tags by it.
   - **When:** on the owner's word «выпускай», or by itself at 03:00 Yerevan time when no release went out in
-    the 24 hours before and the branch holds a commit master does not (owner's В-10: the word and the
-    schedule together). A red CI on the release branch stops the night release and tells the owner.
+    the 24 hours before and the branch differs from master (owner's В-10: the word and the schedule
+    together). A red CI on the release branch stops the night release and tells the owner. **Since MOL-381
+    the word is «Run workflow» on `release-night.yml`, and the night is its cron** (`bin/release.mjs`):
+    - **The branch differs by its files, not by a commit** — after a hotfix master is merged into the next
+      release branch, and that merge alone is nothing to release.
+    - **Only a release by hand holds the night back** (MOL-381, owner's В-4 «а»): GitHub's cron runs late
+      here (MOL-221), and a night on time after a late one would find less than 24 hours and skip a day.
+      The night's merge carries `(night)` after the subject GitHub writes; a release by hand — the button
+      or GitHub's interface — has none. **The price, named:** a subject edited by hand in GitHub's
+      interface is read as GitHub's; edited into `(night)`, it holds no night back.
+    - **What CI passed is what merges**: up to an hour for both gates on the branch's head, the merge
+      bound to that commit (`--match-head-commit`); a task merged meanwhile goes with the next release.
+    - **By the app `molvia-release`, never `GITHUB_TOKEN`** (owner's В-2 «а»): what GitHub's own token
+      does starts no workflow — no CI on master, no rollout, no tag's job.
+    - **Its word is the check `molvia-release`** (owner's В-5 «а»): a night with nothing to release pings
+      too, so a night that never ran is an alarm as well.
   - **Right after a release the next branch is cut from master.** Three `release/*` stay — the next, the
-    one just out and the one before it, so a rollback has its source; older ones are deleted.
+    one just out and the one before it, so a rollback has its source; older ones are deleted. **Since
+    MOL-381 `after-release.yml` does it, and tags**, after CI on master for whoever merged: the merge
+    commit's branch says what it was, `/api/health` naming the commit says it is out (forty minutes at
+    most), then the tag, the next branch and the deletions — an old branch only once master holds it. A
+    release out of turn — not the next name after the last tag — is refused: the tags are the record.
   - **A hotfix mends the release that is out**, never the next one: `hotfix/<that release's name>-<k>`, `k`
     from 1, cut from master, merged into master, tagged `v0.2.<n>-<name>-<k>` with the release's own `n`;
-    then master is merged into the next release branch, so the fix does not vanish with the next release.
+    then master is merged into the next release branch, so the fix does not vanish with the next release —
+    `after-release.yml` both, a conflict a `/fail` to merge by hand.
     The next full release takes its own name and `n + 1`. A hotfix is not «the day's release» for the 03:00
     rule: one fix would otherwise hold the day's features back a day.
   - **Names rotate through three themes — a stone, a wind, a river — each in alphabetical order** (owner's В-9,
     11.11.2026): `v0.2.1-agate`, `v0.2.2-alize`, `v0.2.3-amazon`, `v0.2.4-amethyst`… One word in Latin, lower
     case, from the lists below; a list at its end starts over, and the number `n` keeps the tags apart. A
-    hotfix takes its release's name, never the next one.
+    hotfix takes its release's name, never the next one. **The lists that count are `bin/release.mjs`'s**
+    (`NAMES`, MOL-381): name `n` is the stone, the wind or the river of `n − 1` in turn; the lists below
+    are their copy, held equal by `bin/release.test.ts`.
     - stones: agate, amethyst, azurite, beryl, calcite, cinnabar, citrine, diopside, dolomite, emerald,
       epidote, feldspar, fluorite, galena, garnet, gypsum, hematite, howlite, iolite, jade, jasper, kunzite,
       kyanite, labradorite, lazurite, magnetite, malachite, nephrite, obsidian, onyx, opal, peridot, pyrite,
@@ -235,9 +256,12 @@ The shape worth knowing here:
       euphrates, fraser, ganges, hrazdan, hudson, indus, irtysh, jordan, kura, lena, loire, mekong,
       mississippi, morava, niger, nile, ob, oder, orinoco, po, rhine, rhone, sava, seine, shannon, tagus,
       thames, tigris, ural, vistula, volga, yangtze, yenisei, yukon, zambezi.
-  - **Until MOL-381 lands it is done by hand**: a session cuts the release on the owner's word. MOL-381
-    brings the ruleset that refuses any other branch into master, the 03:00 release, the cut of the next
-    branch, the deletion of old ones and the tag pattern of `release.yml` (it matches `vX.Y.Z` only).
+  - **Master takes `release/*`, `hotfix/*` and `dependabot/*`** (MOL-381; owner's В-7 «б» for Dependabot,
+    whose base cannot follow a name that changes daily): CI's first step, `bin/release.mjs source`, since a
+    ruleset cannot say where a pull request comes from and already requires that job's gate. **The price,
+    named:** a Dependabot merge is a rollout of its own and not the day's release. A tag of either form
+    names the images (`release.yml`) and rolls back (`deploy.sh`, whose copy on the machine is the
+    owner's to bring).
 - **Production is watched from outside, never from the machine (MOL-142; MOL-149, В-4).** A watch on
   the same machine does not notice the machine is down. **The Worker `molvia-watch` on Cloudflare**
   (`deploy/watch`, MOL-221) asks every five minutes for `/api/health` and the page and pings the

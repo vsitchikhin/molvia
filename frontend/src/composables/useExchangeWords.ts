@@ -1,6 +1,6 @@
 import { useI18n } from 'vue-i18n'
 import { formatMoney, formatRate, formatRateBeside, yerevanDate } from '@molvia/model'
-import type { ExchangeRate, ExchangeView } from '@molvia/model'
+import type { ExchangeRate, ExchangeView, Money } from '@molvia/model'
 import { signedAmount } from '@/components/accounts'
 import { bankWords } from '@/components/spending'
 import { calendarDay, calendarDayOfAnyYear } from '@/days'
@@ -48,6 +48,33 @@ export interface ExchangeWords {
   /** The bank an exchange's pair is measured by, named — «ЦБ РА», «НБ Грузии» (MOL-110). */
   readonly bankOf: (exchange: ExchangeView) => string
   readonly marketOf: (exchange: ExchangeView) => MarketWords | null
+}
+
+/** A difference with the market by the sign of its money (MOL-190): its tone, its mark, its word. */
+export type VerdictKind = 'good' | 'bad' | 'even' | 'none'
+
+/** The kind of a sign of money — the card's, a bar's, a place's; null — no comparison. */
+export function verdictKind(sign: number | null): VerdictKind {
+  if (sign === null) return 'none'
+  return sign < 0 ? 'bad' : sign > 0 ? 'good' : 'even'
+}
+
+/** The kind of an amount by its sign. */
+export function verdictOfMoney(money: Money): VerdictKind {
+  return verdictKind(money.minor < 0n ? -1 : money.minor > 0n ? 1 : 0)
+}
+
+/** The tone a kind is drawn in: «ровно» and «без сравнения» have none (Ф-30). */
+export function toneOfVerdict(kind: VerdictKind): 'good' | 'bad' | null {
+  return kind === 'good' || kind === 'bad' ? kind : null
+}
+
+/** «лучше рынка», «хуже рынка», «ровно как рынок», or what no comparison says — one set of words. */
+export const VERDICT_WORD: Readonly<Record<VerdictKind, string>> = {
+  good: 'exchange.vs_market.better',
+  bad: 'exchange.vs_market.worse',
+  even: 'exchange.vs_market.even',
+  none: 'exchange.rate_chart.no_change',
 }
 
 /**

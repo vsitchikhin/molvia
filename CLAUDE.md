@@ -297,7 +297,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and the year come in one answer** (MOL-168): each from the day after the same day N months back,
   whole months on a month's last day — the year is the window of «Обмены против рынка» — the month
   by days, a weekend at Friday's figure; the pairs are the year's, and the period is the screen's
-  address.
+  address. **«Обмен денег» is drawn, not tabled** (MOL-348): a bar an exchange, a track of a currency's
+  rates, the line «мой — ЦБ РА» — every height, place and order the server's (`exchange-screen.ts`), sent
+  only to a phone that asks (`EXCHANGE_SCREEN_HEADER`).
 
 ### Money: spendings and «Деньги» — `.claude/rules/money-spendings.md`
 
@@ -844,8 +846,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### End-to-end — `.claude/rules/e2e.md`
 
 - **End-to-end has a database and ports of its own**, and the database is dropped before every run.
-- **End-to-end runs in CI, not on the push** (MOL-164): a pull request merges only on both jobs
-  green, and a test green only on a retry is red there.
+- **End-to-end runs in CI, not on the push** (MOL-164): a pull request merges only on both required checks
+  green, and a test green only on a retry is red there. **It runs as four shards** (MOL-375), each with its
+  own database and build; `pwa`, which others depend on, is never split.
 - **Every spec comes in through `open()` in `e2e/session.ts`.**
 - **The sheet, the kit's «not now», its rows and the error's strip also run on WebKit** (`iphone`, MOL-80,
   MOL-174, MOL-175, MOL-180); a test it cannot run says why.
@@ -939,7 +942,7 @@ differently in every working copy by design.
 
 - **Every check is CI's** (MOL-164, MOL-165): lint, types, every test and end-to-end run there on
   every push, in parallel and with no queue between the copies, and **`master` takes a pull
-  request only when both CI jobs are green** — a ruleset, not a habit. A flake green only on a
+  request only when both required checks are green** — a ruleset, not a habit. A flake green only on a
   retry fails CI (`failOnFlakyTests`). There is no `pre-push`.
 - **The one local hook that checks is `pre-commit`, and only the formatting of the files
   committed** (`.githooks`, wired by `make setup`, no husky) — seconds, since CI checks formatting
@@ -952,8 +955,13 @@ differently in every working copy by design.
   lock gives the command no terminal, so vitest does not watch by default, and refuses a vitest told
   to watch and Playwright's `--ui` and `--debug`, which never give it back. Why, in
   `.claude/rules/workspace.md`.
-- **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, in two
-  jobs: checks and e2e. CI **checks** formatting rather than fixing it — `make format`
+- **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, side by
+  side (MOL-375): «format, lint, types», the tests, and end-to-end in four shards; two gate jobs
+  carry the names the ruleset requires, «format, lint, types, tests» and «end-to-end», each red
+  unless all it waits for succeeded — `if: always()`, since a required job skipped counts as
+  passed. **The ruleset requires the six jobs themselves too** (MOL-402): a red job holds the merge by itself,
+  and a job's name or the count of shards changed is the ruleset changed the same day. CI **checks**
+  formatting rather than fixing it — `make format`
   mutates files, and a diff must fail rather than be silently repaired. It generates its
   `.env` with the same `bin/init-env.sh` every working copy uses, so CI cannot drift from
   local setup.
@@ -1247,7 +1255,7 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
 
 ### After a task
 
-**Definition of Done: both CI jobs green on the pull request** (`gh pr checks --watch`, MOL-165).
+**Definition of Done: both required checks green on the pull request** (`gh pr checks --watch`, MOL-165).
 Every check runs there, so «pushed» is not «done», and a red CI is the task's to fix exactly as a
 refused push once was. Locally the work runs what it needs to be written — the test file being
 changed, `make check` or `make e2e` when the agent wants an answer before the push — never as a
@@ -1288,7 +1296,8 @@ Owner's decisions of 11.11.2026, after `v0.2.0`. Every merge into master is a ro
 a «Обновить» on every installed phone (MOL-132): ten tasks a day were ten updates. Now a day's tasks reach
 people as one release. The mechanics and their reasons are in `.claude/rules/deploy.md`.
 
-- **Master takes only two kinds of branch: `release/<name>` and `hotfix/<name>-<number>`.** A task's branch
+- **Master takes only two kinds of branch: `release/<name>` and `hotfix/<name>-<number>`** — and Dependabot's
+  (MOL-381, В-7 «б»), refused otherwise by CI's first step (`bin/release.mjs source`). A task's branch
   starts from the current `release/<name>` and its pull request goes there, merged on the owner's word as
   before; CI runs on that pull request as on any other.
 - **A release is the pull request `release/<name>` → master**, and its merge is the rollout. Its tag is
@@ -1303,8 +1312,10 @@ people as one release. The mechanics and their reasons are in `.claude/rules/dep
   `n + 1`, with no number. A hotfix does not count as the day's release for the 03:00 rule.
 - **Names rotate a stone, a wind, a river, each theme in alphabetical order** (`v0.2.1-agate`,
   `v0.2.2-alize`, `v0.2.3-amazon`…), one word in Latin, from the lists in `.claude/rules/deploy.md`.
-- **Until MOL-381 lands, the release is cut by hand**: the ruleset that refuses other branches into master,
-  the 03:00 release, the cut of the next branch and the deletion of old ones are its automation.
+- **The release is automated since MOL-381**: `release-night.yml` at 03:00 and by «Run workflow» (the word
+  «выпускай»), only a release by hand holding the night back; `after-release.yml` tags what runs, cuts the next
+  branch, deletes the old and brings a hotfix into the next branch — by the app `molvia-release`, its word the
+  check `molvia-release`. The rules and their prices: `.claude/rules/deploy.md`.
 
 ### Feature flags — «фф» (MOL-376)
 

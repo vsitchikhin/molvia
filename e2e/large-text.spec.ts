@@ -387,7 +387,7 @@ for (const size of ['150%', '200%'])
         ['/money', page.locator('.donut .sector-name')],
         ['/money/spendings', page.locator('.day-head')],
         ['/money/budget', page.getByRole('button', { name: 'Задать план категории' })],
-        ['/money/exchange', page.locator('article button.body')],
+        ['/money/exchange', page.locator('.rows button.list-row')],
         ['/money/incomes', page.locator('.cards button.body')],
         ['/money/charts', page.locator('.center')],
         ['/money/charts?mode=year', page.locator('.columns')],
@@ -512,6 +512,37 @@ for (const size of ['150%', '200%'])
       ).toBeLessThanOrEqual(0.5)
     })
 
+    // «мой — ЦБ РА сегодня» under «Мой курс» (MOL-348): end to end has no rate of the central bank, so the
+    // server sends no line — the answer is given one, the dots at the ends, as `walletTrack` puts them apart.
+    // Centred on its dot, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 % (adversarial Б1).
+    test('the line «мой — ЦБ РА» under «Мой курс» stands within its card', async ({ page }) => {
+      await page.route('**/api/exchanges', async (route) => {
+        if (route.request().method() !== 'GET') return route.continue()
+        const response = await route.fetch()
+        const json = (await response.json()) as Record<string, unknown> & {
+          wallet?: { rate: Record<string, unknown> } | null
+        }
+        const own = json.wallet?.rate
+        if (own)
+          json.walletTrack = {
+            official: { ...own, rate: '4.902000', source: 'official' },
+            own: 150,
+            officialAt: 850,
+          }
+        await route.fulfill({ response, json })
+      })
+      await signedIn(page)
+      await post(page, '/api/exchanges', {
+        id: randomUUID(),
+        given: { amount: '20000', currency: 'RUB' },
+        received: { amount: '97420', currency: 'AMD' },
+        exchangedOn: day(1),
+      })
+      await page.goto('/money/exchange')
+      expect(await pageSideways(page, page.locator('.wallet-line .label'))).toBe(0)
+      expect(await pastCard(page, '.wallet-line .label')).toBeLessThanOrEqual(0.5)
+    })
+
     test('the sheets of «Деньги» stand within the phone', async ({ page }) => {
       test.setTimeout(90_000)
       await signedIn(page)
@@ -522,9 +553,9 @@ for (const size of ['150%', '200%'])
         0,
       )
       await page.goto('/money/exchange')
-      await expect(page.locator('article button.body').first()).toBeVisible()
+      await expect(page.locator('.rows button.list-row').first()).toBeVisible()
       // «Как меняли»: «Не указано · Банк, нал · Безнал · Обменник».
-      expect(await sheetSideways(page, page.locator('article button.body').first())).toBe(0)
+      expect(await sheetSideways(page, page.locator('.rows button.list-row').first())).toBe(0)
       await page.goto('/money/accounts')
       expect(await sheetSideways(page, page.getByRole('button', { name: 'Добавить счёт' }))).toBe(0)
       await page.goto('/money/budget')
@@ -779,21 +810,27 @@ for (const size of ['150%', '200%'])
             ).length,
         ),
       ).toBe(0)
-      // An exchange: its sum and currency one under the other, the sum typed whole.
+      // An exchange: its currency in the well of its sum (MOL-348), the sum typed whole and the currency
+      // within the well, never past it.
       await page.goto('/money/exchange')
       await page.getByRole('button', { name: 'Записать обмен' }).click()
       const sheet = page.locator('dialog[open]').last()
-      const pair = sheet.locator('.pair').first()
-      await expect(pair).toBeVisible()
-      const [amount, currency] = await pair.locator('.app-field').all()
-      expect((await currency!.boundingBox())!.y).toBeGreaterThan((await amount!.boundingBox())!.y)
-      const typed = amount!.locator('input')
+      const amount = sheet.locator('.pair').first().locator('.app-field').first()
+      await expect(amount).toBeVisible()
+      const typed = amount.locator('input')
       await typed.fill('125403,50')
       await typed.blur()
       await facesIn(page)
       expect(
         await typed.evaluate((input) => input.scrollWidth - input.clientWidth),
       ).toBeLessThanOrEqual(0)
+      const [well, currency] = await Promise.all([
+        amount.locator('.well').boundingBox(),
+        amount.locator('select').boundingBox(),
+      ])
+      expect((currency?.x ?? 0) + (currency?.width ?? 0)).toBeLessThanOrEqual(
+        (well?.x ?? 0) + (well?.width ?? 0) + 0.5,
+      )
     })
 
     // Beyond «Деньги» (MOL-334): before it at 200 % the record went 102 px sideways, «Оценки» 23, «Данные и

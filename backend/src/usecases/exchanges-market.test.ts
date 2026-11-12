@@ -48,6 +48,30 @@ describe('marketTodayOf — «Курсы по данным ЦБ РА» (MOL-137)
       ['bankNoncash', true],
       ['exchanger', false],
     ])
+    // The lists stand the star first and last week's office after its day (MOL-348, adversarial А3).
+    expect(rouble?.track?.sell.map(({ channel }) => channel)).toEqual([
+      'bankNoncash',
+      'bankCash',
+      'exchanger',
+    ])
+  })
+
+  it('lists last week’s office after the starred banks, where it would buy dearest (MOL-348, А3)', () => {
+    const [rouble] = marketTodayOf(
+      [
+        figure('bankCash', '2026-09-29', 4_480_000n, 'bankSells'),
+        figure('bankNoncash', '2026-09-29', 4_420_000n, 'bankSells'),
+        figure('exchanger', '2026-09-18', 4_390_000n, 'bankSells'),
+      ],
+      [],
+      TODAY,
+    )
+    expect(rouble?.quotes.find((quote) => quote.bestSells)?.channel).toBe('bankNoncash')
+    expect(rouble?.track?.buy.map(({ channel }) => channel)).toEqual([
+      'bankNoncash',
+      'bankCash',
+      'exchanger',
+    ])
   })
 
   it('stars an exchange office when it is of the latest day and the best of it', () => {
