@@ -2029,6 +2029,46 @@ describe('ExchangeView: one exchange chosen for the whole screen (MOL-348)', () 
     expect(plate(month)).toContain('Feb 28')
   })
 
+  it('a bar the line does not draw, chosen, takes the line off any exchange and says so (Е1)', async () => {
+    const C = 'a0000000-0000-4000-8000-000000000005'
+    exchanges.mockResolvedValue({
+      ...answer,
+      exchanges: [
+        row({
+          id: C,
+          exchangedOn: '2026-03-01',
+          received: { minor: 23_000n, currency: 'USD' },
+          rate: null,
+        }),
+        ...answer.exchanges,
+      ],
+      bars: [
+        ...(answer.bars ?? []),
+        {
+          id: C,
+          exchangedOn: '2026-03-01',
+          place: null,
+          difference: null,
+          percent: null,
+          sign: null,
+          level: 0,
+        },
+      ],
+    })
+    const view = await render()
+    await view.findAll('.vs-market .cell input')[2]?.trigger('click')
+    expect(plate(view)).toContain('Mar 1')
+    // Not «Feb 28», the exchange just left: the line says the chosen one is not on it.
+    expect(view.find('.rate-chart .mine-rate').exists()).toBe(false)
+    expect(view.findAll('.rate-chart .chosen-ring')).toHaveLength(0)
+    expect(view.get('.rate-chart .stack .none').text()).toBe(
+      'The chosen exchange is not on this line',
+    )
+    // A bar the line draws brings it back.
+    await view.findAll('.vs-market .cell input')[0]?.trigger('click')
+    expect(onChart(view)).toContain('Feb 10')
+  })
+
   it('a chosen exchange removed gives way to the default, on both blocks at once (Д1)', async () => {
     const C = 'a0000000-0000-4000-8000-000000000005'
     const dollars = row({

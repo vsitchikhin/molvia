@@ -756,7 +756,11 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   moves (review №20, MOL-136). **The plate under the bars holds the tallest of theirs**, as the line's reading does:
   a choice made on the line under the card moves nothing under the finger. **A choice gone from the twelve months**
   — removed, here or on another phone, amended out of the year — **gives way to the default for both at once**
-  (adversarial Д1: each block fell back by a rule of its own). **The price, named:** a period without the exchange
+  (adversarial Д1: each block fell back by a rule of its own). **An exchange the line draws in no period of the
+  year** — roubles into dollars, the other side of the pair — chosen on the bars or amended off the line, **is chosen
+  nowhere there, and the reading says so** (adversarial Е1: the line stayed on the exchange just left, or fell back to
+  its latest); a dot or a currency chosen there is a choice again, and an answer that draws it again rings it. **The
+  price, named:** the reading's day and figure go with the choice, so the line stands a line or two higher. **The price, named:** a period without the exchange
   chosen shows the line's own latest of it while the bars stay on theirs. The plate under the bars is no live region: the
   radio says it (review №8).
 - **A label of «мой — ЦБ РА» stands at its dot's end of the line**, wrapping within the card, never centred on the dot

@@ -1163,6 +1163,7 @@
       "none": "Обменов на этой неделе не было",
       "none_day": "В этот день обменов не было",
       "none_period": "Обменов за {period} не было",
+      "chosen_away": "Выбранного обмена на этой линии нет",
       "spoken_market": "рынок {rate}",
       "spoken_no_market": "рынка нет",
       "spoken": "Неделя по {day}: {market}",

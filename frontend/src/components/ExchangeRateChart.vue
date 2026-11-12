@@ -62,9 +62,11 @@
         </p>
         <p v-else class="none">
           {{
-            period.exchanges.length === 0
-              ? t('exchange.rate_chart.none_period', { period: periodIn })
-              : t(words.none)
+            away
+              ? t('exchange.rate_chart.chosen_away')
+              : period.exchanges.length === 0
+                ? t('exchange.rate_chart.none_period', { period: periodIn })
+                : t(words.none)
           }}
         </p>
         <p v-for="plate in plates" :key="plate.id" class="plate ghost" aria-hidden="true">
@@ -310,6 +312,14 @@ export default defineComponent({
     const area = ref<HTMLElement | null>(null)
     const currency = ref<Pair['currency'] | null>(null)
     const chosenKey = ref<string | null>(null)
+    /** The exchange the screen stands on, chosen here or on the bars — or null, a step or nothing. */
+    let screenId: string | null = null
+    /**
+     * The screen's exchange when the line draws it in no period of the year — roubles into dollars, the
+     * other side of the pair (adversarial Е1): the line chooses nothing then and says so, never standing
+     * on another exchange while the bars show this one.
+     */
+    const away = ref<string | null>(null)
 
     const pair = computed<Pair | null>(
       () =>
@@ -439,6 +449,7 @@ export default defineComponent({
     // A new answer and another period keep the choice while they still have it — an exchange by its
     // id, a step by its day (Р-6 of MOL-168); another pair starts afresh.
     const chosenIndex = computed(() => {
+      if (away.value) return -1
       const found = items.value.findIndex((item) => item.key === chosenKey.value)
       return found === -1 ? defaultIndex() : found
     })
@@ -468,22 +479,46 @@ export default defineComponent({
         round = null
       },
     )
+    const drawnIn = (months: RateChartMonths, id: string) =>
+      props.chart.pairs.find((one) =>
+        one.periods[months]?.exchanges.some((point) => point.id === id),
+      )
+
+    /**
+     * The line stands on the screen's exchange: its dot and its pair where the period draws it; nothing,
+     * said, where no period of the year does (Е1); where only this period lacks it, on its own as it was —
+     * the price of review №20.
+     */
+    function follow(id: string): void {
+      screenId = id
+      const owner = drawnIn(props.months, id)
+      if (owner) {
+        currency.value = owner.currency
+        chosenKey.value = id
+        away.value = null
+        round = null
+      } else if (!drawnIn(12, id)) {
+        chosenKey.value = null
+        away.value = id
+      }
+    }
+
     // A bar of «Обмены против рынка» chooses its exchange here, and its pair with it (MOL-348).
     watch(
       () => props.choice,
       (choice) => {
-        if (!choice) return
-        const { id } = choice
-        const owner = props.chart.pairs.find((one) =>
-          one.periods[props.months]?.exchanges.some((point) => point.id === id),
-        )
-        if (!owner) return
-        currency.value = owner.currency
-        chosenKey.value = id
-        round = null
+        if (choice) follow(choice.id)
       },
       // The screen's choice as the line comes up too: the default it names for both blocks (Б2).
       { immediate: true },
+    )
+    // An answer that takes the screen's exchange off the line — amended into dollars — or brings it back
+    // follows it as a choice does (Е1): kept by its key, the line fell back to its own latest.
+    watch(
+      () => props.chart,
+      () => {
+        if (screenId) follow(screenId)
+      },
     )
     // A new answer or another period moves the dots — a scale grown with a new rate, another span
     // — and a round of the old places would turn over dots no longer under the finger (adversarial Р).
@@ -495,6 +530,8 @@ export default defineComponent({
       const item = items.value[index]
       if (!item) return
       chosenKey.value = item.key
+      away.value = null
+      screenId = item.exchange?.id ?? null
       if (item.exchange) emit('choose', item.exchange.id)
     }
 
@@ -511,9 +548,11 @@ export default defineComponent({
      */
     function choosePair(value: string): void {
       currency.value = props.chart.pairs.find((one) => one.currency === value)?.currency ?? null
+      away.value = null
       // Now, not in the watch after the render: the exchange told is the one the line will show.
       keepChosenInPair()
       const shown = chosen.value?.exchange
+      screenId = shown?.id ?? null
       if (shown) emit('choose', shown.id)
     }
 
@@ -785,6 +824,7 @@ export default defineComponent({
       chosenPlate,
       plates,
       chosenIndex,
+      away,
       chosenStep,
       step,
       period,

@@ -1007,11 +1007,51 @@ describe('ExchangeRateChart: in step with «Обмены против рынка
     expect(bare.emitted('choose')).toBeUndefined()
   })
 
-  it('must not fire: an exchange of no pair drawn changes nothing', async () => {
+  it('an exchange the line does not draw is chosen nowhere here, and said so (Е1)', async () => {
     const { view } = chart()
-    const before = view.get('.mine-rate').text()
+    // Roubles into dollars: a bar with no dot. The line stood on the exchange before it.
     await view.setProps({ choice: { id: 'c0000000-0000-4000-8000-000000000000' } })
-    expect(view.get('.mine-rate').text()).toBe(before)
+    expect(view.find('.mine-rate').exists()).toBe(false)
+    expect(view.findAll('.chosen-ring')).toHaveLength(0)
+    expect(view.find('.cursor').exists()).toBe(false)
+    expect(view.findAll('.chart input:checked')).toHaveLength(0)
+    expect(view.get('.stack .none').text()).toBe('Выбранного обмена на этой линии нет')
+    // A dot chosen here is a choice again, told up.
+    const dot = view
+      .findAll('.chart input')
+      .filter((radio) => radio.attributes('aria-label')?.includes('мой'))
+      .at(-1)
+    await dot?.setValue(true)
+    expect(view.find('.mine-rate').exists()).toBe(true)
+    expect(view.emitted('choose')).toHaveLength(1)
+  })
+
+  it('an answer that takes the chosen exchange off the line says so, and one that brings it back rings it (Е1)', async () => {
+    const first = 'a0000000-0000-4000-8000-000000000001'
+    const { view } = chart()
+    await view.setProps({ choice: { id: first } })
+    const drawn = view.props('chart')
+    // Amended into dollars: the answer has no dot of it. Kept by its key, the line went to its latest.
+    const without = {
+      pairs: drawn.pairs.map((one) => ({
+        ...one,
+        periods: Object.fromEntries(
+          Object.entries(one.periods).map(([months, period]) => [
+            months,
+            period && {
+              ...period,
+              exchanges: period.exchanges.filter((point) => point.id !== first),
+            },
+          ]),
+        ),
+      })),
+    } as typeof drawn
+    await view.setProps({ chart: without })
+    expect(view.findAll('.chosen-ring')).toHaveLength(0)
+    expect(view.get('.stack .none').text()).toBe('Выбранного обмена на этой линии нет')
+    await view.setProps({ chart: drawn })
+    expect(plain(view.get('.mine-rate').text())).toContain('10 февр.')
+    expect(view.emitted('choose')).toBeUndefined()
   })
 
   it('draws a dot in the money’s tone, none for no comparison, and says what «higher» means', () => {
