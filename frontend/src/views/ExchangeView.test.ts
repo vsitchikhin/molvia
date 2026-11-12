@@ -332,6 +332,45 @@ describe('ExchangeView: the four states', () => {
   })
 })
 
+describe('ExchangeView: «Мой курс» beside the central bank (MOL-348)', () => {
+  it('draws «mine — the central bank today» where the server places them, with no tone', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        walletTrack: {
+          official: rate('4.34', '2026-11-11', 'official'),
+          own: 850,
+          officialAt: 150,
+        },
+      }),
+    )
+    const card = (await render()).get('.rate')
+    const line = card.get('.beside')
+    expect(line.attributes('role')).toBe('img')
+    expect(line.attributes('aria-label')).toBe('My rate 4.79 ֏/₽, the central bank today 4.34 ֏/₽')
+    expect(line.findAll('.beside-label').map((label) => label.text())).toEqual([
+      'mine 4.79 ֏/₽',
+      'central bank today 4.34 ֏/₽',
+    ])
+    const [own, cb] = line.findAll('.beside-spot')
+    expect(own?.findAll('span:not(.beside-mark):not(.beside-own)')[0]?.attributes('style')).toBe(
+      'flex-grow: 850;',
+    )
+    expect(cb?.findAll('span:not(.beside-mark):not(.beside-cb)')[0]?.attributes('style')).toBe(
+      'flex-grow: 150;',
+    )
+    expect(line.find('.good, .bad').exists()).toBe(false)
+    // «Курс сохраняется…» is the card's own note now.
+    expect(card.get('.frozen').text()).toBe(en.money.rate_frozen)
+  })
+
+  it('must not fire: no place from the server — no line, the figure as before', async () => {
+    exchanges.mockResolvedValue(overview({ walletTrack: null }))
+    const card = (await render()).get('.rate')
+    expect(card.find('.beside').exists()).toBe(false)
+    expect(card.get('.figure').text()).toContain('4.79')
+  })
+})
+
 describe('ExchangeView: the rate and the list', () => {
   it('prints the wallet with how it was worked out and since when', async () => {
     exchanges.mockResolvedValue(overview())

@@ -1175,6 +1175,11 @@
     "list": {
       "pending_tag": "exchange offices — later",
       "no_place": "no place"
+    },
+    "my_rate_line": {
+      "mine": "mine {rate}",
+      "cb_today": "central bank today {rate}",
+      "aria": "My rate {rate}, the central bank today {cb}"
     }
   },
   "income": {

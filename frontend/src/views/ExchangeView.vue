@@ -128,6 +128,53 @@
             <p v-if="overview.wallet.estimated" class="meta">
               {{ t('exchange.estimated', { bank }) }}
             </p>
+            <!-- Where my rate stands beside the central bank's of today (MOL-348, handoff 04, Р-19): no
+                 tone — the central bank is never a verdict (MOL-187); which stands left is the server's. -->
+            <div
+              v-if="overview.walletTrack"
+              class="beside"
+              role="img"
+              :aria-label="
+                t('exchange.my_rate_line.aria', {
+                  rate: rateOf(overview.wallet.rate),
+                  cb: rateOf(overview.walletTrack.official),
+                })
+              "
+            >
+              <span class="beside-row">
+                <span :style="{ flexGrow: overview.walletTrack.own }"></span>
+                <span class="beside-mark"
+                  ><span class="beside-label">{{
+                    t('exchange.my_rate_line.mine', { rate: rateOf(overview.wallet.rate) })
+                  }}</span></span
+                >
+                <span :style="{ flexGrow: level - overview.walletTrack.own }"></span>
+              </span>
+              <span class="beside-row beside-track">
+                <span class="beside-rail"></span>
+                <span class="beside-spot">
+                  <span :style="{ flexGrow: overview.walletTrack.own }"></span>
+                  <span class="beside-mark"><span class="beside-own"></span></span>
+                  <span :style="{ flexGrow: level - overview.walletTrack.own }"></span>
+                </span>
+                <span class="beside-spot">
+                  <span :style="{ flexGrow: overview.walletTrack.officialAt }"></span>
+                  <span class="beside-mark"><span class="beside-cb"></span></span>
+                  <span :style="{ flexGrow: level - overview.walletTrack.officialAt }"></span>
+                </span>
+              </span>
+              <span class="beside-row">
+                <span :style="{ flexGrow: overview.walletTrack.officialAt }"></span>
+                <span class="beside-mark"
+                  ><span class="beside-label">{{
+                    t('exchange.my_rate_line.cb_today', {
+                      rate: rateOf(overview.walletTrack.official),
+                    })
+                  }}</span></span
+                >
+                <span :style="{ flexGrow: level - overview.walletTrack.officialAt }"></span>
+              </span>
+            </div>
           </template>
           <!-- Exchanges of the spending currency are there, its cost is not: the words say why, not
                «no exchanges yet» above a list of them (review С-4). -->
@@ -175,9 +222,8 @@
             @update:model-value="choose"
           />
           <p v-if="overview.pair" class="meta">{{ t('exchange.preference_hint', { bank }) }}</p>
+          <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
         </AppCard>
-
-        <p class="frozen"><IconCheck aria-hidden="true" />{{ t('money.rate_frozen') }}</p>
 
         <MarketRatesCard
           class="market-rates"
@@ -269,7 +315,7 @@
 import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { RATE_CHART_MONTHS, currencySign, yerevanDate } from '@molvia/model'
+import { CHART_LEVEL, RATE_CHART_MONTHS, currencySign, yerevanDate } from '@molvia/model'
 import type {
   Currency,
   CurrencyCost,
@@ -559,6 +605,7 @@ export default defineComponent({
     }
 
     return {
+      level: CHART_LEVEL,
       chosenExchange,
       latestForeign,
       figureChars,
@@ -623,9 +670,9 @@ export default defineComponent({
 
 // Each space has one owner, the group above it: with no rates of the central bank a margin of
 // «Обмены» on top of the note's made 48.
-.losses,
+.vs-market,
 .rate-chart,
-.frozen,
+.rate,
 .market-rates {
   margin-bottom: var(--space-6);
 }
@@ -633,7 +680,79 @@ export default defineComponent({
 .rate {
   /* The figure measures itself against the card (`figure-fit`, MOL-321). */
   container-type: inline-size;
-  margin-bottom: var(--space-2);
+}
+
+/* «мой — ЦБ РА сегодня» (MOL-348, handoff 04): two dots on one line, their labels over and under them,
+   each placed by the room before it and after it — the server's — and no tone. */
+.beside {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+  font-size: var(--text-footnote);
+}
+
+.beside-row {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--space-6);
+
+  > span:not(.beside-mark) {
+    flex-basis: 0;
+  }
+}
+
+.beside-track {
+  display: grid;
+  height: 16px;
+
+  > * {
+    grid-area: 1 / 1;
+  }
+}
+
+.beside-rail {
+  align-self: center;
+  height: 2px;
+  background: var(--border-strong);
+}
+
+.beside-spot {
+  display: flex;
+  align-items: center;
+
+  > span:not(.beside-mark) {
+    flex-basis: 0;
+  }
+}
+
+/* No width of its own, so a dot or a label stands centred on its place. */
+.beside-mark {
+  display: flex;
+  flex: none;
+  justify-content: center;
+  width: 0;
+}
+
+.beside-label {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.beside-own,
+.beside-cb {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+}
+
+.beside-own {
+  background: var(--text);
+}
+
+.beside-cb {
+  border: 2px solid var(--graphic);
+  background: var(--surface);
 }
 
 .rate-caption {
@@ -671,7 +790,7 @@ export default defineComponent({
   align-items: flex-start;
   gap: var(--space-2);
   padding: var(--space-3);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   font-size: var(--text-footnote);
 
   svg {
@@ -681,9 +800,9 @@ export default defineComponent({
   }
 }
 
-// A note, not «хорошо»: nothing good is reported here (Ф-4).
+// A note, not «хорошо»: nothing good is reported here (Ф-4). Inside «Мой курс» since MOL-348.
 .frozen {
-  margin-top: 0;
+  margin: var(--space-4) 0 0;
   background: var(--surface-2);
   color: var(--text-muted);
 }

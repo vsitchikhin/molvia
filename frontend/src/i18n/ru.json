@@ -1175,6 +1175,11 @@
     "list": {
       "pending_tag": "обменники — позже",
       "no_place": "без места"
+    },
+    "my_rate_line": {
+      "mine": "мой {rate}",
+      "cb_today": "ЦБ РА сегодня {rate}",
+      "aria": "Мой курс {rate}, ЦБ РА сегодня {cb}"
     }
   },
   "income": {
