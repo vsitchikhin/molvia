@@ -387,7 +387,7 @@ for (const size of ['150%', '200%'])
         ['/money', page.locator('.donut .sector-name')],
         ['/money/spendings', page.locator('.day-head')],
         ['/money/budget', page.getByRole('button', { name: 'Задать план категории' })],
-        ['/money/exchange', page.locator('article button.body')],
+        ['/money/exchange', page.locator('.rows button.list-row')],
         ['/money/incomes', page.locator('.cards button.body')],
         ['/money/charts', page.locator('.center')],
         ['/money/charts?mode=year', page.locator('.columns')],
@@ -522,9 +522,9 @@ for (const size of ['150%', '200%'])
         0,
       )
       await page.goto('/money/exchange')
-      await expect(page.locator('article button.body').first()).toBeVisible()
+      await expect(page.locator('.rows button.list-row').first()).toBeVisible()
       // «Как меняли»: «Не указано · Банк, нал · Безнал · Обменник».
-      expect(await sheetSideways(page, page.locator('article button.body').first())).toBe(0)
+      expect(await sheetSideways(page, page.locator('.rows button.list-row').first())).toBe(0)
       await page.goto('/money/accounts')
       expect(await sheetSideways(page, page.getByRole('button', { name: 'Добавить счёт' }))).toBe(0)
       await page.goto('/money/budget')

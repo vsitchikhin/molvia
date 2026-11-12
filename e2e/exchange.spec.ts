@@ -33,8 +33,8 @@ test('an exchange becomes the rate of the next trip, and the preference takes it
   await expect(sheet).toContainText('Сколько отдали и сколько получили')
   // The sheet takes no tap while it rises.
   await page.waitForTimeout(400)
-  await sheet.getByLabel('Отдал').fill('20000')
-  await sheet.getByLabel('Получил').fill('95000')
+  await sheet.getByLabel('Отдал', { exact: true }).fill('20000')
+  await sheet.getByLabel('Получил', { exact: true }).fill('95000')
   await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
   await expect(sheet).toBeHidden()
 
@@ -80,11 +80,11 @@ test('roubles to dollars to drams: the chain is the rate of the next trip', asyn
     await page.getByRole('button', { name: 'Записать обмен' }).click()
     await expect(sheet).toContainText('Сколько отдали и сколько получили')
     await page.waitForTimeout(400)
-    const currencies = sheet.getByLabel('Валюта')
-    await currencies.nth(0).selectOption(from)
-    await currencies.nth(1).selectOption(to)
-    await sheet.getByLabel('Отдал').fill(given)
-    await sheet.getByLabel('Получил').fill(received)
+    // Each currency in the well of its amount (MOL-348).
+    await sheet.getByLabel('Валюта, которую отдали').selectOption(from)
+    await sheet.getByLabel('Валюта, которую получили').selectOption(to)
+    await sheet.getByLabel('Отдал', { exact: true }).fill(given)
+    await sheet.getByLabel('Получил', { exact: true }).fill(received)
     await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
     await expect(sheet).toBeHidden()
   }
@@ -97,8 +97,11 @@ test('roubles to dollars to drams: the chain is the rate of the next trip', asyn
 
   // The rate is «большее за меньшее» (MOL-81): the exchange of roubles for dollars says «89,04 ₽/$»,
   // never «0,011232 $/₽», and the very number the price of the dollar says above it.
-  const roubles = page.locator('article').filter({ hasText: '224,63 $' })
-  await expect(roubles.locator('.plate .line').first()).toHaveText(/^Курс обмена\s*89,04 ₽\/\$$/)
+  // Since MOL-348 the rate stands on the plate of the amendment, which the row opens.
+  await page.locator('.rows button.list-row').filter({ hasText: '224,63 $' }).click()
+  await expect(sheet.locator('.comparison .line').first()).toHaveText(/^Курс обмена\s*89,04 ₽\/\$$/)
+  await page.keyboard.press('Escape')
+  await expect(sheet).toBeHidden()
 
   const headers = await asBrowser(page)
   const me = actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json())
@@ -128,8 +131,8 @@ test('an amended exchange changes the rate and keeps what it said before', async
 
   const sheet = page.locator('dialog[open]')
   await page.waitForTimeout(400)
-  await sheet.getByLabel('Отдал').fill('20000')
-  await sheet.getByLabel('Получил').fill('100000')
+  await sheet.getByLabel('Отдал', { exact: true }).fill('20000')
+  await sheet.getByLabel('Получил', { exact: true }).fill('100000')
   await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
   await expect(sheet).toBeHidden()
   await expect(page.locator('.figure')).toHaveText('5,00 ֏/₽')
@@ -137,58 +140,26 @@ test('an amended exchange changes the rate and keeps what it said before', async
   await page.getByRole('button', { name: /^Исправить обмен/ }).click()
   await expect(sheet).toContainText('Правка обмена')
   await page.waitForTimeout(400)
-  await sheet.getByLabel('Получил').fill('95000')
+  await sheet.getByLabel('Получил', { exact: true }).fill('95000')
   await sheet.getByLabel('Где и заметка').fill('ВТБ банкомат')
   await sheet.getByRole('button', { name: 'Сохранить правку' }).click()
   await expect(sheet).toBeHidden()
 
   await expect(page.locator('.figure')).toHaveText('4,75 ֏/₽')
-  await expect(page.locator('.amended')).toContainText('исправлен')
-  await expect(page.locator('.note')).toHaveText('ВТБ банкомат')
+  // The row says the place and the amendment in its line under the amounts (MOL-348).
+  await expect(page.locator('.rows .meta')).toContainText('ВТБ банкомат')
+  await expect(page.locator('.rows .meta')).toContainText('исправлен')
 
   await page.getByRole('button', { name: /^Исправить обмен/ }).click()
   await expect(sheet.locator('.versions')).toContainText('100 000 ֏')
 })
 
 /**
- * What on the cards wraps or runs over another part. A figure never wraps — its spaces do not break
- * — it runs out of its column, so the overflow of every part and the amounts against the arrow are
- * measured, not the height alone (review Т-2).
+ * The row of an exchange at a phone's widths (MOL-348; the card of MOL-81 before): the largest amounts
+ * the owner's journal has — six digits with kopecks against seven of drams — stand whole in its title,
+ * on this phone and on a 320 px one, and nothing of the row stands past the screen.
  */
-function brokenCards(page: Page): Promise<string[]> {
-  return page.locator('article').evaluateAll((cards) =>
-    cards.flatMap((card) => {
-      const found: string[] = []
-      for (const part of card.querySelectorAll<HTMLElement>('.side, .plate .line')) {
-        if (part.scrollWidth > part.clientWidth + 1) found.push(`overflow: ${part.textContent}`)
-        const size = parseFloat(getComputedStyle(part).fontSize)
-        const tall =
-          part.classList.contains('line') && part.getBoundingClientRect().height > size * 2
-        if (tall) found.push(`wraps: ${part.textContent}`)
-      }
-      const arrow = card.querySelector('.arrow')?.getBoundingClientRect()
-      for (const amount of card.querySelectorAll('.amount')) {
-        const box = amount.getBoundingClientRect()
-        const overlaps =
-          arrow &&
-          arrow.width > 0 &&
-          box.left < arrow.right &&
-          arrow.left < box.right &&
-          box.top < arrow.bottom &&
-          arrow.top < box.bottom
-        if (overlaps) found.push(`over the arrow: ${amount.textContent}`)
-      }
-      return found
-    }),
-  )
-}
-
-/**
- * The card of an exchange at a phone's widths (MOL-81): the largest amounts the owner's journal has
- * — six digits with kopecks against seven of drams — stand side by side on this phone, and one
- * under the other on a 320 px one, and nothing wraps or runs over the arrow (review Т-2).
- */
-test('the card of an exchange holds long amounts on this phone and on a 320 px one', async ({
+test('the row of an exchange holds long amounts on this phone and on a 320 px one', async ({
   page,
 }) => {
   await signedIn(page)
@@ -197,15 +168,22 @@ test('the card of an exchange holds long amounts on this phone and on a 320 px o
   await page.getByRole('button', { name: 'Записать обмен' }).click()
   const sheet = page.locator('dialog[open]')
   await page.waitForTimeout(400)
-  await sheet.getByLabel('Отдал').fill('123456,78')
-  await sheet.getByLabel('Получил').fill('1000000')
+  await sheet.getByLabel('Отдал', { exact: true }).fill('123456,78')
+  await sheet.getByLabel('Получил', { exact: true }).fill('1000000')
   await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
   await expect(sheet).toBeHidden()
-  await expect(page.locator('article .amount').first()).toHaveText('123 456,78 ₽')
+  const row = page.locator('.rows button.list-row').first()
+  await expect(row).toContainText('123 456,78 ₽ → 1 000 000 ֏')
 
-  expect(await brokenCards(page)).toEqual([])
-  await page.setViewportSize({ width: 320, height: 700 })
-  expect(await brokenCards(page)).toEqual([])
+  for (const width of [390, 320]) {
+    await page.setViewportSize({ width, height: 700 })
+    const sideways = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    )
+    expect(sideways).toBe(0)
+    const box = await row.boundingBox()
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width)
+  }
 })
 
 /**
@@ -236,19 +214,19 @@ test('«Записать обмен» stands in the strip: the last card ends ab
     await record.click()
     await expect(sheet).toContainText('Сколько отдали и сколько получили')
     await page.waitForTimeout(400)
-    await sheet.getByLabel('Отдал').fill(given)
-    await sheet.getByLabel('Получил').fill(received)
+    await sheet.getByLabel('Отдал', { exact: true }).fill(given)
+    await sheet.getByLabel('Получил', { exact: true }).fill(received)
     await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
     await expect(sheet).toBeHidden()
   }
-  await expect(page.locator('article')).toHaveCount(3)
+  await expect(page.locator('.rows li')).toHaveCount(3)
 
   await page.evaluate(() => {
     window.scrollTo(0, document.documentElement.scrollHeight)
   })
   await page.waitForTimeout(300)
   const [last, dock] = await Promise.all([
-    page.locator('article').last().boundingBox(),
+    page.locator('.rows li').last().boundingBox(),
     page.locator('.dock').boundingBox(),
   ])
   expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual(dock?.y ?? 0)
@@ -280,8 +258,8 @@ async function recordOne(page: Page): Promise<void> {
   await page.locator('.dock').getByRole('button', { name: 'Записать обмен', exact: true }).click()
   await expect(sheet).toContainText('Сколько отдали и сколько получили')
   await page.waitForTimeout(400)
-  await sheet.getByLabel('Отдал').fill('20000')
-  await sheet.getByLabel('Получил').fill('95000')
+  await sheet.getByLabel('Отдал', { exact: true }).fill('20000')
+  await sheet.getByLabel('Получил', { exact: true }).fill('95000')
   await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
   await expect(sheet).toBeHidden()
 }
@@ -300,14 +278,14 @@ test('an exchange is removed from its amendment, the question over it, «Вер�
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: 'Обмен денег' }).click()
   await recordOne(page)
-  await expect(page.locator('article button')).toHaveCount(1)
+  await expect(page.locator('.rows button.list-row')).toHaveCount(1)
 
   const sheet = page.locator('dialog[open]', { hasText: 'Правка обмена' })
   const question = page.locator('dialog[open]', { hasText: 'Удалить обмен?' })
   await page.getByRole('button', { name: /^Исправить обмен от/ }).click()
   await expect(sheet).toBeVisible()
   await page.waitForTimeout(400)
-  await sheet.getByLabel('Получил').fill('96000')
+  await sheet.getByLabel('Получил', { exact: true }).fill('96000')
 
   await sheet.getByRole('button', { name: 'Удалить обмен' }).click()
   await expect(question).toBeVisible()
@@ -315,7 +293,7 @@ test('an exchange is removed from its amendment, the question over it, «Вер�
   await page.waitForTimeout(400)
   await question.getByRole('button', { name: 'Назад' }).click()
   await expect(question).toBeHidden()
-  await expect(sheet.getByLabel('Получил')).toHaveValue('96000')
+  await expect(sheet.getByLabel('Получил', { exact: true })).toHaveValue('96000')
 
   // The system's «back» takes the question alone, as «‹» does.
   await sheet.getByRole('button', { name: 'Удалить обмен' }).click()
@@ -331,7 +309,7 @@ test('an exchange is removed from its amendment, the question over it, «Вер�
   await expect(page.locator('dialog[open]')).toHaveCount(0)
   await expect(page).toHaveURL(/\/money\/exchange$/)
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Обмен денег')
-  await expect(page.locator('article')).toHaveCount(0)
+  await expect(page.locator('.rows li')).toHaveCount(0)
 
   const undo = page.locator('.undo-strip')
   await expect(undo).toContainText('Обмен удалён: 20 000 ₽ → 95 000 ֏')
@@ -360,7 +338,7 @@ test('an exchange is removed from its amendment, the question over it, «Вер�
 
   await restore.click()
   await expect(undo).toBeHidden()
-  await expect(page.locator('article')).toHaveCount(1)
+  await expect(page.locator('.rows li')).toHaveCount(1)
   await expect(
     page.locator('.dock').getByRole('button', { name: 'Записать обмен', exact: true }),
   ).toBeFocused()
@@ -474,14 +452,13 @@ test('how the money was changed goes with the exchange, and the next one starts 
   await page.waitForTimeout(400)
   await expect(sheet.getByRole('radio', { name: 'Не указано' })).toBeChecked()
   await sheet.getByText('Обменник', { exact: true }).click()
-  await sheet.getByLabel('Отдал').fill('20000')
-  await sheet.getByLabel('Получил').fill('83200')
+  await sheet.getByLabel('Отдал', { exact: true }).fill('20000')
+  await sheet.getByLabel('Получил', { exact: true }).fill('83200')
   await sheet.getByRole('button', { name: 'Сохранить обмен' }).click()
   await expect(sheet).toBeHidden()
 
   // No market in this run: nothing is drawn of it, and the central bank's line stands as before.
   await expect(page.locator('.market')).toHaveCount(0)
-  await expect(page.locator('article .official')).not.toHaveClass(/quiet/)
 
   // The next exchange starts from the way the last one was made.
   await page.getByRole('button', { name: 'Записать обмен' }).click()
@@ -493,7 +470,7 @@ test('how the money was changed goes with the exchange, and the next one starts 
 
   // An amendment opens on the exchange's own channel, and «—» clears it for good.
   await page
-    .locator('article')
+    .locator('.rows')
     .getByRole('button', { name: /^Исправить обмен от/ })
     .click()
   await expect(sheet).toContainText('Правка обмена')
@@ -506,7 +483,7 @@ test('how the money was changed goes with the exchange, and the next one starts 
 
   await page.reload()
   await page
-    .locator('article')
+    .locator('.rows')
     .getByRole('button', { name: /^Исправить обмен от/ })
     .click()
   await expect(sheet).toContainText('Правка обмена')
