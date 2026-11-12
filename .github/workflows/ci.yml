@@ -13,6 +13,9 @@ concurrency:
 permissions:
   contents: read
 
+# The ruleset of master requires every job's name below, the gates' and the shards' alike (MOL-402): a name or the
+# count of shards changed is the ruleset changed the same day, or the release's pull request waits for a check
+# that never comes.
 jobs:
   static:
     name: format, lint, types
