@@ -140,7 +140,8 @@ jobs:
 
   # The name the ruleset of master requires (MOL-164), over the two jobs it was split into (MOL-375):
   # `always()`, since a required job skipped counts as passed, and red unless both succeeded — failed,
-  # cancelled and skipped alike.
+  # cancelled and skipped alike. No result at all is `none`, red: a gate whose `needs:` went would
+  # otherwise loop over nothing and pass at once (adversarial Б1).
   check:
     name: format, lint, types, tests
     needs: [static, tests]
@@ -152,7 +153,7 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "static, tests: $RESULTS"
-          for result in $RESULTS; do [ "$result" = success ] || exit 1; done
+          for result in ${RESULTS:-none}; do [ "$result" = success ] || exit 1; done
 
   # Four shards side by side (MOL-375, В-1 «а»): on one runner the suite took 21–23 minutes. Playwright
   # splits by the count of tests, in the order of the projects, and never splits a project others depend on:
@@ -206,7 +207,10 @@ jobs:
           SHARD: ${{ matrix.shard }}
           INDEX: ${{ strategy.job-index }}
         run: |
-          [ "$SHARD" = "$((INDEX + 1))" ] || { echo "leg $((INDEX + 1)) of the matrix names shard $SHARD"; exit 1; }
+          if [ "$SHARD" != "$((INDEX + 1))" ]; then
+            echo "leg $((INDEX + 1)) of the matrix names shard $SHARD"
+            exit 1
+          fi
 
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The image's Node is 24; ours is .nvmrc's.
@@ -254,4 +258,4 @@ jobs:
           RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
           echo "shards: $RESULTS"
-          for result in $RESULTS; do [ "$result" = success ] || exit 1; done
+          for result in ${RESULTS:-none}; do [ "$result" = success ] || exit 1; done

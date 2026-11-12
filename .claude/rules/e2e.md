@@ -25,28 +25,27 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   spec being written, or a change the agent wants seen before it leaves the machine.
 
 - **CI runs end-to-end as four shards side by side** (MOL-375, owner's В-1 «а»): on one runner with two
-  workers the suite took 21–23 minutes of the 23–24 a pull request waited, and every round of review waited
-  it again. `--shard=i/4` of a matrix, `fail-fast: false` — a red shard cancels no other, whose flakes and
-  traces are wanted too — each shard with its own Postgres, stack and build, its traces as
-  `playwright-traces-<i>`; `failOnFlakyTests` is the config's, so every shard holds it. **The count of
-  shards is written once, in the matrix** (adversarial А1): the total is its count of legs,
-  `strategy.job-total`, and a first step holds each leg to its place — `[1, 2, 2, 4]` fails in seconds
-  instead of running shard 3 nowhere, green; three copies of the number dropped up to 163 tests with every
-  check green. **The check the
+  workers the suite took 21–23 minutes of the 23–24 a pull request waited, and every round of review waited it
+  again. `--shard=<i>/<total>` of a matrix, `fail-fast: false` — a red shard cancels no other, whose flakes
+  and traces are wanted too — each shard with its own Postgres, stack and build, its traces as
+  `playwright-traces-<i>`; `failOnFlakyTests` is the config's, so every shard holds it. **The count of shards
+  is written once, in the matrix** (adversarial А1): the total is its count of legs, `strategy.job-total`, and
+  a first step holds each leg to its place — `[1, 2, 2, 4]` fails in seconds instead of running shard 3
+  nowhere, green; three copies of the number dropped up to 163 tests with every check green. **The check the
   ruleset requires is a gate job named «end-to-end»** over the shards, `if: always()` and red unless all of
   them succeeded: a required job skipped counts as passed. **Playwright splits by the count of tests, in the
   order of the projects, and never splits a project others depend on**: `pwa`, with `pwa-update.spec` in
   series, is taken out of the split and runs whole in every shard holding `csp-built` (`pwa-camera`,
   `pwa-iphone`), on that shard's own build — read in Playwright's source, `filterForShard` and
   `createRootSuite`. On 12.11.2026, of 634 tests, shards 1–3 held 157 of `phone` each and shard 4 the rest of
-  `phone`, `camera`, `pwa` and `csp-built`, and `iphone`. A boundary falling inside `csp-built` would run `pwa`
-  in two shards on two builds: right, a minute more. **Workers stay two** (В-2 «а»): the stack shares the
-  runner's four cores with the browsers (the login under load, below). **The prices, named:** eight jobs a run
-  where there were two — GitHub's free plan runs twenty at once for the account, so copies pushing together
-  queue; each shard pays the image, `npm ci` and the stack again; the split is by count, not time, so the
-  heaviest shard sets the pace. **Measured** on one commit, three runs of 12.11.2026 (run 43180391496): green
-  in 7:57, 8:33 and 8:23 against 23–24 minutes in the twelve runs before; the shards 5.3–7.9 minutes, no flake;
-  the tests' job 6.5–8.4 minutes, in two of the three the longest path.
+  `phone`, `camera`, `pwa` and `csp-built`, and `iphone`. A boundary falling inside `csp-built` would run
+  `pwa` in two shards on two builds: right, a minute more. **Workers stay two** (В-2 «а»): the stack shares
+  the runner's four cores with the browsers (the login under load, below). **The prices, named:** eight jobs a
+  run where there were two — GitHub's free plan runs twenty at once for the account, so copies pushing
+  together queue; each shard pays the image, `npm ci` and the stack again; the split is by count, not time, so
+  the heaviest shard sets the pace. **Measured** on one commit, three runs of 12.11.2026 (run 43180391496):
+  green in 7:57, 8:33 and 8:23 against 23–24 minutes in the twelve runs before; the shards 5.3–7.9 minutes, no
+  flake; the tests' job 6.5–8.4 minutes, in two of the three the longest path.
 
 - **CI runs end-to-end in the image of Playwright, `mcr.microsoft.com/playwright:v<version>-noble`**
   (MOL-295). Until then the job installed the browsers with `--with-deps` on every run: the browsers
@@ -79,16 +78,16 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
     (adversarial А4). Both are checked, and a run given them says where the databases are.
   - The image's Node is 24; `setup-node` keeps `.nvmrc`'s. The job runs as the runner's uid
     (`--user 1001`, as Playwright's documentation has it).
-  - **A shard has 25 minutes and its tests 20** (`timeout-minutes`, В-2 «а»; the one job had 40 and 35
-    until MOL-375): a hung step was held for six hours. The job's limit cancels it, and with
-    `if: failure()` a cancelled job uploaded nothing — the traces already written went with the
-    container (adversarial А5). **The upload runs on `failure() || cancelled()`**: a slow pull or
-    `npm ci` leaves the tests less than their 20 minutes, and the job's limit comes first (Б2) — cancelled by it, the job still uploaded its traces
-    (run 40326400563, attempt 2). The step's own limit makes a hung run end failed, not cancelled —
+  - **A shard has 25 minutes and its tests 20** (`timeout-minutes`, В-2 «а»; the one job had 40 and 35 until
+    MOL-375): a hung step was held for six hours. The job's limit cancels it, and with `if: failure()` a
+    cancelled job uploaded nothing — the traces already written went with the container (adversarial А5).
+    **The upload runs on `failure() || cancelled()`**: a slow pull or `npm ci` leaves the tests less than
+    their 20 minutes, and the job's limit comes first (Б2) — cancelled by it, the job still uploaded its
+    traces (run 40326400563, attempt 2). The step's own limit makes a hung run end failed, not cancelled —
     which reads as a newer push (run 40313375737). **The prices, named:** the step is killed with no
-    summary, so a test hung with no timeout of its own is named nowhere — every spec keeps one, and
-    none sets `0`; not `globalTimeout`, which waits as long again for a hung worker's teardown. And a
-    run a newer push cancels uploads what it wrote too, kept seven days.
+    summary, so a test hung with no timeout of its own is named nowhere — every spec keeps one, and none
+    sets `0`; not `globalTimeout`, which waits as long again for a hung worker's teardown. And a run a newer
+    push cancels uploads what it wrote too, kept seven days.
   - **The prices, named:** the image, 956 MB compressed, is pulled on every run — 27 s on the first
     run, the containers up in 39–41 s against 12–14 (26.10.2026), in place of apt's half-minute and
     the cache's six seconds, so an ordinary run is no shorter, and the win is the tail. The tests took

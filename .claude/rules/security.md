@@ -185,33 +185,33 @@ by itself; the owner's decisions are В-1…В-5 in `.scratch/tasks/plans/MOL-36
   `docker run …@sha256` of a workflow neither does; their actions would have been code of third authors beside
   `packages: write`, which `allowed_actions` keeps out (MOL-364).
 - **gitleaks reads every commit of a pull request** (`HEAD^1..HEAD^2` of the merge CI checks out), first in the job
-  `static`, «format, lint, types» (MOL-375 split `check`, a gate job keeping the name the ruleset requires) — red
-  in seconds is the point. **A commit, not the diff**: a secret removed by the next commit is public in its ref all the same, so the step stays red until the secret is
-  rotated by its row of «Rotating the secrets» and its fingerprint goes into `.gitleaksignore` with a line of what
-  it was and the day (Р-4) — a record, never a rewrite. `--redact`: the log of a public repository is public. A push
-  to master is not read: master takes pull requests alone. **gitleaks says «no leaks found» and exits 0 when its git
-  cannot read the range** (seen on a worktree whose `.git` the container did not have), so the same git of the same
-  image counts the range first and fails the step where it cannot — a run that is no merge included. **A merge of
-  master in the branch is read by what it brought** (adversarial А1): `git log -p` shows a merge no diff, and a
-  conflict resolved by hand is exactly where a token is typed — so `--diff-merges=first-parent`, master's changes
-  read again with the hand's; `--remerge-diff`, the hand's alone, writes objects into a checkout mounted read-only.
-  **A file git calls binary is read as text** (`--text`, А3): a NUL or `-diff` in a `.gitattributes` of the same
-  pull request hid a `.env`. **A commit's message is read too** (А6), as public as its diff and out of gitleaks' git
-  mode: a file per commit through `gitleaks dir`, its fingerprint `/messages/<commit>:<rule>:<line>`.
-  **`gitleaks:allow` in a line silences nothing** (`--ignore-gitleaks-allow`, А2): a comment in code is no change of
-  the configuration review watches. **Its rules are its defaults and ours** (`.gitleaks.toml`): a ping URL of
-  healthchecks.io, and a Telegram bot's token by its shape alone — the default wants `telegr…` in the name beside
-  it, and the local check of the red path passed `const TOKEN = '…'` until this rule — bounded on the left alone, by
-  what is no digit, not `\b`: Bot API's address puts it after `…/bot` (А4), its last sign may be `-` (А5), and a
-  bound on the right took the comma before a second token, which then went unfound and unredacted (В1). **A test's
-  value is let go by its value, for the generic rule alone** (Р-2): a path such as `*.test.ts` would pass a real
-  token pasted into a test, and a pattern given to every rule would silence the ping URL, whose path is a uuid. On
-  10.11.2026 the history of master held sixteen such findings and every branch the audit's thirty-three: none after
-  the allowlist. **The prices, named:** the configuration is the pull request's own, so a pull request may loosen it
-  for itself — a change of `.gitleaks.toml`, `.gitleaksignore` or `.gitattributes` is review's; only what a rule
-  knows is found, and a binary's text only where it lies bare (a zip or an xlsx is compressed); a merge of master
-  reads what master brought again, so a secret rotated and left in a file reddens every branch merging it — the
-  secret goes out of the file with its rotation.
+  `static`, «format, lint, types» (MOL-375 split `check`, a gate job keeping the name the ruleset requires) — red in
+  seconds is the point. **A commit, not the diff**: a secret removed by the next commit is public in its ref all the
+  same, so the step stays red until the secret is rotated by its row of «Rotating the secrets» and its fingerprint
+  goes into `.gitleaksignore` with a line of what it was and the day (Р-4) — a record, never a rewrite. `--redact`:
+  the log of a public repository is public. A push to master is not read: master takes pull requests alone.
+  **gitleaks says «no leaks found» and exits 0 when its git cannot read the range** (seen on a worktree whose `.git`
+  the container did not have), so the same git of the same image counts the range first and fails the step where it
+  cannot — a run that is no merge included. **A merge of master in the branch is read by what it brought**
+  (adversarial А1): `git log -p` shows a merge no diff, and a conflict resolved by hand is exactly where a token is
+  typed — so `--diff-merges=first-parent`, master's changes read again with the hand's; `--remerge-diff`, the hand's
+  alone, writes objects into a checkout mounted read-only. **A file git calls binary is read as text** (`--text`,
+  А3): a NUL or `-diff` in a `.gitattributes` of the same pull request hid a `.env`. **A commit's message is read
+  too** (А6), as public as its diff and out of gitleaks' git mode: a file per commit through `gitleaks dir`, its
+  fingerprint `/messages/<commit>:<rule>:<line>`. **`gitleaks:allow` in a line silences nothing**
+  (`--ignore-gitleaks-allow`, А2): a comment in code is no change of the configuration review watches. **Its rules
+  are its defaults and ours** (`.gitleaks.toml`): a ping URL of healthchecks.io, and a Telegram bot's token by its
+  shape alone — the default wants `telegr…` in the name beside it, and the local check of the red path passed
+  `const TOKEN = '…'` until this rule — bounded on the left alone, by what is no digit, not `\b`: Bot API's address
+  puts it after `…/bot` (А4), its last sign may be `-` (А5), and a bound on the right took the comma before a second
+  token, which then went unfound and unredacted (В1). **A test's value is let go by its value, for the generic rule
+  alone** (Р-2): a path such as `*.test.ts` would pass a real token pasted into a test, and a pattern given to every
+  rule would silence the ping URL, whose path is a uuid. On 10.11.2026 the history of master held sixteen such
+  findings and every branch the audit's thirty-three: none after the allowlist. **The prices, named:** the
+  configuration is the pull request's own, so a pull request may loosen it for itself — a change of `.gitleaks.toml`,
+  `.gitleaksignore` or `.gitattributes` is review's; only what a rule knows is found, and a binary's text only where
+  it lies bare (a zip or an xlsx is compressed); a merge of master reads what master brought again, so a secret
+  rotated and left in a file reddens every branch merging it — the secret goes out of the file with its rotation.
 - **`npm audit` of what ships is judged by `bin/npm-audit.mjs`** in `static` (owner's В-4 «б»): a high or critical
   advisory is red unless `bin/npm-audit-accepted.json` accepts it — its GHSA, the reason and the day to look again,
   a day of the calendar a year ahead at most (adversarial Б2), red once more the day after. **What ships is read
