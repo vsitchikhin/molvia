@@ -12,7 +12,7 @@ on:
   workflow_call:
     inputs:
       tag:
-        description: 'Image tag to scan: sha-<7 hex> or v<N>.<N>.<N>'
+        description: 'Image tag to scan: sha-<7 hex>, v<N>.<N>.<N>, v<N>.<N>.<N>-<name> or v<N>.<N>.<N>-<name>-<k>'
         type: string
         required: true
   workflow_dispatch:
