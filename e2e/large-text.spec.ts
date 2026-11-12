@@ -512,6 +512,37 @@ for (const size of ['150%', '200%'])
       ).toBeLessThanOrEqual(0.5)
     })
 
+    // «мой — ЦБ РА сегодня» under «Мой курс» (MOL-348): end to end has no rate of the central bank, so the
+    // server sends no line — the answer is given one, the dots at the ends, as `walletTrack` puts them apart.
+    // Centred on its dot, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 % (adversarial Б1).
+    test('the line «мой — ЦБ РА» under «Мой курс» stands within its card', async ({ page }) => {
+      await page.route('**/api/exchanges', async (route) => {
+        if (route.request().method() !== 'GET') return route.continue()
+        const response = await route.fetch()
+        const json = (await response.json()) as Record<string, unknown> & {
+          wallet?: { rate: Record<string, unknown> } | null
+        }
+        const own = json.wallet?.rate
+        if (own)
+          json.walletTrack = {
+            official: { ...own, rate: '4.902000', source: 'official' },
+            own: 150,
+            officialAt: 850,
+          }
+        await route.fulfill({ response, json })
+      })
+      await signedIn(page)
+      await post(page, '/api/exchanges', {
+        id: randomUUID(),
+        given: { amount: '20000', currency: 'RUB' },
+        received: { amount: '97420', currency: 'AMD' },
+        exchangedOn: day(1),
+      })
+      await page.goto('/money/exchange')
+      expect(await pageSideways(page, page.locator('.wallet-line .label'))).toBe(0)
+      expect(await pastCard(page, '.wallet-line .label')).toBeLessThanOrEqual(0.5)
+    })
+
     test('the sheets of «Деньги» stand within the phone', async ({ page }) => {
       test.setTimeout(90_000)
       await signedIn(page)

@@ -477,6 +477,8 @@ export default defineComponent({
         chosenKey.value = id
         round = null
       },
+      // The screen's choice as the line comes up too: the default it names for both blocks (Б2).
+      { immediate: true },
     )
     // A new answer or another period moves the dots — a scale grown with a new rate, another span
     // — and a round of the old places would turn over dots no longer under the finger (adversarial Р).

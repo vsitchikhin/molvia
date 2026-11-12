@@ -355,11 +355,12 @@ export default defineComponent({
     const { rateOf, day, amountsOf, rateLineOf } = useExchangeWords()
     // «Сегодня» of the cards, asked again when the app comes back into view (MOL-121, adversarial Н).
     const today = useLocalDay()
-    /** The exchange chosen on «Обмены против рынка» (MOL-348); null — the card's own default. */
     /**
      * The exchange chosen on the screen (MOL-348): a bar chooses it on the line of the rate as well — a
      * new `chartChoice` each time, so the same bar again comes back after a dot chosen there (А4) — and a
-     * dot chosen there chooses its bar.
+     * dot chosen there chooses its bar. Until anything is chosen, both stand on the latest exchange of the
+     * twelve months, the line's own default (MOL-161) — one screen, one exchange (adversarial Б2: the bars
+     * took the latest compared, and a fresh exchange with no market of its day yet parted them).
      */
     const chosenExchange = ref<string | null>(null)
     const chartChoice = ref<{ readonly id: string } | null>(null)
@@ -367,6 +368,14 @@ export default defineComponent({
       chosenExchange.value = id
       chartChoice.value = { id }
     }
+    const latestExchange = computed(() => exchanges.overview.value?.bars?.at(-1)?.id ?? null)
+    watch(
+      latestExchange,
+      (id) => {
+        if (chosenExchange.value === null && id !== null) chartChoice.value = { id }
+      },
+      { immediate: true },
+    )
     /** The currency of the latest exchange against the dram, which «Курсы по данным ЦБ РА» shows first. */
     const latestForeign = computed<Currency | null>(() => {
       for (const exchange of exchanges.overview.value?.exchanges ?? []) {

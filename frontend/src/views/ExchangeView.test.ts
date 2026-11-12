@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ApiError } from '@molvia/client'
 import { ERROR, parseRate, yerevanMidnight } from '@molvia/model'
 import type {
+  ExchangeRateChartView,
   ExchangeAmendBody,
   ExchangeBody,
   ExchangeView as Row,
@@ -355,6 +356,11 @@ describe('ExchangeView: «Мой курс» beside the central bank (MOL-348)', 
     expect(line.findAll('.label').map((label) => label.text())).toEqual([
       'mine 4.79 ֏/₽',
       'central bank today 4.34 ֏/₽',
+    ])
+    // Each label at its dot's end of the line, never centred past the card (adversarial Б1).
+    expect(line.findAll('.labels').map((labels) => labels.classes())).toEqual([
+      ['labels', 'end'],
+      ['labels', 'start'],
     ])
     // Each dot by the room before it, the server's: mine, then the central bank.
     const [own, cb] = line.findAll('.line .track-spot')
@@ -1870,5 +1876,137 @@ describe('ExchangeView: «Курс рубля за месяц, 6 и 12 меся�
     exchanges.mockResolvedValue(overview({ rateCharts: null }))
     const view = await render()
     expect(view.find('.rate-chart').exists()).toBe(false)
+  })
+})
+
+describe('ExchangeView: one exchange chosen for the whole screen (MOL-348)', () => {
+  const A = 'a0000000-0000-4000-8000-000000000001'
+  const B = 'a0000000-0000-4000-8000-000000000003'
+  const amd = (minor: bigint) => ({ minor, currency: 'AMD' as const })
+  const point = (id: string, day: string, step: number, x: number) => ({
+    id,
+    day,
+    step,
+    x,
+    rate: rate('4.58', day),
+    level: 400,
+    place: null,
+    percent: -40,
+    sign: -1 as const,
+    market: { rate: rate('4.598', day, 'official'), level: 430, basis: 'bankCash' as const },
+  })
+  const rateCharts: ExchangeRateChartView = {
+    pairs: [
+      {
+        currency: 'RUB',
+        side: 'bankBuys',
+        periods: {
+          1: null,
+          6: null,
+          12: {
+            step: 'week',
+            steps: [
+              {
+                day: '2026-02-08',
+                rate: rate('4.90', '2026-02-06', 'official'),
+                x: 0,
+                level: 1000,
+              },
+              {
+                day: '2026-02-15',
+                rate: rate('4.80', '2026-02-13', 'official'),
+                x: 250,
+                level: 800,
+              },
+              {
+                day: '2026-02-22',
+                rate: rate('4.70', '2026-02-20', 'official'),
+                x: 500,
+                level: 600,
+              },
+              {
+                day: '2026-03-01',
+                rate: rate('4.60', '2026-02-27', 'official'),
+                x: 750,
+                level: 450,
+              },
+              {
+                day: '2026-03-08',
+                rate: rate('4.30', '2026-03-06', 'official'),
+                x: 1000,
+                level: 0,
+              },
+            ],
+            exchanges: [
+              point(A, '2026-02-10', 1, 71),
+              // B — today's exchange: no market of its day yet, a dot with no mark.
+              { ...point(B, '2026-02-28', 3, 714), percent: null, sign: null, market: null },
+            ],
+            levels: [
+              { rate: rate('4.30', '2026-03-04', 'official'), level: 0 },
+              { rate: rate('4.90', '2026-03-04', 'official'), level: 1000 },
+            ],
+          },
+        },
+      },
+    ],
+  }
+  const answer = overview({
+    exchanges: [
+      row({ id: B, exchangedOn: '2026-02-28' }),
+      row({ id: A, exchangedOn: '2026-02-10' }),
+    ],
+    losses: {
+      total: amd(-100_00n),
+      uncounted: 1,
+      groups: [{ place: null, count: 1, difference: amd(-100_00n), percent: -40, level: -1000 }],
+    },
+    bars: [
+      {
+        id: A,
+        exchangedOn: '2026-02-10',
+        place: null,
+        difference: amd(-100_00n),
+        percent: -40,
+        sign: -1,
+        level: -1000,
+      },
+      {
+        id: B,
+        exchangedOn: '2026-02-28',
+        place: null,
+        difference: null,
+        percent: null,
+        sign: null,
+        level: 0,
+      },
+    ],
+    rateCharts,
+  })
+  const plate = (view: VueWrapper) => view.get('.vs-market .plate-where').text()
+  const onChart = (view: VueWrapper) => view.get('.rate-chart .mine-rate').text()
+
+  it('opens with the bars and the line on the same exchange, the latest, compared or not (Б2)', async () => {
+    exchanges.mockResolvedValue(answer)
+    const view = await render()
+    expect(plate(view)).toContain('Feb 28')
+    expect(onChart(view)).toContain('Feb 28')
+  })
+
+  it('a bar, a dot there, the same bar again: the line comes back to it, and the bars follow the dot (А4)', async () => {
+    exchanges.mockResolvedValue(answer)
+    const view = await render()
+    const radios = () => view.findAll('.vs-market .cell input')
+    await radios()[0]?.trigger('click')
+    expect(plate(view)).toContain('Feb 10')
+    expect(onChart(view)).toContain('Feb 10')
+    const toB = view
+      .findAll('.rate-chart input[type="radio"]')
+      .find((radio) => radio.attributes('aria-label')?.includes('February 28'))
+    await toB?.setValue(true)
+    expect(onChart(view)).toContain('Feb 28')
+    expect(plate(view)).toContain('Feb 28')
+    await radios()[0]?.trigger('click')
+    expect(onChart(view)).toContain('Feb 10')
   })
 })

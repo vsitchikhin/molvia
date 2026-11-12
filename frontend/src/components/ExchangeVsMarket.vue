@@ -55,7 +55,6 @@
               :value="bar.id"
               :checked="bar.id === chosenId"
               :aria-label="labelOf(bar)"
-              @change="choose(bar.id)"
               @click="choose(bar.id)"
             />
             <span class="half up" :style="{ height: `${upShare}%` }" aria-hidden="true">
@@ -259,21 +258,28 @@ export default defineComponent({
       return { height: `max(${String(LEAST_PX)}px, ${String(share)}%)` }
     }
 
+    // The screen names the choice — the latest exchange by default, as the line of the rate (Б2) — and
+    // the card falls back to the same only for a choice it has no bar of.
     const chosenId = computed(() => {
       if (props.chosen && props.bars.some(({ id }) => id === props.chosen)) return props.chosen
-      const measured = props.bars.filter(({ sign }) => sign !== null)
-      return (measured.at(-1) ?? props.bars.at(-1))?.id ?? null
+      return props.bars.at(-1)?.id ?? null
     })
     const chosenBar = computed(() => props.bars.find(({ id }) => id === chosenId.value) ?? null)
     const choose = (id: string) => {
       emit('update:chosen', id)
     }
 
-    /** The bar under the pointer: the field is cut into as many columns as there are bars. */
-    const pointer = useChartPointer(area, (fraction) => {
+    /**
+     * One action, one choice (review №16): a tap and a key reach the radio as its `click` — the bar
+     * already chosen too, so the line of the rate comes back to it (А4) — and the field takes only a
+     * finger sliding along the bars, a bar as it comes under it. The field is cut into as many columns
+     * as there are bars.
+     */
+    const pointer = useChartPointer(area, (fraction, point) => {
+      if (point.tap) return
       const n = props.bars.length
       const bar = props.bars[Math.min(n - 1, Math.floor(fraction * n))]
-      if (bar) choose(bar.id)
+      if (bar && bar.id !== chosenId.value) choose(bar.id)
     })
 
     const widest = computed(() =>

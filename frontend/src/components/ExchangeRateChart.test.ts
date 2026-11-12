@@ -974,6 +974,19 @@ describe('ExchangeRateChart: in step with «Обмены против рынка
     expect(view.get('.mine-rate').text()).toBe(before)
   })
 
+  it('takes the screen’s choice as it comes up: one exchange for both blocks (Б2)', () => {
+    const view = mount(ExchangeRateChart, {
+      props: {
+        chart: { pairs: [rouble()] },
+        months: 12,
+        choice: { id: 'a0000000-0000-4000-8000-000000000001' },
+      },
+      global: { plugins: [createAppI18n('ru')] },
+    })
+    // Not the line's own default, the latest: the exchange the screen named.
+    expect(plain(view.get('.mine-rate').text())).toContain('10 февр.')
+  })
+
   it('must not fire: an exchange of no pair drawn changes nothing', async () => {
     const { view } = chart()
     const before = view.get('.mine-rate').text()

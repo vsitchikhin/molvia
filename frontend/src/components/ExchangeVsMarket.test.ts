@@ -110,7 +110,7 @@ describe('ExchangeVsMarket', () => {
     expect(cells[3]?.get('.value').text()).toBe('?')
   })
 
-  it('chooses the last compared exchange by default, and a tap chooses another', async () => {
+  it('chooses the latest exchange by default, compared or not, and a tap chooses another (Б2)', async () => {
     const card = mountCard({
       losses: losses(100n),
       bars: [bar('a', '2026-09-18', 100n), bar('b', '2026-10-01', null)],
@@ -121,16 +121,17 @@ describe('ExchangeVsMarket', () => {
       radios()
         .find((radio) => radio.element.checked)
         ?.attributes('aria-label'),
-    ).toContain('Sep 18')
-    expect(card.get('.plate-amounts').text()).toBe('₽30,000 → ֏146,100')
-    await radios()[1]?.trigger('click')
-    expect(card.emitted('update:chosen')?.at(-1)).toEqual(['b'])
-    // The bar already chosen, chosen again, is told too: the line of the rate goes back to it (А4).
-    await radios()[0]?.trigger('click')
-    expect(card.emitted('update:chosen')?.at(-1)).toEqual(['a'])
-    await card.setProps({ chosen: 'b' })
+    ).toContain('Oct 1')
     expect(card.get('.plate-word').text()).toBe(en.exchange.vs_market.none_said)
     expect(card.get('.plate-word').classes()).toContain('none')
+    // One tap, one choice (review №16).
+    await radios()[0]?.trigger('click')
+    expect(card.emitted('update:chosen')).toEqual([['a']])
+    await card.setProps({ chosen: 'a' })
+    expect(card.get('.plate-amounts').text()).toBe('₽30,000 → ֏146,100')
+    // The bar already chosen, chosen again, is told too: the line of the rate goes back to it (А4).
+    await radios()[0]?.trigger('click')
+    expect(card.emitted('update:chosen')).toEqual([['a'], ['a']])
   })
 
   it('names each bar for a screen reader: day and place, the difference, the percent and the word', () => {
@@ -209,8 +210,9 @@ describe('ExchangeVsMarket', () => {
     expect(up?.attributes('style')).toContain(`height: ${String((100 * 100) / 1100)}%`)
   })
 
-  it('the field is the target: a finger lifted over a bar chooses it (А5)', async () => {
-    const card = mountCard({
+  it('the field is the target: a finger sliding along the bars chooses the one under it (А5)', async () => {
+    // The screen holds the choice, as `ExchangeView` does.
+    const card: ReturnType<typeof mountCard> = mountCard({
       losses: losses(100n),
       bars: [
         bar('a', '2026-09-18', 100n),
@@ -218,12 +220,20 @@ describe('ExchangeVsMarket', () => {
         bar('c', '2026-10-02', 10n),
       ],
       exchanges: [exchange('a'), exchange('b'), exchange('c')],
+      'onUpdate:chosen': (id: string) => card.setProps({ chosen: id }),
     })
     const plot = card.get('.plot')
     plot.element.getBoundingClientRect = () => new DOMRect(0, 0, 300, 100)
-    const at = { clientX: 160, clientY: 50, pointerType: 'touch' }
-    await plot.trigger('pointerdown', at)
-    await plot.trigger('pointerup', at)
-    expect(card.emitted('update:chosen')?.at(-1)).toEqual(['b'])
+    const touch = (clientX: number) => ({ clientX, clientY: 50, pointerType: 'touch' })
+    // A tap is the radio's own click; the field takes the slide only (review №16).
+    await plot.trigger('pointerdown', touch(260))
+    await plot.trigger('pointerup', touch(260))
+    expect(card.emitted('update:chosen')).toBeUndefined()
+    await plot.trigger('pointerdown', touch(260))
+    await plot.trigger('pointermove', touch(160))
+    await plot.trigger('pointermove', touch(40))
+    await plot.trigger('pointerup', touch(40))
+    // Each bar once, as it came under the finger.
+    expect(card.emitted('update:chosen')).toEqual([['b'], ['a']])
   })
 })
