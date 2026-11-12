@@ -24,6 +24,15 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Master takes a release, a hotfix and Dependabot (MOL-376; MOL-381, В-7 «б»): a ruleset cannot say
+      # where a pull request comes from, and it requires this job's gate already. First, red in seconds; a
+      # push has no base, and passes.
+      - name: the pull request may go into its base
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+        run: node bin/release.mjs source
+
       # A secret in any commit of the pull request (MOL-369): its ref is public, so a commit removed later
       # leaks all the same, and the step stays red until the secret is rotated and its fingerprint goes into
       # `.gitleaksignore`. First, so it is red in seconds; `--redact`, since the log of a public repository
