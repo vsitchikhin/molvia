@@ -60,19 +60,10 @@ describe('gateProblems', () => {
     expect(gateProblems(changed('check', "join(needs.*.result, ' ')", "'success'"))).toHaveLength(1)
   })
 
-  it('names a gate whose step may fail or be skipped and leave it green', () => {
+  it('names a gate whose step may be skipped by an `if:` of its own', () => {
     const told = (name: string): string =>
-      `«${name}» has a step that may fail or be skipped and leave it green: ` +
-      'no `continue-on-error`, no `if:` of a step'
+      `«${name}» has a step of its own \`if:\`: skipped, it leaves the gate green`
     const loop = '      - name: every shard succeeded\n'
-    expect(
-      gateProblems(changed('e2e-gate', loop, `${loop}        continue-on-error: true\n`)),
-    ).toEqual([told('end-to-end')])
-    expect(
-      gateProblems(
-        changed('check', '      - run: node', '      - continue-on-error: true\n        run: node'),
-      ),
-    ).toEqual([told('format, lint, types, tests')])
     expect(gateProblems(changed('e2e-gate', loop, `${loop}        if: false\n`))).toEqual([
       told('end-to-end'),
     ])
@@ -98,6 +89,47 @@ describe('gateProblems', () => {
         ),
       ),
     ).toEqual([told('e2e')])
+  })
+
+  it('names a step of `continue-on-error` in any job, a gate or one a gate waits for', () => {
+    const told = (key: string): string =>
+      `\`${key}\` has a step of \`continue-on-error\`: failed, it leaves the job green`
+    const loop = '      - name: every shard succeeded\n'
+    expect(
+      gateProblems(changed('e2e-gate', loop, `${loop}        continue-on-error: true\n`)),
+    ).toEqual([told('e2e-gate')])
+    expect(
+      gateProblems(
+        changed('check', '      - run: node', '      - continue-on-error: true\n        run: node'),
+      ),
+    ).toEqual([told('check')])
+    expect(
+      gateProblems(
+        changed(
+          'e2e',
+          '      - run: npm run test:e2e',
+          '      - continue-on-error: true\n        run: npm run test:e2e',
+        ),
+      ),
+    ).toEqual([told('e2e')])
+    expect(
+      gateProblems(
+        changed(
+          'tests',
+          '      - run: npm run test\n',
+          '      - run: npm run test\n        continue-on-error: true\n',
+        ),
+      ),
+    ).toEqual([told('tests')])
+    expect(
+      gateProblems(
+        changed(
+          'static',
+          '      - run: npm run lint\n',
+          '      - run: npm run lint\n        continue-on-error: true\n',
+        ),
+      ),
+    ).toEqual([told('static')])
   })
 
   it('names a gate that no longer runs the check, and a name the ruleset requires that no job bears', () => {

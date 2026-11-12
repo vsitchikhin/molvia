@@ -1,10 +1,9 @@
 // Holds the form of the two gate jobs of CI (MOL-375, adversarial В1): the names the ruleset of master
 // requires are theirs, and a required job skipped counts as passed. A gate without `if: always()` is
 // skipped where a job it waits for fails, and the pull request merges red; one that waits for no job
-// passes at once; a job no gate waits for is required by nobody; a step of it that may fail and leave
-// the job green — `continue-on-error`, or skipped by an `if:` of its own — lets it pass red too
-// (adversarial Г1), and so does a job of `continue-on-error`, whose failure reaches its gate as
-// `success` (Д1). Each gate runs this first and reads both, so the one whose `if: always()` went is
+// passes at once; a job no gate waits for is required by nobody; a step of it skipped by an `if:` of
+// its own lets it pass red too (adversarial Г1). And `continue-on-error`, of any job or step, turns a
+// failure green before it reaches a gate (Г1, Д1, Е1): nothing in CI is let fail. Each gate runs this first and reads both, so the one whose `if: always()` went is
 // named by the other, which runs.
 //
 //   node bin/check-ci-gates.mjs
@@ -69,17 +68,21 @@ export function gateProblems(workflow) {
       )
     }
     if (!gate.text.includes(SELF)) problems.push(`«${name}» does not run \`${COMMAND}\``)
-    if (/^ {6,}(?:- +)?(?:continue-on-error|if):/m.test(gate.text)) {
-      problems.push(
-        `«${name}» has a step that may fail or be skipped and leave it green: ` +
-          'no `continue-on-error`, no `if:` of a step',
-      )
+    if (/^ {6,}(?:- +)?if:/m.test(gate.text)) {
+      problems.push(`«${name}» has a step of its own \`if:\`: skipped, it leaves the gate green`)
     }
   }
-  for (const job of jobs.filter((job) => /^ {4}continue-on-error:/m.test(job.text))) {
-    problems.push(
-      `\`${job.key}\` runs with \`continue-on-error\`: failed, it reaches its gate as success`,
-    )
+  for (const job of jobs) {
+    if (/^ {4}continue-on-error:/m.test(job.text)) {
+      problems.push(
+        `\`${job.key}\` runs with \`continue-on-error\`: failed, it reaches its gate as success`,
+      )
+    }
+    if (/^ {6,}(?:- +)?continue-on-error:/m.test(job.text)) {
+      problems.push(
+        `\`${job.key}\` has a step of \`continue-on-error\`: failed, it leaves the job green`,
+      )
+    }
   }
   const gateKeys = new Set(gates.map((gate) => gate.key))
   for (const gate of gates) {
