@@ -957,7 +957,9 @@ differently in every working copy by design.
   side (MOL-375): «format, lint, types», the tests, and end-to-end in four shards; two gate jobs
   carry the names the ruleset requires, «format, lint, types, tests» and «end-to-end», each red
   unless all it waits for succeeded — `if: always()`, since a required job skipped counts as
-  passed. CI **checks** formatting rather than fixing it — `make format`
+  passed. **The ruleset requires the six jobs themselves too** (MOL-402): a red job holds the merge by itself,
+  and a job's name or the count of shards changed is the ruleset changed the same day. CI **checks**
+  formatting rather than fixing it — `make format`
   mutates files, and a diff must fail rather than be silently repaired. It generates its
   `.env` with the same `bin/init-env.sh` every working copy uses, so CI cannot drift from
   local setup.
