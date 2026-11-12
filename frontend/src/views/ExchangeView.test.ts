@@ -265,12 +265,13 @@ describe('ExchangeView: the four states', () => {
       }),
     )
     const view = await render()
-    expect(view.text()).not.toContain(en.exchange.empty.title)
+    // No empty state: «No exchanges yet.» of «Обмены против рынка» is its quiet note (MOL-348).
+    expect(view.find('.state').exists()).toBe(false)
     expect(view.get('.figure').text()).toContain('4.3')
     expect(view.text()).toContain('by the last income')
     expect(view.text()).toContain(en.exchange.preference_legend)
     expect(recordButton(view)?.text()).toBe(en.exchange.record)
-    expect(view.text()).not.toContain(en.exchange.list_title)
+    expect(view.find('.exchanges').exists()).toBe(false)
   })
 
   it('incomes that lost the rate, or priced another currency, draw the card too', async () => {
@@ -299,7 +300,7 @@ describe('ExchangeView: the four states', () => {
       }),
     )
     const dollars = await render()
-    expect(dollars.text()).not.toContain(en.exchange.empty.title)
+    expect(dollars.find('.state').exists()).toBe(false)
     expect(dollars.get('.costs').text()).toContain('by the last income')
   })
 
@@ -1869,144 +1870,86 @@ describe('ExchangeView: against the market of the day (MOL-137)', () => {
   })
 })
 
-describe('ExchangeView: «Обмены против рынка» on top (MOL-152, MOL-159)', () => {
+describe('ExchangeView: «Обмены против рынка» on top (MOL-152, MOL-159, MOL-348)', () => {
+  const amd = (minor: bigint) => ({ minor, currency: 'AMD' as const })
   const losses = {
-    total: { minor: -1_338_100n, currency: 'AMD' as const },
+    total: amd(-1_338_100n),
     uncounted: 1,
     groups: [
-      {
-        place: 'Zvartnots',
-        count: 1,
-        difference: { minor: -1_460_400n, currency: 'AMD' as const },
-        percent: -721,
-        level: -1000,
-      },
-      {
-        place: null,
-        count: 2,
-        difference: { minor: 122_300n, currency: 'AMD' as const },
-        percent: 149,
-        level: 207,
-      },
+      { place: 'Zvartnots', count: 1, difference: amd(-1_460_400n), percent: -721, level: -1000 },
+      { place: null, count: 2, difference: amd(122_300n), percent: 149, level: 207 },
     ],
   }
+  const bars: NonNullable<ExchangesResponse['bars']> = [
+    {
+      id: row().id,
+      exchangedOn: row().exchangedOn,
+      place: 'Zvartnots',
+      difference: amd(-1_460_400n),
+      percent: -721,
+      sign: -1,
+      level: -1000,
+    },
+  ]
 
-  it('stands first, above «my rate»: worst place first, the minus red, no «≈ ₽» and no way out', async () => {
-    exchanges.mockResolvedValue(overview({ losses }))
+  it('stands first, above the line of the rate and «my rate»: the total red, no «≈ ₽», places worst first', async () => {
+    exchanges.mockResolvedValue(overview({ losses, bars }))
     const view = await render()
-    const card = view.get('.losses')
-    const rate = view.get('.rate')
+    const card = view.get('.vs-market')
     expect(
-      card.element.compareDocumentPosition(rate.element) & Node.DOCUMENT_POSITION_FOLLOWING,
+      card.element.compareDocumentPosition(view.get('.rate').element) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy()
     const text = card.text().replace(/\s/g, ' ')
     expect(text).toContain(en.exchange.vs_market.title)
-    expect(text).toContain('−֏13,381')
     expect(text).not.toContain('≈')
-    expect(text.indexOf('Zvartnots')).toBeLessThan(text.indexOf(en.exchange.vs_market.no_place))
-    expect(text).toContain('Not compared: 1 exchange')
+    expect(card.get('.total').text()).toBe('−֏13,381')
     expect(card.get('.total').classes()).toContain('bad')
+    expect(card.get('.word').text()).toBe(en.exchange.vs_market.word_worse)
+    expect(text.indexOf('Zvartnots')).toBeLessThan(text.indexOf(en.exchange.vs_market.no_place))
+    expect(text).toContain('? — 1 exchange not compared')
     expect(card.find('a').exists()).toBe(false)
   })
 
-  it('the difference takes its tone both ways, and the words stand beside it (Ф-30)', async () => {
-    exchanges.mockResolvedValue(overview({ losses }))
-    const view = await render()
-    const card = view.get('.losses')
-    expect(card.get('.word').text()).toBe(en.exchange.vs_market.worse)
-    expect(card.get('.word').classes()).toContain('bad')
-    const [worse, better] = card.findAll('.row')
-    expect(worse?.get('.meta').text()).toBe(`1 exchange · ${en.exchange.vs_market.worse}`)
-    expect(worse?.get('.percent').classes()).toContain('bad')
-    expect(worse?.get('.amount').classes()).toContain('bad')
-    expect(better?.get('.meta').text()).toBe(`2 exchanges · ${en.exchange.vs_market.better}`)
-    expect(better?.get('.percent').classes()).toContain('good')
-    expect(better?.get('.amount').classes()).toContain('good')
-
-    exchanges.mockResolvedValue(
-      overview({ losses: { ...losses, total: { minor: 50_000n, currency: 'AMD' } } }),
-    )
-    const plus = (await render()).get('.losses')
-    expect(plus.get('.total').classes()).toContain('good')
-    expect(plus.get('.total').text()).toContain('+')
-    expect(plus.get('.word').text()).toBe(en.exchange.vs_market.better)
-  })
-
-  it("nothing is no tone and no word; one sign a row — the money's, not a percent rounded to 0 (Р-4)", async () => {
-    exchanges.mockResolvedValue(
-      overview({
-        losses: {
-          total: { minor: 0n, currency: 'AMD' },
-          uncounted: 0,
-          groups: [
-            {
-              place: 'Even',
-              count: 1,
-              difference: { minor: 0n, currency: 'AMD' },
-              percent: 0,
-              level: 0,
-            },
-            {
-              place: 'Hair',
-              count: 1,
-              difference: { minor: -300n, currency: 'AMD' },
-              percent: 0,
-              level: -1,
-            },
-          ],
-        },
-      }),
-    )
-    const card = (await render()).get('.losses')
-    expect(card.find('.word').exists()).toBe(false)
-    expect(card.get('.total').classes()).not.toContain('bad')
-    expect(card.get('.total').classes()).not.toContain('good')
-    const [even, hair] = card.findAll('.row')
-    expect(even?.get('.meta').text()).toBe('1 exchange')
-    expect(even?.get('.percent').classes()).not.toContain('bad')
-    expect(even?.get('.percent').classes()).not.toContain('good')
-    expect(hair?.get('.meta').text()).toBe(`1 exchange · ${en.exchange.vs_market.worse}`)
-    expect(hair?.get('.percent').classes()).toContain('bad')
-    expect(hair?.get('.amount').classes()).toContain('bad')
+  it('the bar of an exchange chosen there names its amounts in the plate under it', async () => {
+    exchanges.mockResolvedValue(overview({ losses, bars }))
+    const card = (await render()).get('.vs-market')
+    expect(card.get('[aria-pressed="true"] .bar').exists()).toBe(true)
+    expect(card.get('.plate-diff').text()).toBe('−֏14,604')
+    expect(card.get('.plate-diff').classes()).toContain('bad')
+    expect(card.get('.plate-word').text()).toBe(`−7.21% · ${en.exchange.vs_market.worse}`)
   })
 
   it('a difference whole units would print as 0 is printed as it is, under its tone and word (А1)', async () => {
-    const lossesOf = (minor: bigint): ExchangesResponse['losses'] => ({
-      total: { minor, currency: 'AMD' },
-      uncounted: 0,
-      groups: [
-        { place: 'Hair', count: 1, difference: { minor, currency: 'AMD' }, percent: 0, level: 0 },
-      ],
-    })
     const cardOf = async (minor: bigint) => {
-      exchanges.mockResolvedValue(overview({ losses: lossesOf(minor) }))
-      return (await render()).get('.losses')
+      exchanges.mockResolvedValue(
+        overview({ losses: { total: amd(minor), uncounted: 0, groups: [] } }),
+      )
+      return (await render()).get('.vs-market')
     }
-
     // −0,30 ֏ as the card of the exchange prints it, never «−0 ֏» under «worse than the market».
     const worse = await cardOf(-30n)
     expect(worse.get('.total').text()).toBe('−֏0.30')
     expect(worse.get('.total').classes()).toContain('bad')
-    expect(worse.get('.word').text()).toBe(en.exchange.vs_market.worse)
-    expect(worse.get('.row .amount').text()).toBe('−֏0.30')
-
-    const better = await cardOf(49n)
-    expect(better.get('.total').text()).toBe('+֏0.49')
-    expect(better.get('.word').text()).toBe(en.exchange.vs_market.better)
-
+    expect((await cardOf(49n)).get('.total').text()).toBe('+֏0.49')
     // Half a unit and more rounds to whole units, as every figure of the card.
     expect((await cardOf(-50n)).get('.total').text()).toBe('−֏1')
-    expect((await cardOf(-1_338_149n)).get('.total').text()).toBe('−֏13,381')
-    // Nothing stays nothing.
+    // Nothing stays nothing, with no tone.
     const even = await cardOf(0n)
     expect(even.get('.total').text()).toBe('֏0')
-    expect(even.find('.word').exists()).toBe(false)
+    expect(even.get('.total').classes()).not.toContain('good')
+    expect(even.get('.word').text()).toBe(en.exchange.vs_market.even)
   })
 
-  it('must not fire: nothing of the twelve months measured — no card', async () => {
-    exchanges.mockResolvedValue(overview({ losses: null }))
-    const view = await render()
-    expect(view.find('.losses').exists()).toBe(false)
+  it('must not fire: exchanges and nothing of the twelve months measured — no card', async () => {
+    exchanges.mockResolvedValue(overview({ losses: null, bars: [] }))
+    expect((await render()).find('.vs-market').exists()).toBe(false)
+  })
+
+  it('incomes alone and no exchange — the quiet note in its place (handoff 3k)', async () => {
+    exchanges.mockResolvedValue(overview({ losses: null, bars: [], exchanges: [] }))
+    const card = (await render()).get('.vs-market')
+    expect(card.get('.quiet').text()).toBe(en.exchange.vs_market.incomes_only)
   })
 })
 

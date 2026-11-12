@@ -1090,14 +1090,26 @@
       "pending": "The central bank publishes exchange offices of this day later — the line will update itself"
     },
     "vs_market": {
-      "title": "Exchanges against the market",
-      "note": "Over 12 months, each exchange against the market of its day by the Central Bank of Armenia: its own channel when named, else the best rate. Minus — you gave more than the market",
-      "uncounted": "Not compared: {n} exchange — no market or rate for that day | Not compared: {n} exchanges — no market or rate for those days",
-      "count": "{n} exchange | {n} exchanges",
+      "title": "Exchanges against the market · 12 months",
+      "uncounted": "? — {n} exchange not compared: no market or rate for that day | ? — {n} exchanges not compared: no market or rate for those days",
       "no_place": "No place",
       "worse": "worse than the market",
       "better": "better than the market",
-      "count_word": "{count} · {word}"
+      "even": "the same as the market",
+      "word_better": "more than the market would have given",
+      "word_worse": "less than the market would have given",
+      "count_one": "the exchange beat that day’s market",
+      "count_all": "all {n} beat that day’s market",
+      "count_better": "{n} better",
+      "count_worse": "{n} worse",
+      "count_even": "{n} the same",
+      "legend_up": "up — more drams",
+      "legend_line": "as at that day’s market",
+      "legend_down": "down — fewer",
+      "places": "Where you exchanged",
+      "place_count": "× {n}",
+      "none_said": "not compared · no market or rate for that day",
+      "incomes_only": "No exchanges yet. Record the first — and this will show whether you beat the market or not"
     },
     "rate_chart": {
       "title": {

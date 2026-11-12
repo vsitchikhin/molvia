@@ -92,10 +92,17 @@
       />
 
       <template v-else-if="overview">
-        <!-- First under the strips (handoff MOL-157 05): what the exchanges of a year gave against
-             the market, by place — moved here from «Графики» (MOL-159, MOL-152). No card when
-             nothing of the twelve months was measured. -->
-        <ExchangeLosses v-if="overview.losses" :losses="overview.losses" />
+        <!-- First under the strips (MOL-348, handoff 02): the answer to «хорошо ли я меняю» — the
+             total of twelve months and a bar an exchange from the line «как по рынку дня». Incomes
+             alone and no exchange — the card's quiet note. -->
+        <ExchangeVsMarket
+          v-if="overview.losses || overview.bars?.length || overview.exchanges.length === 0"
+          v-model:chosen="chosenExchange"
+          :losses="overview.losses"
+          :bars="overview.bars ?? []"
+          :exchanges="overview.exchanges"
+          :today="today"
+        />
         <!-- Under it (handoff MOL-157 05): when the exchanges were made, against the market of all
              bank clients by day or week (MOL-161), the period from the address (MOL-168). -->
         <ExchangeRateChart
@@ -268,8 +275,8 @@ import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
 import ExchangeCard from '@/components/ExchangeCard.vue'
-import ExchangeLosses from '@/components/ExchangeLosses.vue'
 import ExchangeRateChart from '@/components/ExchangeRateChart.vue'
+import ExchangeVsMarket from '@/components/ExchangeVsMarket.vue'
 import MarketRatesCard from '@/components/MarketRatesCard.vue'
 import ExchangeRemoveSheet from '@/components/ExchangeRemoveSheet.vue'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
@@ -304,8 +311,8 @@ export default defineComponent({
     AppReveal,
     AppScreen,
     ExchangeCard,
-    ExchangeLosses,
     ExchangeRateChart,
+    ExchangeVsMarket,
     ExchangeRemoveSheet,
     ExchangeSheet,
     IconCheck,
@@ -328,6 +335,8 @@ export default defineComponent({
     const { rateOf, day, amountsOf, rateLineOf } = useExchangeWords()
     // «Сегодня» of the cards, asked again when the app comes back into view (MOL-121, adversarial Н).
     const today = useLocalDay()
+    /** The exchange chosen on «Обмены против рынка» (MOL-348); null — the card's own default. */
+    const chosenExchange = ref<string | null>(null)
     const sheetOpen = ref(false)
     // The exchange the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -531,6 +540,7 @@ export default defineComponent({
     }
 
     return {
+      chosenExchange,
       figureChars,
       t,
       ...exchanges,

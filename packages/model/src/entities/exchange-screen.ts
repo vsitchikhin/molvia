@@ -67,7 +67,8 @@ export function vsMarketBars(exchanges: readonly VsMarketBarInput[]): VsMarketBa
     .reverse()
     .sort((a, b) => (a.exchangedOn < b.exchangedOn ? -1 : a.exchangedOn > b.exchangedOn ? 1 : 0))
     .map((one) => {
-      const place = one.note?.trim() || null
+      const written = one.note?.trim() ?? ''
+      const place = written === '' ? null : written
       const { difference, expected, cardDifference } = one
       if (!measured(one) || difference === null || expected === null || cardDifference === null) {
         return {

@@ -2,8 +2,8 @@
 paths:
   - 'packages/model/src/values/{rates,money,market-rates}.ts'
   - 'packages/model/src/{entities,contracts}/{exchange,income}.ts'
-  - 'packages/model/src/entities/exchange-rate-chart.ts'
-  - 'packages/model/tests/{values,entities,contracts}/{rates,money,market-rates,exchange,exchange-rate-chart,income}.test.ts'
+  - 'packages/model/src/entities/{exchange-rate-chart,exchange-screen}.ts'
+  - 'packages/model/tests/{values,entities,contracts}/{rates,money,market-rates,exchange,exchange-rate-chart,exchange-screen,income}.test.ts'
   - 'backend/src/rates/**'
   - 'backend/src/db/{rates,market-rates,exchanges,incomes}-repository.ts'
   - 'backend/src/usecases/{exchanges,incomes,refresh-official-rates,refresh-market-rates,choose-trip-rate,money-rates,start-trip}*.ts'

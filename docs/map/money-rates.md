@@ -76,6 +76,7 @@ Rules: `.claude/rules/money-rates.md`. A test beside its source, or mirroring it
 ## frontend · components
 
 - `frontend/src/components/ExchangeCard.vue` — Card of one exchange, one button into its amendment: the day, what was given and received, the rate plate against the market of its day and the central bank, the note.
+- `frontend/src/components/ExchangeVsMarket.vue` — «Обмены против рынка» on top of «Обмен денег» (MOL-348; MOL-152 before): the total of twelve months, a bar an exchange from the line «как по рынку дня» that chooses it, the plate of the one chosen, the places as bars — every height the server's.
 - `frontend/src/components/ExchangeRateChart.vue` — «Курс рубля за месяц, 6 и 12 месяцев» on «Обмен денег» (MOL-161, MOL-168): the market of all bank clients by day or week, the exchanges as dots with a mark to the market each was measured by, the reading above, the pairs and the period, hidden radios.
 - `frontend/src/components/ExchangeRemoveSheet.vue` — «Удалить обмен?» sheet over the amendment («‹», no ×): the exchange's amounts and day, and what removing does to the rate of new trips.
 - `frontend/src/components/ExchangeSheet.vue` — «Записать обмен» sheet: given, received, day, how it was changed, «сколько было до» where it weighs; also amends an exchange with its versions, and removes it where the screen offers «Вернуть».
