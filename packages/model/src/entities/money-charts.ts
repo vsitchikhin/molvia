@@ -162,6 +162,8 @@ export function hundredthsOf(part: bigint, whole: bigint): number {
 export interface CountedLoss extends ExchangeLossInput {
   readonly difference: Money
   readonly expected: Money
+  /** The place it is grouped under — «Где и заметка» as `nameIdentity` reads it, none is `''`. */
+  readonly placeKey: string
 }
 
 /**
@@ -176,13 +178,13 @@ export function countedLosses(exchanges: readonly ExchangeLossInput[]): (Counted
   return exchanges.map((exchange) => {
     const { difference, expected } = exchange
     if (difference === null || expected === null || expected.minor <= 0n) return null
-    const place = exchange.note === null ? '' : nameIdentity(exchange.note)
+    const placeKey = exchange.note === null ? '' : nameIdentity(exchange.note)
     const sum = total + difference.minor
-    const held = (expectedOf.get(place) ?? 0n) + expected.minor
+    const held = (expectedOf.get(placeKey) ?? 0n) + expected.minor
     if (sum > INT8_MAX || sum < -INT8_MAX || held > INT8_MAX) return null
     total = sum
-    expectedOf.set(place, held)
-    return { ...exchange, difference, expected }
+    expectedOf.set(placeKey, held)
+    return { ...exchange, difference, expected, placeKey }
   })
 }
 
@@ -208,8 +210,7 @@ export function exchangeLosses(
       uncounted += 1
       continue
     }
-    const { difference, expected } = exchange
-    const place = exchange.note === null ? '' : nameIdentity(exchange.note)
+    const { difference, expected, placeKey: place } = exchange
     const held = groups.get(place)
     total += difference.minor
     const written = exchange.note?.trim() ?? null
