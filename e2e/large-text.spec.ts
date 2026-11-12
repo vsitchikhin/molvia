@@ -779,21 +779,27 @@ for (const size of ['150%', '200%'])
             ).length,
         ),
       ).toBe(0)
-      // An exchange: its sum and currency one under the other, the sum typed whole.
+      // An exchange: its currency in the well of its sum (MOL-348), the sum typed whole and the currency
+      // within the well, never past it.
       await page.goto('/money/exchange')
       await page.getByRole('button', { name: 'Записать обмен' }).click()
       const sheet = page.locator('dialog[open]').last()
-      const pair = sheet.locator('.pair').first()
-      await expect(pair).toBeVisible()
-      const [amount, currency] = await pair.locator('.app-field').all()
-      expect((await currency!.boundingBox())!.y).toBeGreaterThan((await amount!.boundingBox())!.y)
-      const typed = amount!.locator('input')
+      const amount = sheet.locator('.pair').first().locator('.app-field').first()
+      await expect(amount).toBeVisible()
+      const typed = amount.locator('input')
       await typed.fill('125403,50')
       await typed.blur()
       await facesIn(page)
       expect(
         await typed.evaluate((input) => input.scrollWidth - input.clientWidth),
       ).toBeLessThanOrEqual(0)
+      const [well, currency] = await Promise.all([
+        amount.locator('.well').boundingBox(),
+        amount.locator('select').boundingBox(),
+      ])
+      expect((currency?.x ?? 0) + (currency?.width ?? 0)).toBeLessThanOrEqual(
+        (well?.x ?? 0) + (well?.width ?? 0) + 0.5,
+      )
     })
 
     // Beyond «Деньги» (MOL-334): before it at 200 % the record went 102 px sideways, «Оценки» 23, «Данные и
