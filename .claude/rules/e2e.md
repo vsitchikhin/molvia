@@ -39,23 +39,29 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   В1), and so is a step of either skipped by an `if:` of its own (Г1) — and `continue-on-error` on any job or
   step, which turns a failure green before a gate sees it: a shard «quarantined» so, or its Playwright step,
   is one the gate never sees red (Г1, Д1, Е1). What a job runs — `|| true`, a step gone, `test.skip` — is the
-  diff's review, not this check's. **The price, named** (Г2): the check runs inside what it holds, and a pull
-  request runs its own `ci.yml`, so two edits of it pass — `if: always()` gone from both gates with a red job
-  under each, or from `check` with the check's step gone from the other; any guard inside the workflow only
-  adds an edit. Only what a pull request cannot change closes it — the ruleset requiring the jobs themselves,
-  or a workflow it requires from a protected branch: the owner's call, not this task's. **Playwright splits by
-  the count of tests, in the order of the projects, and never splits a project others depend on**: `pwa`, with
-  `pwa-update.spec` in series, is taken out of the split and runs whole in every shard holding `csp-built`
-  (`pwa-camera`, `pwa-iphone`), on that shard's own build — read in Playwright's source, `filterForShard` and
-  `createRootSuite`. On 12.11.2026, of 634 tests, shards 1–3 held 157 of `phone` each and shard 4 the rest of
-  `phone`, `camera`, `pwa` and `csp-built`, and `iphone`. A boundary falling inside `csp-built` would run
-  `pwa` in two shards on two builds: right, a minute more. **Workers stay two** (В-2 «а»): the stack shares
-  the runner's four cores with the browsers (the login under load, below). **The prices, named:** eight jobs a
-  run where there were two — GitHub's free plan runs twenty at once for the account, so copies pushing
-  together queue; each shard pays the image, `npm ci` and the stack again; the split is by count, not time, so
-  the heaviest shard sets the pace. **Measured** on one commit, three runs of 12.11.2026 (run 43180391496):
-  green in 7:57, 8:33 and 8:23 against 23–24 minutes in the twelve runs before; the shards 5.3–7.9 minutes, no
-  flake; the tests' job 6.5–8.4 minutes, in two of the three the longest path.
+  diff's review, not this check's. **Г2 is closed by the ruleset** (MOL-402, owner's word 12.11.2026): the
+  check runs inside what it holds, and a pull request runs its own `ci.yml`, so two edits of it passed —
+  `if: always()` gone from both gates with a red job under each — and any guard inside the workflow only adds
+  an edit. So the ruleset of `master` requires the six jobs themselves beside the two gates — «format, lint,
+  types», «unit and integration tests», «end-to-end shard 1/4» to «4/4» — and a red job holds the merge by
+  itself, whatever the gates' form. A workflow required from a protected branch would close it whole, but
+  GitHub gives that rule to an organization only, and the repository stays the owner's. **The price, named:**
+  the six names and the count of shards live in the ruleset too — a change of either changes it the same day,
+  or the release's pull request waits for a check that never comes, and a task's pull request into
+  `release/*`, which requires nothing, does not show it; a job skipped by an `if:` of its own still counts as
+  passed — the diff's review, as `|| true`. **Playwright splits by the count of tests, in the order of the
+  projects, and never splits a project others depend on**: `pwa`, with `pwa-update.spec` in series, is taken
+  out of the split and runs whole in every shard holding `csp-built` (`pwa-camera`, `pwa-iphone`), on that
+  shard's own build — read in Playwright's source, `filterForShard` and `createRootSuite`. On 12.11.2026, of
+  634 tests, shards 1–3 held 157 of `phone` each and shard 4 the rest of `phone`, `camera`, `pwa` and
+  `csp-built`, and `iphone`. A boundary falling inside `csp-built` would run `pwa` in two shards on two
+  builds: right, a minute more. **Workers stay two** (В-2 «а»): the stack shares the runner's four cores with
+  the browsers (the login under load, below). **The prices, named:** eight jobs a run where there were two —
+  GitHub's free plan runs twenty at once for the account, so copies pushing together queue; each shard pays
+  the image, `npm ci` and the stack again; the split is by count, not time, so the heaviest shard sets the
+  pace. **Measured** on one commit, three runs of 12.11.2026 (run 43180391496): green in 7:57, 8:33 and 8:23
+  against 23–24 minutes in the twelve runs before; the shards 5.3–7.9 minutes, no flake; the tests' job
+  6.5–8.4 minutes, in two of the three the longest path.
 
 - **CI runs end-to-end in the image of Playwright, `mcr.microsoft.com/playwright:v<version>-noble`**
   (MOL-295). Until then the job installed the browsers with `--with-deps` on every run: the browsers
