@@ -1036,6 +1036,30 @@ describe('ExchangeRateChart: in step with «Обмены против рынка
     expect(bare.emitted('choose')).toBeUndefined()
   })
 
+  it('a currency chosen in a period with none of it tells the bars the first exchange a period brings (З1)', async () => {
+    const D = 'b0000000-0000-4000-8000-000000000009'
+    const usd: Pair = {
+      ...dollar,
+      periods: {
+        ...dollar.periods,
+        1: month({ exchanges: [] }),
+        12: { ...year(), exchanges: [point(D, '2026-01-20', 0, 0)] },
+      },
+    }
+    const { view } = chart([rouble({}, { 1: month() }), usd], 1)
+    await view.setProps({ choice: { id: 'a0000000-0000-4000-8000-000000000003' } })
+    await view.get('input[type="radio"][value="USD"]').setValue(true)
+    // No dollars in the month: nothing to tell yet, the bars stay.
+    expect(view.emitted('choose')).toBeUndefined()
+    // The year stands the line on them: the currency chosen is told now, as Г1 tells it.
+    await view.setProps({ months: 12 })
+    expect(view.emitted('choose')).toEqual([[D]])
+    // Must not fire: a period again is no choice.
+    await view.setProps({ months: 1 })
+    await view.setProps({ months: 12 })
+    expect(view.emitted('choose')).toEqual([[D]])
+  })
+
   it('an exchange the line does not draw is chosen nowhere here, and said so (Е1)', async () => {
     const { view } = chart()
     // Roubles into dollars: a bar with no dot. The line stood on the exchange before it.
