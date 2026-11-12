@@ -81,7 +81,8 @@ jobs:
 
       # The receipt reader (MOL-125, В-6): its image built as the release builds it, and one live
       # read of a receipt the test draws itself — Tesseract and its language files are what no fake
-      # of the API's tests can stand for.
+      # of the API's tests can stand for. Here, not in `tests`: it needs no Postgres, and `tests` is the
+      # longer path to green already (MOL-375).
       - run: docker build -f services/receipt-reader/Dockerfile -t molvia-receipt-reader:ci .
       - run: docker run --rm molvia-receipt-reader:ci python3 selftest.py
 
@@ -157,17 +158,18 @@ jobs:
   # splits by the count of tests, in the order of the projects, and never splits a project others depend on:
   # `pwa`, with `pwa-update.spec` in series, runs whole in each shard holding `csp-built`, on that shard's
   # own build. Every shard has its own database and stack. One red shard cancels no other: their flakes
-  # and traces are wanted too.
+  # and traces are wanted too. The count of shards is written once, the matrix: the total is its count of
+  # legs, `strategy.job-total`, and the first step holds that each leg is its place in it.
   e2e:
-    name: end-to-end shard ${{ matrix.shard }}/4
+    name: end-to-end shard ${{ matrix.shard }}/${{ strategy.job-total }}
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
         shard: [1, 2, 3, 4]
-    # A shard took 5.3–7.9 minutes in three runs (MOL-375). A step that hangs is otherwise held for six hours (MOL-295, В-2).
-    # The job's limit cancels it; the tests' own limit, below, fails the step first while the steps
-    # before it are quick, and the traces go up either way.
+    # A shard took 5.3–7.9 minutes in three runs (MOL-375). A step that hangs is otherwise held for six
+    # hours (MOL-295, В-2). The job's limit cancels it; the tests' own limit, below, fails the step first
+    # while the steps before it are quick, and the traces go up either way.
     timeout-minutes: 25
 
     # The browsers and every system package they need come in the image (MOL-295): `playwright install
@@ -197,6 +199,15 @@ jobs:
           --health-retries 10
 
     steps:
+      # A matrix of `[1, 2, 2, 4]` would run shard 2 twice and shard 3 nowhere, every leg green
+      # (adversarial А1): a leg runs the shard of its own place, `[1, 2, …, N]`, or fails in seconds.
+      - name: the shard is the leg's place in the matrix
+        env:
+          SHARD: ${{ matrix.shard }}
+          INDEX: ${{ strategy.job-index }}
+        run: |
+          [ "$SHARD" = "$((INDEX + 1))" ] || { echo "leg $((INDEX + 1)) of the matrix names shard $SHARD"; exit 1; }
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The image's Node is 24; ours is .nvmrc's.
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -215,7 +226,7 @@ jobs:
       # Its own limit, so a hung run ends red as failed rather than as cancelled, which reads as a newer
       # push: the job's 25 minutes less the image, `npm ci` and the upload (adversarial А5). Killed, it
       # prints no summary.
-      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/${{ strategy.job-total }}
         timeout-minutes: 20
 
       # The traces CI records — a retry's, and the first attempt's where a spec asks for it (MOL-217):
@@ -231,7 +242,7 @@ jobs:
           retention-days: 7
 
   # The name the ruleset of master requires (MOL-164), over the shards (MOL-375): as `check`, run always
-  # and red unless every shard succeeded.
+  # and red unless every shard succeeded — a matrix's result is all its legs'.
   e2e-gate:
     name: end-to-end
     needs: [e2e]
@@ -240,7 +251,7 @@ jobs:
     steps:
       - name: every shard succeeded
         env:
-          RESULT: ${{ needs.e2e.result }}
+          RESULTS: ${{ join(needs.*.result, ' ') }}
         run: |
-          echo "shards: $RESULT"
-          [ "$RESULT" = success ]
+          echo "shards: $RESULTS"
+          for result in $RESULTS; do [ "$result" = success ] || exit 1; done
