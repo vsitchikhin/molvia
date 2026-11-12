@@ -954,9 +954,10 @@ differently in every working copy by design.
   to watch and Playwright's `--ui` and `--debug`, which never give it back. Why, in
   `.claude/rules/workspace.md`.
 - **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, side by
-  side (MOL-375): «format, lint, types», the tests, and end-to-end in four shards; two gate jobs carry the
-  names the ruleset requires, «format, lint, types, tests» and «end-to-end», each red unless all it waits
-  for succeeded — `if: always()`, since a required job skipped counts as passed. CI **checks** formatting rather than fixing it — `make format`
+  side (MOL-375): «format, lint, types», the tests, and end-to-end in four shards; two gate jobs
+  carry the names the ruleset requires, «format, lint, types, tests» and «end-to-end», each red
+  unless all it waits for succeeded — `if: always()`, since a required job skipped counts as
+  passed. CI **checks** formatting rather than fixing it — `make format`
   mutates files, and a diff must fail rather than be silently repaired. It generates its
   `.env` with the same `bin/init-env.sh` every working copy uses, so CI cannot drift from
   local setup.

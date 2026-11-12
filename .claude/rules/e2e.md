@@ -28,7 +28,11 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   workers the suite took 21–23 minutes of the 23–24 a pull request waited, and every round of review waited
   it again. `--shard=i/4` of a matrix, `fail-fast: false` — a red shard cancels no other, whose flakes and
   traces are wanted too — each shard with its own Postgres, stack and build, its traces as
-  `playwright-traces-<i>`; `failOnFlakyTests` is the config's, so every shard holds it. **The check the
+  `playwright-traces-<i>`; `failOnFlakyTests` is the config's, so every shard holds it. **The count of
+  shards is written once, in the matrix** (adversarial А1): the total is its count of legs,
+  `strategy.job-total`, and a first step holds each leg to its place — `[1, 2, 2, 4]` fails in seconds
+  instead of running shard 3 nowhere, green; three copies of the number dropped up to 163 tests with every
+  check green. **The check the
   ruleset requires is a gate job named «end-to-end»** over the shards, `if: always()` and red unless all of
   them succeeded: a required job skipped counts as passed. **Playwright splits by the count of tests, in the
   order of the projects, and never splits a project others depend on**: `pwa`, with `pwa-update.spec` in
@@ -57,7 +61,7 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
     dependency hoisted is not the runner's (adversarial А1). The image's browsers are built for that
     one version, and Playwright of another refuses at the first test, naming the tag itself — 1:24
     after the push in the mutation of #215. `bin/check-playwright-image.mjs` in `npm run lint` says
-    it in the checks job too, in one sentence with the tag to set (4:10 there), so the pull request
+    it in «format, lint, types» too, in one sentence with the tag to set (4:10 there), so the pull request
     reads as a tag to move rather than a broken suite. It reads the value of `image:`, never a
     comment (А3), a version with a hyphen of its own whole (А2), and refuses a digest: Docker pulls
     the digest and never reads the tag, and which version a digest is only the registry knows — a tag
@@ -76,11 +80,10 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   - The image's Node is 24; `setup-node` keeps `.nvmrc`'s. The job runs as the runner's uid
     (`--user 1001`, as Playwright's documentation has it).
   - **A shard has 25 minutes and its tests 20** (`timeout-minutes`, В-2 «а»; the one job had 40 and 35
-    until MOL-375): a hung step was held
-    for six hours. The job's limit cancels it, and with `if: failure()` a cancelled job uploaded
-    nothing — the traces already written went with the container (adversarial А5). **The upload runs
-    on `failure() || cancelled()`**: a slow pull or `npm ci` leaves the tests less than their
-    minutes, and the job's limit comes first (Б2) — cancelled by it, the job still uploaded its traces
+    until MOL-375): a hung step was held for six hours. The job's limit cancels it, and with
+    `if: failure()` a cancelled job uploaded nothing — the traces already written went with the
+    container (adversarial А5). **The upload runs on `failure() || cancelled()`**: a slow pull or
+    `npm ci` leaves the tests less than their 20 minutes, and the job's limit comes first (Б2) — cancelled by it, the job still uploaded its traces
     (run 40326400563, attempt 2). The step's own limit makes a hung run end failed, not cancelled —
     which reads as a newer push (run 40313375737). **The prices, named:** the step is killed with no
     summary, so a test hung with no timeout of its own is named nowhere — every spec keeps one, and
