@@ -140,8 +140,9 @@ only a successful CI of a push to master of this repository builds, and only a b
    ```
 
    `restrict` takes away the terminal, forwarding and the agent; whatever the client asks for
-   arrives in `$SSH_ORIGINAL_COMMAND`, and the script refuses anything but `status`, `sha-<7 hex>`
-   and `v<N>.<N>.<N>`.
+   arrives in `$SSH_ORIGINAL_COMMAND`, and the script refuses anything but `status`, `sha-<7 hex>`,
+   `v<N>.<N>.<N>` and, since MOL-381, a release's `v<N>.<N>.<N>-<name>` and a hotfix's
+   `v<N>.<N>.<N>-<name>-<k>`.
 
 3. The environment and its two secrets — the host key taken from the machine itself, not scanned:
 
@@ -158,6 +159,55 @@ only a successful CI of a push to master of this repository builds, and only a b
 
    Then delete `deploy_key`: GitHub holds the only copy it needs, and a new pair is cheaper than
    guarding an old one.
+
+## Releases (MOL-376, MOL-381)
+
+Master takes a release, a hotfix and Dependabot: CI's first step refuses a pull request into it from any
+other branch (`bin/release.mjs source`). The rules are `.claude/rules/deploy.md`, «One release a day»;
+the machinery is two workflows and an app.
+
+- **`release-night.yml`** at 03:00 Yerevan, and «Run workflow» on it — the owner's «выпускай»: the next
+  release branch by the last tag (`bin/release.mjs next`), released when it differs from master by its
+  files and, at night, when nothing went out by hand within 24 hours. It finds or opens the pull request
+  into master, waits up to an hour for both gates of CI and merges the commit CI passed — at night with
+  `(night)` after the subject GitHub writes, which is how the next night tells its own release from one
+  made by hand.
+- **`after-release.yml`** after CI on master, whoever merged: a release's or a hotfix's merge commit is
+  awaited on `/api/health` up to forty minutes and tagged — `v0.2.<n>-<name>`, a hotfix
+  `v0.2.<n>-<name>-<k>` — which `release.yml` then puts on the images. A release cuts the next
+  `release/<name>` from that commit and deletes those older than the one before it, each only once master
+  holds it; a hotfix merges master into the next release branch, and a conflict there is a `/fail` to
+  merge by hand. «Re-run» finishes what a failure left: a tag already on the commit is done.
+- **Both report to `molvia-release`** (Signals, below): a night with nothing to release pings too, so a
+  night that never ran is silence and an alarm.
+
+### Once: the app `molvia-release`
+
+A merge, a tag or a branch pushed with GitHub's own `GITHUB_TOKEN` starts no other workflow — no CI on
+master, so no rollout. The app is someone else, and its token lives an hour.
+
+1. GitHub → Settings → Developer settings → GitHub Apps → New: name `molvia-release`, no webhook,
+   «Only on this account». Repository permissions: **Contents — read and write, Pull requests — read and
+   write, Workflows — read and write** (a release that changed a workflow is merged and pushed only with
+   it), Metadata — read. Nothing else.
+2. Install it on `vsitchikhin/molvia` alone. Generate a private key; it downloads as a `.pem`.
+3. Its client id and key into the environment `production`, never the repository:
+
+   ```bash
+   gh secret set RELEASE_APP_CLIENT_ID --env production   # typed at the prompt
+   gh secret set RELEASE_APP_KEY --env production < molvia-release.*.private-key.pem
+   ```
+
+   Then delete the `.pem`: GitHub holds the only copy it needs.
+
+4. The check `molvia-release` at healthchecks.io — period 1 day, grace 3 hours, the Telegram
+   integration — and its URL: `gh secret set HC_RELEASE_URL --env production`.
+5. **`deploy.sh` on the machine** takes named tags since MOL-381, and the release checks the machine's
+   copy first: before the release that brings MOL-381 is merged,
+   `scp deploy/deploy.sh molvia:molvia/deploy.sh` from that commit. That release goes out by hand — the
+   night has no workflow on master until it does.
+6. See it work: «Run workflow» on «Release night». With nothing new in the release branch it says so and
+   `molvia-release` turns green.
 
 ## The receipt reader (MOL-125)
 
@@ -442,7 +492,7 @@ In a working copy the same thing is `make merge FROM=<id> INTO=<id> [YES=1]`, `m
 
 ## Signals (MOL-142, MOL-221)
 
-Four checks at healthchecks.io tell the owner in Telegram that something in production is down.
+Five checks at healthchecks.io tell the owner in Telegram that something in production is down.
 They go through healthchecks.io's own Telegram integration, never through our bot: a machine that
 is down takes the bot with it. healthchecks.io, Cloudflare and GitHub see the server's address and nothing of
 anyone's data.
@@ -453,6 +503,7 @@ anyone's data.
 | `molvia-cert`    | `.github/workflows/watch.yml`, from GitHub, hourly                          | 1 day · 1 hour  | the certificate has fourteen days left or fewer — or a day of runs that could not read it              |
 | `molvia-bot`     | the bot, after a claim of reminders, while it hears Telegram, every 5–6 min | 6 min · 9 min   | the bot is down, does not hear Telegram or cannot reach the API — and then nobody can sign in (MOL-54) |
 | `molvia-backups` | `backup/backup.sh`, nightly                                                 | 1 day · 1 hour  | no copy of the database tonight (Backups, below)                                                       |
+| `molvia-release` | `release-night.yml` nightly, `after-release.yml` after a release (MOL-381)  | 1 day · 3 hours | the night's release did not go — CI red or late, no merge, no rollout, no tag — or the night never ran |
 
 The periods are a little longer than the pings' rhythm — the bot beats every five to six minutes — so
 the panel is not yellow with «late» all the time; period and grace add up to the time a silent watch
@@ -529,6 +580,9 @@ on GitHub, hourly: its check waits a day and an hour.
   alone. The job takes the environment with `deployment: false` — its secrets and its rule of
   branches, and no record of a deployment: an hourly check would write 24 a day into
   `production`'s history of rollouts. Without the secret every run is red.
+- `molvia-release`'s ping URL is the secret `HC_RELEASE_URL` of the environment `production`, as
+  `molvia-cert`'s (Releases, «Once: the app `molvia-release`»). GitHub's cron runs late here, hence the
+  grace of three hours.
 - `molvia-bot`'s ping URL is `BOT_PULSE_URL` in `~/molvia/.env.prod`, handed to the bot by
   `docker-compose.prod.yml`. **The line is required**: without it compose refuses to start, since
   a check that never got a ping stays «new» and never raises an alarm — a forgotten line would go
@@ -881,6 +935,8 @@ written as their documentation has them and not drilled.
 | `HC_URL` (the copies' ping)            | `backup.env`, healthchecks.io                      | none                                         |
 | `HC_UP_URL`                            | the Worker's secret, healthchecks.io               | none                                         |
 | `HC_CERT_URL`                          | GitHub secret of `production`, healthchecks.io     | none                                         |
+| `HC_RELEASE_URL`                       | GitHub secret of `production`, healthchecks.io     | none                                         |
+| `RELEASE_APP_KEY`                      | GitHub environment `production`, the app's page    | the night's release and the tags after one   |
 | `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` | GitHub environment `production`, `authorized_keys` | none                                         |
 | `CLOUDFLARE_API_TOKEN`                 | GitHub environment `production`, Cloudflare        | none                                         |
 | GHCR token                             | `~/.docker/config.json` of `deploy`, GitHub        | none — the images are public                 |
@@ -944,9 +1000,13 @@ written as their documentation has them and not drilled.
   healthchecks.io with the Telegram integration, its URL where the old one was — `.env.prod` and
   `$C up -d bot` / `grafana`; `HC_URL` of `backup.env`, seen by
   `sudo systemctl start molvia-backup.service`; the Worker's secret (Signals, «Where it is set»);
-  `gh secret set HC_CERT_URL --env production` — and the old check deleted. See the new one turn
+  `gh secret set HC_CERT_URL --env production`, `HC_RELEASE_URL` likewise — and the old check deleted. See the new one turn
   green before deleting the old. Whoever holds a ping URL can say «alive» while it is not, so a
-  leaked server changes all five.
+  leaked server changes all six.
+- **`RELEASE_APP_KEY`**: the app's page → Private keys → Generate, `gh secret set RELEASE_APP_KEY --env
+production < …pem`, then delete the old key there and the `.pem` here. The client id is no secret and
+  stays. Meanwhile neither the night nor the tags after a release run; a release by hand in GitHub still
+  merges and rolls out, and «Re-run» of «After release» tags it once the key is back.
 - **`DEPLOY_SSH_KEY`**: a new pair as in «Once: the deploy key», its line appended to
   `~/.ssh/authorized_keys` with the same `restrict,command=…` before the old one is removed, the
   environment's secret replaced, one rollout seen green, then the old line removed.

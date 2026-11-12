@@ -6,7 +6,8 @@
 #
 #   status          what runs here now and the hashes of the files a deploy relies on
 #   sha-<7 hex>     an image built from a master commit
-#   v<N>.<N>.<N>    an image named by a release tag
+#   v<N>.<N>.<N>    an image named by a release tag — and since MOL-381 v<N>.<N>.<N>-<name> of a
+#                   release and v<N>.<N>.<N>-<name>-<k> of a hotfix
 #
 # While ~/molvia/deploy.hold exists every rollout is refused: restore.sh --into-prod sets it, and
 # so can anyone maintaining the machine by hand. The API migrates when it starts, and a rollback
@@ -37,8 +38,8 @@ if [[ "$request" == status ]]; then
   exit 0
 fi
 
-if [[ ! "$request" =~ ^(sha-[0-9a-f]{7}|v[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-  echo "refused: expected status, sha-<7 hex> or v<N>.<N>.<N>" >&2
+if [[ ! "$request" =~ ^(sha-[0-9a-f]{7}|v[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+(-[0-9]+)?)?)$ ]]; then
+  echo "refused: expected status, sha-<7 hex>, v<N>.<N>.<N>, v<N>.<N>.<N>-<name> or v<N>.<N>.<N>-<name>-<k>" >&2
   exit 2
 fi
 tag="$request"
