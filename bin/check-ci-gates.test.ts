@@ -60,6 +60,30 @@ describe('gateProblems', () => {
     expect(gateProblems(changed('check', "join(needs.*.result, ' ')", "'success'"))).toHaveLength(1)
   })
 
+  it('names a gate whose step may fail or be skipped and leave it green', () => {
+    const told = (name: string): string =>
+      `«${name}» has a step that may fail or be skipped and leave it green: ` +
+      'no `continue-on-error`, no `if:` of a step'
+    const loop = '      - name: every shard succeeded\n'
+    expect(
+      gateProblems(changed('e2e-gate', loop, `${loop}        continue-on-error: true\n`)),
+    ).toEqual([told('end-to-end')])
+    expect(
+      gateProblems(
+        changed('check', '      - run: node', '      - continue-on-error: true\n        run: node'),
+      ),
+    ).toEqual([told('format, lint, types, tests')])
+    expect(
+      gateProblems(changed('check', '    runs-on:', '    continue-on-error: true\n    runs-on:')),
+    ).toEqual([told('format, lint, types, tests')])
+    expect(gateProblems(changed('e2e-gate', loop, `${loop}        if: false\n`))).toEqual([
+      told('end-to-end'),
+    ])
+    expect(
+      gateProblems(changed('check', '      - run: node', '      - if: false\n        run: node')),
+    ).toEqual([told('format, lint, types, tests')])
+  })
+
   it('names a gate that no longer runs the check, and a name the ruleset requires that no job bears', () => {
     expect(
       gateProblems(changed('e2e-gate', 'run: node bin/check-ci-gates.mjs', 'run: true')),

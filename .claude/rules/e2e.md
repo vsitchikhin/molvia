@@ -36,19 +36,24 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   them succeeded: a required job skipped counts as passed. Each gate runs `bin/check-ci-gates.mjs` first,
   which holds the form of both — `if: always()`, every other job waited for by one gate, red with no result —
   so a gate whose `if: always()` went, skipped and so passed, is named by the other, which runs (adversarial
-  В1). **Playwright splits by the count of tests, in the order of the projects, and never splits a project
-  others depend on**: `pwa`, with `pwa-update.spec` in series, is taken out of the split and runs whole in
-  every shard holding `csp-built` (`pwa-camera`, `pwa-iphone`), on that shard's own build — read in
-  Playwright's source, `filterForShard` and `createRootSuite`. On 12.11.2026, of 634 tests, shards 1–3 held
-  157 of `phone` each and shard 4 the rest of `phone`, `camera`, `pwa` and `csp-built`, and `iphone`. A
-  boundary falling inside `csp-built` would run `pwa` in two shards on two builds: right, a minute more.
-  **Workers stay two** (В-2 «а»): the stack shares the runner's four cores with the browsers (the login under
-  load, below). **The prices, named:** eight jobs a run where there were two — GitHub's free plan runs twenty
-  at once for the account, so copies pushing together queue; each shard pays the image, `npm ci` and the stack
-  again; the split is by count, not time, so the heaviest shard sets the pace. **Measured** on one commit,
-  three runs of 12.11.2026 (run 43180391496): green in 7:57, 8:33 and 8:23 against 23–24 minutes in the twelve
-  runs before; the shards 5.3–7.9 minutes, no flake; the tests' job 6.5–8.4 minutes, in two of the three the
-  longest path.
+  В1), and so is a step of either that may fail or be skipped and leave it green — `continue-on-error`, an
+  `if:` of its own (Г1). **The price, named** (Г2): the check runs inside what it holds, and a pull request
+  runs its own `ci.yml`, so two edits of it pass — `if: always()` gone from both gates with a red job under
+  each, or from `check` with the check's step gone from the other; any guard inside the workflow only adds an
+  edit. Only what a pull request cannot change closes it — the ruleset requiring the jobs themselves, or a
+  workflow it requires from a protected branch: the owner's call, not this task's. **Playwright splits by the
+  count of tests, in the order of the projects, and never splits a project others depend on**: `pwa`, with
+  `pwa-update.spec` in series, is taken out of the split and runs whole in every shard holding `csp-built`
+  (`pwa-camera`, `pwa-iphone`), on that shard's own build — read in Playwright's source, `filterForShard` and
+  `createRootSuite`. On 12.11.2026, of 634 tests, shards 1–3 held 157 of `phone` each and shard 4 the rest of
+  `phone`, `camera`, `pwa` and `csp-built`, and `iphone`. A boundary falling inside `csp-built` would run
+  `pwa` in two shards on two builds: right, a minute more. **Workers stay two** (В-2 «а»): the stack shares
+  the runner's four cores with the browsers (the login under load, below). **The prices, named:** eight jobs a
+  run where there were two — GitHub's free plan runs twenty at once for the account, so copies pushing
+  together queue; each shard pays the image, `npm ci` and the stack again; the split is by count, not time, so
+  the heaviest shard sets the pace. **Measured** on one commit, three runs of 12.11.2026 (run 43180391496):
+  green in 7:57, 8:33 and 8:23 against 23–24 minutes in the twelve runs before; the shards 5.3–7.9 minutes, no
+  flake; the tests' job 6.5–8.4 minutes, in two of the three the longest path.
 
 - **CI runs end-to-end in the image of Playwright, `mcr.microsoft.com/playwright:v<version>-noble`**
   (MOL-295). Until then the job installed the browsers with `--with-deps` on every run: the browsers

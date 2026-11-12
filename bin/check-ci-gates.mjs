@@ -1,8 +1,10 @@
 // Holds the form of the two gate jobs of CI (MOL-375, adversarial В1): the names the ruleset of master
 // requires are theirs, and a required job skipped counts as passed. A gate without `if: always()` is
 // skipped where a job it waits for fails, and the pull request merges red; one that waits for no job
-// passes at once; a job no gate waits for is required by nobody. Each gate runs this first and reads
-// both, so the one whose `if: always()` went is named by the other, which runs.
+// passes at once; a job no gate waits for is required by nobody; a step of it that may fail and leave
+// the job green — `continue-on-error`, or skipped by an `if:` of its own — lets it pass red too
+// (adversarial Г1). Each gate runs this first and reads both, so the one whose `if: always()` went is
+// named by the other, which runs.
 //
 //   node bin/check-ci-gates.mjs
 
@@ -16,7 +18,8 @@ const GATES = ['format, lint, types, tests', 'end-to-end']
 
 const RESULTS = "RESULTS: ${{ join(needs.*.result, ' ') }}"
 const LOOP = 'for result in ${RESULTS:-none}; do [ "$result" = success ] || exit 1; done'
-const SELF = 'run: node bin/check-ci-gates.mjs'
+const COMMAND = 'node bin/check-ci-gates.mjs'
+const SELF = `run: ${COMMAND}`
 
 /** The jobs of a workflow: the key, the block, and its `name`, `if` and `needs` at the job's level. */
 function jobsOf(workflow) {
@@ -64,7 +67,13 @@ export function gateProblems(workflow) {
         `«${name}» is not red unless all it waits for succeeded: \`${RESULTS}\`, \`${LOOP}\``,
       )
     }
-    if (!gate.text.includes(SELF)) problems.push(`«${name}» does not run \`${SELF.slice(5)}\``)
+    if (!gate.text.includes(SELF)) problems.push(`«${name}» does not run \`${COMMAND}\``)
+    if (/^ +(?:- +)?continue-on-error:/m.test(gate.text) || /^ {5,}(?:- +)?if:/m.test(gate.text)) {
+      problems.push(
+        `«${name}» has a step that may fail or be skipped and leave it green: ` +
+          'no `continue-on-error`, no `if:` of a step',
+      )
+    }
   }
   const gateKeys = new Set(gates.map((gate) => gate.key))
   for (const gate of gates) {
