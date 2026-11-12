@@ -58,7 +58,9 @@
       </AppCard>
       <SkeletonPart kind="figure" plate />
       <SkeletonPart kind="caption" :width="20" />
-      <OperationSkeleton />
+      <!-- The rows of the list (MOL-348): a sign in a circle, the amounts and the place, the
+           difference and its word under it. -->
+      <SkeletonPart kind="rows" lead="circle" tail under next />
     </ScreenSkeleton>
 
     <template v-else-if="phase !== 'idle'">
@@ -182,14 +184,19 @@
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
         <section v-if="overview.exchanges.length > 0" class="exchanges">
           <SectionCaption>{{ t('exchange.list_title') }}</SectionCaption>
-          <!-- A list, so a screen reader says how many and moves item by item (review Т-5). -->
-          <ul class="cards">
+          <!-- A list, so a screen reader says how many and moves item by item (review Т-5); a row an
+               exchange, its sign, its amounts and its difference with the market (MOL-348, handoff 06). -->
+          <AppCard as="ul" list class="rows">
             <AppReveal group>
-              <li v-for="exchange in overview.exchanges" :key="exchange.id">
-                <ExchangeCard :exchange="exchange" :today="today" @edit="edit" />
-              </li>
+              <ExchangeRow
+                v-for="exchange in overview.exchanges"
+                :key="exchange.id"
+                :exchange="exchange"
+                :today="today"
+                @edit="edit"
+              />
             </AppReveal>
-          </ul>
+          </AppCard>
         </section>
       </template>
     </template>
@@ -274,13 +281,12 @@ import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import AppScreen from '@/components/AppScreen.vue'
-import ExchangeCard from '@/components/ExchangeCard.vue'
 import ExchangeRateChart from '@/components/ExchangeRateChart.vue'
+import ExchangeRow from '@/components/ExchangeRow.vue'
 import ExchangeVsMarket from '@/components/ExchangeVsMarket.vue'
 import MarketRatesCard from '@/components/MarketRatesCard.vue'
 import ExchangeRemoveSheet from '@/components/ExchangeRemoveSheet.vue'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
-import OperationSkeleton from '@/components/OperationSkeleton.vue'
 import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
@@ -310,15 +316,14 @@ export default defineComponent({
     AppCard,
     AppReveal,
     AppScreen,
-    ExchangeCard,
     ExchangeRateChart,
+    ExchangeRow,
     ExchangeVsMarket,
     ExchangeRemoveSheet,
     ExchangeSheet,
     IconCheck,
     IconPlus,
     MarketRatesCard,
-    OperationSkeleton,
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
@@ -715,14 +720,5 @@ export default defineComponent({
 .ghost-area {
   height: 11.25rem;
   border-radius: var(--radius-sm);
-}
-
-.cards {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
 }
 </style>

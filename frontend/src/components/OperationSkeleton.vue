@@ -54,8 +54,12 @@ export default defineComponent({
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-4);
+  border: var(--hairline) solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
+
+  /* The card of the answer has its edge and shadow (`AppCard`), so the bars come in one (MOL-345, Ф-13). */
+  box-shadow: var(--shadow-sm);
 }
 
 // The head of `OperationCardHead`: the day and the chevron of 20 on one line (MOL-189).
@@ -72,7 +76,7 @@ export default defineComponent({
 
 .day {
   width: 24%;
-  height: var(--skeleton-sub);
+  height: var(--skeleton-line);
 }
 
 .sums {

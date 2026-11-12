@@ -157,7 +157,7 @@ function sheetButton(words: string): HTMLButtonElement {
 
 /** The first card — the way into its amendment — and the sheet risen. */
 async function openCard(view: VueWrapper): Promise<void> {
-  await view.get('.cards button.body').trigger('click')
+  await view.get('.rows button.list-row').trigger('click')
   await risen()
 }
 
@@ -449,98 +449,6 @@ describe('ExchangeView: the rate and the list', () => {
     expect(plain.text()).not.toContain(cba(en.exchange.estimated))
   })
 
-  it('compares with the bank in words — more, less, or nothing to compare with', async () => {
-    exchanges.mockResolvedValue(
-      overview({
-        exchanges: [
-          row(),
-          row({
-            id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5e',
-            official: {
-              rate: rate('5', '2026-09-10', 'official'),
-              provider: 'cba',
-              difference: { minor: -500_000n, currency: 'AMD' },
-            },
-          }),
-          row({ id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5f', official: null }),
-        ],
-      }),
-    )
-    const view = await render()
-    const cards = view.findAll('article')
-    // Whole amounts as they would be typed, as everywhere in «Деньги» (MOL-81, В-1).
-    expect(cards[0]?.get('.difference').text()).toBe('֏8,754 more than the central bank')
-    expect(cards[1]?.get('.difference').text()).toBe('֏5,000 less than the central bank')
-    // Nothing to compare with is one line in place of three: no bank's rate and no difference.
-    expect(cards[2]?.get('.missing').text()).toBe(cba(en.exchange.card_no_official))
-    expect(cards[2]?.find('.difference').exists()).toBe(false)
-    expect(cards[2]?.findAll('.plate .line')).toHaveLength(1)
-    expect(view.text()).not.toMatch(/commission/i)
-  })
-
-  it('says the bank’s rate of that day is in doubt when it jumped with nothing before it (С-5)', async () => {
-    exchanges.mockResolvedValue(
-      overview({ exchanges: [row({ official: null, officialDoubtful: true })] }),
-    )
-    const view = await render()
-    expect(view.get('article .missing').text()).toBe(cba(en.exchange.card_doubtful))
-  })
-
-  it('у обмена рублей на лари без курса дня называет НБ Грузии, а не ЦБ РА (MOL-110)', async () => {
-    exchanges.mockResolvedValue(
-      overview({
-        exchanges: [
-          row({
-            received: { minor: 31_200n, currency: 'GEL' },
-            rate: null,
-            official: null,
-          }),
-          row({
-            id: '0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5f',
-            received: { minor: 31_200n, currency: 'GEL' },
-            rate: null,
-            official: null,
-            officialDoubtful: true,
-          }),
-        ],
-      }),
-    )
-    const view = await render()
-    const cards = view.findAll('article')
-    expect(cards[0]?.get('.missing').text()).toBe(
-      'No National Bank of Georgia rate for this day — nothing to compare with',
-    )
-    expect(cards[1]?.get('.missing').text()).toBe(
-      'The National Bank of Georgia rate of that day is in doubt — no comparison',
-    )
-  })
-
-  it('names an open source when the bank of that day was not the central bank', async () => {
-    exchanges.mockResolvedValue(
-      overview({
-        exchanges: [
-          row({
-            official: {
-              rate: rate('4.31', '2026-09-15', 'official'),
-              provider: 'cbr',
-              difference: { minor: 100n, currency: 'AMD' },
-            },
-          }),
-        ],
-      }),
-    )
-    const view = await render()
-    const text = view.get('article').text()
-    // Named instead of the central bank, never beside it (С-6) — in the label and the difference.
-    // A name that stands at the head of a line and after «the» alike — no «the the» (adversarial Е).
-    expect(view.get('article .plate .official .label').text()).toMatch(
-      new RegExp(`^${en.exchange.card_source_cbr} on `),
-    )
-    expect(text).toContain(`than the ${en.exchange.card_source_cbr} rate`)
-    expect(text).not.toMatch(/the the/)
-    expect(text).not.toMatch(/central bank/i)
-  })
-
   it('without a pair says there is nothing to convert, and offers no preference', async () => {
     exchanges.mockResolvedValue(overview({ pair: null, wallet: null }))
     const view = await render()
@@ -604,7 +512,7 @@ describe('ExchangeView: the rate and the list', () => {
     exchanges.mockResolvedValue(overview())
     const view = await render()
     expect(view.find('button.remove').exists()).toBe(false)
-    expect(view.findAll('.cards li button')).toHaveLength(1)
+    expect(view.findAll('.rows button.list-row')).toHaveLength(1)
 
     await openCard(view)
     const amount = document.querySelector<HTMLInputElement>(
@@ -922,7 +830,7 @@ describe('ExchangeView: the rate and the list', () => {
     land(overview({ exchanges: [], wallet: null }))
     await flushPromises()
     expect(document.querySelector('dialog[open]')).toBeNull()
-    expect(view.findAll('.cards button.body')).toHaveLength(0)
+    expect(view.findAll('.rows button.list-row')).toHaveLength(0)
     expect(view.find('.undo-strip').exists()).toBe(true)
     expect(document.activeElement?.textContent.trim()).toBe(en.exchange.restore)
   })
@@ -975,7 +883,7 @@ describe('ExchangeView: the rate and the list', () => {
     await flushPromises()
     expect(view.get('.notice.failed').text()).toBe(en.exchange.failed)
 
-    await view.findAll('.cards button.body')[1]?.trigger('click')
+    await view.findAll('.rows button.list-row')[1]?.trigger('click')
     await risen()
     sheetButton(en.exchange.sheet.remove).click()
     await risen()
@@ -995,7 +903,7 @@ describe('ExchangeView: the rate and the list', () => {
     confirmButton().click()
     await flushPromises()
     await putBothAway()
-    await view.findAll('.cards button.body')[1]?.trigger('click')
+    await view.findAll('.rows button.list-row')[1]?.trigger('click')
     await risen()
 
     land(overview({ exchanges: [other] }))
@@ -1031,7 +939,7 @@ describe('ExchangeView: the rate and the list', () => {
     confirmButton().click()
     await flushPromises()
     await putBothAway()
-    await view.findAll('.cards button.body')[1]?.trigger('click')
+    await view.findAll('.rows button.list-row')[1]?.trigger('click')
     await risen()
     land(overview({ exchanges: [other] }))
     await flushPromises()
@@ -1152,7 +1060,7 @@ describe('ExchangeView: the rate and the list', () => {
     expect(view.get('.undo-strip .count').text()).toBe('8')
 
     window.dispatchEvent(new PopStateEvent('popstate', { state: null }))
-    await view.get('.cards button.body').trigger('click')
+    await view.get('.rows button.list-row').trigger('click')
     await risen()
     expect(document.querySelectorAll('dialog[open]')).toHaveLength(1)
     vi.advanceTimersByTime(15_000)
@@ -1368,7 +1276,7 @@ describe('ExchangeView: the rate and the list', () => {
 describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
   /** A tap on the row, and the sheet risen — until then it takes no tap. */
   async function openRow(view: VueWrapper): Promise<void> {
-    await view.get('button.body').trigger('click')
+    await view.get('.rows button.list-row').trigger('click')
     await flushPromises()
     clock += 1000
     await new Promise((resolve) => setTimeout(resolve, 5))
@@ -1390,8 +1298,7 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
       }),
     )
     const view = await render()
-    expect(view.get('.amended').text()).toContain('amended')
-    expect(view.get('.note').text()).toBe('airport')
+    expect(view.get('.rows .meta').text()).toBe('Sep 15 · airport · amended Sep 25')
   })
 
   it('opens the row in the sheet for an amendment, and lands the answer', async () => {
@@ -1552,42 +1459,13 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     }
   })
 
-  // Near parity the bank's rate falls on the other side of one than the exchange's own; the plate
-  // prints it on the exchange's side all the same, not «1.01 $/€» over «1.01 €/$» (adversarial Г).
-  it('prints the bank’s rate on the side of the exchange’s own, near parity too', async () => {
-    const perEuro = (value: string, source: 'personal' | 'official') => ({
-      ...rate(value, '2026-09-15', source),
-      base: 'EUR' as const,
-      quote: 'USD' as const,
-    })
-    exchanges.mockResolvedValue(
-      overview({
-        exchanges: [
-          row({
-            given: { minor: 100_000n, currency: 'USD' },
-            received: { minor: 99_500n, currency: 'EUR' },
-            rate: perEuro('1.005025', 'personal'),
-            official: {
-              rate: perEuro('0.995', 'official'),
-              provider: 'cba',
-              difference: { minor: -1_003n, currency: 'EUR' },
-            },
-          }),
-        ],
-      }),
-    )
-    const view = await render()
-    const values = view.findAll('article .plate .value').map((value) => value.text())
-    expect(values).toEqual(['1.01 $/€', '0.995 $/€'])
-  })
-
   // The tests run in UTC, where Yerevan's midnight is the evening before (adversarial Ж): a day of
   // Yerevan is printed as that calendar day, never as the moment of its midnight.
   it('prints the day of the exchange as the day it was, west of Yerevan too', async () => {
     exchanges.mockResolvedValue(overview())
     const view = await render()
-    expect(view.get('article .day').text()).toBe('Sep 15')
-    expect(view.get('button.body').text()).toMatch(/^Amend the exchange of Sep 15:/)
+    expect(view.get('.rows .meta').text()).toMatch(/^Sep 15 · /)
+    expect(view.get('.rows button.list-row').text()).toMatch(/^Amend the exchange of Sep 15:/)
   })
 
   // «Today» and «Yesterday» by the phone's calendar, day against day (MOL-121, В-1, В-3): at 20:30
@@ -1600,9 +1478,9 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
       for (const exchangedOn of ['2026-09-28', '2026-09-27', '2026-09-29']) {
         exchanges.mockResolvedValue(overview({ exchanges: [row({ exchangedOn })] }))
         const view = await render()
-        heads.push(view.get('article .day').text())
+        heads.push(view.get('.rows .meta').text().split(' · ')[0] ?? '')
         if (exchangedOn === '2026-09-28') {
-          expect(view.get('button.body').text()).toMatch(/^Amend the exchange of Sep 28:/)
+          expect(view.get('.rows button.list-row').text()).toMatch(/^Amend the exchange of Sep 28:/)
         }
         view.unmount()
       }
@@ -1614,7 +1492,7 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
       vi.setSystemTime(new Date('2026-09-29T00:20:00Z'))
       document.dispatchEvent(new Event('visibilitychange'))
       await flushPromises()
-      expect(view.get('article .day').text()).toBe('Yesterday')
+      expect(view.get('.rows .meta').text()).toMatch(/^Yesterday · /)
     } finally {
       vi.useRealTimers()
     }
@@ -1652,21 +1530,53 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     expect(lost.text()).toContain('Rate unknown: the $ → ֏ exchange of Aug 25 has')
   })
 
-  it('the row is named by its words, the rate and the comparison included (С-3)', async () => {
+  it('the row is named by its words: the amounts, the day, the difference and its word (С-3)', async () => {
+    exchanges.mockResolvedValue(
+      overview({
+        exchanges: [
+          row({
+            market: {
+              best: {
+                channel: 'bankNoncash',
+                basis: 'bankNoncash',
+                rate: rate('4.221606', '2026-09-15', 'official'),
+                difference: { minor: -123_212n, currency: 'AMD' },
+              },
+              own: null,
+              exchangersPending: true,
+            },
+          }),
+        ],
+      }),
+    )
+    const view = await render()
+    const button = view.get('.rows button.list-row')
+    expect(button.attributes('aria-label')).toBeUndefined()
+    // The verb and the day first, unseen; then what was given and received, the place, the difference.
+    expect(button.text()).toMatch(/^Amend the exchange of .+:/)
+    expect(button.text()).toContain('₽20,000 → ֏95,000')
+    expect(button.text()).toContain(en.exchange.list.no_place)
+    expect(button.get('.amount').text()).toBe('−֏1,232')
+    expect(button.get('.amount').classes()).toContain('bad')
+    expect(button.get('.word').text()).toBe(en.exchange.vs_market.worse)
+    expect(button.text()).toContain(en.exchange.list.pending_tag)
+  })
+
+  it('a row with no market has no difference and no tone: «not compared» (MOL-152)', async () => {
+    exchanges.mockResolvedValue(overview())
+    const button = (await render()).get('.rows button.list-row')
+    expect(button.find('.amount').exists()).toBe(false)
+    expect(button.get('.word').text()).toBe(en.exchange.vs_market.none)
+    expect(button.get('.word').classes()).not.toContain('bad')
+  })
+
+  it('the sheet of the amendment sets the exchange beside the market and the central bank (MOL-348)', async () => {
     exchanges.mockResolvedValue(overview())
     const view = await render()
-    const button = view.get('button.body')
-    expect(button.attributes('aria-label')).toBeUndefined()
-    // The verb and the day first, unseen; the head with the day is inside the button (MOL-189).
-    expect(button.text()).toMatch(/^Amend the exchange of .+:/)
-    for (const words of [
-      en.exchange.card_given,
-      en.exchange.card_received,
-      en.exchange.card_rate,
-      'more than the central bank',
-    ]) {
-      expect(button.text()).toContain(words)
-    }
+    await openRow(view)
+    expect(document.querySelector('dialog[open] .comparison')?.textContent).toContain(
+      '֏8,754 more than the central bank',
+    )
   })
 
   it('an exchange removed elsewhere is said to be gone, not «check the connection»', async () => {
@@ -1681,145 +1591,6 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
 })
 
 describe('ExchangeView: against the market of the day (MOL-137)', () => {
-  const quote = (
-    value: string,
-    minor: bigint,
-    channel: 'bankCash' | 'bankNoncash' | 'exchanger',
-    basis: 'bankCash' | 'bankNoncash' | 'banksAll' | 'exchanger' = channel,
-  ) => ({
-    channel,
-    basis,
-    rate: rate(value, '2026-09-15', 'official'),
-    difference: { minor, currency: 'AMD' as const },
-  })
-
-  it('puts the best of the day first, the own channel under it, the central bank quieter last', async () => {
-    exchanges.mockResolvedValue(
-      overview({
-        exchanges: [
-          row({
-            channel: 'bankCash',
-            market: {
-              best: quote('4.221606', -123_212n, 'bankNoncash'),
-              own: quote('4.110180', 99_640n, 'bankCash'),
-              exchangersPending: true,
-            },
-          }),
-        ],
-      }),
-    )
-    const view = await render()
-    const card = view.get('article')
-    const labels = card.findAll('.plate > .line .label').map((label) => label.text())
-    expect(labels).toEqual([
-      en.exchange.card_rate,
-      'Best rate on Sep 15: Banks, non-cash',
-      'Banks, cash on Sep 15',
-    ])
-    // Against the market: the sign, the word and the tone, each line its own (Ф-30).
-    const differences = card.findAll('.plate > .difference')
-    expect(differences.map((line) => line.text())).toEqual([
-      '−֏1,232.12 · worse than at banks non-cash',
-      '+֏996.40 · better than at banks for cash',
-    ])
-    expect(differences[0]?.classes()).toContain('bad')
-    expect(differences[1]?.classes()).toContain('good')
-    expect(card.get('.plate > .missing').text()).toBe(en.exchange.market.pending)
-    // The central bank is still there, a step quieter and with no tone: it is not the market (Р-5, Д-5).
-    expect(card.get('.official').classes()).toContain('quiet')
-    const official = card.get('.official .difference')
-    expect(official.text()).toBe('֏8,754 more than the central bank')
-    expect(official.classes()).not.toContain('good')
-    expect(official.classes()).not.toContain('bad')
-  })
-
-  it('even with the market is said in words and takes no tone', async () => {
-    exchanges.mockResolvedValue(
-      overview({
-        exchanges: [
-          row({
-            market: { best: quote('4.75', 0n, 'exchanger'), own: null, exchangersPending: false },
-          }),
-        ],
-      }),
-    )
-    const line = (await render()).get('article .plate > .difference')
-    expect(line.text()).toBe('Exactly as at exchange offices')
-    expect(line.classes()).not.toContain('good')
-    expect(line.classes()).not.toContain('bad')
-  })
-
-  it('must not fire: no market — the central bank is the main line, neutral, never toned', async () => {
-    exchanges.mockResolvedValue(
-      overview({
-        exchanges: [
-          row({
-            official: {
-              rate: rate('4.80', '2026-09-15', 'official'),
-              provider: 'cba',
-              difference: { minor: -250_000n, currency: 'AMD' },
-            },
-          }),
-        ],
-      }),
-    )
-    const card = (await render()).get('article')
-    expect(card.get('.official').classes()).not.toContain('quiet')
-    const line = card.get('.official .difference')
-    expect(line.text()).toBe('֏2,500 less than the central bank')
-    expect(line.classes()).not.toContain('bad')
-  })
-
-  it('names the row of all bank clients where it stood in for non-cash (В-2)', async () => {
-    exchanges.mockResolvedValue(
-      overview({
-        exchanges: [
-          row({
-            market: {
-              best: quote('4.2095', -10_000n, 'bankNoncash', 'banksAll'),
-              own: null,
-              exchangersPending: false,
-            },
-          }),
-        ],
-      }),
-    )
-    const view = await render()
-    expect(view.get('article .plate > .line + .line .label').text()).toBe(
-      'Best rate on Sep 15: Banks, all clients',
-    )
-    expect(view.get('article .plate > .difference').text()).toContain('at banks (all clients)')
-    expect(view.find('article .plate > .missing').exists()).toBe(false)
-  })
-
-  it('with a market and no bank rate that day, does not say there is nothing to compare with', async () => {
-    exchanges.mockResolvedValue(
-      overview({
-        exchanges: [
-          row({
-            official: null,
-            market: {
-              best: quote('4.110180', 99_640n, 'bankCash'),
-              own: null,
-              exchangersPending: false,
-            },
-          }),
-        ],
-      }),
-    )
-    const view = await render()
-    expect(view.get('article .official .missing').text()).toBe(
-      cba(en.exchange.card_no_official_short),
-    )
-  })
-
-  it('without a market the central bank stands as it did', async () => {
-    exchanges.mockResolvedValue(overview())
-    const view = await render()
-    expect(view.get('article .official').classes()).not.toContain('quiet')
-    expect(view.find('.market').exists()).toBe(false)
-  })
-
   it('shows today’s rates by the central bank, the best starred and said aloud', async () => {
     const rouble = (value: string, day: string) => ({ ...rate(value, day, 'official') })
     exchanges.mockResolvedValue(
@@ -1914,7 +1685,7 @@ describe('ExchangeView: «Обмены против рынка» on top (MOL-152
   it('the bar of an exchange chosen there names its amounts in the plate under it', async () => {
     exchanges.mockResolvedValue(overview({ losses, bars }))
     const card = (await render()).get('.vs-market')
-    expect(card.get('[aria-pressed="true"] .bar').exists()).toBe(true)
+    expect(card.find('[aria-pressed="true"] .bar').exists()).toBe(true)
     expect(card.get('.plate-diff').text()).toBe('−֏14,604')
     expect(card.get('.plate-diff').classes()).toContain('bad')
     expect(card.get('.plate-word').text()).toBe(`−7.21% · ${en.exchange.vs_market.worse}`)

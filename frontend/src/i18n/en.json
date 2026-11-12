@@ -1109,7 +1109,8 @@
       "places": "Where you exchanged",
       "place_count": "× {n}",
       "none_said": "not compared · no market or rate for that day",
-      "incomes_only": "No exchanges yet. Record the first — and this will show whether you beat the market or not"
+      "incomes_only": "No exchanges yet. Record the first — and this will show whether you beat the market or not",
+      "none": "not compared"
     },
     "rate_chart": {
       "title": {
@@ -1156,6 +1157,10 @@
       "note_day_bankBuys": "The line is the market: what banks paid all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday's. Dots are your exchanges: above the line — you got more drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day",
       "note_week_bankSells": "The line is the market: what banks charged all clients for the currency at the end of each week, by the Central Bank of Armenia. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a week",
       "note_day_bankSells": "The line is the market: what banks charged all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday's. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day"
+    },
+    "list": {
+      "pending_tag": "exchange offices — later",
+      "no_place": "no place"
     }
   },
   "income": {

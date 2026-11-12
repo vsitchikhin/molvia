@@ -33,6 +33,10 @@
       </template>
     </StatusStrip>
 
+    <!-- The exchange beside the market of its day and the central bank (MOL-348): the list's row says
+         only the difference, and the rest stands here, over what is amended. -->
+    <ExchangeComparison v-if="base" :exchange="base" />
+
     <form ref="form" class="form" @submit.prevent="submit">
       <div v-for="side in sides" :key="side" class="pair">
         <AppField
@@ -213,6 +217,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import ExchangeComparison from '@/components/ExchangeComparison.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
@@ -248,6 +253,7 @@ export default defineComponent({
     AppField,
     AppReveal,
     BottomSheet,
+    ExchangeComparison,
     HeldFromAccounts,
     IconCheck,
     IconDelete,

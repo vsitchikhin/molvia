@@ -34,9 +34,11 @@ export default defineComponent({
   min-height: var(--icon);
 }
 
+/* The day is the card's heading (MOL-345, handoff of «Доходы» 04): 15/700 in the text's ink, never quieter
+   than the sums under it. */
 .day {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
+  color: var(--text);
+  font-size: var(--text-callout);
   font-weight: var(--weight-bold);
 }
 
