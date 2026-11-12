@@ -20,140 +20,28 @@ const LINE = 'v0.2'
 
 // Owner's В-9 of MOL-376: a stone, a wind, a river, each list in alphabetical order, each starting
 // over at its end. The only copy of the lists — `deploy.md` names this file.
+// prettier-ignore
 export const NAMES = [
   [
-    'agate',
-    'amethyst',
-    'azurite',
-    'beryl',
-    'calcite',
-    'cinnabar',
-    'citrine',
-    'diopside',
-    'dolomite',
-    'emerald',
-    'epidote',
-    'feldspar',
-    'fluorite',
-    'galena',
-    'garnet',
-    'gypsum',
-    'hematite',
-    'howlite',
-    'iolite',
-    'jade',
-    'jasper',
-    'kunzite',
-    'kyanite',
-    'labradorite',
-    'lazurite',
-    'magnetite',
-    'malachite',
-    'nephrite',
-    'obsidian',
-    'onyx',
-    'opal',
-    'peridot',
-    'pyrite',
-    'quartz',
-    'rhodonite',
-    'ruby',
-    'sapphire',
-    'sodalite',
-    'spinel',
-    'topaz',
-    'tourmaline',
-    'turquoise',
-    'unakite',
-    'variscite',
-    'wulfenite',
-    'xenotime',
-    'zircon',
-    'zoisite',
+    'agate', 'amethyst', 'azurite', 'beryl', 'calcite', 'cinnabar', 'citrine', 'diopside', 'dolomite',
+    'emerald', 'epidote', 'feldspar', 'fluorite', 'galena', 'garnet', 'gypsum', 'hematite', 'howlite',
+    'iolite', 'jade', 'jasper', 'kunzite', 'kyanite', 'labradorite', 'lazurite', 'magnetite', 'malachite',
+    'nephrite', 'obsidian', 'onyx', 'opal', 'peridot', 'pyrite', 'quartz', 'rhodonite', 'ruby', 'sapphire',
+    'sodalite', 'spinel', 'topaz', 'tourmaline', 'turquoise', 'unakite', 'variscite', 'wulfenite', 'xenotime',
+    'zircon', 'zoisite',
   ],
   [
-    'alize',
-    'berg',
-    'bora',
-    'brickfielder',
-    'buran',
-    'chergui',
-    'chinook',
-    'elephanta',
-    'etesian',
-    'foehn',
-    'gregale',
-    'haboob',
-    'harmattan',
-    'karaburan',
-    'khamsin',
-    'kona',
-    'levante',
-    'leveche',
-    'libeccio',
-    'marin',
-    'meltemi',
-    'mistral',
-    'ostro',
-    'pampero',
-    'papagayo',
-    'simoom',
-    'sirocco',
-    'solano',
-    'sukhovey',
-    'tramontane',
-    'vendaval',
-    'williwaw',
-    'zonda',
+    'alize', 'berg', 'bora', 'brickfielder', 'buran', 'chergui', 'chinook', 'elephanta', 'etesian', 'foehn',
+    'gregale', 'haboob', 'harmattan', 'karaburan', 'khamsin', 'kona', 'levante', 'leveche', 'libeccio',
+    'marin', 'meltemi', 'mistral', 'ostro', 'pampero', 'papagayo', 'simoom', 'sirocco', 'solano', 'sukhovey',
+    'tramontane', 'vendaval', 'williwaw', 'zonda',
   ],
   [
-    'amazon',
-    'amur',
-    'araks',
-    'brahmaputra',
-    'congo',
-    'danube',
-    'debed',
-    'dnieper',
-    'don',
-    'drina',
-    'ebro',
-    'elbe',
-    'euphrates',
-    'fraser',
-    'ganges',
-    'hrazdan',
-    'hudson',
-    'indus',
-    'irtysh',
-    'jordan',
-    'kura',
-    'lena',
-    'loire',
-    'mekong',
-    'mississippi',
-    'morava',
-    'niger',
-    'nile',
-    'ob',
-    'oder',
-    'orinoco',
-    'po',
-    'rhine',
-    'rhone',
-    'sava',
-    'seine',
-    'shannon',
-    'tagus',
-    'thames',
-    'tigris',
-    'ural',
-    'vistula',
-    'volga',
-    'yangtze',
-    'yenisei',
-    'yukon',
-    'zambezi',
+    'amazon', 'amur', 'araks', 'brahmaputra', 'congo', 'danube', 'debed', 'dnieper', 'don', 'drina', 'ebro',
+    'elbe', 'euphrates', 'fraser', 'ganges', 'hrazdan', 'hudson', 'indus', 'irtysh', 'jordan', 'kura', 'lena',
+    'loire', 'mekong', 'mississippi', 'morava', 'niger', 'nile', 'ob', 'oder', 'orinoco', 'po', 'rhine',
+    'rhone', 'sava', 'seine', 'shannon', 'tagus', 'thames', 'tigris', 'ural', 'vistula', 'volga', 'yangtze',
+    'yenisei', 'yukon', 'zambezi',
   ],
 ]
 
@@ -239,20 +127,22 @@ export function releaseDue({ event, differs, merges, now }) {
  * What a merge into master leaves to do, by its branch: a release is tagged, the next branch is cut and
  * the branches older than the one before it go; a hotfix of the release that is out is tagged with its
  * number and master goes into the next release branch. Anything else — Dependabot, a squash — nothing.
- * A release or a hotfix out of turn is an error: the tags are the record and a wrong one stays.
+ * A release or a hotfix out of turn is an error: the tags are the record and a wrong one stays. A run
+ * again after its tag went is the same answer, so the workflow can finish what a failure left; that
+ * the tag stands on this very commit is the workflow's to check.
  */
 export function afterMerge(branch, tags) {
   if (!branch) return { kind: 'none' }
   const last = lastRelease(tags)
   const released = /^release\/([a-z]+)$/.exec(branch)
   if (released) {
-    const expected = release(last + 1)
-    if (released[1] !== expected.name) {
-      throw new Error(`${branch} merged, but the next release is ${expected.branch}`)
+    const n = [last + 1, last].find((m) => m > 0 && release(m).name === released[1])
+    if (n === undefined) {
+      throw new Error(`${branch} merged, but the next release is ${release(last + 1).branch}`)
     }
     const stale = []
-    for (let n = 1; n < last; n += 1) stale.push(release(n).branch)
-    return { kind: 'release', tag: expected.tag, next: release(last + 2).branch, stale }
+    for (let m = 1; m < n - 1; m += 1) stale.push(release(m).branch)
+    return { kind: 'release', tag: release(n).tag, next: release(n + 1).branch, stale }
   }
   const fixed = /^hotfix\/([a-z]+)-(\d+)$/.exec(branch)
   if (fixed) {
@@ -262,9 +152,7 @@ export function afterMerge(branch, tags) {
       throw new Error(`${branch} merged, but the release that is out is ${out.name}`)
     }
     const k = Number(fixed[2])
-    if (k < 1 || tags.includes(`${out.tag}-${String(k)}`)) {
-      throw new Error(`${branch}: the hotfix number ${String(k)} is not a new one from 1`)
-    }
+    if (k < 1) throw new Error(`${branch}: a hotfix is numbered from 1`)
     return { kind: 'hotfix', tag: `${out.tag}-${String(k)}`, next: release(last + 1).branch }
   }
   return { kind: 'none' }

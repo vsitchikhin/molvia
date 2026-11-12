@@ -136,6 +136,19 @@ describe('afterMerge', () => {
 
   it('refuses a release out of turn', () => {
     expect(() => afterMerge('release/amazon', TAGS)).toThrow('the next release is release/alize')
+    expect(() => afterMerge('release/agate', ['v0.2.0', 'v0.2.2-alize'])).toThrow('release/amazon')
+  })
+
+  it('answers a run again after the tag went as the first', () => {
+    expect(afterMerge('release/agate', TAGS)).toEqual({
+      kind: 'release',
+      tag: 'v0.2.1-agate',
+      next: 'release/alize',
+      stale: [],
+    })
+    expect(afterMerge('hotfix/agate-1', [...TAGS, 'v0.2.1-agate-1'])).toMatchObject({
+      tag: 'v0.2.1-agate-1',
+    })
   })
 
   it('tags a hotfix of the release that is out and sends master to the next branch', () => {
@@ -147,10 +160,9 @@ describe('afterMerge', () => {
     expect(afterMerge('hotfix/agate-2', [...TAGS, 'v0.2.1-agate-1']).kind).toBe('hotfix')
   })
 
-  it('refuses a hotfix of another release, a number taken and a number 0', () => {
+  it('refuses a hotfix of another release and a number 0', () => {
     expect(() => afterMerge('hotfix/alize-1', TAGS)).toThrow('the release that is out is agate')
-    expect(() => afterMerge('hotfix/agate-1', [...TAGS, 'v0.2.1-agate-1'])).toThrow('not a new one')
-    expect(() => afterMerge('hotfix/agate-0', TAGS)).toThrow('not a new one')
+    expect(() => afterMerge('hotfix/agate-0', TAGS)).toThrow('numbered from 1')
     expect(() => afterMerge('hotfix/agate-1', ['v0.2.0'])).toThrow('no named release is out')
   })
 
