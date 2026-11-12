@@ -1,5 +1,9 @@
 // Types of release.mjs for its test: the script is plain JS, which the workflows run as is.
-export declare const NAMES: readonly (readonly string[])[]
+export declare const NAMES: readonly [
+  stones: readonly string[],
+  winds: readonly string[],
+  rivers: readonly string[],
+]
 export declare const NIGHT_MARK: string
 export interface Release {
   readonly n: number

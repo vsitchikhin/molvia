@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   NAMES,
@@ -28,6 +29,15 @@ describe('releaseName', () => {
       'berg',
       'amur',
     ])
+  })
+
+  it('has the lists of deploy.md, word for word and in their order', () => {
+    const rules = readFileSync('.claude/rules/deploy.md', 'utf8').replaceAll(/\n\s+/g, ' ')
+    const listed = ['stones', 'winds', 'rivers'].map((theme) =>
+      (new RegExp(`- ${theme}: ([a-z, ]+)[;.]`).exec(rules)?.[1] ?? '').split(', '),
+    )
+    expect(listed).toEqual(NAMES)
+    for (const list of NAMES) expect(list).toEqual(list.toSorted())
   })
 
   it('starts a list over at its end, each list on its own', () => {
