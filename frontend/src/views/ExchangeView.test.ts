@@ -1993,6 +1993,37 @@ describe('ExchangeView: one exchange chosen for the whole screen (MOL-348)', () 
     expect(onChart(view)).toContain('Feb 28')
   })
 
+  it('a latest exchange the line does not draw — roubles into dollars — is no default of either (В1)', async () => {
+    const C = 'a0000000-0000-4000-8000-000000000005'
+    const dollars = row({
+      id: C,
+      exchangedOn: '2026-03-01',
+      received: { minor: 23_000n, currency: 'USD' },
+      rate: null,
+    })
+    exchanges.mockResolvedValue({
+      ...answer,
+      exchanges: [dollars, ...answer.exchanges],
+      bars: [
+        ...(answer.bars ?? []),
+        {
+          id: C,
+          exchangedOn: '2026-03-01',
+          place: null,
+          difference: null,
+          percent: null,
+          sign: null,
+          level: 0,
+        },
+      ],
+    })
+    const view = await render()
+    // Both on the latest exchange the line draws, the bar of the dollars there to choose.
+    expect(plate(view)).toContain('Feb 28')
+    expect(onChart(view)).toContain('Feb 28')
+    expect(view.findAll('.vs-market .cell')).toHaveLength(3)
+  })
+
   it('a bar, a dot there, the same bar again: the line comes back to it, and the bars follow the dot (А4)', async () => {
     exchanges.mockResolvedValue(answer)
     const view = await render()

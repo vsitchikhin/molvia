@@ -99,7 +99,7 @@
              alone and no exchange — the card's quiet note. -->
         <ExchangeVsMarket
           v-if="overview.losses || overview.bars?.length || overview.exchanges.length === 0"
-          :chosen="chosenExchange"
+          :chosen="chosenExchange ?? defaultExchange"
           :losses="overview.losses"
           :bars="overview.bars ?? []"
           :exchanges="overview.exchanges"
@@ -358,9 +358,7 @@ export default defineComponent({
     /**
      * The exchange chosen on the screen (MOL-348): a bar chooses it on the line of the rate as well — a
      * new `chartChoice` each time, so the same bar again comes back after a dot chosen there (А4) — and a
-     * dot chosen there chooses its bar. Until anything is chosen, both stand on the latest exchange of the
-     * twelve months, the line's own default (MOL-161) — one screen, one exchange (adversarial Б2: the bars
-     * took the latest compared, and a fresh exchange with no market of its day yet parted them).
+     * dot chosen there chooses its bar. Until anything is chosen, both stand on `defaultExchange` (below).
      */
     const chosenExchange = ref<string | null>(null)
     const chartChoice = ref<{ readonly id: string } | null>(null)
@@ -368,14 +366,6 @@ export default defineComponent({
       chosenExchange.value = id
       chartChoice.value = { id }
     }
-    const latestExchange = computed(() => exchanges.overview.value?.bars?.at(-1)?.id ?? null)
-    watch(
-      latestExchange,
-      (id) => {
-        if (chosenExchange.value === null && id !== null) chartChoice.value = { id }
-      },
-      { immediate: true },
-    )
     /** The currency of the latest exchange against the dram, which «Курсы по данным ЦБ РА» shows first. */
     const latestForeign = computed<Currency | null>(() => {
       for (const exchange of exchanges.overview.value?.exchanges ?? []) {
@@ -581,6 +571,30 @@ export default defineComponent({
     const chartMonths = computed<RateChartMonths>(
       () => RATE_CHART_MONTHS.find((months) => String(months) === route.query.months) ?? 12,
     )
+    /**
+     * The one exchange both blocks stand on until anything is chosen, named here for both (review №19): the
+     * latest of the twelve months the line of the rate draws in its period — the line's own default
+     * (MOL-161) — else the latest bar. A bar of roubles into dollars has no dot on the line (В-4): taken as
+     * the default, the line stayed on its own and the screen stood on two exchanges (adversarial В1), as it
+     * did when the bars took the latest compared (Б2).
+     */
+    const defaultExchange = computed(() => {
+      const overview = exchanges.overview.value
+      const bars = overview?.bars ?? []
+      const drawn = new Set(
+        overview?.rateCharts?.pairs.flatMap(
+          (pair) => pair.periods[chartMonths.value]?.exchanges.map(({ id }) => id) ?? [],
+        ) ?? [],
+      )
+      return (bars.findLast(({ id }) => drawn.has(id)) ?? bars.at(-1))?.id ?? null
+    })
+    watch(
+      defaultExchange,
+      (id) => {
+        if (chosenExchange.value === null && id !== null) chartChoice.value = { id }
+      },
+      { immediate: true },
+    )
     function chooseChartMonths(months: RateChartMonths): void {
       void router.replace({
         query: { ...route.query, months: months === 12 ? undefined : String(months) },
@@ -589,6 +603,7 @@ export default defineComponent({
 
     return {
       chosenExchange,
+      defaultExchange,
       chartChoice,
       chooseExchange,
       latestForeign,

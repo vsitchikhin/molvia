@@ -258,8 +258,8 @@ export default defineComponent({
       return { height: `max(${String(LEAST_PX)}px, ${String(share)}%)` }
     }
 
-    // The screen names the choice — the latest exchange by default, as the line of the rate (Б2) — and
-    // the card falls back to the same only for a choice it has no bar of.
+    // The screen names the choice, its default too (`defaultExchange`, review №19); a choice the card has
+    // no bar of — or none, as a test mounts it alone — stands on the latest bar.
     const chosenId = computed(() => {
       if (props.chosen && props.bars.some(({ id }) => id === props.chosen)) return props.chosen
       return props.bars.at(-1)?.id ?? null
