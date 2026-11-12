@@ -124,6 +124,11 @@ describe('ExchangeVsMarket', () => {
     ).toContain('Oct 1')
     expect(card.get('.plate-word').text()).toBe(en.exchange.vs_market.none_said)
     expect(card.get('.plate-word').classes()).toContain('none')
+    // Every bar's plate in one cell, unseen but the chosen one's: the tallest holds the place (Г1).
+    expect(card.findAll('.plate.ghost')).toHaveLength(2)
+    expect(
+      card.findAll('.plate.ghost').every((ghost) => ghost.attributes('aria-hidden') === 'true'),
+    ).toBe(true)
     // One tap, one choice (review №16).
     await radios()[0]?.trigger('click')
     expect(card.emitted('update:chosen')).toEqual([['a']])

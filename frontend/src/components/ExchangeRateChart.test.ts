@@ -987,6 +987,26 @@ describe('ExchangeRateChart: in step with «Обмены против рынка
     expect(plain(view.get('.mine-rate').text())).toContain('10 февр.')
   })
 
+  it('another currency chosen here tells the bars which exchange it now stands on (Г1)', async () => {
+    const usd: Pair = {
+      ...dollar,
+      periods: {
+        ...dollar.periods,
+        12: {
+          ...year(),
+          exchanges: [point('b0000000-0000-4000-8000-000000000009', '2026-02-28', 3, 714)],
+        },
+      },
+    }
+    const { view } = chart([rouble(), usd])
+    await view.get('input[type="radio"][value="USD"]').setValue(true)
+    expect(view.emitted('choose')?.at(-1)).toEqual(['b0000000-0000-4000-8000-000000000009'])
+    // A currency with no exchange in the period chooses none: the bars stay.
+    const { view: bare } = chart([rouble(), dollar])
+    await bare.get('input[type="radio"][value="USD"]').setValue(true)
+    expect(bare.emitted('choose')).toBeUndefined()
+  })
+
   it('must not fire: an exchange of no pair drawn changes nothing', async () => {
     const { view } = chart()
     const before = view.get('.mine-rate').text()

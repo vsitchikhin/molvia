@@ -2022,6 +2022,9 @@ describe('ExchangeView: one exchange chosen for the whole screen (MOL-348)', () 
     expect(plate(view)).toContain('Feb 28')
     expect(onChart(view)).toContain('Feb 28')
     expect(view.findAll('.vs-market .cell')).toHaveLength(3)
+    // The period is the line's switch, under the bars: a month with no dot moves no bar (review №20).
+    const month = await render('/money/exchange?months=1')
+    expect(plate(month)).toContain('Feb 28')
   })
 
   it('a bar, a dot there, the same bar again: the line comes back to it, and the bars follow the dot (А4)', async () => {

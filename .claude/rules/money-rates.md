@@ -748,10 +748,14 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   choice each time (`choice`), so the bar already chosen comes back after a dot chosen there — and a dot chosen there
   chooses its bar; **one action is one choice** (review №16): a tap and a key are the radio's `click`, the field takes
   a slide only. **Until anything is chosen both stand on one default, named by the screen to both**
-  (`defaultExchange`, review №19): the latest exchange of the twelve months the line draws in its period, compared
-  or not — the line's own default (MOL-161) — else the latest bar (adversarial Б2: the bars took the latest compared,
+  (`defaultExchange`, review №19): the latest exchange of the twelve months the line draws in its year, compared or
+  not — the line's own default (MOL-161) — else the latest bar (adversarial Б2: the bars took the latest compared,
   and an exchange of today, its market still to come, parted them; В1: the latest bar, roubles into dollars, has no
-  dot, and the line stayed on its own). The plate under the bars is no live region: the
+  dot, and the line stayed on its own). **Another currency of the line is a choice and tells the bars** the exchange
+  it stands on (Г1); **another period is not** — it is the line's answer under its own switch, and nothing above it
+  moves (review №20, MOL-136). **The plate under the bars holds the tallest of theirs**, as the line's reading does:
+  a choice made on the line under the card moves nothing under the finger. **The price, named:** a period without
+  the exchange chosen shows the line's own latest of it while the bars stay on theirs. The plate under the bars is no live region: the
   radio says it (review №8).
 - **A label of «мой — ЦБ РА» stands at its dot's end of the line**, wrapping within the card, never centred on the dot
   (adversarial Б1: centred on 850, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 %); `large-text.spec`

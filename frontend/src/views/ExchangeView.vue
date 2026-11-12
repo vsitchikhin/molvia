@@ -573,17 +573,20 @@ export default defineComponent({
     )
     /**
      * The one exchange both blocks stand on until anything is chosen, named here for both (review №19): the
-     * latest of the twelve months the line of the rate draws in its period — the line's own default
-     * (MOL-161) — else the latest bar. A bar of roubles into dollars has no dot on the line (В-4): taken as
-     * the default, the line stayed on its own and the screen stood on two exchanges (adversarial В1), as it
-     * did when the bars took the latest compared (Б2).
+     * latest of the twelve months the line of the rate draws — the line's own default (MOL-161) — else the
+     * latest bar. A bar of roubles into dollars has no dot on the line (В-4): taken as the default, the line
+     * stayed on its own and the screen stood on two exchanges (adversarial В1), as it did when the bars took
+     * the latest compared (Б2). Read by the year, the bars' own window (MOL-168), never by the period shown:
+     * the period is the line's switch, under the bars, and moves nothing above it (review №20, MOL-136).
+     * **The price, named:** a period without the exchange chosen shows the line's own latest of it, and
+     * the bars stay on theirs.
      */
     const defaultExchange = computed(() => {
       const overview = exchanges.overview.value
       const bars = overview?.bars ?? []
       const drawn = new Set(
-        overview?.rateCharts?.pairs.flatMap(
-          (pair) => pair.periods[chartMonths.value]?.exchanges.map(({ id }) => id) ?? [],
+        overview?.rateCharts?.pairs.flatMap((pair) =>
+          pair.periods[12].exchanges.map(({ id }) => id),
         ) ?? [],
       )
       return (bars.findLast(({ id }) => drawn.has(id)) ?? bars.at(-1))?.id ?? null

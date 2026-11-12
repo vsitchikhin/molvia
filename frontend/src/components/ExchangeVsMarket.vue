@@ -82,12 +82,23 @@
         </p>
       </fieldset>
 
-      <!-- No live region: the radio chosen says all of it (review №8). -->
-      <div v-if="chosenBar" class="plate">
-        <p class="plate-where">{{ whereOf(chosenBar) }}</p>
-        <p class="plate-diff" :class="kindOf(chosenBar)">{{ diffOf(chosenBar) }}</p>
-        <p class="plate-amounts">{{ amountsOf(chosenBar) }}</p>
-        <p class="plate-word" :class="kindOf(chosenBar)">{{ wordOf(chosenBar) }}</p>
+      <!-- No live region: the radio chosen says all of it (review №8). Every bar's plate in one cell, the
+           chosen one seen: the tallest holds the place, so a choice made on the line of the rate under the
+           card — a dot, another currency there — moves nothing under the finger (adversarial Г1), as the
+           line's own reading holds its plates (MOL-190). -->
+      <div v-if="chosenBar" class="plates">
+        <div class="plate">
+          <p class="plate-where">{{ whereOf(chosenBar) }}</p>
+          <p class="plate-diff" :class="kindOf(chosenBar)">{{ diffOf(chosenBar) }}</p>
+          <p class="plate-amounts">{{ amountsOf(chosenBar) }}</p>
+          <p class="plate-word" :class="kindOf(chosenBar)">{{ wordOf(chosenBar) }}</p>
+        </div>
+        <div v-for="bar in bars" :key="bar.id" class="plate ghost" aria-hidden="true">
+          <p class="plate-where">{{ whereOf(bar) }}</p>
+          <p class="plate-diff">{{ diffOf(bar) }}</p>
+          <p class="plate-amounts">{{ amountsOf(bar) }}</p>
+          <p class="plate-word">{{ wordOf(bar) }}</p>
+        </div>
       </div>
 
       <p v-if="uncounted > 0" class="note">
@@ -591,6 +602,21 @@ export default defineComponent({
   &.chosen {
     color: var(--text);
   }
+}
+
+/* The plates in one cell: the tallest decides, the one shown keeps its own height (`start`). */
+.plates {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+
+  > * {
+    grid-area: 1 / 1;
+  }
+}
+
+.ghost {
+  visibility: hidden;
 }
 
 .plate {

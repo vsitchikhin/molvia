@@ -498,8 +498,17 @@ export default defineComponent({
       if (index !== -1) choose(index)
     }
 
+    /**
+     * Another currency by the person's hand: the line stands on the exchange of that pair it shows — the
+     * one chosen if the pair has it, else its latest — and tells the bars, so the screen stays on one
+     * exchange (adversarial Г1: the bars stayed on theirs). A period changed is no choice of an exchange:
+     * it is the line's own answer under its own switch, and the bars above it do not move (review №20).
+     */
     function choosePair(value: string): void {
       currency.value = props.chart.pairs.find((one) => one.currency === value)?.currency ?? null
+      if (!items.value.some((item) => item.key === chosenKey.value)) chosenKey.value = null
+      const shown = chosen.value?.exchange
+      if (shown) emit('choose', shown.id)
     }
 
     function choosePeriod(value: string): void {
