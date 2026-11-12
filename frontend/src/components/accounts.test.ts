@@ -369,6 +369,11 @@ describe('an operation as its row says it', () => {
         }).tint,
       ).toBe('var(--cat-groceries)')
     })
+
+    it('in a category of its own stands in it, its words too (MOL-400)', () => {
+      const value = row(trip({ categoryId: CAFE }))
+      expect([value.meta, value.tint]).toEqual(['Кафе · 5 позиций', 'var(--cat-cafe)'])
+    })
   })
 
   it('every row is opened by one verb, read first', () => {

@@ -13,6 +13,7 @@ import {
   startTripBodySchema,
   tripPaymentBodySchema,
   tripReceiptBodySchema,
+  tripCategoryBodySchema,
 } from '@molvia/model'
 import type {
   ActorSettings,
@@ -23,6 +24,7 @@ import type {
   StartTripBody,
   TripPaymentBody,
   TripReceiptBody,
+  TripCategoryBody,
   TripView,
   WireCode,
 } from '@molvia/model'
@@ -126,6 +128,11 @@ export type QueuedWrite =
    * safe to send twice, behind the trip's start as the account of a trip is.
    */
   | { readonly kind: 'receipt'; readonly tripId: string; readonly body: TripReceiptBody }
+  /**
+   * The category «Деньги» count the trip in (MOL-400): chosen at «Закончить» and in «Траты», whole each
+   * time, behind the trip's start. It moves no money, so a later one takes the earlier one's place.
+   */
+  | { readonly kind: 'category'; readonly tripId: string; readonly body: TripCategoryBody }
 
 /**
  * What «Удалить поход» took off the phone, for «Вернуть» to put back (MOL-76): the writes of the
@@ -199,6 +206,9 @@ const PAYMENTS_REJECTED_KEY = 'molvia.trip-payments-rejected'
  */
 const RECEIPTS_KEY = 'molvia.trip-receipts'
 const RECEIPTS_REJECTED_KEY = 'molvia.trip-receipts-rejected'
+/** A trip's category (MOL-400), under keys of its own for the same reason: the builds before know none. */
+const CATEGORIES_KEY = 'molvia.trip-categories'
+const CATEGORIES_REJECTED_KEY = 'molvia.trip-categories-rejected'
 
 /**
  * A removal of a row the server does not have is the outcome it was asked for, not a refusal
@@ -214,6 +224,8 @@ const DONE_ENOUGH: Partial<Record<QueuedWrite['kind'], readonly WireCode[]>> = {
   payment: [ERROR.NOT_FOUND],
   // The same for the receipt's sum of one (MOL-78).
   receipt: [ERROR.NOT_FOUND],
+  // And for its category (MOL-400).
+  category: [ERROR.NOT_FOUND],
 }
 
 /** Wire form: the bodies carry bigints, and the codecs that read them back are the contract's. */
@@ -264,6 +276,8 @@ function encode(entry: QueuedWrite): Loose {
         tripId: entry.tripId,
         body: tripReceiptBodySchema.encode(entry.body),
       }
+    case 'category':
+      return { kind: 'category', tripId: entry.tripId, body: { ...entry.body } }
     case 'restore':
       return {
         kind: 'restore',
@@ -327,6 +341,10 @@ function decode(raw: unknown): QueuedWrite | null {
   }
   if (kind === 'receipt') {
     const body = tripReceiptBodySchema.safeParse(raw.body)
+    return body.success ? { kind, tripId, body: body.data } : null
+  }
+  if (kind === 'category') {
+    const body = tripCategoryBodySchema.safeParse(raw.body)
     return body.success ? { kind, tripId, body: body.data } : null
   }
   if (kind === 'restore') {
@@ -419,6 +437,10 @@ function isReceipt(write: QueuedWrite): boolean {
   return write.kind === 'receipt'
 }
 
+function isCategory(write: QueuedWrite): boolean {
+  return write.kind === 'category'
+}
+
 /**
  * Every kind some older version cannot read, each group with the keys of its mirror. Put back in
  * this order: a payment or a receipt may stand before a mark, and the mark has to be back to be
@@ -428,6 +450,7 @@ const MIRRORS = [
   { key: MARKS_KEY, rejected: MARKS_REJECTED_KEY, holds: isMark },
   { key: PAYMENTS_KEY, rejected: PAYMENTS_REJECTED_KEY, holds: isPayment },
   { key: RECEIPTS_KEY, rejected: RECEIPTS_REJECTED_KEY, holds: isReceipt },
+  { key: CATEGORIES_KEY, rejected: CATEGORIES_REJECTED_KEY, holds: isCategory },
 ] as const
 
 function isMirrored(write: QueuedWrite): boolean {
@@ -632,6 +655,8 @@ function send(entry: QueuedWrite, written: boolean): Promise<TripView | null> {
       return api.payTrip(entry.tripId, entry.body)
     case 'receipt':
       return api.setTripReceipt(entry.tripId, entry.body)
+    case 'category':
+      return api.categorizeTrip(entry.tripId, entry.body).then(() => null)
   }
 }
 
@@ -675,6 +700,7 @@ function subject(write: QueuedWrite): string {
     case 'restore':
     case 'payment':
     case 'receipt':
+    case 'category':
       return write.tripId
   }
 }

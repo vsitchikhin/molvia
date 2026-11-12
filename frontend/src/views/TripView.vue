@@ -155,6 +155,17 @@
         optional
         :bad="receiptBad"
       />
+      <!-- The category «Деньги» count it in (MOL-400): the place's last, else «Продукты»; it goes through
+           the queue before the finish, as the account does. -->
+      <div v-if="!finishingEmpty" class="category">
+        <TripCategoryRow
+          :categories="ownCategories"
+          :frequent="ownFrequent"
+          :name-of="categoryName"
+          :selected="finishCategory"
+          @pick="pickedCategory = $event"
+        />
+      </div>
       <!-- The account it was paid from (MOL-312, В-3 «б»): finished is paid, so it is chosen here and
            goes through the queue before the finish, as the sum does. -->
       <div v-if="!finishingEmpty && showsAccount" class="account">
@@ -251,7 +262,7 @@ import IconBasket from '~icons/mdi/basket-outline'
 import IconDelete from '~icons/mdi/delete-outline'
 import IconFlag from '~icons/mdi/flag-checkered'
 import IconPlus from '~icons/mdi/plus'
-import { decimalFromMinor, formatMoney, parseMoney } from '@molvia/model'
+import { decimalFromMinor, formatMoney, guessedTripCategory, parseMoney } from '@molvia/model'
 import type { CatalogueEntry, Money, TripExpenseView, TripPaymentBody } from '@molvia/model'
 import AccountPickerSheet from '@/components/AccountPickerSheet.vue'
 import AccountRow from '@/components/AccountRow.vue'
@@ -270,6 +281,7 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
+import TripCategoryRow from '@/components/TripCategoryRow.vue'
 import TripNotices from '@/components/TripNotices.vue'
 import TripRateNotes from '@/components/TripRateNotes.vue'
 import TripRemoveSheet from '@/components/TripRemoveSheet.vue'
@@ -282,6 +294,7 @@ import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { shown } from '@/composables/useItemDetails'
 import type { RetryPurchase } from '@/composables/useItemDetails'
+import { useOwnCategories } from '@/composables/useOwnCategories'
 import { useReconnect } from '@/composables/useReconnect'
 import { useTripReceipt } from '@/composables/useTripReceipt'
 import { localDay, purchaseDay, timeOfDay } from '@/days'
@@ -290,6 +303,11 @@ import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import { useItemEntryStore } from '@/stores/itemEntry'
 import { rememberPaymentAccount, rememberedAccount } from '@/stores/paymentAccounts'
+import {
+  placeCategoriesOf,
+  refreshPlaceCategories,
+  rememberPlaceCategory,
+} from '@/stores/placeCategories'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -345,6 +363,7 @@ export default defineComponent({
     ScreenState,
     SkeletonPart,
     StatusStrip,
+    TripCategoryRow,
     TripNotices,
     TripRateNotes,
     TripRemoveSheet,
@@ -515,6 +534,12 @@ export default defineComponent({
         return
       }
       if (id && receipt) queue.enqueue({ kind: 'receipt', tripId: id, body: { receipt } })
+      // the category likewise (MOL-400): sent only when it says more than what the trip holds
+      const category = finishingEmpty.value ? null : finishCategory.value
+      if (id && category && category !== heldCategory.value) {
+        queue.enqueue({ kind: 'category', tripId: id, body: { categoryId: category } })
+      }
+      rememberPlaceCategory(actor.id, trip.value?.place.id ?? null, category)
       const payment = receipt ? paymentAfterSum(paid) : changedPayment(paid)
       if (id && payment) {
         queue.enqueue({ kind: 'payment', tripId: id, body: payment })
@@ -567,8 +592,21 @@ export default defineComponent({
       debited.value = heldPayment?.debited ? typedMoney(heldPayment.debited) : ''
       debitedBad.value = false
       followDefault()
-      // «Счета» read when the sheet opens, never with every opening of «Покупки» (review Р1-2)
+      // The category (MOL-400, Р-6): a choice still in the queue — made in «Траты» meanwhile — is where the sheet
+      // opens; otherwise the guess, which follows the answers until the person chooses (`finishCategory`).
+      const queued = queue.pending.findLast(
+        (write) => write.kind === 'category' && write.tripId === tripId.value,
+      )
+      heldCategory.value = queued?.kind === 'category' ? queued.body.categoryId : null
+      pickedCategory.value = null
+      // «Счета», the categories and the places' last ones read when the sheet opens, never with every opening of
+      // «Покупки» (review Р1-2, MOL-400 review №6): an answer that comes while it is up moves the guess
       void accounts.refresh()
+      void ownCategoryList.refresh()
+      const owner = actor.id
+      void refreshPlaceCategories(owner).then(() => {
+        if (actor.id === owner) placesAt.value = placeCategoriesOf(owner)
+      })
       finishing.value = true
     }
 
@@ -577,6 +615,29 @@ export default defineComponent({
      * `PUT /trips/:id/payment`, as the summary in «Траты» sends it. «Списано» where the account's currency
      * is not the record's; a purchase in a third currency is the summary's to cover, as before.
      */
+    const ownCategoryList = useOwnCategories({ lazy: true })
+    /** The place's last category, the server's laid over this phone's (Р-6), read again as «Закончить» opens. */
+    const placesAt = ref(placeCategoriesOf(actor.id))
+    /** Chosen in «Закончить»; `null` — the guess stands. */
+    const pickedCategory = ref<string | null>(null)
+    /** The category still in the queue when «Закончить» was asked: sent again, it moves nothing. */
+    const heldCategory = ref<string | null>(null)
+    /**
+     * What «Закончить» sends: the person's choice, else the queue's word, else the guess — a computed one, so an
+     * answer of the server or of the categories that comes while the sheet is up moves it (review №2, adversarial
+     * А3), as on the receipt's review.
+     */
+    const finishCategory = computed(
+      () =>
+        pickedCategory.value ??
+        heldCategory.value ??
+        guessedTripCategory(ownCategoryList.categories.value, {
+          placeId: trip.value?.place.id ?? null,
+          lastAt: placesAt.value,
+          food: false,
+        }),
+    )
+
     const accounts = useAccountsStore()
     const accountId = ref<string | null>(null)
     /** The account and «Списано» the record was on when «Закончить» was asked: sent again, they move nothing. */
@@ -767,6 +828,11 @@ export default defineComponent({
       accountId,
       account,
       showsAccount,
+      ownCategories: ownCategoryList.categories,
+      ownFrequent: ownCategoryList.frequent,
+      categoryName: ownCategoryList.nameOf,
+      finishCategory,
+      pickedCategory,
       charged,
       debited,
       debitedBad,
@@ -804,6 +870,8 @@ export default defineComponent({
   margin-bottom: var(--space-2);
 }
 
+/* The category and the account of «Закончить», each a field of its own (MOL-400, MOL-312). */
+.category,
 .account {
   display: flex;
   flex-direction: column;

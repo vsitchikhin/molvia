@@ -29,6 +29,7 @@ import { useActorStore } from '@/stores/actor'
 import { useItemEntryStore } from '@/stores/itemEntry'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
 import { useTripStore } from '@/stores/trip'
+import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import TripNotices from '@/components/TripNotices.vue'
@@ -44,6 +45,8 @@ const restoreTrip = vi.fn()
 const moneyAccounts = vi.fn<() => Promise<MoneyAccountsResponse>>(
   () => new Promise(() => undefined),
 )
+const spendingCategories = vi.fn<() => Promise<unknown>>(() => new Promise(() => undefined))
+const placeCategories = vi.fn<() => Promise<unknown>>(() => new Promise(() => undefined))
 vi.mock('@/api', () => ({
   api: {
     receipts: () => Promise.resolve({ receipts: [] }),
@@ -64,6 +67,11 @@ vi.mock('@/api', () => ({
     // «Деньги», where an empty record is handed over as a spending (MOL-78, В-1).
     moneyMonth: () => new Promise(() => undefined),
     moneyAccounts: () => moneyAccounts(),
+    // The category of «Закончить» (MOL-400).
+    spendingCategories: () => spendingCategories(),
+    placeCategories: () => placeCategories(),
+    categorizeTrip: () => new Promise(() => undefined),
+    addSpendingCategory: () => new Promise(() => undefined),
     // «Тут дешевле» on the purchase sheet (MOL-92): never answered here.
     ownPrices: () => new Promise(() => undefined),
   },
@@ -1645,6 +1653,149 @@ describe('TripView', () => {
       inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
       await flushPromises()
       expect(queue.pending.map((write) => write.kind)).toEqual(['finish'])
+    })
+  })
+
+  // MOL-400: the category «Деньги» count the record in, chosen in «Закончить», goes before the finish
+  describe('категория записи вручную (MOL-400)', () => {
+    const PLACE = 'aaaaaaaa-0000-4000-8000-000000000001'
+    const GROCERIES = 'cc000000-0000-4000-8000-000000000001'
+    const PETS = 'cc000000-0000-4000-8000-000000000002'
+    const preset = (id: string, key: 'groceries' | 'pets') =>
+      ({ id, preset: key, name: null, colour: null, icon: null, archived: false }) as const
+    const openSheets = () => [...document.body.querySelectorAll('dialog[open]')]
+
+    beforeEach(() => {
+      currentTrip.mockResolvedValue(trip(handoff()))
+      spendingCategories.mockResolvedValue({
+        categories: [preset(GROCERIES, 'groceries'), preset(PETS, 'pets')],
+        frequent: [],
+      })
+      placeCategories.mockResolvedValue({ places: [] })
+    })
+    afterEach(() => {
+      spendingCategories.mockImplementation(() => new Promise(() => undefined))
+      placeCategories.mockImplementation(() => new Promise(() => undefined))
+    })
+
+    async function finishWith(view: VueWrapper, name?: string): Promise<void> {
+      await docked(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+      if (name) {
+        openSheets()[0]?.querySelector<HTMLButtonElement>('.nav-row')?.click()
+        await flushPromises()
+        clock += 1000
+        const option = [...(openSheets().at(-1)?.querySelectorAll('[role="radio"]') ?? [])].find(
+          (one) => one.textContent.includes(name),
+        )
+        if (!(option instanceof HTMLElement)) throw new Error(`нет категории «${name}»`)
+        option.click()
+        await flushPromises()
+      }
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+    }
+
+    it('без выбора — «Продукты», перед завершением', async () => {
+      const { view, queue } = await render()
+      await flushPromises()
+      await finishWith(view)
+      expect(queue.pending.map((write) => write.kind)).toEqual(['category', 'finish'])
+      expect(queue.pending[0]).toMatchObject({ tripId: TRIP, body: { categoryId: GROCERIES } })
+    })
+
+    it('выбранная уходит и запоминается за местом', async () => {
+      const { view, queue } = await render()
+      await flushPromises()
+      await finishWith(view, ru.spending.category.pets)
+      expect(queue.pending[0]).toMatchObject({ kind: 'category', body: { categoryId: PETS } })
+      expect(JSON.parse(localStorage.getItem(`molvia.place-categories.${ME}`) ?? '{}')).toEqual({
+        [PLACE]: PETS,
+      })
+    })
+
+    // Ответ сервера приходит, пока шторка открыта, и двигает догадку (ревью №2, адверсариальная А3 «а»)
+    it('ответ сервера о прошлой записи в месте, пришедший после открытия, двигает догадку', async () => {
+      let answer: (value: unknown) => void = () => undefined
+      placeCategories.mockReturnValue(
+        new Promise((resolve) => {
+          answer = resolve
+        }),
+      )
+      const { view, queue } = await render()
+      await docked(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+      const sheetRow = () => openSheets()[0]?.querySelector('.nav-row')?.textContent ?? ''
+      expect(sheetRow()).toContain(ru.spending.category.groceries)
+      answer({ places: [{ placeId: PLACE, categoryId: PETS }] })
+      await flushPromises()
+      expect(sheetRow()).toContain(ru.spending.category.pets)
+      inside(openSheets()[0] ?? null, ru.trip.finish_confirm.ok).click()
+      await flushPromises()
+      expect(queue.pending[0]).toMatchObject({ kind: 'category', body: { categoryId: PETS } })
+    })
+
+    // Категория, ещё ждущая в очереди трат, походу не предлагается (адверсариальная А1)
+    it('своя категория, ещё не дошедшая до сервера, в списке не стоит', async () => {
+      const PHARMACY = 'cc000000-0000-4000-8000-000000000003'
+      const { view } = await render()
+      useSpendingQueueStore().addCategory({ id: PHARMACY, name: 'Аптека' })
+      await flushPromises()
+      await docked(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      clock += 1000
+      openSheets()[0]?.querySelector<HTMLButtonElement>('.nav-row')?.click()
+      await flushPromises()
+      const names = [...(openSheets().at(-1)?.querySelectorAll('[role="radio"]') ?? [])].map(
+        (one) => one.textContent,
+      )
+      expect(names.some((name) => name.includes(ru.spending.category.pets))).toBe(true)
+      expect(names.some((name) => name.includes('Аптека'))).toBe(false)
+    })
+
+    // Без связи, «Деньги» на телефоне не открывались: список — последний ответ, сохранённый здесь (А3 «б»)
+    it('без связи берёт список категорий, сохранённый с прошлого ответа, и память места', async () => {
+      localStorage.setItem(
+        `molvia.own-categories.${ME}`,
+        JSON.stringify({
+          askedAt: '2026-11-09T10:00:00.000Z',
+          answer: {
+            categories: [preset(GROCERIES, 'groceries'), preset(PETS, 'pets')],
+            frequent: [],
+          },
+        }),
+      )
+      localStorage.setItem(`molvia.place-categories.${ME}`, JSON.stringify({ [PLACE]: PETS }))
+      spendingCategories.mockRejectedValue(new TypeError('Failed to fetch'))
+      placeCategories.mockRejectedValue(new TypeError('Failed to fetch'))
+      const { view, queue } = await render()
+      await finishWith(view)
+      expect(queue.pending[0]).toMatchObject({ kind: 'category', body: { categoryId: PETS } })
+    })
+
+    // Ревью №6: категории и память мест нужны только «Закончить» — их читают, когда шторка открывается
+    it('«Покупки» открылись — ни категорий, ни памяти мест; «Закончить» — оба', async () => {
+      spendingCategories.mockClear()
+      placeCategories.mockClear()
+      const { view } = await render()
+      await flushPromises()
+      expect(spendingCategories).not.toHaveBeenCalled()
+      expect(placeCategories).not.toHaveBeenCalled()
+      await docked(view, ru.trip.finish).trigger('click')
+      await flushPromises()
+      expect(spendingCategories).toHaveBeenCalledTimes(1)
+      expect(placeCategories).toHaveBeenCalledTimes(1)
+    })
+
+    it('начинает с категории прошлой записи в этом месте', async () => {
+      placeCategories.mockResolvedValue({ places: [{ placeId: PLACE, categoryId: PETS }] })
+      localStorage.setItem(`molvia.place-categories.${ME}`, JSON.stringify({ [PLACE]: PETS }))
+      const { view, queue } = await render()
+      await flushPromises()
+      await finishWith(view)
+      expect(queue.pending[0]).toMatchObject({ kind: 'category', body: { categoryId: PETS } })
     })
   })
 

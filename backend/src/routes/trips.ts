@@ -11,7 +11,9 @@ import {
   tripHistoryQuerySchema,
   rateChoiceBodySchema,
   restoreTripBodySchema,
+  placeCategoriesCodec,
   startTripBodySchema,
+  tripCategoryBodySchema,
   tripReceiptBodySchema,
   tripViewCodec,
 } from '@molvia/model'
@@ -22,9 +24,11 @@ import type {
   ExpensePatch,
   RateChoiceBody,
   Money,
+  PlaceCategories,
   PreviousItemsResponse,
   RestoreTripBody,
   StartTripBody,
+  TripCategoryBody,
   TripView,
 } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
@@ -48,6 +52,8 @@ export interface TripsApi {
   finish(actorId: string, tripId: string, deviceAt?: Date, deviceDay?: string): Promise<void>
   chooseRate(actorId: string, tripId: string, body: RateChoiceBody): Promise<TripView>
   setReceipt(actorId: string, tripId: string, receipt: Money | null): Promise<TripView>
+  categorize(actorId: string, tripId: string, body: TripCategoryBody): Promise<void>
+  placeCategories(actorId: string): Promise<PlaceCategories>
   removeTrip(actorId: string, tripId: string): Promise<void>
   restoreTrip(actorId: string, tripId: string, body: RestoreTripBody): Promise<TripView>
 }
@@ -213,6 +219,23 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
       await api.setReceipt(request.actorId, resourceId(request.params.tripId), body.receipt),
     )
   })
+
+  /**
+   * The category «Деньги» count the trip in (MOL-400): 204, and 204 again for the same — the queue sends
+   * it twice. A stranger's, a missing and a removed trip are one 404.
+   */
+  app.put<{ Params: TripParams }>('/trips/:tripId/category', async (request, reply) => {
+    const body = parseBody(tripCategoryBodySchema, request.body)
+    await api.categorize(request.actorId, resourceId(request.params.tripId), body)
+    return reply.code(204).header('cache-control', 'no-store').send()
+  })
+
+  /** What the phone starts a trip at a place on (MOL-400, Р-6): the person's own, `no-store`. */
+  app.get('/trips/place-categories', { exposeHeadRoute: false }, async (request, reply) =>
+    reply
+      .header('cache-control', 'no-store')
+      .send(z.encode(placeCategoriesCodec, await api.placeCategories(request.actorId))),
+  )
 
   /**
    * «Считать по новому курсу / по прежнему / по своему», when the rate the trip took jumped

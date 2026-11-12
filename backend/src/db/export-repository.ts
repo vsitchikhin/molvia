@@ -182,6 +182,7 @@ export const EXPORT_COLUMNS: Readonly<
       'receipt_currency',
       'receipt_set_at',
       'receipt_first_at',
+      'category_id',
       'deleted_at',
     ],
     omitted: { actor_id: OWNER },
@@ -1069,6 +1070,7 @@ export function createExportRepository(db: Db): ExportRepository {
               receipt: cash(row.receiptMinor, row.receiptCurrency),
               receiptSetAt: row.receiptSetAt,
               receiptFirstAt: row.receiptFirstAt,
+              categoryId: row.categoryId,
               removedAt: row.deletedAt,
             })),
             expenses: expenseRows.map((row) => ({

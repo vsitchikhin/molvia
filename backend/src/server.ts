@@ -153,6 +153,7 @@ import {
   spendingCategoriesOf,
 } from '@/usecases/spendings'
 import { chooseSalaryShift, moneyMonthOf, salaryShiftOf } from '@/usecases/money-month'
+import { categorizeTrip, placeCategoriesOf } from '@/usecases/trip-category'
 import { acceptConsent, consentOf } from '@/usecases/consent'
 import { moneyChartMonthOf } from '@/usecases/money-chart-month'
 import { moneyBudgetOf, setBudgetPlan } from '@/usecases/money-budget'
@@ -1274,6 +1275,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           finishTrip(tripData.trips, actorId, tripId, deviceAt, deviceDay),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
         setReceipt: (actorId, tripId, receipt) => setReceipt(transact, actorId, tripId, receipt),
+        categorize: (actorId, tripId, body) =>
+          categorizeTrip(tripData, { id: actorId }, tripId, body),
+        placeCategories: (actorId) => placeCategoriesOf(tripData, { id: actorId }),
         removeTrip: (actorId, tripId) => removeTrip(tripData.trips, actorId, tripId),
         restoreTrip: (actorId, tripId, body) => restoreTrip(tripData, actorId, tripId, body),
       })

@@ -631,6 +631,62 @@ test('a record finished on an account moves that account, and nothing is left un
   expect((await accounts()).unassigned).toBe(0)
 })
 
+test('a record finished in «Pets» lands there, and «Spendings» move it to cafés (MOL-400)', async ({
+  page,
+}) => {
+  test.setTimeout(60_000)
+  const setting = await device(page)
+  const headers = await asBrowser(page)
+  const month = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' })
+    .format(new Date())
+    .slice(0, 7)
+  const categories = (await (
+    await page.request.get('/api/spending-categories', { headers })
+  ).json()) as { categories: { id: string; preset: string | null }[] }
+  const idOf = (preset: string) =>
+    categories.categories.find((one) => one.preset === preset)?.id ?? ''
+  /** The trip's own category in the month, as a phone of this build asks for it. */
+  const tripCategory = async () => {
+    const response = await page.request.get(`/api/money/months/${month}`, {
+      headers: { ...headers, 'X-Molvia-Trip-Category': '1' },
+    })
+    const body = (await response.json()) as {
+      days: { entries: { kind: string; categoryId?: string | null }[] }[]
+    }
+    return body.days.flatMap((day) => day.entries).find((entry) => entry.kind === 'trip')
+      ?.categoryId
+  }
+
+  await startTrip(page, 'Зоомагазин')
+  await addItem(page, setting.word, '4500')
+  await expect.poll(async () => (await setting.current())?.expenses.length).toBe(1)
+
+  await page.getByRole('button', { name: 'Finish', exact: true }).click()
+  await page.waitForTimeout(400)
+  await sheet(page)
+    .getByRole('button', { name: /^Category/ })
+    .click()
+  await page.waitForTimeout(400)
+  await page.getByRole('radio', { name: 'Pets' }).click()
+  await expect(sheet(page).getByRole('button', { name: /^Category/ })).toContainText('Pets')
+  await sheet(page).getByRole('button', { name: 'Finish', exact: true }).click()
+  await expect(page).toHaveURL(/\/purchases$/)
+  await expect.poll(tripCategory).toBe(idOf('pets'))
+
+  // «Траты» of the month: the trip's summary changes it at once, through the trip's queue
+  await page.getByRole('link', { name: 'Money', exact: true }).click()
+  await page.getByRole('link', { name: /^Spendings/ }).click()
+  await page.getByRole('button', { name: /Purchases at “Зоомагазин”/ }).click()
+  await page.waitForTimeout(400)
+  await expect(sheet(page).getByRole('button', { name: /^Category/ })).toContainText('Pets')
+  await sheet(page)
+    .getByRole('button', { name: /^Category/ })
+    .click()
+  await page.waitForTimeout(400)
+  await page.getByRole('radio', { name: 'Cafés and restaurants' }).click()
+  await expect.poll(tripCategory).toBe(idOf('cafe'))
+})
+
 /**
  * «Сумма по чеку» (MOL-78): the receipt typed whole when not every price was — at «Закончить» and
  * any time after — and the record's money everywhere, the prices untouched.

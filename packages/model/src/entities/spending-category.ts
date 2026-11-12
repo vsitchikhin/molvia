@@ -26,8 +26,51 @@ export const SPENDING_PRESETS = [
 export const spendingPresetSchema = z.enum(SPENDING_PRESETS)
 export type SpendingPreset = z.infer<typeof spendingPresetSchema>
 
-/** Where a finished trip's purchases land in the month (handoff 06): always the groceries. */
+/**
+ * Where a finished trip's purchases land in the month when it names no category of its own (handoff 06):
+ * the groceries. Since MOL-400 a trip is given one at «Записать» and «Закончить», changed in «Траты».
+ */
 export const TRIP_CATEGORY: SpendingPreset = 'groceries'
+
+/** A category as the guess below needs it: which, and whether it may still be chosen. */
+export interface ChoosableCategory {
+  readonly id: string
+  readonly preset: SpendingPreset | null
+  readonly archived: boolean
+}
+
+/**
+ * A receipt of food service (MOL-400, Р-6): a line of the class «56.xx» (MOL-226) — the fiscal till's
+ * class of restaurants and cafés — or a café's service charge (MOL-310).
+ */
+export function servesFood(classes: readonly (string | null)[], service: boolean): boolean {
+  return service || classes.some((hs) => hs !== null && /^56\.\d{2}$/.test(hs))
+}
+
+/**
+ * What a trip at a place starts on before the person touches it (MOL-400, Р-6, owner's В-2 «а» with
+ * «use an algorithm that assumes the category»): the category of their last trip at this place, else a
+ * café where the receipt says food service, else «Продукты»; a category taken out of the choice is passed
+ * over. `null` — none to offer; the trip is then «Продукты» by the rule above.
+ */
+export function guessedTripCategory(
+  categories: readonly ChoosableCategory[],
+  input: {
+    readonly placeId: string | null
+    readonly lastAt: readonly { readonly placeId: string; readonly categoryId: string }[]
+    readonly food: boolean
+  },
+): string | null {
+  const live = (found: ChoosableCategory | undefined) => (found && !found.archived ? found : null)
+  const last = input.lastAt.find((one) => one.placeId === input.placeId)?.categoryId
+  const byPreset = (preset: SpendingPreset) =>
+    live(categories.find((category) => category.preset === preset))
+  const chosen =
+    live(last === undefined ? undefined : categories.find((category) => category.id === last)) ??
+    (input.food ? byPreset('cafe') : null) ??
+    byPreset(TRIP_CATEGORY)
+  return chosen?.id ?? null
+}
 
 /** A category's own name, when the person made it: short enough to fit a chip. */
 export const SPENDING_CATEGORY_NAME_MAX = 40

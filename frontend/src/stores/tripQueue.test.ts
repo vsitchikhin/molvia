@@ -38,6 +38,7 @@ const removeTrip = vi.fn<(tripId: string) => Promise<void>>()
 const restoreTrip = vi.fn<(tripId: string, finish?: unknown) => Promise<TripView>>()
 const payTrip = vi.fn<(tripId: string, body: unknown) => Promise<TripView>>()
 const setTripReceipt = vi.fn<(tripId: string, body: unknown) => Promise<TripView>>()
+const categorizeTrip = vi.fn<(tripId: string, body: unknown) => Promise<void>>()
 const me = vi.fn<() => Promise<never>>()
 vi.mock('@/api', () => ({
   api: {
@@ -54,6 +55,7 @@ vi.mock('@/api', () => ({
       finish === undefined ? restoreTrip(tripId) : restoreTrip(tripId, finish),
     payTrip: (tripId: string, body: unknown) => payTrip(tripId, body),
     setTripReceipt: (tripId: string, body: unknown) => setTripReceipt(tripId, body),
+    categorizeTrip: (tripId: string, body: unknown) => categorizeTrip(tripId, body),
   },
 }))
 
@@ -284,6 +286,7 @@ describe('trip queue', () => {
     addExpense.mockReset()
     payTrip.mockReset()
     setTripReceipt.mockReset()
+    categorizeTrip.mockReset()
     updateExpense.mockReset()
     removeExpense.mockReset()
     startTrip.mockReset()
@@ -2678,6 +2681,79 @@ describe('trip queue', () => {
       queue.restoreTrip(undo)
       // Back behind the removal and its «Вернуть», still waiting for a connection.
       expect(queue.pending.map((write) => write.kind)).toEqual(['delete', 'restore', 'receipt'])
+    })
+  })
+
+  describe('категория похода (MOL-400)', () => {
+    const QUEUE = `molvia.trip-queue.${ME}`
+    const CATEGORIES = `molvia.trip-categories.${ME}`
+    const CAFE = 'eeeeeeee-0000-4000-8000-000000000001'
+    const PETS = 'eeeeeeee-0000-4000-8000-000000000002'
+    const category = (categoryId: string): QueuedWrite => ({
+      kind: 'category',
+      tripId: TRIP,
+      body: { categoryId },
+    })
+
+    it('уходит после старта записи, начатой без связи', async () => {
+      startTrip.mockRejectedValueOnce(offline())
+      const queue = fresh()
+      queue.enqueue(started(TRIP, 'Кафе «Вкусно»'))
+      queue.enqueue(category(CAFE))
+      await settled()
+      expect(categorizeTrip).not.toHaveBeenCalled()
+      startTrip.mockResolvedValue({ trip: answer('0'), created: true })
+      categorizeTrip.mockResolvedValue(undefined)
+      await queue.flush()
+      expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: CAFE })
+      expect(queue.pending).toEqual([])
+    })
+
+    it('новый выбор встаёт на место прежнего, пока тот не ушёл', async () => {
+      categorizeTrip.mockRejectedValue(offline())
+      addExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(category(CAFE))
+      queue.enqueue(add(BREAD))
+      queue.enqueue(category(PETS))
+      await settled()
+      expect(queue.pending).toEqual([category(PETS), expect.objectContaining({ kind: 'add' })])
+    })
+
+    it('запись, которой больше нет, — не отказ', async () => {
+      categorizeTrip.mockRejectedValue(new ApiError(ERROR.NOT_FOUND, 'trip'))
+      const queue = fresh()
+      queue.enqueue(category(CAFE))
+      await queue.flush()
+      expect(queue.pending).toEqual([])
+      expect(queue.rejected).toEqual([])
+    })
+
+    it('дошедшая категория поднимает landed — «Деньги» перечитывают месяц', async () => {
+      categorizeTrip.mockResolvedValue(undefined)
+      const queue = fresh()
+      const before = queue.landed
+      queue.enqueue(category(CAFE))
+      await queue.flush()
+      expect(queue.landed).toBe(before + 1)
+    })
+
+    it('возвращается на место, когда окно прежней версии её потеряло', async () => {
+      categorizeTrip.mockRejectedValue(offline())
+      addExpense.mockRejectedValue(offline())
+      const queue = fresh()
+      queue.enqueue(add(BREAD))
+      queue.enqueue(category(CAFE))
+      await settled()
+      expect(localStorage.getItem(CATEGORIES)).toContain(CAFE)
+      const held = JSON.parse(localStorage.getItem(QUEUE) ?? '[]') as { write: { kind: string } }[]
+      localStorage.setItem(
+        QUEUE,
+        JSON.stringify(held.filter((item) => item.write.kind !== 'category')),
+      )
+      window.dispatchEvent(new StorageEvent('storage', { key: QUEUE }))
+      expect(queue.pending.map((write) => write.kind)).toEqual(['add', 'category'])
+      expect(fresh().pending.map((write) => write.kind)).toEqual(['add', 'category'])
     })
   })
 })

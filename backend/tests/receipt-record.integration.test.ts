@@ -7,6 +7,7 @@ import {
   latestDay,
   moneyAccountsCodec,
   receiptRecordedCodec,
+  spendingCategoriesResponseCodec,
   tripHistoryCodec,
   parseRate,
   tripViewCodec,
@@ -2216,5 +2217,84 @@ describe('the account of «Записать» (MOL-312)', () => {
     expect(again.statusCode).toBe(200)
     expect(receiptRecordedCodec.parse(again.json()).tripId).toBe(body.tripId)
     expect((await tripOf(body.tripId))?.accountId).toBe(cash)
+  })
+})
+
+// MOL-400: the category chosen on the review, written with the trip
+describe('the category of «Записать» (MOL-400)', () => {
+  const bodyOf = (categoryId?: string) => ({
+    tripId: randomUUID(),
+    place: { name: 'Кафе «Вкусно»', city: 'Гюмри' },
+    purchasedOn: '2026-09-26',
+    lines: LINES.map((_, position) => ({ position, skip: true })),
+    ...(categoryId === undefined ? {} : { categoryId }),
+  })
+
+  /** Each a paper of its own: one paper recorded twice is a 409 (Т-11). */
+  let papers = 0
+  const another = (actorId: string) =>
+    parsedReceipt(actorId, LINES, { receiptNo: String(40_000_000 + ++papers) })
+
+  async function categoryOf(tripId: string) {
+    const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, tripId)))
+    return trip?.categoryId
+  }
+
+  async function presets(actorId: string) {
+    const response = await app.inject({
+      method: 'GET',
+      url: '/spending-categories',
+      headers: { cookie: await signIn(db, actorId) },
+    })
+    return spendingCategoriesResponseCodec.parse(response.json()).categories
+  }
+
+  it('writes the person’s own category, a removed one too, with the trip', async () => {
+    const me = await insertActor(db)
+    const cafe = (await presets(me)).find((category) => category.preset === 'cafe')?.id ?? ''
+    const body = bodyOf(cafe.toUpperCase())
+    expect((await record(me, await another(me), body)).statusCode).toBe(200)
+    expect(await categoryOf(body.tripId)).toBe(cafe)
+
+    const pets = (await presets(me)).find((category) => category.preset === 'pets')?.id ?? ''
+    await db
+      .update(schema.spendingCategories)
+      .set({ archivedAt: new Date() })
+      .where(eq(schema.spendingCategories.id, pets))
+    const removed = bodyOf(pets)
+    expect((await record(me, await another(me), removed)).statusCode).toBe(200)
+    expect(await categoryOf(removed.tripId)).toBe(pets)
+  })
+
+  it('takes someone else’s category, or none, as «Продукты» — never a refusal', async () => {
+    const me = await insertActor(db)
+    const stranger = await insertActor(db)
+    const theirs = (await presets(stranger)).find((category) => category.preset === 'cafe')?.id
+    const body = bodyOf(theirs)
+    expect((await record(me, await another(me), body)).statusCode).toBe(200)
+    expect(await categoryOf(body.tripId)).toBeNull()
+
+    const earlier = bodyOf()
+    expect((await record(me, await another(me), earlier)).statusCode).toBe(200)
+    expect(await categoryOf(earlier.tripId)).toBeNull()
+  })
+
+  it('a repeat moves no category chosen since in «Траты»', async () => {
+    const me = await insertActor(db)
+    const mine = await presets(me)
+    const cafe = mine.find((category) => category.preset === 'cafe')?.id ?? ''
+    const pets = mine.find((category) => category.preset === 'pets')?.id ?? ''
+    const id = await another(me)
+    const body = bodyOf(cafe)
+    expect((await record(me, id, body)).statusCode).toBe(200)
+    const moved = await app.inject({
+      method: 'PUT',
+      url: `/trips/${body.tripId}/category`,
+      headers: { cookie: await signIn(db, me) },
+      payload: { categoryId: pets },
+    })
+    expect(moved.statusCode).toBe(204)
+    expect((await record(me, id, body)).statusCode).toBe(200)
+    expect(await categoryOf(body.tripId)).toBe(pets)
   })
 })

@@ -230,6 +230,7 @@ interface TripRow extends Record<string, unknown> {
   account_id: string | null
   debited_minor: string | bigint | null
   debited_currency: Currency | null
+  category_id: string | null
   items: string | number
   unpriced: string | number
 }
@@ -461,7 +462,7 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
                  greatest(t.started_at, t.finished_at, t.account_set_at, t.receipt_set_at,
                           (select max(e.created_at) from expenses e where e.trip_id = t.id))
                    as seen_at,
-                 t.account_id, t.debited_minor, t.debited_currency,
+                 t.account_id, t.debited_minor, t.debited_currency, t.category_id,
                  (select count(*) from expenses e where e.trip_id = t.id) as items,
                  -- A receipt's sum is the trip's money whole (MOL-78): nothing is missing from it.
                  case when t.receipt_minor is not null then 0
@@ -637,7 +638,13 @@ export function createMoneyAccountRepository(db: Conn): MoneyAccountRepository {
           rate: null,
           unpriced: Number(row.unpriced),
           revision: null,
-          details: { ...NO_DETAILS, place: row.place_name, items: Number(row.items) },
+          details: {
+            ...NO_DETAILS,
+            place: row.place_name,
+            items: Number(row.items),
+            // The trip's own category (MOL-400); none — «Продукты», as the phone draws it.
+            categoryId: row.category_id,
+          },
         })
       }
       return operations

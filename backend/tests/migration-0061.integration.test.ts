@@ -5,7 +5,7 @@ import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
-import { insertPlace, insertTrip, telegramId } from './fixtures'
+import { insertPlace, telegramId } from './fixtures'
 import { storeMemoryWords } from '@molvia/model'
 import { MIGRATIONS } from '@/db/migrate'
 import * as schema from '@/db/schema'
@@ -67,6 +67,25 @@ afterAll(async () => {
   await admin.end()
 })
 
+/**
+ * A trip by SQL of its own: `trips` has a column since (0086, MOL-400) the schema would name, and the
+ * database here stands before it.
+ */
+async function insertOldTrip(fields: {
+  actorId: string
+  placeId: string
+  startedAt?: Date
+  accountId?: string | undefined
+  accountSetAt?: Date
+}): Promise<string> {
+  const id = randomUUID()
+  await sql`
+    insert into trips (id, actor_id, place_id, currency, started_at, account_id, account_set_at)
+    values (${id}, ${fields.actorId}, ${fields.placeId}, 'AMD', ${(fields.startedAt ?? new Date()).toISOString()},
+      ${fields.accountId ?? null}, ${fields.accountSetAt?.toISOString() ?? null})`
+  return id
+}
+
 describe('0061: what a removed trip or purchase left of its receipt', () => {
   it('removes the orphans, then makes the receipt go with its trip and the line with its purchase', async () => {
     const before = journal.entries.filter((entry) => entry.idx < 61)
@@ -87,7 +106,7 @@ describe('0061: what a removed trip or purchase left of its receipt', () => {
       insert into items (id, kind, name, search_key, default_unit)
       values (${milk}, 'product', 'Молоко «Ашхар»', 'moloko ashar', 'l')`
     const place = await insertPlace(db)
-    const trip = await insertTrip(db, { actorId: me, placeId: place })
+    const trip = await insertOldTrip({ actorId: me, placeId: place })
     const bought = randomUUID()
     await db.insert(expenses).values({ id: bought, tripId: trip, itemId: milk })
 

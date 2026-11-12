@@ -57,6 +57,9 @@ import {
   transferViewCodec,
   tripPaymentBodySchema,
   tripReceiptBodySchema,
+  tripCategoryBodySchema,
+  placeCategoriesCodec,
+  MONEY_TRIP_CATEGORY_HEADER,
   unassignedOperationsCodec,
   budgetPlanBodySchema,
   moneyBudgetCodec,
@@ -106,6 +109,8 @@ import {
   verdictPathSchema,
 } from '@molvia/model'
 import type {
+  TripCategoryBody,
+  PlaceCategories,
   LoginStarted,
   SessionsResponse,
   LoginPoll,
@@ -345,6 +350,13 @@ export interface MolviaClient {
    * to send twice. `error.not_found` for a trip the server does not hold.
    */
   setTripReceipt(tripId: string, body: TripReceiptBody): Promise<TripView>
+  /**
+   * The category «Деньги» count the trip in (MOL-400), whole each time — safe for the queue to send
+   * twice. `error.not_found` for a trip the server does not hold, which the queue reads as done.
+   */
+  categorizeTrip(tripId: string, body: TripCategoryBody): Promise<void>
+  /** The category of the person's last trip at each place (MOL-400, Р-6): what a trip there starts on. */
+  placeCategories(): Promise<PlaceCategories>
   /**
    * «Удалить поход» (MOL-76): marked on the server, safe to send again. `error.not_found` for a
    * trip the server does not hold — never sent, someone else's, or final — which the queue reads
@@ -854,6 +866,17 @@ export function createClient(options: ClientOptions): MolviaClient {
         body: encode(tripReceiptBodySchema, body),
       }),
 
+    categorizeTrip: async (tripId, body) => {
+      noContent(
+        await exchange(`/trips/${segment(tripId)}/category`, z.undefined(), {
+          method: 'PUT',
+          body: encode(tripCategoryBodySchema, body),
+        }),
+      )
+    },
+
+    placeCategories: () => request('/trips/place-categories', placeCategoriesCodec),
+
     // A portal's page answering a redirected DELETE with 200 is not the removal (MOL-57, round 4).
     removeTrip: async (tripId) => {
       noContent(await exchange(`/trips/${segment(tripId)}`, z.undefined(), { method: 'DELETE' }))
@@ -922,7 +945,10 @@ export function createClient(options: ClientOptions): MolviaClient {
       const query = cursor
         ? `?${new URLSearchParams({ cursor: journalCursorCodec.encode(cursor) }).toString()}`
         : ''
-      return request(`/money/months/${month}${query}`, moneyMonthCodec)
+      // a trip's own category in the journal (MOL-400): only a phone that asks is told it
+      return request(`/money/months/${month}${query}`, moneyMonthCodec, {
+        headers: new Headers({ [MONEY_TRIP_CATEGORY_HEADER]: '1' }),
+      })
     },
 
     moneyChartMonth: async (month) => {

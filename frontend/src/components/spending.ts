@@ -365,6 +365,8 @@ export type JournalRow =
       readonly items: number
       readonly amount: Money
       readonly counted: Money | null
+      /** The trip's own category (MOL-400); `null` — «Продукты». */
+      readonly categoryId: string | null
     }
 
 export interface JournalDay {
@@ -454,6 +456,7 @@ export function journalOf(
                 items: entry.items,
                 amount: entry.amount,
                 counted: entry.counted,
+                categoryId: entry.categoryId ?? null,
               },
             ]
       const { id } = entry.spending
@@ -683,9 +686,12 @@ export function unbroken(text: string): string {
   return head + text.slice(head.length).replaceAll(' ', '\u00a0')
 }
 
-/** Purchases are drawn in the colour of «Продукты», where they land (Ф-4) — never the accent. */
-export function tripTint(groceries: SpendingCategoryView | null): string {
-  return groceries ? categoryColour(groceries) : `var(--cat-${TRIP_CATEGORY})`
+/**
+ * Purchases are drawn in the colour of their category (Ф-4, MOL-400) — «Продукты» where they name none —
+ * never the accent.
+ */
+export function tripTint(category: SpendingCategoryView | null): string {
+  return category ? categoryColour(category) : `var(--cat-${TRIP_CATEGORY})`
 }
 
 /** A spending's circle: its category's colour and icon, or no colour for one the phone does not know. */

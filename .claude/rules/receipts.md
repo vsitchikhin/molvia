@@ -1025,6 +1025,13 @@ minutes of «Вернуть» run out in the very transaction is a 404, as `payT
 drawn yet (self-review Р1-3: held for the answer, a record at the shelf with no connection would wait for it). A choice
 is kept as chosen even where it was the default, which moves with the next receipt recorded (adversarial А5).
 
+**The trip of «Записать» is in the category the review chose** (MOL-400, `money-spendings.md`): `categoryId` of the
+body, one the person has not got «Продукты», never a refusal; absent — an earlier build — «Продукты». The row is
+not now while «Записать» is on its way, as the account under it (`NavRow`'s `inactive`). The review's
+row «Категория ›» starts on the guess of the place and the receipt (a line of the class 56, a café's service); the
+choice is a draft beside the review's (`molvia.receipt-category`), as the account's is. A repeat moves no category
+chosen since in «Траты».
+
 **The same trip sent again is the same answer, another trip a 409** — the phone names the trip, as every
 write offline (MOL-24). **The same receipt recorded before is refused** (Т-11,
 `error.receipt_recorded_before`): its seller's tax number and number, the person's, while its purchases

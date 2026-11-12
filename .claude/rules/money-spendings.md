@@ -57,8 +57,8 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   currency and the snapshot's use stay; otherwise it is taken anew. The price, named: on-the-fly
   lines move when an exchange of their period is amended (С-3).
 - **The month is counted by the server** (`GET /money/months/:month`): spendings and **finished**
-  trips — one line per currency of the trip's money, on the device's day of finishing, in
-  «Продукты», read every time by `tripMoneyRows` so an amendment, the receipt's sum (MOL-78) or
+  trips — one line per currency of the trip's money, on the device's day of finishing, in the
+  trip's own category, else «Продукты» (MOL-400, below), read every time by `tripMoneyRows` so an amendment, the receipt's sum (MOL-78) or
   MOL-76's removal moves it by itself, **each line counting the purchases behind its own sum**
   (owner's decision В-7) — every purchase of the trip under a receipt, which stands for all of them;
   a trip with no price and a receipt's sum is a line, one with neither is none — what came
@@ -70,6 +70,41 @@ so (В-2) — the boundary is held by the hint, not by a ban, because the owner'
   the journal is read from the start — which the screen does after its own amendment of a day (round
   2, Е3). A row no money can hold is «не посчитано», never a failed month (Д5, MOL-66's rule). A
   month is one of the days a rate may be dated by — `0000-01` is 404, not a 500 from Postgres (Д4).
+- **A trip is counted in its own category** (MOL-400, owner's В-1…В-4 «а», 11.11.2026: «это может быть кафе, или
+  животные… и в «Тратах» должна быть возможность сменить категорию»). `trips.category_id`, the pair with the owner
+  as a spending's; empty is «Продукты», as every trip was — old trips and a phone of an earlier build move nothing.
+  **One for the whole trip** (В-1 «а»): one receipt, one category; a line of its own is not in it. **Chosen where the
+  account is** (MOL-312's places): the receipt's review — sent in «Записать» — «Закончить» of a record by hand — a
+  write `category` of the trip's queue before the finish — and the summary of «Траты», at once through the queue.
+  **A category the person has not got is never a refusal, and moves nothing** (adversarial А1): the write came
+  from a queue; on a new trip of «Записать» it is «Продукты», and `PUT /trips/:id/category` leaves the trip with the
+  one it has — written as «Продукты», a category still on its way in the spendings' queue took the choice before it
+  with it. A removed one of theirs is taken. **So the list of a trip offers no category still waiting in the
+  spendings' queue**, nor «+ Своя»: the two queues send apart, and the trip could land first. **The month reads it
+  by one seam**, `categoryOfEntry`, so «Бюджет» and both «Графики» follow with no second count; the line of the
+  month carries it only to a phone that asks (`MONEY_TRIP_CATEGORY_HEADER`), since the month's answer is strict.
+  **The default is a guess** (В-2 «а», «some algorithm that assumes», `guessedTripCategory`): the category of the
+  person's last trip at that place (`GET /trips/place-categories`, every phone's, laid over what this one recorded
+  since), else «Кафе» for a receipt of food service — a line of the class 56 or a café's service (`servesFood`) —
+  else «Продукты»; a category taken out of the choice is passed over. **It follows the answers until the person
+  chooses** — on the review and in «Закончить» alike (review №2, А3): one taken once as the sheet opened missed the
+  server's answer that came a moment later. «Закончить» reads the list and the places' last ones as it opens, never
+  with every opening of «Покупки» (review №6, as «Счета», MOL-312 Р1-2). **The list is kept as the server last
+  answered it** (`molvia.own-categories`, А3 «б»): at the shelf with no connection, on a phone where «Деньги» was
+  never opened, the list was empty — **with when its read set out, and the later of it and the newest month of
+  «Деньги» is the list** (adversarial Б1): taken first whatever its age, it hid «Аптека» made in «Деньги» since.
+  **A choice made in a sheet stays its word for that opening** (review №1, А2, Б2): the summary of «Траты» holds the
+  month's row as it was when opened, and a choice that landed gave way to it; kept past the opening, it hid a change
+  made in another window since. **Only the sheet's own word keeps a choice from going** — a write in the queue,
+  a choice of this opening — never the month's row, which may be older than the server: a choice landed and the
+  month not read again, from this sheet or another screen's (В1, В2). A choice equal to it goes anyway — a write
+  of the category is whole, and a repeat moves nothing. A transfer's fee stays «Прочее» (В-4
+  «а»). Accounting only: no item, price, verdict or memory of a shop moves, and a café's receipt is still recorded
+  as a shop's (MOL-226). **The prices, named:** until «Обновить» a phone of an earlier build draws every trip as
+  «Продукты» and records a receipt so; a category made in «Категории» with no connection is offered to a trip once
+  it has landed; a choice made here and not landed gives way to the server's older answer of the place until it
+  lands; a trip view carries no category, so «Закончить» of a record whose category was set in «Траты» before it is
+  finished starts on the guess and writes it over.
 - **A closed month is counted in the income currency by the rate of its last day, frozen the first
   time it is read** (`money_month_rates`): a new exchange today does not move August. **A fact of
   August amended later does** (owner's decision В-6): writing, amending, removing or bringing back
@@ -454,7 +489,8 @@ nothing up.
   any dated later, a tie and a category not used in the order of the list — a newcomer's, the presets as
   listed. A transfer's fee is no choice and does not count; «Прочее · сверка» does — only its note in the
   language of a screen tells it, and the server knows none (the price: a check or two a month in
-  «Прочее»). A trip's purchases are no spending and never count. **An order, not counts**, and a field
+  «Прочее»). A trip's purchases are no spending and never count — its category too (MOL-400): the review
+  and «Закончить» send their guess with every trip, so a choice cannot be told from the default. **An order, not counts**, and a field
   of the answer, not of a category: the category's view is the budget's and the charts' too, and
   `categoryOrder` stays the order of everything but the choice — a row of «Бюджет» does not move by
   frequency. **The phone takes the order when the sheet opens and keeps it while it is up**
@@ -1013,7 +1049,7 @@ task did not: five plans of six there are a percent of the month's income — «
   The sheet says what it was and asks for a sum anew.
 - **What was spent is the month's `byCategory`, never a second count** (Р-2): the budget is
   `monthBudget` over the very `countMonth` and `monthRate` of `GET /money/months/:month`, frozen and
-  settled as it is (`settleThaws`); a trip is in «Продукты»; an integration test holds every row
+  settled as it is (`settleThaws`); a trip is in its category, else «Продукты»; an integration test holds every row
   equal to the month. **A sum not whole is no share**: a category short of a rate, or a share of a
   «Пришло» short of one, has its «осталось» but no percent, and the total is not said as a figure on
   the way in.

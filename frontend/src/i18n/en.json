@@ -876,7 +876,8 @@
       "trip_note": "This spending came from Purchases and is changed there — with the prices and ratings of the items",
       "trip_open": "Open in Purchases",
       "trip_items_offline": "The items will appear when the connection is back",
-      "trip_items_error": "Could not load the items"
+      "trip_items_error": "Could not load the items",
+      "trip_category_saved": "Purchases category: {name}"
     },
     "categories": {
       "title": "Categories",

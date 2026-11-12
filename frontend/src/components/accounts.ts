@@ -154,10 +154,9 @@ export function operationRowProps(
   const { t } = context
   const { kind } = operation
   const groceries = context.categories.find((one) => one.preset === 'groceries') ?? null
-  const category =
-    kind === 'trip'
-      ? groceries
-      : (context.categories.find((one) => one.id === operation.categoryId) ?? null)
+  const named = context.categories.find((one) => one.id === operation.categoryId) ?? null
+  // a trip in its own category (MOL-400), «Продукты» where it names none
+  const category = kind === 'trip' ? (named ?? groceries) : named
   const categoryName = category ? context.nameOf(category) : t('spending.category.other', {})
   // «Прочее · сверка»: what «Записать разницу» wrote (handoff 05) — its note and «Прочее».
   const reconciled =
@@ -166,7 +165,7 @@ export function operationRowProps(
     (kind === 'income' ? operation.source === 'other' : category?.preset === 'other')
 
   let look: { readonly icon: OperationRowProps['icon']; readonly tint: string }
-  if (kind === 'trip') look = { icon: tripIcon, tint: tripTint(groceries) }
+  if (kind === 'trip') look = { icon: tripIcon, tint: tripTint(category) }
   else if (kind === 'income') look = { icon: markRaw(IconCashPlus), tint: 'muted' }
   else if (kind === 'exchange') look = { icon: markRaw(IconSwap), tint: 'muted' }
   // Not a spending: the circle of an exchange or an income, never a category's (MOL-253, Ф-4).

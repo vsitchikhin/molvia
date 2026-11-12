@@ -407,7 +407,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   its sides are 8 and it stands 8 into the row's padding at the right, so beside a circle of 40 a word of
   a name fits at 320 under the widest word of the tail (adversarial А2: «Развлечения» broke in its middle
   at 16; Б1: under «Вернуть» with the sides alone). `NavRow` without `to` is a button that opens a sheet and says so
-  (`aria-haspopup="dialog"`). **Among the fields of a form it is drawn as one** (`field`, MOL-199):
+  (`aria-haspopup="dialog"`); `inactive` is the kit's not now — `aria-disabled`, no chevron, the tap going nowhere, no
+  pointer and no light under it, a list's row as a field (MOL-400, as `AccountRow`). **Among the fields of a form it is drawn as one** (`field`, MOL-199):
   the well of `AccountRow` — `--surface-2`, a `border-strong` edge, the tint under the pointer — since a
   list's row, with no fill and no edge, read in a form as plain text; `invalid` marks a field behind it
   that holds an error (a `--bad` edge, `aria-invalid`). **Their classes are the kit's own words**
@@ -828,7 +829,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   **On `ListRow`, by two things the kit gained**: `tint`, the icon of 24 in a circle of 40
   (`--row-circle`) in a category's colour on `--cat-tint-share`, or `muted` (`surface-2`,
   `text-muted`) for an income, an exchange, a spending whose category the phone does not know —
-  never the accent, which is «press here» (Ф-4): purchases take the circle of «Продукты»; and `#below`,
+  never the accent, which is «press here» (Ф-4): purchases take the circle of their category, «Продукты» where they name none (MOL-400); and `#below`,
   the tag under the meta, since in the meta it would be cut with it. **The chevron is on every row** —
   every one opens a sheet to go on with — so the amounts end in one column; a sum over the rows stands
   in it by `--space-tail` (the card's hairline, the row's inset, the chevron and the gap: the day's sum
