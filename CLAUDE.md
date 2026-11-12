@@ -297,7 +297,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and the year come in one answer** (MOL-168): each from the day after the same day N months back,
   whole months on a month's last day — the year is the window of «Обмены против рынка» — the month
   by days, a weekend at Friday's figure; the pairs are the year's, and the period is the screen's
-  address.
+  address. **«Обмен денег» is drawn, not tabled** (MOL-348): a bar an exchange, a track of a currency's
+  rates, the line «мой — ЦБ РА» — every height, place and order the server's (`exchange-screen.ts`), sent
+  only to a phone that asks (`EXCHANGE_SCREEN_HEADER`).
 
 ### Money: spendings and «Деньги» — `.claude/rules/money-spendings.md`
 

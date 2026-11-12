@@ -537,7 +537,8 @@ rate exactly as before.
   named the central bank (review П-3). The best is marked among the figures of the latest day still
   fresh today — an exchange office of last week is shown, not starred beside today's banks, as a card
   sets it only beside its own day (review П-5). The server marks it; the phone compares nothing.
-- **On the card the market comes first and the central bank under it, a step quieter** (Р-5).
+- **On the card the market comes first and the central bank under it, a step quieter** (Р-5) — since MOL-348 on
+  the plate of the amendment's sheet (`ExchangeComparison`): the list's row says only the difference with the market.
 - **Against the market the difference takes its tone, its sign and a word; against the central bank
   it stays neutral** (MOL-187, Ф-30 of MOL-118, owner's В-11). The rule of MOL-81, «the difference is
   neutral always», is withdrawn for the market: there a minus is an exchange worse than one could
@@ -709,6 +710,35 @@ rate exactly as before.
   note is the person's, and what they see of it is not the chart's to decide. **The price, named:** a
   plate in the page for each exchange of the period, unseen — some fifty in a year of weekly ones —
   and another period may stand the chart a line higher or lower, a change of the screen's own query.
+
+## «Обмен денег» drawn (MOL-348)
+
+**The screen answers «хорошо ли я меняю» with a picture, never a table** (owner, 31.10 and 12.11.2026: the screen
+«сложный и перегруженный», the table of rates and the card of an exchange the worst of it, «Обмены против рынка» not
+understood). The design is Claude Design's handoff `design_handoff_mol_348`, checked against these rules
+(`.lavish/mol-348-check.html`); where the two parted, the rules held (Р-11…Р-19 of the plan).
+
+- **Every height, place and order is the server's, as on the line of the rate** (Р-12, `exchange-screen.ts`):
+  `vsMarketBars` — a bar an exchange of the twelve months, oldest first, two of a day in the order made, its level the
+  drams of «Обмены против рынка» against the furthest, its sign the card's money (MOL-190) — an exchange the sum leaves
+  out is a bar «без сравнения» on the line, never one by the central bank; `marketTrack` — each currency's one track
+  from its lowest figure to its highest, the central bank on it, «продать» by the highest the bank buys at first,
+  «купить» by the lowest it sells at first; `walletTrack` — «мой — ЦБ РА сегодня» by the printed figures, the lower
+  left, only for a pair the block of the market has. The handoff had the markup work them out of percents and rates.
+- **The new fields go only to a phone that asks** (`EXCHANGE_SCREEN_HEADER`): `bars`, `walletTrack`, a currency's
+  `track` — an installed app of an earlier build reads the answer strictly. Without them the screen stands the lines as
+  they came, with no dots, and no line beside «Мой курс».
+- **«Ровно» is a zero of money, as before** (Р-13): the handoff's |%| < 0,05 was a new rule and was not taken.
+- **The line of the rate is still named all bank clients** (Р-11, MOL-161 Р-3), and its marks to the market stay
+  (В-1 of MOL-161); the dot takes the money's tone, the chosen one a terracotta ring around it, and a bar chosen on
+  «Обмены против рынка» chooses the same exchange there, its pair with it.
+- **«Удалить обмен?» stays** (Р-16, В-5): the handoff took it away on the word that «Перевод» removes at once, which
+  it does not.
+- **One currency of «Курсы по данным ЦБ РА» at a time** (Р-18), the latest exchange's first; the figures always seen.
+- **The amount and its currency are one well** of the sheet (`CurrencySelect` in the field's `#suffix`), its account
+  under it; «Как меняли» says what the exchange will be set beside; «Подставить» puts the focus in the field
+  (MOL-338 п. 2). An exchange is still written with a connection only (Р-15), «Было ֏ до обмена» still decided by
+  `receipts` and `heldEstimates` (Р-14).
 
 ## Incomes
 
