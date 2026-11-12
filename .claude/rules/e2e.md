@@ -16,13 +16,31 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   CI ran the very same suite on every push anyway — on GitHub's machines, in parallel, with no line,
   and for free on a public repository — so the push was paying a second time for an answer CI
   already gave. **What keeps it a gate is the ruleset on `master`**: a pull request merges only when
-  both jobs, «format, lint, types, tests» and «end-to-end», are green; before it nothing but habit
+  both checks, «format, lint, types, tests» and «end-to-end», are green; before it nothing but habit
   stopped a red merge. **And a flake fails CI** (`failOnFlakyTests`): the push ran with no retries,
   so a flaky test failed loudly there; CI keeps its two retries so the report names a flake as one,
   but a test green only on a retry is red. **The price, named:** the answer comes with CI, some
   seven minutes after the push, rather than in two to four here with an empty line; the agent's
   «done» waits for it (`gh pr checks --watch`). Since MOL-165 every other check is CI's as well. `make e2e` is the same suite here, on demand — for a
   spec being written, or a change the agent wants seen before it leaves the machine.
+
+- **CI runs end-to-end as four shards side by side** (MOL-375, owner's В-1 «а»): on one runner with two
+  workers the suite took 21–23 minutes of the 23–24 a pull request waited, and every round of review waited
+  it again. `--shard=i/4` of a matrix, `fail-fast: false` — a red shard cancels no other, whose flakes and
+  traces are wanted too — each shard with its own Postgres, stack and build, its traces as
+  `playwright-traces-<i>`; `failOnFlakyTests` is the config's, so every shard holds it. **The check the
+  ruleset requires is a gate job named «end-to-end»** over the shards, `if: always()` and red unless all of
+  them succeeded: a required job skipped counts as passed. **Playwright splits by the count of tests, in the
+  order of the projects, and never splits a project others depend on**: `pwa`, with `pwa-update.spec` in
+  series, is taken out of the split and runs whole in every shard holding `csp-built` (`pwa-camera`,
+  `pwa-iphone`), on that shard's own build — read in Playwright's source, `filterForShard` and
+  `createRootSuite`. On 12.11.2026, of 634 tests, shards 1–3 held 157 of `phone` each and shard 4 the rest of
+  `phone`, `camera`, `pwa` and `csp-built`, and `iphone`. A boundary falling inside `csp-built` would run `pwa`
+  in two shards on two builds: right, a minute more. **Workers stay two** (В-2 «а»): the stack shares the
+  runner's four cores with the browsers (the login under load, below). **The prices, named:** eight jobs a run
+  where there were two — GitHub's free plan runs twenty at once for the account, so copies pushing together
+  queue; each shard pays the image, `npm ci` and the stack again; the split is by count, not time, so the
+  heaviest shard — shard 4, with WebKit, the full Chromium and the build — sets the pace.
 
 - **CI runs end-to-end in the image of Playwright, `mcr.microsoft.com/playwright:v<version>-noble`**
   (MOL-295). Until then the job installed the browsers with `--with-deps` on every run: the browsers
@@ -55,10 +73,11 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
     (adversarial А4). Both are checked, and a run given them says where the databases are.
   - The image's Node is 24; `setup-node` keeps `.nvmrc`'s. The job runs as the runner's uid
     (`--user 1001`, as Playwright's documentation has it).
-  - **The job has 40 minutes and its tests 35** (`timeout-minutes`, В-2 «а»): a hung step was held
+  - **A shard has 25 minutes and its tests 20** (`timeout-minutes`, В-2 «а»; the one job had 40 and 35
+    until MOL-375): a hung step was held
     for six hours. The job's limit cancels it, and with `if: failure()` a cancelled job uploaded
     nothing — the traces already written went with the container (adversarial А5). **The upload runs
-    on `failure() || cancelled()`**: a slow pull or `npm ci` leaves the tests less than their 35
+    on `failure() || cancelled()`**: a slow pull or `npm ci` leaves the tests less than their
     minutes, and the job's limit comes first (Б2) — cancelled by it, the job still uploaded its traces
     (run 40326400563, attempt 2). The step's own limit makes a hung run end failed, not cancelled —
     which reads as a newer push (run 40313375737). **The prices, named:** the step is killed with no

@@ -185,7 +185,7 @@ by itself; the owner's decisions are В-1…В-5 in `.scratch/tasks/plans/MOL-36
   `docker run …@sha256` of a workflow neither does; their actions would have been code of third authors beside
   `packages: write`, which `allowed_actions` keeps out (MOL-364).
 - **gitleaks reads every commit of a pull request** (`HEAD^1..HEAD^2` of the merge CI checks out), first in the job
-  `check` — a third job would need the ruleset changed, and red in seconds is the point. **A commit, not the diff**:
+  `static` (MOL-375 split `check`, a gate job keeping the name the ruleset requires) — red in seconds is the point. **A commit, not the diff**:
   a secret removed by the next commit is public in its ref all the same, so the step stays red until the secret is
   rotated by its row of «Rotating the secrets» and its fingerprint goes into `.gitleaksignore` with a line of what
   it was and the day (Р-4) — a record, never a rewrite. `--redact`: the log of a public repository is public. A push

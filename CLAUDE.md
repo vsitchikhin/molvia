@@ -844,8 +844,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### End-to-end — `.claude/rules/e2e.md`
 
 - **End-to-end has a database and ports of its own**, and the database is dropped before every run.
-- **End-to-end runs in CI, not on the push** (MOL-164): a pull request merges only on both jobs
-  green, and a test green only on a retry is red there.
+- **End-to-end runs in CI, not on the push** (MOL-164): a pull request merges only on both required checks
+  green, and a test green only on a retry is red there. **It runs as four shards** (MOL-375), each with its
+  own database and build; `pwa`, which others depend on, is never split.
 - **Every spec comes in through `open()` in `e2e/session.ts`.**
 - **The sheet, the kit's «not now», its rows and the error's strip also run on WebKit** (`iphone`, MOL-80,
   MOL-174, MOL-175, MOL-180); a test it cannot run says why.
@@ -939,7 +940,7 @@ differently in every working copy by design.
 
 - **Every check is CI's** (MOL-164, MOL-165): lint, types, every test and end-to-end run there on
   every push, in parallel and with no queue between the copies, and **`master` takes a pull
-  request only when both CI jobs are green** — a ruleset, not a habit. A flake green only on a
+  request only when both required checks are green** — a ruleset, not a habit. A flake green only on a
   retry fails CI (`failOnFlakyTests`). There is no `pre-push`.
 - **The one local hook that checks is `pre-commit`, and only the formatting of the files
   committed** (`.githooks`, wired by `make setup`, no husky) — seconds, since CI checks formatting
@@ -952,8 +953,10 @@ differently in every working copy by design.
   lock gives the command no terminal, so vitest does not watch by default, and refuses a vitest told
   to watch and Playwright's `--ui` and `--debug`, which never give it back. Why, in
   `.claude/rules/workspace.md`.
-- **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, in two
-  jobs: checks and e2e. CI **checks** formatting rather than fixing it — `make format`
+- **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, side by
+  side (MOL-375): «format, lint, types», the tests, and end-to-end in four shards; two gate jobs carry the
+  names the ruleset requires, «format, lint, types, tests» and «end-to-end», each red unless all it waits
+  for succeeded — `if: always()`, since a required job skipped counts as passed. CI **checks** formatting rather than fixing it — `make format`
   mutates files, and a diff must fail rather than be silently repaired. It generates its
   `.env` with the same `bin/init-env.sh` every working copy uses, so CI cannot drift from
   local setup.
@@ -1247,7 +1250,7 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
 
 ### After a task
 
-**Definition of Done: both CI jobs green on the pull request** (`gh pr checks --watch`, MOL-165).
+**Definition of Done: both required checks green on the pull request** (`gh pr checks --watch`, MOL-165).
 Every check runs there, so «pushed» is not «done», and a red CI is the task's to fix exactly as a
 refused push once was. Locally the work runs what it needs to be written — the test file being
 changed, `make check` or `make e2e` when the agent wants an answer before the push — never as a
