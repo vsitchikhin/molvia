@@ -13,6 +13,7 @@ import type {
   ExchangeView,
 } from '@molvia/model'
 import ExchangeSheet from '@/components/ExchangeSheet.vue'
+import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
@@ -236,6 +237,21 @@ describe('ExchangeSheet', () => {
     expect(view.text()).toContain('held before the exchange')
   })
 
+  // MOL-338 п. 2, in MOL-348: «Подставить» lays the figure in the field and the focus with it, so the
+  // person can put it right at once; nothing is saved.
+  it('«Fill in» puts the figure in «held before» and the focus in it, saving nothing', async () => {
+    const income = { id: '5d1c6a2b-3e4f-4a5b-8c6d-7e8f9a0b1c2d', currency: 'AMD' as const }
+    const view = await render(
+      overview({ exchanges: [], receipts: [{ ...income, on: '2026-09-01', priced: true }] }),
+    )
+    view.findComponent(HeldFromAccounts).vm.$emit('fill', { minor: 18_430_000n, currency: 'AMD' })
+    await flushPromises()
+    const held = view.get<HTMLInputElement>('[data-field="held"]')
+    expect(held.element.value).toBe('184300')
+    expect(document.activeElement).toBe(held.element)
+    expect(record).not.toHaveBeenCalled()
+  })
+
   it('asks what was held only from the second exchange of the pair, and hints at it', async () => {
     const first = await render(overview({ wallet: null, heldEstimates: [], exchanges: [] }))
     expect(first.text()).not.toContain('held before the exchange')
@@ -412,15 +428,24 @@ describe('ExchangeSheet', () => {
     expect(received.at.marked).toBe('true')
   })
 
-  it('one currency on both sides: the focus goes to the currency of «Got»', async () => {
+  // The currency stands in the well of its amount since MOL-348: «Got» is marked, its currency in it.
+  it('one currency on both sides: the focus goes to «Got», whose well holds its currency', async () => {
     const view = await render()
     await fill(view, '20000', '95000')
-    const select = view.findAll('select')[1]
-    await select?.setValue('RUB')
+    const received = field(view, en.exchange.sheet.received)
+    await received.get('select').setValue('RUB')
     saveButton(view).focus()
     await save(view)
     expect(record).not.toHaveBeenCalled()
-    expect(document.activeElement).toBe(select?.element)
+    expect(document.activeElement).toBe(received.get('input').element)
+    expect(received.text()).toContain(en.exchange.sheet.same_currency)
+  })
+
+  it('says what the exchange will be set beside, by «How it was changed» (MOL-348)', async () => {
+    const view = await render()
+    expect(view.get('.channel .hint').text()).toBe(en.exchange.sheet.compared.none)
+    await view.get('.channel input[value="bankCash"]').setValue(true)
+    expect(view.get('.channel .hint').text()).toBe(en.exchange.sheet.compared.bankCash)
   })
 
   // «Done» on the keyboard sends the form with the focus in the note: nothing to move, so it is said.

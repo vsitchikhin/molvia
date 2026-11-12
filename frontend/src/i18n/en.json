@@ -1010,7 +1010,6 @@
       "meta": "What you gave and what you got — the rate is worked out for you",
       "given": "Gave",
       "received": "Got",
-      "currency": "Currency",
       "same_currency": "The same currency on both sides is not an exchange",
       "day": "Day of the exchange",
       "held": "{currency} held before the exchange",
@@ -1042,7 +1041,15 @@
       "channel_none": "Not said",
       "channel_bankCash": "Bank, cash",
       "channel_bankNoncash": "Non-cash",
-      "channel_exchanger": "Exchange office"
+      "channel_exchanger": "Exchange office",
+      "currency_given": "Currency you gave",
+      "currency_received": "Currency you got",
+      "compared": {
+        "none": "Compared with the best market rate of the day",
+        "bankCash": "Compared with banks’ cash rate of the day",
+        "bankNoncash": "Compared with banks’ non-cash rate of the day",
+        "exchanger": "Compared with exchange offices’ rate of the day"
+      }
     },
     "edit_on": "Amend the exchange of {date}:",
     "card_given": "Gave",
@@ -1087,21 +1094,16 @@
       "cb": "Central bank {rate}",
       "sell_title": "Sell {currency}",
       "buy_title": "Buy {currency}",
+      "unit": "֏ for 1 {sign}",
+      "legend": "{unit} · ★ the best for you · dashed — the central bank",
+      "legend_no_cb": "{unit} · ★ the best for you · no central bank rate today",
+      "legend_no_best": "{unit} · rates over a week old — no best marked",
+      "channel_noncash": "Bank, non-cash",
       "plural": {
         "RUB": "roubles",
         "USD": "dollars",
         "EUR": "euros"
-      },
-      "channel_short": {
-        "bankCash": "Bank, cash",
-        "bankNoncash": "Bank, non-cash",
-        "banksAll": "Banks, all clients",
-        "exchanger": "Exchange offices"
-      },
-      "unit": "֏ for 1 {sign}",
-      "legend": "{unit} · ★ the best for you · dashed — the central bank",
-      "legend_no_cb": "{unit} · ★ the best for you · no central bank rate today",
-      "legend_no_best": "{unit} · rates over a week old — no best marked"
+      }
     },
     "vs_market": {
       "title": "Exchanges against the market · 12 months",
@@ -1123,8 +1125,7 @@
       "places": "Where you exchanged",
       "place_count": "× {n}",
       "none_said": "not compared · no market or rate for that day",
-      "incomes_only": "No exchanges yet. Record the first — and this will show whether you beat the market or not",
-      "none": "not compared"
+      "incomes_only": "No exchanges yet. Record the first — and this will show whether you beat the market or not"
     },
     "rate_chart": {
       "title": {

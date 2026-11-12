@@ -29,8 +29,7 @@
         role="row"
       >
         <span class="channel" role="rowheader"
-          >{{ t(`exchange.market.channel_short.${line.basis}`) }}
-          <span class="day">{{ line.day }}</span></span
+          >{{ t(SHORT[line.basis]) }} <span class="day">{{ line.day }}</span></span
         >
         <span class="track" aria-hidden="true">
           <span class="rail"></span>
@@ -73,6 +72,14 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import { calendarDayOfAnyYear } from '@/days'
 
 type Quote = MarketToday['quotes'][number]
+
+/** A channel named short, as «Как меняли» names it (handoff 05) — the words the app already has. */
+const SHORT: Readonly<Record<Quote['basis'], string>> = {
+  bankCash: 'exchange.sheet.channel_bankCash',
+  bankNoncash: 'exchange.market.channel_noncash',
+  banksAll: 'exchange.channel.banksAll',
+  exchanger: 'exchange.channel.exchanger',
+}
 
 /**
  * «Курсы по данным ЦБ РА» (MOL-137, owner's В-1; drawn anew in MOL-348, handoff 05): one currency at a
@@ -176,6 +183,7 @@ export default defineComponent({
     )
     return {
       t,
+      SHORT,
       headingId: useId(),
       level: CHART_LEVEL,
       shown,

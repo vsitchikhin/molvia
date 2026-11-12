@@ -1605,7 +1605,7 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     exchanges.mockResolvedValue(overview())
     const button = (await render()).get('.rows button.list-row')
     expect(button.find('.amount').exists()).toBe(false)
-    expect(button.get('.word').text()).toBe(en.exchange.vs_market.none)
+    expect(button.get('.word').text()).toBe(en.exchange.rate_chart.no_change)
     expect(button.get('.word').classes()).not.toContain('bad')
   })
 

@@ -39,22 +39,24 @@
 
     <form ref="form" class="form" @submit.prevent="submit">
       <div v-for="side in sides" :key="side" class="pair">
+        <!-- The amount and its currency in one well (MOL-348, handoff 07): one side, one group. -->
         <AppField
           v-model="amounts[side]"
           :label="t(`exchange.sheet.${side}`)"
           kind="decimal"
           :error="amountErrors[side]"
-          enterkeyhint="next"
-        />
-        <AppField
-          v-model="currencies[side]"
-          :label="t('exchange.sheet.currency')"
-          kind="select"
-          :options="currencyOptions"
           :error-text="
             side === 'received' && sameCurrency ? t('exchange.sheet.same_currency') : null
           "
-        />
+          enterkeyhint="next"
+        >
+          <template #suffix>
+            <CurrencySelect
+              v-model="currencies[side]"
+              :label="t(`exchange.sheet.currency_${side}`)"
+            />
+          </template>
+        </AppField>
         <!-- The account of this side, under its own pair; only accounts of its currency (06). -->
         <AccountRow
           v-if="showsAccounts"
@@ -79,12 +81,16 @@
 
       <!-- How the money was changed, optional (MOL-137, В-1): the card then also says how this
            exchange stood against its own channel, not only against the best of the day. -->
-      <SegmentedControl
-        v-model="channel"
-        :options="channelOptions"
-        :legend="t('exchange.sheet.channel')"
-        fit
-      />
+      <div class="channel">
+        <SegmentedControl
+          v-model="channel"
+          :options="channelOptions"
+          :legend="t('exchange.sheet.channel')"
+          fit
+        />
+        <!-- What the choice means, said (MOL-348, handoff 07): what the exchange is set beside. -->
+        <p class="hint">{{ t(`exchange.sheet.compared.${channel || 'none'}`) }}</p>
+      </div>
 
       <AppReveal>
         <div v-if="showsHeld">
@@ -92,6 +98,7 @@
             v-model="held"
             :label="t('exchange.sheet.held', { currency: sign(currencies.received) })"
             kind="decimal"
+            data-field="held"
             :error="heldError"
             :aria-describedby="`${id}-held`"
           />
@@ -182,14 +189,13 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, reactive, ref, toRef, useId, watch } from 'vue'
+import { computed, defineComponent, nextTick, reactive, ref, toRef, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ApiError } from '@molvia/client'
 import {
   ERROR,
   EXCHANGE_NOTE_MAX,
-  currencySchema,
   currencySign,
   decimalFromMinor,
   exchangeChannelSchema,
@@ -217,6 +223,7 @@ import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
 import AppReveal from '@/components/AppReveal.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
+import CurrencySelect from '@/components/CurrencySelect.vue'
 import ExchangeComparison from '@/components/ExchangeComparison.vue'
 import HeldFromAccounts from '@/components/HeldFromAccounts.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
@@ -253,6 +260,7 @@ export default defineComponent({
     AppField,
     AppReveal,
     BottomSheet,
+    CurrencySelect,
     ExchangeComparison,
     HeldFromAccounts,
     IconCheck,
@@ -430,14 +438,11 @@ export default defineComponent({
       { immediate: true },
     )
 
+    /** «Подставить» puts the figure in the field and the focus with it, saving nothing (MOL-338 п. 2). */
     function fillHeld(value: Money): void {
       held.value = shown(decimalFromMinor(value), locale.value === 'ru' ? ',' : '.')
+      void nextTick(() => form.value?.querySelector<HTMLElement>('[data-field="held"]')?.focus())
     }
-
-    const currencyOptions = currencySchema.options.map((currency) => ({
-      value: currency,
-      label: `${currencySign(currency, locale.value)} ${currency}`,
-    }))
 
     const channelOptions = computed(() => [
       { value: '', label: '—', spoken: t('exchange.sheet.channel_none') },
@@ -682,7 +687,6 @@ export default defineComponent({
       amounts,
       currencies,
       amountErrors,
-      currencyOptions,
       sameCurrency,
       sign,
       today,
@@ -730,21 +734,11 @@ export default defineComponent({
   gap: var(--space-4);
 }
 
+/* One side — the amount, its currency in the same well, its account under it — is one group (MOL-348). */
 .pair {
   display: grid;
-  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
-  gap: var(--space-3);
-}
-
-/* Narrower than this the sum and its currency stand one under the other (MOL-321, adversarial И2, И3): side by side
-   at 200 % the sum had 89 px — «125403» read «1254» — and the currency under its chevron none, «₽ RUB» unseen. In
-   rem, as every turn of large text: the form is 18rem at 100 % on 320 and keeps the pair. */
-$pair-beside: 15rem;
-
-@container (width < #{$pair-beside}) {
-  .pair {
-    grid-template-columns: minmax(0, 1fr);
-  }
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-2);
 }
 
 .side-account {

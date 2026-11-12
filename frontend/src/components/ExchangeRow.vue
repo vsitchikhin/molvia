@@ -101,7 +101,7 @@ export default defineComponent({
           good: 'exchange.vs_market.better',
           bad: 'exchange.vs_market.worse',
           even: 'exchange.vs_market.even',
-          none: 'exchange.vs_market.none',
+          none: 'exchange.rate_chart.no_change',
         }[kind.value],
       ),
     )

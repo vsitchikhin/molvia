@@ -235,7 +235,10 @@ describe('словарь: повторяющиеся тексты', () => {
       // Две подстраницы настроек, одно и то же «не загрузилось» (MOL-129).
       'Сервер не ответил. Попробуйте ещё раз.': ['bot.load_error.body', 'devices.load_error.body'],
       'Не получилось. Проверьте связь и попробуйте ещё раз': ['exchange.failed', 'income.failed'],
-      Валюта: ['accounts.sheet.currency', 'exchange.sheet.currency', 'income.sheet.currency'],
+      // «Продать евро» и «в евро» — одно слово в обоих падежах (MOL-348).
+      евро: ['exchange.market.plural.EUR', 'spending.charts.currency_in.EUR'],
+      // «Курсы по данным ЦБ РА» выбирают валюту тем же словом (MOL-348).
+      Валюта: ['accounts.sheet.currency', 'exchange.market.currency', 'income.sheet.currency'],
       'Прежние версии': ['exchange.sheet.history', 'income.sheet.history'],
       'Сохранить правку': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Сейчас записано: {details}': ['exchange.sheet.current', 'income.sheet.current'],
@@ -481,7 +484,11 @@ describe('словарь: повторяющиеся тексты', () => {
       ],
       'The server did not answer. Try again.': ['bot.load_error.body', 'devices.load_error.body'],
       'That did not work. Check the connection and try again': ['exchange.failed', 'income.failed'],
-      Currency: ['accounts.sheet.currency', 'exchange.sheet.currency', 'income.sheet.currency'],
+      // «Sell roubles» and «in roubles»: English keeps one word where Russian declines it (MOL-348).
+      roubles: ['exchange.market.plural.RUB', 'spending.charts.currency_in.RUB'],
+      dollars: ['exchange.market.plural.USD', 'spending.charts.currency_in.USD'],
+      euros: ['exchange.market.plural.EUR', 'spending.charts.currency_in.EUR'],
+      Currency: ['accounts.sheet.currency', 'exchange.market.currency', 'income.sheet.currency'],
       'Earlier versions': ['exchange.sheet.history', 'income.sheet.history'],
       'Save the amendment': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Now recorded: {details}': ['exchange.sheet.current', 'income.sheet.current'],
@@ -584,7 +591,6 @@ describe('словарь: плюральные формы', () => {
       'spending.list.count',
       'spending.list.unsent',
       'exchange.vs_market.uncounted',
-      'exchange.vs_market.count',
       'sign_out.unsent',
       'feedback.attached_pictures',
       'field.left',
