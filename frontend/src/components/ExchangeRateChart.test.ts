@@ -796,16 +796,19 @@ describe('ExchangeRateChart by period (MOL-168)', () => {
     expect(view.find('.mine-place').text()).toContain('Обменник')
   })
 
-  it('a choice of the year the month has not got stands the month on its own latest (Ж1)', async () => {
+  it('a choice of the year the month has not got: the month stands on no exchange and says so (Ж1)', async () => {
     const { view } = chart([rouble({}, { 1: month() })], 1)
     await view.setProps({ choice: { id: 'a0000000-0000-4000-8000-000000000003' } })
     expect(view.get('.mine-rate').text()).toContain('28 февр.')
-    // 10 February is the year's only: not the 28th just left, the month's latest.
+    // 10 February is the year's only: neither the 28th just left nor the month's own latest.
     await view.setProps({ choice: { id: 'a0000000-0000-4000-8000-000000000001' } })
-    expect(view.get('.mine-place').text()).toContain('Обменник')
+    expect(view.find('.mine-rate').exists()).toBe(false)
+    expect(view.findAll('.chosen-ring')).toHaveLength(0)
+    expect(view.get('.stack .none').text()).toBe('Выбранного обмена за месяц нет')
     // The year draws it: the line is on it again.
     await view.setProps({ months: 12 })
     expect(view.get('.mine-rate').text()).toContain('10 февр.')
+    expect(view.emitted('choose')).toBeUndefined()
   })
 
   it('an answer that brings the screen’s exchange back to the year rings it there (review №23)', async () => {
@@ -819,7 +822,7 @@ describe('ExchangeRateChart by period (MOL-168)', () => {
       { 1: month() },
     )
     await view.setProps({ chart: { pairs: [back] } })
-    expect(view.get('.mine-place').text()).toContain('Обменник')
+    expect(view.get('.stack .none').text()).toBe('Выбранного обмена за месяц нет')
     await view.setProps({ months: 12 })
     expect(view.findAll('.chosen-ring')).toHaveLength(1)
     expect(view.get('.mine-rate').text()).toContain('5 янв.')
@@ -1036,7 +1039,7 @@ describe('ExchangeRateChart: in step with «Обмены против рынка
     expect(bare.emitted('choose')).toBeUndefined()
   })
 
-  it('a currency chosen in a period with none of it tells the bars the first exchange a period brings (З1)', async () => {
+  it('must not fire: another period never stands the line on an exchange the bars are not on (З1, И1)', async () => {
     const D = 'b0000000-0000-4000-8000-000000000009'
     const usd: Pair = {
       ...dollar,
@@ -1046,18 +1049,27 @@ describe('ExchangeRateChart: in step with «Обмены против рынка
         12: { ...year(), exchanges: [point(D, '2026-01-20', 0, 0)] },
       },
     }
-    const { view } = chart([rouble({}, { 1: month() }), usd], 1)
-    await view.setProps({ choice: { id: 'a0000000-0000-4000-8000-000000000003' } })
-    await view.get('input[type="radio"][value="USD"]').setValue(true)
-    // No dollars in the month: nothing to tell yet, the bars stay.
-    expect(view.emitted('choose')).toBeUndefined()
-    // The year stands the line on them: the currency chosen is told now, as Г1 tells it.
-    await view.setProps({ months: 12 })
-    expect(view.emitted('choose')).toEqual([[D]])
-    // Must not fire: a period again is no choice.
-    await view.setProps({ months: 1 })
-    await view.setProps({ months: 12 })
-    expect(view.emitted('choose')).toEqual([[D]])
+    for (const tapDay of [false, true]) {
+      const { view } = chart([rouble({}, { 1: month() }), usd], 1)
+      await view.setProps({ choice: { id: 'a0000000-0000-4000-8000-000000000003' } })
+      await view.get('input[type="radio"][value="USD"]').setValue(true)
+      // No dollars in the month: nothing to tell, the bars stay.
+      expect(view.get('.stack .none').text()).toBe('Обменов за месяц не было')
+      // И1: a day read on the empty month changes nothing of it.
+      if (tapDay) await view.findAll('.chart input')[0]?.setValue(true)
+      await view.setProps({ months: 12 })
+      // The year draws dollars, not the bars' exchange: none ringed, none told, said why.
+      expect(view.findAll('.chosen-ring')).toHaveLength(0)
+      expect(view.find('.mine-rate').exists()).toBe(false)
+      expect(view.get('.stack .none').text()).toBe('Выбранного обмена на этой линии нет')
+      expect(view.emitted('choose')).toBeUndefined()
+      // A dollar dot chosen by hand is a choice, told up.
+      await view
+        .findAll('.chart input')
+        .find((radio) => radio.attributes('aria-label')?.includes('мой'))
+        ?.setValue(true)
+      expect(view.emitted('choose')).toEqual([[D]])
+    }
   })
 
   it('an exchange the line does not draw is chosen nowhere here, and said so (Е1)', async () => {

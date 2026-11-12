@@ -1164,6 +1164,7 @@
       "none_day": "No exchanges that day",
       "none_period": "No exchanges in {period}",
       "chosen_away": "The chosen exchange is not on this line",
+      "chosen_out": "The chosen exchange is not in {period}",
       "spoken_market": "market {rate}",
       "spoken_no_market": "no market",
       "spoken": "Week to {day}: {market}",

@@ -744,30 +744,24 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
 - **«Обменов пока нет» only with no exchange at all** (review №1, adversarial А1): exchanges of the twelve months none
   of them measured — roubles into dollars, the dinar, a day with no market — are their bars on the line and «N без
   сравнения», no sum; the note is the kit's quiet empty state inside the card (`ScreenState inline`, review №11).
-- **One choice for the screen, both ways** (adversarial А4): a bar chooses its exchange on the line of the rate — a new
-  choice each time (`choice`), so the bar already chosen comes back after a dot chosen there — and a dot chosen there
-  chooses its bar; **one action is one choice** (review №16): a tap and a key are the radio's `click`, the field takes
-  a slide only. **Until anything is chosen both stand on one default, named by the screen to both**
-  (`defaultExchange`, review №19): the latest exchange of the twelve months the line draws in its year, compared or
-  not — the line's own default (MOL-161) — else the latest bar (adversarial Б2: the bars took the latest compared,
-  and an exchange of today, its market still to come, parted them; В1: the latest bar, roubles into dollars, has no
-  dot, and the line stayed on its own). **Another currency of the line is a choice and tells the bars** the exchange
-  it stands on (Г1) — in a period with none of that currency, the first a period or an answer stands it on
-  (adversarial З1: «$» on an empty month, then the year, put the line on the dollars and left the bars on the roubles);
-  **another period is not** — it is the line's answer under its own switch, and nothing above it
-  moves (review №20, MOL-136). **The plate under the bars holds the tallest of theirs**, as the line's reading does:
-  a choice made on the line under the card moves nothing under the finger. **A choice gone from the twelve months**
-  — removed, here or on another phone, amended out of the year — **gives way to the default for both at once**
-  (adversarial Д1: each block fell back by a rule of its own). **An exchange the line draws in no period of the
-  year** — roubles into dollars, the other side of the pair — chosen on the bars or amended off the line, **is chosen
-  nowhere there, and the reading says so** (adversarial Е1: the line stayed on the exchange just left, or fell back to
-  its latest); a dot or a currency chosen there is a choice again, and an answer or a period that draws it again rings
-  it — not on the line is worked out from the screen's exchange, never kept (review №23). **The prices, named:** a
-  period without the exchange chosen stands on its own latest while the bars stay on theirs, and goes back to the
-  chosen one with a period that has it (adversarial Ж1: kept by its key, the month stood on the exchange just left);
-  with the chosen exchange not on the line the reading above the chart has no day and no figure of the market, so the
-  plot of the line stands those one or two lines higher. The plate under the bars is no live region: the radio says it
-  (review №8).
+- **One exchange on the screen: the line stands on no exchange but the bars'** (adversarial Е1, Ж1, З1, И1, review
+  №23 — each a way in where the line kept an exchange of its own; one rule worked out in `chosenIndex` replaced them).
+  A bar chooses its exchange on the line — a new choice each time (`choice`, adversarial А4), its pair with it, the
+  period's else the year's — and a dot chosen there chooses its bar; **one action is one choice** (review №16): a tap
+  and a key are the radio's `click`, the field takes a slide only. A step of the line chosen there is kept by its day
+  and tells the bars nothing. **Where the line does not draw the bars' exchange it stands on nothing and the reading
+  says why** — «Выбранного обмена за месяц нет» for another period, «…на этой линии нет» for another pair or none
+  (roubles into dollars, the other side of a pair) — never on its own latest. **Until anything is chosen both stand on
+  one default, named by the screen to both** (`defaultExchange`, review №19): the latest exchange of the twelve months
+  the line draws in its year, compared or not, else the latest bar (adversarial Б2, В1). **Another currency of the
+  line is a choice** (Г1): the line stands on the bars' exchange if that pair draws it, else on the pair's latest of
+  the period, told to the bars; with none in the period, on nothing. **Another period is not** — the line's answer
+  under its own switch; nothing above it moves (review №20, MOL-136). **The plate under the bars holds the tallest of
+  theirs**, as the line's reading does: a choice made on the line moves nothing under the finger. **A choice gone from
+  the twelve months** — removed, here or on another phone, amended out of the year — **gives way to the default for
+  both at once** (adversarial Д1). **The price, named:** standing on nothing, the reading has no day and no figure of
+  the market, so the plot stands those one or two lines higher than on an exchange. The plate under the bars is no
+  live region: the radio says it (review №8).
 - **A label of «мой — ЦБ РА» stands at its dot's end of the line**, wrapping within the card, never centred on the dot
   (adversarial Б1: centred on 850, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 %); `large-text.spec`
   gives the answer a line, since end to end has no rate of the central bank.

@@ -304,10 +304,11 @@ export default defineComponent({
     const area = ref<HTMLElement | null>(null)
     const currency = ref<Pair['currency'] | null>(null)
     const chosenKey = ref<string | null>(null)
-    /** The exchange the screen stands on, chosen here or on the bars — or null, a step or nothing. */
+    /**
+     * The exchange the screen stands on — the bars' — chosen here or there; null only for a line with no
+     * screen around it (an answer before `bars`).
+     */
     const screenId = ref<string | null>(null)
-    /** A currency chosen by hand whose period had no exchange to stand on: the first it gets is a choice. */
-    let pairWaits = false
 
     const pair = computed<Pair | null>(
       () =>
@@ -438,29 +439,39 @@ export default defineComponent({
       props.chart.pairs.find((one) =>
         one.periods[months]?.exchanges.some((point) => point.id === id),
       )
-    /**
-     * The screen's exchange drawn in no period of the year — roubles into dollars, the other side of the
-     * pair (adversarial Е1): the line chooses nothing then and says so, never standing on another
-     * exchange while the bars show this one. Worked out, never kept (review №23): kept, it outlived an
-     * answer that drew the exchange again.
-     */
-    const chosenOffLine = computed(
-      () => screenId.value !== null && drawnIn(12, screenId.value) === undefined,
-    )
 
-    // A new answer and another period keep the choice while they still have it — an exchange by its
-    // id, a step by its day (Р-6 of MOL-168); another pair starts afresh.
+    /**
+     * **The line stands on no exchange but the screen's** — the one rule that keeps the two blocks on one
+     * exchange, worked out here rather than kept by each way in (adversarial Е1, Ж1, З1, И1 and review
+     * №23 were each a way in that kept another). A step chosen here is kept by its day, an exchange chosen
+     * here is the screen's at once (it is told up); else the screen's exchange where the period draws it,
+     * and where it does not — another pair, another period, off the line — nothing, said in the reading
+     * (`noneWords`). A new answer and another period keep a step while they still have it (Р-6 of MOL-168).
+     * With no screen around the line, its own latest exchange, else its latest step.
+     */
     const chosenIndex = computed(() => {
-      if (chosenOffLine.value) return -1
-      const found = items.value.findIndex((item) => item.key === chosenKey.value)
-      return found === -1 ? defaultIndex() : found
+      const all = items.value
+      const screen = screenId.value
+      const kept = all.findIndex(
+        (item) =>
+          item.key === chosenKey.value && (item.exchange === null || item.exchange.id === screen),
+      )
+      if (kept !== -1) return kept
+      if (screen === null) return defaultIndex()
+      return all.findIndex((item) => item.exchange?.id === screen)
     })
     const chosen = computed(() => items.value[chosenIndex.value] ?? null)
-    /** The reading with no exchange chosen: the screen's not on the line, none in the period, none that step. */
+    /** The reading with nothing of the screen's to stand on: why, else no exchange that step. */
     const noneWords = computed(() => {
-      if (chosenOffLine.value) return t('exchange.rate_chart.chosen_away')
       if (period.value?.exchanges.length === 0) {
         return t('exchange.rate_chart.none_period', { period: periodIn.value })
+      }
+      const screen = screenId.value
+      if (screen !== null && chosenIndex.value === -1) {
+        const inYear = pair.value?.periods[12]?.exchanges.some((point) => point.id === screen)
+        return inYear
+          ? t('exchange.rate_chart.chosen_out', { period: periodIn.value })
+          : t('exchange.rate_chart.chosen_away')
       }
       return t(words.value.none)
     })
@@ -476,34 +487,22 @@ export default defineComponent({
     /** The spot taps go round on: the centre of the dot the round began with, and its dots. */
     let round: { x: number; y: number; keys: string[] } | null = null
 
-    /** A choice the pair shown has not got is let go: the line stands on its own default (`defaultIndex`). */
-    function keepChosenInPair(): void {
-      if (!items.value.some((item) => item.key === chosenKey.value)) chosenKey.value = null
-    }
-
+    // Another pair — by hand, by a bar, by an answer without the one shown — starts afresh: a step
+    // of one line is no step of another.
     watch(
       () => pair.value?.currency,
       () => {
-        // A pair chosen with its exchange (below) keeps it; any other starts afresh.
-        keepChosenInPair()
+        if (!items.value.some((item) => item.key === chosenKey.value)) chosenKey.value = null
         round = null
       },
     )
-    /**
-     * The line stands on the screen's exchange: its dot and its pair where the period draws it; else on
-     * nothing — said where no period of the year draws it (`chosenOffLine`), the period's own latest where
-     * only this period lacks it (the price of review №20; adversarial Ж1: kept, the line stood on the
-     * exchange just left).
-     */
+    /** The screen's exchange, chosen on the bars: its pair with it — the period's, else the year's. */
     function follow(id: string): void {
       screenId.value = id
-      pairWaits = false
-      const owner = drawnIn(props.months, id)
-      chosenKey.value = owner ? id : null
-      if (owner) {
-        currency.value = owner.currency
-        round = null
-      }
+      chosenKey.value = null
+      const owner = drawnIn(props.months, id) ?? drawnIn(12, id)
+      if (owner) currency.value = owner.currency
+      round = null
     }
 
     // A bar of «Обмены против рынка» chooses its exchange here, and its pair with it (MOL-348).
@@ -515,36 +514,19 @@ export default defineComponent({
       // The screen's choice as the line comes up too: the default it names for both blocks (Б2).
       { immediate: true },
     )
-    /**
-     * A new answer or another period. The dots move — a scale grown with a new rate, another span — and
-     * a round of the old places would turn over dots no longer under the finger (adversarial Р). The line
-     * follows the screen's exchange as a choice does (Е1, review №23): one taken off it — amended into
-     * dollars — or brought back, and a period that draws it again; kept by its key, the line fell back to
-     * its own latest, and a period back stood on another. A currency chosen by hand with no exchange to
-     * stand on tells the bars the first one a period or an answer brings (adversarial З1: the year put the
-     * line on the dollars' latest while the bars stayed on the roubles).
-     */
+    // A new answer or another period moves the dots — a scale grown with a new rate, another span
+    // — and a round of the old places would turn over dots no longer under the finger (adversarial Р).
     watch([() => props.chart, () => props.months], () => {
       round = null
-      if (screenId.value) {
-        follow(screenId.value)
-        return
-      }
-      const shown = chosen.value?.exchange
-      if (pairWaits && shown) {
-        pairWaits = false
-        screenId.value = shown.id
-        emit('choose', shown.id)
-      }
     })
 
     function choose(index: number): void {
       const item = items.value[index]
       if (!item) return
       chosenKey.value = item.key
-      screenId.value = item.exchange?.id ?? null
-      pairWaits = false
-      if (item.exchange) emit('choose', item.exchange.id)
+      if (!item.exchange) return
+      screenId.value = item.exchange.id
+      emit('choose', item.exchange.id)
     }
 
     function chooseKey(key: string | undefined): void {
@@ -553,20 +535,23 @@ export default defineComponent({
     }
 
     /**
-     * Another currency by the person's hand: the line stands on the exchange of that pair it shows — the
-     * one chosen if the pair has it, else its latest — and tells the bars, so the screen stays on one
-     * exchange (adversarial Г1: the bars stayed on theirs). A period changed is no choice of an exchange:
-     * it is the line's own answer under its own switch, and the bars above it do not move (review №20).
+     * Another currency by the person's hand is a choice (adversarial Г1): the line stands on the screen's
+     * exchange if this pair draws it in the period, else on the pair's latest there, told to the bars;
+     * with none of the pair in the period it stands on nothing, and the bars keep theirs. A period is no
+     * choice of an exchange (review №20, MOL-136): nothing above its switch moves.
      */
     function choosePair(value: string): void {
       currency.value = props.chart.pairs.find((one) => one.currency === value)?.currency ?? null
-      screenId.value = null
-      // Now, not in the watch after the render: the exchange told is the one the line will show.
-      keepChosenInPair()
-      const shown = chosen.value?.exchange
-      screenId.value = shown?.id ?? null
-      pairWaits = !shown
-      if (shown) emit('choose', shown.id)
+      chosenKey.value = null
+      round = null
+      const all = items.value
+      if (all.some((item) => item.exchange !== null && item.exchange.id === screenId.value)) return
+      for (let index = all.length - 1; index >= 0; index -= 1) {
+        if (all[index]?.exchange) {
+          choose(index)
+          return
+        }
+      }
     }
 
     function choosePeriod(value: string): void {
