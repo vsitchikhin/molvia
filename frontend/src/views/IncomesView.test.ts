@@ -203,7 +203,7 @@ describe('IncomesView: the four states', () => {
     const roots = view.findAll('.skeleton-cards')
     expect(roots).toHaveLength(2)
     for (const root of roots) {
-      expect(root.classes()).toEqual(['skeleton-cards', 'skeleton-income'])
+      expect(root.classes()).toEqual(['skeleton-cards'])
     }
     expect(view.find('.skeleton-lines').exists()).toBe(false)
   })
