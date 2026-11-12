@@ -148,6 +148,15 @@ jobs:
     if: always()
     runs-on: ubuntu-latest
     steps:
+      # Both gates' form first, so a gate whose `if: always()` went is named by the other, which runs
+      # (adversarial В1): skipped, it would pass. Two files, on the runner's own Node.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github/workflows/ci.yml
+            bin/check-ci-gates.mjs
+          sparse-checkout-cone-mode: false
+      - run: node bin/check-ci-gates.mjs
       - name: both jobs succeeded
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
@@ -245,14 +254,21 @@ jobs:
           path: test-results/
           retention-days: 7
 
-  # The name the ruleset of master requires (MOL-164), over the shards (MOL-375): as `check`, run always
-  # and red unless every shard succeeded — a matrix's result is all its legs'.
+  # The name the ruleset of master requires (MOL-164), over the shards (MOL-375): as `check`, run always,
+  # holding both gates' form and red unless every shard succeeded — a matrix's result is all its legs'.
   e2e-gate:
     name: end-to-end
     needs: [e2e]
     if: always()
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          sparse-checkout: |
+            .github/workflows/ci.yml
+            bin/check-ci-gates.mjs
+          sparse-checkout-cone-mode: false
+      - run: node bin/check-ci-gates.mjs
       - name: every shard succeeded
         env:
           RESULTS: ${{ join(needs.*.result, ' ') }}
