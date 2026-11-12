@@ -265,8 +265,11 @@ describe('ExchangeView: the four states', () => {
       }),
     )
     const view = await render()
-    // No empty state: «No exchanges yet.» of «Обмены против рынка» is its quiet note (MOL-348).
-    expect(view.find('.state').exists()).toBe(false)
+    // No empty state of the screen: «No exchanges yet» stands only as the quiet note of «Обмены против
+    // рынка», inside its card (MOL-348).
+    expect(
+      view.findAll('.state').filter((state) => !state.element.closest('.vs-market')),
+    ).toHaveLength(0)
     expect(view.get('.figure').text()).toContain('4.3')
     expect(view.text()).toContain('by the last income')
     expect(view.text()).toContain(en.exchange.preference_legend)
@@ -300,7 +303,9 @@ describe('ExchangeView: the four states', () => {
       }),
     )
     const dollars = await render()
-    expect(dollars.find('.state').exists()).toBe(false)
+    expect(
+      dollars.findAll('.state').filter((state) => !state.element.closest('.vs-market')),
+    ).toHaveLength(0)
     expect(dollars.get('.costs').text()).toContain('by the last income')
   })
 
@@ -344,20 +349,19 @@ describe('ExchangeView: «Мой курс» beside the central bank (MOL-348)', 
       }),
     )
     const card = (await render()).get('.rate')
-    const line = card.get('.beside')
+    const line = card.get('.wallet-line')
     expect(line.attributes('role')).toBe('img')
     expect(line.attributes('aria-label')).toBe('My rate 4.79 ֏/₽, the central bank today 4.34 ֏/₽')
-    expect(line.findAll('.beside-label').map((label) => label.text())).toEqual([
+    expect(line.findAll('.label').map((label) => label.text())).toEqual([
       'mine 4.79 ֏/₽',
       'central bank today 4.34 ֏/₽',
     ])
-    const [own, cb] = line.findAll('.beside-spot')
-    expect(own?.findAll('span:not(.beside-mark):not(.beside-own)')[0]?.attributes('style')).toBe(
-      'flex-grow: 850;',
-    )
-    expect(cb?.findAll('span:not(.beside-mark):not(.beside-cb)')[0]?.attributes('style')).toBe(
-      'flex-grow: 150;',
-    )
+    // Each dot by the room before it, the server's: mine, then the central bank.
+    const [own, cb] = line.findAll('.line .track-spot')
+    expect(own?.find('.own').exists()).toBe(true)
+    expect(own?.get('span').attributes('style')).toBe('flex-grow: 850;')
+    expect(cb?.find('.cb').exists()).toBe(true)
+    expect(cb?.get('span').attributes('style')).toBe('flex-grow: 150;')
     expect(line.find('.good, .bad').exists()).toBe(false)
     // «Курс сохраняется…» is the card's own note now.
     expect(card.get('.frozen').text()).toBe(en.money.rate_frozen)
@@ -366,7 +370,7 @@ describe('ExchangeView: «Мой курс» beside the central bank (MOL-348)', 
   it('must not fire: no place from the server — no line, the figure as before', async () => {
     exchanges.mockResolvedValue(overview({ walletTrack: null }))
     const card = (await render()).get('.rate')
-    expect(card.find('.beside').exists()).toBe(false)
+    expect(card.find('.wallet-line').exists()).toBe(false)
     expect(card.get('.figure').text()).toContain('4.79')
   })
 })
@@ -1727,7 +1731,7 @@ describe('ExchangeView: «Обмены против рынка» on top (MOL-152
   it('the bar of an exchange chosen there names its amounts in the plate under it', async () => {
     exchanges.mockResolvedValue(overview({ losses, bars }))
     const card = (await render()).get('.vs-market')
-    expect(card.find('[aria-pressed="true"] .bar').exists()).toBe(true)
+    expect(card.find('.cell.chosen .bar').exists()).toBe(true)
     expect(card.get('.plate-diff').text()).toBe('−֏14,604')
     expect(card.get('.plate-diff').classes()).toContain('bad')
     expect(card.get('.plate-word').text()).toBe(`−7.21% · ${en.exchange.vs_market.worse}`)
@@ -1762,7 +1766,11 @@ describe('ExchangeView: «Обмены против рынка» on top (MOL-152
   it('incomes alone and no exchange — the quiet note in its place (handoff 3k)', async () => {
     exchanges.mockResolvedValue(overview({ losses: null, bars: [], exchanges: [] }))
     const card = (await render()).get('.vs-market')
-    expect(card.get('.quiet').text()).toBe(en.exchange.vs_market.incomes_only)
+    // The kit's empty state, inside the card (review №11).
+    const note = card.get('.state')
+    expect(note.get('.title').text()).toBe(en.exchange.empty.title)
+    expect(note.get('.body').text()).toBe(en.exchange.vs_market.incomes_only)
+    expect(card.find('.plot').exists()).toBe(false)
   })
 })
 

@@ -293,11 +293,17 @@ export default defineComponent({
   props: {
     chart: { type: Object as PropType<ExchangeRateChartView>, required: true },
     months: { type: Number as PropType<RateChartMonths>, default: 12 },
-    /** An exchange chosen elsewhere — a bar of «Обмены против рынка» (MOL-348) — chosen here too. */
-    chosenId: { type: String as PropType<string | null>, default: null },
+    /**
+     * An exchange chosen elsewhere — a bar of «Обмены против рынка» (MOL-348) — chosen here too. A new
+     * object for every choice, so the same bar chosen again comes again after a dot chosen here
+     * (adversarial А4: watched by its id, it did not).
+     */
+    choice: { type: Object as PropType<{ readonly id: string } | null>, default: null },
   },
   emits: {
     'update:months': (months: RateChartMonths) => RATE_CHART_MONTHS.includes(months),
+    /** An exchange chosen here, by a finger or the keys — so the bars choose it too. */
+    choose: (id: string) => typeof id === 'string',
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
@@ -459,9 +465,10 @@ export default defineComponent({
     )
     // A bar of «Обмены против рынка» chooses its exchange here, and its pair with it (MOL-348).
     watch(
-      () => props.chosenId,
-      (id) => {
-        if (!id) return
+      () => props.choice,
+      (choice) => {
+        if (!choice) return
+        const { id } = choice
         const owner = props.chart.pairs.find((one) =>
           one.periods[props.months]?.exchanges.some((point) => point.id === id),
         )
@@ -479,7 +486,9 @@ export default defineComponent({
 
     function choose(index: number): void {
       const item = items.value[index]
-      if (item) chosenKey.value = item.key
+      if (!item) return
+      chosenKey.value = item.key
+      if (item.exchange) emit('choose', item.exchange.id)
     }
 
     function chooseKey(key: string | undefined): void {

@@ -946,19 +946,38 @@ describe('ExchangeRateChart: in step with «Обмены против рынка
       },
     }
     const { view } = chart([rouble(), usd])
-    await view.setProps({ chosenId: 'b0000000-0000-4000-8000-000000000009' })
+    await view.setProps({ choice: { id: 'b0000000-0000-4000-8000-000000000009' } })
     // The dollar's line now, its one exchange ringed.
     expect(view.get('input[type="radio"][value="USD"]').element).toHaveProperty('checked', true)
     expect(view.findAll('.chosen-ring')).toHaveLength(1)
-    await view.setProps({ chosenId: 'a0000000-0000-4000-8000-000000000001' })
+    await view.setProps({ choice: { id: 'a0000000-0000-4000-8000-000000000001' } })
     expect(view.get('input[type="radio"][value="RUB"]').element).toHaveProperty('checked', true)
     expect(plain(view.get('.mine-rate').text())).toContain('10 февр.')
+  })
+
+  it('the same bar chosen again after a dot chosen here comes back to it, and a dot is told up (А4)', async () => {
+    const { view } = chart()
+    const first = 'a0000000-0000-4000-8000-000000000001'
+    await view.setProps({ choice: { id: first } })
+    const before = view.get('.mine-rate').text()
+    // A dot of the line chosen by the keys: the bars are told which.
+    const other = view
+      .findAll('.chart input')
+      .filter((radio) => radio.attributes('aria-label')?.includes('мой'))
+      .at(-1)
+    await other?.setValue(true)
+    expect(view.get('.mine-rate').text()).not.toBe(before)
+    const told = view.emitted('choose') ?? []
+    expect(told.at(-1)?.[0]).not.toBe(first)
+    // The bar of the first chosen again — the same id, a new choice.
+    await view.setProps({ choice: { id: first } })
+    expect(view.get('.mine-rate').text()).toBe(before)
   })
 
   it('must not fire: an exchange of no pair drawn changes nothing', async () => {
     const { view } = chart()
     const before = view.get('.mine-rate').text()
-    await view.setProps({ chosenId: 'c0000000-0000-4000-8000-000000000000' })
+    await view.setProps({ choice: { id: 'c0000000-0000-4000-8000-000000000000' } })
     expect(view.get('.mine-rate').text()).toBe(before)
   })
 

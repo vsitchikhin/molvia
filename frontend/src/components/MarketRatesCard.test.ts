@@ -116,10 +116,10 @@ describe('MarketRatesCard (MOL-137, MOL-348)', () => {
   it('places each dot and the central bank’s dashed line where the server says, with no tone', () => {
     const [sell] = card([rouble()]).findAll('[role="table"]')
     const first = sell?.get('.line')
-    const spots = first?.findAll('.spot') ?? []
+    const spots = first?.findAll('.track-spot') ?? []
     // The central bank first, then the line's own dot: the room before each and after it.
     const grows = spots.map((spot) =>
-      spot.findAll(':scope > span:not(.mark)').map((part) => part.attributes('style')),
+      spot.findAll(':scope > span:not(.track-mark)').map((part) => part.attributes('style')),
     )
     expect(grows).toEqual([
       ['flex-grow: 914;', 'flex-grow: 86;'],

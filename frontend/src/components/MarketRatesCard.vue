@@ -33,16 +33,10 @@
         >
         <span class="track" aria-hidden="true">
           <span class="rail"></span>
-          <span v-if="officialAt !== null" class="spot"
-            ><span :style="{ flexGrow: officialAt }"></span
-            ><span class="mark"><span class="cb"></span></span
-            ><span :style="{ flexGrow: level - officialAt }"></span
-          ></span>
-          <span v-if="line.at !== null" class="spot"
-            ><span :style="{ flexGrow: line.at }"></span
-            ><span class="mark"><span class="dot"></span></span
-            ><span :style="{ flexGrow: level - line.at }"></span
-          ></span>
+          <TrackSpot v-if="officialAt !== null" :at="officialAt"
+            ><span class="cb"></span
+          ></TrackSpot>
+          <TrackSpot v-if="line.at !== null" :at="line.at"><span class="dot"></span></TrackSpot>
         </span>
         <span class="figure" role="cell"
           ><IconStar v-if="line.best" class="star" aria-hidden="true" />{{ line.rate
@@ -64,11 +58,12 @@ import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconInfo from '~icons/mdi/information-outline'
 import IconStar from '~icons/mdi/star'
-import { CHART_LEVEL, currencySign, formatRate, yerevanDate } from '@molvia/model'
+import { currencySign, formatRate, yerevanDate } from '@molvia/model'
 import type { Currency, ExchangeRate, MarketToday } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
+import TrackSpot from '@/components/TrackSpot.vue'
 import { calendarDayOfAnyYear } from '@/days'
 
 type Quote = MarketToday['quotes'][number]
@@ -93,7 +88,7 @@ const SHORT: Readonly<Record<Quote['basis'], string>> = {
  */
 export default defineComponent({
   name: 'MarketRatesCard',
-  components: { AppCard, IconInfo, IconStar, SectionCaption, SegmentedControl },
+  components: { AppCard, IconInfo, IconStar, SectionCaption, SegmentedControl, TrackSpot },
   props: {
     rows: { type: Array as PropType<MarketToday[]>, required: true },
     /** The currency shown first — the latest exchange's; else the first with figures. */
@@ -185,7 +180,6 @@ export default defineComponent({
       t,
       SHORT,
       headingId: useId(),
-      level: CHART_LEVEL,
       shown,
       current,
       lists,
@@ -289,24 +283,6 @@ export default defineComponent({
 .rail {
   height: 2px;
   background: var(--border-strong);
-}
-
-/* A mark's place is the room before it and after it, in thousandths of the track (the server's). */
-.spot {
-  display: flex;
-  align-items: center;
-
-  > span {
-    flex-basis: 0;
-  }
-}
-
-/* No width of its own, so the mark stands centred on its place. */
-.mark {
-  display: flex;
-  flex: none;
-  justify-content: center;
-  width: 0;
 }
 
 .dot {

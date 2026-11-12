@@ -1119,13 +1119,14 @@
       "count_better": "{n} better",
       "count_worse": "{n} worse",
       "count_even": "{n} the same",
-      "legend_up": "up — more drams",
+      "legend_up": "up — got more",
       "legend_line": "as at that day’s market",
-      "legend_down": "down — fewer",
+      "legend_down": "down — less",
+      "bars_legend": "Exchange by exchange",
       "places": "Where you exchanged",
       "place_count": "× {n}",
       "none_said": "not compared · no market or rate for that day",
-      "incomes_only": "No exchanges yet. Record the first — and this will show whether you beat the market or not"
+      "incomes_only": "Record the first — and this will show whether you beat the market or not"
     },
     "rate_chart": {
       "title": {

@@ -36,6 +36,7 @@
 import { computed, defineComponent, markRaw } from 'vue'
 import type { Component, PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { cardMeasureOf } from '@molvia/model'
 import type { ExchangeView } from '@molvia/model'
 import IconEqual from '~icons/mdi/equal'
 import IconHelp from '~icons/mdi/help'
@@ -46,12 +47,11 @@ import ListRow from '@/components/ListRow.vue'
 import { signedAmount } from '@/components/accounts'
 import { figureChars } from '@/components/figure'
 import { roundsToNought } from '@/components/spending'
-import { useExchangeWords } from '@/composables/useExchangeWords'
+import { useExchangeWords, VERDICT_WORD, verdictOfMoney } from '@/composables/useExchangeWords'
+import type { VerdictKind } from '@/composables/useExchangeWords'
 import { calendarDayOfAnyYear, dayWords, purchaseDay, shiftDay } from '@/days'
 
-type Kind = 'good' | 'bad' | 'even' | 'none'
-
-const MARKS: Readonly<Record<Kind, { icon: Component; tint: string }>> = {
+const MARKS: Readonly<Record<VerdictKind, { icon: Component; tint: string }>> = {
   good: { icon: markRaw(IconPlus), tint: 'var(--good-ink)' },
   bad: { icon: markRaw(IconMinus), tint: 'var(--bad-ink)' },
   even: { icon: markRaw(IconEqual), tint: 'muted' },
@@ -81,13 +81,11 @@ export default defineComponent({
   setup(props) {
     const { t, locale } = useI18n()
     const { amountsOf, dayOf } = useExchangeWords()
-    const measure = computed(
-      () => props.exchange.market?.own ?? props.exchange.market?.best ?? null,
-    )
-    const kind = computed<Kind>(() => {
-      const minor = measure.value?.difference.minor
-      if (minor === undefined) return 'none'
-      return minor > 0n ? 'good' : minor < 0n ? 'bad' : 'even'
+    // The card's own measure — its channel, else the best (MOL-152) — by the domain's one rule.
+    const measure = computed(() => cardMeasureOf(props.exchange.market))
+    const kind = computed<VerdictKind>(() => {
+      const money = measure.value?.difference
+      return money ? verdictOfMoney(money) : 'none'
     })
     const mark = computed(() => ({ ...MARKS[kind.value], kind: kind.value }))
     const difference = computed(() => {
@@ -95,16 +93,7 @@ export default defineComponent({
       if (!money) return null
       return signedAmount(money, locale.value, { plus: true, estimate: !roundsToNought(money) })
     })
-    const word = computed(() =>
-      t(
-        {
-          good: 'exchange.vs_market.better',
-          bad: 'exchange.vs_market.worse',
-          even: 'exchange.vs_market.even',
-          none: 'exchange.rate_chart.no_change',
-        }[kind.value],
-      ),
-    )
+    const word = computed(() => t(VERDICT_WORD[kind.value]))
     const meta = computed(() => {
       const { exchange } = props
       const parts = [

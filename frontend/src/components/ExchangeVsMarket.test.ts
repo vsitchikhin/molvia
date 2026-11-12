@@ -116,10 +116,18 @@ describe('ExchangeVsMarket', () => {
       bars: [bar('a', '2026-09-18', 100n), bar('b', '2026-10-01', null)],
       exchanges: [exchange('a'), exchange('b')],
     })
-    expect(card.get('[aria-pressed="true"]').attributes('aria-label')).toContain('Sep 18')
+    const radios = () => card.findAll<HTMLInputElement>('.cell input[type="radio"]')
+    expect(
+      radios()
+        .find((radio) => radio.element.checked)
+        ?.attributes('aria-label'),
+    ).toContain('Sep 18')
     expect(card.get('.plate-amounts').text()).toBe('₽30,000 → ֏146,100')
-    await card.findAll('.cell')[1]?.trigger('click')
-    expect(card.emitted('update:chosen')).toEqual([['b']])
+    await radios()[1]?.trigger('click')
+    expect(card.emitted('update:chosen')?.at(-1)).toEqual(['b'])
+    // The bar already chosen, chosen again, is told too: the line of the rate goes back to it (А4).
+    await radios()[0]?.trigger('click')
+    expect(card.emitted('update:chosen')?.at(-1)).toEqual(['a'])
     await card.setProps({ chosen: 'b' })
     expect(card.get('.plate-word').text()).toBe(en.exchange.vs_market.none_said)
     expect(card.get('.plate-word').classes()).toContain('none')
@@ -130,7 +138,7 @@ describe('ExchangeVsMarket', () => {
       losses: losses(1_877_600n),
       bars: [bar('a', '2026-10-03', 1_877_600n, { level: 1000 })],
     })
-    expect(card.get('.cell').attributes('aria-label')).toBe(
+    expect(card.get('.cell input').attributes('aria-label')).toBe(
       'Oct 3 · ВТБ: +֏18,776: +14.75% · better than the market',
     )
   })
@@ -166,9 +174,56 @@ describe('ExchangeVsMarket', () => {
     expect(card.text()).toContain('? — 2 exchanges not compared: no market or rate for those days')
   })
 
-  it('with incomes alone and no exchange is the quiet note', () => {
+  it('with incomes alone and no exchange is the kit’s quiet empty state (review №11)', () => {
     const card = mountCard({ losses: null, bars: [] })
-    expect(card.get('.quiet').text()).toBe(en.exchange.vs_market.incomes_only)
+    expect(card.get('.state .title').text()).toBe(en.exchange.empty.title)
+    expect(card.get('.state .body').text()).toBe(en.exchange.vs_market.incomes_only)
     expect(card.find('.plot').exists()).toBe(false)
+  })
+
+  it('every exchange «без сравнения» is bars on the line and the count, never «no exchanges» (А1)', () => {
+    // Roubles into dollars, the dinar, a day with no market: nothing measured, so no sum.
+    const card = mountCard({
+      losses: null,
+      bars: [bar('a', '2026-02-10', null), bar('b', '2026-02-28', null)],
+      exchanges: [exchange('a'), exchange('b')],
+    })
+    expect(card.find('.state').exists()).toBe(false)
+    expect(card.findAll('.cell')).toHaveLength(2)
+    expect(card.get('.plot').classes()).toContain('flat')
+    expect(card.find('.total').exists()).toBe(false)
+    expect(card.text()).toContain('? — 2 exchanges not compared: no market or rate for those days')
+    expect(card.get('.plate-word').text()).toBe(en.exchange.vs_market.none_said)
+  })
+
+  it('draws both halves on one scale: the line where the furthest up and down share the height (№3)', () => {
+    const card = mountCard({
+      losses: losses(-900n),
+      bars: [
+        bar('up', '2026-01-01', 100n, { level: 100 }),
+        bar('down', '2026-02-01', -1000n, { level: -1000 }),
+      ],
+    })
+    // 100 up, 1000 down: the line at a eleventh of the height, never pressed down to a third.
+    const up = card.findAll('.cell')[0]?.get('.half.up')
+    expect(up?.attributes('style')).toContain(`height: ${String((100 * 100) / 1100)}%`)
+  })
+
+  it('the field is the target: a finger lifted over a bar chooses it (А5)', async () => {
+    const card = mountCard({
+      losses: losses(100n),
+      bars: [
+        bar('a', '2026-09-18', 100n),
+        bar('b', '2026-10-01', 50n),
+        bar('c', '2026-10-02', 10n),
+      ],
+      exchanges: [exchange('a'), exchange('b'), exchange('c')],
+    })
+    const plot = card.get('.plot')
+    plot.element.getBoundingClientRect = () => new DOMRect(0, 0, 300, 100)
+    const at = { clientX: 160, clientY: 50, pointerType: 'touch' }
+    await plot.trigger('pointerdown', at)
+    await plot.trigger('pointerup', at)
+    expect(card.emitted('update:chosen')?.at(-1)).toEqual(['b'])
   })
 })

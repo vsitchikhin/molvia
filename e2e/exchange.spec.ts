@@ -40,6 +40,12 @@ test('an exchange becomes the rate of the next trip, and the preference takes it
 
   await expect(page.locator('.figure')).toHaveText('4,75 ֏/₽')
   await expect(page.getByText(/по последнему обмену/)).toBeVisible()
+  // End to end has no market: the exchange is «без сравнения», a bar on the line and its count —
+  // never «Обменов пока нет» over the list it stands in (MOL-348, adversarial А1).
+  const vsMarket = page.locator('.vs-market')
+  await expect(vsMarket.locator('.cell')).toHaveCount(1)
+  await expect(vsMarket).toContainText('1 обмен без сравнения')
+  await expect(vsMarket).not.toContainText('Обменов пока нет')
 
   const headers = await asBrowser(page)
   const me = actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json())

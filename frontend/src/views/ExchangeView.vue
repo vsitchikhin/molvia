@@ -99,11 +99,12 @@
              alone and no exchange — the card's quiet note. -->
         <ExchangeVsMarket
           v-if="overview.losses || overview.bars?.length || overview.exchanges.length === 0"
-          v-model:chosen="chosenExchange"
+          :chosen="chosenExchange"
           :losses="overview.losses"
           :bars="overview.bars ?? []"
           :exchanges="overview.exchanges"
           :today="today"
+          @update:chosen="chooseExchange"
         />
         <!-- Under it (handoff MOL-157 05): when the exchanges were made, against the market of all
              bank clients by day or week (MOL-161), the period from the address (MOL-168). -->
@@ -111,8 +112,9 @@
           v-if="overview.rateCharts"
           :chart="overview.rateCharts"
           :months="chartMonths"
-          :chosen-id="chosenExchange"
+          :choice="chartChoice"
           @update:months="chooseChartMonths"
+          @choose="chosenExchange = $event"
         />
 
         <AppCard class="rate">
@@ -129,53 +131,12 @@
             <p v-if="overview.wallet.estimated" class="meta">
               {{ t('exchange.estimated', { bank }) }}
             </p>
-            <!-- Where my rate stands beside the central bank's of today (MOL-348, handoff 04, Р-19): no
-                 tone — the central bank is never a verdict (MOL-187); which stands left is the server's. -->
-            <div
+            <!-- Where my rate stands beside the central bank's of today (MOL-348, handoff 04, Р-19). -->
+            <WalletRateLine
               v-if="overview.walletTrack"
-              class="beside"
-              role="img"
-              :aria-label="
-                t('exchange.my_rate_line.aria', {
-                  rate: rateOf(overview.wallet.rate),
-                  cb: rateOf(overview.walletTrack.official),
-                })
-              "
-            >
-              <span class="beside-row">
-                <span :style="{ flexGrow: overview.walletTrack.own }"></span>
-                <span class="beside-mark"
-                  ><span class="beside-label">{{
-                    t('exchange.my_rate_line.mine', { rate: rateOf(overview.wallet.rate) })
-                  }}</span></span
-                >
-                <span :style="{ flexGrow: level - overview.walletTrack.own }"></span>
-              </span>
-              <span class="beside-row beside-track">
-                <span class="beside-rail"></span>
-                <span class="beside-spot">
-                  <span :style="{ flexGrow: overview.walletTrack.own }"></span>
-                  <span class="beside-mark"><span class="beside-own"></span></span>
-                  <span :style="{ flexGrow: level - overview.walletTrack.own }"></span>
-                </span>
-                <span class="beside-spot">
-                  <span :style="{ flexGrow: overview.walletTrack.officialAt }"></span>
-                  <span class="beside-mark"><span class="beside-cb"></span></span>
-                  <span :style="{ flexGrow: level - overview.walletTrack.officialAt }"></span>
-                </span>
-              </span>
-              <span class="beside-row">
-                <span :style="{ flexGrow: overview.walletTrack.officialAt }"></span>
-                <span class="beside-mark"
-                  ><span class="beside-label">{{
-                    t('exchange.my_rate_line.cb_today', {
-                      rate: rateOf(overview.walletTrack.official),
-                    })
-                  }}</span></span
-                >
-                <span :style="{ flexGrow: level - overview.walletTrack.officialAt }"></span>
-              </span>
-            </div>
+              :own="overview.wallet.rate"
+              :track="overview.walletTrack"
+            />
           </template>
           <!-- Exchanges of the spending currency are there, its cost is not: the words say why, not
                «no exchanges yet» above a list of them (review С-4). -->
@@ -316,7 +277,7 @@
 import { computed, defineComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { CHART_LEVEL, RATE_CHART_MONTHS, currencySign, yerevanDate } from '@molvia/model'
+import { RATE_CHART_MONTHS, currencySign, yerevanDate } from '@molvia/model'
 import type {
   Currency,
   CurrencyCost,
@@ -346,6 +307,7 @@ import SegmentedControl from '@/components/SegmentedControl.vue'
 import SkeletonPart from '@/components/SkeletonPart.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import UndoStrip from '@/components/UndoStrip.vue'
+import WalletRateLine from '@/components/WalletRateLine.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useExchangeWords } from '@/composables/useExchangeWords'
 import { useExchanges } from '@/composables/useExchanges'
@@ -383,6 +345,7 @@ export default defineComponent({
     SkeletonPart,
     StatusStrip,
     UndoStrip,
+    WalletRateLine,
   },
   setup() {
     const { t, locale } = useI18n()
@@ -393,7 +356,17 @@ export default defineComponent({
     // «Сегодня» of the cards, asked again when the app comes back into view (MOL-121, adversarial Н).
     const today = useLocalDay()
     /** The exchange chosen on «Обмены против рынка» (MOL-348); null — the card's own default. */
+    /**
+     * The exchange chosen on the screen (MOL-348): a bar chooses it on the line of the rate as well — a
+     * new `chartChoice` each time, so the same bar again comes back after a dot chosen there (А4) — and a
+     * dot chosen there chooses its bar.
+     */
     const chosenExchange = ref<string | null>(null)
+    const chartChoice = ref<{ readonly id: string } | null>(null)
+    function chooseExchange(id: string): void {
+      chosenExchange.value = id
+      chartChoice.value = { id }
+    }
     /** The currency of the latest exchange against the dram, which «Курсы по данным ЦБ РА» shows first. */
     const latestForeign = computed<Currency | null>(() => {
       for (const exchange of exchanges.overview.value?.exchanges ?? []) {
@@ -606,8 +579,9 @@ export default defineComponent({
     }
 
     return {
-      level: CHART_LEVEL,
       chosenExchange,
+      chartChoice,
+      chooseExchange,
       latestForeign,
       figureChars,
       t,
@@ -681,79 +655,6 @@ export default defineComponent({
 .rate {
   /* The figure measures itself against the card (`figure-fit`, MOL-321). */
   container-type: inline-size;
-}
-
-/* «мой — ЦБ РА сегодня» (MOL-348, handoff 04): two dots on one line, their labels over and under them,
-   each placed by the room before it and after it — the server's — and no tone. */
-.beside {
-  display: grid;
-  gap: var(--space-1);
-  margin-top: var(--space-4);
-  font-size: var(--text-footnote);
-}
-
-.beside-row {
-  display: flex;
-  align-items: center;
-  padding: 0 var(--space-6);
-
-  > span:not(.beside-mark) {
-    flex-basis: 0;
-  }
-}
-
-.beside-track {
-  display: grid;
-  height: 16px;
-
-  > * {
-    grid-area: 1 / 1;
-  }
-}
-
-.beside-rail {
-  align-self: center;
-  height: 2px;
-  background: var(--border-strong);
-}
-
-.beside-spot {
-  display: flex;
-  align-items: center;
-
-  > span:not(.beside-mark) {
-    flex-basis: 0;
-  }
-}
-
-/* No width of its own, so a dot or a label stands centred on its place. */
-.beside-mark {
-  display: flex;
-  flex: none;
-  justify-content: center;
-  width: 0;
-}
-
-.beside-label {
-  color: var(--text-muted);
-  white-space: nowrap;
-}
-
-.beside-own,
-.beside-cb {
-  flex: none;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-}
-
-.beside-own {
-  background: var(--text);
-}
-
-.beside-cb {
-  border: 2px solid var(--graphic);
-  background: var(--surface);
 }
 
 .rate-caption {
