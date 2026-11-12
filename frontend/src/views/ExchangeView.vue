@@ -111,6 +111,7 @@
           v-if="overview.rateCharts"
           :chart="overview.rateCharts"
           :months="chartMonths"
+          :chosen-id="chosenExchange"
           @update:months="chooseChartMonths"
         />
 

@@ -169,7 +169,9 @@ describe('ExchangeRateChart (MOL-161)', () => {
     expect(view.find('.mine-place').text()).toBe('Ардшинбанк')
     expect(plain(view.find('.mine-diff').text())).toBe('−0,40 % · хуже рынка')
     expect(view.find('.mine-diff').classes()).toContain('bad')
-    expect(view.findAll('.point.chosen')).toHaveLength(1)
+    // The chosen one is ringed in terracotta; its dot keeps the money's tone (MOL-348).
+    expect(view.findAll('.chosen-ring')).toHaveLength(1)
+    expect(view.findAll('.point.bad').length).toBeGreaterThan(0)
   })
 
   it('a finger lifted on a week with no exchange chooses the week', async () => {
@@ -928,5 +930,46 @@ describe('ExchangeRateChart by period (MOL-168)', () => {
     const { view } = chart([rouble({}, { 1: month({ exchanges: [] }) })], 1)
     expect(view.find('.none').text()).toBe('Обменов за месяц не было')
     expect(view.findAll('.point')).toHaveLength(0)
+  })
+})
+
+describe('ExchangeRateChart: in step with «Обмены против рынка» (MOL-348)', () => {
+  it('a bar chosen there chooses its exchange here, and its pair with it', async () => {
+    const usd: Pair = {
+      ...dollar,
+      periods: {
+        ...dollar.periods,
+        12: {
+          ...year(),
+          exchanges: [point('b0000000-0000-4000-8000-000000000009', '2026-02-28', 3, 714)],
+        },
+      },
+    }
+    const { view } = chart([rouble(), usd])
+    await view.setProps({ chosenId: 'b0000000-0000-4000-8000-000000000009' })
+    // The dollar's line now, its one exchange ringed.
+    expect(view.get('input[type="radio"][value="USD"]').element).toHaveProperty('checked', true)
+    expect(view.findAll('.chosen-ring')).toHaveLength(1)
+    await view.setProps({ chosenId: 'a0000000-0000-4000-8000-000000000001' })
+    expect(view.get('input[type="radio"][value="RUB"]').element).toHaveProperty('checked', true)
+    expect(plain(view.get('.mine-rate').text())).toContain('10 февр.')
+  })
+
+  it('must not fire: an exchange of no pair drawn changes nothing', async () => {
+    const { view } = chart()
+    const before = view.get('.mine-rate').text()
+    await view.setProps({ chosenId: 'c0000000-0000-4000-8000-000000000000' })
+    expect(view.get('.mine-rate').text()).toBe(before)
+  })
+
+  it('draws a dot in the money’s tone, none for no comparison, and says what «higher» means', () => {
+    const { view } = chart()
+    const points = view.findAll('line.point')
+    expect(points.map((one) => one.classes().filter((c) => c === 'good' || c === 'bad'))).toEqual([
+      ['bad'],
+      [],
+      ['bad'],
+    ])
+    expect(view.get('.hint').text()).toBe('↑ выше — больше ֏ за 1 ₽')
   })
 })

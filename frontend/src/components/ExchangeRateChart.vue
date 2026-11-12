@@ -30,6 +30,11 @@
       @update:model-value="choosePeriod"
     />
 
+    <!-- What «higher» means, on the chart itself (MOL-348, handoff 03): the owner could not tell. -->
+    <p class="hint" aria-hidden="true">
+      {{ t('exchange.rate_chart.y_hint', { sign: currencySign(pair.currency, locale) }) }}
+    </p>
+
     <!-- The reading is not a live region: the radio chosen says the same (Р-6 of MOL-157). -->
     <div class="reading">
       <p v-if="!period" class="none">
@@ -157,11 +162,14 @@
               </template>
             </template>
             <!-- A dot is a zero-length round-capped line: stretched with the plot, still round. -->
+            <!-- The dot in the money's tone (MOL-190, MOL-348), the chosen one ringed in terracotta. -->
             <template v-for="point in period.exchanges" :key="point.id">
               <line
-                v-for="part in ['halo', 'point']"
+                v-for="part in chosen?.exchange?.id === point.id
+                  ? ['ring', 'halo', 'point']
+                  : ['halo', 'point']"
                 :key="part"
-                :class="[part, { chosen: chosen?.exchange?.id === point.id }]"
+                :class="[part === 'ring' ? 'chosen-ring' : part, toneOf(point)]"
                 :x1="point.x"
                 :y1="yOf(point.level)"
                 :x2="point.x"
@@ -285,6 +293,8 @@ export default defineComponent({
   props: {
     chart: { type: Object as PropType<ExchangeRateChartView>, required: true },
     months: { type: Number as PropType<RateChartMonths>, default: 12 },
+    /** An exchange chosen elsewhere — a bar of «Обмены против рынка» (MOL-348) — chosen here too. */
+    chosenId: { type: String as PropType<string | null>, default: null },
   },
   emits: {
     'update:months': (months: RateChartMonths) => RATE_CHART_MONTHS.includes(months),
@@ -442,7 +452,22 @@ export default defineComponent({
     watch(
       () => pair.value?.currency,
       () => {
-        chosenKey.value = null
+        // A pair chosen with its exchange (below) keeps it; any other starts afresh.
+        if (!items.value.some((item) => item.key === chosenKey.value)) chosenKey.value = null
+        round = null
+      },
+    )
+    // A bar of «Обмены против рынка» chooses its exchange here, and its pair with it (MOL-348).
+    watch(
+      () => props.chosenId,
+      (id) => {
+        if (!id) return
+        const owner = props.chart.pairs.find((one) =>
+          one.periods[props.months]?.exchanges.some((point) => point.id === id),
+        )
+        if (!owner) return
+        currency.value = owner.currency
+        chosenKey.value = id
         round = null
       },
     )
@@ -723,6 +748,8 @@ export default defineComponent({
 
     return {
       t,
+      locale,
+      currencySign,
       headingId: useId(),
       name: useId(),
       area,
@@ -769,6 +796,13 @@ export default defineComponent({
   display: grid;
   gap: var(--space-3);
   padding: var(--space-4);
+}
+
+.hint {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-medium);
 }
 
 .legend {
@@ -1002,20 +1036,26 @@ export default defineComponent({
 .halo {
   stroke: var(--surface);
   stroke-width: 14;
-
-  &.chosen {
-    stroke-width: 17;
-  }
 }
 
+/* The chosen one's ring, terracotta — the chosen one's and the cursor's alone (Ф-4) — round its dot. */
+.chosen-ring {
+  stroke: var(--accent);
+  stroke-width: 20;
+  stroke-linecap: round;
+}
+
+/* The dot takes the money's tone (MOL-190, MOL-348); with no comparison or nothing at all, `--text`. */
 .point {
   stroke: var(--text);
   stroke-width: 10;
 
-  /* Terracotta is the chosen one's and the cursor's alone (Ф-4). */
-  &.chosen {
-    stroke: var(--accent);
-    stroke-width: 13;
+  &.bad {
+    stroke: var(--bad);
+  }
+
+  &.good {
+    stroke: var(--good);
   }
 }
 
