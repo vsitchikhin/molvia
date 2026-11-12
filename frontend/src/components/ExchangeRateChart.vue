@@ -40,12 +40,32 @@
       <p v-if="!period" class="none">
         {{ t('exchange.rate_chart.no_market_period', { period: periodIn }) }}
       </p>
-      <template v-if="chosenStep">
-        <p class="week">
-          {{ t(`exchange.rate_chart.${step}`, { day: shortDay(chosenStep.day) }) }}
+      <!-- Standing on nothing, the day and the figure keep their place unseen: a dot tapped then puts
+           them back without moving the chart under the finger (adversarial round 10). -->
+      <template v-if="readStep">
+        <p
+          class="week"
+          :class="{ held: !chosenStep }"
+          :aria-hidden="chosenStep ? undefined : 'true'"
+        >
+          {{ t(`exchange.rate_chart.${step}`, { day: shortDay(readStep.day) }) }}
         </p>
-        <p v-if="chosenStep.rate" class="figure">{{ rateOf(chosenStep.rate) }}</p>
-        <p v-else class="figure missing">{{ t(words.noMarket) }}</p>
+        <p
+          v-if="readStep.rate"
+          class="figure"
+          :class="{ held: !chosenStep }"
+          :aria-hidden="chosenStep ? undefined : 'true'"
+        >
+          {{ rateOf(readStep.rate) }}
+        </p>
+        <p
+          v-else
+          class="figure missing"
+          :class="{ held: !chosenStep }"
+          :aria-hidden="chosenStep ? undefined : 'true'"
+        >
+          {{ t(words.noMarket) }}
+        </p>
       </template>
       <!-- Every plate of the period in one cell, the chosen one seen: the tallest holds the place, so a
            week with no exchange leaves the chart under the finger where it was (adversarial А2, Б1). -->
@@ -482,17 +502,19 @@ export default defineComponent({
     const chosenStep = computed(
       () => (chosen.value ? period.value?.steps[chosen.value.step] : null) ?? null,
     )
+    /** What the reading's day and figure stand for: the step chosen, else the latest, held unseen. */
+    const readStep = computed(() => chosenStep.value ?? period.value?.steps.at(-1) ?? null)
     const cursorX = computed(() => chosen.value?.exchange?.x ?? chosenStep.value?.x ?? 0)
 
     /** The spot taps go round on: the centre of the dot the round began with, and its dots. */
     let round: { x: number; y: number; keys: string[] } | null = null
 
-    // Another pair — by hand, by a bar, by an answer without the one shown — starts afresh: a step
+    // Another pair — by hand, by a bar, by an answer without the one shown — starts afresh (review №27): a step
     // of one line is no step of another.
     watch(
       () => pair.value?.currency,
       () => {
-        if (!items.value.some((item) => item.key === chosenKey.value)) chosenKey.value = null
+        chosenKey.value = null
         round = null
       },
     )
@@ -546,12 +568,8 @@ export default defineComponent({
       round = null
       const all = items.value
       if (all.some((item) => item.exchange !== null && item.exchange.id === screenId.value)) return
-      for (let index = all.length - 1; index >= 0; index -= 1) {
-        if (all[index]?.exchange) {
-          choose(index)
-          return
-        }
-      }
+      const latest = defaultIndex()
+      if (all[latest]?.exchange) choose(latest)
     }
 
     function choosePeriod(value: string): void {
@@ -824,6 +842,7 @@ export default defineComponent({
       chosenIndex,
       noneWords,
       chosenStep,
+      readStep,
       step,
       period,
       title,
@@ -903,6 +922,10 @@ export default defineComponent({
   align-content: start;
   gap: var(--space-1);
   min-height: 6rem;
+}
+
+.held {
+  visibility: hidden;
 }
 
 .week,

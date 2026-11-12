@@ -759,9 +759,9 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   under its own switch; nothing above it moves (review №20, MOL-136). **The plate under the bars holds the tallest of
   theirs**, as the line's reading does: a choice made on the line moves nothing under the finger. **A choice gone from
   the twelve months** — removed, here or on another phone, amended out of the year — **gives way to the default for
-  both at once** (adversarial Д1). **The price, named:** standing on nothing, the reading has no day and no figure of
-  the market, so the plot stands those one or two lines higher than on an exchange. The plate under the bars is no
-  live region: the radio says it (review №8).
+  both at once** (adversarial Д1). **Standing on nothing, the reading keeps the place of its day and figure**, unseen
+  — the latest step's, as the plates are held (adversarial round 10: without them a dot tapped then pushed the plot
+  down under the finger). The plate under the bars is no live region: the radio says it (review №8).
 - **A label of «мой — ЦБ РА» stands at its dot's end of the line**, wrapping within the card, never centred on the dot
   (adversarial Б1: centred on 850, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 %); `large-text.spec`
   gives the answer a line, since end to end has no rate of the central bank.

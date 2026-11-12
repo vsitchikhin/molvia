@@ -805,9 +805,14 @@ describe('ExchangeRateChart by period (MOL-168)', () => {
     expect(view.find('.mine-rate').exists()).toBe(false)
     expect(view.findAll('.chosen-ring')).toHaveLength(0)
     expect(view.get('.stack .none').text()).toBe('Выбранного обмена за месяц нет')
+    // The day and the figure keep their place unseen and unsaid: a dot tapped then moves nothing.
+    const held = view.findAll('.reading > .held')
+    expect(held.map((one) => one.classes()[0])).toEqual(['week', 'figure'])
+    expect(held.every((one) => one.attributes('aria-hidden') === 'true')).toBe(true)
     // The year draws it: the line is on it again.
     await view.setProps({ months: 12 })
     expect(view.get('.mine-rate').text()).toContain('10 февр.')
+    expect(view.findAll('.reading > .held')).toHaveLength(0)
     expect(view.emitted('choose')).toBeUndefined()
   })
 
