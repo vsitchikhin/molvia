@@ -14,31 +14,12 @@ permissions:
   contents: read
 
 jobs:
-  check:
-    name: format, lint, types, tests
+  static:
+    name: format, lint, types
     runs-on: ubuntu-latest
 
-    # Integration tests run against a real Postgres: pg_trgm and unaccent cannot be
-    # faked, and they are exactly what catalogue search will stand on. The port and the
-    # credentials match what bin/init-env.sh writes, so CI and a working copy agree.
-    services:
-      postgres:
-        image: pgvector/pgvector:0.8.7-pg17-bookworm
-        env:
-          POSTGRES_DB: molvia_0
-          POSTGRES_USER: molvia
-          POSTGRES_PASSWORD: molvia
-        ports:
-          - 5500:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
-
     steps:
-      # The whole history: gitleaks reads the pull request's own commits, `HEAD^1..HEAD^2` of the merge,
-      # and the time reporter the files it changes, `HEAD^1..HEAD` (MOL-266, В-4 «а»).
+      # The whole history: gitleaks reads the pull request's own commits, `HEAD^1..HEAD^2` of the merge.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
@@ -92,6 +73,56 @@ jobs:
       - name: npm audit of what ships
         run: node bin/npm-audit.mjs
 
+      # `make format` mutates files, so CI checks instead of fixing: a diff must fail,
+      # not be silently repaired.
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+
+      # The receipt reader (MOL-125, В-6): its image built as the release builds it, and one live
+      # read of a receipt the test draws itself — Tesseract and its language files are what no fake
+      # of the API's tests can stand for.
+      - run: docker build -f services/receipt-reader/Dockerfile -t molvia-receipt-reader:ci .
+      - run: docker run --rm molvia-receipt-reader:ci python3 selftest.py
+
+  tests:
+    name: unit and integration tests
+    runs-on: ubuntu-latest
+
+    # Integration tests run against a real Postgres: pg_trgm and unaccent cannot be
+    # faked, and they are exactly what catalogue search will stand on. The port and the
+    # credentials match what bin/init-env.sh writes, so CI and a working copy agree.
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg17-bookworm
+        env:
+          POSTGRES_DB: molvia_0
+          POSTGRES_USER: molvia
+          POSTGRES_PASSWORD: molvia
+        ports:
+          - 5500:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      # The merge's first parent too: the time reporter turns red only for the files the pull request
+      # changes, `HEAD^1..HEAD` (MOL-266, В-4 «а»).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 2
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      # onnxruntime-node fetches CUDA and TensorRT on linux/x64 by default (MOL-105): the API runs
+      # on the CPU, and the package carries the CPU build in itself.
+      - run: npm ci
+        env:
+          ONNXRUNTIME_NODE_INSTALL: skip
+
       # The same generator every working copy uses, so CI cannot drift from local setup.
       - run: ./bin/init-env.sh 0
 
@@ -104,18 +135,23 @@ jobs:
           key: models-${{ hashFiles('backend/src/embeddings/model.json') }}
       - run: node bin/fetch-model.mjs
 
-      # `make format` mutates files, so CI checks instead of fixing: a diff must fail,
-      # not be silently repaired.
-      - run: npm run format:check
-      - run: npm run lint
-      - run: npm run typecheck
       - run: npm run test
 
-      # The receipt reader (MOL-125, В-6): its image built as the release builds it, and one live
-      # read of a receipt the test draws itself — Tesseract and its language files are what no fake
-      # of the API's tests can stand for.
-      - run: docker build -f services/receipt-reader/Dockerfile -t molvia-receipt-reader:ci .
-      - run: docker run --rm molvia-receipt-reader:ci python3 selftest.py
+  # The name the ruleset of master requires (MOL-164), over the two jobs it was split into (MOL-375):
+  # `always()`, since a required job skipped counts as passed, and red unless both succeeded — failed,
+  # cancelled and skipped alike.
+  check:
+    name: format, lint, types, tests
+    needs: [static, tests]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: both jobs succeeded
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "static, tests: $RESULTS"
+          for result in $RESULTS; do [ "$result" = success ] || exit 1; done
 
   e2e:
     name: end-to-end
