@@ -796,6 +796,35 @@ describe('ExchangeRateChart by period (MOL-168)', () => {
     expect(view.find('.mine-place').text()).toContain('Обменник')
   })
 
+  it('a choice of the year the month has not got stands the month on its own latest (Ж1)', async () => {
+    const { view } = chart([rouble({}, { 1: month() })], 1)
+    await view.setProps({ choice: { id: 'a0000000-0000-4000-8000-000000000003' } })
+    expect(view.get('.mine-rate').text()).toContain('28 февр.')
+    // 10 February is the year's only: not the 28th just left, the month's latest.
+    await view.setProps({ choice: { id: 'a0000000-0000-4000-8000-000000000001' } })
+    expect(view.get('.mine-place').text()).toContain('Обменник')
+    // The year draws it: the line is on it again.
+    await view.setProps({ months: 12 })
+    expect(view.get('.mine-rate').text()).toContain('10 февр.')
+  })
+
+  it('an answer that brings the screen’s exchange back to the year rings it there (review №23)', async () => {
+    const C = 'c0000000-0000-4000-8000-000000000000'
+    const { view } = chart([rouble({}, { 1: month() })], 1)
+    await view.setProps({ choice: { id: C } })
+    expect(view.get('.stack .none').text()).toBe('Выбранного обмена на этой линии нет')
+    // Amended into drams two months back: in the year, not in the month.
+    const back = rouble(
+      { exchanges: [...year().exchanges, point(C, '2026-01-05', 0, 0)] },
+      { 1: month() },
+    )
+    await view.setProps({ chart: { pairs: [back] } })
+    expect(view.get('.mine-place').text()).toContain('Обменник')
+    await view.setProps({ months: 12 })
+    expect(view.findAll('.chosen-ring')).toHaveLength(1)
+    expect(view.get('.mine-rate').text()).toContain('5 янв.')
+  })
+
   it('says a day of the month with no exchange is a day, and speaks it so', async () => {
     const { view, area } = chart([rouble({}, { 1: month() })], 1)
     await tap(view, area, 0)

@@ -759,10 +759,13 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   (adversarial Д1: each block fell back by a rule of its own). **An exchange the line draws in no period of the
   year** — roubles into dollars, the other side of the pair — chosen on the bars or amended off the line, **is chosen
   nowhere there, and the reading says so** (adversarial Е1: the line stayed on the exchange just left, or fell back to
-  its latest); a dot or a currency chosen there is a choice again, and an answer that draws it again rings it. **The
-  price, named:** the reading's day and figure go with the choice, so the line stands a line or two higher. **The price, named:** a period without the exchange
-  chosen shows the line's own latest of it while the bars stay on theirs. The plate under the bars is no live region: the
-  radio says it (review №8).
+  its latest); a dot or a currency chosen there is a choice again, and an answer or a period that draws it again rings
+  it — not on the line is worked out from the screen's exchange, never kept (review №23). **The prices, named:** a
+  period without the exchange chosen stands on its own latest while the bars stay on theirs, and goes back to the
+  chosen one with a period that has it (adversarial Ж1: kept by its key, the month stood on the exchange just left);
+  with the chosen exchange not on the line the reading above the chart has no day and no figure of the market, so the
+  plot of the line stands those one or two lines higher. The plate under the bars is no live region: the radio says it
+  (review №8).
 - **A label of «мой — ЦБ РА» stands at its dot's end of the line**, wrapping within the card, never centred on the dot
   (adversarial Б1: centred on 850, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 %); `large-text.spec`
   gives the answer a line, since end to end has no rate of the central bank.

@@ -60,15 +60,7 @@
             }}</span>
           </span>
         </p>
-        <p v-else class="none">
-          {{
-            away
-              ? t('exchange.rate_chart.chosen_away')
-              : period.exchanges.length === 0
-                ? t('exchange.rate_chart.none_period', { period: periodIn })
-                : t(words.none)
-          }}
-        </p>
+        <p v-else class="none">{{ noneWords }}</p>
         <p v-for="plate in plates" :key="plate.id" class="plate ghost" aria-hidden="true">
           <span class="plate-dot"></span>
           <span class="plate-text">
@@ -313,13 +305,7 @@ export default defineComponent({
     const currency = ref<Pair['currency'] | null>(null)
     const chosenKey = ref<string | null>(null)
     /** The exchange the screen stands on, chosen here or on the bars — or null, a step or nothing. */
-    let screenId: string | null = null
-    /**
-     * The screen's exchange when the line draws it in no period of the year — roubles into dollars, the
-     * other side of the pair (adversarial Е1): the line chooses nothing then and says so, never standing
-     * on another exchange while the bars show this one.
-     */
-    const away = ref<string | null>(null)
+    const screenId = ref<string | null>(null)
 
     const pair = computed<Pair | null>(
       () =>
@@ -448,12 +434,34 @@ export default defineComponent({
 
     // A new answer and another period keep the choice while they still have it — an exchange by its
     // id, a step by its day (Р-6 of MOL-168); another pair starts afresh.
+    const drawnIn = (months: RateChartMonths, id: string) =>
+      props.chart.pairs.find((one) =>
+        one.periods[months]?.exchanges.some((point) => point.id === id),
+      )
+    /**
+     * The screen's exchange drawn in no period of the year — roubles into dollars, the other side of the
+     * pair (adversarial Е1): the line chooses nothing then and says so, never standing on another
+     * exchange while the bars show this one. Worked out, never kept (review №23): kept, it outlived an
+     * answer that drew the exchange again.
+     */
+    const chosenOffLine = computed(
+      () => screenId.value !== null && drawnIn(12, screenId.value) === undefined,
+    )
+
     const chosenIndex = computed(() => {
-      if (away.value) return -1
+      if (chosenOffLine.value) return -1
       const found = items.value.findIndex((item) => item.key === chosenKey.value)
       return found === -1 ? defaultIndex() : found
     })
     const chosen = computed(() => items.value[chosenIndex.value] ?? null)
+    /** The reading with no exchange chosen: the screen's not on the line, none in the period, none that step. */
+    const noneWords = computed(() => {
+      if (chosenOffLine.value) return t('exchange.rate_chart.chosen_away')
+      if (period.value?.exchanges.length === 0) {
+        return t('exchange.rate_chart.none_period', { period: periodIn.value })
+      }
+      return t(words.value.none)
+    })
     const chosenPlate = computed(() =>
       chosen.value?.exchange ? plateOf(chosen.value.exchange) : null,
     )
@@ -479,27 +487,19 @@ export default defineComponent({
         round = null
       },
     )
-    const drawnIn = (months: RateChartMonths, id: string) =>
-      props.chart.pairs.find((one) =>
-        one.periods[months]?.exchanges.some((point) => point.id === id),
-      )
-
     /**
-     * The line stands on the screen's exchange: its dot and its pair where the period draws it; nothing,
-     * said, where no period of the year does (Е1); where only this period lacks it, on its own as it was —
-     * the price of review №20.
+     * The line stands on the screen's exchange: its dot and its pair where the period draws it; else on
+     * nothing — said where no period of the year draws it (`chosenOffLine`), the period's own latest where
+     * only this period lacks it (the price of review №20; adversarial Ж1: kept, the line stood on the
+     * exchange just left).
      */
     function follow(id: string): void {
-      screenId = id
+      screenId.value = id
       const owner = drawnIn(props.months, id)
+      chosenKey.value = owner ? id : null
       if (owner) {
         currency.value = owner.currency
-        chosenKey.value = id
-        away.value = null
         round = null
-      } else if (!drawnIn(12, id)) {
-        chosenKey.value = null
-        away.value = id
       }
     }
 
@@ -512,14 +512,12 @@ export default defineComponent({
       // The screen's choice as the line comes up too: the default it names for both blocks (Б2).
       { immediate: true },
     )
-    // An answer that takes the screen's exchange off the line — amended into dollars — or brings it back
-    // follows it as a choice does (Е1): kept by its key, the line fell back to its own latest.
-    watch(
-      () => props.chart,
-      () => {
-        if (screenId) follow(screenId)
-      },
-    )
+    // An answer that takes the screen's exchange off the line — amended into dollars — or brings it back,
+    // and another period, follow it as a choice does (Е1, review №23): kept by its key, the line fell back
+    // to its own latest, and a period back that draws it again stood on another.
+    watch([() => props.chart, () => props.months], () => {
+      if (screenId.value) follow(screenId.value)
+    })
     // A new answer or another period moves the dots — a scale grown with a new rate, another span
     // — and a round of the old places would turn over dots no longer under the finger (adversarial Р).
     watch([() => props.chart, () => props.months], () => {
@@ -530,8 +528,7 @@ export default defineComponent({
       const item = items.value[index]
       if (!item) return
       chosenKey.value = item.key
-      away.value = null
-      screenId = item.exchange?.id ?? null
+      screenId.value = item.exchange?.id ?? null
       if (item.exchange) emit('choose', item.exchange.id)
     }
 
@@ -548,11 +545,11 @@ export default defineComponent({
      */
     function choosePair(value: string): void {
       currency.value = props.chart.pairs.find((one) => one.currency === value)?.currency ?? null
-      away.value = null
+      screenId.value = null
       // Now, not in the watch after the render: the exchange told is the one the line will show.
       keepChosenInPair()
       const shown = chosen.value?.exchange
-      screenId = shown?.id ?? null
+      screenId.value = shown?.id ?? null
       if (shown) emit('choose', shown.id)
     }
 
@@ -824,7 +821,7 @@ export default defineComponent({
       chosenPlate,
       plates,
       chosenIndex,
-      away,
+      noneWords,
       chosenStep,
       step,
       period,
