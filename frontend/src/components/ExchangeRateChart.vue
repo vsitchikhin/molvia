@@ -455,11 +455,16 @@ export default defineComponent({
     /** The spot taps go round on: the centre of the dot the round began with, and its dots. */
     let round: { x: number; y: number; keys: string[] } | null = null
 
+    /** A choice the pair shown has not got is let go: the line stands on its own default (`defaultIndex`). */
+    function keepChosenInPair(): void {
+      if (!items.value.some((item) => item.key === chosenKey.value)) chosenKey.value = null
+    }
+
     watch(
       () => pair.value?.currency,
       () => {
         // A pair chosen with its exchange (below) keeps it; any other starts afresh.
-        if (!items.value.some((item) => item.key === chosenKey.value)) chosenKey.value = null
+        keepChosenInPair()
         round = null
       },
     )
@@ -506,7 +511,8 @@ export default defineComponent({
      */
     function choosePair(value: string): void {
       currency.value = props.chart.pairs.find((one) => one.currency === value)?.currency ?? null
-      if (!items.value.some((item) => item.key === chosenKey.value)) chosenKey.value = null
+      // Now, not in the watch after the render: the exchange told is the one the line will show.
+      keepChosenInPair()
       const shown = chosen.value?.exchange
       if (shown) emit('choose', shown.id)
     }

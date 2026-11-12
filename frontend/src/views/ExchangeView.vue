@@ -598,6 +598,19 @@ export default defineComponent({
       },
       { immediate: true },
     )
+    // A choice gone from the twelve months — removed here or on another phone, amended out of the year —
+    // gives way to the default, for both blocks at once (adversarial Д1: each fell back by a rule of its
+    // own, and the screen stood on two exchanges). An answer with no bars (a server before them) says
+    // nothing of it.
+    watch(
+      () => exchanges.overview.value?.bars,
+      (bars) => {
+        const chosen = chosenExchange.value
+        if (chosen === null || !bars || bars.some(({ id }) => id === chosen)) return
+        chosenExchange.value = null
+        if (defaultExchange.value !== null) chartChoice.value = { id: defaultExchange.value }
+      },
+    )
     function chooseChartMonths(months: RateChartMonths): void {
       void router.replace({
         query: { ...route.query, months: months === 12 ? undefined : String(months) },

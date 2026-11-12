@@ -122,10 +122,10 @@ describe('ExchangeVsMarket', () => {
         .find((radio) => radio.element.checked)
         ?.attributes('aria-label'),
     ).toContain('Oct 1')
-    expect(card.get('.plate-word').text()).toBe(en.exchange.vs_market.none_said)
-    expect(card.get('.plate-word').classes()).toContain('none')
+    expect(card.get('.plate:not(.ghost) .plate-word').text()).toBe(en.exchange.vs_market.none_said)
+    expect(card.get('.plate:not(.ghost) .plate-word').classes()).toContain('none')
     // Every bar's plate in one cell, unseen but the chosen one's: the tallest holds the place (Г1).
-    expect(card.findAll('.plate.ghost')).toHaveLength(2)
+    expect(card.findAll('.plate.ghost')).toHaveLength(1)
     expect(
       card.findAll('.plate.ghost').every((ghost) => ghost.attributes('aria-hidden') === 'true'),
     ).toBe(true)
@@ -133,7 +133,7 @@ describe('ExchangeVsMarket', () => {
     await radios()[0]?.trigger('click')
     expect(card.emitted('update:chosen')).toEqual([['a']])
     await card.setProps({ chosen: 'a' })
-    expect(card.get('.plate-amounts').text()).toBe('₽30,000 → ֏146,100')
+    expect(card.get('.plate:not(.ghost) .plate-amounts').text()).toBe('₽30,000 → ֏146,100')
     // The bar already chosen, chosen again, is told too: the line of the rate goes back to it (А4).
     await radios()[0]?.trigger('click')
     expect(card.emitted('update:chosen')).toEqual([['a'], ['a']])
@@ -155,7 +155,7 @@ describe('ExchangeVsMarket', () => {
       bars: [bar('a', '2026-10-03', 1_877_600n, { level: 1000 })],
     })
     expect(card.get('.value').text()).toBe('+18.8K')
-    expect(card.get('.plate-diff').text()).toBe('+֏18,776')
+    expect(card.get('.plate:not(.ghost) .plate-diff').text()).toBe('+֏18,776')
   })
 
   it('shows the places as bars only when there is more than one, each with its word unseen', () => {
@@ -199,7 +199,7 @@ describe('ExchangeVsMarket', () => {
     expect(card.get('.plot').classes()).toContain('flat')
     expect(card.find('.total').exists()).toBe(false)
     expect(card.text()).toContain('? — 2 exchanges not compared: no market or rate for those days')
-    expect(card.get('.plate-word').text()).toBe(en.exchange.vs_market.none_said)
+    expect(card.get('.plate:not(.ghost) .plate-word').text()).toBe(en.exchange.vs_market.none_said)
   })
 
   it('draws both halves on one scale: the line where the furthest up and down share the height (№3)', () => {

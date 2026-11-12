@@ -1738,9 +1738,11 @@ describe('ExchangeView: «Обмены против рынка» on top (MOL-152
     exchanges.mockResolvedValue(overview({ losses, bars }))
     const card = (await render()).get('.vs-market')
     expect(card.find('.cell.chosen .bar').exists()).toBe(true)
-    expect(card.get('.plate-diff').text()).toBe('−֏14,604')
-    expect(card.get('.plate-diff').classes()).toContain('bad')
-    expect(card.get('.plate-word').text()).toBe(`−7.21% · ${en.exchange.vs_market.worse}`)
+    expect(card.get('.plate:not(.ghost) .plate-diff').text()).toBe('−֏14,604')
+    expect(card.get('.plate:not(.ghost) .plate-diff').classes()).toContain('bad')
+    expect(card.get('.plate:not(.ghost) .plate-word').text()).toBe(
+      `−7.21% · ${en.exchange.vs_market.worse}`,
+    )
   })
 
   it('a difference whole units would print as 0 is printed as it is, under its tone and word (А1)', async () => {
@@ -1983,7 +1985,7 @@ describe('ExchangeView: one exchange chosen for the whole screen (MOL-348)', () 
     ],
     rateCharts,
   })
-  const plate = (view: VueWrapper) => view.get('.vs-market .plate-where').text()
+  const plate = (view: VueWrapper) => view.get('.vs-market .plate:not(.ghost) .plate-where').text()
   const onChart = (view: VueWrapper) => view.get('.rate-chart .mine-rate').text()
 
   it('opens with the bars and the line on the same exchange, the latest, compared or not (Б2)', async () => {
@@ -2025,6 +2027,68 @@ describe('ExchangeView: one exchange chosen for the whole screen (MOL-348)', () 
     // The period is the line's switch, under the bars: a month with no dot moves no bar (review №20).
     const month = await render('/money/exchange?months=1')
     expect(plate(month)).toContain('Feb 28')
+  })
+
+  it('a chosen exchange removed gives way to the default, on both blocks at once (Д1)', async () => {
+    const C = 'a0000000-0000-4000-8000-000000000005'
+    const dollars = row({
+      id: C,
+      exchangedOn: '2026-03-01',
+      received: { minor: 23_000n, currency: 'USD' },
+      rate: null,
+    })
+    const noBar = {
+      id: C,
+      exchangedOn: '2026-03-01',
+      place: null,
+      difference: null,
+      percent: null,
+      sign: null,
+      level: 0,
+    }
+    const [barA, barB] = answer.bars ?? []
+    if (!barA) throw new Error('the answer has its bars')
+    exchanges.mockResolvedValue({
+      ...answer,
+      exchanges: [dollars, ...answer.exchanges],
+      bars: [...(answer.bars ?? []), noBar],
+    })
+    // The answer of the removal: the screen without the exchange of 28 February.
+    removeExchange.mockResolvedValue({
+      ...answer,
+      exchanges: [dollars, row({ id: A, exchangedOn: '2026-02-10' })],
+      bars: [barA, noBar],
+      rateCharts: {
+        pairs: rateCharts.pairs.map((pair) => ({
+          ...pair,
+          periods: {
+            ...pair.periods,
+            12: {
+              ...pair.periods[12],
+              exchanges: pair.periods[12].exchanges.filter(({ id }) => id !== B),
+            },
+          },
+        })),
+      },
+    })
+    const view = await render()
+    expect(barB?.id).toBe(B)
+    await view.findAll('.vs-market .cell input')[1]?.trigger('click')
+    expect(plate(view)).toContain('Feb 28')
+    const rowOfB = view
+      .findAll('.rows button.list-row')
+      .find((one) => one.text().includes('Feb 28'))
+    await rowOfB?.trigger('click')
+    await risen()
+    sheetButton(en.exchange.sheet.remove).click()
+    await risen()
+    sheetButton(en.exchange.remove_sheet.confirm).click()
+    await flushPromises()
+    await risen()
+    expect(removeExchange).toHaveBeenCalledWith(B)
+    // Both on the latest the line draws — 10 February — never the dollars' bar on one and a dot on the other.
+    expect(plate(view)).toContain('Feb 10')
+    expect(onChart(view)).toContain('Feb 10')
   })
 
   it('a bar, a dot there, the same bar again: the line comes back to it, and the bars follow the dot (А4)', async () => {

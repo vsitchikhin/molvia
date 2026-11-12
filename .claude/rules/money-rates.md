@@ -754,8 +754,10 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   dot, and the line stayed on its own). **Another currency of the line is a choice and tells the bars** the exchange
   it stands on (Г1); **another period is not** — it is the line's answer under its own switch, and nothing above it
   moves (review №20, MOL-136). **The plate under the bars holds the tallest of theirs**, as the line's reading does:
-  a choice made on the line under the card moves nothing under the finger. **The price, named:** a period without
-  the exchange chosen shows the line's own latest of it while the bars stay on theirs. The plate under the bars is no live region: the
+  a choice made on the line under the card moves nothing under the finger. **A choice gone from the twelve months**
+  — removed, here or on another phone, amended out of the year — **gives way to the default for both at once**
+  (adversarial Д1: each block fell back by a rule of its own). **The price, named:** a period without the exchange
+  chosen shows the line's own latest of it while the bars stay on theirs. The plate under the bars is no live region: the
   radio says it (review №8).
 - **A label of «мой — ЦБ РА» stands at its dot's end of the line**, wrapping within the card, never centred on the dot
   (adversarial Б1: centred on 850, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 %); `large-text.spec`

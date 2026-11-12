@@ -87,17 +87,17 @@
            card — a dot, another currency there — moves nothing under the finger (adversarial Г1), as the
            line's own reading holds its plates (MOL-190). -->
       <div v-if="chosenBar" class="plates">
-        <div class="plate">
-          <p class="plate-where">{{ whereOf(chosenBar) }}</p>
-          <p class="plate-diff" :class="kindOf(chosenBar)">{{ diffOf(chosenBar) }}</p>
-          <p class="plate-amounts">{{ amountsOf(chosenBar) }}</p>
-          <p class="plate-word" :class="kindOf(chosenBar)">{{ wordOf(chosenBar) }}</p>
-        </div>
-        <div v-for="bar in bars" :key="bar.id" class="plate ghost" aria-hidden="true">
+        <div
+          v-for="bar in bars"
+          :key="bar.id"
+          class="plate"
+          :class="{ ghost: bar.id !== chosenId }"
+          :aria-hidden="bar.id === chosenId ? undefined : 'true'"
+        >
           <p class="plate-where">{{ whereOf(bar) }}</p>
-          <p class="plate-diff">{{ diffOf(bar) }}</p>
+          <p class="plate-diff" :class="kindOf(bar)">{{ diffOf(bar) }}</p>
           <p class="plate-amounts">{{ amountsOf(bar) }}</p>
-          <p class="plate-word">{{ wordOf(bar) }}</p>
+          <p class="plate-word" :class="kindOf(bar)">{{ wordOf(bar) }}</p>
         </div>
       </div>
 
