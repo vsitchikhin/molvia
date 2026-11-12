@@ -1292,7 +1292,8 @@ Owner's decisions of 11.11.2026, after `v0.2.0`. Every merge into master is a ro
 a «Обновить» on every installed phone (MOL-132): ten tasks a day were ten updates. Now a day's tasks reach
 people as one release. The mechanics and their reasons are in `.claude/rules/deploy.md`.
 
-- **Master takes only two kinds of branch: `release/<name>` and `hotfix/<name>-<number>`.** A task's branch
+- **Master takes only two kinds of branch: `release/<name>` and `hotfix/<name>-<number>`** — and Dependabot's
+  (MOL-381, В-7 «б»), refused otherwise by CI's first step (`bin/release.mjs source`). A task's branch
   starts from the current `release/<name>` and its pull request goes there, merged on the owner's word as
   before; CI runs on that pull request as on any other.
 - **A release is the pull request `release/<name>` → master**, and its merge is the rollout. Its tag is
@@ -1307,8 +1308,10 @@ people as one release. The mechanics and their reasons are in `.claude/rules/dep
   `n + 1`, with no number. A hotfix does not count as the day's release for the 03:00 rule.
 - **Names rotate a stone, a wind, a river, each theme in alphabetical order** (`v0.2.1-agate`,
   `v0.2.2-alize`, `v0.2.3-amazon`…), one word in Latin, from the lists in `.claude/rules/deploy.md`.
-- **Until MOL-381 lands, the release is cut by hand**: the ruleset that refuses other branches into master,
-  the 03:00 release, the cut of the next branch and the deletion of old ones are its automation.
+- **The release is automated since MOL-381**: `release-night.yml` at 03:00 and by «Run workflow» (the word
+  «выпускай»), only a release by hand holding the night back; `after-release.yml` tags what runs, cuts the next
+  branch, deletes the old and brings a hotfix into the next branch — by the app `molvia-release`, its word the
+  check `molvia-release`. The rules and their prices: `.claude/rules/deploy.md`.
 
 ### Feature flags — «фф» (MOL-376)
 

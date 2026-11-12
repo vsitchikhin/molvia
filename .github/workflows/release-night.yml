@@ -1,0 +1,128 @@
+name: Release night
+
+# The day's release (MOL-376; MOL-381): at 03:00 Yerevan — 23:00 UTC, Armenia keeps no summer time — or
+# by «Run workflow», the owner's «выпускай». It decides by `bin/release.mjs`, finds or opens the pull
+# request of the release branch into master, waits for its CI and merges what CI passed. What follows a
+# merge — the tag, the next branch — is `after-release.yml`'s, so a release merged by hand gets it too.
+# It never touches production: a merge into master is what `release.yml` rolls out.
+# `.claude/rules/deploy.md`, «One release a day».
+on:
+  # GitHub's cron runs late on this repository (MOL-221): the night counts no release of its own as the
+  # day's, so a late run never costs the next one.
+  schedule:
+    - cron: '0 23 * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+# One release at a time, with `after-release.yml`: a run late behind GitHub's queue waits for the one
+# before it.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: the day's release
+    # Never in a fork: it has no secret, and no master of ours to merge into.
+    if: github.repository == 'vsitchikhin/molvia'
+    # The app's key and the ping URL are the environment's secrets, which admit master alone (MOL-368).
+    environment:
+      name: production
+      deployment: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      # GitHub's own token merges, and the merge starts no workflow — no CI on master, no rollout. The app
+      # `molvia-release` is somebody else (owner's В-2 «а»), its token an hour long. `workflows`: a release
+      # that changed a workflow is merged only with it.
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+
+      # The tags, for the next release, and master's history, for the releases of the day.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
+
+      - name: decide, wait for CI, merge
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          EVENT: ${{ github.event_name }}
+          OWNER: ${{ github.repository_owner }}
+          HC_RELEASE_URL: ${{ secrets.HC_RELEASE_URL }}
+        shell: bash
+        run: |
+          fail() { echo "$1" >"$RUNNER_TEMP/failure"; echo "::error::$1"; exit 1; }
+
+          next="$(node bin/release.mjs next)"
+          tag="$(jq -r .tag <<<"$next")"
+          branch="$(jq -r .branch <<<"$next")"
+          git fetch --quiet origin "+refs/heads/$branch:refs/remotes/origin/$branch" ||
+            fail "$tag: there is no branch $branch to release"
+
+          # The branch differs by its files (В-10 of MOL-376): master merged in after a hotfix alone does not.
+          differs=false
+          git diff --quiet origin/master "origin/$branch" || differs=true
+          verdict="$(git log --first-parent --since='48 hours ago' --format='%cI%x09%s' origin/master |
+            DIFFERS="$differs" node bin/release.mjs due "$EVENT")"
+          reason="$(jq -r .reason <<<"$verdict")"
+          echo "$branch: $reason"
+          if [[ "$(jq -r .due <<<"$verdict")" != true ]]; then
+            node bin/release.mjs ping ok "$tag not released: $reason"
+            exit 0
+          fi
+
+          pr="$(gh pr list --base master --head "$branch" --state open --json number --jq '.[0].number // empty')"
+          if [[ -z "$pr" ]]; then
+            gh pr create --base master --head "$branch" --title "Release $tag" \
+              --body "The day's release $tag, opened by \`release-night.yml\` (MOL-381)."
+            pr="$(gh pr list --base master --head "$branch" --state open --json number --jq '.[0].number')"
+          fi
+
+          # The two gates the ruleset of master requires (MOL-164, `bin/check-ci-gates.mjs`), on the commit
+          # merged — up to an hour: a task merged into the branch just before starts its CI again. A
+          # refusal of `gh` while checks are still being registered is waiting too.
+          head="$(git rev-parse "origin/$branch")"
+          gates=''
+          for _ in $(seq 120); do
+            if [[ "$(gh pr view "$pr" --json headRefOid --jq .headRefOid)" != "$head" ]]; then
+              git fetch --quiet origin "+refs/heads/$branch:refs/remotes/origin/$branch"
+              head="$(git rev-parse "origin/$branch")"
+            fi
+            checks="$(gh pr checks "$pr" --json name,bucket 2>/dev/null)" || true
+            gates="$(jq -r '[.[]? | select(.name == "format, lint, types, tests" or .name == "end-to-end") | .bucket]
+              | if length < 2 then "pending" elif all(. == "pass") then "pass"
+                elif any(. == "fail" or . == "cancel") then "fail" else "pending" end' <<<"${checks:-[]}")"
+            [[ "$gates" != pending ]] && break
+            sleep 30
+          done
+          case "$gates" in
+            pass) ;;
+            fail) fail "$tag not released: CI of #$pr is red" ;;
+            *) fail "$tag not released: CI of #$pr did not finish within an hour" ;;
+          esac
+
+          # A merge commit, its subject GitHub's own, and the night's mark (В-4 «а» of MOL-381). Only the
+          # commit CI passed: a task merged meanwhile waits for the next release.
+          subject="Merge pull request #$pr from $OWNER/$branch"
+          [[ "$EVENT" == schedule ]] && subject="$subject (night)"
+          gh pr merge "$pr" --merge --subject "$subject" --match-head-commit "$head" ||
+            fail "$tag not released: #$pr did not merge"
+          node bin/release.mjs ping ok "$tag merged, #$pr"
+
+      # Red only where it could not say so: a run that failed tells healthchecks.io why (owner's В-5 «а»).
+      - name: tell the owner
+        if: failure()
+        env:
+          HC_RELEASE_URL: ${{ secrets.HC_RELEASE_URL }}
+        shell: bash
+        run: |
+          reason="$(cat "$RUNNER_TEMP/failure" 2>/dev/null || echo "release-night failed: run $GITHUB_RUN_ID")"
+          node bin/release.mjs ping fail "$reason"
