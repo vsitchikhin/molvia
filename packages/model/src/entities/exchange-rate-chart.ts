@@ -2,7 +2,7 @@ import { CHART_LEVEL, hundredthsOf } from '#model/entities/money-charts'
 import { divideRounded } from '#model/support/decimal'
 import { currencySchema } from '#model/values/money'
 import type { Currency } from '#model/values/money'
-import { MARKET_CURRENCIES, marketSideOf } from '#model/values/market-rates'
+import { MARKET_CURRENCIES, cardMeasureOf, marketSideOf } from '#model/values/market-rates'
 import type { MarketCurrency } from '#model/values/market-rates'
 import type {
   ForeignCurrency,
@@ -338,7 +338,7 @@ function ratePeriod(
       if (day < from || day > today || !exchange.rate) return []
       const scaled = inDrams(exchange.rate, currency)
       if (scaled === null) return []
-      const offered = exchange.market?.own ?? exchange.market?.best ?? null
+      const offered = cardMeasureOf(exchange.market)
       // A market that would have given nothing for the money is no market to draw a mark to.
       const expected = offered ? exchange.received.minor - offered.difference.minor : 0n
       const measure = expected > 0n ? offered : null

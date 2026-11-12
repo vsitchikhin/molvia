@@ -6,6 +6,7 @@ import {
   OFFICIAL_RATE_FRESH_DAYS,
   RATE_SCALE,
   bestQuote,
+  cardMeasureOf,
   convertAcross,
   convertSigned,
   currencySchema,
@@ -180,8 +181,10 @@ export function marketTodayOf(
       const newest = recent.reduce((day, quote) => (quote.date > day ? quote.date : day), '')
       return recent.filter((quote) => quote.date === newest)
     }
-    const bestBuys = bestQuote(fresh(buys), 'bankBuys')
-    const bestSells = bestQuote(fresh(sells), 'bankSells')
+    const latestBuys = fresh(buys)
+    const latestSells = fresh(sells)
+    const bestBuys = bestQuote(latestBuys, 'bankBuys')
+    const bestSells = bestQuote(latestSells, 'bankSells')
     const channels = [...new Set([...buys, ...sells].map((quote) => quote.channel))]
     const bank = freshOfficialRate(
       currency,
@@ -205,13 +208,17 @@ export function marketTodayOf(
         },
       ]
     })
-    const track = marketTrack({ currency, official: bank, quotes })
-    return {
+    // The star and the order of the lists are one rule: the star first, the latest day after it.
+    const track = marketTrack({
       currency,
       official: bank,
-      quotes,
-      track: { official: track.official, sell: [...track.sell], buy: [...track.buy] },
-    }
+      quotes: quotes.map((quote) => ({
+        ...quote,
+        latestBuys: latestBuys.some(({ channel }) => channel === quote.channel),
+        latestSells: latestSells.some(({ channel }) => channel === quote.channel),
+      })),
+    })
+    return { currency, official: bank, quotes, track }
   })
 }
 
@@ -319,7 +326,7 @@ function marketMeasureOf(
 ): ExchangeLossInput {
   const { note, exchangedOn, received } = view
   const unknown = { note, exchangedOn, difference: null, expected: null }
-  const measure = view.market?.own ?? view.market?.best
+  const measure = cardMeasureOf(view.market)
   if (!measure) return unknown
   const { difference } = measure
   // What the market would have given for the same money: what came, less what came beyond it.
@@ -644,12 +651,14 @@ function barsOf(
   views: readonly ExchangeView[],
   measures: ReadonlyMap<string, ExchangeLossInput>,
 ): NonNullable<ExchangesResponse['bars']> {
+  // The list comes newest first; the bars are given it in the order the sum counts it, each with its
+  // place in the order the exchanges were made.
   return vsMarketBars(
-    views.flatMap((view) => {
+    views.flatMap((view, index) => {
       const measure = measures.get(view.id)
       if (!measure) return []
-      const card = view.market?.own ?? view.market?.best ?? null
-      return [{ ...measure, id: view.id, cardDifference: card?.difference.minor ?? null }]
+      const cardDifference = cardMeasureOf(view.market)?.difference.minor ?? null
+      return [{ ...measure, id: view.id, made: views.length - index, cardDifference }]
     }),
   )
 }

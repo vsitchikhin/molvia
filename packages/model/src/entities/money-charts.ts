@@ -158,6 +158,34 @@ export function hundredthsOf(part: bigint, whole: bigint): number {
   return Number(divideRounded(part * 10_000n, whole))
 }
 
+/** An exchange the sum counts: its difference and what the market would have given, both known. */
+export interface CountedLoss extends ExchangeLossInput {
+  readonly difference: Money
+  readonly expected: Money
+}
+
+/**
+ * Which exchanges «Обмены против рынка» counts, in the order given — the rest are «без сравнения»: no
+ * comparison or rate, a market that would have given nothing, or a sum past what money holds
+ * (`INT8_MAX`). One rule for the sum and its bars (MOL-348, review №7): a bar of an exchange the sum
+ * left out said «лучше» under «N без сравнения».
+ */
+export function countedLosses(exchanges: readonly ExchangeLossInput[]): (CountedLoss | null)[] {
+  const expectedOf = new Map<string, bigint>()
+  let total = 0n
+  return exchanges.map((exchange) => {
+    const { difference, expected } = exchange
+    if (difference === null || expected === null || expected.minor <= 0n) return null
+    const place = exchange.note === null ? '' : nameIdentity(exchange.note)
+    const sum = total + difference.minor
+    const held = (expectedOf.get(place) ?? 0n) + expected.minor
+    if (sum > INT8_MAX || sum < -INT8_MAX || held > INT8_MAX) return null
+    total = sum
+    expectedOf.set(place, held)
+    return { ...exchange, difference, expected }
+  })
+}
+
 /**
  * «Обмены против курса ЦБ РА» by exchanger (owner's decision В-1): the exchanges grouped by where
  * they were made — «Где и заметка» read as `nameIdentity` reads a name, so «Аэропорт», « аэропорт »
@@ -175,20 +203,15 @@ export function exchangeLosses(
   >()
   let uncounted = 0
   let total = 0n
-  for (const exchange of exchanges) {
-    const { difference, expected } = exchange
-    if (difference === null || expected === null || expected.minor <= 0n) {
+  for (const exchange of countedLosses(exchanges)) {
+    if (!exchange) {
       uncounted += 1
       continue
     }
+    const { difference, expected } = exchange
     const place = exchange.note === null ? '' : nameIdentity(exchange.note)
     const held = groups.get(place)
-    const sum = total + difference.minor
-    if (sum > INT8_MAX || sum < -INT8_MAX || (held?.expected ?? 0n) + expected.minor > INT8_MAX) {
-      uncounted += 1
-      continue
-    }
-    total = sum
+    total += difference.minor
     const written = exchange.note?.trim() ?? null
     groups.set(
       place,

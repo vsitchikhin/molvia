@@ -30,6 +30,7 @@ function measured(
   return {
     id,
     exchangedOn,
+    made: 0,
     note: null,
     cardDifference: difference,
     difference: dram(difference),
@@ -52,12 +53,24 @@ describe('vsMarketBars', () => {
     expect(bars[2]?.percent).toBe(18_776)
   })
 
-  it('keeps two exchanges of one day in the order they were made', () => {
+  it('keeps two exchanges of one day in the order they were made, whatever order they come in', () => {
+    const later = measured('later', '2026-10-03', 100n, { made: 2 })
+    const earlier = measured('earlier', '2026-10-03', 200n, { made: 1 })
+    expect(vsMarketBars([later, earlier]).map(({ id }) => id)).toEqual(['earlier', 'later'])
+    expect(vsMarketBars([earlier, later]).map(({ id }) => id)).toEqual(['earlier', 'later'])
+  })
+
+  it('puts on the line an exchange the sum leaves out past what money holds, as «без сравнения»', () => {
+    // The sum counts it as `uncounted` (`INT8_MAX`, review №7): its bar has no sign either.
+    const huge = 9_000_000_000_000_000_000n
     const bars = vsMarketBars([
-      measured('later', '2026-10-03', 100n),
-      measured('earlier', '2026-10-03', 200n),
+      measured('second', '2026-10-02', huge, { expected: dram(huge) }),
+      measured('first', '2026-10-01', huge, { expected: dram(huge) }),
     ])
-    expect(bars.map(({ id }) => id)).toEqual(['earlier', 'later'])
+    expect(bars.map(({ id, sign }) => [id, sign])).toEqual([
+      ['first', null],
+      ['second', 1],
+    ])
   })
 
   it('puts an exchange with no market on the line, in no scale, with no sign', () => {
@@ -110,26 +123,32 @@ describe('vsMarketBars', () => {
   })
 })
 
+function quote(
+  channel: 'bankCash' | 'bankNoncash' | 'exchanger',
+  buys: ExchangeRate | null,
+  sells: ExchangeRate | null,
+  marks: Partial<Record<'bestBuys' | 'bestSells' | 'latestBuys' | 'latestSells', boolean>> = {},
+) {
+  return {
+    channel,
+    buys,
+    sells,
+    bestBuys: false,
+    bestSells: false,
+    latestBuys: false,
+    latestSells: false,
+    ...marks,
+  }
+}
+
 describe('marketTrack', () => {
   const rouble = {
     currency: 'RUB' as const,
     official: rate('RUB', 'AMD', '4.34'),
     quotes: [
-      {
-        channel: 'bankCash' as const,
-        buys: rate('RUB', 'AMD', '4.13'),
-        sells: rate('RUB', 'AMD', '4.37'),
-      },
-      {
-        channel: 'bankNoncash' as const,
-        buys: rate('RUB', 'AMD', '4.24'),
-        sells: rate('RUB', 'AMD', '4.34'),
-      },
-      {
-        channel: 'exchanger' as const,
-        buys: rate('RUB', 'AMD', '4.02'),
-        sells: rate('RUB', 'AMD', '4.09'),
-      },
+      quote('bankCash', rate('RUB', 'AMD', '4.13'), rate('RUB', 'AMD', '4.37')),
+      quote('bankNoncash', rate('RUB', 'AMD', '4.24'), rate('RUB', 'AMD', '4.34')),
+      quote('exchanger', rate('RUB', 'AMD', '4.02'), rate('RUB', 'AMD', '4.09')),
     ],
   }
 
@@ -144,6 +163,36 @@ describe('marketTrack', () => {
       'exchanger',
       'bankNoncash',
       'bankCash',
+    ])
+  })
+
+  it('stands the star first, the rest of its day after it, the older figures last (review №2, А3)', () => {
+    // The banks of the 29th, the exchange offices of the 25th — over a week late, as their file is.
+    const track = marketTrack({
+      ...rouble,
+      quotes: [
+        quote('bankCash', rate('RUB', 'AMD', '4.110180'), rate('RUB', 'AMD', '4.48'), {
+          latestBuys: true,
+          latestSells: true,
+        }),
+        quote('bankNoncash', rate('RUB', 'AMD', '4.221606'), rate('RUB', 'AMD', '4.42'), {
+          bestBuys: true,
+          latestBuys: true,
+          bestSells: true,
+          latestSells: true,
+        }),
+        quote('exchanger', rate('RUB', 'AMD', '4.25'), rate('RUB', 'AMD', '4.39')),
+      ],
+    })
+    expect(track.sell.map(({ channel }) => channel)).toEqual([
+      'bankNoncash',
+      'bankCash',
+      'exchanger',
+    ])
+    expect(track.buy.map(({ channel }) => channel)).toEqual([
+      'bankNoncash',
+      'bankCash',
+      'exchanger',
     ])
   })
 
@@ -168,8 +217,8 @@ describe('marketTrack', () => {
       currency: 'EUR',
       official: null,
       quotes: [
-        { channel: 'bankCash', buys: rate('EUR', 'AMD', '407'), sells: null },
-        { channel: 'exchanger', buys: rate('EUR', 'AMD', '410'), sells: rate('EUR', 'AMD', '416') },
+        quote('bankCash', rate('EUR', 'AMD', '407'), null),
+        quote('exchanger', rate('EUR', 'AMD', '410'), rate('EUR', 'AMD', '416')),
       ],
     })
     expect(track.official).toBeNull()
@@ -185,8 +234,8 @@ describe('marketTrack', () => {
       currency: 'USD',
       official: null,
       quotes: [
-        { channel: 'bankCash', buys: rate('USD', 'AMD', '362'), sells: null },
-        { channel: 'bankNoncash', buys: rate('USD', 'AMD', '362'), sells: null },
+        quote('bankCash', rate('USD', 'AMD', '362'), null),
+        quote('bankNoncash', rate('USD', 'AMD', '362'), null),
       ],
     })
     expect(track.sell).toEqual([
@@ -219,6 +268,20 @@ describe('walletTrack', () => {
   it('compares a rate kept the other way round by its printed side', () => {
     // 0,205339 ₽/֏ is printed 4,87 ֏/₽.
     expect(walletTrack(rate('AMD', 'RUB', '0.205339'), rate('RUB', 'AMD', '4.34'))).toEqual({
+      own: 850,
+      official: 150,
+    })
+  })
+
+  it('stands both in the middle when they print as one figure (adversarial А2)', () => {
+    // Six digits apart, two printed: «4,87 ֏/₽» and «4,87 ֏/₽».
+    const middle = { own: CHART_LEVEL / 2, official: CHART_LEVEL / 2 }
+    expect(walletTrack(rate('RUB', 'AMD', '4.871234'), rate('RUB', 'AMD', '4.87'))).toEqual(middle)
+    expect(walletTrack(rate('USD', 'AMD', '386.497'), rate('USD', 'AMD', '386.50'))).toEqual(middle)
+    // 0,205286 ₽/֏ is printed 4,87 ֏/₽ too.
+    expect(walletTrack(rate('AMD', 'RUB', '0.205286'), rate('RUB', 'AMD', '4.87'))).toEqual(middle)
+    // A hundredth apart as printed, they part.
+    expect(walletTrack(rate('RUB', 'AMD', '4.875'), rate('RUB', 'AMD', '4.87'))).toEqual({
       own: 850,
       official: 150,
     })
