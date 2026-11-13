@@ -18,13 +18,16 @@ import type {
   TripHistory,
   TripHistoryEntry,
   TripView as TripViewModel,
+  SpendingCategoryView,
 } from '@molvia/model'
 import { ApiError } from '@molvia/client'
 import ru from '@/i18n/ru.json'
 import { answeredAt, localDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
+import { categoryIcon, tripIcon } from '@/components/spending'
 import { useActorStore } from '@/stores/actor'
+import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -668,6 +671,105 @@ describe('PurchasesView (MOL-128)', () => {
       })
       expect(view.text()).toContain('2 покупки ждут оценки')
       expect(view.text()).not.toContain(ru.purchases.empty.title)
+    })
+  })
+
+  // MOL-406: a purchase stands in its category's circle, typed by hand or recorded from a receipt
+  describe('the category’s circle (MOL-406)', () => {
+    const preset = (n: number, key: SpendingCategoryView['preset']): SpendingCategoryView => ({
+      id: `c0000000-0000-4000-8000-00000000000${String(n)}`,
+      preset: key,
+      name: null,
+      colour: null,
+      icon: null,
+      archived: false,
+    })
+    const groceries = preset(1, 'groceries')
+    const cafe = preset(2, 'cafe')
+    const pets = preset(3, 'pets')
+    /** The list the phone keeps, as the server last answered it (`molvia.own-categories`). */
+    const keepCategories = () => {
+      localStorage.setItem(
+        `molvia.own-categories.${ME}`,
+        JSON.stringify({
+          askedAt: NOW.toISOString(),
+          answer: { categories: [groceries, cafe, pets], frequent: [] },
+        }),
+      )
+    }
+    /** The glyph a circle draws, by its path: what tells one icon from another in the page. */
+    const glyph = (row: {
+      find: (selector: string) => { attributes: (name: string) => string | undefined }
+    }) => row.find('.circle path').attributes('d')
+    const glyphOf = (icon: ReturnType<typeof categoryIcon>) =>
+      mount(icon).find('path').attributes('d')
+
+    it('a recorded row draws its category’s icon in its colour; «Продукты» where it names none', async () => {
+      tripHistory.mockResolvedValue({
+        trips: [
+          { ...trip(1), categoryId: cafe.id },
+          { ...trip(2), categoryId: null },
+        ],
+        nextCursor: null,
+      })
+      const { view } = await render({ before: keepCategories })
+      const [inCafe, inGroceries] = rows(view)
+      expect(inCafe && glyph(inCafe)).toBe(glyphOf(categoryIcon(cafe)))
+      expect(inCafe?.find('.circle').attributes('style')).toContain('--cat-cafe')
+      expect(inGroceries && glyph(inGroceries)).toBe(glyphOf(categoryIcon(groceries)))
+    })
+
+    it('must not fire: a row whose category is not known — a server before it — keeps the cart', async () => {
+      tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+      const { view } = await render({ before: keepCategories })
+      const [row] = rows(view)
+      expect(row && glyph(row)).toBe(glyphOf(tripIcon))
+    })
+
+    const READ = 'cccccccc-0000-4000-8000-0000000000f1'
+    const readReceipt = (food: boolean, status: 'parsed' | 'failed' = 'parsed') => ({
+      id: READ,
+      status,
+      failure: status === 'failed' ? ('reshoot' as const) : null,
+      parts: 1,
+      received: 1,
+      capturedAt: new Date('2026-09-26T16:00:00.000Z'),
+      country: 'AM' as const,
+      language: 'ru' as const,
+      header: null,
+      total: { minor: 155_000n, currency: 'AMD' as const },
+      balanced: true,
+      lineCount: 1,
+      unsettled: 0,
+      place: null,
+      tripId: null,
+      food,
+    })
+    /** The one receipt row on a screen with no history and none in work: the card «Посмотреть и записать». */
+    const reviewRow = (view: VueWrapper) => view.find('.block .list-row')
+
+    it('a receipt waiting for «Записать» stands in the category the review guesses — a café by its food', async () => {
+      receipts.mockResolvedValue({ receipts: [readReceipt(true)] })
+      const { view } = await render({ before: keepCategories })
+      expect(glyph(reviewRow(view))).toBe(glyphOf(categoryIcon(cafe)))
+    })
+
+    it('and in the category the person chose on its review, over the guess', async () => {
+      receipts.mockResolvedValue({ receipts: [readReceipt(true)] })
+      const { view } = await render({
+        before: () => {
+          keepCategories()
+          useReceiptDraftsStore().setCategory(READ, pets.id)
+        },
+      })
+      expect(glyph(reviewRow(view))).toBe(glyphOf(categoryIcon(pets)))
+    })
+
+    it('must not fire: a receipt not read keeps the sign of its state, no circle', async () => {
+      receipts.mockResolvedValue({ receipts: [readReceipt(false, 'failed')] })
+      const { view } = await render({ before: keepCategories })
+      const failed = reviewRow(view)
+      expect([failed.exists(), failed.find('.circle').exists()]).toEqual([true, false])
     })
   })
 

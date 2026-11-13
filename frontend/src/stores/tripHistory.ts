@@ -400,9 +400,12 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     }
     if (row) {
       selected.value ??= trip
+      // a trip view carries no category (MOL-406): the row keeps the one the answer gave it
+      const category = page.value.trips.find((held) => held.id === trip.id)?.categoryId
+      const placed = category === undefined ? row : { ...row, categoryId: category }
       page.value = {
         ...page.value,
-        trips: [...page.value.trips.filter((held) => held.id !== trip.id), row].sort(
+        trips: [...page.value.trips.filter((held) => held.id !== trip.id), placed].sort(
           (a, b) =>
             (b.finishedOnDeviceAt ?? b.finishedAt).getTime() -
               (a.finishedOnDeviceAt ?? a.finishedAt).getTime() || b.id.localeCompare(a.id),

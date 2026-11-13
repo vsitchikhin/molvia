@@ -8,6 +8,7 @@ import {
   finishTripBodySchema,
   previousItemsResponseSchema,
   tripHistoryCodec,
+  TRIP_HISTORY_CATEGORY_HEADER,
   tripHistoryQuerySchema,
   rateChoiceBodySchema,
   restoreTripBodySchema,
@@ -117,7 +118,13 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
     const cursor =
       query.before && query.beforeId ? { at: query.before, id: query.beforeId } : undefined
     const page = await api.history(request.actorId, cursor)
-    return reply.header('cache-control', 'no-store').send(z.encode(tripHistoryCodec, page))
+    // the category only to a phone that asks (MOL-406): an earlier build reads a row strictly
+    const asked = request.headers[TRIP_HISTORY_CATEGORY_HEADER.toLowerCase()] === '1'
+    // undefined leaves the key out of the JSON
+    const sent = asked
+      ? page
+      : { ...page, trips: page.trips.map((row) => ({ ...row, categoryId: undefined })) }
+    return reply.header('cache-control', 'no-store').send(z.encode(tripHistoryCodec, sent))
   })
 
   app.get<{ Params: TripParams }>(

@@ -286,6 +286,7 @@ function fakeRepositories(
       create: unexpected('receipts.create'),
       putPart: unexpected('receipts.putPart'),
       list: unexpected('receipts.list'),
+      classesOf: unexpected('receipts.classesOf'),
       one: unexpected('receipts.one'),
       heardInApp: unexpected('receipts.heardInApp'),
       claimUntold: unexpected('receipts.claimUntold'),

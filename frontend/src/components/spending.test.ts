@@ -16,6 +16,7 @@ import {
   refusedRows,
   roundsToNought,
   spentApprox,
+  tripIcon,
   unbroken,
   unsentIn,
 } from '@/components/spending'
@@ -650,6 +651,13 @@ describe('a line of the journal as its row says it', () => {
   it('a trip in a category of its own stands in that category’s circle and words (MOL-400)', () => {
     const value = row({ ...trip, categoryId: beauty.id }, beauty)
     expect([value.meta, value.tint]).toEqual(['Красота · 9 позиций', 'var(--cat-beauty)'])
+  })
+
+  it('a trip draws its category’s icon, never the cart; naming none, «Продукты»’s (MOL-406)', () => {
+    expect(row({ ...trip, categoryId: beauty.id }, beauty).icon).toBe(categoryIcon(beauty))
+    expect(row(trip, groceries).icon).toBe(categoryIcon(groceries))
+    expect(row(trip, null).icon).toBe(categoryIcon(groceries))
+    expect(row(trip, beauty).icon).not.toBe(tripIcon)
   })
 
   it('a trip with money and no purchase is the receipt’s sum, never «0 позиций» (MOL-227)', () => {

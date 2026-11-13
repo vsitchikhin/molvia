@@ -14,6 +14,7 @@ import {
   priceInDoubt,
   receiptDigits,
   recordedSums,
+  servesFood,
   storeMemoryWords,
 } from '@molvia/model'
 import type {
@@ -147,15 +148,36 @@ async function handedOver(
   )
 }
 
-/** «Покупки»: the person's receipts, each with its place where its tax number tells it (MOL-126). */
+/**
+ * «Покупки»: the person's receipts, each with its place where its tax number tells it (MOL-126). `food` — the phone
+ * knows a summary's `food` (`RECEIPT_FOOD_HEADER`, MOL-406): said of a receipt read and not recorded, by the one rule
+ * the review guesses its category by (`servesFood`).
+ */
 export async function receiptsOf(
   repositories: ReceiptReviewRepositories,
   actor: Actor,
   shown: boolean,
+  food = false,
 ): Promise<ReceiptSummary[]> {
   const stored = await repositories.receipts.list(actor.id)
   if (shown) await handedOver(repositories.receipts, actor.id, stored)
-  return withPlaces(repositories.receipts, actor, stored)
+  const summaries = await withPlaces(repositories.receipts, actor, stored)
+  if (!food) return summaries
+  const reviewed = stored.filter(({ receipt }) => receipt.status === 'parsed')
+  const classes = await repositories.receipts.classesOf(
+    actor.id,
+    reviewed.map(({ receipt }) => receipt.id),
+  )
+  const serving = new Map(
+    reviewed.map(({ receipt, service }) => [
+      receipt.id,
+      servesFood(classes.get(receipt.id) ?? [], service !== null),
+    ]),
+  )
+  return summaries.map((summary) => {
+    const said = serving.get(summary.id)
+    return said === undefined ? summary : { ...summary, food: said }
+  })
 }
 
 /** Each line as the review first shows it, before the person touches anything. */
