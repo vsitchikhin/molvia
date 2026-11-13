@@ -360,9 +360,11 @@ function totalOf(
   service: number | null
 } {
   const w = reading.words
-  const word = (fragment: string): RegExp => new RegExp(`(?:${fragment})`, 'u')
-  // a café's words are printed in capitals as often as not, «ՎՃԱՐՄԱՆ» (MOL-310)
-  const [service, bill] = [serviceWordOf(reading), new RegExp(`(?:${w.billTotal})`, 'iu')]
+  // a summary's words are printed in capitals as often as not — «ՎՃԱՐՄԱՆ» (MOL-310), «ԸՆԴԱՄԵՆԸ» of a café's or a
+  // shop's till (MOL-310, round 2): read in any case, all but the payment's — its «Վճար» in small letters is inside
+  // «կանխավճար», the prepayment slip, which would pay
+  const word = (fragment: string): RegExp => new RegExp(`(?:${fragment})`, 'iu')
+  const [service, bill] = [serviceWordOf(reading), word(w.billTotal)]
   const [total, discount, cashbacks, taxedSum, redemption] = [
     word(w.totalKept),
     word(w.discountKept),
@@ -373,7 +375,7 @@ function totalOf(
   // a sum since the start of the year is what a card bought this year (MOL-288): the largest the total's word
   // stands by, it was the total read — «Прочитали не всё» short by 120 000 ֏
   const sinceStart = word(w.sinceStart)
-  const paid = word(w.paid.join('|'))
+  const paid = new RegExp(`(?:${w.paid.join('|')})`, 'u')
   const places = new Map<string, Set<number>>([
     ['total', new Set()],
     ['paid', new Set()],

@@ -1145,6 +1145,56 @@ describe('a café’s bill (MOL-310)', () => {
   })
 })
 
+describe('a summary printed in capitals (MOL-310, round 2)', () => {
+  // made-up lines of a till that prints its summary in capitals, as a food court's and a shop's of production did
+  const item = (printed: string, sum: string): Line =>
+    line({ printed, code: '56.10', article: null, unit: null, quantity: '1', unit_price: sum, sum })
+  const two = [item('Սուրճ', '800'), item('Թխվածք', '1950')]
+  const summed = (totals: [string, string][], lines = two) =>
+    read(answer({ lines, totals: totals.map(([label, amount]) => ({ label, amount })) }))
+
+  it('reads the total’s word in capitals, alone and with the payment’s word after it', () => {
+    for (const label of ['ԸՆԴԱՄԵՆԸ', 'ԸՆԴԱՄԵՆԸ ՎՃԱՐՄԱՆ', 'ԸՆԴԱՄԵՆԸ ՎՃԱՐՎԱԾ', 'ԳՈՒՄԱՐԸ ԸՆԴԱՄԵՆԸ']) {
+      const text = summed([[label, '2750']])
+      expect([text.totalHundredths, text.balanced], label).toEqual([275_000, true])
+    }
+  })
+
+  it('reads «ԵՆԹԱԿԱ Է ՎՃԱՐՄԱՆ», subject to payment, as the total, in any case', () => {
+    for (const label of ['ԵՆԹԱԿԱ Է ՎՃԱՐՄԱՆ:', 'Ենթակա է վճարման']) {
+      expect(
+        summed([
+          [label, '2750'],
+          ['ՎՃԱՐՈՒՄ', '3000'],
+        ]).totalHundredths,
+        label,
+      ).toBe(275_000)
+    }
+  })
+
+  it('takes a discount in capitals for no total', () => {
+    expect(
+      summed([
+        ['ԸՆԴԱՄԵՆԸ ԶԵՂՉ', '300'],
+        ['ԸՆԴԱՄԵՆԸ', '2750'],
+      ]).totalHundredths,
+    ).toBe(275_000)
+  })
+
+  it('reads the payment’s words as printed: «կանխավճարին» in small letters is the prepayment, never a payment', () => {
+    // lines short of the total: only two places could vouch for it, and the slip is no second place
+    const short = [item('Սուրճ', '800')]
+    const text = summed(
+      [
+        ['ԸՆԴԱՄԵՆԸ', '2750'],
+        ['կանխավճարին ավել. մանր', '2750'],
+      ],
+      short,
+    )
+    expect(text.totalHundredths).toBeNull()
+  })
+})
+
 describe('a bank terminal’s slip with no bill (MOL-310, owner’s В-3 «а»)', () => {
   const slip = (over: Partial<ModelReceipt> = {}) =>
     answer({
