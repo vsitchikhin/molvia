@@ -1604,6 +1604,8 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     // The verb and the day first, unseen; then what was given and received, the place, the difference.
     expect(button.text()).toMatch(/^Amend the exchange of .+:/)
     expect(button.text()).toContain('₽20,000 → ֏95,000')
+    // Each sum a piece of its own: under the caption's size the line wraps between them, never inside one (А4).
+    expect(button.findAll('.amounts .sum').map((sum) => sum.text())).toEqual(['₽20,000', '֏95,000'])
     expect(button.text()).toContain(en.exchange.list.no_place)
     expect(button.get('.amount').text()).toBe('−֏1,232')
     expect(button.get('.amount').classes()).toContain('bad')

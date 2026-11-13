@@ -8,9 +8,16 @@
 /// of 190. The component says how wide the figure is in its own size (`figureChars`, a share of it a
 /// character, measured), since CSS cannot measure text.
 /// `$less` is what of the box the figure does not get — a field's edges around a figure typed.
-@mixin figure-fit($size: var(--text-figure), $less: 0px) {
-  /* stylelint-disable-next-line declaration-property-value-allowed-list -- the one place a figure's size is worked out (MOL-321) */
-  font-size: min(#{$size}, calc((100cqi - #{$less}) / var(--figure-width, 1)));
+/// `$least` is the size it never goes under, for words that wrap there rather than shrink further (MOL-404:
+/// «отдал → получил» at 200 % stood at 13 px, under the caption of 22).
+@mixin figure-fit($size: var(--text-figure), $less: 0px, $least: null) {
+  @if $least {
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- the one place a figure's size is worked out (MOL-321) */
+    font-size: max(#{$least}, min(#{$size}, calc((100cqi - #{$less}) / var(--figure-width, 1))));
+  } @else {
+    /* stylelint-disable-next-line declaration-property-value-allowed-list -- the one place a figure's size is worked out (MOL-321) */
+    font-size: min(#{$size}, calc((100cqi - #{$less}) / var(--figure-width, 1)));
+  }
 }
 
 /// Anything a thumb has to hit at a shelf, in bad light.

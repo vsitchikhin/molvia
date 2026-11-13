@@ -2,6 +2,7 @@ import { useI18n } from 'vue-i18n'
 import { formatMoney, formatRate, formatRateBeside, yerevanDate } from '@molvia/model'
 import type { ExchangeRate, ExchangeView, Money } from '@molvia/model'
 import { signedAmount } from '@/components/accounts'
+import { aroundFigure } from '@/components/figure'
 import { bankWords } from '@/components/spending'
 import { calendarDay, calendarDayOfAnyYear } from '@/days'
 
@@ -42,12 +43,19 @@ export interface ExchangeWords {
   readonly dayOf: (exchange: ExchangeView) => string
   readonly moneyOf: (value: ExchangeView['given']) => string
   readonly amountsOf: (exchange: ExchangeView) => string
+  readonly amountPartsOf: (exchange: ExchangeView) => readonly AmountPart[]
   readonly rateLineOf: (exchange: ExchangeView, today: string) => string
   readonly officialOf: (exchange: ExchangeView) => OfficialWords | null
   readonly noOfficialOf: (exchange: ExchangeView) => string
   /** The bank an exchange's pair is measured by, named — «ЦБ РА», «НБ Грузии» (MOL-110). */
   readonly bankOf: (exchange: ExchangeView) => string
   readonly marketOf: (exchange: ExchangeView) => MarketWords | null
+}
+
+/** A piece of «отдал → получил»: a sum, which stands whole, or the words around it (MOL-404). */
+export interface AmountPart {
+  readonly text: string
+  readonly sum: boolean
 }
 
 /** A difference with the market by the sign of its money (MOL-190): its tone, its mark, its word. */
@@ -96,12 +104,25 @@ export function useExchangeWords(): ExchangeWords {
   /** Amounts as they were typed, as everywhere in «Деньги» (owner's decision В-1). */
   const moneyOf = (value: ExchangeView['given']): string => formatMoney(value, locale.value)
 
-  function amountsOf(exchange: ExchangeView): string {
-    return t('exchange.row_amounts', {
-      given: moneyOf(exchange.given),
-      received: moneyOf(exchange.received),
-    })
+  /** «Отдал → получил», cut around its two sums (`aroundFigure`), so a line breaks between them, never inside one. */
+  function amountPartsOf(exchange: ExchangeView): AmountPart[] {
+    const given = moneyOf(exchange.given)
+    const received = moneyOf(exchange.received)
+    const first = aroundFigure(t('exchange.row_amounts', { given, received }), given)
+    const second = aroundFigure(first.after, received)
+    return [
+      { text: first.before, sum: false },
+      { text: first.figure, sum: true },
+      { text: second.before, sum: false },
+      { text: second.figure, sum: true },
+      { text: second.after, sum: false },
+    ].filter((part) => part.text !== '')
   }
+
+  const amountsOf = (exchange: ExchangeView): string =>
+    amountPartsOf(exchange)
+      .map(({ text }) => text)
+      .join('')
 
   /**
    * The day and the rate it was made at — the day alone for amounts no rate in the band says. «Удалить обмен?» has
@@ -190,6 +211,7 @@ export function useExchangeWords(): ExchangeWords {
     dayOf,
     moneyOf,
     amountsOf,
+    amountPartsOf,
     rateLineOf,
     officialOf,
     noOfficialOf,

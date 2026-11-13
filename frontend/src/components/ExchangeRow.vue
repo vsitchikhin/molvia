@@ -11,7 +11,14 @@
     >
       <template #title
         ><span class="verb">{{ `${t('exchange.edit_on', { date: dayOf(exchange) })} ` }}</span
-        ><span class="amounts" :style="figureChars(amounts, 'text')">{{ amounts }}</span></template
+        ><span class="amounts" :style="figureChars(amounts, 'text')"
+          ><template v-for="(part, index) in parts" :key="index"
+            ><span v-if="part.sum" class="sum" :style="figureChars(part.text, 'text')">{{
+              part.text
+            }}</span
+            ><template v-else>{{ part.text }}</template></template
+          ></span
+        ></template
       >
       <template #tail>
         <span class="sums">
@@ -63,7 +70,8 @@ const MARKS: Readonly<Record<VerdictKind, { icon: Component; tint: string }>> = 
  * own channel, else the best (MOL-152) — in the currency received, the server's; its tone the money's
  * sign, never alone (Ф-30, MOL-190), and «ровно» and «без сравнения» have none. «Отдал → получил» is one line,
  * shrunk to the words' column where it is narrower (MOL-404, В-7 «б»): wrapped at the arrow, a row was four lines;
- * the exchange offices still to come are said once over the list, not on every recent row.
+ * never under the caption's size, where it wraps between its sums instead (adversarial А4); the exchange offices
+ * still to come are said once over the list, not on every recent row.
  */
 export default defineComponent({
   name: 'ExchangeRow',
@@ -78,7 +86,7 @@ export default defineComponent({
   },
   setup(props) {
     const { t, locale } = useI18n()
-    const { amountsOf, dayOf } = useExchangeWords()
+    const { amountPartsOf, dayOf } = useExchangeWords()
     // The card's own measure — its channel, else the best (MOL-152) — by the domain's one rule.
     const measure = computed(() => cardMeasureOf(props.exchange.market))
     const kind = computed<VerdictKind>(() => {
@@ -110,8 +118,9 @@ export default defineComponent({
       }
       return parts.join(' · ')
     })
-    const amounts = computed(() => amountsOf(props.exchange))
-    return { t, mark, difference, word, meta, amounts, dayOf, figureChars }
+    const parts = computed(() => amountPartsOf(props.exchange))
+    const amounts = computed(() => parts.value.map(({ text }) => text).join(''))
+    return { t, mark, difference, word, meta, parts, amounts, dayOf, figureChars }
   },
 })
 </script>
@@ -133,7 +142,14 @@ li {
   container-type: inline-size;
 }
 
+/* Never under the caption (`_tokens.scss`): at 200 % the words' column is the narrowest, and shrunk to it the line stood
+   at 13 px, under the 22 of a caption that size (adversarial А4) — there it wraps between its sums instead. */
 .amounts {
+  @include figure-fit(1em, $least: var(--text-caption));
+}
+
+/* A sum whole, shrunk only where even it alone is wider than the column (MOL-321). */
+.sum {
   @include figure-fit(1em);
 
   white-space: nowrap;
