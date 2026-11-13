@@ -70,7 +70,8 @@ const MARKS: Readonly<Record<VerdictKind, { icon: Component; tint: string }>> = 
  * own channel, else the best (MOL-152) — in the currency received, the server's; its tone the money's
  * sign, never alone (Ф-30, MOL-190), and «ровно» and «без сравнения» have none. «Отдал → получил» is one line,
  * shrunk to the words' column where it is narrower (MOL-404, В-7 «б»): wrapped at the arrow, a row was four lines;
- * never under the caption's size, where it wraps between its sums instead (adversarial А4); the exchange offices
+ * never under the caption's size, where it wraps between its sums instead (adversarial А4) — a sum alone wider than
+ * the column still shrinks, since it never breaks (Б3); the exchange offices
  * still to come are said once over the list, not on every recent row.
  */
 export default defineComponent({
@@ -148,7 +149,8 @@ li {
   @include figure-fit(1em, $least: var(--text-caption));
 }
 
-/* A sum whole, shrunk only where even it alone is wider than the column (MOL-321). */
+/* A sum whole, shrunk only where even it alone is wider than the column — under the caption too, then: a sum never
+   breaks (MOL-321), and 13 812 345,60 ֏ at 200 % on 320 is wider than the words' column (round 2, Б3). */
 .sum {
   @include figure-fit(1em);
 

@@ -11,13 +11,14 @@
 /// `$least` is the size it never goes under, for words that wrap there rather than shrink further (MOL-404:
 /// «отдал → получил» at 200 % stood at 13 px, under the caption of 22).
 @mixin figure-fit($size: var(--text-figure), $less: 0px, $least: null) {
+  $fit: min(#{$size}, calc((100cqi - #{$less}) / var(--figure-width, 1)));
+
   @if $least {
-    /* stylelint-disable-next-line declaration-property-value-allowed-list -- the one place a figure's size is worked out (MOL-321) */
-    font-size: max(#{$least}, min(#{$size}, calc((100cqi - #{$less}) / var(--figure-width, 1))));
-  } @else {
-    /* stylelint-disable-next-line declaration-property-value-allowed-list -- the one place a figure's size is worked out (MOL-321) */
-    font-size: min(#{$size}, calc((100cqi - #{$less}) / var(--figure-width, 1)));
+    $fit: max(#{$least}, #{$fit});
   }
+
+  /* stylelint-disable-next-line declaration-property-value-allowed-list -- the one place a figure's size is worked out (MOL-321) */
+  font-size: $fit;
 }
 
 /// Anything a thumb has to hit at a shelf, in bad light.
