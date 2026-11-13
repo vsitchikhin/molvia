@@ -763,10 +763,15 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   both at once** (adversarial Д1). **Standing on nothing, the reading says why and nothing more** (MOL-404; round 10
   held the latest step's day and figure unseen). The plate under the bars is no live region: the radio says it
   (review №8).
-- **A label under or over a bar never wraps, and stands within the card** (MOL-404): a month and a value stand in a
-  row as wide as their column, centred while they fit; wider, the first column's runs from the card's left edge, the
-  last's back from its right. Past eight bars only the first month and the last are named (В-2 «а»: the chosen
-  bar's day is on its plate) — a column of 8 px broke «нояб» a letter a line. The field is one column of the card's
+- **A label under or over a bar never wraps, stands within the card and never over another** (MOL-404): a month
+  and a value stand in a row as wide as their column, centred on it; where centred they would stand past the field,
+  laid from the column's edge inward; of two that would run into each other one gives way, unseen (`placeLabels`,
+  measured — review №1–2, adversarial А1–А3: by the count of bars alone, the chosen penultimate's value lay on the
+  furthest's, eight months at 200 % ran into each other, six values on 320 too). The values give way in their order —
+  the chosen bar's, the furthest's, then by size — the months from the edges, then from the left, so a choice moves
+  none. Past eight bars only the first month and the last are named (В-2 «а»: the chosen bar's day is on its plate) —
+  a column of 8 px broke «нояб» a letter a line. The price: a value or a month may be unseen — the plate and the
+  bar's name say it. The field is one column of the card's
   width (`minmax(0, 1fr)`): as `auto`, forty-one frames of «без сравнения» at 14 px stood it 590 px wide on 320; a
   frame is a square of 14 narrower with its column. No bar down, no room is kept under the line.
 - **A label of «мой — ЦБ РА» stands at its dot's end of the line**, wrapping within the card, never centred on the dot
@@ -781,7 +786,10 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   «Обмены против рынка» chooses the same exchange there, its pair with it. The legend of the bars names no currency
   — «вверх — получили больше» (review №12, adversarial А6): bought with drams, up is more of the currency received.
 - **A row of the list says «отдал → получил» on one line**, shrunk to the words' column where it is narrower
-  (`figure-fit`, MOL-404, В-7 «б»): wrapped at the arrow, a row of the owner's 41 was three to five lines. **The
+  (`figure-fit`, MOL-404, В-7 «б»): wrapped at the arrow, a row of the owner's 41 was three to five lines. **Never
+  under `--text-caption`** (`$least`, adversarial А4: at 200 % the words' column is the narrowest and the line stood at
+  13 px under a caption of 22; a million roubles at 9,5 px on 390): there it wraps between its two sums, each whole
+  (`amountPartsOf`, one cut for the row and the plate). **The
   exchange offices still to come are said once, over the list** (`list.pending_note`), never a tag on every recent
   row.
 - **«Удалить обмен?» stays** (Р-16, В-5): the handoff took it away on the word that «Перевод» removes at once, which
