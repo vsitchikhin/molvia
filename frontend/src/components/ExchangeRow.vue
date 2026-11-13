@@ -11,11 +11,15 @@
     >
       <template #title
         ><span class="verb">{{ `${t('exchange.edit_on', { date: dayOf(exchange) })} ` }}</span
-        >{{ amountsOf(exchange) }}</template
+        ><span class="amounts" :style="figureChars(amounts, 'text')"
+          ><template v-for="(part, index) in parts" :key="index"
+            ><span v-if="part.sum" class="sum" :style="figureChars(part.text, 'text')">{{
+              part.text
+            }}</span
+            ><template v-else>{{ part.text }}</template></template
+          ></span
+        ></template
       >
-      <template v-if="exchange.market?.exchangersPending" #below>
-        <AppTag>{{ t('exchange.list.pending_tag') }}</AppTag>
-      </template>
       <template #tail>
         <span class="sums">
           <span
@@ -42,7 +46,6 @@ import IconEqual from '~icons/mdi/equal'
 import IconHelp from '~icons/mdi/help'
 import IconMinus from '~icons/mdi/minus'
 import IconPlus from '~icons/mdi/plus'
-import AppTag from '@/components/AppTag.vue'
 import ListRow from '@/components/ListRow.vue'
 import { signedAmount } from '@/components/accounts'
 import { figureChars } from '@/components/figure'
@@ -65,11 +68,15 @@ const MARKS: Readonly<Record<VerdictKind, { icon: Component; tint: string }>> = 
  * that said all of it in five to seven lines is gone: the rate, the market and the central bank are in
  * the sheet of the amendment, which the whole row opens. The difference is the card's own measure — its
  * own channel, else the best (MOL-152) — in the currency received, the server's; its tone the money's
- * sign, never alone (Ф-30, MOL-190), and «ровно» and «без сравнения» have none.
+ * sign, never alone (Ф-30, MOL-190), and «ровно» and «без сравнения» have none. «Отдал → получил» is one line,
+ * shrunk to the words' column where it is narrower (MOL-404, В-7 «б»): wrapped at the arrow, a row was four lines;
+ * never under the caption's size, where it wraps between its sums instead (adversarial А4) — a sum alone wider than
+ * the column still shrinks, since it never breaks (Б3); the exchange offices
+ * still to come are said once over the list, not on every recent row.
  */
 export default defineComponent({
   name: 'ExchangeRow',
-  components: { AppTag, ListRow },
+  components: { ListRow },
   props: {
     exchange: { type: Object as PropType<ExchangeView>, required: true },
     /** The screen's day (MOL-329). */
@@ -80,7 +87,7 @@ export default defineComponent({
   },
   setup(props) {
     const { t, locale } = useI18n()
-    const { amountsOf, dayOf } = useExchangeWords()
+    const { amountPartsOf, dayOf } = useExchangeWords()
     // The card's own measure — its channel, else the best (MOL-152) — by the domain's one rule.
     const measure = computed(() => cardMeasureOf(props.exchange.market))
     const kind = computed<VerdictKind>(() => {
@@ -112,7 +119,9 @@ export default defineComponent({
       }
       return parts.join(' · ')
     })
-    return { t, mark, difference, word, meta, amountsOf, dayOf, figureChars }
+    const parts = computed(() => amountPartsOf(props.exchange))
+    const amounts = computed(() => parts.value.map(({ text }) => text).join(''))
+    return { t, mark, difference, word, meta, parts, amounts, dayOf, figureChars }
   },
 })
 </script>
@@ -126,6 +135,26 @@ li {
 
 .verb {
   @include visually-hidden;
+}
+
+/* The words' column is the box the amounts shrink to, as a trip's price per unit (MOL-334): its width is the
+   row's share, never its words'. */
+:deep(.words) {
+  container-type: inline-size;
+}
+
+/* Never under the caption (`_tokens.scss`): at 200 % the words' column is the narrowest, and shrunk to it the line stood
+   at 13 px, under the 22 of a caption that size (adversarial А4) — there it wraps between its sums instead. */
+.amounts {
+  @include figure-fit(1em, $least: var(--text-caption));
+}
+
+/* A sum whole, shrunk only where even it alone is wider than the column — under the caption too, then: a sum never
+   breaks (MOL-321), and 13 812 345,60 ֏ at 200 % on 320 is wider than the words' column (round 2, Б3). */
+.sum {
+  @include figure-fit(1em);
+
+  white-space: nowrap;
 }
 
 .sums {

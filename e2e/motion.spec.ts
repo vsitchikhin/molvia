@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page, Route } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
+import { yerevanDay } from './days'
 import { asBrowser, signedIn } from './session'
 
 // Motion as it is (MOL-151): what must not move does not, and what moves does it once. Born of the
@@ -83,12 +84,6 @@ async function openSpendings(page: Page): Promise<void> {
   await page.getByRole('link', { name: 'Деньги', exact: true }).click()
   await page.getByRole('link', { name: /^Траты/ }).click()
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Траты')
-}
-
-function yerevanDay(days = 0): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
-    new Date(Date.now() + days * 86_400_000),
-  )
 }
 
 function lastMonthDay(day: number): string {

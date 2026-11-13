@@ -2319,6 +2319,32 @@ service)` for every comparison of the lines with the total, the trip's money the
   **Not reached**: 62260baa — its «ԱԱՀ-ով հարկվող» copied 5↔6 too, so no place vouches for its total; two lines whose
   quantity the model did not copy (Dog City's «,019», «Ереван Сити»'s cosmetics) — the next iteration's.
 
+## A summary in capitals, sums the total vouches for (MOL-310, iteration 2)
+
+**The owner's 13.11.2026: half of the last ten receipts with no total, many lines with no sum** — and «неверно прочитанное
+хуже непрочитанного» meant reading better, never emptying what was read. Of the seven kept for the review the model had
+misread none: every total and every sum it copied was the paper's (`misses/2026-11-13.md`). Sonnet re-reading them would
+have paid to read the same; it waits (MOL-405), and Haiku at `high` measured within the runs' spread, so it stays `medium`.
+
+- **A summary's words are read in any case** (`totalOf`): «ԸՆԴԱՄԵՆԸ», «ԸՆԴԱՄԵՆԸ ՎՃԱՐՄԱՆ», «ԸՆԴԱՄԵՆԸ ՎՃԱՐՎԱԾ» of a food court and
+  a shop's till lost four receipts their total — the total, discount, cashback, VAT, bonus and since-start words with `iu`.
+  **Never the payment's** (`paid`): its «Վճար» in small letters is inside «կանխավճարին» and «Կանխավճար», the prepayment
+  slip — read so, the slip paid, and four totals of the bench came out wrong. **«Ենթակա է վճարման»**, subject to payment,
+  is a total (`billTotal`).
+- **«ԱԱՀ-ով հարկվող» is the total's second place without the card's cashback too**: the sum taxed with VAT, the lines'
+  sum printed again (MOL-289). «Ереван Сити» without the card prints the total twice and the model copies it once.
+- **A model's sums as copied that meet a total two places vouch for vouch for every sum** (`explainedReading`,
+  `sumsMeet`): a line whose quantity or price does not hold keeps **its sum alone**, quantity and price empty, its reason
+  as before — Dog City's weight under the table's rule «?,001», «Ереван Сити»'s own rounding «989,96 / 990», «1 × цена»
+  of a receipt not whole. Only sums as copied (`sumsCopied`): one the font's swaps chose was chosen to meet the total. The
+  model's reading only — Tesseract's sum may be the total's choice. **A total read in one place stays none** (MOL-244,
+  owner's В-1 «а»), the sums meeting it or not: a food court's «1 բաժին 1,550» — the portion copied as a row of the summary
+  — keeps its bill with no total. The receipt is no more proven whole than before: its lines' quantities are not.
+- **Measured** (`status/MOL-310/score.mts`): the model's bench, three runs (two of `medium`, one of `high`), right fields
+  661 → 674, 704 → 721, 695 → 710, made up 2, 1, 1 as before; totals right 37, 36, 39 → 44 each, wrong 0; production's ten
+  of iteration 1 183 → 188, made up 0; the seven of this one: four whole, two with every sum and the total, one — the
+  portion — none.
+
 ## What lives how long
 
 | What                          | How long                                                                                         |

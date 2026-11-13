@@ -1,10 +1,12 @@
 import { randomUUID } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
-import { standAt, stillIn, topOf } from './scroll'
+import { yerevanDay } from './days'
+import { facesIn, standAt, stillIn, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
+import { textAt } from './text-size'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -628,18 +630,23 @@ test('the rate of twelve months: no market — no card; the latest exchange firs
   await expect(card.locator('.mine-place')).toHaveText('Ардшинбанк')
   await expect(card.locator('.mine-diff')).toHaveText(/\+1,21\s%\s·\sлучше рынка/)
 
-  // Where the line stands in its card: the reading above it holds the plate's three lines, so a week
-  // with no exchange or no market leaves it under the finger (MOL-190, adversarial А2).
+  // The reading is as tall as what it says: no room held for another week's plate, the chart under it
+  // moving instead (MOL-404, the owner's word; MOL-190 held the plate's three lines before).
   const area = card.locator('.area')
-  const lineTop = async () =>
-    ((await area.boundingBox())?.y ?? NaN) - ((await card.boundingBox())?.y ?? NaN)
-  const withPlate = await lineTop()
+  const reading = card.locator('.reading')
+  const roomUnder = () =>
+    reading.evaluate(
+      (box) =>
+        box.getBoundingClientRect().bottom -
+        (box.lastElementChild?.getBoundingClientRect().bottom ?? NaN),
+    )
+  expect(await roomUnder()).toBeCloseTo(0, 0)
 
   // A finger lifted at the left edge: the first week, which had no exchange.
   await area.tap({ position: { x: 2, y: 60 } })
-  await expect(card.locator('.reading')).toContainText('Неделя по 8 февр. · рынок')
+  await expect(reading).toContainText('Неделя по 8 февр. · рынок')
   await expect(card.locator('.none')).toHaveText('Обменов на этой неделе не было')
-  expect(await lineTop()).toBe(withPlate)
+  expect(await roomUnder()).toBeCloseTo(0, 0)
 
   // The keys walk the radios: one more step brings the second week.
   await card.getByRole('radio', { name: /Неделя по 8 февраля/ }).focus()
@@ -647,15 +654,15 @@ test('the rate of twelve months: no market — no card; the latest exchange firs
   await expect(card.locator('.figure')).toHaveText('4,80 ֏/₽')
   await page.keyboard.press('ArrowRight')
   await expect(card.locator('.figure')).toHaveText('Рынка за эту неделю нет')
-  expect(await lineTop()).toBe(withPlate)
+  expect(await roomUnder()).toBeCloseTo(0, 0)
 })
 
 /**
- * Every plate of the period stands unseen in one cell, holding the place (MOL-190): a note of another
- * exchange — a link to a map, no spaces — neither stretches the plate shown nor pushes the page aside,
- * on the week of an exchange or on one without (adversarial В1, В2).
+ * Only the chosen exchange's plate is drawn, at its own height (MOL-404; MOL-190 held every plate of the
+ * period unseen before): a note of another exchange — a link to a map, no spaces — does not stretch the
+ * plate shown, and chosen, it wraps within its plate and never pushes the page aside (adversarial В1, В2).
  */
-test('a long note of another exchange: the plate keeps its height, the page its width', async ({
+test('a long note: the plate is as tall as its own lines, the page keeps its width', async ({
   page,
 }) => {
   await signedIn(page)
@@ -681,11 +688,20 @@ test('a long note of another exchange: the plate keeps its height, the page its 
   const box = async (selector: string) =>
     (await card.locator(selector).boundingBox())?.height ?? NaN
   // The plate is its three lines and its padding (8 above, 8 below), not the link's four or more.
-  expect(await box('.mine')).toBeCloseTo((await box('.mine .plate-text')) + 16, 0)
+  const three = await box('.mine')
+  expect(three).toBeCloseTo((await box('.mine .plate-text')) + 16, 0)
+  expect(await wide()).toBe(0)
+
+  // The link's own exchange: its plate grows by the link's lines, and the page keeps its width.
+  await card.getByRole('radio', { name: /мой обмен 14 февраля/ }).focus()
+  await page.keyboard.press('Space')
+  await expect(card.locator('.mine-place')).toContainText('yandex.ru')
+  expect(await box('.mine')).toBeGreaterThan(three)
   expect(await wide()).toBe(0)
 
   await card.locator('.area').tap({ position: { x: 2, y: 60 } })
   await expect(card.locator('.none')).toHaveText('Обменов на этой неделе не было')
+  await expect(card.locator('.plate')).toHaveCount(0)
   expect(await wide()).toBe(0)
 })
 
@@ -740,3 +756,328 @@ test('the month of the rate by days: the switch and the page stay put, the addre
   await expect(card.locator('.none')).toHaveText('Рынка за 6 месяцев нет')
   await expect(periods).toBeVisible()
 })
+
+/** How many lines a text stands on: one box a line of it. */
+function linesOf(element: Locator): Promise<number> {
+  return element.evaluate((box) => {
+    const range = document.createRange()
+    range.selectNodeContents(box)
+    return new Set([...range.getClientRects()].map((rect) => Math.round(rect.top))).size
+  })
+}
+
+/**
+ * «Обмены против рынка» of a year of exchanges, as the owner's 41 (MOL-404): with a bar 8 px wide, «нояб»
+ * stood a letter a line, and every plate held unseen in one cell left a screen and a half of nothing under
+ * the bars — «без сравнения · …» took the plate's whole width as an `auto` column, and a note of 122
+ * characters stood a letter a line in what was left. This run has no market, so every bar is «без
+ * сравнения», the longest word a plate has. At 390 and 320, and at 150 % and 200 % of the system's text.
+ */
+const LONG_NOTE =
+  'Обменник у рынка на Ширакаци, второй этаж, окошко слева от входа; курс табло на утро, наличные, без комиссии, спросить Ару'
+const ONE_WORD = 'Обменникрынкаширакацивторойэтажокошкосле'
+for (const [width, size] of [
+  [390, '100%'],
+  [320, '100%'],
+  [320, '150%'],
+  [320, '200%'],
+] as const)
+  test(`a year of 41 exchanges: months on one line, one plate, nothing past the card — ${String(width)} at ${size}`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000)
+    await page.setViewportSize({ width, height: 800 })
+    await textAt(page, size)
+    await signedIn(page)
+    const headers = await asBrowser(page)
+    for (let index = 0; index < 41; index += 1) {
+      const recorded = await page.request.post('/api/exchanges', {
+        headers,
+        data: {
+          id: randomUUID(),
+          given: { amount: '139.86', currency: 'USD' },
+          received: { amount: '54000', currency: 'AMD' },
+          exchangedOn: yerevanDay(index * 8 - 330),
+          note: index === 20 ? LONG_NOTE : index === 30 ? ONE_WORD : 'Ардшинбанк',
+        },
+      })
+      expect(recorded.status()).toBe(201)
+    }
+
+    await page.goto('/money/exchange')
+    const card = page.locator('.vs-market')
+    await expect(card.locator('.cell')).toHaveCount(41)
+    const edges = async () => {
+      const box = await card.boundingBox()
+      return { left: box?.x ?? NaN, right: (box?.x ?? NaN) + (box?.width ?? NaN) }
+    }
+    const within = async () => {
+      const { left, right } = await edges()
+      for (const label of await card.locator('.bars .label').all()) {
+        const box = await label.boundingBox()
+        expect(box?.x ?? NaN).toBeGreaterThanOrEqual(left)
+        expect((box?.x ?? NaN) + (box?.width ?? NaN)).toBeLessThanOrEqual(right)
+      }
+      expect(await card.evaluate((box) => box.scrollWidth - box.clientWidth)).toBe(0)
+      expect(
+        await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        ),
+      ).toBe(0)
+    }
+
+    // The first month and the last, each on one line (В-2 «а»): the chosen bar's day is on its plate.
+    const months = card.locator('.month .label')
+    await expect(months).toHaveCount(2)
+    for (const month of await months.all()) expect(await linesOf(month)).toBe(1)
+    // The values of the edge bars and the chosen one, the latest, «?» each.
+    await expect(card.locator('.value')).toHaveCount(2)
+    await within()
+
+    // One plate, the chosen one; the place keeps about half of it — less the gap — the word of «без сравнения» the rest.
+    const plate = card.locator('.plate')
+    await expect(plate).toHaveCount(1)
+    const share = () =>
+      plate.evaluate((box) => {
+        const where = box.querySelector('.plate-where')?.getBoundingClientRect().width ?? 0
+        const style = getComputedStyle(box)
+        const inner =
+          box.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight)
+        return where / inner
+      })
+    expect(await share()).toBeGreaterThanOrEqual(0.4)
+
+    // The long note whole, and the word of forty letters broken within its half (MOL-318).
+    for (const note of [LONG_NOTE, ONE_WORD]) {
+      await card.getByRole('radio', { name: new RegExp(note.slice(0, 24)) }).focus()
+      await page.keyboard.press('Space')
+      await expect(plate.locator('.plate-where')).toContainText(note)
+      await expect(plate).toHaveCount(1)
+      expect(await share()).toBeGreaterThanOrEqual(0.4)
+      await within()
+    }
+
+    // The list under it: «отдал → получил» on one line at the phone's own size (В-7 «б»), never under the caption —
+    // at 200 % it wraps between its sums instead, each whole (adversarial А4); the row within the phone.
+    const row = page.locator('.rows button.list-row').first()
+    const amounts = row.locator('.amounts')
+    if (size === '100%') expect(await linesOf(amounts)).toBe(1)
+    expect(await amounts.evaluate(sizeOverCaption)).toBeGreaterThanOrEqual(0)
+    await expect(amounts.locator('.sum')).toHaveCount(2)
+    // Each sum whole, and no smaller than the caption where its estimate (`figureChars`) fits the column — the arrow
+    // takes no width from either (round 3, В1).
+    for (const sum of await amounts.locator('.sum').all()) {
+      expect(await linesOf(sum)).toBe(1)
+      expect(await sum.evaluate(sizeOverCaption)).toBeGreaterThanOrEqual(0)
+    }
+    const box = await row.boundingBox()
+    expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width)
+  })
+
+/** How far a text's size stands over `--text-caption` at the root's size now, in px. */
+function sizeOverCaption(element: Element): number {
+  const probe = document.createElement('span')
+  probe.style.fontSize = 'var(--text-caption)'
+  document.body.append(probe)
+  const caption = parseFloat(getComputedStyle(probe).fontSize)
+  probe.remove()
+  return parseFloat(getComputedStyle(element).fontSize) - caption
+}
+
+/**
+ * Bars measured against the market, as the server lays them (`vsMarketBars`), put into the answer on its way: this run
+ * has no market of its own. Every one worse than the market, the last the furthest — the owner's year.
+ */
+function marketBars(days: readonly string[], mixed = false) {
+  const differences = days.map((_, index) => 31_240 + index * 10_244)
+  const furthest = Math.max(...differences)
+  return days.map((day, index) => {
+    const minor = differences[index] ?? 0
+    // Mixed: better and worse than the market by turns, the furthest worse.
+    const sign = mixed && (days.length - 1 - index) % 2 === 1 ? 1 : -1
+    return {
+      id: `a0000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      exchangedOn: day,
+      place: 'Ардшинбанк',
+      difference: { amount: `${sign < 0 ? '-' : ''}${(minor / 100).toFixed(2)}`, currency: 'AMD' },
+      percent: sign * 150,
+      sign,
+      level: sign * Math.round((minor * 1000) / furthest),
+    }
+  })
+}
+
+/** The labels of a row of the card, each with its box — one given way keeps it, unseen. */
+const labelsOf = (labels: Locator) =>
+  labels.evaluateAll((all) =>
+    all.map((one) => {
+      const box = one.getBoundingClientRect()
+      return {
+        text: one.textContent,
+        seen: getComputedStyle(one).visibility !== 'hidden',
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+      }
+    }),
+  )
+
+type LabelBox = Awaited<ReturnType<typeof labelsOf>>[number]
+
+/** Two labels stand `room` apart, across or one over the other. */
+const apartBy = (a: LabelBox, b: LabelBox, room: number) =>
+  a.right + room <= b.left ||
+  b.right + room <= a.left ||
+  a.bottom + room <= b.top ||
+  b.bottom + room <= a.top
+
+/**
+ * The labels of measured bars (MOL-404, review №1–2, adversarial А1–А3): a label never wraps, so wider than its column
+ * it stood over its neighbour — the chosen penultimate's value on the furthest's, eight months at 150 % and 200 %, six
+ * values on 320 — and a column in from the edge, past the card. Whatever is seen stands apart and within the card; a
+ * label is hidden only where it would stand on one seen — a value over the line and one under it are not neighbours
+ * (round 2, Б1) — and among six a choice hides none (Б2).
+ */
+for (const [width, size] of [
+  [390, '100%'],
+  [320, '100%'],
+  [320, '150%'],
+  [320, '200%'],
+] as const)
+  test(`the labels of measured bars never run into each other nor past the card — ${String(width)} at ${size}`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000)
+    await page.setViewportSize({ width, height: 800 })
+    await textAt(page, size)
+    await signedIn(page)
+    await exchangeOfFebruary(page)
+    const scenarios = {
+      year: Array.from({ length: 41 }, (_, index) => yerevanDay(index * 8 - 330)),
+      // A month apart and never two in one: 31 days on.
+      months: Array.from({ length: 8 }, (_, index) => yerevanDay(index * 31 - 220)),
+      values: Array.from({ length: 6 }, (_, index) => yerevanDay(index * 31 - 158)),
+    }
+    let days: readonly string[] = []
+    let mixed = false
+    await page.route('**/api/exchanges', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue()
+      const response = await route.fetch()
+      const json = (await response.json()) as Record<string, unknown>
+      json.bars = marketBars(days, mixed)
+      await route.fulfill({ response, json })
+    })
+
+    const card = page.locator('.vs-market')
+    const placed = async () => {
+      await facesIn(page)
+      await stillIn(card)
+      const box = await card.boundingBox()
+      const left = box?.x ?? NaN
+      const right = left + (box?.width ?? NaN)
+      const rows = {
+        values: await labelsOf(card.locator('.value .label')),
+        months: await labelsOf(card.locator('.month .label')),
+      }
+      for (const labels of Object.values(rows)) {
+        const seen = labels.filter((one) => one.seen)
+        expect(seen.length).toBeGreaterThan(0)
+        for (const label of seen) {
+          expect(label.left).toBeGreaterThanOrEqual(left)
+          expect(label.right).toBeLessThanOrEqual(right)
+          for (const other of seen)
+            if (other !== label)
+              expect(apartBy(label, other, 0), `${label.text} | ${other.text}`).toBe(true)
+        }
+        // Hidden only in the way of one seen, the room between labels counted (`LABEL_SPACE_PX`).
+        for (const label of labels.filter((one) => !one.seen))
+          expect(
+            seen.some((other) => !apartBy(label, other, 8)),
+            label.text,
+          ).toBe(true)
+      }
+      // A value wider than its column crosses its neighbours' bars, and stands over them: a bar later in the row was
+      // drawn over it, its «֏» lost (round 3, В2). What is drawn on top at any point across it is the label — taken as
+      // a target only while measured: it has none of its own (Г1). And no box of ground of its own, which hid where the
+      // neighbours' bars end (Г2): a halo around its glyphs only.
+      expect(
+        await card.locator('.value .label').evaluateAll((all) =>
+          all
+            .filter((one) => getComputedStyle(one).visibility !== 'hidden')
+            .flatMap((one) => {
+              const label = one as HTMLElement
+              // Only what is in the window is found at a point.
+              label.scrollIntoView({ block: 'center' })
+              const box = label.getBoundingClientRect()
+              const y = (box.top + box.bottom) / 2
+              label.style.pointerEvents = 'auto'
+              const covered = [box.left + 2, (box.left + box.right) / 2, box.right - 2]
+                .filter((x) => document.elementFromPoint(x, y)?.closest('.label') !== label)
+                .map((x) => `${label.textContent} under something at ${String(Math.round(x))}`)
+              label.style.pointerEvents = ''
+              const ground = getComputedStyle(label).backgroundColor
+              return ground === 'rgba(0, 0, 0, 0)'
+                ? covered
+                : [...covered, `${label.textContent} on ${ground}`]
+            }),
+        ),
+      ).toEqual([])
+      expect(await card.evaluate((one) => one.scrollWidth - one.clientWidth)).toBe(0)
+      return {
+        values: rows.values.filter((one) => one.seen).map(({ text }) => text),
+        months: rows.months.filter((one) => one.seen).map(({ text }) => text),
+      }
+    }
+    const choose = async (index: number) => {
+      await card.locator('.cell').nth(index).locator('input').focus()
+      await page.keyboard.press('Space')
+      await expect(card.locator('.cell').nth(index)).toHaveClass(/chosen/)
+    }
+
+    // A year, the penultimate chosen, beside the furthest: the chosen one's value is seen, inside the card.
+    days = scenarios.year
+    await page.goto('/money/exchange')
+    await expect(card.locator('.cell')).toHaveCount(41)
+    await choose(39)
+    const year = await placed()
+    expect(year.values).toContain(await card.locator('.cell.chosen .value .label').textContent())
+
+    // A tap inside the chosen value, over a neighbour's column, is the neighbour's: the value is no target (round 4,
+    // Г1 — over the bars, it took the taps of eight of them at 200 % on 320).
+    await choose(20)
+    await placed()
+    const value = card.locator('.cell.chosen .value .label')
+    await value.scrollIntoViewIfNeeded()
+    const across = await value.boundingBox()
+    const neighbour = await card.locator('.cell').nth(21).boundingBox()
+    if (!across || !neighbour) throw new Error('no value or no neighbour drawn')
+    const x = neighbour.x + neighbour.width / 2
+    expect(x).toBeGreaterThan(across.x)
+    expect(x).toBeLessThan(across.x + across.width)
+    await page.mouse.click(x, across.y + across.height / 2)
+    await expect(card.locator('.cell').nth(21)).toHaveClass(/chosen/)
+
+    // Eight months, every one a candidate: the first and the last always seen.
+    days = scenarios.months
+    await page.reload()
+    await expect(card.locator('.cell')).toHaveCount(8)
+    const months = await placed()
+    const named = await card.locator('.month .label').allTextContents()
+    expect(months.months.at(0)).toBe(named.at(0))
+    expect(months.months.at(-1)).toBe(named.at(-1))
+
+    // Six values, every one a candidate: another choice hides none and brings none back.
+    days = scenarios.values
+    await page.reload()
+    await expect(card.locator('.cell')).toHaveCount(6)
+    const six = await placed()
+    await choose(1)
+    expect((await placed()).values).toEqual(six.values)
+
+    // Six better and worse by turns: over the line and under it, the values stand on both sides.
+    mixed = true
+    await page.reload()
+    await expect(card.locator('.cell.good')).toHaveCount(3)
+    await placed()
+  })

@@ -1604,16 +1604,24 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     // The verb and the day first, unseen; then what was given and received, the place, the difference.
     expect(button.text()).toMatch(/^Amend the exchange of .+:/)
     expect(button.text()).toContain('₽20,000 → ֏95,000')
+    // Each sum a piece of its own: under the caption's size the line wraps between them, never inside one (А4), and
+    // the arrow is no sum's: glued to one it took its width from it (Б3, В1).
+    expect(button.findAll('.amounts .sum').map((sum) => sum.text())).toEqual(['₽20,000', '֏95,000'])
     expect(button.text()).toContain(en.exchange.list.no_place)
     expect(button.get('.amount').text()).toBe('−֏1,232')
     expect(button.get('.amount').classes()).toContain('bad')
     expect(button.get('.word').text()).toBe(en.exchange.vs_market.worse)
-    expect(button.text()).toContain(en.exchange.list.pending_tag)
+    // The exchange offices still to come are said once over the list, not on the row (MOL-404, В-7 «б»).
+    expect(button.text()).not.toContain(en.exchange.list.pending_note)
+    expect(view.get('.exchanges .pending').text()).toBe(en.exchange.list.pending_note)
   })
 
   it('a row with no market has no difference and no tone: «not compared» (MOL-152)', async () => {
     exchanges.mockResolvedValue(overview())
-    const button = (await render()).get('.rows button.list-row')
+    const view = await render()
+    const button = view.get('.rows button.list-row')
+    // Nothing still to come: no note over the list.
+    expect(view.find('.exchanges .pending').exists()).toBe(false)
     expect(button.find('.amount').exists()).toBe(false)
     expect(button.get('.word').text()).toBe(en.exchange.rate_chart.no_change)
     expect(button.get('.word').classes()).not.toContain('bad')
@@ -1738,11 +1746,9 @@ describe('ExchangeView: «Обмены против рынка» on top (MOL-152
     exchanges.mockResolvedValue(overview({ losses, bars }))
     const card = (await render()).get('.vs-market')
     expect(card.find('.cell.chosen .bar').exists()).toBe(true)
-    expect(card.get('.plate:not(.ghost) .plate-diff').text()).toBe('−֏14,604')
-    expect(card.get('.plate:not(.ghost) .plate-diff').classes()).toContain('bad')
-    expect(card.get('.plate:not(.ghost) .plate-word').text()).toBe(
-      `−7.21% · ${en.exchange.vs_market.worse}`,
-    )
+    expect(card.get('.plate .plate-diff').text()).toBe('−֏14,604')
+    expect(card.get('.plate .plate-diff').classes()).toContain('bad')
+    expect(card.get('.plate .plate-word').text()).toBe(`−7.21% · ${en.exchange.vs_market.worse}`)
   })
 
   it('a difference whole units would print as 0 is printed as it is, under its tone and word (А1)', async () => {
@@ -1985,7 +1991,7 @@ describe('ExchangeView: one exchange chosen for the whole screen (MOL-348)', () 
     ],
     rateCharts,
   })
-  const plate = (view: VueWrapper) => view.get('.vs-market .plate:not(.ghost) .plate-where').text()
+  const plate = (view: VueWrapper) => view.get('.vs-market .plate .plate-where').text()
   const onChart = (view: VueWrapper) => view.get('.rate-chart .mine-rate').text()
 
   it('opens with the bars and the line on the same exchange, the latest, compared or not (Б2)', async () => {
@@ -2061,7 +2067,7 @@ describe('ExchangeView: one exchange chosen for the whole screen (MOL-348)', () 
     // Not «Feb 28», the exchange just left: the line says the chosen one is not on it.
     expect(view.find('.rate-chart .mine-rate').exists()).toBe(false)
     expect(view.findAll('.rate-chart .chosen-ring')).toHaveLength(0)
-    expect(view.get('.rate-chart .stack .none').text()).toBe(
+    expect(view.get('.rate-chart .reading .none').text()).toBe(
       'The chosen exchange is not on this line',
     )
     // A bar the line draws brings it back.

@@ -9,6 +9,8 @@ that area's map; here are the shell's own specs and what every run stands on.
 - `e2e/barcode-video.ts` — Global setup: draws an EAN-13 with its own encoder into the one-frame Y4M the `camera` project's fake camera films.
 - `e2e/header.spec.ts` — Spec: at 320px, in both languages, the back label steps down by the ladder and never overlaps the title or leaves the window.
 - `e2e/category.ts` — Helper: chooses a spending's category as a person does — its chip where the two rows hold it, else through «Ещё…» (MOL-198).
+- `e2e/days.ts` — Helper: a day of Yerevan's calendar some days from today (`yerevanDay`), the one copy the specs share (MOL-404, review №6).
+- `e2e/text-size.ts` — Helper: the system's text size as Android's 150 % and 200 % reach the page, the root's, set before it loads (`textAt`, MOL-404).
 - `e2e/spending-details.ts` — Helper: opens «Дата, заметка, место» from its line in the spending sheet and types the note and the place there, back with «Готово» (MOL-199).
 - `e2e/keyboard.ts` — Helper: stands in for the iOS keyboard — the visual viewport replaced before the app loads, moved by `keyboard(covered, pan)` as Safari moves it (MOL-135); shared by «Деньги» and the sheet (MOL-182).
 - `e2e/live-region.ts` — Helper: records every announcement added to the app's live region, and reads what it holds now.

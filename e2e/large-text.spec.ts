@@ -8,6 +8,7 @@ import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { facesIn, stillIn } from './scroll'
 import { asBrowser, signedIn } from './session'
+import { textAt } from './text-size'
 
 /**
  * Android's text at 150 % and 200 % on a phone of 320 (MOL-321, owner's В-4 «б»): no screen and no sheet
@@ -335,13 +336,7 @@ for (const size of ['150%', '200%'])
   test.describe(`the text at ${size} on a phone of 320`, () => {
     test.beforeEach(async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 720 })
-      await page.addInitScript((value) => {
-        document.addEventListener('DOMContentLoaded', () => {
-          const style = document.createElement('style')
-          style.textContent = `html { font-size: ${value} }`
-          document.head.append(style)
-        })
-      }, size)
+      await textAt(page, size)
     })
 
     test('a newcomer’s «Что брать» and «Настройки» stand within the phone', async ({ page }) => {
@@ -1072,13 +1067,7 @@ for (const size of ['110%', '115%'])
   test(`a price per unit in a record's row stands whole at ${size} on 320`, async ({ page }) => {
     test.setTimeout(60_000)
     await page.setViewportSize({ width: 320, height: 720 })
-    await page.addInitScript((value) => {
-      document.addEventListener('DOMContentLoaded', () => {
-        const style = document.createElement('style')
-        style.textContent = `html { font-size: ${value} }`
-        document.head.append(style)
-      })
-    }, size)
+    await textAt(page, size)
     await signedIn(page)
     const { finished } = await aLife(page)
     await page.goto(`/purchases/${finished}`)

@@ -360,9 +360,11 @@ function totalOf(
   service: number | null
 } {
   const w = reading.words
-  const word = (fragment: string): RegExp => new RegExp(`(?:${fragment})`, 'u')
-  // a café's words are printed in capitals as often as not, «ՎՃԱՐՄԱՆ» (MOL-310)
-  const [service, bill] = [serviceWordOf(reading), new RegExp(`(?:${w.billTotal})`, 'iu')]
+  // a summary's words are printed in capitals as often as not — «ՎՃԱՐՄԱՆ» (MOL-310), «ԸՆԴԱՄԵՆԸ» of a café's or a
+  // shop's till (MOL-310, round 2): read in any case, all but the payment's — its «Վճար» in small letters is inside
+  // «կանխավճար», the prepayment slip, which would pay
+  const word = (fragment: string): RegExp => new RegExp(`(?:${fragment})`, 'iu')
+  const [service, bill] = [serviceWordOf(reading), word(w.billTotal)]
   const [total, discount, cashbacks, taxedSum, redemption] = [
     word(w.totalKept),
     word(w.discountKept),
@@ -373,7 +375,7 @@ function totalOf(
   // a sum since the start of the year is what a card bought this year (MOL-288): the largest the total's word
   // stands by, it was the total read — «Прочитали не всё» short by 120 000 ֏
   const sinceStart = word(w.sinceStart)
-  const paid = word(w.paid.join('|'))
+  const paid = new RegExp(`(?:${w.paid.join('|')})`, 'u')
   const places = new Map<string, Set<number>>([
     ['total', new Set()],
     ['paid', new Set()],
@@ -457,7 +459,9 @@ function totalOf(
     if (met) return { total: sum, read, met, owed: sum, cashback, redeemed: null, service: null }
     // a total voted by its places took the service: every bill seen prints it so — ZERO, Bakery, Аракс (owner's В-7
     // «а», adversarial Б1) — so the lines make it less the service, the font's swaps putting them right to that
-    const voted = vote(places.values())
+    // the sum taxed with VAT, «ԱԱՀ-ով հարկվող», is the lines' sum printed again (MOL-289): a place of the total where no
+    // discount goes to the card (MOL-310, round 2 — «Ереван Сити» without the card, the total copied once)
+    const voted = vote([...places.values(), taxed])
     // the service alone is one figure the model may copy 5↔6: where a percent is printed beside it, that is its second
     // place — the percent of the dishes, to the dram (adversarial Е1); with none it stands as printed (В-7 «а»)
     const service =

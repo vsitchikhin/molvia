@@ -338,7 +338,8 @@ describe('the model reads whoever it is granted to (MOL-272, В-4)', () => {
     expect(lines.map((line) => [line.printed, line.sumMinor, line.discountMinor])).toEqual([
       ['Կաթ «Օրինակ» 3.2% 1լ', 74_000n, null],
       ['Հաց «Օրինակ»', 28_710n, 290n],
-      ['Թեյ «Օրինակ»', null, null],
+      // its price no figure, its sum as copied: the sums meet the total two places print (MOL-310, round 2)
+      ['Թեյ «Օրինակ»', 74_000n, null],
     ])
     // the count alone, never the figure (Т-8)
     expect(reports.find((r) => r.kind === 'read')).toMatchObject({ reader: 'model', unparsed: 1 })
@@ -931,9 +932,10 @@ describe('the shop’s memory in the digits (MOL-291)', () => {
         }),
       ),
     )
+    // the sum as copied stands alone: it meets the total two places print (MOL-310, round 2); the price, none
     expect(
       await db.select().from(receiptLines).where(eq(receiptLines.receiptId, id)),
-    ).toMatchObject([{ priceMinor: null, sumMinor: null, repaired: false, remembered: false }])
+    ).toMatchObject([{ priceMinor: null, sumMinor: 65_000n, repaired: false, remembered: false }])
   }, 30_000)
 
   // MOL-314: the hint «В прошлый раз здесь было 550 — проверьте цифры» argued with the voices that settled it
@@ -1339,7 +1341,8 @@ describe('a receipt read not whole: its reasons, its review and the developer to
       kind: 'receipt_partial',
       country: 'AM',
       lines: 3,
-      shown: 2,
+      // the unsettled line keeps its sum: the three as copied meet the total two places print (MOL-310, round 2)
+      shown: 3,
       reason: 'line_not_as_printed',
     })
     // the id and the day may hold any digits: the name and the sums are looked for in the rest (MOL-316)

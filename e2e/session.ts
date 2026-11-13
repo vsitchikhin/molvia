@@ -1,7 +1,7 @@
 import { randomInt } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import { POLICY_VERSION, SESSION_COOKIE } from '@molvia/model'
-import type { Page, Request, Response, Route } from '@playwright/test'
+import type { ConsoleMessage, Page, Request, Response, Route } from '@playwright/test'
 
 /**
  * Как тест ходит в API от лица той же личности, что и страница (MOL-53).
@@ -83,8 +83,83 @@ async function seamAnswer(page: Page): Promise<Response> {
   }
 }
 
+/**
+ * **What the page saw on its way through the door, kept for a failure of it** (MOL-310, round 2): on
+ * CI the door once shut again after «Принимаю» — the seam 201, the terms 200, the screen behind it
+ * fetched, then «Вход» for five seconds — and a failure there keeps no trace of its first attempt. The
+ * console, every answer of the API with its status, the page's errors and the door's keys in storage
+ * are attached to the failure only; a door that opens costs a listener.
+ */
+interface DoorWitness {
+  /** Attaches what the page saw and fails as the check did. */
+  readonly fail: (what: string, error: unknown) => Promise<never>
+  /** The door opened: the page is listened to no more. */
+  readonly stop: () => void
+}
+
+function doorWitness(page: Page): DoorWitness {
+  const started = Date.now()
+  const lines: string[] = []
+  const at = () => `+${String(Date.now() - started).padStart(5)} ms`
+  const onConsole = (message: ConsoleMessage) =>
+    lines.push(`${at()} console.${message.type()} ${message.text()}`)
+  const onError = (error: Error) => lines.push(`${at()} pageerror ${error.name}: ${error.message}`)
+  const onResponse = (response: Response) => {
+    const url = new URL(response.url())
+    if (url.pathname.startsWith('/api/'))
+      lines.push(
+        `${at()} ${response.request().method()} ${url.pathname} ${String(response.status())}`,
+      )
+  }
+  const onFailed = (request: Request) => {
+    const url = new URL(request.url())
+    if (url.pathname.startsWith('/api/'))
+      lines.push(
+        `${at()} ${request.method()} ${url.pathname} failed ${request.failure()?.errorText ?? '?'}`,
+      )
+  }
+  page.on('console', onConsole)
+  page.on('pageerror', onError)
+  page.on('response', onResponse)
+  page.on('requestfailed', onFailed)
+  const stop = () => {
+    page.off('console', onConsole)
+    page.off('pageerror', onError)
+    page.off('response', onResponse)
+    page.off('requestfailed', onFailed)
+  }
+  const fail = async (what: string, error: unknown): Promise<never> => {
+    stop()
+    const kept = await page
+      .evaluate(() =>
+        Object.keys(localStorage)
+          .filter((key) => /^molvia\.(actor|login|consent|leaving|erasing)/.test(key))
+          .map((key) => `${key} = ${localStorage.getItem(key) ?? ''}`),
+      )
+      .catch((failure: unknown) => [`storage unread: ${String(failure)}`])
+    const screen = await page
+      .locator('h1, .state .title, [role="alert"]')
+      .allInnerTexts()
+      .catch(() => [])
+    await test.info().attach(`дверь: ${what}`, {
+      body: [...lines, '— storage', ...kept, '— on screen', ...screen].join('\n'),
+      contentType: 'text/plain',
+    })
+    throw error
+  }
+  return { fail, stop }
+}
+
 export async function open(page: Page, path = '/'): Promise<void> {
   const first = !(await page.context().cookies()).some((one) => one.name === SESSION_COOKIE)
+  const witness = first ? doorWitness(page) : null
+  // a failure of the door keeps what the page saw, and is the same failure
+  const door =
+    (what: string) =>
+    async (error: unknown): Promise<never> => {
+      if (witness === null) throw error
+      return witness.fail(what, error)
+    }
   // **WebKit keeps no `Secure` cookie on http://127.0.0.1** (`sheet.spec`, MOL-80): every request
   // after the seam's answer comes in signed out, and the step's question about the terms (MOL-95)
   // turned the page into the login screen before the sheet was ever opened. The step is not what the
@@ -138,7 +213,9 @@ export async function open(page: Page, path = '/'): Promise<void> {
   // из двух.
   const age = page.getByRole('checkbox', { name: AGE })
   const app = page.getByRole('heading', { level: 1 }).filter({ hasNotText: LOGIN_TITLE })
-  await expect(age.or(app), 'ответ шва пришёл, а ни шага согласия, ни приложения').toBeVisible()
+  await expect(age.or(app), 'ответ шва пришёл, а ни шага согласия, ни приложения')
+    .toBeVisible()
+    .catch(door('ни шага, ни приложения'))
   if (await age.isVisible()) await acceptTerms(page)
   // **Дверь — прежние пять секунд, и поднимать их нельзя.** От ответа до неё — синхронная
   // цепочка (`settle`, `claim`) и одна отрисовка, ждать тут нечего; упала эта проверка — это
@@ -147,7 +224,10 @@ export async function open(page: Page, path = '/'): Promise<void> {
   await expect(
     page.getByRole('heading', { level: 1 }),
     'ответ шва пришёл, а дверь не открылась — это вход, а не стенд',
-  ).not.toHaveText(LOGIN_TITLE)
+  )
+    .not.toHaveText(LOGIN_TITLE)
+    .catch(door('не открылась'))
+  witness?.stop()
 }
 
 /**

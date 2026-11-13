@@ -697,19 +697,16 @@ rate exactly as before.
   «−0,40 % · хуже рынка» in `bad-ink` or `good-ink` at 600 (`rate_chart.diff`) — the colour never
   alone; nothing is «0,00 %» with no word; no comparison is a quiet line, «Рынка того дня нет» or
   «Без сравнения: курса ЦБ РА того дня нет». The radio of the point says the word too. **The reading
-  holds the tallest plate of the period** (adversarial А2, Б1, Б2): every plate stands in one cell,
-  unseen and `aria-hidden` but the chosen one's, as the words of «Графики» do (MOL-186) — so a week
-  with no exchange leaves the chart under the finger where it was, however long a note runs or a line
-  wraps on a phone of 320, and a period with no exchange holds nothing; a week with no market keeps the
-  figure's line. The plate shown keeps its own height (`align-items: start`) — stretched, it stood a
-  grey line of nothing under three lines beside a note of a sentence — and a note with no spaces, a
-  link to a map, wraps anywhere: unseen, it pushed the page aside on every week (adversarial В1, В2).
-  Three lines held by a number missed both ways: a note of a sentence took a fourth
-  (the place is the person's own note, up to 200 signs), and a period with no exchange kept 55 px of
-  nothing; the three lines had doubled a jump of 19 px master already had, to 38. Not cut with «…»: the
-  note is the person's, and what they see of it is not the chart's to decide. **The price, named:** a
-  plate in the page for each exchange of the period, unseen — some fifty in a year of weekly ones —
-  and another period may stand the chart a line higher or lower, a change of the screen's own query.
+  is as tall as what it says, and holds no room** (MOL-404, the owner's word of 13.11.2026: «delete all
+  empty space; if a chart wants more vertical space, the page must stretch», В-5 «а»): only the chosen
+  exchange's plate is drawn, at its own height; standing on nothing, no day and no figure; a week with
+  no market says so in a line of its own size. MOL-190 held the tallest plate of the period unseen in
+  one cell (adversarial А2, Б1, Б2) and the day and figure of the latest step (round 10), so the chart
+  never moved under the finger — on the owner's 41 exchanges that was the empty room he scrolled past.
+  A note with no spaces, a link to a map, wraps anywhere (adversarial В1, В2). Not cut with «…» (В-6
+  «а»): the note is the person's, and what they see of it is not the chart's to decide. **The price,
+  named:** the chart under the reading moves up or down as a choice changes its lines — a finger sliding
+  along it keeps its step, since the slide is read across, never down.
 
 ## «Обмен денег» drawn (MOL-348)
 
@@ -756,12 +753,35 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   the line draws in its year, compared or not, else the latest bar (adversarial Б2, В1). **Another currency of the
   line is a choice** (Г1): the line stands on the bars' exchange if that pair draws it, else on the pair's latest of
   the period, told to the bars; with none in the period, on nothing. **Another period is not** — the line's answer
-  under its own switch; nothing above it moves (review №20, MOL-136). **The plate under the bars holds the tallest of
-  theirs**, as the line's reading does: a choice made on the line moves nothing under the finger. **A choice gone from
+  under its own switch; nothing above it moves (review №20, MOL-136). **The plate under the bars is the chosen bar's
+  only, at its own height** (MOL-404, the owner's word; Г1 held the tallest of theirs unseen in one cell before —
+  on 41 exchanges a screen and a half of nothing): a choice moves «Где меняли» under it, and the page stretches.
+  **Its right column is at most half** (`fit-content(50%)`): as `auto`, «без сравнения · рынка или курса того дня
+  нет» took the whole plate and stood the place and the amounts a letter a line; in a card narrower than `$row-tight`
+  — large text — the plate stands its lines one under another, each sum whole. **A choice gone from
   the twelve months** — removed, here or on another phone, amended out of the year — **gives way to the default for
-  both at once** (adversarial Д1). **Standing on nothing, the reading keeps the place of its day and figure**, unseen
-  — the latest step's, as the plates are held (adversarial round 10: without them a dot tapped then pushed the plot
-  down under the finger). The plate under the bars is no live region: the radio says it (review №8).
+  both at once** (adversarial Д1). **Standing on nothing, the reading says why and nothing more** (MOL-404; round 10
+  held the latest step's day and figure unseen). The plate under the bars is no live region: the radio says it
+  (review №8).
+- **A label under or over a bar never wraps, stands within the card and never over another** (MOL-404): a month
+  and a value stand in a row as wide as their column, centred on it; where centred they would stand past the field,
+  laid from the column's edge inward; of two that would run into each other one gives way, unseen (`placeLabels`,
+  measured — review №1–2, adversarial А1–А3: by the count of bars alone, the chosen penultimate's value lay on the
+  furthest's, eight months at 200 % ran into each other, six values on 320 too). **Into each other is across and one
+  over the other**: a value over the line and one under it are no neighbours (round 2, Б1 — three of six better and
+  worse by turns were hidden, the furthest among them). The values up to six give way in a fixed order — the
+  furthest's, then by size — so a choice hides none as a finger slides along them (Б2); past six only the chosen
+  bar's and the furthest's are labelled, the chosen first. The months from the edges, then from the left, so a choice
+  moves none. **The measure, the edge and the room between labels are one composable with the line of the rate**
+  (`useLabelPlaces`, review №8); which label gives way is each chart's own. **A value stands over the bars, a halo
+  of the card's ground around its glyphs, and is no target** (`z-index` in the field's own stacking context,
+  `text-shadow`, `pointer-events: none`): wider than its column at large text it crosses its neighbours' bars, and a bar
+  later in the row was drawn over it — «−3 456 ֏» lost its «֏» at 200 % (round 3, В2); a box of ground hid where those
+  bars end, which is what a bar says (round 4, Г2), and as a target it took their taps (Г1). Past eight bars only the first month and the last are named (В-2 «а»: the chosen bar's day is on its plate) —
+  a column of 8 px broke «нояб» a letter a line. The price: a value or a month may be unseen — the plate and the
+  bar's name say it. The field is one column of the card's
+  width (`minmax(0, 1fr)`): as `auto`, forty-one frames of «без сравнения» at 14 px stood it 590 px wide on 320; a
+  frame is a square of 14 narrower with its column. No bar down, no room is kept under the line.
 - **A label of «мой — ЦБ РА» stands at its dot's end of the line**, wrapping within the card, never centred on the dot
   (adversarial Б1: centred on 850, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 %); `large-text.spec`
   gives the answer a line, since end to end has no rate of the central bank.
@@ -773,6 +793,19 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   (В-1 of MOL-161); the dot takes the money's tone, the chosen one a terracotta ring around it, and a bar chosen on
   «Обмены против рынка» chooses the same exchange there, its pair with it. The legend of the bars names no currency
   — «вверх — получили больше» (review №12, adversarial А6): bought with drams, up is more of the currency received.
+- **A row of the list says «отдал → получил» on one line**, shrunk to the words' column where it is narrower
+  (`figure-fit`, MOL-404, В-7 «б»): wrapped at the arrow, a row of the owner's 41 was three to five lines. **Never
+  under `--text-caption`** (`$least`, adversarial А4: at 200 % the words' column is the narrowest and the line stood at
+  13 px under a caption of 22; a million roubles at 9,5 px on 390): there it wraps between its two sums, each whole
+  (`amountPartsOf`, one cut for the row and the plate). **The arrow is no sum's**: glued to either it took its width
+  from that sum, shrunk under the caption though the sum alone fitted (rounds 2–3, Б3, В1); on its own it stands beside
+  whichever sum it fits beside. The prices: the arrow stands on a line of its own where it fits beside neither — two
+  sums each near the column's width — and a sum alone wider than the words' column still shrinks, under the caption
+  too: a sum never breaks (MOL-321), and 13 812 345,60 ֏ at 200 % on 320 is wider than the column (round 2, Б3). Wider
+  by its estimate (`figureChars`), which errs wide so that nothing stands past its column: a sum that fits by a hair
+  may stand half a pixel under the caption (round 4, Г3, 914 821,30 ֏ at 21,5 px) — as every figure of `figure-fit`. **The
+  exchange offices still to come are said once, over the list** (`list.pending_note`), never a tag on every recent
+  row.
 - **«Удалить обмен?» stays** (Р-16, В-5): the handoff took it away on the word that «Перевод» removes at once, which
   it does not.
 - **One currency of «Курсы по данным ЦБ РА» at a time** (Р-18), the latest exchange's first; the figures always seen.
