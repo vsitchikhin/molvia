@@ -464,8 +464,20 @@ export const tripHistoryEntryCodec = z.strictObject({
   total: z.array(moneyCodec).nullable().default(null),
   /** Recorded from a receipt (MOL-126): «· из чека» beside the row. */
   fromReceipt: z.boolean().default(false),
+  /**
+   * The category «Деньги» count it in (MOL-400), `null` — «Продукты»: the row's icon and colour (MOL-406). Only to
+   * a phone that asks (`TRIP_HISTORY_CATEGORY_HEADER`): an installed app of an earlier build reads a row strictly.
+   * Absent — not asked, or a server before it — is not known, and the row draws the cart.
+   */
+  categoryId: z.uuid().nullable().optional(),
 })
 export type TripHistoryEntry = z.output<typeof tripHistoryEntryCodec>
+
+/**
+ * A phone that knows a history row's `categoryId` says so by this header (MOL-406), as `RECEIPT_CODES_HEADER`: a
+ * header, not the query — a server rolled back refuses a query it does not know, and leaves a header alone.
+ */
+export const TRIP_HISTORY_CATEGORY_HEADER = 'X-Molvia-Trip-Category'
 export const tripHistoryCodec = z.strictObject({
   trips: z.array(tripHistoryEntryCodec).max(TRIP_HISTORY_PAGE_SIZE),
   nextCursor: tripHistoryCursorSchema.nullable(),

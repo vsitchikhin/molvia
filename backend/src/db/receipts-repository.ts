@@ -561,6 +561,8 @@ export interface ReceiptRepository {
     part: ReceiptPart,
   ): Promise<{ receipt: ReceiptSummary; queued: boolean }>
   list(actorId: string): Promise<StoredReceipt[]>
+  /** The class each line printed (MOL-226), by the person's receipt — for `servesFood` (MOL-406). */
+  classesOf(actorId: string, ids: readonly string[]): Promise<Map<string, (string | null)[]>>
   one(
     actorId: string,
     id: string,
@@ -1027,6 +1029,19 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         .where(and(eq(receipts.actorId, actorId), sql`${receipts.deletedAt} is null`))
         .orderBy(desc(receipts.createdAt), desc(receipts.id))
       return rows.map(toStored)
+    },
+
+    async classesOf(actorId, ids) {
+      const classes = new Map<string, (string | null)[]>()
+      if (ids.length === 0) return classes
+      const rows = await db
+        .select({ receiptId: receiptLines.receiptId, hs: receiptLines.hs })
+        .from(receiptLines)
+        .innerJoin(receipts, eq(receipts.id, receiptLines.receiptId))
+        .where(and(eq(receipts.actorId, actorId), inArray(receiptLines.receiptId, [...ids])))
+      for (const row of rows)
+        classes.set(row.receiptId, [...(classes.get(row.receiptId) ?? []), row.hs])
+      return classes
     },
 
     async one(actorId, id) {

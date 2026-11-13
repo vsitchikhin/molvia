@@ -1308,7 +1308,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           if (queued) receiptQueue?.nudge()
           return receipt
         },
-        list: (actor, shown) => receiptsOf(tripData, actor, shown),
+        list: (actor, shown, food) => receiptsOf(tripData, actor, shown, food),
         one: (
           actor,
           id,
