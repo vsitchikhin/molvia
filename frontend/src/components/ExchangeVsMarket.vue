@@ -704,14 +704,18 @@ $flat-height: 5rem;
     color: var(--text-muted);
   }
 
-  /* Over the bars, on the card's own ground: wider than its column at large text, a value crosses its neighbours, and
-     a bar later in the row was drawn over it — «−3 456 ֏» lost its «֏» at 200 % (round 3, В2). The bar breaks under it. */
+  /* Over the bars: wider than its column at large text, a value crosses its neighbours, and a bar later in the row was
+     drawn over it — «−3 456 ֏» lost its «֏» at 200 % (round 3, В2). A halo of the card's ground around the glyphs only:
+     a box of it hid where the neighbours' bars end, which is what a bar says (round 4, Г2). No target of its own — the
+     tap is the bar's under it, the whole field the finger's (round 4, Г1). */
   .label {
     position: relative;
     z-index: 1;
-    border-radius: var(--radius-mark);
-    background: var(--surface);
-    box-shadow: 0 0 0 2px var(--surface);
+    text-shadow:
+      0 0 2px var(--surface),
+      0 0 2px var(--surface),
+      0 0 2px var(--surface);
+    pointer-events: none;
   }
 }
 
