@@ -122,18 +122,15 @@ describe('ExchangeVsMarket', () => {
         .find((radio) => radio.element.checked)
         ?.attributes('aria-label'),
     ).toContain('Oct 1')
-    expect(card.get('.plate:not(.ghost) .plate-word').text()).toBe(en.exchange.vs_market.none_said)
-    expect(card.get('.plate:not(.ghost) .plate-word').classes()).toContain('none')
-    // Every bar's plate in one cell, unseen but the chosen one's: the tallest holds the place (Г1).
-    expect(card.findAll('.plate.ghost')).toHaveLength(1)
-    expect(
-      card.findAll('.plate.ghost').every((ghost) => ghost.attributes('aria-hidden') === 'true'),
-    ).toBe(true)
+    expect(card.get('.plate .plate-word').text()).toBe(en.exchange.vs_market.none_said)
+    expect(card.get('.plate .plate-word').classes()).toContain('none')
+    // Only the chosen bar's plate: no room is held for another (MOL-404, the owner's word).
+    expect(card.findAll('.plate')).toHaveLength(1)
     // One tap, one choice (review №16).
     await radios()[0]?.trigger('click')
     expect(card.emitted('update:chosen')).toEqual([['a']])
     await card.setProps({ chosen: 'a' })
-    expect(card.get('.plate:not(.ghost) .plate-amounts').text()).toBe('₽30,000 → ֏146,100')
+    expect(card.get('.plate .plate-amounts').text()).toBe('₽30,000 → ֏146,100')
     // The bar already chosen, chosen again, is told too: the line of the rate goes back to it (А4).
     await radios()[0]?.trigger('click')
     expect(card.emitted('update:chosen')).toEqual([['a'], ['a']])
@@ -155,7 +152,7 @@ describe('ExchangeVsMarket', () => {
       bars: [bar('a', '2026-10-03', 1_877_600n, { level: 1000 })],
     })
     expect(card.get('.value').text()).toBe('+18.8K')
-    expect(card.get('.plate:not(.ghost) .plate-diff').text()).toBe('+֏18,776')
+    expect(card.get('.plate .plate-diff').text()).toBe('+֏18,776')
   })
 
   it('shows the places as bars only when there is more than one, each with its word unseen', () => {
@@ -199,7 +196,7 @@ describe('ExchangeVsMarket', () => {
     expect(card.get('.plot').classes()).toContain('flat')
     expect(card.find('.total').exists()).toBe(false)
     expect(card.text()).toContain('? — 2 exchanges not compared: no market or rate for those days')
-    expect(card.get('.plate:not(.ghost) .plate-word').text()).toBe(en.exchange.vs_market.none_said)
+    expect(card.get('.plate .plate-word').text()).toBe(en.exchange.vs_market.none_said)
   })
 
   it('draws both halves on one scale: the line where the furthest up and down share the height (№3)', () => {
@@ -213,6 +210,21 @@ describe('ExchangeVsMarket', () => {
     // 100 up, 1000 down: the line at a eleventh of the height, never pressed down to a third.
     const up = card.findAll('.cell')[0]?.get('.half.up')
     expect(up?.attributes('style')).toContain(`height: ${String((100 * 100) / 1100)}%`)
+  })
+
+  it('names every month up to eight bars; past eight the first and the last only, never the chosen (MOL-404, В-2 «а»)', () => {
+    const bars = (n: number) =>
+      Array.from({ length: n }, (_, i) =>
+        bar(`b${String(i)}`, `2026-${String(i + 1).padStart(2, '0')}-10`, 100n),
+      )
+    const months = (card: ReturnType<typeof mountCard>) =>
+      card.findAll('.month').map((month) => month.text())
+    const eight = months(mountCard({ losses: losses(800n), bars: bars(8) }))
+    expect(eight.every((month) => month !== '')).toBe(true)
+    // Nine, the fifth chosen: its day is on its plate, its month stays unnamed.
+    const nine = mountCard({ losses: losses(900n), bars: bars(9), chosen: 'b4' })
+    expect(months(nine)).toEqual(['Jan', '', '', '', '', '', '', '', 'Sep'])
+    expect(nine.get('.plate-where').text()).toContain('May 10')
   })
 
   it('the field is the target: a finger sliding along the bars chooses the one under it (А5)', async () => {

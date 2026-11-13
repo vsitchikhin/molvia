@@ -40,36 +40,17 @@
       <p v-if="!period" class="none">
         {{ t('exchange.rate_chart.no_market_period', { period: periodIn }) }}
       </p>
-      <!-- Standing on nothing, the day and the figure keep their place unseen: a dot tapped then puts
-           them back without moving the chart under the finger (adversarial round 10). -->
-      <template v-if="readStep">
-        <p
-          class="week"
-          :class="{ held: !chosenStep }"
-          :aria-hidden="chosenStep ? undefined : 'true'"
-        >
-          {{ t(`exchange.rate_chart.${step}`, { day: shortDay(readStep.day) }) }}
+      <!-- Only what is chosen, at its own height: standing on nothing, no day and no figure; no room is
+           held for a taller plate, and the chart under the reading moves with it — the page stretches
+           rather than keep empty room (MOL-404, the owner's word; MOL-190 and round 10 held it before). -->
+      <template v-if="chosenStep">
+        <p class="week">
+          {{ t(`exchange.rate_chart.${step}`, { day: shortDay(chosenStep.day) }) }}
         </p>
-        <p
-          v-if="readStep.rate"
-          class="figure"
-          :class="{ held: !chosenStep }"
-          :aria-hidden="chosenStep ? undefined : 'true'"
-        >
-          {{ rateOf(readStep.rate) }}
-        </p>
-        <p
-          v-else
-          class="figure missing"
-          :class="{ held: !chosenStep }"
-          :aria-hidden="chosenStep ? undefined : 'true'"
-        >
-          {{ t(words.noMarket) }}
-        </p>
+        <p v-if="chosenStep.rate" class="figure">{{ rateOf(chosenStep.rate) }}</p>
+        <p v-else class="figure missing">{{ t(words.noMarket) }}</p>
       </template>
-      <!-- Every plate of the period in one cell, the chosen one seen: the tallest holds the place, so a
-           week with no exchange leaves the chart under the finger where it was (adversarial А2, Б1). -->
-      <div v-if="period" class="stack">
+      <template v-if="period">
         <p v-if="chosenPlate" class="plate mine">
           <span class="plate-dot" aria-hidden="true"></span>
           <span class="plate-text">
@@ -81,15 +62,7 @@
           </span>
         </p>
         <p v-else class="none">{{ noneWords }}</p>
-        <p v-for="plate in plates" :key="plate.id" class="plate ghost" aria-hidden="true">
-          <span class="plate-dot"></span>
-          <span class="plate-text">
-            <span class="plate-rate">{{ plate.rate }}</span>
-            <span class="plate-place">{{ plate.place }}</span>
-            <span :class="['plate-diff', plate.tone]">{{ plate.diff }}</span>
-          </span>
-        </p>
-      </div>
+      </template>
     </div>
 
     <fieldset v-if="period" class="chart">
@@ -400,7 +373,6 @@ export default defineComponent({
     /** The plate under the reading: the exchange and its rate, the place, the difference (Р-4). */
     function plateOf(point: Point) {
       return {
-        id: point.id,
         rate: t('exchange.rate_chart.mine', {
           day: shortDay(point.day),
           rate: rateOf(point.rate),
@@ -410,7 +382,6 @@ export default defineComponent({
         tone: diffClassOf(point),
       }
     }
-    const plates = computed(() => period.value?.exchanges.map(plateOf) ?? [])
 
     const items = computed<Item[]>(() => {
       const shown = period.value
@@ -502,8 +473,6 @@ export default defineComponent({
     const chosenStep = computed(
       () => (chosen.value ? period.value?.steps[chosen.value.step] : null) ?? null,
     )
-    /** What the reading's day and figure stand for: the step chosen, else the latest, held unseen. */
-    const readStep = computed(() => chosenStep.value ?? period.value?.steps.at(-1) ?? null)
     const cursorX = computed(() => chosen.value?.exchange?.x ?? chosenStep.value?.x ?? 0)
 
     /** The spot taps go round on: the centre of the dot the round began with, and its dots. */
@@ -838,11 +807,9 @@ export default defineComponent({
       items,
       chosen,
       chosenPlate,
-      plates,
       chosenIndex,
       noneWords,
       chosenStep,
-      readStep,
       step,
       period,
       title,
@@ -921,11 +888,6 @@ export default defineComponent({
   display: grid;
   align-content: start;
   gap: var(--space-1);
-  min-height: 6rem;
-}
-
-.held {
-  visibility: hidden;
 }
 
 .week,
@@ -944,28 +906,11 @@ export default defineComponent({
 
   /* A sentence in the figure's place, not a figure: the text's face (Ф-7 keeps Nunito for figures). */
   &.missing {
-    min-height: calc(var(--text-title) * var(--leading-body));
     color: var(--text-muted);
     font-family: var(--font);
     font-size: var(--text-callout);
     font-weight: var(--weight-medium);
   }
-}
-
-/* The plates of the period in one cell: the tallest decides, the one shown is the exchange chosen —
-   at its own height, never stretched to the tallest (adversarial В1). */
-.stack {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-
-  > * {
-    grid-area: 1 / 1;
-  }
-}
-
-.ghost {
-  visibility: hidden;
 }
 
 .plate {
@@ -988,8 +933,7 @@ export default defineComponent({
   background: var(--accent);
 }
 
-/* A note with no spaces — a link to a map — wraps: unseen, it would push the page aside on every week
-   of the period (adversarial В2). */
+/* A note with no spaces — a link to a map — wraps: whole, it would push the page aside (adversarial В2). */
 .plate-text {
   display: grid;
   min-width: 0;

@@ -36,7 +36,7 @@
         <div
           ref="area"
           class="plot"
-          :class="{ flat: span === 0 }"
+          :class="{ flat: span === 0, 'none-down': !hasWorse }"
           @pointerdown="pointer.down"
           @pointermove="pointer.move"
           @pointerup="pointer.up"
@@ -59,14 +59,18 @@
             />
             <span class="half up" :style="{ height: `${upShare}%` }" aria-hidden="true">
               <template v-if="bar.level > 0 || bar.sign !== -1">
-                <span v-if="labelled(bar)" class="value">{{ valueOf(bar) }}</span>
+                <span v-if="labelled(bar)" class="value"
+                  ><span class="label">{{ valueOf(bar) }}</span></span
+                >
                 <span class="bar" :style="barStyle(bar)"></span>
               </template>
             </span>
             <span class="half down" aria-hidden="true">
               <template v-if="bar.level < 0 || bar.sign === -1">
                 <span class="bar" :style="barStyle(bar)"></span>
-                <span v-if="labelled(bar)" class="value">{{ valueOf(bar) }}</span>
+                <span v-if="labelled(bar)" class="value"
+                  ><span class="label">{{ valueOf(bar) }}</span></span
+                >
               </template>
             </span>
           </label>
@@ -77,28 +81,29 @@
             :key="bar.id"
             class="month"
             :class="{ chosen: bar.id === chosenId }"
-            >{{ monthLabelled(bar) ? monthOf(bar.exchangedOn) : '' }}</span
+            ><span v-if="monthLabelled(bar)" class="label">{{
+              monthOf(bar.exchangedOn)
+            }}</span></span
           >
         </p>
       </fieldset>
 
-      <!-- No live region: the radio chosen says all of it (review №8). Every bar's plate in one cell, the
-           chosen one seen: the tallest holds the place, so a choice made on the line of the rate under the
-           card — a dot, another currency there — moves nothing under the finger (adversarial Г1), as the
-           line's own reading holds its plates (MOL-190). -->
-      <div v-if="chosenBar" class="plates">
-        <div
-          v-for="bar in bars"
-          :key="bar.id"
-          class="plate"
-          :class="{ ghost: bar.id !== chosenId }"
-          :aria-hidden="bar.id === chosenId ? undefined : 'true'"
-        >
-          <p class="plate-where">{{ whereOf(bar) }}</p>
-          <p class="plate-diff" :class="kindOf(bar)">{{ diffOf(bar) }}</p>
-          <p class="plate-amounts">{{ amountsOf(bar) }}</p>
-          <p class="plate-word" :class="kindOf(bar)">{{ wordOf(bar) }}</p>
-        </div>
+      <!-- No live region: the radio chosen says all of it (review №8). Only the chosen bar's plate, at its
+           own height: no room is held for a taller one, and a choice moves what stands under the plate —
+           the page stretches rather than keep empty room (MOL-404, the owner's word; Г1 of MOL-348 before). -->
+      <div v-if="chosenBar" class="plate">
+        <p class="plate-where">{{ whereOf(chosenBar) }}</p>
+        <p class="plate-diff" :class="kindOf(chosenBar)">{{ diffOf(chosenBar) }}</p>
+        <!-- Each sum a piece of its own, so the words break between them, never inside one. -->
+        <p class="plate-amounts">
+          <template v-for="(part, index) in amountsOf(chosenBar)" :key="index"
+            ><span v-if="part.sum" class="sum" :style="figureChars(part.text, 'text')">{{
+              part.text
+            }}</span
+            ><template v-else>{{ part.text }}</template></template
+          >
+        </p>
+        <p class="plate-word" :class="kindOf(chosenBar)">{{ wordOf(chosenBar) }}</p>
       </div>
 
       <p v-if="uncounted > 0" class="note">
@@ -159,7 +164,7 @@ import IconSwap from '~icons/mdi/swap-horizontal'
 import AppCard from '@/components/AppCard.vue'
 import { signedAmount } from '@/components/accounts'
 import { signedPercent } from '@/components/charts'
-import { figureChars } from '@/components/figure'
+import { aroundFigure, figureChars } from '@/components/figure'
 import { roundsToNought } from '@/components/spending'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
@@ -303,14 +308,11 @@ export default defineComponent({
       props.bars.length <= LABELLED_AT_MOST ||
       bar.id === chosenId.value ||
       bar.id === widest.value?.id
-    const monthLabelled = (bar: Bar) => {
-      if (props.bars.length <= MONTHS_AT_MOST) return true
-      return (
-        bar.id === props.bars[0]?.id ||
-        bar.id === props.bars.at(-1)?.id ||
-        bar.id === chosenId.value
-      )
-    }
+    // Past eight, the first and the last only: the chosen bar's day is on its plate (MOL-404, В-2 «а»).
+    const monthLabelled = (bar: Bar) =>
+      props.bars.length <= MONTHS_AT_MOST ||
+      bar.id === props.bars[0]?.id ||
+      bar.id === props.bars.at(-1)?.id
     function valueOf(bar: Bar): string {
       if (bar.difference === null) return '?'
       const whole = Number(decimalFromMinor(bar.difference))
@@ -330,13 +332,21 @@ export default defineComponent({
     const exchangeOf = (bar: Bar) => props.exchanges.find(({ id }) => id === bar.id) ?? null
     const dayOf = (bar: Bar) => calendarDayOfAnyYear(bar.exchangedOn, locale.value, props.today)
     const whereOf = (bar: Bar) => `${dayOf(bar)} · ${bar.place ?? t('exchange.vs_market.no_place')}`
-    function amountsOf(bar: Bar): string {
+    /** «Отдал → получил», cut around its two sums (`aroundFigure`): a sum stands whole (MOL-321). */
+    function amountsOf(bar: Bar): { text: string; sum: boolean }[] {
       const exchange = exchangeOf(bar)
-      if (!exchange) return ''
-      return t('exchange.row_amounts', {
-        given: formatMoney(exchange.given, locale.value),
-        received: formatMoney(exchange.received, locale.value),
-      })
+      if (!exchange) return []
+      const given = formatMoney(exchange.given, locale.value)
+      const received = formatMoney(exchange.received, locale.value)
+      const first = aroundFigure(t('exchange.row_amounts', { given, received }), given)
+      const second = aroundFigure(first.after, received)
+      return [
+        { text: first.before, sum: false },
+        { text: first.figure, sum: true },
+        { text: second.before, sum: false },
+        { text: second.figure, sum: true },
+        { text: second.after, sum: false },
+      ].filter((part) => part.text !== '')
     }
     const diffOf = (bar: Bar) => (bar.difference ? amountOf(bar.difference) : '')
     function wordOf(bar: Bar): string {
@@ -394,7 +404,9 @@ export default defineComponent({
 </script>
 
 <style scoped lang="scss">
+/* The plate turns by the card's width (below). */
 .vs-market {
+  container: vs-market / inline-size;
   display: grid;
   gap: var(--space-4);
 }
@@ -471,8 +483,11 @@ export default defineComponent({
   }
 }
 
+/* One column of the card's width, never the bars' own: as `auto`, forty-one frames of «без сравнения» at
+   14 px stood the field 590 px wide on a phone of 320 (MOL-404). */
 .bars {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-1);
   min-width: 0;
   margin: 0;
@@ -496,6 +511,16 @@ export default defineComponent({
   &.flat {
     height: 5rem;
   }
+}
+
+/* No bar down, no value under the line: the room kept for one goes (MOL-404, the owner's «no empty space») —
+   to the bars, or, with every bar on the line, out of the field. */
+.none-down .cell {
+  padding-bottom: 0;
+}
+
+.flat.none-down {
+  height: calc(5rem - var(--space-8));
 }
 
 /* The room over and under the bars is the values': a bar as tall as its half leaves its value there. */
@@ -552,9 +577,10 @@ export default defineComponent({
   background: var(--graphic);
 }
 
+/* A square of 14, narrower with its column, as a bar is. */
 .none .bar {
-  width: 14px;
-  height: 14px;
+  width: min(14px, 70%);
+  aspect-ratio: 1;
   border: 1.5px dashed var(--graphic);
   border-radius: var(--radius-mark);
 }
@@ -564,12 +590,39 @@ export default defineComponent({
   outline-offset: 2px;
 }
 
+/*
+ * A label of a bar — its value, its month — never wraps: a column of 8 px broke «нояб» a letter a line
+ * (MOL-404). It stands in a row as wide as its column, centred while it fits; wider, the first column's
+ * runs on from the card's left edge, the last's back from its right, a middle one over both sides — the
+ * auto margins give way to `justify-content` once there is no room left.
+ */
+.value,
+.month {
+  display: flex;
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.cell:first-child .value,
+.month:first-child {
+  justify-content: flex-start;
+}
+
+.cell:last-child .value,
+.month:last-child {
+  justify-content: flex-end;
+}
+
+.label {
+  margin-inline: auto;
+}
+
 .value {
+  align-self: stretch;
   padding: var(--space-1) 0;
   font-size: var(--text-caption);
   font-weight: var(--weight-bold);
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
 
   .good & {
     color: var(--good-ink);
@@ -596,7 +649,6 @@ export default defineComponent({
 .month {
   flex: 1 1 0;
   min-width: 0;
-  text-align: center;
 
   /* Chosen is the bar's ring; the month only darkens, at the same weight (MOL-179, review №9). */
   &.chosen {
@@ -604,24 +656,11 @@ export default defineComponent({
   }
 }
 
-/* The plates in one cell: the tallest decides, the one shown keeps its own height (`start`). */
-.plates {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-
-  > * {
-    grid-area: 1 / 1;
-  }
-}
-
-.ghost {
-  visibility: hidden;
-}
-
+/* The right column — the difference and its word — takes at most half: as `auto`, «без сравнения · рынка
+   или курса того дня нет» took the whole plate and stood the place and the amounts a letter a line (MOL-404). */
 .plate {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) fit-content(50%);
   gap: var(--space-1) var(--space-3);
   padding: var(--space-3) var(--space-4);
   border-radius: var(--radius-sm);
@@ -659,6 +698,28 @@ export default defineComponent({
   &.none,
   &.even {
     color: var(--text);
+  }
+}
+
+/* With large text the card is narrower than a list card's row keeps its tail beside (`$row-tight`): the
+   difference never breaks and «сравнения» is a word, so beside the place they left it no width at all, and
+   the plate stands its four lines one under another (MOL-404, MOL-321). */
+@container vs-market (width < #{$row-tight}) {
+  .plate {
+    grid-template-columns: minmax(0, 1fr);
+    padding-inline: var(--space-3);
+  }
+
+  /* A sum whole, shrunk to the plate where even it alone is wider (`figure-fit`, MOL-321). */
+  .sum {
+    @include figure-fit(1em, $less: calc(2 * var(--space-3)));
+
+    white-space: nowrap;
+  }
+
+  .plate-diff,
+  .plate-word {
+    text-align: left;
   }
 }
 
