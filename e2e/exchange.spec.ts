@@ -864,7 +864,12 @@ for (const [width, size] of [
     if (size === '100%') expect(await linesOf(amounts)).toBe(1)
     expect(await amounts.evaluate(sizeOverCaption)).toBeGreaterThanOrEqual(0)
     await expect(amounts.locator('.sum')).toHaveCount(2)
-    for (const sum of await amounts.locator('.sum').all()) expect(await linesOf(sum)).toBe(1)
+    // Each sum whole, and no smaller than the caption where it alone fits its column — the arrow takes no width from
+    // either (round 3, В1).
+    for (const sum of await amounts.locator('.sum').all()) {
+      expect(await linesOf(sum)).toBe(1)
+      expect(await sum.evaluate(sizeOverCaption)).toBeGreaterThanOrEqual(0)
+    }
     const box = await row.boundingBox()
     expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width)
   })
@@ -992,6 +997,23 @@ for (const [width, size] of [
             label.text,
           ).toBe(true)
       }
+      // A value wider than its column crosses its neighbours' bars, and stands over them: a bar later in the row was
+      // drawn over it, its «֏» lost (round 3, В2). What stands at any point across it is the label.
+      expect(
+        await card.locator('.value .label').evaluateAll((all) =>
+          all
+            .filter((one) => getComputedStyle(one).visibility !== 'hidden')
+            .flatMap((one) => {
+              // Only what is in the window is found at a point.
+              one.scrollIntoView({ block: 'center' })
+              const box = one.getBoundingClientRect()
+              const y = (box.top + box.bottom) / 2
+              return [box.left + 2, (box.left + box.right) / 2, box.right - 2]
+                .filter((x) => document.elementFromPoint(x, y)?.closest('.label') !== one)
+                .map((x) => `${one.textContent} at ${String(Math.round(x))}`)
+            }),
+        ),
+      ).toEqual([])
       expect(await card.evaluate((one) => one.scrollWidth - one.clientWidth)).toBe(0)
       return {
         values: rows.values.filter((one) => one.seen).map(({ text }) => text),
