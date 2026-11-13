@@ -11,11 +11,8 @@
     >
       <template #title
         ><span class="verb">{{ `${t('exchange.edit_on', { date: dayOf(exchange) })} ` }}</span
-        >{{ amountsOf(exchange) }}</template
+        ><span class="amounts" :style="figureChars(amounts, 'text')">{{ amounts }}</span></template
       >
-      <template v-if="exchange.market?.exchangersPending" #below>
-        <AppTag>{{ t('exchange.list.pending_tag') }}</AppTag>
-      </template>
       <template #tail>
         <span class="sums">
           <span
@@ -42,7 +39,6 @@ import IconEqual from '~icons/mdi/equal'
 import IconHelp from '~icons/mdi/help'
 import IconMinus from '~icons/mdi/minus'
 import IconPlus from '~icons/mdi/plus'
-import AppTag from '@/components/AppTag.vue'
 import ListRow from '@/components/ListRow.vue'
 import { signedAmount } from '@/components/accounts'
 import { figureChars } from '@/components/figure'
@@ -65,11 +61,13 @@ const MARKS: Readonly<Record<VerdictKind, { icon: Component; tint: string }>> = 
  * that said all of it in five to seven lines is gone: the rate, the market and the central bank are in
  * the sheet of the amendment, which the whole row opens. The difference is the card's own measure — its
  * own channel, else the best (MOL-152) — in the currency received, the server's; its tone the money's
- * sign, never alone (Ф-30, MOL-190), and «ровно» and «без сравнения» have none.
+ * sign, never alone (Ф-30, MOL-190), and «ровно» and «без сравнения» have none. «Отдал → получил» is one line,
+ * shrunk to the words' column where it is narrower (MOL-404, В-7 «б»): wrapped at the arrow, a row was four lines;
+ * the exchange offices still to come are said once over the list, not on every recent row.
  */
 export default defineComponent({
   name: 'ExchangeRow',
-  components: { AppTag, ListRow },
+  components: { ListRow },
   props: {
     exchange: { type: Object as PropType<ExchangeView>, required: true },
     /** The screen's day (MOL-329). */
@@ -112,7 +110,8 @@ export default defineComponent({
       }
       return parts.join(' · ')
     })
-    return { t, mark, difference, word, meta, amountsOf, dayOf, figureChars }
+    const amounts = computed(() => amountsOf(props.exchange))
+    return { t, mark, difference, word, meta, amounts, dayOf, figureChars }
   },
 })
 </script>
@@ -126,6 +125,18 @@ li {
 
 .verb {
   @include visually-hidden;
+}
+
+/* The words' column is the box the amounts shrink to, as a trip's price per unit (MOL-334): its width is the
+   row's share, never its words'. */
+:deep(.words) {
+  container-type: inline-size;
+}
+
+.amounts {
+  @include figure-fit(1em);
+
+  white-space: nowrap;
 }
 
 .sums {

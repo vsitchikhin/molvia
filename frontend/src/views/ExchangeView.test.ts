@@ -1608,12 +1608,17 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     expect(button.get('.amount').text()).toBe('−֏1,232')
     expect(button.get('.amount').classes()).toContain('bad')
     expect(button.get('.word').text()).toBe(en.exchange.vs_market.worse)
-    expect(button.text()).toContain(en.exchange.list.pending_tag)
+    // The exchange offices still to come are said once over the list, not on the row (MOL-404, В-7 «б»).
+    expect(button.text()).not.toContain(en.exchange.list.pending_note)
+    expect(view.get('.exchanges .pending').text()).toBe(en.exchange.list.pending_note)
   })
 
   it('a row with no market has no difference and no tone: «not compared» (MOL-152)', async () => {
     exchanges.mockResolvedValue(overview())
-    const button = (await render()).get('.rows button.list-row')
+    const view = await render()
+    const button = view.get('.rows button.list-row')
+    // Nothing still to come: no note over the list.
+    expect(view.find('.exchanges .pending').exists()).toBe(false)
     expect(button.find('.amount').exists()).toBe(false)
     expect(button.get('.word').text()).toBe(en.exchange.rate_chart.no_change)
     expect(button.get('.word').classes()).not.toContain('bad')
