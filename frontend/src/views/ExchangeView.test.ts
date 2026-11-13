@@ -1605,11 +1605,8 @@ describe('ExchangeView: amending an exchange (MOL-42, В-3)', () => {
     expect(button.text()).toMatch(/^Amend the exchange of .+:/)
     expect(button.text()).toContain('₽20,000 → ֏95,000')
     // Each sum a piece of its own: under the caption's size the line wraps between them, never inside one (А4), and
-    // the arrow goes with the second (Б3).
-    expect(button.findAll('.amounts .sum').map((sum) => sum.text())).toEqual([
-      '₽20,000',
-      '→ ֏95,000',
-    ])
+    // the arrow is no sum's: glued to one it took its width from it (Б3, В1).
+    expect(button.findAll('.amounts .sum').map((sum) => sum.text())).toEqual(['₽20,000', '֏95,000'])
     expect(button.text()).toContain(en.exchange.list.no_place)
     expect(button.get('.amount').text()).toBe('−֏1,232')
     expect(button.get('.amount').classes()).toContain('bad')

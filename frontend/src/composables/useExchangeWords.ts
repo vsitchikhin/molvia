@@ -52,7 +52,7 @@ export interface ExchangeWords {
   readonly marketOf: (exchange: ExchangeView) => MarketWords | null
 }
 
-/** A piece of «отдал → получил»: a sum, which stands whole — the second with the arrow before it — or a word (MOL-404). */
+/** A piece of «отдал → получил»: a sum, which stands whole, or the words around it (MOL-404). */
 export interface AmountPart {
   readonly text: string
   readonly sum: boolean
@@ -106,20 +106,19 @@ export function useExchangeWords(): ExchangeWords {
 
   /**
    * «Отдал → получил», cut around its two sums (`aroundFigure`), so a line breaks between them, never inside one. The
-   * words between go with the second sum, all but the space before them: wrapped, the arrow stood on a line of its own
-   * (MOL-404, round 2, Б3).
+   * arrow is a piece of its own: glued to either sum it took its width from that sum, shrunk under the caption though
+   * the sum alone fitted (rounds 2–3, Б3, В1); on its own it stands beside whichever sum it fits beside.
    */
   function amountPartsOf(exchange: ExchangeView): AmountPart[] {
     const given = moneyOf(exchange.given)
     const received = moneyOf(exchange.received)
     const first = aroundFigure(t('exchange.row_amounts', { given, received }), given)
     const second = aroundFigure(first.after, received)
-    const between = second.figure === '' ? '' : second.before.trimStart()
     return [
       { text: first.before, sum: false },
       { text: first.figure, sum: true },
-      { text: second.before.slice(0, second.before.length - between.length), sum: false },
-      { text: `${between}${second.figure}`, sum: true },
+      { text: second.before, sum: false },
+      { text: second.figure, sum: true },
       { text: second.after, sum: false },
     ].filter((part) => part.text !== '')
   }
