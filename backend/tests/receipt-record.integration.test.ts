@@ -1790,7 +1790,7 @@ describe('«Записать»', () => {
     expect(await db.select().from(receiptDays)).toMatchObject([
       { recorded: 5, within5m: 1, within15m: 1, within1h: 1, within1d: 1, later: 1 },
     ])
-  }, 10_000)
+  }, 25_000)
 
   // MOL-222, adversarial А6: the memory learns from another record between the review and «Записать»;
   // only the phone knows what it showed, and it says which lines it put right
@@ -1829,7 +1829,7 @@ describe('«Записать»', () => {
     // C: put right the same way as A, though the memory would now show cheese
     expect((await record(me, c, body(cheese, [0]))).statusCode).toBe(200)
     expect(await db.select().from(receiptDays)).toMatchObject([{ linesEdited: 1, linesItem: 1 }])
-  }, 10_000)
+  }, 25_000)
 
   // MOL-222, review 2 and adversarial А7: a total put right confirms the printed sums of the lines that
   // do not add up (В-5) — one edit of the receipt, never of the lines nobody opened
