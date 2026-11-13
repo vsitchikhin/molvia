@@ -1178,7 +1178,7 @@
       "y_hint": "↑ higher — more ֏ for 1 {sign}"
     },
     "list": {
-      "pending_tag": "exchange offices — later",
+      "pending_note": "The CBA publishes exchange office rates for recent days with a delay — the difference with the market will update by itself",
       "no_place": "no place"
     },
     "my_rate_line": {

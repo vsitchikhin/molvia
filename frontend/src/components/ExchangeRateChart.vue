@@ -40,36 +40,17 @@
       <p v-if="!period" class="none">
         {{ t('exchange.rate_chart.no_market_period', { period: periodIn }) }}
       </p>
-      <!-- Standing on nothing, the day and the figure keep their place unseen: a dot tapped then puts
-           them back without moving the chart under the finger (adversarial round 10). -->
-      <template v-if="readStep">
-        <p
-          class="week"
-          :class="{ held: !chosenStep }"
-          :aria-hidden="chosenStep ? undefined : 'true'"
-        >
-          {{ t(`exchange.rate_chart.${step}`, { day: shortDay(readStep.day) }) }}
+      <!-- Only what is chosen, at its own height: standing on nothing, no day and no figure; no room is
+           held for a taller plate, and the chart under the reading moves with it — the page stretches
+           rather than keep empty room (MOL-404, the owner's word; MOL-190 and round 10 held it before). -->
+      <template v-if="chosenStep">
+        <p class="week">
+          {{ t(`exchange.rate_chart.${step}`, { day: shortDay(chosenStep.day) }) }}
         </p>
-        <p
-          v-if="readStep.rate"
-          class="figure"
-          :class="{ held: !chosenStep }"
-          :aria-hidden="chosenStep ? undefined : 'true'"
-        >
-          {{ rateOf(readStep.rate) }}
-        </p>
-        <p
-          v-else
-          class="figure missing"
-          :class="{ held: !chosenStep }"
-          :aria-hidden="chosenStep ? undefined : 'true'"
-        >
-          {{ t(words.noMarket) }}
-        </p>
+        <p v-if="chosenStep.rate" class="figure">{{ rateOf(chosenStep.rate) }}</p>
+        <p v-else class="figure missing">{{ t(words.noMarket) }}</p>
       </template>
-      <!-- Every plate of the period in one cell, the chosen one seen: the tallest holds the place, so a
-           week with no exchange leaves the chart under the finger where it was (adversarial А2, Б1). -->
-      <div v-if="period" class="stack">
+      <template v-if="period">
         <p v-if="chosenPlate" class="plate mine">
           <span class="plate-dot" aria-hidden="true"></span>
           <span class="plate-text">
@@ -81,15 +62,7 @@
           </span>
         </p>
         <p v-else class="none">{{ noneWords }}</p>
-        <p v-for="plate in plates" :key="plate.id" class="plate ghost" aria-hidden="true">
-          <span class="plate-dot"></span>
-          <span class="plate-text">
-            <span class="plate-rate">{{ plate.rate }}</span>
-            <span class="plate-place">{{ plate.place }}</span>
-            <span :class="['plate-diff', plate.tone]">{{ plate.diff }}</span>
-          </span>
-        </p>
-      </div>
+      </template>
     </div>
 
     <fieldset v-if="period" class="chart">
@@ -219,7 +192,7 @@
           <span
             v-for="label in axisLabels"
             :key="label.key"
-            :class="['month', edges[label.key], { hidden: hidden[label.key] }]"
+            :class="['month', labels.edges[label.key], { hidden: labels.hidden[label.key] }]"
             :data-key="label.key"
             :data-x="label.x"
             :data-names="label.names"
@@ -242,7 +215,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -265,6 +238,8 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { shortMonth, signedPercent } from '@/components/charts'
 import { useChartPointer } from '@/composables/useChartPointer'
+import { LABEL_SPACE_PX, laidOn, useLabelPlaces } from '@/composables/useLabelPlaces'
+import type { LabelEdge } from '@/composables/useLabelPlaces'
 import { calendarDay } from '@/days'
 
 type Pair = ExchangeRateChartView['pairs'][number]
@@ -286,8 +261,6 @@ const FINGER_PX = 12
 const STACK_PX = 3
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
-/** The least room between two names under the line, in pixels: closer, they read as one word. */
-const LABEL_SPACE_PX = 8
 
 /**
  * «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168, handoff MOL-157 05, frames 6c and 6d):
@@ -400,7 +373,6 @@ export default defineComponent({
     /** The plate under the reading: the exchange and its rate, the place, the difference (Р-4). */
     function plateOf(point: Point) {
       return {
-        id: point.id,
         rate: t('exchange.rate_chart.mine', {
           day: shortDay(point.day),
           rate: rateOf(point.rate),
@@ -410,7 +382,6 @@ export default defineComponent({
         tone: diffClassOf(point),
       }
     }
-    const plates = computed(() => period.value?.exchanges.map(plateOf) ?? [])
 
     const items = computed<Item[]>(() => {
       const shown = period.value
@@ -502,8 +473,6 @@ export default defineComponent({
     const chosenStep = computed(
       () => (chosen.value ? period.value?.steps[chosen.value.step] : null) ?? null,
     )
-    /** What the reading's day and figure stand for: the step chosen, else the latest, held unseen. */
-    const readStep = computed(() => chosenStep.value ?? period.value?.steps.at(-1) ?? null)
     const cursorX = computed(() => chosen.value?.exchange?.x ?? chosenStep.value?.x ?? 0)
 
     /** The spot taps go round on: the centre of the dot the round began with, and its dots. */
@@ -696,11 +665,6 @@ export default defineComponent({
      * Mondays, «7 сент. · 14 · 21 · 28», the month named again where it turns.
      */
     const monthsBox = ref<HTMLElement | null>(null)
-    /** The names laid from an end of the line rather than centred on their day, by key. */
-    const edges = ref<Record<string, 'start' | 'end'>>({})
-    /** The names that give way to a neighbour they would run into, by key. */
-    const hidden = ref<Record<string, true>>({})
-    let observer: ResizeObserver | undefined
 
     /**
      * A name is centred on its day, and laid from an end only when, centred, it would stand past the
@@ -712,22 +676,25 @@ export default defineComponent({
      * window holds the tail of, or today's — unless it alone names its month, which the other then
      * does not, or days of its month follow it, which would then stand under the month before
      * («29 марта · 12 · 19» in WebKit, round 5, Т); else the later. A name given way keeps its width
-     * (`visibility`), so measuring again finds the same.
+     * (`visibility`), so measuring again finds the same (`useLabelPlaces`, shared with the bars of MOL-404).
      */
-    function placeLabels(): void {
+    function placeLabels(): {
+      /** The names laid from an end of the line rather than centred on their day, by key. */
+      edges: Record<string, LabelEdge>
+      /** The names that give way to a neighbour they would run into, by key. */
+      hidden: Record<string, true>
+    } {
       const box = monthsBox.value
-      if (!box) return
+      const edgeOf: Record<string, LabelEdge> = {}
+      if (!box) return { edges: edgeOf, hidden: {} }
       const width = box.getBoundingClientRect().width
-      const edgeOf: Record<string, 'start' | 'end'> = {}
       const placed = [...box.querySelectorAll<HTMLElement>('.month')].flatMap((node) => {
         const key = node.dataset.key
         if (!key) return []
         const at = (Number(node.dataset.x) * width) / CHART_LEVEL
-        const wide = node.getBoundingClientRect().width
-        const edge = at - wide / 2 < 0 ? 'start' : at + wide / 2 > width ? 'end' : null
+        const { left, right, edge } = laidOn(at, at, node.getBoundingClientRect().width, width)
         if (edge) edgeOf[key] = edge
-        const left = edge === 'start' ? at : edge === 'end' ? at - wide : at - wide / 2
-        return [{ key, left, right: left + wide, edge, names: node.dataset.names === 'true' }]
+        return [{ key, left, right, edge, names: node.dataset.names === 'true' }]
       })
       const gone: Record<string, true> = {}
       const kept: typeof placed = []
@@ -752,21 +719,8 @@ export default defineComponent({
           kept.pop()
         }
       }
-      if (JSON.stringify(edgeOf) !== JSON.stringify(edges.value)) edges.value = edgeOf
-      if (JSON.stringify(gone) !== JSON.stringify(hidden.value)) hidden.value = gone
+      return { edges: edgeOf, hidden: gone }
     }
-
-    function observeLabels(): void {
-      observer?.disconnect()
-      placeLabels()
-      if (!monthsBox.value || typeof ResizeObserver === 'undefined') return
-      observer = new ResizeObserver(placeLabels)
-      observer.observe(monthsBox.value)
-    }
-
-    onBeforeUnmount(() => {
-      observer?.disconnect()
-    })
 
     const axisLabels = computed(() => {
       const steps = period.value?.steps ?? []
@@ -805,11 +759,7 @@ export default defineComponent({
     })
     // The names change with the period and the pair, the line with the window and the screen; the
     // face comes after the first frame and widens them.
-    watch([monthsBox, axisLabels], observeLabels, { flush: 'post', immediate: true })
-    onMounted(() => {
-      // Not every engine has it: happy-dom of the component tests has not.
-      if ('fonts' in document) void document.fonts.ready.then(placeLabels)
-    })
+    const labels = useLabelPlaces(monthsBox, placeLabels, { edges: {}, hidden: {} }, [axisLabels])
 
     const periodOptions = computed(() =>
       RATE_CHART_MONTHS.map((months) => ({
@@ -838,11 +788,9 @@ export default defineComponent({
       items,
       chosen,
       chosenPlate,
-      plates,
       chosenIndex,
       noneWords,
       chosenStep,
-      readStep,
       step,
       period,
       title,
@@ -853,8 +801,7 @@ export default defineComponent({
       lone,
       axisLabels,
       monthsBox,
-      edges,
-      hidden,
+      labels,
       pairOptions,
       periodOptions,
       TICK,
@@ -921,11 +868,6 @@ export default defineComponent({
   display: grid;
   align-content: start;
   gap: var(--space-1);
-  min-height: 6rem;
-}
-
-.held {
-  visibility: hidden;
 }
 
 .week,
@@ -944,28 +886,11 @@ export default defineComponent({
 
   /* A sentence in the figure's place, not a figure: the text's face (Ф-7 keeps Nunito for figures). */
   &.missing {
-    min-height: calc(var(--text-title) * var(--leading-body));
     color: var(--text-muted);
     font-family: var(--font);
     font-size: var(--text-callout);
     font-weight: var(--weight-medium);
   }
-}
-
-/* The plates of the period in one cell: the tallest decides, the one shown is the exchange chosen —
-   at its own height, never stretched to the tallest (adversarial В1). */
-.stack {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  align-items: start;
-
-  > * {
-    grid-area: 1 / 1;
-  }
-}
-
-.ghost {
-  visibility: hidden;
 }
 
 .plate {
@@ -988,8 +913,7 @@ export default defineComponent({
   background: var(--accent);
 }
 
-/* A note with no spaces — a link to a map — wraps: unseen, it would push the page aside on every week
-   of the period (adversarial В2). */
+/* A note with no spaces — a link to a map — wraps: whole, it would push the page aside (adversarial В2). */
 .plate-text {
   display: grid;
   min-width: 0;

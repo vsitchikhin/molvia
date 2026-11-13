@@ -5,6 +5,7 @@ import { fakeKeyboard } from './keyboard'
 import { facesIn, standAt, stillIn, topOf } from './scroll'
 import { asBrowser, launchOffline, signedIn } from './session'
 import { chooseCategory } from './category'
+import { yerevanDay } from './days'
 import { fillDetails, openDetails } from './spending-details'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -1033,13 +1034,6 @@ test.describe('in English', () => {
     await fitsNarrowPhone(page, 'Money')
   })
 })
-
-/** A day of Yerevan's calendar, `days` from today. */
-function yerevanDay(days = 0): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
-    new Date(Date.now() + days * 24 * 60 * 60 * 1000),
-  )
-}
 
 // «На счетах сейчас» (MOL-183, Ф-27): the money on the accounts now, in the income currency, over the
 // switcher — the same balances «Счета» add up, and «now», not the month's.

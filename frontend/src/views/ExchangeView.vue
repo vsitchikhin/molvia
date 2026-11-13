@@ -197,6 +197,8 @@
         <!-- Incomes alone can make the rate (MOL-66): then there is the card, and no list. -->
         <section v-if="overview.exchanges.length > 0" class="exchanges">
           <SectionCaption>{{ t('exchange.list_title') }}</SectionCaption>
+          <!-- Once over the list, not a tag on every recent row (MOL-404, В-7 «б»). -->
+          <p v-if="exchangersPending" class="pending">{{ t('exchange.list.pending_note') }}</p>
           <!-- A list, so a screen reader says how many and moves item by item (review Т-5); a row an
                exchange, its sign, its amounts and its difference with the market (MOL-348, handoff 06). -->
           <AppCard as="ul" list class="rows">
@@ -375,6 +377,11 @@ export default defineComponent({
       }
       return null
     })
+    const exchangersPending = computed(() =>
+      (exchanges.overview.value?.exchanges ?? []).some(
+        (exchange) => exchange.market?.exchangersPending,
+      ),
+    )
     const sheetOpen = ref(false)
     // The exchange the sheet amends, or null when it records a new one.
     const editing = ref<Row | null>(null)
@@ -623,6 +630,7 @@ export default defineComponent({
       chartChoice,
       chooseExchange,
       latestForeign,
+      exchangersPending,
       figureChars,
       t,
       ...exchanges,
@@ -717,6 +725,12 @@ export default defineComponent({
 
 .preference {
   margin-top: var(--space-4);
+}
+
+.pending {
+  margin: 0 0 var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--text-footnote);
 }
 
 .costs {
