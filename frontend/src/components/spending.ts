@@ -704,7 +704,21 @@ export function spendingLook(category: SpendingCategoryView | null): {
     : { icon: markRaw(IconTag), tint: 'muted' }
 }
 
+/** A trip whose category is not known at all — an answer of a server before MOL-406 — draws the cart. */
 export const tripIcon = markRaw(IconCart)
+
+/**
+ * A trip's circle (MOL-406): its category's icon in its colour, as a spending's — «Продукты»'s where it names none
+ * (MOL-400) — whether it was typed by hand or recorded from a receipt.
+ */
+export function tripLook(category: SpendingCategoryView | null): {
+  readonly icon: Component
+  readonly tint: string
+} {
+  return category
+    ? { icon: categoryIcon(category), tint: categoryColour(category) }
+    : { icon: PRESET_ICONS[TRIP_CATEGORY], tint: tripTint(null) }
+}
 
 /**
  * A line of the month's journal (MOL-82, handoff 01): a spending of one's own, or a finished trip's
@@ -747,7 +761,7 @@ export function journalRowProps(
       : unbroken(t('spending.uncounted_row', {}))
 
   const mark = row.kind === 'manual' ? row.mark : null
-  const look = trip ? { icon: tripIcon, tint: tripTint(category) } : spendingLook(category)
+  const look = trip ? tripLook(category) : spendingLook(category)
   return {
     ...look,
     verb: t(trip ? 'spending.row_open_trip' : 'spending.row_open', {}),

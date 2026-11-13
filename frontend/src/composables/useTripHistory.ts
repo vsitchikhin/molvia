@@ -23,6 +23,8 @@ export interface HistoryRow {
   fromReceipt: boolean
   /** Finished on this phone and in no answer yet: no read drew it, failed or not (adversarial Б3). */
   onPhone: boolean
+  /** Its category (MOL-406), `null` — «Продукты»; absent — not known: a row the phone made, a server before it. */
+  categoryId?: string | null
 }
 interface TripHistoryScreen {
   t: ReturnType<typeof useI18n>['t']
@@ -88,6 +90,7 @@ export function useTripHistory(): TripHistoryScreen {
           total: unsure.has(row.id) ? null : row.total,
           fromReceipt: row.fromReceipt,
           onPhone: false,
+          ...(row.categoryId === undefined ? {} : { categoryId: row.categoryId }),
         },
       ]),
     )

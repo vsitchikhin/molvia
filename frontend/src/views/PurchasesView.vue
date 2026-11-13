@@ -85,7 +85,7 @@
           <ListRow
             v-for="row in review"
             :key="row.id"
-            :icon="iconOf(row)"
+            v-bind="reviewLook(row)"
             :tone="row.state === 'failed' ? 'warn' : ''"
             :title="receiptTitle(row)"
             :meta="receiptMeta(row)"
@@ -136,12 +136,13 @@
       </AppCard>
     </AppReveal>
 
-    <!-- The answer's shape (Ф-13, Р-7): «Записаны» and three rows with a sum and a chevron, no icon —
-         a recorded row has none. The record going on is no part of it: drawn from the phone, it stands
-         over the skeleton already, and a bar in its place would go from under a person with none. -->
+    <!-- The answer's shape (Ф-13, Р-7): «Записаны» and three rows with the category's circle (MOL-406), a sum
+         and a chevron — `ListRow`s in plain items, never narrow. The record going on is no part of it: drawn from
+         the phone, it stands over the skeleton already, and a bar in its place would go from under a person with
+         none. -->
     <ScreenSkeleton v-if="shown === 'loading'" class="loading">
       <SkeletonPart kind="caption" :width="22" />
-      <SkeletonPart kind="rows" tail next />
+      <SkeletonPart kind="rows" lead="circle" :narrow="false" tail next />
     </ScreenSkeleton>
 
     <!-- No button: the action is in the strip below. The circle is the quiet one, which does not
@@ -182,6 +183,7 @@
           <ListRow
             v-for="row in rows"
             :key="row.id"
+            v-bind="recordedLook(row)"
             :title="row.name"
             :meta="recordedMeta(row)"
             wrap
@@ -250,6 +252,7 @@ import IconFileAlert from '~icons/mdi/file-alert-outline'
 import IconReceipt from '~icons/mdi/receipt-text-outline'
 import IconSync from '~icons/mdi/sync'
 import { formatMoney, withoutItems } from '@molvia/model'
+import { tripIcon, tripLook, tripTint } from '@/components/spending'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
@@ -275,6 +278,7 @@ import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { WORKING, rejectedReasonWords, useReceipts } from '@/composables/useReceipts'
 import type { ReceiptRow } from '@/composables/useReceipts'
 import { useReconnect } from '@/composables/useReconnect'
+import { useOwnCategories } from '@/composables/useOwnCategories'
 import { useTripHistory } from '@/composables/useTripHistory'
 import type { HistoryRow } from '@/composables/useTripHistory'
 import { useTripRows } from '@/composables/useTripRows'
@@ -288,7 +292,10 @@ import {
   timeOfDay,
 } from '@/days'
 import { useNavigation } from '@/navigation'
+import { reviewCategory } from '@/receipts/review'
 import { useActorStore } from '@/stores/actor'
+import { placeCategoriesOf, refreshPlaceCategories } from '@/stores/placeCategories'
+import { placeIdOf, useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import { useTripStore } from '@/stores/trip'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -366,6 +373,40 @@ export default defineComponent({
     )
     const receipts = useReceipts()
     const receiptRows = computed(() => receipts.rows.value)
+
+    // A purchase stands in its category's circle, typed by hand or recorded from a receipt (MOL-406)
+    const own = useOwnCategories()
+    const drafts = useReceiptDraftsStore()
+    const placesAt = ref(placeCategoriesOf(actor.id))
+    void refreshPlaceCategories(actor.id).then(() => {
+      placesAt.value = placeCategoriesOf(actor.id)
+    })
+    const categoryOf = (id: string | null) =>
+      own.categories.value.find((category) => category.id === id) ?? null
+    /** Its category's look; not known — a server before MOL-406, a row the phone made — the cart. */
+    function recordedLook(row: HistoryRow) {
+      return row.categoryId === undefined
+        ? { icon: tripIcon, tint: tripTint(null) }
+        : tripLook(categoryOf(row.categoryId))
+    }
+    /**
+     * A receipt read and waiting for «Записать» stands in the category it will be recorded in — the review's rule,
+     * the person's choice or the guess (`reviewCategory`); one failed keeps the sign of its state.
+     */
+    function reviewLook(row: ReceiptRow) {
+      if (row.state === 'failed') return { icon: iconOf(row) }
+      const draft = drafts.draftOf(row.id)
+      const found = row.summary?.place
+      const place =
+        draft?.place ?? (found ? { id: found.id, name: found.name, city: found.city } : null)
+      const id = reviewCategory(own.categories.value, {
+        chosen: drafts.categoryOf(row.id),
+        placeId: place ? placeIdOf(place) : null,
+        lastAt: placesAt.value,
+        food: row.summary?.food ?? false,
+      })
+      return tripLook(categoryOf(id))
+    }
     const working = computed(() => receiptRows.value.filter((row) => WORKING.includes(row.state)))
     const review = computed(() => receiptRows.value.filter((row) => !WORKING.includes(row.state)))
     // The sheet follows the live row: a receipt read while it is up says so (review 21).
@@ -668,6 +709,8 @@ export default defineComponent({
         return total ? formatMoney(total, locale.value) : null
       },
       iconOf,
+      recordedLook,
+      reviewLook,
       openReceipt,
       sum: (row: HistoryRow): string | null =>
         row.total && row.total.length > 0

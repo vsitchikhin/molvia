@@ -4,9 +4,11 @@ import {
   ERROR,
   EXPORT_FORMAT,
   LOGIN_HEADER,
+  TRIP_HISTORY_CATEGORY_HEADER,
   RECEIPT_CASHBACK_HEADER,
   RECEIPT_BILL_HEADER,
   RECEIPT_CODES_HEADER,
+  RECEIPT_FOOD_HEADER,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
   RECEIPT_REPAIRED_HEADER,
@@ -839,6 +841,7 @@ export function createClient(options: ClientOptions): MolviaClient {
           ? `/trips/history?${new URLSearchParams({ before: cursor.at, beforeId: cursor.id })}`
           : '/trips/history',
         tripHistoryCodec,
+        { headers: new Headers({ [TRIP_HISTORY_CATEGORY_HEADER]: '1' }) },
       ),
 
     addExpense: async (tripId, body) => {
@@ -1069,7 +1072,9 @@ export function createClient(options: ClientOptions): MolviaClient {
       }),
 
     receipts: (options) =>
-      request(`/receipts${options?.shown ? '?shown=1' : ''}`, receiptsResponseCodec),
+      request(`/receipts${options?.shown ? '?shown=1' : ''}`, receiptsResponseCodec, {
+        headers: new Headers({ [RECEIPT_FOOD_HEADER]: '1' }),
+      }),
 
     receipt: (id, options) =>
       request(`/receipts/${segment(id)}${options?.shown ? '?shown=1' : ''}`, receiptDetailCodec, {

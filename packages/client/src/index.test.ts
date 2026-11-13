@@ -3,9 +3,11 @@ import {
   ERROR,
   ISSUE,
   RECEIPT_CODES_HEADER,
+  RECEIPT_FOOD_HEADER,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
   TODAY_HEADER,
+  TRIP_HISTORY_CATEGORY_HEADER,
   VERSION_HEADER,
   ZONE_HEADER,
 } from '@molvia/model'
@@ -2145,5 +2147,25 @@ describe('a receipt’s review asks for its lines’ codes and its total as read
     expect(seen.map((headers) => headers.get(RECEIPT_CODES_HEADER))).toEqual(['1', '1'])
     expect(seen.map((headers) => headers.get(RECEIPT_READ_TOTAL_HEADER))).toEqual(['1', '1'])
     expect(seen.map((headers) => headers.get(RECEIPT_READ_PARTLY_HEADER))).toEqual(['1', '1'])
+  })
+})
+
+describe('«Покупки» ask for a trip’s category and a receipt’s food service (MOL-406)', () => {
+  it('names both headers, so the server sends `categoryId` and `food` to this build only', async () => {
+    const seen = new Map<string, Headers>()
+    const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      seen.set(new URL(String(input)).pathname, new Headers(init?.headers))
+      return Promise.resolve(
+        new Response(JSON.stringify({ code: ERROR.NOT_FOUND }), {
+          status: 404,
+          headers: { 'content-type': 'application/json' },
+        }),
+      )
+    }
+    const client = createClient({ baseUrl: 'http://api', fetch })
+    await client.tripHistory().catch(() => undefined)
+    await client.receipts().catch(() => undefined)
+    expect(seen.get('/trips/history')?.get(TRIP_HISTORY_CATEGORY_HEADER)).toBe('1')
+    expect(seen.get('/receipts')?.get(RECEIPT_FOOD_HEADER)).toBe('1')
   })
 })

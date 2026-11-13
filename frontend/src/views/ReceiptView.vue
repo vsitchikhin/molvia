@@ -410,7 +410,6 @@ import {
   RECEIPT_ADDED_MAX,
   RECEIPT_ITEMS_DAY_MAX,
   formatMoney,
-  guessedTripCategory,
   linesTotalOf,
   parseMoney,
   readCovered,
@@ -459,7 +458,14 @@ import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { afterStep, useNavigation } from '@/navigation'
 import { photoShelf } from '@/receipts/photoShelf'
-import { recordBody, reviewBalance, reviewDay, reviewLines, reviewPlace } from '@/receipts/review'
+import {
+  recordBody,
+  reviewBalance,
+  reviewCategory,
+  reviewDay,
+  reviewLines,
+  reviewPlace,
+} from '@/receipts/review'
 import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
@@ -644,11 +650,9 @@ export default defineComponent({
       return place ? placeIdOf(place) : null
     })
     const categoryId = computed(() => {
-      const chosen = drafts.categoryOf(id.value)
-      const categories = own.categories.value
-      if (chosen && categories.some((category) => category.id === chosen)) return chosen
       const one = detail.value
-      return guessedTripCategory(categories, {
+      return reviewCategory(own.categories.value, {
+        chosen: drafts.categoryOf(id.value),
         placeId: reviewPlaceId.value,
         lastAt: placesAt.value,
         food: one

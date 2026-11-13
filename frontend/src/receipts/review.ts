@@ -1,4 +1,5 @@
 import {
+  guessedTripCategory,
   linesTotalOf,
   packedQuantity,
   receiptBalance,
@@ -8,6 +9,7 @@ import {
   recordedSums,
 } from '@molvia/model'
 import type {
+  ChoosableCategory,
   Money,
   Quantity,
   ReceiptBalance,
@@ -251,6 +253,25 @@ export function reviewPlace(detail: ReceiptDetail, draft: ReceiptDraft | null): 
   if (draft?.place) return draft.place
   const place = detail.receipt.place
   return place ? { id: place.id, name: place.name, city: place.city } : null
+}
+
+/**
+ * The category a receipt is recorded in (MOL-400, Р-6): the person's choice on the review while the phone still
+ * knows it, else the guess — their last trip's at the place, a café where the receipt serves food, else «Продукты».
+ * One rule for the review and for the receipt's row in «Покупки» (MOL-406).
+ */
+export function reviewCategory(
+  categories: readonly ChoosableCategory[],
+  input: {
+    readonly chosen: string | null
+    readonly placeId: string | null
+    readonly lastAt: readonly { readonly placeId: string; readonly categoryId: string }[]
+    readonly food: boolean
+  },
+): string | null {
+  const { chosen, placeId, lastAt, food } = input
+  if (chosen && categories.some((category) => category.id === chosen)) return chosen
+  return guessedTripCategory(categories, { placeId, lastAt, food })
 }
 
 /** The day of the purchases: the person's, else the one printed, else the day the photo was taken. */
