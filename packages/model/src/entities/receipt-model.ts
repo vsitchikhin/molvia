@@ -459,7 +459,9 @@ function totalOf(
     if (met) return { total: sum, read, met, owed: sum, cashback, redeemed: null, service: null }
     // a total voted by its places took the service: every bill seen prints it so — ZERO, Bakery, Аракс (owner's В-7
     // «а», adversarial Б1) — so the lines make it less the service, the font's swaps putting them right to that
-    const voted = vote(places.values())
+    // the sum taxed with VAT, «ԱԱՀ-ով հարկվող», is the lines' sum printed again (MOL-289): a place of the total where no
+    // discount goes to the card (MOL-310, round 2 — «Ереван Сити» without the card, the total copied once)
+    const voted = vote([...places.values(), taxed])
     // the service alone is one figure the model may copy 5↔6: where a percent is printed beside it, that is its second
     // place — the percent of the dishes, to the dram (adversarial Е1); with none it stands as printed (В-7 «а»)
     const service =

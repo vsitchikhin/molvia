@@ -657,7 +657,12 @@ describe('a line put right by the font’s 5↔6, the receipt whole (MOL-290)', 
     const flour = carded({ quantity: '1', unit_price: '1234', discount: '12.34', sum: '1221.66' })
     const { text, shown } = read2([flour, eggs], owed('1741.41'))
     expect(text.lines.some((l) => l.repaired === true)).toBe(false)
-    expect([shown.balanced, shown.lines[1]?.sumHundredths]).toEqual([false, null])
+    // the sums as copied meet the total, so the eggs' sum stands alone — its count copied «6» is none (MOL-310, round 2)
+    expect([shown.balanced, shown.lines[1]?.sumHundredths, shown.lines[1]?.quantityMilli]).toEqual([
+      false,
+      51_975,
+      null,
+    ])
     // a line no swap moves takes nothing away
     expect(read2([bread, eggs], owed('806.85')).shown.lines[1]?.repaired).toBe(true)
   })
@@ -1192,6 +1197,107 @@ describe('a summary printed in capitals (MOL-310, round 2)', () => {
       short,
     )
     expect(text.totalHundredths).toBeNull()
+  })
+})
+
+describe('sums as copied that meet a total two places print (MOL-310, round 2)', () => {
+  // made-up lines: a till's own rounding, one number printed twice, a dish whose portion the model copied as a total
+  const rounded = line({
+    printed: 'Չիպս',
+    code: '1904',
+    article: '1156466',
+    unit: 'pcs',
+    quantity: '1',
+    unit_price: '990',
+    discount: '0',
+    sum: '989.96',
+  })
+  const cola = line({
+    printed: 'Կոլա',
+    code: '2202',
+    article: '008542',
+    unit: 'pcs',
+    quantity: '1',
+    unit_price: '850',
+    discount: null,
+    sum: '850',
+  })
+  const weighed = line({
+    printed: 'Ըղալթ',
+    code: '2309',
+    article: null,
+    unit: 'kg',
+    quantity: null,
+    unit_price: '750',
+    sum: '3000',
+  })
+  const of = (lines: Line[], totals: [string, string][], byModel = true) => {
+    const text = read(
+      answer({ lines, totals: totals.map(([label, amount]) => ({ label, amount })) }),
+    )
+    const one = explainedReading(text, { byModel })
+    return {
+      total: text.totalHundredths,
+      sums: one.shown.lines.map((l) => l.sumHundredths),
+      rest: one.shown.lines.map((l) => [l.quantityMilli, l.priceHundredths]),
+      whole: one.shown.balanced,
+    }
+  }
+  const taxed = (amount: string): [string, string][] => [
+    ['ԱԱՀ-ով հարկվող', amount],
+    ['Ընդամենը', amount],
+  ]
+
+  it('takes the sum taxed with VAT for the total’s second place, and keeps every sum alone', () => {
+    expect(of([rounded, cola], taxed('1839.96'))).toEqual({
+      total: 183_996,
+      sums: [98_996, 85_000],
+      rest: [
+        [null, null],
+        [null, null],
+      ],
+      whole: false,
+    })
+  })
+
+  it('keeps the sum of a line whose weight was not copied, under a total and a payment alike', () => {
+    const totals: [string, string][] = [
+      ['Ընդամենը', '3850'],
+      ['Անկանխիկ', '3850'],
+    ]
+    expect(of([weighed, cola], totals)).toMatchObject({
+      total: 385_000,
+      sums: [300_000, 85_000],
+      rest: [
+        [null, null],
+        [null, null],
+      ],
+    })
+  })
+
+  it('keeps no sum where the sums miss the total', () => {
+    expect(of([rounded, cola], taxed('1840.96'))).toMatchObject({ sums: [null, null] })
+  })
+
+  it('takes no total read in one place, though the sums meet it (MOL-244, owner’s В-1 «а»)', () => {
+    const dish = line({
+      printed: 'Գոնիո',
+      code: '56.10',
+      article: null,
+      unit: null,
+      quantity: null,
+      unit_price: null,
+      sum: '1550',
+    })
+    const portion: [string, string][] = [
+      ['1 բաժին', '1550'],
+      ['ԸՆԴԱՄԵՆԸ ՎՃԱՐՄԱՆ', '1550'],
+    ]
+    expect(of([dish], portion)).toMatchObject({ total: null, sums: [null] })
+  })
+
+  it('keeps the sums for a model’s reading only: Tesseract’s sum may be the total’s choice', () => {
+    expect(of([rounded, cola], taxed('1839.96'), false).sums).toEqual([null, null])
   })
 })
 
