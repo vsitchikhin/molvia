@@ -164,16 +164,7 @@
 </template>
 
 <script lang="ts">
-import {
-  computed,
-  defineComponent,
-  markRaw,
-  onBeforeUnmount,
-  onMounted,
-  ref,
-  useId,
-  watch,
-} from 'vue'
+import { computed, defineComponent, markRaw, ref, useId } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { CHART_LEVEL, decimalFromMinor } from '@molvia/model'
@@ -195,6 +186,8 @@ import {
   verdictOfMoney,
 } from '@/composables/useExchangeWords'
 import type { AmountPart } from '@/composables/useExchangeWords'
+import { apart, laidOn, useLabelPlaces } from '@/composables/useLabelPlaces'
+import type { LabelBox } from '@/composables/useLabelPlaces'
 import { calendarDay, calendarDayOfAnyYear } from '@/days'
 
 type Bar = NonNullable<ExchangesResponse['bars']>[number]
@@ -205,8 +198,6 @@ type LabelPlace = 'from-start' | 'from-end' | 'gone'
 const LABELLED_AT_MOST = 6
 /** Every month under the bars up to eight, past it the first and the last — those with room (MOL-404, В-2 «а»). */
 const MONTHS_AT_MOST = 8
-/** The least room between two labels side by side, as on the line of the rate. */
-const LABEL_SPACE_PX = 8
 /** From ten thousand a value over a bar is «+18,8 тыс». */
 const COMPACT_FROM = 10_000
 /** The least a bar off the line is drawn, so a small difference is still seen. */
@@ -377,21 +368,23 @@ export default defineComponent({
 
     const widthOf = (level: number) => `${String((Math.abs(level) * 100) / CHART_LEVEL)}%`
 
-    /** The labels laid from an edge or given way, by `value:<id>` and `month:<id>`. */
-    const places = ref<Record<string, LabelPlace[]>>({})
     /**
      * Where each label stands, measured (MOL-404, review №1–2, adversarial А1–А3): a label never wraps, so wider than
      * its column it stood over its neighbours and, a column in from the edge, past the card — by the count of bars
      * alone, eight months at 200 % ran into each other, and the chosen value beside the furthest lay on it. A label is
-     * centred on its column while that keeps it in the field, else laid from its column's edge inward; of two that
-     * would run into each other the one later in the order gives way — the values the chosen bar's first, then the
-     * furthest's, then by their size; the months the first, the last, then from the left, so a choice moves none.
-     * A label given way keeps its width (`visibility`) and its edge, so measuring again finds the same.
+     * centred on its column while that keeps it in the field, else laid from its column's edge inward (`laidOn`); of
+     * two that would run into each other — across, or one over the other: a value over the line and one under it stand
+     * apart (round 2, Б1) — the one later in the order gives way. The months: the first, the last, then from the left.
+     * The values up to six: the furthest, then by size — a choice moves none, as a finger slides along them (Б2); past
+     * six only the chosen bar's and the furthest's are labelled, the chosen first, its value on its plate too.
      */
-    function placeLabels(): void {
+    function placeLabels(): Record<string, LabelPlace[]> {
       const next: Record<string, LabelPlace[]> = {}
       const byLevel = [...props.bars].sort((a, b) => Math.abs(b.level) - Math.abs(a.level))
-      const values = [chosenBar.value, widest.value, ...byLevel]
+      const values =
+        props.bars.length <= LABELLED_AT_MOST
+          ? [widest.value, ...byLevel]
+          : [chosenBar.value, widest.value]
       const months = [props.bars[0], props.bars.at(-1), ...props.bars]
       for (const [row, kind, order] of [
         [area.value, 'value', values],
@@ -405,7 +398,7 @@ export default defineComponent({
             node,
           ]),
         )
-        const kept: { left: number; right: number }[] = []
+        const kept: LabelBox[] = []
         const seen = new Set<string>()
         for (const bar of order) {
           const key = `${kind}:${bar?.id ?? ''}`
@@ -414,50 +407,22 @@ export default defineComponent({
           if (!node || !label || seen.has(key)) continue
           seen.add(key)
           const column = node.getBoundingClientRect()
-          const width = label.getBoundingClientRect().width
+          const own = label.getBoundingClientRect()
           const from = column.left - field.left
-          const centre = from + column.width / 2
-          let left = centre - width / 2
-          const place: LabelPlace[] = []
-          if (left < 0) {
-            left = from
-            place.push('from-start')
-          } else if (left + width > field.width) {
-            left = from + column.width - width
-            place.push('from-end')
-          }
-          const right = left + width
+          const { left, right, edge } = laidOn(from, from + column.width, own.width, field.width)
+          // Its height is its own wherever it is laid across: the place moves it only along the row.
+          const box = { left, right, top: own.top - field.top, bottom: own.bottom - field.top }
           // Given way, it keeps its edge too: unseen past the card, it still widened what scrolls.
-          if (
-            kept.some(
-              (one) => left < one.right + LABEL_SPACE_PX && one.left < right + LABEL_SPACE_PX,
-            )
-          )
-            place.push('gone')
-          else kept.push({ left, right })
+          const place: LabelPlace[] = edge ? [edge === 'start' ? 'from-start' : 'from-end'] : []
+          if (kept.every((one) => apart(one, box))) kept.push(box)
+          else place.push('gone')
           if (place.length > 0) next[key] = place
         }
       }
-      if (JSON.stringify(next) !== JSON.stringify(places.value)) places.value = next
+      return next
     }
-
-    let observer: ResizeObserver | undefined
-    function observeLabels(): void {
-      observer?.disconnect()
-      placeLabels()
-      if (!area.value || typeof ResizeObserver === 'undefined') return
-      observer = new ResizeObserver(placeLabels)
-      observer.observe(area.value)
-    }
-    watch([area, () => props.bars, chosenId, locale], observeLabels, { flush: 'post' })
-    onMounted(() => {
-      observeLabels()
-      // A label measured in the fallback face is narrower or wider than in its own.
-      if ('fonts' in document) void document.fonts.ready.then(placeLabels)
-    })
-    onBeforeUnmount(() => {
-      observer?.disconnect()
-    })
+    /** The labels laid from an edge or given way, by `value:<id>` and `month:<id>`. */
+    const places = useLabelPlaces(area, placeLabels, {}, [() => props.bars, chosenId, locale])
 
     return {
       t,

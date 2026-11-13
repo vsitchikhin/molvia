@@ -192,7 +192,7 @@
           <span
             v-for="label in axisLabels"
             :key="label.key"
-            :class="['month', edges[label.key], { hidden: hidden[label.key] }]"
+            :class="['month', labels.edges[label.key], { hidden: labels.hidden[label.key] }]"
             :data-key="label.key"
             :data-x="label.x"
             :data-names="label.names"
@@ -215,7 +215,7 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, onBeforeUnmount, onMounted, ref, useId, watch } from 'vue'
+import { computed, defineComponent, ref, useId, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
@@ -238,6 +238,8 @@ import SectionCaption from '@/components/SectionCaption.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import { shortMonth, signedPercent } from '@/components/charts'
 import { useChartPointer } from '@/composables/useChartPointer'
+import { LABEL_SPACE_PX, laidOn, useLabelPlaces } from '@/composables/useLabelPlaces'
+import type { LabelEdge } from '@/composables/useLabelPlaces'
 import { calendarDay } from '@/days'
 
 type Pair = ExchangeRateChartView['pairs'][number]
@@ -259,8 +261,6 @@ const FINGER_PX = 12
 const STACK_PX = 3
 /** Half the end of the mark, in thousandths of the plot's width. */
 const TICK = 14
-/** The least room between two names under the line, in pixels: closer, they read as one word. */
-const LABEL_SPACE_PX = 8
 
 /**
  * «Курс рубля за месяц, 6 и 12 месяцев» (MOL-161, MOL-168, handoff MOL-157 05, frames 6c and 6d):
@@ -665,11 +665,6 @@ export default defineComponent({
      * Mondays, «7 сент. · 14 · 21 · 28», the month named again where it turns.
      */
     const monthsBox = ref<HTMLElement | null>(null)
-    /** The names laid from an end of the line rather than centred on their day, by key. */
-    const edges = ref<Record<string, 'start' | 'end'>>({})
-    /** The names that give way to a neighbour they would run into, by key. */
-    const hidden = ref<Record<string, true>>({})
-    let observer: ResizeObserver | undefined
 
     /**
      * A name is centred on its day, and laid from an end only when, centred, it would stand past the
@@ -681,22 +676,25 @@ export default defineComponent({
      * window holds the tail of, or today's — unless it alone names its month, which the other then
      * does not, or days of its month follow it, which would then stand under the month before
      * («29 марта · 12 · 19» in WebKit, round 5, Т); else the later. A name given way keeps its width
-     * (`visibility`), so measuring again finds the same.
+     * (`visibility`), so measuring again finds the same (`useLabelPlaces`, shared with the bars of MOL-404).
      */
-    function placeLabels(): void {
+    function placeLabels(): {
+      /** The names laid from an end of the line rather than centred on their day, by key. */
+      edges: Record<string, LabelEdge>
+      /** The names that give way to a neighbour they would run into, by key. */
+      hidden: Record<string, true>
+    } {
       const box = monthsBox.value
-      if (!box) return
+      const edgeOf: Record<string, LabelEdge> = {}
+      if (!box) return { edges: edgeOf, hidden: {} }
       const width = box.getBoundingClientRect().width
-      const edgeOf: Record<string, 'start' | 'end'> = {}
       const placed = [...box.querySelectorAll<HTMLElement>('.month')].flatMap((node) => {
         const key = node.dataset.key
         if (!key) return []
         const at = (Number(node.dataset.x) * width) / CHART_LEVEL
-        const wide = node.getBoundingClientRect().width
-        const edge = at - wide / 2 < 0 ? 'start' : at + wide / 2 > width ? 'end' : null
+        const { left, right, edge } = laidOn(at, at, node.getBoundingClientRect().width, width)
         if (edge) edgeOf[key] = edge
-        const left = edge === 'start' ? at : edge === 'end' ? at - wide : at - wide / 2
-        return [{ key, left, right: left + wide, edge, names: node.dataset.names === 'true' }]
+        return [{ key, left, right, edge, names: node.dataset.names === 'true' }]
       })
       const gone: Record<string, true> = {}
       const kept: typeof placed = []
@@ -721,21 +719,8 @@ export default defineComponent({
           kept.pop()
         }
       }
-      if (JSON.stringify(edgeOf) !== JSON.stringify(edges.value)) edges.value = edgeOf
-      if (JSON.stringify(gone) !== JSON.stringify(hidden.value)) hidden.value = gone
+      return { edges: edgeOf, hidden: gone }
     }
-
-    function observeLabels(): void {
-      observer?.disconnect()
-      placeLabels()
-      if (!monthsBox.value || typeof ResizeObserver === 'undefined') return
-      observer = new ResizeObserver(placeLabels)
-      observer.observe(monthsBox.value)
-    }
-
-    onBeforeUnmount(() => {
-      observer?.disconnect()
-    })
 
     const axisLabels = computed(() => {
       const steps = period.value?.steps ?? []
@@ -774,11 +759,7 @@ export default defineComponent({
     })
     // The names change with the period and the pair, the line with the window and the screen; the
     // face comes after the first frame and widens them.
-    watch([monthsBox, axisLabels], observeLabels, { flush: 'post', immediate: true })
-    onMounted(() => {
-      // Not every engine has it: happy-dom of the component tests has not.
-      if ('fonts' in document) void document.fonts.ready.then(placeLabels)
-    })
+    const labels = useLabelPlaces(monthsBox, placeLabels, { edges: {}, hidden: {} }, [axisLabels])
 
     const periodOptions = computed(() =>
       RATE_CHART_MONTHS.map((months) => ({
@@ -820,8 +801,7 @@ export default defineComponent({
       lone,
       axisLabels,
       monthsBox,
-      edges,
-      hidden,
+      labels,
       pairOptions,
       periodOptions,
       TICK,
