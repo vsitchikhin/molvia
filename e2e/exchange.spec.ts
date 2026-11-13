@@ -864,8 +864,8 @@ for (const [width, size] of [
     if (size === '100%') expect(await linesOf(amounts)).toBe(1)
     expect(await amounts.evaluate(sizeOverCaption)).toBeGreaterThanOrEqual(0)
     await expect(amounts.locator('.sum')).toHaveCount(2)
-    // Each sum whole, and no smaller than the caption where it alone fits its column — the arrow takes no width from
-    // either (round 3, В1).
+    // Each sum whole, and no smaller than the caption where its estimate (`figureChars`) fits the column — the arrow
+    // takes no width from either (round 3, В1).
     for (const sum of await amounts.locator('.sum').all()) {
       expect(await linesOf(sum)).toBe(1)
       expect(await sum.evaluate(sizeOverCaption)).toBeGreaterThanOrEqual(0)
@@ -998,19 +998,28 @@ for (const [width, size] of [
           ).toBe(true)
       }
       // A value wider than its column crosses its neighbours' bars, and stands over them: a bar later in the row was
-      // drawn over it, its «֏» lost (round 3, В2). What stands at any point across it is the label.
+      // drawn over it, its «֏» lost (round 3, В2). What is drawn on top at any point across it is the label — taken as
+      // a target only while measured: it has none of its own (Г1). And no box of ground of its own, which hid where the
+      // neighbours' bars end (Г2): a halo around its glyphs only.
       expect(
         await card.locator('.value .label').evaluateAll((all) =>
           all
             .filter((one) => getComputedStyle(one).visibility !== 'hidden')
             .flatMap((one) => {
+              const label = one as HTMLElement
               // Only what is in the window is found at a point.
-              one.scrollIntoView({ block: 'center' })
-              const box = one.getBoundingClientRect()
+              label.scrollIntoView({ block: 'center' })
+              const box = label.getBoundingClientRect()
               const y = (box.top + box.bottom) / 2
-              return [box.left + 2, (box.left + box.right) / 2, box.right - 2]
-                .filter((x) => document.elementFromPoint(x, y)?.closest('.label') !== one)
-                .map((x) => `${one.textContent} at ${String(Math.round(x))}`)
+              label.style.pointerEvents = 'auto'
+              const covered = [box.left + 2, (box.left + box.right) / 2, box.right - 2]
+                .filter((x) => document.elementFromPoint(x, y)?.closest('.label') !== label)
+                .map((x) => `${label.textContent} under something at ${String(Math.round(x))}`)
+              label.style.pointerEvents = ''
+              const ground = getComputedStyle(label).backgroundColor
+              return ground === 'rgba(0, 0, 0, 0)'
+                ? covered
+                : [...covered, `${label.textContent} on ${ground}`]
             }),
         ),
       ).toEqual([])
@@ -1033,6 +1042,21 @@ for (const [width, size] of [
     await choose(39)
     const year = await placed()
     expect(year.values).toContain(await card.locator('.cell.chosen .value .label').textContent())
+
+    // A tap inside the chosen value, over a neighbour's column, is the neighbour's: the value is no target (round 4,
+    // Г1 — over the bars, it took the taps of eight of them at 200 % on 320).
+    await choose(20)
+    await placed()
+    const value = card.locator('.cell.chosen .value .label')
+    await value.scrollIntoViewIfNeeded()
+    const across = await value.boundingBox()
+    const neighbour = await card.locator('.cell').nth(21).boundingBox()
+    if (!across || !neighbour) throw new Error('no value or no neighbour drawn')
+    const x = neighbour.x + neighbour.width / 2
+    expect(x).toBeGreaterThan(across.x)
+    expect(x).toBeLessThan(across.x + across.width)
+    await page.mouse.click(x, across.y + across.height / 2)
+    await expect(card.locator('.cell').nth(21)).toHaveClass(/chosen/)
 
     // Eight months, every one a candidate: the first and the last always seen.
     days = scenarios.months
