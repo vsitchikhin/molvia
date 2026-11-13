@@ -1030,7 +1030,13 @@ body, one the person has not got «Продукты», never a refusal; absent �
 not now while «Записать» is on its way, as the account under it (`NavRow`'s `inactive`). The review's
 row «Категория ›» starts on the guess of the place and the receipt (a line of the class 56, a café's service); the
 choice is a draft beside the review's (`molvia.receipt-category`), as the account's is. A repeat moves no category
-chosen since in «Траты».
+chosen since in «Траты». **A receipt waiting for «Записать» stands in that category in «Покупки» too** (MOL-406):
+one rule, `reviewCategory` — the choice while the phone knows it, else `guessedTripCategory` — for the review and its
+row. The row has no lines, so **whether it serves food is the server's word on the summary** (`food`, by
+`servesFood` over its lines' classes and its service, `receipts.classesOf`), said only of a receipt read and not
+recorded, and only to a phone that asks (`RECEIPT_FOOD_HEADER`). A receipt in work or failed keeps the sign of its
+state. **The price, named:** without the word — a server rolled back past it — the row guesses as if no food, and a
+café's receipt stands in «Продукты» there while its review says «Кафе».
 
 **The same trip sent again is the same answer, another trip a 409** — the phone names the trip, as every
 write offline (MOL-24). **The same receipt recorded before is refused** (Т-11,

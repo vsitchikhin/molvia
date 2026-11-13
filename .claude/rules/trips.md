@@ -177,6 +177,15 @@ before the finish, and from the summary in «Траты»; whole each time, 404 
 takes the earlier one's place while it waits. Mirrored under `molvia.trip-categories(-rejected)`: every build
 before it drops the kind.
 
+**A trip stands in its category's circle wherever it is a row** (MOL-406, owner, 13.11.2026: «иконки должны быть из
+категории, даже если покупка записана сканом»): its icon in its colour (`tripLook`), «Продукты»'s where it names
+none — on «Траты», an account's operations and «Записаны» of «Покупки» alike, typed by hand or from a receipt. The
+row of «Записаны» learns it from the history, **only by asking** (`TRIP_HISTORY_CATEGORY_HEADER`): an installed app of
+an earlier build reads a row strictly, so the server leaves the key out for it. **Not known is the cart**: an answer
+of a server before it, a row the phone made, a cache of a build before — never a guess of «Продукты». A write landing
+on a recorded trip keeps the row's category (`apply`): a trip view carries none. **The price, named:** a category
+changed in «Траты» reaches the row of «Записаны» with the next read of the history.
+
 ## «Брали здесь в прошлый раз» (MOL-209)
 
 **`GET /trips/:tripId/previous-items` and `TripRepository.previousPurchases` are read by «Что взяли?»**, and
