@@ -3,8 +3,10 @@ import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
-import { standAt, stillIn, topOf } from './scroll'
+import { yerevanDay } from './days'
+import { facesIn, standAt, stillIn, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
+import { textAt } from './text-size'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
 
@@ -755,13 +757,6 @@ test('the month of the rate by days: the switch and the page stay put, the addre
   await expect(periods).toBeVisible()
 })
 
-/** A day in Yerevan, `back` days before today: the bars are the last twelve months' (MOL-152). */
-function dayBefore(back: number): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
-    new Date(Date.now() - back * 24 * 60 * 60 * 1000),
-  )
-}
-
 /** How many lines a text stands on: one box a line of it. */
 function linesOf(element: Locator): Promise<number> {
   return element.evaluate((box) => {
@@ -792,15 +787,7 @@ for (const [width, size] of [
   }) => {
     test.setTimeout(60_000)
     await page.setViewportSize({ width, height: 800 })
-    if (size !== '100%')
-      // The system's size as `large-text.spec` gives it: the root's, which every size of the app is in.
-      await page.addInitScript((value) => {
-        document.addEventListener('DOMContentLoaded', () => {
-          const style = document.createElement('style')
-          style.textContent = `html { font-size: ${value} }`
-          document.head.append(style)
-        })
-      }, size)
+    await textAt(page, size)
     await signedIn(page)
     const headers = await asBrowser(page)
     for (let index = 0; index < 41; index += 1) {
@@ -810,7 +797,7 @@ for (const [width, size] of [
           id: randomUUID(),
           given: { amount: '139.86', currency: 'USD' },
           received: { amount: '54000', currency: 'AMD' },
-          exchangedOn: dayBefore(330 - index * 8),
+          exchangedOn: yerevanDay(index * 8 - 330),
           note: index === 20 ? LONG_NOTE : index === 30 ? ONE_WORD : 'Ардшинбанк',
         },
       })
@@ -870,9 +857,143 @@ for (const [width, size] of [
       await within()
     }
 
-    // The list under it: «отдал → получил» on one line, the row within the phone (В-7 «б»).
+    // The list under it: «отдал → получил» on one line at the phone's own size (В-7 «б»), never under the caption —
+    // at 200 % it wraps between its sums instead, each whole (adversarial А4); the row within the phone.
     const row = page.locator('.rows button.list-row').first()
-    expect(await linesOf(row.locator('.amounts'))).toBe(1)
+    const amounts = row.locator('.amounts')
+    if (size === '100%') expect(await linesOf(amounts)).toBe(1)
+    expect(await amounts.evaluate(sizeOverCaption)).toBeGreaterThanOrEqual(0)
+    await expect(amounts.locator('.sum')).toHaveCount(2)
+    for (const sum of await amounts.locator('.sum').all()) expect(await linesOf(sum)).toBe(1)
     const box = await row.boundingBox()
     expect((box?.x ?? 0) + (box?.width ?? 0)).toBeLessThanOrEqual(width)
+  })
+
+/** How far a text's size stands over `--text-caption` at the root's size now, in px. */
+function sizeOverCaption(element: Element): number {
+  const probe = document.createElement('span')
+  probe.style.fontSize = 'var(--text-caption)'
+  document.body.append(probe)
+  const caption = parseFloat(getComputedStyle(probe).fontSize)
+  probe.remove()
+  return parseFloat(getComputedStyle(element).fontSize) - caption
+}
+
+/**
+ * Bars measured against the market, as the server lays them (`vsMarketBars`), put into the answer on its way: this run
+ * has no market of its own. Every one worse than the market, the last the furthest — the owner's year.
+ */
+function marketBars(days: readonly string[]) {
+  const differences = days.map((_, index) => 31_240 + index * 10_244)
+  const furthest = Math.max(...differences)
+  return days.map((day, index) => {
+    const minor = differences[index] ?? 0
+    return {
+      id: `a0000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+      exchangedOn: day,
+      place: 'Ардшинбанк',
+      difference: { amount: `-${(minor / 100).toFixed(2)}`, currency: 'AMD' },
+      percent: -150,
+      sign: -1,
+      level: -Math.round((minor * 1000) / furthest),
+    }
+  })
+}
+
+/** The labels of a row of the card a person sees — a label given way keeps its box, unseen — left to right. */
+const seenLabels = (labels: Locator) =>
+  labels.evaluateAll((all) =>
+    all
+      .filter((one) => getComputedStyle(one).visibility !== 'hidden')
+      .map((one) => {
+        const box = one.getBoundingClientRect()
+        return { text: one.textContent, left: box.left, right: box.right }
+      })
+      .sort((a, b) => a.left - b.left),
+  )
+
+/**
+ * The labels of measured bars (MOL-404, review №1–2, adversarial А1–А3): a label never wraps, so wider than its column
+ * it stood over its neighbour — the chosen penultimate's value on the furthest's, eight months at 150 % and 200 %, six
+ * values on 320 — and a column in from the edge, past the card. Whatever is seen stands apart and within the card.
+ */
+for (const [width, size] of [
+  [390, '100%'],
+  [320, '100%'],
+  [320, '150%'],
+  [320, '200%'],
+] as const)
+  test(`the labels of measured bars never run into each other nor past the card — ${String(width)} at ${size}`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000)
+    await page.setViewportSize({ width, height: 800 })
+    await textAt(page, size)
+    await signedIn(page)
+    await exchangeOfFebruary(page)
+    const scenarios = {
+      year: Array.from({ length: 41 }, (_, index) => yerevanDay(index * 8 - 330)),
+      // A month apart and never two in one: 31 days on.
+      months: Array.from({ length: 8 }, (_, index) => yerevanDay(index * 31 - 220)),
+      values: Array.from({ length: 6 }, (_, index) => yerevanDay(index * 31 - 158)),
+    }
+    let days: readonly string[] = []
+    await page.route('**/api/exchanges', async (route) => {
+      if (route.request().method() !== 'GET') return route.continue()
+      const response = await route.fetch()
+      const json = (await response.json()) as Record<string, unknown>
+      json.bars = marketBars(days)
+      await route.fulfill({ response, json })
+    })
+
+    const card = page.locator('.vs-market')
+    const apart = async () => {
+      await facesIn(page)
+      await stillIn(card)
+      const box = await card.boundingBox()
+      const left = box?.x ?? NaN
+      const right = left + (box?.width ?? NaN)
+      const rows = {
+        values: await seenLabels(card.locator('.value .label')),
+        months: await seenLabels(card.locator('.month .label')),
+      }
+      for (const labels of Object.values(rows)) {
+        expect(labels.length).toBeGreaterThan(0)
+        for (const [index, label] of labels.entries()) {
+          expect(label.left).toBeGreaterThanOrEqual(left)
+          expect(label.right).toBeLessThanOrEqual(right)
+          const next = labels[index + 1]
+          if (next)
+            expect(label.right, `${label.text} | ${next.text}`).toBeLessThanOrEqual(next.left)
+        }
+      }
+      expect(await card.evaluate((one) => one.scrollWidth - one.clientWidth)).toBe(0)
+      return rows
+    }
+
+    // A year, the penultimate chosen, beside the furthest: the chosen one's value is seen, inside the card.
+    days = scenarios.year
+    await page.goto('/money/exchange')
+    await expect(card.locator('.cell')).toHaveCount(41)
+    await card.locator('.cell').nth(39).locator('input').focus()
+    await page.keyboard.press('Space')
+    await expect(card.locator('.cell').nth(39)).toHaveClass(/chosen/)
+    const year = await apart()
+    const chosen = (await card.locator('.cell.chosen .value .label').textContent()) ?? ''
+    expect(year.values.map(({ text }) => text)).toContain(chosen)
+
+    // Eight months, every one a candidate: the first and the last always seen.
+    days = scenarios.months
+    await page.reload()
+    await expect(card.locator('.cell')).toHaveCount(8)
+    const months = await apart()
+    const named = await card.locator('.month .label').allTextContents()
+    expect(months.months.at(0)?.text).toBe(named.at(0))
+    expect(months.months.at(-1)?.text).toBe(named.at(-1))
+
+    // Six values, every one a candidate.
+    days = scenarios.values
+    await page.reload()
+    await expect(card.locator('.cell')).toHaveCount(6)
+    await apart()
   })
