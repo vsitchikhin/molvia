@@ -2154,7 +2154,8 @@ describe('«Покупки» ask for a trip’s category and a receipt’s food 
   it('names both headers, so the server sends `categoryId` and `food` to this build only', async () => {
     const seen = new Map<string, Headers>()
     const fetch = (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-      seen.set(new URL(String(input)).pathname, new Headers(init?.headers))
+      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+      seen.set(new URL(url).pathname, new Headers(init?.headers))
       return Promise.resolve(
         new Response(JSON.stringify({ code: ERROR.NOT_FOUND }), {
           status: 404,
