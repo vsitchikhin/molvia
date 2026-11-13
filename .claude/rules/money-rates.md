@@ -773,7 +773,9 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   furthest's, then by size — so a choice hides none as a finger slides along them (Б2); past six only the chosen
   bar's and the furthest's are labelled, the chosen first. The months from the edges, then from the left, so a choice
   moves none. **The measure, the edge and the room between labels are one composable with the line of the rate**
-  (`useLabelPlaces`, review №8); which label gives way is each chart's own. Past eight bars only the first month and the last are named (В-2 «а»: the chosen bar's day is on its plate) —
+  (`useLabelPlaces`, review №8); which label gives way is each chart's own. **A value stands over the bars, on the
+  card's ground** (`z-index` in the field's own stacking context): wider than its column at large text it crosses its
+  neighbours' bars, and a bar later in the row was drawn over it — «−3 456 ֏» lost its «֏» at 200 % (round 3, В2). Past eight bars only the first month and the last are named (В-2 «а»: the chosen bar's day is on its plate) —
   a column of 8 px broke «нояб» a letter a line. The price: a value or a month may be unseen — the plate and the
   bar's name say it. The field is one column of the card's
   width (`minmax(0, 1fr)`): as `auto`, forty-one frames of «без сравнения» at 14 px stood it 590 px wide on 320; a
@@ -793,9 +795,11 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   (`figure-fit`, MOL-404, В-7 «б»): wrapped at the arrow, a row of the owner's 41 was three to five lines. **Never
   under `--text-caption`** (`$least`, adversarial А4: at 200 % the words' column is the narrowest and the line stood at
   13 px under a caption of 22; a million roubles at 9,5 px on 390): there it wraps between its two sums, each whole
-  (`amountPartsOf`, one cut for the row and the plate), the arrow with the second — alone on a line it read as nothing
-  (Б3). The price: a sum alone wider than the words' column still shrinks, under the caption too — a sum never breaks
-  (MOL-321), and 13 812 345,60 ֏ at 200 % on 320 is wider than the column (round 2, Б3). **The
+  (`amountPartsOf`, one cut for the row and the plate). **The arrow is no sum's**: glued to either it took its width
+  from that sum, shrunk under the caption though the sum alone fitted (rounds 2–3, Б3, В1); on its own it stands beside
+  whichever sum it fits beside. The prices: the arrow stands on a line of its own where it fits beside neither — two
+  sums each near the column's width — and a sum alone wider than the words' column still shrinks, under the caption
+  too: a sum never breaks (MOL-321), and 13 812 345,60 ֏ at 200 % on 320 is wider than the column (round 2, Б3). **The
   exchange offices still to come are said once, over the list** (`list.pending_note`), never a tag on every recent
   row.
 - **«Удалить обмен?» stays** (Р-16, В-5): the handoff took it away on the word that «Перевод» removes at once, which
