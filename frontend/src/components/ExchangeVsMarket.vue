@@ -187,12 +187,12 @@ import {
 } from '@/composables/useExchangeWords'
 import type { AmountPart } from '@/composables/useExchangeWords'
 import { apart, laidOn, useLabelPlaces } from '@/composables/useLabelPlaces'
-import type { LabelBox } from '@/composables/useLabelPlaces'
+import type { LabelBox, LabelEdge } from '@/composables/useLabelPlaces'
 import { calendarDay, calendarDayOfAnyYear } from '@/days'
 
 type Bar = NonNullable<ExchangesResponse['bars']>[number]
 /** A label laid from its column's edge inward, or given way to a neighbour (MOL-404). */
-type LabelPlace = 'from-start' | 'from-end' | 'gone'
+type LabelPlace = LabelEdge | 'gone'
 
 /** Every value over the bars up to six (handoff 02), past it the chosen bar's and the furthest's — those with room. */
 const LABELLED_AT_MOST = 6
@@ -413,7 +413,7 @@ export default defineComponent({
           // Its height is its own wherever it is laid across: the place moves it only along the row.
           const box = { left, right, top: own.top - field.top, bottom: own.bottom - field.top }
           // Given way, it keeps its edge too: unseen past the card, it still widened what scrolls.
-          const place: LabelPlace[] = edge ? [edge === 'start' ? 'from-start' : 'from-end'] : []
+          const place: LabelPlace[] = edge ? [edge] : []
           if (kept.every((one) => apart(one, box))) kept.push(box)
           else place.push('gone')
           if (place.length > 0) next[key] = place
@@ -570,6 +570,9 @@ $flat-height: 5rem;
 /* The whole field is the target (`useChartPointer`); `pan-y` leaves the page its scroll. */
 .plot {
   display: flex;
+
+  /* A stacking context of its own: the values' z-index lifts them over the bars, never over the page (BarChart's). */
+  isolation: isolate;
   flex-direction: row;
   height: 11rem;
   touch-action: pan-y;
@@ -668,11 +671,11 @@ $flat-height: 5rem;
   justify-content: center;
   white-space: nowrap;
 
-  &.from-start {
+  &.start {
     justify-content: flex-start;
   }
 
-  &.from-end {
+  &.end {
     justify-content: flex-end;
   }
 
@@ -699,6 +702,16 @@ $flat-height: 5rem;
   .even &,
   .none & {
     color: var(--text-muted);
+  }
+
+  /* Over the bars, on the card's own ground: wider than its column at large text, a value crosses its neighbours, and
+     a bar later in the row was drawn over it — «−3 456 ֏» lost its «֏» at 200 % (round 3, В2). The bar breaks under it. */
+  .label {
+    position: relative;
+    z-index: 1;
+    border-radius: var(--radius-mark);
+    background: var(--surface);
+    box-shadow: 0 0 0 2px var(--surface);
   }
 }
 
