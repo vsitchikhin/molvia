@@ -86,11 +86,28 @@ export interface ExplainedReading {
   readonly receipt: ReceiptReason | null
 }
 
+/**
+ * Every line copied with a sum of its own, above nought, and none put right by the font's swaps (MOL-310, round 2): a
+ * sum the swaps chose was chosen to meet the total, so it vouches for nothing.
+ */
+function sumsCopied(lines: readonly ReceiptTextLine[]): boolean {
+  return (
+    lines.length > 0 &&
+    lines.every(
+      (line) => line.sumHundredths !== null && line.sumHundredths > 0 && line.repaired !== true,
+    )
+  )
+}
+
 /** `verifiedReading`, with the reasons of what it did not show (MOL-309). */
 export function explainedReading(text: ReceiptText, { byModel = false } = {}): ExplainedReading {
   const receipt = notWhole(text)
   const proven = receipt === null
-  const checked = text.lines.map((line) => verifiedLine(line, proven, text.layout, byModel))
+  // a model's sums as copied that meet the total shown — on a receipt not proven whole, one two places print — vouch
+  // for every sum (MOL-310, round 2; owner, 13.11.2026: «улучшать чтение, а не стирать прочитанное»): a line whose
+  // quantity or price does not hold keeps its sum alone
+  const summed = byModel && !proven && sumsMeet(text)
+  const checked = text.lines.map((line) => verifiedLine(line, proven, text.layout, byModel, summed))
   return {
     shown: { ...text, lines: checked.map((one) => one.line), balanced: proven },
     lines: checked.map((one) => one.reason),
@@ -113,6 +130,13 @@ function notWhole(text: ReceiptText): ReceiptReason | null {
   return sum < total ? 'lines_lost' : 'lines_over'
 }
 
+function sumsMeet(text: ReceiptText): boolean {
+  if (text.totalHundredths === null || !sumsCopied(text.lines)) return false
+  if (text.lines.some((line) => line.remembered === 'doubted')) return false
+  const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
+  return sum === linesTotalHundredths(text, text.totalHundredths)
+}
+
 interface CheckedLine {
   readonly line: ReceiptTextLine
   readonly reason: ReceiptLineReason | null
@@ -123,10 +147,15 @@ function verifiedLine(
   proven: boolean,
   layout: ReceiptLayout,
   byModel: boolean,
+  /** The model's sums as copied meet the total shown: each sum is vouched for, its quantity and price are not. */
+  summed = false,
 ): CheckedLine {
   const { quantityMilli: qty, priceHundredths: price, sumHundredths: sum } = line
   const discount = line.discountHundredths ?? 0
-  const emptied = (reason: ReceiptLineReason): CheckedLine => ({ line: blank(line), reason })
+  const emptied = (reason: ReceiptLineReason): CheckedLine =>
+    summed && sum !== null && sum > 0
+      ? { line: { ...blank(line), sumHundredths: sum }, reason }
+      : { line: blank(line), reason }
   // a line put right by the font's swaps stands only on the receipt it proved whole (MOL-290); one the shop's
   // memory put right, on its own word; one it doubts, never (MOL-291, owner's В-2 «б»)
   if (line.remembered === 'doubted') return emptied('doubted')

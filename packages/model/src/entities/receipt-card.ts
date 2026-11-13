@@ -194,7 +194,8 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
     service: 'Հավելավճար|Սպասարկում|Обслуживание|Service',
     // «ՎՃԱՐՄԱՆ», to be paid — the word alone on its row: the model copies the payment «Վճարված է Առձեռն» as «Վճարման է
     // Առնեմն», which is the payment's place (adversarial А1); «Всего», «Итого к оплате», «Итого с обслуживанием»
-    billTotal: '^[\\s:=/-]*Վճարման[\\s:=/-]*$|Всего|Итого|К оплате',
+    // and «ԵՆԹԱԿԱ Է ՎՃԱՐՄԱՆ», subject to payment, a shop's till (MOL-310, round 2)
+    billTotal: '^[\\s:=/-]*Վճարման[\\s:=/-]*$|Ենթակա\\s+է\\s+վճարման|Всего|Итого|К оплате',
     slipTerminal: '\\b(?:TID|MID|RRN)\\b',
     // «Գումար:», the amount — never «Գումար/Զչ», a fiscal till's column, since a slip has no lines
     slipAmount: 'Գումար|Amount|Сумма',
