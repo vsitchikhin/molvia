@@ -59,7 +59,11 @@
             />
             <span class="half up" :style="{ height: `${upShare}%` }" aria-hidden="true">
               <template v-if="bar.level > 0 || bar.sign !== -1">
-                <span v-if="labelled(bar)" class="value"
+                <span
+                  v-if="labelled(bar)"
+                  class="value"
+                  :class="places[`value:${bar.id}`]"
+                  :data-label="`value:${bar.id}`"
                   ><span class="label">{{ valueOf(bar) }}</span></span
                 >
                 <span class="bar" :style="barStyle(bar)"></span>
@@ -68,19 +72,24 @@
             <span class="half down" aria-hidden="true">
               <template v-if="bar.level < 0 || bar.sign === -1">
                 <span class="bar" :style="barStyle(bar)"></span>
-                <span v-if="labelled(bar)" class="value"
+                <span
+                  v-if="labelled(bar)"
+                  class="value"
+                  :class="places[`value:${bar.id}`]"
+                  :data-label="`value:${bar.id}`"
                   ><span class="label">{{ valueOf(bar) }}</span></span
                 >
               </template>
             </span>
           </label>
         </div>
-        <p class="months" aria-hidden="true">
+        <p ref="monthsRow" class="months" aria-hidden="true">
           <span
             v-for="bar in bars"
             :key="bar.id"
             class="month"
-            :class="{ chosen: bar.id === chosenId }"
+            :class="[places[`month:${bar.id}`], { chosen: bar.id === chosenId }]"
+            :data-label="monthLabelled(bar) ? `month:${bar.id}` : undefined"
             ><span v-if="monthLabelled(bar)" class="label">{{
               monthOf(bar.exchangedOn)
             }}</span></span
@@ -155,34 +164,49 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, markRaw, ref, useId } from 'vue'
+import {
+  computed,
+  defineComponent,
+  markRaw,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  useId,
+  watch,
+} from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { CHART_LEVEL, decimalFromMinor, formatMoney } from '@molvia/model'
+import { CHART_LEVEL, decimalFromMinor } from '@molvia/model'
 import type { ExchangeLossesView, ExchangeView, ExchangesResponse, Money } from '@molvia/model'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import AppCard from '@/components/AppCard.vue'
 import { signedAmount } from '@/components/accounts'
 import { signedPercent } from '@/components/charts'
-import { aroundFigure, figureChars } from '@/components/figure'
+import { figureChars } from '@/components/figure'
 import { roundsToNought } from '@/components/spending'
 import ScreenState from '@/components/ScreenState.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { useChartPointer } from '@/composables/useChartPointer'
 import {
   toneOfVerdict,
+  useExchangeWords,
   VERDICT_WORD,
   verdictKind,
   verdictOfMoney,
 } from '@/composables/useExchangeWords'
+import type { AmountPart } from '@/composables/useExchangeWords'
 import { calendarDay, calendarDayOfAnyYear } from '@/days'
 
 type Bar = NonNullable<ExchangesResponse['bars']>[number]
+/** A label laid from its column's edge inward, or given way to a neighbour (MOL-404). */
+type LabelPlace = 'from-start' | 'from-end' | 'gone'
 
-/** Values over the bars only while each has room for one (handoff 02). */
+/** Every value over the bars up to six (handoff 02), past it the chosen bar's and the furthest's — those with room. */
 const LABELLED_AT_MOST = 6
-/** Months under the bars only while they do not run into each other. */
+/** Every month under the bars up to eight, past it the first and the last — those with room (MOL-404, В-2 «а»). */
 const MONTHS_AT_MOST = 8
+/** The least room between two labels side by side, as on the line of the rate. */
+const LABEL_SPACE_PX = 8
 /** From ten thousand a value over a bar is «+18,8 тыс». */
 const COMPACT_FROM = 10_000
 /** The least a bar off the line is drawn, so a small difference is still seen. */
@@ -216,7 +240,9 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const { t, locale } = useI18n()
+    const { amountPartsOf } = useExchangeWords()
     const area = ref<HTMLElement | null>(null)
+    const monthsRow = ref<HTMLElement | null>(null)
 
     const toneOf = (money: Money) => toneOfVerdict(verdictOfMoney(money))
     const kindOf = (bar: Bar) => verdictKind(bar.sign)
@@ -332,21 +358,10 @@ export default defineComponent({
     const exchangeOf = (bar: Bar) => props.exchanges.find(({ id }) => id === bar.id) ?? null
     const dayOf = (bar: Bar) => calendarDayOfAnyYear(bar.exchangedOn, locale.value, props.today)
     const whereOf = (bar: Bar) => `${dayOf(bar)} · ${bar.place ?? t('exchange.vs_market.no_place')}`
-    /** «Отдал → получил», cut around its two sums (`aroundFigure`): a sum stands whole (MOL-321). */
-    function amountsOf(bar: Bar): { text: string; sum: boolean }[] {
+    /** «Отдал → получил», cut around its two sums: a sum stands whole (MOL-321). */
+    function amountsOf(bar: Bar): readonly AmountPart[] {
       const exchange = exchangeOf(bar)
-      if (!exchange) return []
-      const given = formatMoney(exchange.given, locale.value)
-      const received = formatMoney(exchange.received, locale.value)
-      const first = aroundFigure(t('exchange.row_amounts', { given, received }), given)
-      const second = aroundFigure(first.after, received)
-      return [
-        { text: first.before, sum: false },
-        { text: first.figure, sum: true },
-        { text: second.before, sum: false },
-        { text: second.figure, sum: true },
-        { text: second.after, sum: false },
-      ].filter((part) => part.text !== '')
+      return exchange ? amountPartsOf(exchange) : []
     }
     const diffOf = (bar: Bar) => (bar.difference ? amountOf(bar.difference) : '')
     function wordOf(bar: Bar): string {
@@ -362,10 +377,94 @@ export default defineComponent({
 
     const widthOf = (level: number) => `${String((Math.abs(level) * 100) / CHART_LEVEL)}%`
 
+    /** The labels laid from an edge or given way, by `value:<id>` and `month:<id>`. */
+    const places = ref<Record<string, LabelPlace[]>>({})
+    /**
+     * Where each label stands, measured (MOL-404, review №1–2, adversarial А1–А3): a label never wraps, so wider than
+     * its column it stood over its neighbours and, a column in from the edge, past the card — by the count of bars
+     * alone, eight months at 200 % ran into each other, and the chosen value beside the furthest lay on it. A label is
+     * centred on its column while that keeps it in the field, else laid from its column's edge inward; of two that
+     * would run into each other the one later in the order gives way — the values the chosen bar's first, then the
+     * furthest's, then by their size; the months the first, the last, then from the left, so a choice moves none.
+     * A label given way keeps its width (`visibility`) and its edge, so measuring again finds the same.
+     */
+    function placeLabels(): void {
+      const next: Record<string, LabelPlace[]> = {}
+      const byLevel = [...props.bars].sort((a, b) => Math.abs(b.level) - Math.abs(a.level))
+      const values = [chosenBar.value, widest.value, ...byLevel]
+      const months = [props.bars[0], props.bars.at(-1), ...props.bars]
+      for (const [row, kind, order] of [
+        [area.value, 'value', values],
+        [monthsRow.value, 'month', months],
+      ] as const) {
+        if (!row) continue
+        const field = row.getBoundingClientRect()
+        const nodes = new Map(
+          [...row.querySelectorAll<HTMLElement>('[data-label]')].map((node) => [
+            node.dataset.label,
+            node,
+          ]),
+        )
+        const kept: { left: number; right: number }[] = []
+        const seen = new Set<string>()
+        for (const bar of order) {
+          const key = `${kind}:${bar?.id ?? ''}`
+          const node = nodes.get(key)
+          const label = node?.querySelector('.label')
+          if (!node || !label || seen.has(key)) continue
+          seen.add(key)
+          const column = node.getBoundingClientRect()
+          const width = label.getBoundingClientRect().width
+          const from = column.left - field.left
+          const centre = from + column.width / 2
+          let left = centre - width / 2
+          const place: LabelPlace[] = []
+          if (left < 0) {
+            left = from
+            place.push('from-start')
+          } else if (left + width > field.width) {
+            left = from + column.width - width
+            place.push('from-end')
+          }
+          const right = left + width
+          // Given way, it keeps its edge too: unseen past the card, it still widened what scrolls.
+          if (
+            kept.some(
+              (one) => left < one.right + LABEL_SPACE_PX && one.left < right + LABEL_SPACE_PX,
+            )
+          )
+            place.push('gone')
+          else kept.push({ left, right })
+          if (place.length > 0) next[key] = place
+        }
+      }
+      if (JSON.stringify(next) !== JSON.stringify(places.value)) places.value = next
+    }
+
+    let observer: ResizeObserver | undefined
+    function observeLabels(): void {
+      observer?.disconnect()
+      placeLabels()
+      if (!area.value || typeof ResizeObserver === 'undefined') return
+      observer = new ResizeObserver(placeLabels)
+      observer.observe(area.value)
+    }
+    watch([area, () => props.bars, chosenId, locale], observeLabels, { flush: 'post' })
+    onMounted(() => {
+      observeLabels()
+      // A label measured in the fallback face is narrower or wider than in its own.
+      if ('fonts' in document) void document.fonts.ready.then(placeLabels)
+    })
+    onBeforeUnmount(() => {
+      observer?.disconnect()
+    })
+
     return {
       t,
       locale,
       area,
+      monthsRow,
+      places,
       name: useId(),
       headingId: useId(),
       IconSwap: markRaw(IconSwap),
@@ -500,6 +599,9 @@ export default defineComponent({
   @include visually-hidden;
 }
 
+/* Every bar on the line, none measured: the frames and their «?», no height to give. */
+$flat-height: 5rem;
+
 /* The whole field is the target (`useChartPointer`); `pan-y` leaves the page its scroll. */
 .plot {
   display: flex;
@@ -507,9 +609,8 @@ export default defineComponent({
   height: 11rem;
   touch-action: pan-y;
 
-  /* Every bar on the line, none measured: the frames and their «?», no height to give. */
   &.flat {
-    height: 5rem;
+    height: $flat-height;
   }
 }
 
@@ -520,7 +621,7 @@ export default defineComponent({
 }
 
 .flat.none-down {
-  height: calc(5rem - var(--space-8));
+  height: calc(#{$flat-height} - var(--space-8));
 }
 
 /* The room over and under the bars is the values': a bar as tall as its half leaves its value there. */
@@ -592,29 +693,27 @@ export default defineComponent({
 
 /*
  * A label of a bar — its value, its month — never wraps: a column of 8 px broke «нояб» a letter a line
- * (MOL-404). It stands in a row as wide as its column, centred while it fits; wider, the first column's
- * runs on from the card's left edge, the last's back from its right, a middle one over both sides — the
- * auto margins give way to `justify-content` once there is no room left.
+ * (MOL-404). It stands in a row as wide as its column, centred on it — over both sides where it is wider —
+ * and laid from the column's edge inward where centred it would stand past the field, or unseen where it
+ * would run into a neighbour (`placeLabels`, measured).
  */
 .value,
 .month {
   display: flex;
   justify-content: center;
   white-space: nowrap;
-}
 
-.cell:first-child .value,
-.month:first-child {
-  justify-content: flex-start;
-}
+  &.from-start {
+    justify-content: flex-start;
+  }
 
-.cell:last-child .value,
-.month:last-child {
-  justify-content: flex-end;
-}
+  &.from-end {
+    justify-content: flex-end;
+  }
 
-.label {
-  margin-inline: auto;
+  &.gone .label {
+    visibility: hidden;
+  }
 }
 
 .value {
@@ -691,6 +790,10 @@ export default defineComponent({
   font-variant-numeric: tabular-nums;
 }
 
+.sum {
+  white-space: nowrap;
+}
+
 .plate-word {
   font-size: var(--text-footnote);
   text-align: right;
@@ -710,11 +813,9 @@ export default defineComponent({
     padding-inline: var(--space-3);
   }
 
-  /* A sum whole, shrunk to the plate where even it alone is wider (`figure-fit`, MOL-321). */
+  /* A sum shrunk to the plate where even it alone is wider (`figure-fit`, MOL-321). */
   .sum {
     @include figure-fit(1em, $less: calc(2 * var(--space-3)));
-
-    white-space: nowrap;
   }
 
   .plate-diff,

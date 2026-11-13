@@ -131,6 +131,7 @@ describe('ExchangeVsMarket', () => {
     expect(card.emitted('update:chosen')).toEqual([['a']])
     await card.setProps({ chosen: 'a' })
     expect(card.get('.plate .plate-amounts').text()).toBe('₽30,000 → ֏146,100')
+    expect(card.findAll('.plate .sum').map((sum) => sum.text())).toEqual(['₽30,000', '֏146,100'])
     // The bar already chosen, chosen again, is told too: the line of the rate goes back to it (А4).
     await radios()[0]?.trigger('click')
     expect(card.emitted('update:chosen')).toEqual([['a'], ['a']])
