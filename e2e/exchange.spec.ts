@@ -883,39 +883,56 @@ function sizeOverCaption(element: Element): number {
  * Bars measured against the market, as the server lays them (`vsMarketBars`), put into the answer on its way: this run
  * has no market of its own. Every one worse than the market, the last the furthest — the owner's year.
  */
-function marketBars(days: readonly string[]) {
+function marketBars(days: readonly string[], mixed = false) {
   const differences = days.map((_, index) => 31_240 + index * 10_244)
   const furthest = Math.max(...differences)
   return days.map((day, index) => {
     const minor = differences[index] ?? 0
+    // Mixed: better and worse than the market by turns, the furthest worse.
+    const sign = mixed && (days.length - 1 - index) % 2 === 1 ? 1 : -1
     return {
       id: `a0000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
       exchangedOn: day,
       place: 'Ардшинбанк',
-      difference: { amount: `-${(minor / 100).toFixed(2)}`, currency: 'AMD' },
-      percent: -150,
-      sign: -1,
-      level: -Math.round((minor * 1000) / furthest),
+      difference: { amount: `${sign < 0 ? '-' : ''}${(minor / 100).toFixed(2)}`, currency: 'AMD' },
+      percent: sign * 150,
+      sign,
+      level: sign * Math.round((minor * 1000) / furthest),
     }
   })
 }
 
-/** The labels of a row of the card a person sees — a label given way keeps its box, unseen — left to right. */
-const seenLabels = (labels: Locator) =>
+/** The labels of a row of the card, each with its box — one given way keeps it, unseen. */
+const labelsOf = (labels: Locator) =>
   labels.evaluateAll((all) =>
-    all
-      .filter((one) => getComputedStyle(one).visibility !== 'hidden')
-      .map((one) => {
-        const box = one.getBoundingClientRect()
-        return { text: one.textContent, left: box.left, right: box.right }
-      })
-      .sort((a, b) => a.left - b.left),
+    all.map((one) => {
+      const box = one.getBoundingClientRect()
+      return {
+        text: one.textContent,
+        seen: getComputedStyle(one).visibility !== 'hidden',
+        left: box.left,
+        right: box.right,
+        top: box.top,
+        bottom: box.bottom,
+      }
+    }),
   )
+
+type LabelBox = Awaited<ReturnType<typeof labelsOf>>[number]
+
+/** Two labels stand `room` apart, across or one over the other. */
+const apartBy = (a: LabelBox, b: LabelBox, room: number) =>
+  a.right + room <= b.left ||
+  b.right + room <= a.left ||
+  a.bottom + room <= b.top ||
+  b.bottom + room <= a.top
 
 /**
  * The labels of measured bars (MOL-404, review №1–2, adversarial А1–А3): a label never wraps, so wider than its column
  * it stood over its neighbour — the chosen penultimate's value on the furthest's, eight months at 150 % and 200 %, six
- * values on 320 — and a column in from the edge, past the card. Whatever is seen stands apart and within the card.
+ * values on 320 — and a column in from the edge, past the card. Whatever is seen stands apart and within the card; a
+ * label is hidden only where it would stand on one seen — a value over the line and one under it are not neighbours
+ * (round 2, Б1) — and among six a choice hides none (Б2).
  */
 for (const [width, size] of [
   [390, '100%'],
@@ -938,62 +955,83 @@ for (const [width, size] of [
       values: Array.from({ length: 6 }, (_, index) => yerevanDay(index * 31 - 158)),
     }
     let days: readonly string[] = []
+    let mixed = false
     await page.route('**/api/exchanges', async (route) => {
       if (route.request().method() !== 'GET') return route.continue()
       const response = await route.fetch()
       const json = (await response.json()) as Record<string, unknown>
-      json.bars = marketBars(days)
+      json.bars = marketBars(days, mixed)
       await route.fulfill({ response, json })
     })
 
     const card = page.locator('.vs-market')
-    const apart = async () => {
+    const placed = async () => {
       await facesIn(page)
       await stillIn(card)
       const box = await card.boundingBox()
       const left = box?.x ?? NaN
       const right = left + (box?.width ?? NaN)
       const rows = {
-        values: await seenLabels(card.locator('.value .label')),
-        months: await seenLabels(card.locator('.month .label')),
+        values: await labelsOf(card.locator('.value .label')),
+        months: await labelsOf(card.locator('.month .label')),
       }
       for (const labels of Object.values(rows)) {
-        expect(labels.length).toBeGreaterThan(0)
-        for (const [index, label] of labels.entries()) {
+        const seen = labels.filter((one) => one.seen)
+        expect(seen.length).toBeGreaterThan(0)
+        for (const label of seen) {
           expect(label.left).toBeGreaterThanOrEqual(left)
           expect(label.right).toBeLessThanOrEqual(right)
-          const next = labels[index + 1]
-          if (next)
-            expect(label.right, `${label.text} | ${next.text}`).toBeLessThanOrEqual(next.left)
+          for (const other of seen)
+            if (other !== label)
+              expect(apartBy(label, other, 0), `${label.text} | ${other.text}`).toBe(true)
         }
+        // Hidden only in the way of one seen, the room between labels counted (`LABEL_SPACE_PX`).
+        for (const label of labels.filter((one) => !one.seen))
+          expect(
+            seen.some((other) => !apartBy(label, other, 8)),
+            label.text,
+          ).toBe(true)
       }
       expect(await card.evaluate((one) => one.scrollWidth - one.clientWidth)).toBe(0)
-      return rows
+      return {
+        values: rows.values.filter((one) => one.seen).map(({ text }) => text),
+        months: rows.months.filter((one) => one.seen).map(({ text }) => text),
+      }
+    }
+    const choose = async (index: number) => {
+      await card.locator('.cell').nth(index).locator('input').focus()
+      await page.keyboard.press('Space')
+      await expect(card.locator('.cell').nth(index)).toHaveClass(/chosen/)
     }
 
     // A year, the penultimate chosen, beside the furthest: the chosen one's value is seen, inside the card.
     days = scenarios.year
     await page.goto('/money/exchange')
     await expect(card.locator('.cell')).toHaveCount(41)
-    await card.locator('.cell').nth(39).locator('input').focus()
-    await page.keyboard.press('Space')
-    await expect(card.locator('.cell').nth(39)).toHaveClass(/chosen/)
-    const year = await apart()
-    const chosen = (await card.locator('.cell.chosen .value .label').textContent()) ?? ''
-    expect(year.values.map(({ text }) => text)).toContain(chosen)
+    await choose(39)
+    const year = await placed()
+    expect(year.values).toContain(await card.locator('.cell.chosen .value .label').textContent())
 
     // Eight months, every one a candidate: the first and the last always seen.
     days = scenarios.months
     await page.reload()
     await expect(card.locator('.cell')).toHaveCount(8)
-    const months = await apart()
+    const months = await placed()
     const named = await card.locator('.month .label').allTextContents()
-    expect(months.months.at(0)?.text).toBe(named.at(0))
-    expect(months.months.at(-1)?.text).toBe(named.at(-1))
+    expect(months.months.at(0)).toBe(named.at(0))
+    expect(months.months.at(-1)).toBe(named.at(-1))
 
-    // Six values, every one a candidate.
+    // Six values, every one a candidate: another choice hides none and brings none back.
     days = scenarios.values
     await page.reload()
     await expect(card.locator('.cell')).toHaveCount(6)
-    await apart()
+    const six = await placed()
+    await choose(1)
+    expect((await placed()).values).toEqual(six.values)
+
+    // Six better and worse by turns: over the line and under it, the values stand on both sides.
+    mixed = true
+    await page.reload()
+    await expect(card.locator('.cell.good')).toHaveCount(3)
+    await placed()
   })
