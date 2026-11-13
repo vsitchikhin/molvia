@@ -767,9 +767,13 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   and a value stand in a row as wide as their column, centred on it; where centred they would stand past the field,
   laid from the column's edge inward; of two that would run into each other one gives way, unseen (`placeLabels`,
   measured — review №1–2, adversarial А1–А3: by the count of bars alone, the chosen penultimate's value lay on the
-  furthest's, eight months at 200 % ran into each other, six values on 320 too). The values give way in their order —
-  the chosen bar's, the furthest's, then by size — the months from the edges, then from the left, so a choice moves
-  none. Past eight bars only the first month and the last are named (В-2 «а»: the chosen bar's day is on its plate) —
+  furthest's, eight months at 200 % ran into each other, six values on 320 too). **Into each other is across and one
+  over the other**: a value over the line and one under it are no neighbours (round 2, Б1 — three of six better and
+  worse by turns were hidden, the furthest among them). The values up to six give way in a fixed order — the
+  furthest's, then by size — so a choice hides none as a finger slides along them (Б2); past six only the chosen
+  bar's and the furthest's are labelled, the chosen first. The months from the edges, then from the left, so a choice
+  moves none. **The measure, the edge and the room between labels are one composable with the line of the rate**
+  (`useLabelPlaces`, review №8); which label gives way is each chart's own. Past eight bars only the first month and the last are named (В-2 «а»: the chosen bar's day is on its plate) —
   a column of 8 px broke «нояб» a letter a line. The price: a value or a month may be unseen — the plate and the
   bar's name say it. The field is one column of the card's
   width (`minmax(0, 1fr)`): as `auto`, forty-one frames of «без сравнения» at 14 px stood it 590 px wide on 320; a
@@ -789,7 +793,9 @@ understood). The design is Claude Design's handoff `design_handoff_mol_348`, che
   (`figure-fit`, MOL-404, В-7 «б»): wrapped at the arrow, a row of the owner's 41 was three to five lines. **Never
   under `--text-caption`** (`$least`, adversarial А4: at 200 % the words' column is the narrowest and the line stood at
   13 px under a caption of 22; a million roubles at 9,5 px on 390): there it wraps between its two sums, each whole
-  (`amountPartsOf`, one cut for the row and the plate). **The
+  (`amountPartsOf`, one cut for the row and the plate), the arrow with the second — alone on a line it read as nothing
+  (Б3). The price: a sum alone wider than the words' column still shrinks, under the caption too — a sum never breaks
+  (MOL-321), and 13 812 345,60 ֏ at 200 % on 320 is wider than the column (round 2, Б3). **The
   exchange offices still to come are said once, over the list** (`list.pending_note`), never a tag on every recent
   row.
 - **«Удалить обмен?» stays** (Р-16, В-5): the handoff took it away on the word that «Перевод» removes at once, which
