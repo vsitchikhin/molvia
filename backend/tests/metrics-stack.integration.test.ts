@@ -262,15 +262,14 @@ describe('the compose file', () => {
 
   it('pulls the metrics before anything changes but lets only the application judge a rollout (adversarial А4)', () => {
     const deploy = read('deploy/deploy.sh')
-    expect(deploy).toContain('metrics=(victoria node-exporter cadvisor postgres-exporter grafana)')
+    expect(deploy).toContain(`metrics=(${METRICS.join(' ')})`)
     expect(deploy).toMatch(/pull -q "\$\{metrics\[@\]\}" \|\|/)
     expect(deploy).toContain(
       'if "${compose[@]}" up -d postgres backend bot frontend receipt-reader && wait_healthy "$tag"; then',
     )
     expect(deploy).toMatch(/up -d "\$\{metrics\[@\]\}" \|\|/)
     // The list is the compose file's own services of the metrics.
-    for (const name of ['victoria', 'node-exporter', 'cadvisor', 'postgres-exporter', 'grafana'])
-      expect(services().has(name), name).toBe(true)
+    for (const name of METRICS) expect(services().has(name), name).toBe(true)
     expect(deploy).not.toMatch(/if "\$\{compose\[@\]\}" up -d && /)
   })
 })
