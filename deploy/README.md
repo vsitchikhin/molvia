@@ -529,10 +529,11 @@ on GitHub, hourly: its check waits a day and an hour.
   on the site's check it kept a fall of the API silent, since healthchecks.io speaks only when a
   check flips. A certificate that could not be read is the site's matter and sends nothing to
   `molvia-cert`.
-- **The lock of Grafana** (MOL-399, В-3). `GET https://grafana.<DOMAIN>/` with no pass, the redirect
-  not followed, must be Cloudflare Access's redirect to `https://<team>.cloudflareaccess.com/…` — what
-  Access does with every request carrying no pass. `grafana open 200` or `302` is Grafana answering by
-  itself (its second lock, the pass, still holds); anything else — `grafana 530`, or `403`, which may be a
+- **The lock of Grafana** (MOL-399, В-3). `GET https://grafana.<DOMAIN>/public-dashboards/watch` — a path
+  the tunnel passes — with no pass, the redirect not followed, must be Cloudflare Access's redirect to
+  `https://<team>.cloudflareaccess.com/…`, what Access does with every request carrying none. `grafana
+open 200` is Grafana answering by itself: Access is off, and the dashboard's link is the one secret
+  left; anything else — `grafana 530`, or `403`, which may be a
   challenge or the firewall of Cloudflare a browser passes to the Grafana behind it (adversarial А5) —
   says nothing of the lock and is no lock seen either. By the same three of four, told to
   `molvia-grafana-lock`, a check of its own — never `HC_UP_URL`'s, which the round refuses (adversarial
@@ -617,7 +618,7 @@ makes four tries — a minute and a half, since a name that does not resolve fai
 `/fail` and a message in Telegram — two: `grafana.molvia.invalid` does not resolve either, and
 `molvia-grafana-lock` says `grafana 530`. `DOMAIN` back to `molvia.net` — or `make watcher`, which sets
 it — and the next round puts both back up. The lock alone is tried by switching the application of
-Access off for a round (Metrics, «Where it is set»): `grafana open 302`.
+Access off for a round (Metrics, «Where it is set»): `grafana open 200`.
 
 The certificate's way: `gh workflow run watch.yml -f domain=molvia.invalid` sends `molvia-cert`
 nothing — an unreadable certificate is the site's matter — so a `/fail` of it is tried only by a
@@ -641,9 +642,9 @@ certificate that really ends.
   https://www.cloudflarestatus.com.
 
 **`molvia-grafana-lock`** (MOL-399). Grafana's address answered without Access — the application of
-Access deleted, its hostname changed or its policy made «Bypass». Grafana still lets in nobody without
-Access's signed pass, but its login page faces the internet: put the application back (Metrics, «Where
-it is set»), or `docker compose … stop tunnel` until then. `grafana 403` — a challenge or the firewall of
+Access deleted, its hostname changed or its policy made «Bypass». The tunnel still passes the shared
+dashboard alone, but its link is then the only lock: put the application back (Metrics, «Where it is
+set»), or `docker compose … stop tunnel` until then. `grafana 403` — a challenge or the firewall of
 Cloudflare answered before Access did: Security → Events of the zone names it. `grafana 530`, `grafana 502` on its own — the tunnel and
 Access both away: Zero Trust → Networks → Tunnels shows whether `molvia-grafana` is healthy.
 
@@ -716,15 +717,17 @@ pages, to the owner through Cloudflare.
 
 ### Looking
 
-**From any device: `https://grafana.molvia.net`** (MOL-399). Cloudflare Access asks for the e-mail and
-sends a code to it — only to the owner's e-mail; any other gets no code — and the dashboard opens, the
-device remembered for a month. Grafana lets the request in only with Access's signed pass
-(`Cf-Access-Jwt-Assertion`: the team's keys, the application's tag, the team as issuer), and signs the
-owner in as a user of their own, made from the pass's e-mail at the first visit — a **Viewer**: what runs
-is what the repository says, so nothing is changed from outside. A stranger sees Cloudflare's page and
-nothing of Grafana — no login form, no version.
+**From any device: the dashboard's shared link**, `https://grafana.molvia.net/public-dashboards/<token>`,
+bookmarked (MOL-399, В-6 «а»). Cloudflare Access asks for the e-mail and sends a code to it — only to the
+owner's e-mail; any other gets no code — and the dashboard opens, the device remembered for a month. The
+link signs in to nothing: it runs the dashboard's own panels over the time range chosen, and no other
+query. **The tunnel passes nothing else of Grafana** — `/public-dashboards/`, `/public/` and `/api/public/`
+by the routes of `docker-compose.prod.yml`, anything else its own 404 — so from outside there is no login,
+no API and no data source's proxy, whether Access stands in front or not. A stranger sees Cloudflare's
+page and nothing of Grafana.
 
-**`admin`, and Grafana when Cloudflare is down, by the SSH tunnel** — Explore, a contact point's Test:
+**Grafana whole — `admin`, Explore, the alarms, a contact point's Test — by the SSH tunnel**, and the
+dashboard too when Cloudflare is down:
 
 ```bash
 ssh -L 3000:127.0.0.1:3000 molvia     # then http://localhost:3000, admin and GRAFANA_ADMIN_PASSWORD
@@ -839,27 +842,34 @@ node-exporter`, and `✅ Прошло` follows.
   (grafana/alerting #558). A Grafana that takes a numeric chat — after 13.0.2 — no longer needs it.
   **The address an alarm names** (`Дашборд — https://grafana.molvia.net`) is written by it too, from
   `GF_SERVER_ROOT_URL`: Grafana reads no environment inside a template (MOL-399).
-- **Grafana from outside** (MOL-399): the tunnel and Access are Cloudflare's, set in its dashboard, not in
-  the repository — so nothing here holds them but the watch (`molvia-grafana-lock`, «Signals») and
-  Grafana's own check of the pass. **Before the release that brings `tunnel` rolls out**, in this order —
-  compose refuses to start without the three lines, so a release without them stops at the compare of the
-  compose file, as any change of it does:
+- **Grafana from outside** (MOL-399, В-6 «а»): what the tunnel passes is the compose file's (`configs:
+tunnel`), held by a test; who gets past Access is Cloudflare's dashboard, held by the watch
+  (`molvia-grafana-lock`, «Signals»); the shared link is Grafana's volume. **The tunnel is managed
+  locally, so it is made with `cloudflared` on the owner's computer, never in Zero Trust → Tunnels**: a
+  tunnel made there takes its routes from Cloudflare's dashboard, and they would replace the compose
+  file's — the paths would no longer be held. **Before the release that brings `tunnel` rolls out**, in
+  this order — compose refuses to start without the token, so a release without it stops at the compare of
+  the compose file, as any change of it does:
   1. Zero Trust (`one.dash.cloudflare.com`) → the plan Free (up to 50 users; Cloudflare may ask for a card)
-     and the team's name: `<team>.cloudflareaccess.com`.
+     and a team's name.
   2. Access → Applications → Add → Self-hosted: domain `grafana.molvia.net`, session **one month**;
-     sign-in «One-time PIN» alone; a policy **Allow** — Emails: the owner's e-mail, nothing else. Its
-     Overview → **Application Audience (AUD) Tag**.
-  3. Networks → Tunnels → Create → Cloudflared, named `molvia-grafana`, environment Docker — its token is the
-     long string after `--token` in the command it shows. Public hostname: `grafana` · `molvia.net` →
-     service `HTTP` · `grafana:3000`. Cloudflare writes the DNS record itself.
-  4. Into `~/molvia/.env.prod`: `GRAFANA_ACCESS_DOMAIN=<team>.cloudflareaccess.com`, `GRAFANA_ACCESS_AUD=<tag>` and the token —
-     typed at `read -rs T`, then `printf 'CLOUDFLARE_TUNNEL_TOKEN=%s\n' "$T" >>.env.prod`: `printf` is
-     the shell's own, so the token is in no command's arguments («Rotating the secrets»).
+     sign-in «One-time PIN» alone; a policy **Allow** — Emails: the owner's e-mail, nothing else.
+  3. On the owner's computer: `brew install cloudflared`, then `cloudflared tunnel login` (the browser,
+     `molvia.net`), `cloudflared tunnel create molvia-grafana`, `cloudflared tunnel route dns
+molvia-grafana grafana.molvia.net` — the DNS record — and `cloudflared tunnel token molvia-grafana`,
+     the token. `~/.cloudflared/cert.pem` makes tunnels on the account: delete it once done.
+  4. Into `~/molvia/.env.prod` on the machine: the token typed at `read -rs T`, then
+     `printf 'CLOUDFLARE_TUNNEL_TOKEN=%s\n' "$T" >>.env.prod` — `printf` is the shell's own, so the token is
+     in no command's arguments («Rotating the secrets»).
   5. The check `molvia-grafana-lock` in healthchecks.io (period 10 min, grace 10 min, the Telegram
      integration), its URL the Worker's secret `HC_LOCK_URL` («Signals», «Where it is set»).
-  6. The compose file and `deploy/deploy.sh` copied to the machine, then the release. After it: a phone with
-     no session opens `https://grafana.molvia.net` on Cloudflare's page; the code, then the dashboard; the
-     tunnel healthy in Networks → Tunnels; `molvia-grafana-lock` green after the Worker's next round.
+  6. The compose file and `deploy/deploy.sh` copied to the machine, then the release.
+  7. **The shared link**, once, by the SSH tunnel as `admin`: Dashboards → «Молвия» → Share → Share
+     externally → «Anyone with the link», the time range picker on → copy the link, bookmark it on the
+     phone. It lives in Grafana's volume: a volume made anew needs a new link, and «Revoke» there takes a
+     leaked one back. Then: the phone opens the link on Cloudflare's page; the code, then the dashboard;
+     `https://grafana.molvia.net/login` after the code is the tunnel's 404; `molvia-grafana-lock` green
+     after the Worker's next round.
 
 ## Backups (MOL-70)
 
@@ -989,7 +999,8 @@ written as their documentation has them and not drilled.
 | `GRAFANA_ADMIN_PASSWORD`               | `.env.prod`                                        | Grafana's restart                            |
 | `TELEGRAM_BOT_TOKEN`                   | `.env.prod`, BotFather                             | the bot's restart; no login meanwhile        |
 | `ALERTS_BOT_TOKEN`                     | `.env.prod`, BotFather                             | Grafana's restart                            |
-| `CLOUDFLARE_TUNNEL_TOKEN`              | `.env.prod`, Cloudflare Zero Trust                 | Grafana from outside; never the site         |
+| `CLOUDFLARE_TUNNEL_TOKEN`              | `.env.prod`, Cloudflare (`cloudflared tunnel`)     | Grafana from outside; never the site         |
+| the shared dashboard's link            | Grafana's volume, the owner's bookmark             | Grafana from outside                         |
 | `CLAUDE_API_KEY`                       | `.env.prod`, Anthropic console                     | none — Tesseract reads a refused key's reads |
 | `BOT_PULSE_URL`, `ALERTS_PULSE_URL`    | `.env.prod`, healthchecks.io                       | none                                         |
 | `HC_URL` (the copies' ping)            | `backup.env`, healthchecks.io                      | none                                         |
@@ -1052,10 +1063,13 @@ written as their documentation has them and not drilled.
   revoked token (`401`) rather than retrying, so a restart loop says the line was not changed.
   **`ALERTS_BOT_TOKEN`** the same for the alarms' bot, then `$C up -d grafana`.
 - **`CLOUDFLARE_TUNNEL_TOKEN`** (MOL-399): whoever holds it can run a connector of the tunnel — put their
-  own machine behind `grafana.<DOMAIN>` — though Access still stands before it, and Grafana's pass is
-  Access's. Zero Trust → Networks → Tunnels → `molvia-grafana` → «Refresh token» (or the tunnel deleted
-  and made anew, its public hostname with it), the new token into the line by `read -rs` as above, then
-  `$C up -d tunnel`. The old connectors drop at the refresh. Not drilled.
+  own machine behind `grafana.<DOMAIN>`, Access still in front, and take a share of the requests. The
+  tunnel made anew on the owner's computer: `cloudflared tunnel cleanup molvia-grafana`, `cloudflared
+tunnel delete molvia-grafana`, then `create`, `route dns --overwrite-dns` and `token` as in «Metrics»,
+  «Where it is set», the new token into the line by `read -rs` as above, `$C up -d tunnel`. Not drilled.
+- **The shared dashboard's link** (MOL-399): Access stands before it, but the link is the second lock.
+  By the SSH tunnel as `admin`: Dashboards → Shared dashboards → «Revoke», and a new one shared as in
+  «Metrics», «Where it is set», step 7.
 - **`CLAUDE_API_KEY`**: a new key in the console's workspace, the line, `$C up -d backend`, and only
   then the old key deleted. **A key the API refuses is no wait**: a `401` is `ModelRejected`, and that
   receipt goes to Tesseract at once, for good — never asked of the model again — each one a

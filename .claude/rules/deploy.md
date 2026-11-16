@@ -52,8 +52,8 @@ The shape worth knowing here:
   node_exporter, cAdvisor and postgres_exporter on `metrics`, an `internal` network with no way out,
   Grafana in `metrics` and in `alerts`, a network of its own with a way out, its one port on
   `127.0.0.1:3000` for an SSH tunnel. **The sixth is `tunnel`** (MOL-399): `cloudflare/cloudflared` of an
-  exact tag, in `alerts` beside Grafana, no port — Grafana from any device through Cloudflare Access
-  (`observability.md`); one of the metrics, so it never judges a rollout either, and its line of
+  exact tag, in `alerts` beside Grafana, no port, its routes the compose file's — the dashboard shared by link
+  from any device, through Cloudflare Access (`observability.md`); one of the metrics, so it never judges a rollout either, and its line of
   `.env.prod`, `CLOUDFLARE_TUNNEL_TOKEN`, is required — set
   before the release that brought them, as `deploy/README.md`, «Metrics», says. `molvia-grafana` and `molvia-victoria` carry what they read baked
   in and are built by the release beside the four — Grafana from `grafana/grafana`, never
