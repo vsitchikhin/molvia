@@ -336,8 +336,10 @@ services:
       GF_AUTH_JWT_HEADER_NAME: Cf-Access-Jwt-Assertion
       GF_AUTH_JWT_EMAIL_CLAIM: email
       GF_AUTH_JWT_USERNAME_CLAIM: email
-      GF_AUTH_JWT_JWK_SET_URL: https://${GRAFANA_ACCESS_TEAM:?set GRAFANA_ACCESS_TEAM — the team of Cloudflare Access}.cloudflareaccess.com/cdn-cgi/access/certs
-      GF_AUTH_JWT_EXPECT_CLAIMS: '{"aud": "${GRAFANA_ACCESS_AUD:?set GRAFANA_ACCESS_AUD — the Application Audience tag of Access}", "iss": "https://${GRAFANA_ACCESS_TEAM}.cloudflareaccess.com"}'
+      # The team's domain whole, as Zero Trust shows it — `<team>.cloudflareaccess.com`; `start.sh` warns
+      # of another form, which would lock the owner out with nothing else saying so (adversarial А6).
+      GF_AUTH_JWT_JWK_SET_URL: https://${GRAFANA_ACCESS_DOMAIN:?set GRAFANA_ACCESS_DOMAIN — the team domain of Cloudflare Access}/cdn-cgi/access/certs
+      GF_AUTH_JWT_EXPECT_CLAIMS: '{"aud": "${GRAFANA_ACCESS_AUD:?set GRAFANA_ACCESS_AUD — the Application Audience tag of Access}", "iss": "https://${GRAFANA_ACCESS_DOMAIN}"}'
       GF_AUTH_JWT_AUTO_SIGN_UP: 'true'
       GF_AUTH_JWT_URL_LOGIN: 'false'
       GF_AUTH_JWT_ALLOW_ASSIGN_GRAFANA_ADMIN: 'false'

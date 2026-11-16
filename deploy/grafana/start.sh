@@ -15,6 +15,20 @@ case "${OWNER_TELEGRAM_ID:-}" in
     ;;
 esac
 
+# Access's keys from the team's domain, `<team>.cloudflareaccess.com` (MOL-399): a team written another way
+# — its name alone, the domain twice, a scheme — is a URL with no keys behind it, and every pass of the owner
+# is refused with nothing but Grafana's own «Failed to verify JWT» (adversarial А6). Said here, in its words;
+# Grafana starts all the same, since the alarms are not the door's.
+if [ -n "${GF_AUTH_JWT_JWK_SET_URL:-}" ]; then
+  team="${GF_AUTH_JWT_JWK_SET_URL#https://}"
+  team="${team%.cloudflareaccess.com/cdn-cgi/access/certs}"
+  case "$team" in
+    '' | *[!a-z0-9-]*)
+      echo "GRAFANA_ACCESS_DOMAIN is not <team>.cloudflareaccess.com: nobody gets in from outside" >&2
+      ;;
+  esac
+fi
+
 sed -i "s/\"chatid\": \"[^\"]*\"/\"chatid\": \"${OWNER_TELEGRAM_ID}\"/" \
   /etc/grafana/provisioning/alerting/notify.json
 

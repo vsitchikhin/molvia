@@ -160,13 +160,12 @@ describe('the compose file', () => {
 
   it('lets into Grafana from outside only Access’s signed pass, and as a Viewer (MOL-399)', () => {
     const grafana = services().get('grafana') ?? ''
-    const team = '${GRAFANA_ACCESS_TEAM'
     for (const setting of [
       "GF_AUTH_JWT_ENABLED: 'true'",
       'GF_AUTH_JWT_HEADER_NAME: Cf-Access-Jwt-Assertion',
       'GF_AUTH_JWT_EMAIL_CLAIM: email',
       'GF_AUTH_JWT_USERNAME_CLAIM: email',
-      `GF_AUTH_JWT_JWK_SET_URL: https://${team}:?`,
+      'GF_AUTH_JWT_JWK_SET_URL: https://${GRAFANA_ACCESS_DOMAIN:?',
       "GF_AUTH_JWT_AUTO_SIGN_UP: 'true'",
       // A token in the address lands in the history and the logs.
       "GF_AUTH_JWT_URL_LOGIN: 'false'",
@@ -176,18 +175,18 @@ describe('the compose file', () => {
       'GF_SERVER_ROOT_URL: https://grafana.${DOMAIN:?',
     ])
       expect(grafana).toContain(setting)
-    expect(grafana).toContain('.cloudflareaccess.com/cdn-cgi/access/certs\n')
+    expect(grafana).toContain('}/cdn-cgi/access/certs\n')
     // The pass is the application's and the team's, never any of Cloudflare's: the tag and the issuer.
     const claims = /^ {6}GF_AUTH_JWT_EXPECT_CLAIMS: '(.+)'$/m.exec(grafana)?.[1] ?? ''
     expect(JSON.parse(claims)).toEqual({
       aud: '${GRAFANA_ACCESS_AUD:?set GRAFANA_ACCESS_AUD — the Application Audience tag of Access}',
-      iss: `https://${team}}.cloudflareaccess.com`,
+      iss: 'https://${GRAFANA_ACCESS_DOMAIN}',
     })
     // One source of keys: Grafana refuses to start with two.
     expect(grafana).not.toMatch(/GF_AUTH_JWT_(?:KEY_FILE|JWK_SET_FILE|KEY_ID)/)
     // A role from the pass is never read: the e-mail is the owner's, the role the repository's.
     expect(grafana).not.toContain('GF_AUTH_JWT_ROLE_ATTRIBUTE_PATH')
-    for (const name of ['GRAFANA_ACCESS_TEAM', 'GRAFANA_ACCESS_AUD'])
+    for (const name of ['GRAFANA_ACCESS_DOMAIN', 'GRAFANA_ACCESS_AUD'])
       expect(read('.env.prod.example')).toMatch(new RegExp(`^${name}=$`, 'm'))
     // An alarm names the address it is looked at by, not a tunnel to set up first (Т-8) — written by
     // `start.sh`, since Grafana reads no environment inside a template.
@@ -225,6 +224,29 @@ describe('the compose file', () => {
     expect(read('deploy/grafana/start.sh')).toContain('OWNER_TELEGRAM_ID')
     expect(grafana).toMatch(/^ {6}OWNER_TELEGRAM_ID: /m)
     expect(notify).not.toMatch(/"chatid": "-?\d+"/)
+  })
+
+  it('says so when the team of Access is not <team>.cloudflareaccess.com (MOL-399, adversarial А6)', () => {
+    const start = (domain: string): string =>
+      spawnSync('sh', [fileURLToPath(new URL('../../deploy/grafana/start.sh', import.meta.url))], {
+        env: {
+          PATH: process.env.PATH,
+          OWNER_TELEGRAM_ID: '123456789',
+          GF_AUTH_JWT_JWK_SET_URL: `https://${domain}/cdn-cgi/access/certs`,
+        },
+        encoding: 'utf8',
+      }).stderr
+    const warning =
+      'GRAFANA_ACCESS_DOMAIN is not <team>.cloudflareaccess.com: nobody gets in from outside\n'
+    expect(start('molvia.cloudflareaccess.com')).not.toContain(warning)
+    for (const domain of [
+      'molvia',
+      'molvia.cloudflareaccess.com.cloudflareaccess.com',
+      'https://molvia.cloudflareaccess.com',
+      '.cloudflareaccess.com',
+      'molvia.cloudflareaccess.com/',
+    ])
+      expect(start(domain), domain).toContain(warning)
   })
 
   it('reads the owner’s id by the API’s rule in Grafana’s start too (adversarial А5)', () => {

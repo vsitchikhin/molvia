@@ -54,7 +54,7 @@ The shape worth knowing here:
   `127.0.0.1:3000` for an SSH tunnel. **The sixth is `tunnel`** (MOL-399): `cloudflare/cloudflared` of an
   exact tag, in `alerts` beside Grafana, no port — Grafana from any device through Cloudflare Access
   (`observability.md`); one of the metrics, so it never judges a rollout either, and its three lines of
-  `.env.prod` (`CLOUDFLARE_TUNNEL_TOKEN`, `GRAFANA_ACCESS_TEAM`, `GRAFANA_ACCESS_AUD`) are required — set
+  `.env.prod` (`CLOUDFLARE_TUNNEL_TOKEN`, `GRAFANA_ACCESS_DOMAIN`, `GRAFANA_ACCESS_AUD`) are required — set
   before the release that brought them, as `deploy/README.md`, «Metrics», says. `molvia-grafana` and `molvia-victoria` carry what they read baked
   in and are built by the release beside the four — Grafana from `grafana/grafana`, never
   `grafana/grafana-oss`, which stopped at 13.0.2 in June 2026 and so would never have reached Dependabot
