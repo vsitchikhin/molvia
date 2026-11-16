@@ -148,6 +148,9 @@ describe('the compose file', () => {
     const tunnel = services().get('tunnel') ?? ''
     // An exact tag of the upstream image, which Dependabot moves (В-5).
     expect(tunnel).toMatch(/^ {4}image: cloudflare\/cloudflared:\d{4}\.\d+\.\d+$/m)
+    expect(read('.github/dependabot.yml')).toMatch(
+      /^ {2}- package-ecosystem: docker-compose\n {4}directory: \/\n(?: {4}.*\n)*? {4}allow:\n {6}- dependency-name: cloudflare\/cloudflared\n/m,
+    )
     expect(tunnel).toMatch(/^ {6}TUNNEL_TOKEN: \$\{CLOUDFLARE_TUNNEL_TOKEN:\?/m)
     // Every user of the machine reads the arguments in `ps`.
     expect(tunnel).toMatch(/^ {4}command: \['tunnel', 'run'\]$/m)
