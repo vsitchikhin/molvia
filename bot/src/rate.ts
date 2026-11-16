@@ -5,7 +5,7 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import { dropKeyboard, refuse, settleKeeping, shownText, stopSpinner } from './answer'
 import { t } from './i18n'
-import { SCALE_DATA, keyboardOf, readText, scale, writeText } from './remind'
+import { SCALE_DATA, keyboardOf, languageOf, readText, scale, writeText } from './remind'
 import { handlerOf, reportDefect } from './failure'
 
 export interface RateDeps {
@@ -25,6 +25,7 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
 
   composer.chatType('private').callbackQuery(SCALE_DATA, async (ctx) => {
     const [, itemId = '', digit = ''] = ctx.match
+    const named = languageOf(ctx.match, 3)
     const score = Number(digit)
 
     // The API call alone is inside the `try`, as in `login.ts`: a Telegram failure after the
@@ -40,8 +41,8 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
         // under the last message of the evening still can, and it is that evening's only one
         // (review №3).
         await refuse(ctx, 'rate.gone')
-        const { offer } = keyboardOf(ctx.callbackQuery.message?.reply_markup)
-        await dropKeyboard(ctx, offer ? scale(undefined, undefined, offer) : undefined)
+        const { offer, language = named } = keyboardOf(ctx.callbackQuery.message?.reply_markup)
+        await dropKeyboard(ctx, offer ? scale(undefined, undefined, offer, language) : undefined)
         return
       }
       console.error(
@@ -53,14 +54,16 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
       return
     }
 
-    const outcome = t(ctx.from.language_code, 'rate.done', { score })
+    // In the language the message is written in, which its button names (MOL-398); a message sent
+    // before it names none, and Telegram's is taken.
+    const outcome = t(named ?? ctx.from.language_code, 'rate.done', { score })
     const message = ctx.callbackQuery.message
     // The switch's row and its outcome stay as the message holds them (MOL-103, Р-7).
-    const { offer } = keyboardOf(message?.reply_markup)
+    const { offer, language = named } = keyboardOf(message?.reply_markup)
     const shown = shownText(message)
     try {
       const text = shown === null ? null : writeText({ ...readText(shown), rated: outcome })
-      await settleKeeping(ctx, text, scale(itemId, score, offer), outcome)
+      await settleKeeping(ctx, text, scale(itemId, score, offer, language), outcome)
     } finally {
       await stopSpinner(ctx)
     }

@@ -2,8 +2,8 @@ import { InlineKeyboard } from 'grammy'
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
-import { cityWhereNameRepeats, settingsCityOf } from '@molvia/model'
-import type { Reminder, ReminderItem } from '@molvia/model'
+import { LOCALES, cityWhereNameRepeats, settingsCityOf } from '@molvia/model'
+import type { AppLocale, Reminder, ReminderItem } from '@molvia/model'
 import type { InlineKeyboardMarkup } from 'grammy/types'
 import { hasMessage, t } from './i18n'
 import { reportDefect } from './failure'
@@ -13,10 +13,12 @@ import type { Wait } from './deliver'
 /**
  * What a button of the scale carries: the item and the digit — and never whose verdict it is.
  * That is `ctx.from.id`, Telegram's word for who pressed, so a message forwarded to someone else
- * rates for them, never for the person it was sent to. 43 bytes of Telegram's 64.
+ * rates for them, never for the person it was sent to. And the language its message is written in
+ * (MOL-398): the outcome and the rebuilt switch are written in it, though the bot keeps nothing —
+ * absent on a message sent before it. 46 bytes of Telegram's 64.
  */
 const PREFIX = 'rate:'
-export const SCALE_DATA = new RegExp(`^${PREFIX}([0-9a-f-]{36}):([1-5])$`)
+export const SCALE_DATA = new RegExp(`^${PREFIX}([0-9a-f-]{36}):([1-5])(?::(ru|en))?$`)
 
 /**
  * The switch under the last reminder of the evening (MOL-103, В-2): «Не напоминать», and once it is
@@ -25,28 +27,40 @@ export const SCALE_DATA = new RegExp(`^${PREFIX}([0-9a-f-]{36}):([1-5])$`)
  */
 export type Offer = 'off' | 'on'
 const SWITCH_PREFIX = 'remind:'
-export const SWITCH_DATA = new RegExp(`^${SWITCH_PREFIX}(off|on)$`)
+export const SWITCH_DATA = new RegExp(`^${SWITCH_PREFIX}(off|on)(?::(ru|en))?$`)
+
+/** The language a button names its message in, as `scale` writes it: `:en` at the end. */
+export const languageOf = (
+  match: ArrayLike<string | undefined> | null,
+  at: number,
+): AppLocale | undefined => LOCALES.find((one) => one === match?.[at])
 
 /**
  * The scale 1–5 under an item, with the digit already pressed marked — and under it, on the last
  * message of the evening, the switch it offers. Without an item, the switch alone: a message whose
  * scale could not be read back is still given its other button.
  */
-export function scale(itemId: string | undefined, pressed?: number, offer?: Offer): InlineKeyboard {
+export function scale(
+  itemId: string | undefined,
+  pressed?: number,
+  offer?: Offer,
+  language?: AppLocale,
+): InlineKeyboard {
   const keyboard = new InlineKeyboard()
+  const named = language ? `:${language}` : ''
   if (itemId) {
     for (const score of [1, 2, 3, 4, 5]) {
       keyboard.text(
         score === pressed ? `${String(score)} ✓` : String(score),
-        `${PREFIX}${itemId}:${String(score)}`,
+        `${PREFIX}${itemId}:${String(score)}${named}`,
       )
     }
   }
   if (offer) {
     if (itemId) keyboard.row()
     keyboard.text(
-      t(undefined, offer === 'off' ? 'remind.stop' : 'remind.resume'),
-      `${SWITCH_PREFIX}${offer}`,
+      t(language, offer === 'off' ? 'remind.stop' : 'remind.resume'),
+      `${SWITCH_PREFIX}${offer}${named}`,
     )
   }
   return keyboard
@@ -61,24 +75,31 @@ export function keyboardOf(markup: InlineKeyboardMarkup | undefined): {
   readonly itemId?: string
   readonly pressed?: number
   readonly offer?: Offer
+  readonly language?: AppLocale
 } {
   let itemId: string | undefined
   let pressed: number | undefined
   let offer: Offer | undefined
+  let language: AppLocale | undefined
   for (const button of (markup?.inline_keyboard ?? []).flat()) {
     const data = 'callback_data' in button ? button.callback_data : undefined
     const digit = SCALE_DATA.exec(data ?? '')
     if (digit) {
       itemId = digit[1]
       if (button.text.endsWith('✓')) pressed = Number(digit[2])
+      language ??= languageOf(digit, 3)
     }
     const action = SWITCH_DATA.exec(data ?? '')
-    if (action) offer = action[1] as Offer
+    if (action) {
+      offer = action[1] as Offer
+      language ??= languageOf(action, 2)
+    }
   }
   return {
     ...(itemId ? { itemId } : {}),
     ...(pressed ? { pressed } : {}),
     ...(offer ? { offer } : {}),
+    ...(language ? { language } : {}),
   }
 }
 
@@ -119,39 +140,41 @@ export function writeText({ question, rated, switched }: ReminderText): string {
  * «Ереван Сити в Ереване», or the name alone where `city` is `null` (MOL-120). The case is looked
  * up by the city of the settings the stored spelling folds to — «гюмри» is Gyumri (adversarial А2).
  */
-function placeText(name: string, city: string | null): string {
+function placeText(name: string, city: string | null, language: AppLocale): string {
   if (city === null) return name
   const known = settingsCityOf(city)
   const key = `remind.in.${known ?? ''}`
   return known !== null && hasMessage(key)
-    ? t(undefined, 'remind.placeIn', { place: name, where: t(undefined, key) })
-    : t(undefined, 'remind.placeInBrackets', { place: name, city })
+    ? t(language, 'remind.placeIn', { place: name, where: t(language, key) })
+    : t(language, 'remind.placeInBrackets', { place: name, city })
 }
 
 /**
  * The words of one message (MOL-101): when and where, the item, the scale's meaning — and under
- * the last one of the day, how many more wait in «Оценки». Always Russian (Р-7): the reminder is
- * sent without an update, and the person's language is not something we keep.
+ * the last one of the day, how many more wait in «Оценки». In the language the person's app last
+ * spoke (MOL-398, В-1 «в»), which the API hands with the reminder; Russian where it knows none — the
+ * reminder is sent without an update, so Telegram's language is not at hand (Р-7).
  */
 export function reminderText(
   item: ReminderItem,
   more: number,
   appUrl: string,
   city: string | null = null,
+  language: AppLocale = 'ru',
 ): string {
   const when =
     item.daysAgo === 1
-      ? t(undefined, 'remind.yesterday')
+      ? t(language, 'remind.yesterday')
       : item.daysAgo === 2
-        ? t(undefined, 'remind.dayBefore')
-        : t(undefined, 'remind.daysAgo', { n: item.daysAgo })
-  const question = t(undefined, 'remind.question', {
+        ? t(language, 'remind.dayBefore')
+        : t(language, 'remind.daysAgo', { n: item.daysAgo })
+  const question = t(language, 'remind.question', {
     when,
-    place: placeText(item.placeName, city),
+    place: placeText(item.placeName, city, language),
     name: item.name,
   })
   return more > 0
-    ? `${question}\n\n${t(undefined, 'remind.more', { n: more, url: `${appUrl.replace(/\/+$/, '')}/verdicts` })}`
+    ? `${question}\n\n${t(language, 'remind.more', { n: more, url: `${appUrl.replace(/\/+$/, '')}/verdicts` })}`
     : question
 }
 
@@ -172,6 +195,7 @@ async function send(
   wait: Wait,
 ): Promise<void> {
   const { telegramUserId, items, total } = reminder
+  const language = reminder.language ?? 'ru'
   // The city of a place, where another item of this reminder names a shop of its name in another
   // city (MOL-120) — the domain's rule, the one «Оценки» reads.
   const cityOf = cityWhereNameRepeats(
@@ -183,9 +207,15 @@ async function send(
     const message = async () =>
       telegram.sendMessage(
         telegramUserId,
-        reminderText(item, more, appUrl, cityOf({ name: item.placeName, city: item.placeCity })),
+        reminderText(
+          item,
+          more,
+          appUrl,
+          cityOf({ name: item.placeName, city: item.placeCity }),
+          language,
+        ),
         {
-          reply_markup: scale(item.itemId, undefined, last ? 'off' : undefined),
+          reply_markup: scale(item.itemId, undefined, last ? 'off' : undefined, language),
           disable_notification: index > 0,
         },
       )

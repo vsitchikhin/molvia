@@ -141,6 +141,19 @@ describe('строка выключателя и итоги в тексте (MOL
     expect(keyboardOf(scale(undefined, undefined, 'off')).offer).toBe('off')
   })
 
+  it('кнопки называют язык своего сообщения — он читается обратно, и выключатель пишется на нём (MOL-398)', () => {
+    const keyboard = scale(MILK, undefined, 'off', 'en')
+    for (const button of keyboard.inline_keyboard.flat()) {
+      const data = 'callback_data' in button ? button.callback_data : ''
+      expect(data.endsWith(':en')).toBe(true)
+      expect(new TextEncoder().encode(data).length).toBeLessThanOrEqual(64)
+    }
+    expect(keyboard.inline_keyboard[1]?.[0]?.text).toBe(t('en', 'remind.stop'))
+    expect(keyboardOf(keyboard)).toEqual({ itemId: MILK, offer: 'off', language: 'en' })
+    // A message sent before MOL-398 names none.
+    expect(keyboardOf(scale(MILK, undefined, 'off')).language).toBeUndefined()
+  })
+
   it('итог оценки и итог выключателя не стирают друг друга, в любом порядке', () => {
     const question = reminderText(item('Хлеб'), 2, APP)
     const stopped = t('ru', 'remind.stopped')
@@ -185,7 +198,8 @@ describe('рассылка (MOL-101)', () => {
       reminderText(item('Сыр'), 0, APP),
       reminderText(item('Хлеб'), 2, APP),
     ])
-    expect(calls[0]?.payload.reply_markup).toEqual(scale(MILK))
+    // Russian where the API names no language: the buttons name it all the same (MOL-398).
+    expect(calls[0]?.payload.reply_markup).toEqual(scale(MILK, undefined, undefined, 'ru'))
   })
 
   it('город — только где два места напоминания носят одно имя (MOL-120)', async () => {
@@ -235,7 +249,33 @@ describe('рассылка (MOL-101)', () => {
       'off',
       'off',
     ])
-    expect(calls[2]?.payload.reply_markup).toEqual(scale(MILK, undefined, 'off'))
+    expect(calls[2]?.payload.reply_markup).toEqual(scale(MILK, undefined, 'off', 'ru'))
+  })
+
+  it('на языке, которым говорило приложение человека (MOL-398, В-1 «в»)', async () => {
+    const { api, calls } = telegram()
+    const reminders = [
+      {
+        telegramUserId: 777,
+        language: 'en' as const,
+        items: [item('Кефир'), item('Сыр')],
+        total: 4,
+      },
+      { telegramUserId: 888, language: 'ru' as const, items: [item('Молоко')], total: 1 },
+    ]
+
+    await remindDue(claiming(reminders) as MolviaBotClient, api, APP)
+
+    expect(calls.map((call) => call.payload.text)).toEqual([
+      reminderText(item('Кефир'), 0, APP, null, 'en'),
+      reminderText(item('Сыр'), 2, APP, null, 'en'),
+      reminderText(item('Молоко'), 0, APP, null, 'ru'),
+    ])
+    expect(String(calls[0]?.payload.text).split('\n')[0]).toBe(
+      `${t('en', 'remind.yesterday')} · Ереван Сити`,
+    )
+    expect(calls[1]?.payload.reply_markup).toEqual(scale(MILK, undefined, 'off', 'en'))
+    expect(keyboardOf(calls[1]?.payload.reply_markup as never).language).toBe('en')
   })
 
   it('заблокировавший бота не останавливает остальных, ему дальше не шлём и напоминания выключаем', async () => {

@@ -1826,7 +1826,7 @@
       },
       "settings": {
         "term": "Your settings",
-        "text": "Country, city, currencies, and the day you changed the currency of conversion — and for “Count me in the statistics”: since when it is off, and when you last turned it back on. And when you last used the app or signed in to it: the two years of “An inactive account” are counted from that day. And when the bot last warned you that the account is about to be deleted — 30 or 7 days before: so that it does not warn twice."
+        "text": "Country, city, currencies, and the day you changed the currency of conversion — and for “Count me in the statistics”: since when it is off, and when you last turned it back on. And when you last used the app or signed in to it: the two years of “An inactive account” are counted from that day. And when the bot last warned you that the account is about to be deleted — 30 or 7 days before: so that it does not warn twice. And the language the app was last open in: the bot sends rating reminders in it."
       },
       "consent": {
         "term": "Consent to the terms",

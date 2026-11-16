@@ -6,7 +6,7 @@ import { ERROR } from '@molvia/model'
 import type { ReminderSwitch } from '@molvia/model'
 import { dropKeyboard, refuse, settleKeeping, shownText, stopSpinner } from './answer'
 import { t } from './i18n'
-import { SWITCH_DATA, keyboardOf, readText, scale, writeText } from './remind'
+import { SWITCH_DATA, keyboardOf, languageOf, readText, scale, writeText } from './remind'
 import { handlerOf, reportDefect } from './failure'
 
 export interface MuteDeps {
@@ -55,16 +55,21 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
       return
     }
 
-    const outcome = t(ctx.from.language_code, offer === 'off' ? 'remind.stopped' : 'remind.resumed')
+    // In the language of the message, which its button names (MOL-398), else Telegram's.
+    const named = languageOf(ctx.match, 2)
+    const outcome = t(
+      named ?? ctx.from.language_code,
+      offer === 'off' ? 'remind.stopped' : 'remind.resumed',
+    )
     const message = ctx.callbackQuery.message
-    const { itemId, pressed } = keyboardOf(message?.reply_markup)
+    const { itemId, pressed, language = named } = keyboardOf(message?.reply_markup)
     const shown = shownText(message)
     try {
       const text = shown === null ? null : writeText({ ...readText(shown), switched: outcome })
       await settleKeeping(
         ctx,
         text,
-        scale(itemId, pressed, offer === 'off' ? 'on' : 'off'),
+        scale(itemId, pressed, offer === 'off' ? 'on' : 'off', language),
         outcome,
       )
     } finally {

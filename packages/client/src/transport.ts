@@ -5,6 +5,7 @@ import {
   TODAY_HEADER,
   VERSION_HEADER,
   ZONE_HEADER,
+  LOCALE_HEADER,
   errorResponseSchema,
 } from '@molvia/model'
 import type { WireCode } from '@molvia/model'
@@ -119,6 +120,11 @@ export interface ClientOptions {
    * begin and end, for a moment the server stamped itself. The bot names none.
    */
   readonly zone?: () => string
+  /**
+   * The language of the phone's screens, named on every request (`LOCALE_HEADER`, MOL-398): what the
+   * bot's rating reminder speaks. The bot names none.
+   */
+  readonly locale?: () => string
 }
 
 interface RequestOptions<A = never> {
@@ -161,6 +167,7 @@ export function createTransport({
   onVersion,
   today,
   zone,
+  locale,
   botSecret,
 }: ClientOptions & { readonly botSecret?: string }): Transport {
   async function exchange<T, A = never>(
@@ -172,6 +179,7 @@ export function createTransport({
     if (botSecret) headers.set('authorization', `Bearer ${botSecret}`)
     if (today) headers.set(TODAY_HEADER, today())
     if (zone) headers.set(ZONE_HEADER, zone())
+    if (locale) headers.set(LOCALE_HEADER, locale())
     if (options.body !== undefined) headers.set('content-type', 'application/json')
     if (options.raw !== undefined) headers.set('content-type', options.raw.type)
 

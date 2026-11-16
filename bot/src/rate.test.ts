@@ -6,7 +6,7 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import { assembleBot } from './assemble'
 import { t } from './i18n'
-import { scale } from './remind'
+import { keyboardOf, scale } from './remind'
 
 /** Through `assembleBot`: whether a press reaches the scale is a property of the order. */
 const BOT_INFO: UserFromGetMe = {
@@ -169,6 +169,18 @@ describe('кнопки 1–5 под напоминанием (MOL-101)', () => {
     expect(edits(calls)[0]?.payload.text).toBe(
       `${QUESTION}\n\n✓ ${t('en', 'rate.done', { score: 4 })}`,
     )
+  })
+
+  it('итог — на языке сообщения, который назвала кнопка, а не Telegram (MOL-398)', async () => {
+    const rateFromBot = vi.fn(() => Promise.resolve())
+    const { bot, calls } = harness({ rateFromBot })
+
+    await bot.handleUpdate(press(`rate:${MILK}:4:en`, { from: { ...FROM, language_code: 'ru' } }))
+
+    expect(edits(calls)[0]?.payload.text).toBe(
+      `${QUESTION}\n\n✓ ${t('en', 'rate.done', { score: 4 })}`,
+    )
+    expect(keyboardOf(edits(calls)[0]?.payload.reply_markup as never).language).toBe('en')
   })
 
   it('API не ответил — отказ поверх, сообщение не тронуто, шкала на месте', async () => {

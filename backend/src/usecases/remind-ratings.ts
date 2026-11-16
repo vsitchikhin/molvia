@@ -115,6 +115,7 @@ export async function remindRatings(
     }
     due.push({
       telegramUserId: candidate.telegramUserId,
+      ...(candidate.locale === null ? {} : { language: candidate.locale }),
       items: claimed.items.map(({ itemId, name, placeName, placeCity, boughtAt }) => ({
         itemId,
         name,
