@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
-import { open, signedIn } from './session'
+import { DEV_SEAM, acceptTerms, open, signedIn } from './session'
 
 // A Russian phone: the app speaks Russian until the person chooses otherwise (MOL-398).
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -44,9 +44,12 @@ test('a language chosen in the settings speaks every screen at once, outlives a 
   // Russian has one order of a day: nothing is asked about it.
   await expect(group(page, DATE_STYLE)).toHaveCount(0)
 
+  await expect(page).toHaveTitle('Настройки · Molvia')
   await choose(page, LANGUAGE, 'English')
   await expect(title(page)).toHaveText('Settings')
   await expect(page.locator('html')).toHaveAttribute('lang', 'en-GB')
+  // The tab is the screen's name too: a screen reader reads it, and Android's switcher shows it (А1).
+  await expect(page).toHaveTitle('Settings · Molvia')
   await expect(group(page, DATE_STYLE).getByRole('radio', { name: '16 Nov, 14:05' })).toBeChecked()
 
   // `Intl` puts a narrow no-break space before «PM» in recent engines: the order is what is held.
@@ -76,6 +79,13 @@ test('the login screen offers the other language named in itself, and it stays a
   await other.click()
   await expect(page.getByText('What to buy in a new place — and where')).toBeVisible()
   await expect(page.getByRole('button', { name: 'Русский', exact: true })).toBeVisible()
+  await expect(page).toHaveTitle('Sign in · Molvia')
+
+  // In with no reload: the door gives the tab back by the route, in the language chosen at it (А1).
+  await page.getByRole('button', { name: DEV_SEAM }).click()
+  await acceptTerms(page)
+  await expect(title(page)).toHaveText('What to buy')
+  await expect(page).toHaveTitle('What to buy · Molvia')
 
   await open(page, '/settings')
   await expect(title(page)).toHaveText('Settings')

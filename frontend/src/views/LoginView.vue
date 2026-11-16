@@ -174,7 +174,7 @@ import { useLocale } from '@/composables/useLocale'
 import { useReconnect } from '@/composables/useReconnect'
 import { provideStateStrip } from '@/composables/useStateStrip'
 import { purchaseDay } from '@/days'
-import { focusScreenTitle } from '@/transitions'
+import { focusScreenTitle, nameScreen } from '@/transitions'
 import { usePwaUpdate } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { takeErasureNote } from '@/stores/identity'
@@ -285,28 +285,36 @@ export default defineComponent({
     // The tab is named by the screen that is actually shown. `installArrival` names it by the
     // route, and behind this door the route is a screen nobody can see yet.
     const before = document.title
-    // Taken as the screen is made: the note goes as it is read, and a reload says nothing again.
+    // Taken as the screen is made: the note goes as it is read, and a reload says nothing again. Its
+    // words follow the language, though — it is chosen right here (MOL-398, adversarial А2).
     // Keys written whole: one built from a string is seen by neither the linter nor vue-tsc.
     const note = takeErasureNote()
-    const erasure =
+    const erasure = computed(() =>
       note === 'erased'
         ? { tone: 'done', words: t('login.erased') }
         : note === 'unknown'
           ? { tone: 'doubt', words: t('login.erase_unknown') }
           : note === 'kept'
             ? { tone: 'doubt', words: t('login.erase_kept') }
-            : null
+            : null,
+    )
     const announce = useAnnouncer()
     let withdraw: (() => void) | undefined
-    const own = `${t('login.title')} · ${t('app.name')}`
+    const own = computed(() => `${t('login.title')} · ${t('app.name')}`)
     onMounted(() => {
-      document.title = own
-      if (erasure) withdraw = announce?.(erasure.words)
+      document.title = own.value
+      if (erasure.value) withdraw = announce?.(erasure.value.words)
+    })
+    // The tab follows a language chosen at the door (MOL-398, adversarial А1) — while it is the door's.
+    watch(own, (now, was) => {
+      if (document.title === was) document.title = now
     })
     // Only a title still the door's: a public screen opened from it is named by `installArrival`
     // before the door goes, and «Purchases» put back over it named a screen nobody saw (adversarial А4).
+    // Given back by the route, in the language spoken now — the one kept as the door came was the
+    // language before a choice made here (MOL-398, adversarial А1).
     onBeforeUnmount(() => {
-      if (document.title === own) document.title = before
+      if (document.title === own.value && !nameScreen()) document.title = before
       withdraw?.()
     })
 

@@ -1,4 +1,4 @@
-import { nextTick } from 'vue'
+import { nextTick, watch } from 'vue'
 import type { RouteLocation, RouteLocationNormalized, Router } from 'vue-router'
 
 /**
@@ -231,6 +231,18 @@ function holdWhileFocused(title: HTMLElement): void {
   )
 }
 
+let renameScreen: (() => void) | undefined
+
+/**
+ * The tab named by the route's screen again, in the language spoken now — for the door, which named it
+ * itself and gives it back (MOL-398, adversarial А1). Answers whether there was a name to give: none
+ * before `installArrival`.
+ */
+export function nameScreen(): boolean {
+  renameScreen?.()
+  return renameScreen !== undefined
+}
+
 /**
  * What a person who cannot see the screen needs after a move: the tab's title names the screen
  * (and the Android task switcher shows it), and focus lands on the new heading instead of
@@ -243,7 +255,11 @@ function holdWhileFocused(title: HTMLElement): void {
  * the month, the period, the category keep the focus, and the next Enter or arrow is theirs — taken
  * to the heading, the second tap on «‹» went into the title (MOL-136, adversarial Ф).
  */
-export function installArrival(router: Router, t: (key: string) => string): void {
+export function installArrival(
+  router: Router,
+  t: (key: string) => string,
+  language: () => string = () => '',
+): void {
   // The first route that never settled is the router's start, with no meta at all: the app's name
   // alone, or the throw would stop the start before the app is mounted (adversarial Б2 of MOL-144).
   const name = (to: RouteLocationNormalized): string => {
@@ -251,10 +267,23 @@ export function installArrival(router: Router, t: (key: string) => string): void
     return key === undefined ? t('app.name') : `${t(key)} · ${t('app.name')}`
   }
 
-  document.title = name(router.currentRoute.value)
+  // What this wrote last: a language chosen renames the tab only while it is still the route's — the
+  // door names its own (MOL-398, adversarial А1).
+  let written = name(router.currentRoute.value)
+  const write = (to: RouteLocationNormalized): void => {
+    written = name(to)
+    document.title = written
+  }
+  document.title = written
+  renameScreen = () => {
+    write(router.currentRoute.value)
+  }
+  watch(language, () => {
+    if (document.title === written) write(router.currentRoute.value)
+  })
   router.afterEach(async (to, from, failure) => {
     if (failure || to.fullPath === from.fullPath || sameScreen(from, to)) return
-    document.title = name(to)
+    write(to)
     if (from.matched.length === 0) return
     await nextTick()
     focusScreenTitle()

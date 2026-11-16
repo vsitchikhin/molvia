@@ -103,7 +103,11 @@ function start(): void {
     })
     .finally(() => {
       installViewTransitions(router)
-      installArrival(router, (key) => i18n.global.t(key))
+      installArrival(
+        router,
+        (key) => i18n.global.t(key),
+        () => i18n.global.locale.value,
+      )
       installHeightHold(router)
       installSheetEntryGuard(router)
       app.mount('#app')
