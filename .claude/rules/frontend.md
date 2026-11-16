@@ -874,7 +874,12 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   the hint of Open Food Facts, a message to the developer, and `LOCALE_HEADER` on every request — the
   account keeps the last one for the bot's reminder (`bot.md`). Applied on the tap with no reload: no
   screen is kept alive, so the next one mounts in the new language; a sheet's decimal separator is taken
-  at its opening, and none is open on «Настройки». The login screen offers the other language under its
+  at its opening, and none is open on «Настройки». **The tab's title follows too** (adversarial А1):
+  `installArrival` renames it while it is still the route's, the door names its own and gives the tab back
+  by the route (`nameScreen`), never a string kept from before the choice; a note the door shows once —
+  the erasure's — is words of the language spoken now (А2). **A category of one's own is refused a
+  ready-made name in either language** (А3): after a switch the two would stand as twins; the server does
+  not know the presets' names, so what was created before stays. The login screen offers the other language under its
   way in, apart from it (the owner's note on the plan), on the first step only. The line of a browser
   below the floor stays `pickLocale`'s: the app never started there, so nothing could have been chosen.
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the

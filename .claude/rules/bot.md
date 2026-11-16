@@ -245,9 +245,14 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   it — always Russian): it is sent without an update, so Telegram's is not at hand, and the account keeps
   the one every request of the phone names (`actors.locale`, `LOCALE_HEADER`), handed as `language` with
   the reminder; none — Russian, as it was, and a bot of the new version reads the API of the old one.
-  **Every button names the language of its message** (`:en` after the digit or the action, 46 bytes of
-  64): the bot keeps nothing, so a press answers and rebuilds the switch in the message's language, and
-  a message sent before it names none — the presser's Telegram language answers, as before. The silence
+  **A button of an English message says so** (`:en` after the digit or the action, 46 bytes of 64): the
+  bot keeps nothing, so a press reads the language off the button pressed — one source — and its outcome,
+  a refusal over it and the switch rebuilt speak the message's. **Russian is named by no suffix** (review
+  №1–2, adversarial А6): every reminder before MOL-398 was Russian, so a button naming none is Russian
+  whenever it was sent, and the bot of the release before reads every Russian one still. **The price,
+  named:** rolled back past this release, the old bot does not know an English reminder's buttons — it
+  answers «ссылка больше не действует» and strips them; English reminders did not exist before it.
+  «Ещё N ждут» picks its form by the language's plural rule (`remind.more.*`, adversarial А5). The silence
   warning, the sign-in notice and a leak's message stay Russian then English: a notice not understood is
   the harm it warns of, and a kept language may be one a stranger never read.
 - **A place is named with its city only where two items of one reminder share its name** (MOL-120)
