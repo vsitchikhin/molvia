@@ -23,10 +23,13 @@ export default {
       },
     }
     // Side by side, and neither stops the other (MOL-399): the lock's secret missing or a ping of it
-    // not gone fails the round only once the site has been told of.
+    // not gone fails the round only once the site has been told of — and both failing name both.
     const rounds = await Promise.allSettled([watch(settings, io), watchLock(settings, io)])
-    const failed = rounds.find((round) => round.status === 'rejected')
-    if (failed)
-      throw failed.reason instanceof Error ? failed.reason : new Error(String(failed.reason))
+    const failures = rounds.flatMap((round) =>
+      round.status === 'rejected'
+        ? [round.reason instanceof Error ? round.reason.message : String(round.reason)]
+        : [],
+    )
+    if (failures.length > 0) throw new Error(failures.join('; '))
   },
 }

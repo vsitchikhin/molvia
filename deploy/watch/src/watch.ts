@@ -1,10 +1,11 @@
 import { ATTEMPTS, judge, readLock, readSite } from '@/site'
-import type { Answer, Door, Verdict } from '@/site'
+import type { Answer, Verdict } from '@/site'
 
 /**
  * One round of the outside watch (MOL-221): asks the site, then tells healthchecks.io — the check
  * «molvia-up», or its `/fail` saying what. The watch it replaces ran on GitHub's cron, which on this
- * repository came every two to six hours instead of every five minutes; the rules are the same.
+ * repository came every two to six hours instead of every five minutes; the rules are the same. Beside
+ * it the lock's round (MOL-399): `grafana.<DOMAIN>` with no pass, told to «molvia-grafana-lock».
  */
 
 /** Between tries once a check has failed: four of them span the seconds a rollout is silent. */
@@ -106,8 +107,9 @@ async function drop(response: Response): Promise<void> {
 }
 
 /**
- * A redirect is not followed — it is not the page, and curl did not follow one either. A request
- * that fails — a bad certificate too — is a `000`, unless Cloudflare answers it with its own code.
+ * A redirect is not followed — it is not the page, and curl did not follow one either; where it sends
+ * is read, for the lock of Grafana (MOL-399). A request that fails — a bad certificate too — is a `000`,
+ * unless Cloudflare answers it with its own code.
  */
 async function ask(io: Io, url: string, read: boolean): Promise<Answer> {
   try {
@@ -115,26 +117,12 @@ async function ask(io: Io, url: string, read: boolean): Promise<Answer> {
       redirect: 'manual',
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
-    if (read) return { status: response.status, body: await response.text() }
-    await drop(response)
-    return { status: response.status, body: '' }
-  } catch {
-    return { status: 0, body: '' }
-  }
-}
-
-/** Grafana's address asked with no pass (MOL-399): where a redirect sends is read, never followed. */
-async function knock(io: Io, url: string): Promise<Door> {
-  try {
-    const response = await io.fetch(url, {
-      redirect: 'manual',
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    })
     const location = response.headers.get('location') ?? ''
+    if (read) return { status: response.status, body: await response.text(), location }
     await drop(response)
-    return { status: response.status, location }
+    return { status: response.status, body: '', location }
   } catch {
-    return { status: 0, location: '' }
+    return { status: 0, body: '', location: '' }
   }
 }
 
@@ -215,8 +203,15 @@ export async function watch(settings: Settings, io: Io): Promise<Round> {
  */
 export async function watchLock(settings: Settings, io: Io): Promise<Round> {
   const pingUrl = pingUrlOf('HC_LOCK_URL', settings.lockUrl)
+  // One check for both would let the later round's ping stand for the other's (adversarial А4): a lock
+  // well told after the site's `/fail` turned «molvia-up» green over a site down.
+  if (pingUrl === settings.pingUrl) {
+    throw new Error(
+      'HC_LOCK_URL is the same check as HC_UP_URL — the lock needs a check of its own',
+    )
+  }
   const host = `grafana.${settings.domain}`
-  const attempts = await look(async () => readLock(await knock(io, `https://${host}/`)), io)
+  const attempts = await look(async () => readLock(await ask(io, `https://${host}/`, false)), io)
   return told(host, attempts, pingUrl, io)
 }
 

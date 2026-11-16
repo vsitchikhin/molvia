@@ -13,37 +13,30 @@ const urlOf = (input: Parameters<typeof globalThis.fetch>[0]): string =>
   input instanceof Request ? input.url : input.toString()
 
 /**
- * A site that answers each try as `tries` says — the last state holds — and a healthchecks.io that
- * answers `pings` in turn. Every request is recorded, the pauses too.
+ * A Worker's `io` whose requests `answer` serves, and a healthchecks.io behind `pingUrl` that answers
+ * `pings` in turn. Every request is recorded, the pauses and the log too.
  */
-function rig(tries: readonly Site[], pings: readonly (number | 'network')[] = [200]) {
-  let attempt = -1
+function fakeIo(
+  pingUrl: string,
+  answer: (url: string) => Response,
+  pings: readonly (number | 'network')[] = [200],
+) {
   let ping = -1
   const waits: number[] = []
   const logged: string[] = []
   const reports: { url: string; method: string; body: string }[] = []
-  const answer = (url: string, init: RequestInit | undefined): Response => {
-    if (url.startsWith(PING)) {
+  // A thrown answer is a rejected fetch, as the network's failure is.
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
+    Promise.resolve().then(() => {
+      const url = urlOf(input)
+      if (!url.startsWith(pingUrl)) return answer(url)
       ping += 1
       const body = typeof init?.body === 'string' ? init.body : ''
       reports.push({ url, method: init?.method ?? 'GET', body })
       const status = pings[Math.min(ping, pings.length - 1)] ?? 200
       if (status === 'network') throw new TypeError('fetch failed')
       return new Response('OK', { status })
-    }
-    if (url.endsWith('/api/health')) attempt += 1
-    const site = tries[Math.min(attempt, tries.length - 1)]
-    if (site === 'unreachable') throw new TypeError('fetch failed')
-    if (url.endsWith('/api/health')) {
-      return site === 'well'
-        ? new Response(HEALTHY)
-        : new Response('{"status":"degraded","database":"down"}', { status: 503 })
-    }
-    return new Response('<!doctype html>')
-  }
-  // A thrown answer is a rejected fetch, as the network's failure is.
-  const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
-    Promise.resolve().then(() => answer(urlOf(input), init)),
+    }),
   )
   const io: Io = {
     fetch,
@@ -55,7 +48,28 @@ function rig(tries: readonly Site[], pings: readonly (number | 'network')[] = [2
       logged.push(`${warn ? 'warn' : 'log'}: ${line}`)
     },
   }
-  return { io, fetch, waits, reports, logged, tries: () => attempt + 1 }
+  return { io, fetch, waits, reports, logged }
+}
+
+/** A site that answers each try as `tries` says — the last state holds. */
+function rig(tries: readonly Site[], pings: readonly (number | 'network')[] = [200]) {
+  let attempt = -1
+  const fake = fakeIo(
+    PING,
+    (url) => {
+      if (url.endsWith('/api/health')) attempt += 1
+      const site = tries[Math.min(attempt, tries.length - 1)]
+      if (site === 'unreachable') throw new TypeError('fetch failed')
+      if (url.endsWith('/api/health')) {
+        return site === 'well'
+          ? new Response(HEALTHY)
+          : new Response('{"status":"degraded","database":"down"}', { status: 503 })
+      }
+      return new Response('<!doctype html>')
+    },
+    pings,
+  )
+  return { ...fake, tries: () => attempt + 1 }
 }
 
 describe('watch', () => {
@@ -375,44 +389,21 @@ describe('the lock of Grafana (MOL-399)', () => {
   const LOCKED = { ...SETTINGS, lockUrl: LOCK }
   const SIGN_IN = 'https://molvia.cloudflareaccess.com/cdn-cgi/access/login/grafana.molvia.net'
 
-  type Door = 'access' | 'grafana' | 'unreachable'
+  type Door = 'access' | 'grafana' | 'challenge' | 'unreachable'
 
   /** Grafana's address answering each try as `doors` says — the last state holds. */
   function door(doors: readonly Door[]) {
     let attempt = -1
-    const waits: number[] = []
-    const logged: string[] = []
-    const reports: { url: string; method: string; body: string }[] = []
-    const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
-      Promise.resolve().then(() => {
-        const url = urlOf(input)
-        if (url.startsWith(LOCK)) {
-          reports.push({
-            url,
-            method: init?.method ?? 'GET',
-            body: typeof init?.body === 'string' ? init.body : '',
-          })
-          return new Response('OK')
-        }
-        attempt += 1
-        const state = doors[Math.min(attempt, doors.length - 1)]
-        if (state === 'unreachable') throw new TypeError('fetch failed')
-        return state === 'access'
-          ? new Response(null, { status: 302, headers: { location: SIGN_IN } })
-          : new Response(null, { status: 302, headers: { location: '/login' } })
-      }),
-    )
-    const io: Io = {
-      fetch,
-      wait: async (ms) => {
-        waits.push(ms)
-        return Promise.resolve()
-      },
-      log: (line, warn) => {
-        logged.push(`${warn ? 'warn' : 'log'}: ${line}`)
-      },
-    }
-    return { io, fetch, waits, logged, reports }
+    return fakeIo(LOCK, () => {
+      attempt += 1
+      const state = doors[Math.min(attempt, doors.length - 1)]
+      if (state === 'unreachable') throw new TypeError('fetch failed')
+      if (state === 'challenge') return new Response(null, { status: 403 })
+      return new Response(null, {
+        status: 302,
+        headers: { location: state === 'access' ? SIGN_IN : '/login' },
+      })
+    })
   }
 
   it('asks grafana.<domain> with no pass, never following the redirect, and pings its own check', async () => {
@@ -473,6 +464,21 @@ describe('the lock of Grafana (MOL-399)', () => {
     }
   })
 
+  it('never takes a 403 for the lock — a challenge a browser passes to the Grafana behind (adversarial А5)', async () => {
+    const { io, reports } = door(['challenge'])
+    const round = await watchLock(LOCKED, io)
+    expect(round.attempts).toEqual(Array(4).fill(['grafana 403']))
+    expect(reports).toEqual([{ url: `${LOCK}/fail`, method: 'POST', body: 'grafana 403' }])
+  })
+
+  it('refuses the site’s own check, and asks nothing (adversarial А4)', async () => {
+    const { io, fetch } = door(['access'])
+    await expect(watchLock({ ...SETTINGS, lockUrl: PING }, io)).rejects.toThrow(
+      'HC_LOCK_URL is the same check as HC_UP_URL — the lock needs a check of its own',
+    )
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   it('is read as set: the site’s settings never refuse over it', () => {
     expect(settingsOf({ HC_UP_URL: PING, HC_LOCK_URL: 'not a url' })).toEqual({
       ...SETTINGS,
@@ -508,6 +514,24 @@ describe('the Worker', () => {
       /^HC_LOCK_URL is not/,
     )
     expect(fetch.mock.calls.map(([input]) => urlOf(input))).toContain(PING)
+  })
+
+  it('names both rounds when both fail (review №1)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) =>
+      Promise.resolve(
+        new Response(
+          urlOf(input).endsWith('/api/health')
+            ? HEALTHY
+            : urlOf(input) === PING
+              ? 'OK (not found)'
+              : '',
+        ),
+      ),
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    await expect(worker.scheduled(undefined, { HC_UP_URL: PING })).rejects.toThrow(
+      /^the ping to healthchecks\.io reached no check: «OK \(not found\)»; HC_LOCK_URL is not an https URL/,
+    )
   })
 
   it('runs both rounds and fails for neither when both are told', async () => {

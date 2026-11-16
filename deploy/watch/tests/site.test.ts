@@ -76,9 +76,9 @@ describe('readLock', () => {
       expect(readLock({ status, location: SIGN_IN })).toEqual([])
   })
 
-  it('finds it shut when Access refuses the request outright', () => {
-    expect(readLock({ status: 401, location: '' })).toEqual([])
-    expect(readLock({ status: 403, location: '' })).toEqual([])
+  it('never finds it shut by a refusal — nobody can tell Access’s from a challenge’s (adversarial А5)', () => {
+    expect(readLock({ status: 401, location: '' })).toEqual(['grafana 401'])
+    expect(readLock({ status: 403, location: '' })).toEqual(['grafana 403'])
   })
 
   it('names Grafana answering by itself — its page or its own login — the lock open', () => {
