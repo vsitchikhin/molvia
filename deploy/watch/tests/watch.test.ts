@@ -1,5 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PAUSE_MS, PING_TRIES, REQUEST_TIMEOUT_MS, settingsOf, watch, watchLock } from '@/watch'
+import {
+  LOCK_PATH,
+  PAUSE_MS,
+  PING_TRIES,
+  REQUEST_TIMEOUT_MS,
+  settingsOf,
+  watch,
+  watchLock,
+} from '@/watch'
 import type { Io } from '@/watch'
 import worker from '@/worker'
 
@@ -399,21 +407,21 @@ describe('the lock of Grafana (MOL-399)', () => {
       const state = doors[Math.min(attempt, doors.length - 1)]
       if (state === 'unreachable') throw new TypeError('fetch failed')
       if (state === 'challenge') return new Response(null, { status: 403 })
-      return new Response(null, {
-        status: 302,
-        headers: { location: state === 'access' ? SIGN_IN : '/login' },
-      })
+      // Access switched off: Grafana serves a shared dashboard's page for any link, a known one or not.
+      if (state === 'grafana') return new Response('<!doctype html>')
+      return new Response(null, { status: 302, headers: { location: SIGN_IN } })
     })
   }
 
-  it('asks grafana.<domain> with no pass, never following the redirect, and pings its own check', async () => {
+  it('asks a path the tunnel passes, with no pass, never following the redirect, and pings its own check', async () => {
     const { io, fetch, waits, reports, logged } = door(['access'])
     const round = await watchLock(LOCKED, io)
     expect(round.verdict).toEqual({ up: true })
     expect(fetch.mock.calls.map(([input]) => urlOf(input))).toEqual([
-      'https://grafana.molvia.net/',
+      'https://grafana.molvia.net/public-dashboards/watch',
       LOCK,
     ])
+    expect(LOCK_PATH).toMatch(/^\/public-dashboards\//)
     expect(fetch.mock.calls[0]?.[1]?.redirect).toBe('manual')
     expect(fetch.mock.calls[0]?.[1]?.headers).toBeUndefined()
     expect(waits).toEqual([])
@@ -421,16 +429,16 @@ describe('the lock of Grafana (MOL-399)', () => {
     expect(logged).toEqual(['log: grafana.molvia.net is well'])
   })
 
-  it('reports /fail «grafana open» at three answers of Grafana’s own in four', async () => {
+  it('reports /fail «grafana open» at three answers of Grafana’s own in four — Access off', async () => {
     const { io, reports } = door(['grafana', 'grafana', 'access', 'grafana'])
     const round = await watchLock(LOCKED, io)
     expect(round.attempts).toEqual([
-      ['grafana open 302'],
-      ['grafana open 302'],
+      ['grafana open 200'],
+      ['grafana open 200'],
       [],
-      ['grafana open 302'],
+      ['grafana open 200'],
     ])
-    expect(reports).toEqual([{ url: `${LOCK}/fail`, method: 'POST', body: 'grafana open 302' }])
+    expect(reports).toEqual([{ url: `${LOCK}/fail`, method: 'POST', body: 'grafana open 200' }])
   })
 
   it('still pings at two of four — a rollout of the tunnel', async () => {
@@ -442,7 +450,9 @@ describe('the lock of Grafana (MOL-399)', () => {
   it('asks the domain it is given', async () => {
     const { io, fetch } = door(['access'])
     await watchLock({ ...LOCKED, domain: 'molvia.invalid' }, io)
-    expect(urlOf(fetch.mock.calls[0]?.[0] ?? '')).toBe('https://grafana.molvia.invalid/')
+    expect(urlOf(fetch.mock.calls[0]?.[0] ?? '')).toBe(
+      'https://grafana.molvia.invalid/public-dashboards/watch',
+    )
   })
 
   it('refuses a missing or malformed secret by its name, never its value, and asks nothing', async () => {
@@ -538,7 +548,7 @@ describe('the Worker', () => {
     const LOCK = 'https://hc-ping.com/9a8b7c6d-lock'
     const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = urlOf(input)
-      if (url === 'https://grafana.molvia.net/')
+      if (url === 'https://grafana.molvia.net/public-dashboards/watch')
         return Promise.resolve(
           new Response(null, {
             status: 302,

@@ -63,8 +63,8 @@ function accessSignIn(location: string): boolean {
 /**
  * What is wrong with the lock of Grafana from outside (MOL-399, В-3), a line or nothing. A request with
  * no pass is shut only when Access sends it to the team's sign-in — what Access does with every request
- * that carries none. Grafana answering by itself, its page or its own `/login`, is the lock open:
- * Grafana's own check of the pass is the second lock, not the first. Any other answer — none, Cloudflare's
+ * that carries none. Grafana answering by itself — a shared dashboard's page, or a redirect of its own — is
+ * the lock open: the dashboard's link is the only secret left. Any other answer — none, Cloudflare's
  * own error, a `403` of its challenge or its firewall, which a browser may pass and reach Grafana behind
  * (adversarial А5) — says nothing of the lock, and is no lock seen either.
  */

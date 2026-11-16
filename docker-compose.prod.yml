@@ -325,25 +325,12 @@ services:
       GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED: 'true'
       # Grafana fetches five plugins from grafana.com at every start unless told not to.
       GF_PLUGINS_PREINSTALL_DISABLED: 'true'
-      # From any device of the owner (MOL-399): `tunnel` below brings `grafana.<DOMAIN>` here through
-      # Cloudflare Access, and Grafana lets in only a request that carries Access's signed pass — the
-      # second lock, should Access ever be switched off or bypassed. The owner is a user of their own,
-      # made from the pass's e-mail at the first visit, a Viewer: what runs is what the repository says
-      # (Р-10 of MOL-145), so nothing is edited from outside. A token in the address would land in the
-      # history and the logs, so the header is the only way (`URL_LOGIN`).
+      # From any device of the owner (MOL-399, В-6 «а»): the dashboard shared by link, which `tunnel`
+      # below brings to `grafana.<DOMAIN>` behind Cloudflare Access. A visitor of the link signs in to
+      # nothing — it runs the dashboard's own panels and no other query, no API, no proxy — so nobody
+      # from outside is a user of Grafana. The address the link and the alarms name is the root's.
       GF_SERVER_ROOT_URL: https://grafana.${DOMAIN:?set DOMAIN}
-      GF_AUTH_JWT_ENABLED: 'true'
-      GF_AUTH_JWT_HEADER_NAME: Cf-Access-Jwt-Assertion
-      GF_AUTH_JWT_EMAIL_CLAIM: email
-      GF_AUTH_JWT_USERNAME_CLAIM: email
-      # The team's domain whole, as Zero Trust shows it — `<team>.cloudflareaccess.com`; `start.sh` warns
-      # of another form, which would lock the owner out with nothing else saying so (adversarial А6).
-      GF_AUTH_JWT_JWK_SET_URL: https://${GRAFANA_ACCESS_DOMAIN:?set GRAFANA_ACCESS_DOMAIN — the team domain of Cloudflare Access}/cdn-cgi/access/certs
-      GF_AUTH_JWT_EXPECT_CLAIMS: '{"aud": "${GRAFANA_ACCESS_AUD:?set GRAFANA_ACCESS_AUD — the Application Audience tag of Access}", "iss": "https://${GRAFANA_ACCESS_DOMAIN}"}'
-      GF_AUTH_JWT_AUTO_SIGN_UP: 'true'
-      GF_AUTH_JWT_URL_LOGIN: 'false'
-      GF_AUTH_JWT_ALLOW_ASSIGN_GRAFANA_ADMIN: 'false'
-      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
+      GF_PUBLIC_DASHBOARDS_ENABLED: 'true'
       # The alarms' own bot (В-3), never the product's: the login's token stays out of a container
       # that goes to the internet. Whom it writes is the owner the failures go to (MOL-143), put
       # into the contact point by `deploy/grafana/start.sh`.
@@ -358,7 +345,7 @@ services:
     mem_limit: 768m
     ports:
       # The one port of the metrics, on the machine's loopback only: `ssh -L 3000:127.0.0.1:3000` —
-      # `admin`'s way in, and the owner's when Cloudflare is down (MOL-399, Р-3).
+      # Grafana whole, `admin`'s way in, and the dashboard's when Cloudflare is down (MOL-399, Р-3).
       - '127.0.0.1:${GRAFANA_PORT:-3000}:3000'
     volumes:
       - grafana_data:/var/lib/grafana
@@ -371,22 +358,37 @@ services:
   tunnel:
     logging: *logging
     # Cloudflare Tunnel to Grafana (MOL-399): a connection out to Cloudflare, so the machine opens no
-    # port. Run by its token, the tunnel is managed in Cloudflare's dashboard beside the policy of
-    # Access — `grafana.<DOMAIN>` → `http://grafana:3000` (deploy/README.md, «Metrics»). An upstream
-    # image of an exact tag, which Dependabot moves.
+    # port. The tunnel is managed locally (В-6 «а»): what it passes is `tunnel.yml` below, never
+    # Cloudflare's dashboard (deploy/README.md, «Metrics»). An upstream image of an exact tag, which
+    # Dependabot moves.
     image: cloudflare/cloudflared:2026.11.0
     restart: unless-stopped
     # The image's entrypoint is `cloudflared --no-autoupdate`: the version is this file's.
-    command: ['tunnel', 'run']
+    command: ['tunnel', '--config', '/etc/cloudflared/config.yml', 'run']
+    configs:
+      - source: tunnel
+        target: /etc/cloudflared/config.yml
     environment:
       # The environment, never `--token`: an argument is read by every user of the machine in `ps`.
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN — the token of the tunnel to Grafana}
     mem_limit: 128m
-    # Grafana's network alone, never `metrics`: whatever Cloudflare's ingress names, all the tunnel can
-    # reach is Grafana — not VictoriaMetrics, which has no password, nor the API.
+    # Grafana's network alone, never `metrics`: all the tunnel can reach is Grafana — not
+    # VictoriaMetrics, which has no password, nor the API.
     networks: [alerts]
     depends_on:
       - grafana
+
+configs:
+  # What the tunnel passes (MOL-399, В-6 «а», adversarial А1–А3): the shared dashboard's page, its
+  # files and its answers, and nothing else of Grafana — no login, no API, no data source's proxy —
+  # whatever Access lets through or would, switched off. Anything else is the tunnel's own 404.
+  tunnel:
+    content: |
+      ingress:
+        - hostname: grafana.${DOMAIN:?set DOMAIN}
+          path: ^/(public-dashboards|public|api/public)/
+          service: http://grafana:3000
+        - service: http_status:404
 
 networks:
   default: {}

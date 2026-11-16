@@ -14,6 +14,9 @@ export const PAUSE_MS = 30_000
 /** One request is given up on after this, and counts as no answer, `000`. */
 export const REQUEST_TIMEOUT_MS = 10_000
 
+/** What the lock's round knocks at: a shared dashboard's path, no link of any — the tunnel's, not its 404. */
+export const LOCK_PATH = '/public-dashboards/watch'
+
 /** A ping is tried this many times before the round fails — curl's `--retry 3` before. */
 export const PING_TRIES = 4
 
@@ -211,7 +214,9 @@ export async function watchLock(settings: Settings, io: Io): Promise<Round> {
     )
   }
   const host = `grafana.${settings.domain}`
-  const attempts = await look(async () => readLock(await ask(io, `https://${host}/`, false)), io)
+  // A path the tunnel passes (В-6 «а»): Access switched off, Grafana answers it itself, `200`.
+  const door = `https://${host}${LOCK_PATH}`
+  const attempts = await look(async () => readLock(await ask(io, door, false)), io)
   return told(host, attempts, pingUrl, io)
 }
 
