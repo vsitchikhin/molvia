@@ -36,14 +36,14 @@ export const en: Dictionary = {
     'To delete all your data — /delete.',
   'erase.prompt':
     'Delete all your data in Molvia?\n\n' +
-    'Everything Molvia knows about you will go: purchases, spending and its categories, money ' +
-    'exchanges, income, accounts and checks, ratings and ' +
+    'Everything Molvia knows about you will be deleted: purchases, expenses and their categories, ' +
+    'currency exchanges, incomes, accounts and checks, ratings and ' +
     'reviews, search picks, visit marks, settings and sign-ins on every device. Your items in the ' +
     'shared catalogue will be deleted if nobody else uses them. Those someone else has already ' +
     'bought, rated or picked in search will stay, without your name — as will the shops, the ' +
-    'barcodes and the shops’ memory — which item stands behind a receipt line and the shelf ' +
-    'price. One number will ' +
-    'stay too — how many people who came in the same week deleted their data.\n\n' +
+    'barcodes and the shops’ memory (which item a receipt line stands for, and the shelf ' +
+    'price). One number will ' +
+    'stay too — how many people who joined in the same week deleted their data.\n\n' +
     'This cannot be undone.',
   'erase.confirm': 'Delete for good',
   'erase.cancel': 'Cancel',
@@ -67,17 +67,17 @@ export const en: Dictionary = {
   'remind.in.Батуми': 'in Batumi',
   'remind.in.Белград': 'in Belgrade',
   'remind.in.Нови-Сад': 'in Novi Sad',
-  'remind.more': '{n} more wait in «Ratings»: {url}',
-  'rate.done': 'Saved: {score} out of 5. Pressed the wrong one? Press another.',
-  'rate.failed': 'No answer came back. Please press again in a minute.',
+  'remind.more': '{n} more are waiting in “Ratings”: {url}',
+  'rate.done': 'Saved: {score} out of 5. Tapped the wrong one? Tap another.',
+  'rate.failed': 'No answer came back. Please tap again in a minute.',
   'rate.gone': 'This rating can no longer be given: the account or the item is gone.',
   'remind.stop': '🔕 Stop reminding',
-  'remind.resume': '🔔 Bring reminders back',
+  'remind.resume': '🔔 Turn reminders back on',
   'remind.stopped':
-    '🔕 Reminders are off. Bring them back with the button below or in the app’s settings.',
+    '🔕 Reminders are off. Turn them back on with the button below or in the app’s settings.',
   'remind.resumed': '🔔 Reminders are on again.',
   'remind.gone': 'Nothing to turn on: the Molvia account is gone.',
-  'remind.switchFailed': 'No answer came back. Please press again in a minute.',
+  'remind.switchFailed': 'No answer came back. Please tap again in a minute.',
   'receipt.parsed': 'Your {place} receipt is ready: {count}. Take a look and save them.',
   'receipt.parsed_no_place':
     'Your receipt from {date} is ready: {count}. Take a look and save them.',
@@ -93,16 +93,16 @@ export const en: Dictionary = {
   'receipt.link_unread':
     'Your receipt from {date} could not be read. You can add the purchases by hand or paste the receipt’s link again.',
   'receipt.duplicate':
-    'Your {place} receipt is read, but it is saved already — no need to save it again.',
+    'Your {place} receipt has been read, but it’s already saved — no need to save it again.',
   'receipt.duplicate_no_place':
-    'Your receipt from {date} is read, but it is saved already — no need to save it again.',
+    'Your receipt from {date} has been read, but it’s already saved — no need to save it again.',
   'receipt.view': 'View receipt',
   'receipt.open': 'Open receipt',
   'receipt.items.one': '{n} item',
   'receipt.items.few': '{n} items',
   'receipt.items.many': '{n} items',
   'silence.warn':
-    "You haven't opened Molvia for almost two years. On {date} — in {days} — your account and all your data will be deleted, just as by «Delete my data».\n\nTo keep them, open the app and sign in. You can take a copy first: «Download my data» in the settings.",
+    "You haven't opened Molvia for almost two years. On {date} — in {days} — your account and all your data will be deleted, just as by “Delete my data”.\n\nTo keep them, open the app and sign in. You can take a copy first: “Download my data” in the settings.",
   'silence.days.one': '{n} day',
   'silence.days.few': '{n} days',
   'silence.days.many': '{n} days',
@@ -192,7 +192,7 @@ export const en: Dictionary = {
   'feedback.notSent': 'Not sent: Telegram refused the message. Reply again.',
   'feedback.unknown':
     'Not sure it arrived: the connection to Telegram broke. Reply again and the person may get it twice.',
-  'owner.feedback.bug': '🐞 Broken · #fb{thread}',
+  'owner.feedback.bug': '🐞 Bug · #fb{thread}',
   'owner.feedback.idea': '💡 Idea · #fb{thread}',
   'owner.feedback.other': '💬 Other · #fb{thread}',
   'owner.feedback.continued': '↩️ Continued · #fb{thread}',

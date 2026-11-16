@@ -59,8 +59,8 @@ describe('предупреждение о стирании (MOL-239)', () => {
     expect(silenceText(notice())).toBe(
       'Вы не открывали Molvia почти два года. 26 октября — через 30 дней — аккаунт и все ваши данные удалятся, так же как по «Удалить мои данные».\n\n' +
         'Чтобы их оставить, откройте приложение и войдите. Копию можно взять до этого: «Скачать мои данные» в настройках.\n\n' +
-        "You haven't opened Molvia for almost two years. On 26 October — in 30 days — your account and all your data will be deleted, just as by «Delete my data».\n\n" +
-        'To keep them, open the app and sign in. You can take a copy first: «Download my data» in the settings.',
+        "You haven't opened Molvia for almost two years. On 26 October — in 30 days — your account and all your data will be deleted, just as by “Delete my data”.\n\n" +
+        'To keep them, open the app and sign in. You can take a copy first: “Download my data” in the settings.',
     )
   })
 
