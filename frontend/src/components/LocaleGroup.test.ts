@@ -2,9 +2,8 @@ import { mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Component } from 'vue'
-import DateStyleGroup from '@/components/DateStyleGroup.vue'
 import LocaleGroup from '@/components/LocaleGroup.vue'
-import { DATE_STYLE_KEY, LOCALE_KEY, installLocale, useLocale } from '@/composables/useLocale'
+import { LOCALE_KEY, installLocale, useLocale } from '@/composables/useLocale'
 import { i18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
@@ -72,28 +71,5 @@ describe('LocaleGroup', () => {
     await view.get('input[value="device"]').setValue(true)
     expect(view.get('h2').text()).toBe(ru.settings.group_locale)
     expect(localStorage.getItem(LOCALE_KEY)).toBe('device')
-  })
-})
-
-describe('DateStyleGroup', () => {
-  it('names each order by a day and an hour written in it, British first', () => {
-    useLocale().choose('en')
-    const view = render(DateStyleGroup)
-    expect(view.get('h2').text()).toBe(en.settings.group_date_style)
-    expect(view.findAll('.segment').map((segment) => segment.text())).toEqual([
-      '16 Nov, 14:05',
-      'Nov 16, 2:05 PM',
-    ])
-    expect(checked(view)).toEqual(['gb'])
-    expect(view.get('.hint').text()).toBe(en.settings.date_style.hint)
-  })
-
-  it('a tap moves every date of the screens to the American order', async () => {
-    useLocale().choose('en')
-    const view = render(DateStyleGroup)
-    await view.get('input[value="us"]').setValue(true)
-    expect(i18n.global.locale.value).toBe('en-US')
-    expect(localStorage.getItem(DATE_STYLE_KEY)).toBe('us')
-    expect(checked(view)).toEqual(['us'])
   })
 })

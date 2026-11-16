@@ -1,24 +1,17 @@
 <template>
-  <section class="group">
-    <SectionCaption>{{ t('settings.group_locale') }}</SectionCaption>
-    <SegmentedControl
-      :model-value="choice"
-      :options="languages"
-      :legend="t('settings.group_locale')"
-      hide-legend
-      fit
-      :aria-describedby="`${id}-hint`"
-      @update:model-value="pickLanguage"
-    />
-    <p :id="`${id}-hint`" class="hint">{{ t('settings.locale.hint') }}</p>
-  </section>
+  <DeviceChoiceGroup
+    :caption="t('settings.group_locale')"
+    :hint="t('settings.locale.hint')"
+    :options="languages"
+    :model-value="choice"
+    @update:model-value="pick"
+  />
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, useId } from 'vue'
+import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
-import SectionCaption from '@/components/SectionCaption.vue'
-import SegmentedControl from '@/components/SegmentedControl.vue'
+import DeviceChoiceGroup from '@/components/DeviceChoiceGroup.vue'
 import type { Segment } from '@/components/SegmentedControl.vue'
 import { useLocale } from '@/composables/useLocale'
 import type { LocaleChoice } from '@/composables/useLocale'
@@ -33,7 +26,7 @@ const CHOICES: readonly LocaleChoice[] = ['device', 'ru', 'en']
  */
 export default defineComponent({
   name: 'LocaleGroup',
-  components: { SectionCaption, SegmentedControl },
+  components: { DeviceChoiceGroup },
   setup() {
     const { t } = useI18n()
     const { choice, choose } = useLocale()
@@ -44,20 +37,11 @@ export default defineComponent({
           : { value, label: t(`settings.locale.${value}`), lang: value },
       ),
     )
-    function pickLanguage(value: string): void {
+    function pick(value: string): void {
       const chosen = CHOICES.find((known) => known === value)
       if (chosen) choose(chosen)
     }
-    return { t, id: useId(), choice, languages, pickLanguage }
+    return { t, choice, languages, pick }
   },
 })
 </script>
-
-<style scoped lang="scss">
-.hint {
-  margin: var(--space-2) 0 0;
-  padding: 0 var(--space-1);
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-</style>
