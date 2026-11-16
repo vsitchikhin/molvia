@@ -70,6 +70,9 @@ const PHOTO_ROUTE = '/receipts/:receiptId/parts/:part'
  */
 const PEOPLE = 'route!~"unmatched|/health|/internal/.*"'
 
+/** The services of the metrics, which never judge a rollout (MOL-145), the tunnel to Grafana with them (MOL-399). */
+const METRICS = ['victoria', 'node-exporter', 'cadvisor', 'postgres-exporter', 'grafana', 'tunnel']
+
 describe('the compose file', () => {
   it('publishes no port but Caddy’s and Grafana’s on the loopback', () => {
     // Every entry under `ports:`, quoted any way or not at all (review №2): a test that read only
@@ -100,8 +103,12 @@ describe('the compose file', () => {
     // nobody who calls.
     expect(networks.get('grafana')).toBe('alerts, metrics')
     expect(compose).toMatch(/^ {2}alerts: \{\}$/m)
+    // The tunnel beside Grafana alone (MOL-399): whatever Cloudflare's ingress names, it reaches
+    // Grafana and nothing else — never VictoriaMetrics, which has no password.
+    expect(networks.get('tunnel')).toBe('alerts')
     for (const [name, joined] of networks)
-      if (name !== 'grafana') expect(joined ?? '', name).not.toContain('alerts')
+      if (name !== 'grafana' && name !== 'tunnel')
+        expect(joined ?? '', name).not.toContain('alerts')
     // Neither the exporters' host network nor a privileged container (Р-7, Р-8) — cAdvisor gets the
     // one capability it reads the OOM-killer with (review №1).
     expect(compose).not.toMatch(/network_mode: host|privileged: true/)
@@ -134,8 +141,58 @@ describe('the compose file', () => {
   })
 
   it('gives every service of the metrics a limit of memory', () => {
-    for (const name of ['victoria', 'node-exporter', 'cadvisor', 'postgres-exporter', 'grafana'])
-      expect(services().get(name), name).toMatch(/^ {4}mem_limit: \d+m$/m)
+    for (const name of METRICS) expect(services().get(name), name).toMatch(/^ {4}mem_limit: \d+m$/m)
+  })
+
+  it('runs the tunnel by a token from the environment, never an argument (MOL-399)', () => {
+    const tunnel = services().get('tunnel') ?? ''
+    // An exact tag of the upstream image, which Dependabot moves (В-5).
+    expect(tunnel).toMatch(/^ {4}image: cloudflare\/cloudflared:\d{4}\.\d+\.\d+$/m)
+    expect(tunnel).toMatch(/^ {6}TUNNEL_TOKEN: \$\{CLOUDFLARE_TUNNEL_TOKEN:\?/m)
+    // Every user of the machine reads the arguments in `ps`.
+    expect(tunnel).toMatch(/^ {4}command: \['tunnel', 'run'\]$/m)
+    expect(read('.env.prod.example')).toMatch(/^CLOUDFLARE_TUNNEL_TOKEN=$/m)
+    expect(read('deploy/README.md')).toMatch(/^\| `CLOUDFLARE_TUNNEL_TOKEN` +\|/m)
+  })
+
+  it('lets into Grafana from outside only Access’s signed pass, and as a Viewer (MOL-399)', () => {
+    const grafana = services().get('grafana') ?? ''
+    const team = '${GRAFANA_ACCESS_TEAM'
+    for (const setting of [
+      "GF_AUTH_JWT_ENABLED: 'true'",
+      'GF_AUTH_JWT_HEADER_NAME: Cf-Access-Jwt-Assertion',
+      'GF_AUTH_JWT_EMAIL_CLAIM: email',
+      'GF_AUTH_JWT_USERNAME_CLAIM: email',
+      `GF_AUTH_JWT_JWK_SET_URL: https://${team}:?`,
+      "GF_AUTH_JWT_AUTO_SIGN_UP: 'true'",
+      // A token in the address lands in the history and the logs.
+      "GF_AUTH_JWT_URL_LOGIN: 'false'",
+      "GF_AUTH_JWT_ALLOW_ASSIGN_GRAFANA_ADMIN: 'false'",
+      // What runs is what the repository says (Р-10 of MOL-145): nothing is edited from outside.
+      'GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer',
+      'GF_SERVER_ROOT_URL: https://grafana.${DOMAIN:?',
+    ])
+      expect(grafana).toContain(setting)
+    expect(grafana).toContain('.cloudflareaccess.com/cdn-cgi/access/certs\n')
+    // The pass is the application's and the team's, never any of Cloudflare's: the tag and the issuer.
+    const claims = /^ {6}GF_AUTH_JWT_EXPECT_CLAIMS: '(.+)'$/m.exec(grafana)?.[1] ?? ''
+    expect(JSON.parse(claims)).toEqual({
+      aud: '${GRAFANA_ACCESS_AUD:?set GRAFANA_ACCESS_AUD — the Application Audience tag of Access}',
+      iss: `https://${team}}.cloudflareaccess.com`,
+    })
+    // One source of keys: Grafana refuses to start with two.
+    expect(grafana).not.toMatch(/GF_AUTH_JWT_(?:KEY_FILE|JWK_SET_FILE|KEY_ID)/)
+    // A role from the pass is never read: the e-mail is the owner's, the role the repository's.
+    expect(grafana).not.toContain('GF_AUTH_JWT_ROLE_ATTRIBUTE_PATH')
+    for (const name of ['GRAFANA_ACCESS_TEAM', 'GRAFANA_ACCESS_AUD'])
+      expect(read('.env.prod.example')).toMatch(new RegExp(`^${name}=$`, 'm'))
+    // An alarm names the address it is looked at by, not a tunnel to set up first (Т-8) — written by
+    // `start.sh`, since Grafana reads no environment inside a template.
+    const place = '{{/* GF_SERVER_ROOT_URL, written by start.sh */}}'
+    expect(notify).toContain(`Дашборд — ${place}{{ end }}`)
+    expect(read('deploy/grafana/start.sh')).toContain(
+      `s#${place.replaceAll('*', '\\*')}#\${GF_SERVER_ROOT_URL}#`,
+    )
   })
 
   it('switches off everything Grafana would call home with (Р-6)', () => {

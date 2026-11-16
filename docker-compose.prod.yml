@@ -310,7 +310,7 @@ services:
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      # Behind the tunnel and a password still: the tunnel is the door, the password the lock.
+      # `admin` is reached only by the SSH tunnel to the loopback port, and its password is the lock.
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?set GRAFANA_ADMIN_PASSWORD}
       GF_USERS_ALLOW_SIGN_UP: 'false'
       GF_AUTH_ANONYMOUS_ENABLED: 'false'
@@ -325,6 +325,23 @@ services:
       GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED: 'true'
       # Grafana fetches five plugins from grafana.com at every start unless told not to.
       GF_PLUGINS_PREINSTALL_DISABLED: 'true'
+      # From any device of the owner (MOL-399): `tunnel` below brings `grafana.<DOMAIN>` here through
+      # Cloudflare Access, and Grafana lets in only a request that carries Access's signed pass — the
+      # second lock, should Access ever be switched off or bypassed. The owner is a user of their own,
+      # made from the pass's e-mail at the first visit, a Viewer: what runs is what the repository says
+      # (Р-10 of MOL-145), so nothing is edited from outside. A token in the address would land in the
+      # history and the logs, so the header is the only way (`URL_LOGIN`).
+      GF_SERVER_ROOT_URL: https://grafana.${DOMAIN:?set DOMAIN}
+      GF_AUTH_JWT_ENABLED: 'true'
+      GF_AUTH_JWT_HEADER_NAME: Cf-Access-Jwt-Assertion
+      GF_AUTH_JWT_EMAIL_CLAIM: email
+      GF_AUTH_JWT_USERNAME_CLAIM: email
+      GF_AUTH_JWT_JWK_SET_URL: https://${GRAFANA_ACCESS_TEAM:?set GRAFANA_ACCESS_TEAM — the team of Cloudflare Access}.cloudflareaccess.com/cdn-cgi/access/certs
+      GF_AUTH_JWT_EXPECT_CLAIMS: '{"aud": "${GRAFANA_ACCESS_AUD:?set GRAFANA_ACCESS_AUD — the Application Audience tag of Access}", "iss": "https://${GRAFANA_ACCESS_TEAM}.cloudflareaccess.com"}'
+      GF_AUTH_JWT_AUTO_SIGN_UP: 'true'
+      GF_AUTH_JWT_URL_LOGIN: 'false'
+      GF_AUTH_JWT_ALLOW_ASSIGN_GRAFANA_ADMIN: 'false'
+      GF_USERS_AUTO_ASSIGN_ORG_ROLE: Viewer
       # The alarms' own bot (В-3), never the product's: the login's token stays out of a container
       # that goes to the internet. Whom it writes is the owner the failures go to (MOL-143), put
       # into the contact point by `deploy/grafana/start.sh`.
@@ -338,7 +355,8 @@ services:
     # OOM-killer took Grafana — and the alarms with it — on the first login (04.10.2026).
     mem_limit: 768m
     ports:
-      # The one port of the metrics, on the machine's loopback only: `ssh -L 3000:127.0.0.1:3000`.
+      # The one port of the metrics, on the machine's loopback only: `ssh -L 3000:127.0.0.1:3000` —
+      # `admin`'s way in, and the owner's when Cloudflare is down (MOL-399, Р-3).
       - '127.0.0.1:${GRAFANA_PORT:-3000}:3000'
     volumes:
       - grafana_data:/var/lib/grafana
@@ -348,9 +366,30 @@ services:
     depends_on:
       - victoria
 
+  tunnel:
+    logging: *logging
+    # Cloudflare Tunnel to Grafana (MOL-399): a connection out to Cloudflare, so the machine opens no
+    # port. Run by its token, the tunnel is managed in Cloudflare's dashboard beside the policy of
+    # Access — `grafana.<DOMAIN>` → `http://grafana:3000` (deploy/README.md, «Metrics»). An upstream
+    # image of an exact tag, which Dependabot moves.
+    image: cloudflare/cloudflared:2026.11.0
+    restart: unless-stopped
+    # The image's entrypoint is `cloudflared --no-autoupdate`: the version is this file's.
+    command: ['tunnel', 'run']
+    environment:
+      # The environment, never `--token`: an argument is read by every user of the machine in `ps`.
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN — the token of the tunnel to Grafana}
+    mem_limit: 128m
+    # Grafana's network alone, never `metrics`: whatever Cloudflare's ingress names, all the tunnel can
+    # reach is Grafana — not VictoriaMetrics, which has no password, nor the API.
+    networks: [alerts]
+    depends_on:
+      - grafana
+
 networks:
   default: {}
-  # Grafana's alone: a way out to Telegram and healthchecks.io, and no neighbour (review №4).
+  # Grafana's and its tunnel's: a way out to Telegram, healthchecks.io and Cloudflare, and no other
+  # neighbour (review №4, MOL-399).
   alerts: {}
   # No way out of it: neither an exporter nor VictoriaMetrics reaches the internet (Р-7).
   metrics:

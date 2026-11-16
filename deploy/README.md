@@ -930,6 +930,7 @@ written as their documentation has them and not drilled.
 | `GRAFANA_ADMIN_PASSWORD`               | `.env.prod`                                        | Grafana's restart                            |
 | `TELEGRAM_BOT_TOKEN`                   | `.env.prod`, BotFather                             | the bot's restart; no login meanwhile        |
 | `ALERTS_BOT_TOKEN`                     | `.env.prod`, BotFather                             | Grafana's restart                            |
+| `CLOUDFLARE_TUNNEL_TOKEN`              | `.env.prod`, Cloudflare Zero Trust                 | Grafana from outside; never the site         |
 | `CLAUDE_API_KEY`                       | `.env.prod`, Anthropic console                     | none — Tesseract reads a refused key's reads |
 | `BOT_PULSE_URL`, `ALERTS_PULSE_URL`    | `.env.prod`, healthchecks.io                       | none                                         |
 | `HC_URL` (the copies' ping)            | `backup.env`, healthchecks.io                      | none                                         |
@@ -991,6 +992,11 @@ written as their documentation has them and not drilled.
   new one into `.env.prod`, `$C up -d bot`. Until the bot is back nobody can sign in; the bot exits on a
   revoked token (`401`) rather than retrying, so a restart loop says the line was not changed.
   **`ALERTS_BOT_TOKEN`** the same for the alarms' bot, then `$C up -d grafana`.
+- **`CLOUDFLARE_TUNNEL_TOKEN`** (MOL-399): whoever holds it can run a connector of the tunnel — put their
+  own machine behind `grafana.<DOMAIN>` — though Access still stands before it, and Grafana's pass is
+  Access's. Zero Trust → Networks → Tunnels → `molvia-grafana` → «Refresh token» (or the tunnel deleted
+  and made anew, its public hostname with it), the new token into the line by `read -rs` as above, then
+  `$C up -d tunnel`. The old connectors drop at the refresh. Not drilled.
 - **`CLAUDE_API_KEY`**: a new key in the console's workspace, the line, `$C up -d backend`, and only
   then the old key deleted. **A key the API refuses is no wait**: a `401` is `ModelRejected`, and that
   receipt goes to Tesseract at once, for good — never asked of the model again — each one a

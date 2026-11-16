@@ -18,6 +18,22 @@ esac
 sed -i "s/\"chatid\": \"[^\"]*\"/\"chatid\": \"${OWNER_TELEGRAM_ID}\"/" \
   /etc/grafana/provisioning/alerting/notify.json
 
+# The address an alarm names (MOL-399): `grafana.<DOMAIN>`. Grafana reads no environment inside a
+# template — `$__env{…}` came out as itself (probe of 16.11.2026) — so it is written here as the chat is.
+# Its place is a comment of the template, so an address this check refuses leaves the line without one
+# and the alarms going, rather than stop them over a word of a message.
+case "${GF_SERVER_ROOT_URL:-}" in
+  https://*[!A-Za-z0-9.:/-]*) plain=no ;;
+  https://?*) plain=yes ;;
+  *) plain=no ;;
+esac
+if [ "$plain" = yes ]; then
+  sed -i "s#{{/\* GF_SERVER_ROOT_URL, written by start.sh \*/}}#${GF_SERVER_ROOT_URL}#" \
+    /etc/grafana/provisioning/alerting/notify.json
+else
+  echo "GF_SERVER_ROOT_URL is not a plain https address: the alarms name no dashboard" >&2
+fi
+
 # The password of `.env.prod` is the password, at every start (adversarial А6): Grafana reads
 # GF_SECURITY_ADMIN_PASSWORD only when it creates its database, so a password changed after a leak
 # changed nothing and the old one still opened it. Through stdin, never the arguments, which every
