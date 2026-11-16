@@ -402,10 +402,32 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   node_exporter is not on the host's network, which would be a port outside, so the machine's network
   counters are not there. **Grafana is in `metrics` and in `alerts` of its own**, for Telegram and the
   pulse — not in `default` (review №4), beside Caddy, the API, the bot and the receipt reader, which
-  asks nobody who calls — and its one port is on the loopback for the tunnel. cAdvisor has
+  asks nobody who calls — and its one port is on the loopback for the SSH tunnel. cAdvisor has
   `CAP_SYSLOG` and nothing more (review №1): the OOM-killer is read from the kernel's log, which
   `kernel.dmesg_restrict=1` of Debian and Ubuntu keeps from anything without it — every OOM counted 0
   in silence, «Could not configure a source for OOM detection» in its log alone.
+- **Grafana from outside is a Cloudflare Tunnel behind Cloudflare Access, with Grafana's own check of the
+  pass behind both** (MOL-399, owner's В-1 «а»; MOL-149's В-3 «SSH tunnel» changed by the owner's word of
+  MOL-376: «с любого устройства… но скрыть от ненужных глаз»). `cloudflared` holds a connection out, so the
+  machine opens no port, and **stands in `alerts` alone, never `metrics`**: whatever the ingress in
+  Cloudflare's dashboard names, all it reaches is Grafana — not VictoriaMetrics, which has no password,
+  nor the API. Its token is the environment's (`TUNNEL_TOKEN`), never an argument. Access sends a code to
+  the owner's e-mail alone, a month a device (В-2 «а»), so a stranger sees Cloudflare's page and nothing of
+  Grafana. **Grafana lets in only Access's signed pass** (`[auth.jwt]`: `Cf-Access-Jwt-Assertion`, the
+  team's keys, the application's `aud` and the team as `iss`) — the second lock, should Access be switched
+  off or bypassed; a token in the address is refused (`url_login`), it would land in the history and the
+  logs. Tried on a copy (`.scratch/tasks/selftests/MOL-399-probe.md`): a forged signature, another `aud` or
+  `iss`, an expired pass, `alg: none` and none at all — 401; Access's `aud` as an array is read. **The
+  owner is a user of their own, a Viewer** (Р-1), made from the pass's e-mail: what runs is what the
+  repository says. `admin` and Explore stay behind the SSH tunnel, the way in when Cloudflare is down
+  (Р-3). **The lock is watched from outside** (В-3 «а»): the Worker asks `grafana.<DOMAIN>` with no pass,
+  and anything but Access's redirect or refusal is `/fail` of `molvia-grafana-lock`, a check of its own —
+  the policy and the ingress live in Cloudflare's dashboard, where no test of the repository reaches.
+  **The prices, named:** Cloudflare sees Grafana's pages — figures of the machine and routes' templates,
+  nothing of a person, so no recipient of anyone's data; who gets a pass is Access's policy alone — a pass
+  of the team for another e-mail Grafana takes too; Cloudflare down, Grafana is the SSH tunnel's; the
+  image is another's and trivy does not read it. No logs in Grafana (В-4 «а»): Caddy's errors may carry a
+  visitor's address, and Cloudflare would see them.
 - **Grafana calls nobody home** (Р-6): usage reports, update checks, the news, gravatar, plugin keys
   and the five plugins it would install at every start, snapshots and feedback links are switched off —
   a test holds each setting. No sign-up, no anonymous view. **The admin's password is

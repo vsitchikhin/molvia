@@ -163,7 +163,9 @@ file holds what belongs to no single area, and what the audit found missing.
   refuses one left out, since a digest nobody moves is frozen for good (adversarial В1). A security update of
   npm comes in one pull request (`security`, `applies-to: security-updates`), Playwright's apart, as its
   version updates. A patch of Alpine or Debian under the same tag comes with
-  every release since MOL-365 — the stage `runtime` brings the distribution up to date and is built afresh (`deploy.md`). **Not watched**: the images of
+  every release since MOL-365 — the stage `runtime` brings the distribution up to date and is built afresh (`deploy.md`). **The one image of compose watched is `cloudflare/cloudflared`** (MOL-399, owner's В-5 «а»), monthly,
+  its entry `allow`ing nothing else: it faces the internet, and a release of it is supported a year. **Not
+  watched**: the other images of
   compose (`pgvector` — a contract of ICU and glibc that a migration moves, `deploy.md`; the exporters and
   cAdvisor on `metrics`, which has no way out — each move of `docker-compose.prod.yml` a copy by hand to the
   machine) and `services:`/`container:` of `ci.yml`, the Playwright image held by its own check (`e2e.md`).

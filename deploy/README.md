@@ -704,10 +704,22 @@ VictoriaMetrics keeps thirty days of figures, scraped every fifteen seconds from
 (9464, never through Caddy), node_exporter (the machine), cAdvisor (the containers) and
 postgres_exporter (the database, as `molvia_metrics`: `pg_monitor` and no table — MOL-366). All four
 are on a network with no way out. Grafana draws them and
-sends the alarms; it is the only one with a port, on the machine's loopback. Nothing leaves the machine
-but the alarms, through Telegram, and the alarms' pulse, to healthchecks.io.
+sends the alarms; it is the only one with a port, on the machine's loopback, and the only one reached from
+outside — through a Cloudflare Tunnel behind Cloudflare Access, for the owner alone (MOL-399). Nothing
+leaves the machine but the alarms, through Telegram, the alarms' pulse, to healthchecks.io, and Grafana's
+pages, to the owner through Cloudflare.
 
 ### Looking
+
+**From any device: `https://grafana.molvia.net`** (MOL-399). Cloudflare Access asks for the e-mail and
+sends a code to it — only to the owner's e-mail; any other gets no code — and the dashboard opens, the
+device remembered for a month. Grafana lets the request in only with Access's signed pass
+(`Cf-Access-Jwt-Assertion`: the team's keys, the application's tag, the team as issuer), and signs the
+owner in as a user of their own, made from the pass's e-mail at the first visit — a **Viewer**: what runs
+is what the repository says, so nothing is changed from outside. A stranger sees Cloudflare's page and
+nothing of Grafana — no login form, no version.
+
+**`admin`, and Grafana when Cloudflare is down, by the SSH tunnel** — Explore, a contact point's Test:
 
 ```bash
 ssh -L 3000:127.0.0.1:3000 molvia     # then http://localhost:3000, admin and GRAFANA_ADMIN_PASSWORD
@@ -820,6 +832,29 @@ node-exporter`, and `✅ Прошло` follows.
 - **Grafana 13.0 and the chat id**: `deploy/grafana/start.sh` writes `OWNER_TELEGRAM_ID` into the
   contact point as text before Grafana starts, since Grafana turned it into a number and refused it
   (grafana/alerting #558). A Grafana that takes a numeric chat — after 13.0.2 — no longer needs it.
+  **The address an alarm names** (`Дашборд — https://grafana.molvia.net`) is written by it too, from
+  `GF_SERVER_ROOT_URL`: Grafana reads no environment inside a template (MOL-399).
+- **Grafana from outside** (MOL-399): the tunnel and Access are Cloudflare's, set in its dashboard, not in
+  the repository — so nothing here holds them but the watch (`molvia-grafana-lock`, «Signals») and
+  Grafana's own check of the pass. **Before the release that brings `tunnel` rolls out**, in this order —
+  compose refuses to start without the three lines, so a release without them stops at the compare of the
+  compose file, as any change of it does:
+  1. Zero Trust (`one.dash.cloudflare.com`) → the plan Free (up to 50 users; Cloudflare may ask for a card)
+     and the team's name: `<team>.cloudflareaccess.com`.
+  2. Access → Applications → Add → Self-hosted: domain `grafana.molvia.net`, session **one month**;
+     sign-in «One-time PIN» alone; a policy **Allow** — Emails: the owner's e-mail, nothing else. Its
+     Overview → **Application Audience (AUD) Tag**.
+  3. Networks → Tunnels → Create → Cloudflared, named `molvia-grafana`, environment Docker — its token is the
+     long string after `--token` in the command it shows. Public hostname: `grafana` · `molvia.net` →
+     service `HTTP` · `grafana:3000`. Cloudflare writes the DNS record itself.
+  4. Into `~/molvia/.env.prod`: `GRAFANA_ACCESS_TEAM=<team>`, `GRAFANA_ACCESS_AUD=<tag>` and the token —
+     typed at `read -rs T`, then `printf 'CLOUDFLARE_TUNNEL_TOKEN=%s\n' "$T" >>.env.prod`: `printf` is
+     the shell's own, so the token is in no command's arguments («Rotating the secrets»).
+  5. The check `molvia-grafana-lock` in healthchecks.io (period 10 min, grace 10 min, the Telegram
+     integration), its URL the Worker's secret `HC_LOCK_URL` («Signals», «Where it is set»).
+  6. The compose file and `deploy/deploy.sh` copied to the machine, then the release. After it: a phone with
+     no session opens `https://grafana.molvia.net` on Cloudflare's page; the code, then the dashboard; the
+     tunnel healthy in Networks → Tunnels; `molvia-grafana-lock` green after the Worker's next round.
 
 ## Backups (MOL-70)
 

@@ -48,10 +48,14 @@ The shape worth knowing here:
   with the others; **a rollback starts `backend bot frontend` only** — a tag from before MOL-125 has no
   reader image, and `up -d` of everything would stop on the missing pull with the API left broken. The
   reader holds nothing and answers any API alike, so whatever runs of it stays.
-- **The metrics are five more services and two more images** (MOL-145): VictoriaMetrics,
+- **The metrics are six more services and two more images of ours** (MOL-145, MOL-399): VictoriaMetrics,
   node_exporter, cAdvisor and postgres_exporter on `metrics`, an `internal` network with no way out,
   Grafana in `metrics` and in `alerts`, a network of its own with a way out, its one port on
-  `127.0.0.1:3000` for an SSH tunnel. `molvia-grafana` and `molvia-victoria` carry what they read baked
+  `127.0.0.1:3000` for an SSH tunnel. **The sixth is `tunnel`** (MOL-399): `cloudflare/cloudflared` of an
+  exact tag, in `alerts` beside Grafana, no port — Grafana from any device through Cloudflare Access
+  (`observability.md`); one of the metrics, so it never judges a rollout either, and its three lines of
+  `.env.prod` (`CLOUDFLARE_TUNNEL_TOKEN`, `GRAFANA_ACCESS_TEAM`, `GRAFANA_ACCESS_AUD`) are required — set
+  before the release that brought them, as `deploy/README.md`, «Metrics», says. `molvia-grafana` and `molvia-victoria` carry what they read baked
   in and are built by the release beside the four — Grafana from `grafana/grafana`, never
   `grafana/grafana-oss`, which stopped at 13.0.2 in June 2026 and so would never have reached Dependabot
   (MOL-365); the exporters are upstream images of exact tags.
