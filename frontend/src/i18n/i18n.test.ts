@@ -418,6 +418,9 @@ describe('словарь: повторяющиеся тексты', () => {
       Undo: ['spending.restore', 'trip.remove.restore'],
       'What to buy': ['advice.title', 'nav.advice'],
       Ratings: ['nav.verdicts', 'verdict.title'],
+      // The language a message is written in and the language of the app: both name it in English, and
+      // the setting names every language in itself (MOL-398).
+      English: ['feedback.languages.en', 'settings.locale.en'],
       Settings: ['nav.settings', 'settings.title'],
       Money: ['nav.money', 'settings.group_money', 'spending.title'],
       Save: [

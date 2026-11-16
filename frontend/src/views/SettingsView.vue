@@ -111,6 +111,10 @@
     </section>
     <!-- This device's own, not the account's: nothing goes to the server (MOL-111). -->
     <SchemeGroup v-show="groupsShown" class="group" />
+    <!-- This device's too, though the account hears it with every request: the bot's reminders
+         speak it (MOL-398). The order of a day is asked of English alone (owner's В-3). -->
+    <LocaleGroup v-show="groupsShown" class="group" />
+    <DateStyleGroup v-if="language === 'en'" v-show="groupsShown" class="group" />
     <!-- Outside the form's states: the way into the account does not depend on whether its
          settings loaded (MOL-57) — only on the skeleton having gone, answer or failure (MOL-269).
          One group (owner's Q3) and two cards: «Устройства» goes on to a screen and «Выйти» asks to
@@ -200,6 +204,7 @@
 <script lang="ts">
 import { computed, defineComponent, onUnmounted, ref, useId, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { pickLocale } from '@molvia/model'
 import type { ActorSettings } from '@molvia/model'
 import IconCloud from '~icons/mdi/cloud-off-outline'
 import IconPencil from '~icons/mdi/pencil-outline'
@@ -218,6 +223,8 @@ import ListRow from '@/components/ListRow.vue'
 import NavRow from '@/components/NavRow.vue'
 import SalaryShiftGroup from '@/components/SalaryShiftGroup.vue'
 import SchemeGroup from '@/components/SchemeGroup.vue'
+import LocaleGroup from '@/components/LocaleGroup.vue'
+import DateStyleGroup from '@/components/DateStyleGroup.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import SettingsFields from '@/components/SettingsFields.vue'
 import { countryLabel } from '@/components/placeLabel'
@@ -253,6 +260,8 @@ export default defineComponent({
     NavRow,
     SalaryShiftGroup,
     SchemeGroup,
+    LocaleGroup,
+    DateStyleGroup,
     ScreenSkeleton,
     ScreenState,
     SkeletonPart,
@@ -383,6 +392,8 @@ export default defineComponent({
 
     return {
       t,
+      // The language the screen is drawn in: the order of a day is asked of English alone.
+      language: computed(() => pickLocale(i18n.locale.value)),
       saidIn,
       id: useId(),
       ...settings,

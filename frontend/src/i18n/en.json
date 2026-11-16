@@ -1638,6 +1638,17 @@
       "dark": "Dark",
       "hint": "Applies to this device only"
     },
+    "group_locale": "Language",
+    "locale": {
+      "device": "As on device",
+      "ru": "Русский",
+      "en": "English",
+      "hint": "Applies to this device. The bot sends its reminders in this language too"
+    },
+    "group_date_style": "Date format",
+    "date_style": {
+      "hint": "How days and times are written on this device"
+    },
     "tap": {
       "offline": "Cannot save without a connection — the switch comes back with it.",
       "save_failed": "Not saved. Check the connection and try again.",

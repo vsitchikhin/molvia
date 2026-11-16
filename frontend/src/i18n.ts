@@ -25,7 +25,7 @@ import { pluralRu } from '@/i18n/plural-ru'
  * the options actually select, and satisfies the linter's demand for an explicit return type.
  */
 type AppI18n = I18n<
-  { en: typeof en; ru: typeof ru },
+  { en: typeof en; 'en-GB': typeof en; 'en-US': typeof en; ru: typeof ru },
   Record<string, unknown>,
   Record<string, unknown>,
   // `string`, not `AppLocale`: `createI18n` widens the locale it was handed, and narrowing it
@@ -34,32 +34,39 @@ type AppI18n = I18n<
   false
 >
 
-export function createAppI18n(locale: AppLocale = pickLocale(navigator.languages)): AppI18n {
+export function createAppI18n(
+  locale: AppLocale | EnglishTag = pickLocale(navigator.languages),
+): AppI18n {
   return createI18n({
     legacy: false,
     locale,
     // About a key that is missing, never about a person: whoever gets Russian above keeps it.
     fallbackLocale: 'en',
-    messages: { en, ru },
+    // English is one dictionary under three tags (MOL-398): the tag is also what every `Intl` of a
+    // screen formats by — `locale.value` — so the order of a day is the tag's, never a second
+    // setting passed around. `en` stays for tests and for the moment before `installLocale`.
+    messages: { en, 'en-GB': en, 'en-US': en, ru },
     pluralRules: { ru: pluralRu },
   })
 }
 
+/** The tags English is spoken under: the order of a day, British or American (MOL-398, owner's В-3). */
+export type EnglishTag = 'en-GB' | 'en-US'
+
 // Not a single string lives in the markup. The plan is to reach other languages without
 // rebranding, and hardcoded text is the cheapest mistake today and the dearest one later.
-export const locale = pickLocale(navigator.languages)
-
-export const i18n = createAppI18n(locale)
+// The device's language until `installLocale` (`useLocale.ts`) puts the person's choice over it.
+export const i18n = createAppI18n()
 
 /**
  * The `lang` attribute is not cosmetic: hyphenation, the voice a screen reader picks and the
  * font the system falls back to all follow it. `index.html` pins it to `ru`, which is right
  * until the app boots and wrong from the moment the locale is anything else.
  *
- * Called from `main.ts` rather than here: a module that rewrites the document just because it
- * was imported makes import order significant where it normally is not, and every test that
- * touches i18n inherits the side effect.
+ * Called by `useLocale.ts` — at the start from `main.ts`, and at every choice — rather than here: a
+ * module that rewrites the document just because it was imported makes import order significant
+ * where it normally is not, and every test that touches i18n inherits the side effect.
  */
-export function applyDocumentLang(value: string = locale): void {
+export function applyDocumentLang(value: string): void {
   document.documentElement.lang = value
 }
