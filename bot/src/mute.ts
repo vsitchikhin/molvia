@@ -40,29 +40,26 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
 
   composer.chatType('private').callbackQuery(SWITCH_DATA, async (ctx) => {
     const offer = ctx.match[1] === 'on' ? 'on' : 'off'
+    // The message's language, from the button pressed: the outcome, a refusal, the switch rebuilt (MOL-398).
+    const language = languageOf(ctx.match)
     try {
       await api.switchReminders(ctx.from.id, offer)
     } catch (error) {
       if (error instanceof ApiError && error.code === ERROR.NOT_FOUND) {
-        await refuse(ctx, 'remind.gone')
+        await refuse(ctx, 'remind.gone', language)
         await dropKeyboard(ctx)
         return
       }
       logged('remind switch', error)
       reportDefect(api, error, handlerOf(ctx))
       // The buttons stay: «press again» must leave something to press.
-      await refuse(ctx, 'remind.switchFailed')
+      await refuse(ctx, 'remind.switchFailed', language)
       return
     }
 
-    // In the language of the message, which its button names (MOL-398), else Telegram's.
-    const named = languageOf(ctx.match, 2)
-    const outcome = t(
-      named ?? ctx.from.language_code,
-      offer === 'off' ? 'remind.stopped' : 'remind.resumed',
-    )
+    const outcome = t(language, offer === 'off' ? 'remind.stopped' : 'remind.resumed')
     const message = ctx.callbackQuery.message
-    const { itemId, pressed, language = named } = keyboardOf(message?.reply_markup)
+    const { itemId, pressed } = keyboardOf(message?.reply_markup)
     const shown = shownText(message)
     try {
       const text = shown === null ? null : writeText({ ...readText(shown), switched: outcome })

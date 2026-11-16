@@ -25,7 +25,8 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
 
   composer.chatType('private').callbackQuery(SCALE_DATA, async (ctx) => {
     const [, itemId = '', digit = ''] = ctx.match
-    const named = languageOf(ctx.match, 3)
+    // The message's language, from the button pressed: the outcome, a refusal and the scale rebuilt (MOL-398).
+    const language = languageOf(ctx.match)
     const score = Number(digit)
 
     // The API call alone is inside the `try`, as in `login.ts`: a Telegram failure after the
@@ -40,8 +41,8 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
         // An erased account or an item gone: no press of the scale can succeed again. The switch
         // under the last message of the evening still can, and it is that evening's only one
         // (review №3).
-        await refuse(ctx, 'rate.gone')
-        const { offer, language = named } = keyboardOf(ctx.callbackQuery.message?.reply_markup)
+        await refuse(ctx, 'rate.gone', language)
+        const { offer } = keyboardOf(ctx.callbackQuery.message?.reply_markup)
         await dropKeyboard(ctx, offer ? scale(undefined, undefined, offer, language) : undefined)
         return
       }
@@ -50,16 +51,14 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
       )
       reportDefect(api, error, handlerOf(ctx))
       // The scale stays: a repeat is harmless, and «press again» must leave something to press.
-      await refuse(ctx, 'rate.failed')
+      await refuse(ctx, 'rate.failed', language)
       return
     }
 
-    // In the language the message is written in, which its button names (MOL-398); a message sent
-    // before it names none, and Telegram's is taken.
-    const outcome = t(named ?? ctx.from.language_code, 'rate.done', { score })
+    const outcome = t(language, 'rate.done', { score })
     const message = ctx.callbackQuery.message
     // The switch's row and its outcome stay as the message holds them (MOL-103, Р-7).
-    const { offer, language = named } = keyboardOf(message?.reply_markup)
+    const { offer } = keyboardOf(message?.reply_markup)
     const shown = shownText(message)
     try {
       const text = shown === null ? null : writeText({ ...readText(shown), rated: outcome })

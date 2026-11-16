@@ -26,7 +26,7 @@ export const en: Dictionary = {
   'login.already':
     'This sign-in is already confirmed — go back to Molvia.\n\n' +
     'If it was not you who confirmed it, tap “Not me”: otherwise the app will open somebody ' +
-    "else's account instead of yours.",
+    'else’s account instead of yours.',
   'login.declined': 'Sign-in declined. Nobody got into the account.',
   'login.unavailable': 'This link no longer works. Start signing in again in the app.',
   'login.failed': 'No answer came back. Please try again in a minute.',
@@ -50,7 +50,7 @@ export const en: Dictionary = {
   'erase.done':
     'Done: Molvia holds no data of yours. You can sign in again — it will be a new, empty account.\n\n' +
     'Saved copies may remain on your phone: to remove them, delete the app or clear the ' +
-    "site's data in your browser.",
+    'site’s data in your browser.',
   'erase.cancelled':
     'The buttons are gone. If “Delete for good” was already pressed, it cannot be undone.',
   'erase.expired': 'This button has expired. Send /delete again.',
@@ -67,7 +67,9 @@ export const en: Dictionary = {
   'remind.in.Батуми': 'in Batumi',
   'remind.in.Белград': 'in Belgrade',
   'remind.in.Нови-Сад': 'in Novi Sad',
-  'remind.more': '{n} more are waiting in “Ratings”: {url}',
+  'remind.more.one': '{n} more is waiting in “Ratings”: {url}',
+  'remind.more.few': '{n} more are waiting in “Ratings”: {url}',
+  'remind.more.many': '{n} more are waiting in “Ratings”: {url}',
   'rate.done': 'Saved: {score} out of 5. Tapped the wrong one? Tap another.',
   'rate.failed': 'No answer came back. Please tap again in a minute.',
   'rate.gone': 'This rating can no longer be given: the account or the item is gone.',
@@ -102,7 +104,7 @@ export const en: Dictionary = {
   'receipt.items.few': '{n} items',
   'receipt.items.many': '{n} items',
   'silence.warn':
-    "You haven't opened Molvia for almost two years. On {date} — in {days} — your account and all your data will be deleted, just as by “Delete my data”.\n\nTo keep them, open the app and sign in. You can take a copy first: “Download my data” in the settings.",
+    'You haven’t opened Molvia for almost two years. On {date} — in {days} — your account and all your data will be deleted, just as by “Delete my data”.\n\nTo keep them, open the app and sign in. You can take a copy first: “Download my data” in the settings.',
   'silence.days.one': '{n} day',
   'silence.days.few': '{n} days',
   'silence.days.many': '{n} days',
@@ -121,7 +123,7 @@ export const en: Dictionary = {
   'owner.failure.platform': 'Platform {platform}',
   'owner.failure.muted': '🔕 Notices about the phone held back: {count}',
   'owner.failure.unwritten':
-    "🔕 New phone failures not written: {unwritten} — the hour's rows were full",
+    '🔕 New phone failures not written: {unwritten} — the hour’s rows were full',
   'owner.failure.build': 'Build {build}',
   'owner.failure.buildPrint': 'Build {build} · {fingerprint}',
   'owner.failure.more': 'Details — make failures',
@@ -131,7 +133,7 @@ export const en: Dictionary = {
   'owner.merge.merged': 'Merged',
   'owner.merge.wouldMerge': 'Would merge',
   'owner.merge.candidates': 'Candidates — merge by the command',
-  'owner.merge.pair': '«{from}» → «{into}»',
+  'owner.merge.pair': '“{from}” → “{into}”',
   'owner.merge.place': 'place {pair} · {city}',
   'owner.merge.cut': '…and {count} more past the message — all: make merge-candidates',
   'owner.merge.moreNight': '…and {count} more — all: make merge-night DAY={day}',
@@ -170,7 +172,7 @@ export const en: Dictionary = {
   'owner.receipt.line.unsettled': 'arithmetic does not hold',
   'owner.receipt.line.bent': 'held only by swaps',
   'owner.receipt.line.zero_not_gift': '0, no gift',
-  'owner.receipt.line.one_alike_unproven': '«1 × price» on a receipt not whole',
+  'owner.receipt.line.one_alike_unproven': '“1 × price” on a receipt not whole',
   'owner.receipt.line.no_price_unproven': 'a sum with no price on a receipt not whole',
   'owner.receipt.line.price_dropped': 'price taken off',
   'feedback.frame': 'A reply to your message of {date}:',

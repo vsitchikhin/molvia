@@ -103,11 +103,20 @@ describe('текст напоминания', () => {
 
   it('под последним — сколько ещё ждут в «Оценках», со ссылкой', () => {
     expect(reminderText(item('Молоко'), 2, APP)).toBe(
-      `${reminderText(item('Молоко'), 0, APP)}\n\n${t(undefined, 'remind.more', {
+      `${reminderText(item('Молоко'), 0, APP)}\n\n${t(undefined, 'remind.more.few', {
         n: 2,
         url: `${APP}/verdicts`,
       })}`,
     )
+  })
+
+  it('«ещё» — в числе своего языка: одна ждёт, одна is waiting (адверсариальное А5)', () => {
+    const tail = (n: number, language: 'ru' | 'en') =>
+      reminderText(item('Молоко'), n, APP, null, language).split('\n').at(-1)
+    expect(tail(1, 'ru')).toBe(`Ещё 1 ждёт в «Оценках»: ${APP}/verdicts`)
+    expect(tail(5, 'ru')).toBe(`Ещё 5 ждут в «Оценках»: ${APP}/verdicts`)
+    expect(tail(1, 'en')).toBe(`1 more is waiting in “Ratings”: ${APP}/verdicts`)
+    expect(tail(2, 'en')).toBe(`2 more are waiting in “Ratings”: ${APP}/verdicts`)
   })
 })
 
@@ -149,9 +158,14 @@ describe('строка выключателя и итоги в тексте (MOL
       expect(new TextEncoder().encode(data).length).toBeLessThanOrEqual(64)
     }
     expect(keyboard.inline_keyboard[1]?.[0]?.text).toBe(t('en', 'remind.stop'))
-    expect(keyboardOf(keyboard)).toEqual({ itemId: MILK, offer: 'off', language: 'en' })
-    // A message sent before MOL-398 names none.
-    expect(keyboardOf(scale(MILK, undefined, 'off')).language).toBeUndefined()
+    expect(keyboardOf(keyboard)).toEqual({ itemId: MILK, offer: 'off' })
+    // Russian is named by no suffix, as every reminder before MOL-398 was: the bot of the release
+    // before reads it, so a rollback leaves Russian reminders their buttons (adversarial А6).
+    expect(scale(MILK, undefined, 'off', 'ru')).toEqual(scale(MILK, undefined, 'off'))
+    for (const button of scale(MILK, undefined, 'off', 'ru').inline_keyboard.flat()) {
+      const data = 'callback_data' in button ? button.callback_data : ''
+      expect(data).toMatch(/^(rate:[0-9a-f-]{36}:[1-5]|remind:off)$/)
+    }
   })
 
   it('итог оценки и итог выключателя не стирают друг друга, в любом порядке', () => {
@@ -275,7 +289,6 @@ describe('рассылка (MOL-101)', () => {
       `${t('en', 'remind.yesterday')} · Ереван Сити`,
     )
     expect(calls[1]?.payload.reply_markup).toEqual(scale(MILK, undefined, 'off', 'en'))
-    expect(keyboardOf(calls[1]?.payload.reply_markup as never).language).toBe('en')
   })
 
   it('заблокировавший бота не останавливает остальных, ему дальше не шлём и напоминания выключаем', async () => {

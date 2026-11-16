@@ -6,7 +6,7 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import { assembleBot } from './assemble'
 import { t } from './i18n'
-import { keyboardOf, scale } from './remind'
+import { scale } from './remind'
 
 /** Through `assembleBot`: whether a press reaches the scale is a property of the order. */
 const BOT_INFO: UserFromGetMe = {
@@ -160,14 +160,14 @@ describe('кнопки 1–5 под напоминанием (MOL-101)', () => {
     expect(calls.filter((call) => call.method === 'sendMessage')).toEqual([])
   })
 
-  it('итог — на языке нажавшего', async () => {
+  it('кнопка, не назвавшая языка, — под русским сообщением, на каком бы языке ни был Telegram (MOL-398)', async () => {
     const rateFromBot = vi.fn(() => Promise.resolve())
     const { bot, calls } = harness({ rateFromBot })
 
     await bot.handleUpdate(press(`rate:${MILK}:4`, { from: { ...FROM, language_code: 'en' } }))
 
     expect(edits(calls)[0]?.payload.text).toBe(
-      `${QUESTION}\n\n✓ ${t('en', 'rate.done', { score: 4 })}`,
+      `${QUESTION}\n\n✓ ${t('ru', 'rate.done', { score: 4 })}`,
     )
   })
 
@@ -180,7 +180,24 @@ describe('кнопки 1–5 под напоминанием (MOL-101)', () => {
     expect(edits(calls)[0]?.payload.text).toBe(
       `${QUESTION}\n\n✓ ${t('en', 'rate.done', { score: 4 })}`,
     )
-    expect(keyboardOf(edits(calls)[0]?.payload.reply_markup as never).language).toBe('en')
+    expect(edits(calls)[0]?.payload.reply_markup).toEqual(scale(MILK, 4, undefined, 'en'))
+  })
+
+  it('отказ под английским сообщением — по-английски, а не на языке Telegram (адверсариальное А4)', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    const failing = harness({
+      rateFromBot: vi.fn(() => Promise.reject(new ApiError(ERROR.INTERNAL))),
+    })
+    await failing.bot.handleUpdate(
+      press(`rate:${MILK}:4:en`, { from: { ...FROM, language_code: 'ru' } }),
+    )
+    expect(alert(failing.calls)?.text).toBe(t('en', 'rate.failed'))
+
+    const gone = harness({
+      rateFromBot: vi.fn(() => Promise.reject(new ApiError(ERROR.NOT_FOUND))),
+    })
+    await gone.bot.handleUpdate(press(`rate:${MILK}:4:en`))
+    expect(alert(gone.calls)?.text).toBe(t('en', 'rate.gone'))
   })
 
   it('API не ответил — отказ поверх, сообщение не тронуто, шкала на месте', async () => {

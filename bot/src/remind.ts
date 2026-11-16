@@ -2,7 +2,7 @@ import { InlineKeyboard } from 'grammy'
 import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
-import { LOCALES, cityWhereNameRepeats, settingsCityOf } from '@molvia/model'
+import { cityWhereNameRepeats, settingsCityOf } from '@molvia/model'
 import type { AppLocale, Reminder, ReminderItem } from '@molvia/model'
 import type { InlineKeyboardMarkup } from 'grammy/types'
 import { hasMessage, t } from './i18n'
@@ -13,12 +13,15 @@ import type { Wait } from './deliver'
 /**
  * What a button of the scale carries: the item and the digit — and never whose verdict it is.
  * That is `ctx.from.id`, Telegram's word for who pressed, so a message forwarded to someone else
- * rates for them, never for the person it was sent to. And the language its message is written in
- * (MOL-398): the outcome and the rebuilt switch are written in it, though the bot keeps nothing —
- * absent on a message sent before it. 46 bytes of Telegram's 64.
+ * rates for them, never for the person it was sent to. And `:en` where its message is English
+ * (MOL-398): the outcome, a refusal and the rebuilt switch are written in it, though the bot keeps
+ * nothing. **Only English is named**: every reminder before MOL-398 was Russian, so a button that
+ * names none is Russian whenever it was sent — and the bot of the release before reads every
+ * Russian one still, so a rollback strips only English reminders of their buttons (adversarial А6).
+ * 46 bytes of Telegram's 64.
  */
 const PREFIX = 'rate:'
-export const SCALE_DATA = new RegExp(`^${PREFIX}([0-9a-f-]{36}):([1-5])(?::(ru|en))?$`)
+export const SCALE_DATA = new RegExp(`^${PREFIX}([0-9a-f-]{36}):([1-5])(?::(?<language>en))?$`)
 
 /**
  * The switch under the last reminder of the evening (MOL-103, В-2): «Не напоминать», and once it is
@@ -27,13 +30,12 @@ export const SCALE_DATA = new RegExp(`^${PREFIX}([0-9a-f-]{36}):([1-5])(?::(ru|e
  */
 export type Offer = 'off' | 'on'
 const SWITCH_PREFIX = 'remind:'
-export const SWITCH_DATA = new RegExp(`^${SWITCH_PREFIX}(off|on)(?::(ru|en))?$`)
+export const SWITCH_DATA = new RegExp(`^${SWITCH_PREFIX}(off|on)(?::(?<language>en))?$`)
 
-/** The language a button names its message in, as `scale` writes it: `:en` at the end. */
-export const languageOf = (
-  match: ArrayLike<string | undefined> | null,
-  at: number,
-): AppLocale | undefined => LOCALES.find((one) => one === match?.[at])
+/** The language of the message a pressed button stands under: English where it says so, else Russian. */
+export function languageOf(match: string | RegExpMatchArray): AppLocale {
+  return typeof match !== 'string' && match.groups?.language === 'en' ? 'en' : 'ru'
+}
 
 /**
  * The scale 1–5 under an item, with the digit already pressed marked — and under it, on the last
@@ -44,10 +46,10 @@ export function scale(
   itemId: string | undefined,
   pressed?: number,
   offer?: Offer,
-  language?: AppLocale,
+  language: AppLocale = 'ru',
 ): InlineKeyboard {
   const keyboard = new InlineKeyboard()
-  const named = language ? `:${language}` : ''
+  const named = language === 'en' ? ':en' : ''
   if (itemId) {
     for (const score of [1, 2, 3, 4, 5]) {
       keyboard.text(
@@ -75,31 +77,24 @@ export function keyboardOf(markup: InlineKeyboardMarkup | undefined): {
   readonly itemId?: string
   readonly pressed?: number
   readonly offer?: Offer
-  readonly language?: AppLocale
 } {
   let itemId: string | undefined
   let pressed: number | undefined
   let offer: Offer | undefined
-  let language: AppLocale | undefined
   for (const button of (markup?.inline_keyboard ?? []).flat()) {
     const data = 'callback_data' in button ? button.callback_data : undefined
     const digit = SCALE_DATA.exec(data ?? '')
     if (digit) {
       itemId = digit[1]
       if (button.text.endsWith('✓')) pressed = Number(digit[2])
-      language ??= languageOf(digit, 3)
     }
     const action = SWITCH_DATA.exec(data ?? '')
-    if (action) {
-      offer = action[1] as Offer
-      language ??= languageOf(action, 2)
-    }
+    if (action) offer = action[1] as Offer
   }
   return {
     ...(itemId ? { itemId } : {}),
     ...(pressed ? { pressed } : {}),
     ...(offer ? { offer } : {}),
-    ...(language ? { language } : {}),
   }
 }
 
@@ -173,9 +168,15 @@ export function reminderText(
     place: placeText(item.placeName, city, language),
     name: item.name,
   })
-  return more > 0
-    ? `${question}\n\n${t(language, 'remind.more', { n: more, url: `${appUrl.replace(/\/+$/, '')}/verdicts` })}`
-    : question
+  return more > 0 ? `${question}\n\n${moreText(language, more, appUrl)}` : question
+}
+
+/** «Ещё 1 ждёт…», «1 more is waiting…»: the form by the language's own plural rule (adversarial А5). */
+function moreText(language: AppLocale, n: number, appUrl: string): string {
+  const form = new Intl.PluralRules(language).select(n)
+  const key =
+    form === 'one' ? 'remind.more.one' : form === 'few' ? 'remind.more.few' : 'remind.more.many'
+  return t(language, key, { n, url: `${appUrl.replace(/\/+$/, '')}/verdicts` })
 }
 
 /**
