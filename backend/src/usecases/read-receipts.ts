@@ -209,7 +209,8 @@ function headOf(
 
 /**
  * Reads one receipt: by the model where it is granted and its key set (MOL-272), else — or where the
- * model is not the one to — by Tesseract. A receipt with no item line fails as `reshoot`, unless it is a
+ * model is not the one to — by Tesseract, in a country it reads (a card with its `languages`; Georgia's has none,
+ * MOL-408: its receipt fails as `unreadable`). A receipt with no item line fails as `reshoot`, unless it is a
  * section printed with no items, read whole with its sum (MOL-227); one with any is read, however little
  * of it (MOL-222, В-1), and Tesseract's has its item lines cut out for the reader's training (MOL-169).
  * `'wait'`: the model is away, and the receipt waits for it in the queue.
@@ -234,7 +235,23 @@ async function readOne(
     const byModel = await readByModel(deps, deps.model, claimed, photoReading)
     if (byModel !== null) return byModel
   }
-  return { outcome: await readByOcr(deps, claimed, photoReading), paid: null, unparsed: null }
+  const { languages } = photoReading
+  if (languages === null) {
+    // a country the model alone reads (MOL-408, В-2 «а»): no layout of Tesseract's finds its lines, so a receipt the
+    // model did not read is said so — the purchases typed by hand — never «переснимите»
+    const outcome: ReadOutcome = {
+      kind: 'failed',
+      failure: 'unreadable',
+      readerVersion: null,
+      head: null,
+    }
+    return { outcome, paid: null, unparsed: null }
+  }
+  return {
+    outcome: await readByOcr(deps, claimed, photoReading, languages),
+    paid: null,
+    unparsed: null,
+  }
 }
 
 /**
@@ -370,6 +387,7 @@ async function readByOcr(
   deps: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
   photoReading: PhotoReading,
+  languages: string,
 ): Promise<ReadOutcome> {
   const { reader, report } = deps
   const { currency } = receiptCard(claimed.country)
@@ -379,7 +397,7 @@ async function readByOcr(
   for (const mode of RECEIPT_PAGE_MODES) {
     const parts: TextRow[][] = []
     for (const [index, part] of claimed.parts.entries()) {
-      const reading = await reader.read(part.photo, photoReading.languages, mode)
+      const reading = await reader.read(part.photo, languages, mode)
       version ??= reading.version
       const rows = reading.rows.map((row, line) => {
         const text: TextRow = { text: row.text, part: index, line }

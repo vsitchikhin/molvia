@@ -544,6 +544,37 @@ describe('a catalogue with no names of the tills (MOL-293)', () => {
   })
 })
 
+describe('binding the lines of a Georgian receipt (MOL-408, В-5 «б»)', () => {
+  it('searches the line’s name whole, as Serbia’s, and marks every item it finds «проверьте»', async () => {
+    const nodes = vi.fn(() => Promise.resolve(NODES))
+    const search = vi.fn<ItemRepository['search']>((query) =>
+      Promise.resolve(
+        query === 'კოკა-კოლა 0.5ლ'
+          ? { items: [item(MILK, 'Coca-Cola')], near: true, nearIds: [MILK] }
+          : query === 'პური თეთრი'
+            ? { items: [item(GLUE, 'Хлеб белый')], near: false, nearIds: [] }
+            : { items: [], near: false, nearIds: [] },
+      ),
+    )
+    const bound = await bindReceiptLines(
+      { items: { nodes, search, byBarcode: NONE }, embedder: NO_EMBEDDER },
+      ACTOR,
+      'GE',
+      'ru',
+      [line('კოკა-კოლა 0.5ლ'), line('პური თეთრი'), line('სულგუნი')],
+      [],
+      { byModel: true },
+    )
+    // must not: no names in the till's language and no gloss — the catalogue has none of Georgia's
+    expect(nodes).not.toHaveBeenCalled()
+    expect(bound).toEqual([
+      { itemId: MILK, match: 'weak', translation: null },
+      { itemId: GLUE, match: 'weak', translation: null },
+      { itemId: null, match: 'new', translation: null },
+    ])
+  })
+})
+
 describe('binding the lines of a Serbian receipt by its link (MOL-232, В-3)', () => {
   it('reads no names and no gloss: the search by the line’s name whole, near or far', async () => {
     const nodes = vi.fn(() => Promise.resolve(NODES))

@@ -113,7 +113,8 @@ const SHORTEST_NAME = 3
  * gloss. A line of a class of services, «56.10» of food service, is a dish: whatever the
  * catalogue's goods give it is «проверьте» (MOL-226). The shop's memory comes before all of it, but it
  * is laid over on every reading of the receipt rather than here: it changes with every receipt recorded.
- * A country with no names of its own, Serbia, goes by the search of the line's name alone (MOL-232, В-3)
+ * A country with no names of its own, Serbia, goes by the search of the line's name alone (MOL-232, В-3), and
+ * Georgia so too, every item it finds «проверьте» (MOL-408, В-5 «б»)
  * — after the line's code, where the tax office gave one and an item holds it (MOL-234): a package's
  * code is the package, as the scanner's is (MOL-99). The memory is still laid over it on reading.
  *
@@ -164,7 +165,12 @@ export async function bindReceiptLines(
       }
       // a country with no names of its own in the catalogue, Serbia: its till prints the name in full,
       // the same every time, and the search — by meaning too — reads it as typed (MOL-232, В-3)
-      bound.push(await bySearch(receiptLineName(line.printed, country)))
+      const searched = await bySearch(receiptLineName(line.printed, country))
+      // Georgia's lines are a script the catalogue names nothing in, its items found by letters across scripts and
+      // by meaning: every one «проверьте» (MOL-408, owner's В-5 «б»)
+      bound.push(
+        country === 'GE' && searched.match === 'search' ? { ...searched, match: 'weak' } : searched,
+      )
       continue
     }
     const mended = mendedLines[position] ?? null
