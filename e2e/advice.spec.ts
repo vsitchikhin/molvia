@@ -405,9 +405,9 @@ test('a connection lost mid-request is offline, not an error', async ({ page, co
   await page.getByRole('searchbox', { name: 'Search the catalogue' }).fill('молоко')
   // Taken from the block, not the live region, which says the same words (e2e rule).
   const found = page.locator('.state')
-  await expect(found.getByText('No «молоко» found')).toBeVisible()
+  await expect(found.getByText('Nothing found for “молоко”')).toBeVisible()
   await expect(
-    found.getByText('Without a connection we search only what was rated. The whole catalogue'),
+    found.getByText('Offline, we search only what has been rated. The whole catalogue'),
   ).toBeVisible()
   await expect(
     page.getByRole('heading', { name: 'The list will show up once you are online' }),
@@ -579,7 +579,7 @@ test('the connection back without a list keeps the field typed in; left empty, i
   const field = page.getByRole('searchbox', { name: 'Search the catalogue' })
   await field.click()
   await field.pressSequentially('молоко')
-  await expect(page.locator('.state').getByText('No «молоко» found')).toBeVisible()
+  await expect(page.locator('.state').getByText('Nothing found for “молоко”')).toBeVisible()
 
   await page.route('**/api/advice', (route) => route.fulfill({ status: 500, body: '{}' }))
   const searched = page.waitForResponse((response) => response.url().includes('/api/advice/search'))
@@ -587,7 +587,7 @@ test('the connection back without a list keeps the field typed in; left empty, i
   // The search is asked of the server now, and its answer — whatever the shared catalogue holds —
   // stands where the phone's «offline» did.
   await searched
-  await expect(page.getByText('Without a connection we search only what was rated')).toHaveCount(0)
+  await expect(page.getByText('Offline, we search only what has been rated')).toHaveCount(0)
   await expect(field).toHaveValue('молоко')
   await expect(field).toBeFocused()
   await expect(page.getByRole('heading', { name: 'The server did not answer' })).toHaveCount(0)
@@ -939,7 +939,9 @@ test.describe('the search (MOL-128)', () => {
     const field = page.getByRole('searchbox', { name: 'Search the catalogue' })
     await field.fill(`кускус${tag}`)
     // The empty block's own heading, outside the live region (`e2e.md`): said once, not muted.
-    await expect(page.getByRole('heading', { name: `No «кускус${tag}» found` })).toBeVisible()
+    await expect(
+      page.getByRole('heading', { name: `Nothing found for “кускус${tag}”` }),
+    ).toBeVisible()
     await expect(page.locator('section.take')).toHaveCount(0)
 
     await page.getByRole('button', { name: 'Clear' }).click()
