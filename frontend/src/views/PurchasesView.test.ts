@@ -257,12 +257,33 @@ describe('PurchasesView (MOL-128)', () => {
   })
 
   describe('без чека (Д-3, ревью 12)', () => {
-    it('человек не из страны чеков — одна кнопка «Записать покупки», камеры и чеков нет', async () => {
+    it('человек из Грузии, чьи чеки модель не читает, — одна кнопка «Записать покупки», камеры нет (MOL-408)', async () => {
       const { view } = await render({ country: 'GE' })
       expect(view.get('.dock').text()).toContain(ru.purchases.manual)
       expect(view.get('.dock').text()).not.toContain(ru.purchases.capture)
       expect(captions(view)).not.toContain(ru.purchases.group_review)
       expect(view.text()).not.toContain(ru.purchases.error.title)
+    })
+
+    it('человек из Грузии, чьи чеки читает модель, — с камерой; без слова сервера — без неё (MOL-408, В-2 «а»)', async () => {
+      const georgian = (receiptsByModel?: boolean) => () => {
+        useActorStore().actor = {
+          id: ME,
+          country: 'GE',
+          city: 'Тбилиси',
+          spendCurrency: 'GEL',
+          incomeCurrency: 'RUB',
+          createdAt: new Date('2026-10-01T10:00:00.000Z'),
+          updatedAt: new Date('2026-10-01T10:00:00.000Z'),
+          ...(receiptsByModel === undefined ? {} : { receiptsByModel }),
+        }
+      }
+      const granted = await render({ country: 'GE', before: georgian(true) })
+      expect(granted.view.get('.dock').text()).toContain(ru.purchases.capture)
+      while (mounted.length) mounted.pop()?.unmount()
+      // must not: a grant not said — an answer of a server before the field — is no grant
+      const unsaid = await render({ country: 'GE', before: georgian() })
+      expect(unsaid.view.get('.dock').text()).not.toContain(ru.purchases.capture)
     })
 
     it('у человека из Грузии «пусто» — только после ответа о чеках; сбой списка сказан (MOL-109, Б1)', async () => {

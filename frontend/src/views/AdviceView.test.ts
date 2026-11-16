@@ -629,6 +629,17 @@ describe('AdviceView', () => {
   })
 
   describe('the newcomer (MOL-128, handoff `02`)', () => {
+    it('says no «translates» where the catalogue has not the till’s language — a Serbian receipt (MOL-408)', async () => {
+      advice.mockResolvedValue(answer([], { geography: { country: 'RS', city: 'Гюмри' } }))
+      const { view } = await render({ country: 'RS' })
+      const app = en.app.name
+      expect(view.text()).toContain(en.advice.home.new_capture.title)
+      expect(view.text()).toContain(
+        en.advice.home.new_capture.body_untranslated.replace('{app}', app),
+      )
+      expect(view.text()).not.toContain(en.advice.home.new_capture.body.replace('{app}', app))
+    })
+
     it('nothing rated: an offer to act — first purchases, the cycle, «Записать покупки» below', async () => {
       advice.mockResolvedValue(answer([]))
       const { view, router } = await render()

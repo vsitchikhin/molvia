@@ -4,7 +4,6 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
   DomainError,
   ERROR,
-  MODEL_CONSENT_EDITION,
   RECEIPT_MODEL,
   REVIEW_CONSENT_EDITION,
   placeSchema,
@@ -45,6 +44,7 @@ import type {
   TelegramUserId,
   TripReceiptSource,
 } from '@molvia/model'
+import { READS_BY_MODEL } from './actors-repository'
 import { countOfDay } from './day-count'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -1512,8 +1512,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           })
         const [owner] = await tx
           .select({
-            byModel: sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp()
-              and ${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}, false)`,
+            byModel: READS_BY_MODEL,
             reviewable: sql<boolean>`coalesce(${actors.consentVersion} >= ${REVIEW_CONSENT_EDITION}, false)`,
           })
           .from(actors)

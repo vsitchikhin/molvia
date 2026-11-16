@@ -1,6 +1,6 @@
 import { computed } from 'vue'
 import type { ComputedRef } from 'vue'
-import { photoReceiptCountrySchema, receiptCountrySchema } from '@molvia/model'
+import { photoReceiptCountrySchema, receiptCard, receiptCountrySchema } from '@molvia/model'
 import type { PhotoReceiptCountry, ReceiptCountry } from '@molvia/model'
 import { useActorStore } from '@/stores/actor'
 
@@ -9,6 +9,8 @@ import { useActorStore } from '@/stores/actor'
  * v2, Д-3) — and the country they are read in. **By the country of the settings, against the
  * countries the server reads** (Р-1): a receipt of any other is refused by the schema, and a button
  * that always ends in «не принят» is worse than none. No flag: the rule is the model's list.
+ * **A country the model alone reads, Georgia, only for whom it reads** (MOL-408, owner's В-2 «а»): its receipt
+ * would fail as unreadable for anyone else, so `/actors/me` must have said `receiptsByModel` — not yet said, none.
  */
 export function useReceiptCapture(): {
   /**
@@ -20,13 +22,18 @@ export function useReceiptCapture(): {
   readonly photoCountry: ComputedRef<PhotoReceiptCountry | null>
 } {
   const actor = useActorStore()
+  const country = computed(() => {
+    const parsed = receiptCountrySchema.safeParse(actor.settings?.country)
+    if (!parsed.success) return null
+    return receiptCard(parsed.data).photo?.languages === null &&
+      actor.actor?.receiptsByModel !== true
+      ? null
+      : parsed.data
+  })
   return {
-    country: computed(() => {
-      const parsed = receiptCountrySchema.safeParse(actor.settings?.country)
-      return parsed.success ? parsed.data : null
-    }),
+    country,
     photoCountry: computed(() => {
-      const parsed = photoReceiptCountrySchema.safeParse(actor.settings?.country)
+      const parsed = photoReceiptCountrySchema.safeParse(country.value)
       return parsed.success ? parsed.data : null
     }),
   }

@@ -1,5 +1,5 @@
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
-import { actorSchema, telegramUserIdSchema } from '@molvia/model'
+import { MODEL_CONSENT_EDITION, actorSchema, telegramUserIdSchema } from '@molvia/model'
 import type { Actor, ActorPatch, NewActor, TelegramUserId } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -55,7 +55,17 @@ export interface ActorRepository {
    * arriving together write once. `now()`, the database's clock, as everywhere a moment is stamped.
    */
   markSeen(id: string, afterHours: number): Promise<boolean>
+
+  /** Whether the model reads this owner's receipts now (MOL-408): `READS_BY_MODEL`, by the database's clock. */
+  readsReceiptsByModel(id: string): Promise<boolean>
 }
+
+/**
+ * The model reads a person's receipts while `receipts_model_until` is to come and edition `MODEL_CONSENT_EDITION` is
+ * accepted (MOL-272): one condition for the queue that reads and the phone that offers the camera (MOL-408).
+ */
+export const READS_BY_MODEL = sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp()
+  and ${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}, false)`
 
 /**
  * A row becomes an entity only by passing the domain's own schema. The cost is that a row
@@ -164,6 +174,15 @@ export function createActorRepository(db: Conn): ActorRepository {
     },
 
     consentVersion,
+
+    async readsReceiptsByModel(id) {
+      if (idOrNull(id) === null) return false
+      const [row] = await db
+        .select({ byModel: READS_BY_MODEL })
+        .from(actors)
+        .where(eq(actors.id, id))
+      return row?.byModel ?? false
+    },
 
     async acceptConsent(id, version) {
       if (idOrNull(id) === null) return null
