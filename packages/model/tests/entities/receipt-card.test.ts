@@ -41,6 +41,14 @@ describe('a country’s card (MOL-247)', () => {
     expect(receiptCard('RS')).toEqual({ currency: 'RSD', nameLanguage: null, photo: null })
   })
 
+  it('Georgia is read by the model alone, in lari, with no names of its own in the catalogue (MOL-408)', () => {
+    expect(receiptCard('GE')).toMatchObject({ currency: 'GEL', nameLanguage: null })
+    expect(receiptCard('GE').photo).toMatchObject({ languages: null, tinDigits: [9, 11] })
+    // must not: no swap of the model's until the bench measures one
+    expect(receiptCard('GE').photo?.modelSwaps).toEqual({})
+    expect(receiptCard('AM').photo?.tinDigits).toEqual([8])
+  })
+
   it('names only formats of numbers the parse reads', () => {
     for (const { country, photo } of photoCards) {
       expect(photo.numbers.length, country).toBeGreaterThan(0)

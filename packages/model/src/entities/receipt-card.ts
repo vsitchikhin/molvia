@@ -124,8 +124,17 @@ export interface ReceiptWords {
 
 /** What reading a country's receipt off a photo needs. */
 export interface PhotoReading {
-  /** Tesseract's languages, one country's set: every script at once is slower and mixes them (MOL-114). */
-  readonly languages: string
+  /**
+   * Tesseract's languages, one country's set: every script at once is slower and mixes them (MOL-114). `null` — the
+   * model alone reads the country (MOL-408, owner's В-2 «а»): no layout of Tesseract's finds its lines, and a receipt
+   * the model does not read fails as unreadable, never «переснимите».
+   */
+  readonly languages: string | null
+  /**
+   * How many digits the seller's tax number has after its word (MOL-408): Armenia's eight, Georgia's nine of a
+   * company and eleven of a sole trader. The model's rows are read by it; Tesseract's layouts read Armenia's eight.
+   */
+  readonly tinDigits: readonly number[]
   readonly numbers: readonly NumberFormat[]
   /** Digits OCR confuses in the tills' font: a figure is tried with each of them swapped in. */
   readonly swaps: Readonly<Record<string, string>>
@@ -169,6 +178,7 @@ export interface ReceiptCard {
  */
 export const ARMENIAN_RECEIPTS: PhotoReading = {
   languages: 'hye+rus+eng',
+  tinDigits: [8],
   // «5 403,12 ֏», «688.09դրամ»: a point or a comma before the hundredths, thousands apart by a space
   numbers: [{ fractionDigits: 2 }],
   swaps: { 5: '6', 6: '5', 1: '4', 4: '1', 3: '8', 8: '3', 0: '9', 9: '0' },
@@ -231,13 +241,83 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
   },
 }
 
+/** A word a country's tills never print: a field of the card no rule of that country reads. */
+const NEVER = '(?!)'
+
+/** Georgia's letters: Mkhedruli, which has no case, and Mtavruli, its capitals for headings. */
+const GEORGIAN = { capital: 'Ა-ᲺᲽ-Ჿ', small: 'ა-ჺჽ-ჿ' }
+
+/**
+ * Georgia (MOL-408): read off its photo by the model alone — `languages` none (owner's В-2 «а») — so the card names
+ * the words the model's summary is read by: the total «სულ» and a supermarket's «TOT», «TOTAL»; the payment in cash
+ * «ნაღდი», by card «ბარათი», a bank's «BOG_Cards», a terminal's «EFT»; the change «ხურდა» is no payment, and prints
+ * below nought anyway. MOL-229's five receipts and their draft (`research/MOL-229/cards/GE.json`). Armenia's words
+ * Georgia prints no counterpart of — the card's cashback, the sum since the year's start, the fiscal number — are
+ * `NEVER`: the receipt has no key against a second record until a Georgian receipt shows its number's word. The model's
+ * swaps are none until measured. The pharmacies' three decimals, «23.868 ლარი», are not read: such a figure stays
+ * empty.
+ */
+export const GEORGIAN_RECEIPTS: PhotoReading = {
+  languages: null,
+  // «ს/კ 405123456» of a company, eleven digits of a sole trader's personal number
+  tinDigits: [9, 11],
+  numbers: [{ fractionDigits: 2 }],
+  swaps: {},
+  modelSwaps: {},
+  modelRepairSwaps: {},
+  digitLike: {},
+  // «25.05.2024 14:03»
+  dateOrder: 'day-first',
+  words: {
+    // «სულ:», «სულ გადასახდელი», a supermarket's «GEL* TOT» — never inside a word, «სულგუნი» is a cheese
+    total: `(?<![${GEORGIAN.small}])სულ(?![${GEORGIAN.small}])`,
+    totalKept: `(?<![${GEORGIAN.small}])სულ(?![${GEORGIAN.small}])|\\bTOT(?:AL)?\\b`,
+    discountKept: 'ფასდაკლ|[Dd]iscount|DISCOUNT',
+    sinceStart: NEVER,
+    cashback: NEVER,
+    taxed: NEVER,
+    redeemed: NEVER,
+    prepayment: NEVER,
+    service: 'მომსახურ|Service|Обслуживание',
+    billTotal: 'გადასახდელი|Всего|Итого|К оплате',
+    slipTerminal: '\\b(?:TID|MID|RRN)\\b',
+    slipAmount: 'თანხა|Amount|Сумма',
+    paid: ['ნაღდ', 'ბარათ', 'გადახდ', 'Cards?\\b', '\\bEFT\\b', '\\bCASH\\b'],
+    cash: ['ნაღდ', '\\bCASH\\b'],
+    cashless: ['ბარათ', 'Cards?\\b', '\\bEFT\\b'],
+    sectionTax: [NEVER],
+    control: NEVER,
+    fiscalSign: NEVER,
+    // «ს/კ», «ს.კ.» — the identification code
+    tin: 'ს[/.]\\s?კ\\.?',
+    tinMisread: [],
+    fiscal: NEVER,
+    fiscalNumber: NEVER,
+    receiptNumber: NEVER,
+    head: ['მოლარე', 'მისამართი'],
+    sumSign: 'ლარ',
+    currency: ['ლარი', '₾', 'GEL'],
+    // «1ც», «100 ცალი»; «კგ» of the scales
+    units: {
+      piece: `ც(?:ალი)?(?![${GEORGIAN.small}])`,
+      pieceCut: 'ც\\S{0,3}',
+      kg: 'კგ',
+      ml: 'მლ',
+      litre: `ლ(?![${GEORGIAN.small}])`,
+      gram: `გრ?(?![${GEORGIAN.small}])`,
+    },
+    letters: { ...GEORGIAN, any: `${GEORGIAN.small}${GEORGIAN.capital}` },
+  },
+}
+
 /**
  * The countries a receipt is read in. Serbia's receipts are not read off a photo but asked of the tax
  * office by their link (MOL-232), and its names have no language of their own in the catalogue yet
- * (MOL-232, В-3); Georgia joins with its card (MOL-248).
+ * (MOL-232, В-3); nor have Georgia's (MOL-408).
  */
 export const RECEIPT_CARDS: Readonly<Record<ReceiptCountry, ReceiptCard>> = {
   AM: { currency: 'AMD', nameLanguage: 'hy', photo: ARMENIAN_RECEIPTS },
+  GE: { currency: 'GEL', nameLanguage: null, photo: GEORGIAN_RECEIPTS },
   RS: { currency: 'RSD', nameLanguage: null, photo: null },
 }
 
