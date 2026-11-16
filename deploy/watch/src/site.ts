@@ -47,3 +47,29 @@ export function judge(attempts: readonly (readonly string[])[]): Verdict {
   if (failed.length < FAILURES_TO_ALARM || !last) return { up: true }
   return { up: false, said: last.join('\n') }
 }
+
+/** What Grafana's address answered a request with no pass of Access (MOL-399): its status and where it sent. */
+export interface Door {
+  readonly status: number
+  readonly location: string
+}
+
+/** Access's own sign-in, on the team's domain, where it sends a request that carries no pass. */
+function accessSignIn(location: string): boolean {
+  if (!URL.canParse(location)) return false
+  const url = new URL(location)
+  return url.protocol === 'https:' && url.hostname.endsWith('.cloudflareaccess.com')
+}
+
+/**
+ * What is wrong with the lock of Grafana from outside (MOL-399, В-3), a line or nothing. A request with
+ * no pass is Access's to answer — sent to the team's sign-in, or refused. Anything Grafana answers itself,
+ * its page or its own `/login`, is the lock open: Grafana's own check of the pass is the second lock, not
+ * the first. No answer, or Cloudflare's own error, is no Access in front either.
+ */
+export function readLock(door: Door): string[] {
+  if (door.status === 401 || door.status === 403) return []
+  if (door.status >= 300 && door.status < 400 && accessSignIn(door.location)) return []
+  if (door.status === 0 || door.status >= 500) return [`grafana ${code(door.status)}`]
+  return [`grafana open ${code(door.status)}`]
+}

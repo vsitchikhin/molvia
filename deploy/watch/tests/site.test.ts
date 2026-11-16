@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { judge, readSite } from '@/site'
+import { judge, readLock, readSite } from '@/site'
 
 const OK = { status: 200, body: '{"status":"ok","version":"v0.1.3-45-gfebb22c8","database":"up"}' }
 const PAGE = { status: 200, body: '' }
@@ -64,5 +64,44 @@ describe('judge', () => {
 
   it('is down when all four failed', () => {
     expect(judge([down, down, down, down])).toEqual({ up: false, said: 'health 503' })
+  })
+})
+
+describe('readLock', () => {
+  const SIGN_IN =
+    'https://molvia.cloudflareaccess.com/cdn-cgi/access/login/grafana.molvia.net?kid=abc&redirect_url=%2F'
+
+  it('finds the lock shut when Access sends the request to its sign-in', () => {
+    for (const status of [302, 303, 307])
+      expect(readLock({ status, location: SIGN_IN })).toEqual([])
+  })
+
+  it('finds it shut when Access refuses the request outright', () => {
+    expect(readLock({ status: 401, location: '' })).toEqual([])
+    expect(readLock({ status: 403, location: '' })).toEqual([])
+  })
+
+  it('names Grafana answering by itself — its page or its own login — the lock open', () => {
+    expect(readLock({ status: 200, location: '' })).toEqual(['grafana open 200'])
+    expect(readLock({ status: 302, location: '/login' })).toEqual(['grafana open 302'])
+    expect(readLock({ status: 302, location: 'https://grafana.molvia.net/login' })).toEqual([
+      'grafana open 302',
+    ])
+  })
+
+  it('takes no sign-in but Access’s own, over https', () => {
+    for (const location of [
+      'http://molvia.cloudflareaccess.com/cdn-cgi/access/login/x',
+      'https://cloudflareaccess.com.evil.test/cdn-cgi/access/login/x',
+      'https://evil.test/molvia.cloudflareaccess.com',
+      'molvia.cloudflareaccess.com/cdn-cgi/access/login/x',
+    ])
+      expect(readLock({ status: 302, location }), location).toEqual(['grafana open 302'])
+  })
+
+  it('names no answer, or Cloudflare’s own error, by its code — no Access in front either', () => {
+    expect(readLock({ status: 0, location: '' })).toEqual(['grafana 000'])
+    expect(readLock({ status: 530, location: '' })).toEqual(['grafana 530'])
+    expect(readLock({ status: 502, location: '' })).toEqual(['grafana 502'])
   })
 })
