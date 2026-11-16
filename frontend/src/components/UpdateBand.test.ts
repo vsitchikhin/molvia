@@ -79,7 +79,7 @@ describe('«Вышла новая версия · Обновить» (MOL-132)',
 
   it('has its words in English too', () => {
     expect(render(fakeUpdate('ready'), 'en').view.text()).toContain('A new version is out')
-    expect(render(fakeUpdate('failed'), 'en').view.text()).toContain('The update did not take')
+    expect(render(fakeUpdate('failed'), 'en').view.text()).toContain('The update didn’t apply')
   })
 
   describe('said out loud', () => {
@@ -178,7 +178,7 @@ describe('«Вышла новая версия · Обновить» (MOL-132)',
       await nextTick()
       vi.advanceTimersByTime(200)
       await nextTick()
-      expect(said).toEqual(['The update did not take'])
+      expect(said).toEqual(['The update didn’t apply'])
     })
 
     it('says the failure, and not the moment in between', async () => {
@@ -192,7 +192,7 @@ describe('«Вышла новая версия · Обновить» (MOL-132)',
       vi.advanceTimersByTime(200)
       await nextTick()
 
-      expect(said).toEqual(['The update did not take'])
+      expect(said).toEqual(['The update didn’t apply'])
     })
   })
 })

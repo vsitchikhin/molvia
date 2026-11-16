@@ -251,7 +251,7 @@ test('nothing rated yet: the newcomer is offered to act, and the cycle leads to 
   await expect(page.getByRole('heading', { name: 'Photograph your first receipt' })).toBeVisible()
   // No search before the first verdict: whatever it found would be «not rated yet».
   await expect(page.getByRole('searchbox')).toHaveCount(0)
-  await page.getByRole('button', { name: /At home — «Ratings»/ }).click()
+  await page.getByRole('button', { name: /At home — “Ratings”/ }).click()
 
   await expect(page).toHaveURL(/\/verdicts$/)
 })
@@ -784,7 +784,7 @@ test('offline without a session: the door says so, and the offer comes back with
   })
   await page.goto('/')
 
-  await expect(page.getByRole('heading', { name: 'No internet, no sign-in' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Signing in needs the internet' })).toBeVisible()
   await expect(
     page.getByRole('heading', { name: 'The list will show up once you are online' }),
   ).toHaveCount(0)

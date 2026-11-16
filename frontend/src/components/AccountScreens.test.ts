@@ -327,7 +327,7 @@ describe('ReconcileSheet (handoff 05)', () => {
     const plate = view.get('.difference')
     expect(plate.text()).toContain('−֏5,132')
     expect(plate.classes()).not.toContain('negative')
-    expect(view.text()).toContain('Spending ֏1,200 with no account')
+    expect(view.text()).toContain('Expense ֏1,200 with no account')
     const [id] = checkAccount.mock.calls[0] ?? []
     expect(id).toBe(cash.id)
 

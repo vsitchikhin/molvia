@@ -289,7 +289,7 @@ describe('edition 2: the text of the consent art. 10 of Armenia’s law asks for
     }
     expect(ru.privacy.stored.search.text).toMatch(/Другим людям ваши пары не видны/)
     expect(ru.privacy.stored.search.text).toContain(`«${ru.privacy.statistics.title}»`)
-    expect(en.privacy.stored.search.text).toContain(`«${en.privacy.statistics.title}»`)
+    expect(en.privacy.stored.search.text).toContain(`“${en.privacy.statistics.title}”`)
   })
 
   it('lists every recipient, the Serbian tax office among them, and nobody else', async () => {

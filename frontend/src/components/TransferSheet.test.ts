@@ -182,7 +182,7 @@ describe('TransferSheet (MOL-253)', () => {
     expect(row(none, 'To').attributes('aria-disabled')).toBe('true')
 
     const alone = await sheet({ from: cash.id }, withAccounts([card, dollars, savings, cash]))
-    expect(mainButton(alone).text()).toBe('Needs a second account in drams')
+    expect(mainButton(alone).text()).toBe('You need a second account in drams')
     expect(alone.text()).toContain('No other account in drams')
 
     const two = await sheet({ from: card.id }, withAccounts([card, dollars, savings, cash]))
@@ -234,7 +234,7 @@ describe('TransferSheet (MOL-253)', () => {
     const view = await sheet({ from: card.id, online: false }, withAccounts([card, dollars]))
     expect(view.text()).toContain('No connection. You can transfer once online')
     await typeAmount(view, '2000')
-    expect(mainButton(view).text()).toBe('We’ll transfer once online'.replace('’', "'"))
+    expect(mainButton(view).text()).toBe('We’ll transfer once online')
     await mainButton(view).trigger('click')
     expect(recordTransfer).not.toHaveBeenCalled()
   })
@@ -256,7 +256,7 @@ describe('TransferSheet (MOL-253)', () => {
           one.attributes('inputmode') === 'decimal' && one.attributes('data-field') !== 'amount',
       )
     await fee?.setValue('20')
-    expect(view.text()).toContain('leaves in all')
+    expect(view.text()).toContain('leaves the account in total')
     await mainButton(view).trigger('click')
     await flushPromises()
     expect(view.text()).toContain('The transfer didn')
@@ -293,7 +293,7 @@ describe('TransferSheet (MOL-253)', () => {
     await flushPromises()
     await mainButton(view).trigger('click')
     await flushPromises()
-    expect(view.text()).toContain('«Dollars» was deleted on another phone')
+    expect(view.text()).toContain('“Dollars” was deleted on another phone')
     expect(row(view, 'To').attributes('aria-invalid')).toBe('true')
     expect((view.get('input[data-field="amount"]').element as HTMLInputElement).value).toBe('2000')
   })

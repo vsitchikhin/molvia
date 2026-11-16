@@ -22,10 +22,10 @@ const NO_SECOND_LOAD = 'WebKit keeps no Secure cookie on http://127.0.0.1: a sec
 const CDP_ONLY = 'the rise is held through CDP, which only Chromium speaks'
 
 const opener = (page: Page) => page.getByRole('button', { name: 'Open the sheet' })
-const sheet = (page: Page) => page.getByRole('dialog', { name: 'Milk «Ashkhar»' })
+const sheet = (page: Page) => page.getByRole('dialog', { name: 'Milk “Ashkhar”' })
 // The same sheet as an element, whether it is open or not: its animations are read while it is
 // still rising. By its text, since the kit holds the scanner's sheet too (MOL-98).
-const sheetElement = (page: Page) => page.locator('dialog', { hasText: 'Milk «Ashkhar»' })
+const sheetElement = (page: Page) => page.locator('dialog', { hasText: 'Milk “Ashkhar”' })
 const heading = (page: Page) => page.getByRole('heading', { level: 1 })
 
 async function expectOn(page: Page, path: string, title: string): Promise<void> {
@@ -192,7 +192,7 @@ test.describe('the sheet', () => {
     test.skip(browserName !== 'chromium', CDP_ONLY)
     const { top, length } = await openSheet(page)
     const height = await sheet(page).evaluate((dialog) => dialog.getBoundingClientRect().height)
-    await pull(page, await centreOf(page, 'Milk «Ashkhar»'), height / 3, { steps: 12, gap: 40 })
+    await pull(page, await centreOf(page, 'Milk “Ashkhar”'), height / 3, { steps: 12, gap: 40 })
     await expectPutAway(page, top)
     expect(await historyLength(page)).toBe(length + 1)
   })
@@ -200,7 +200,7 @@ test.describe('the sheet', () => {
   test('a short slow pull lets it go back up', async ({ page, browserName }) => {
     test.skip(browserName !== 'chromium', CDP_ONLY)
     await openSheet(page)
-    await pull(page, await centreOf(page, 'Milk «Ashkhar»'), 40, { steps: 8, gap: 60 })
+    await pull(page, await centreOf(page, 'Milk “Ashkhar”'), 40, { steps: 8, gap: 60 })
     await page.waitForTimeout(500)
     await expect(sheet(page)).toBeVisible()
     expect(await sheet(page).evaluate((dialog) => getComputedStyle(dialog).transform)).toBe('none')
@@ -247,7 +247,7 @@ test.describe('the sheet', () => {
 
   test('a tap inside the sheet does not', async ({ page }) => {
     await openSheet(page)
-    await sheet(page).getByRole('heading', { name: 'Milk «Ashkhar»' }).click()
+    await sheet(page).getByRole('heading', { name: 'Milk “Ashkhar”' }).click()
     await expect(sheet(page)).toBeVisible()
   })
 
@@ -634,7 +634,7 @@ test.describe('the sheet', () => {
     async function priceOverTheKeys(page: Page, seen: number): Promise<void> {
       const keyboard = await fakeKeyboard(page)
       await openSheet(page)
-      await sheet(page).getByLabel('Price as on the tag').focus()
+      await sheet(page).getByLabel('Price on the tag').focus()
       const window = page.viewportSize()?.height ?? 0
       await keyboard(window - seen, window - seen)
     }
@@ -904,7 +904,7 @@ test.describe('the sheet', () => {
       await expect(note(page)).toHaveAttribute('aria-invalid', 'true')
       await expect(note(page)).toBeFocused()
       const error = longSheet(page).locator('[id$="-error"]')
-      await expect(error).toHaveText('This has characters that cannot be saved')
+      await expect(error).toHaveText('This contains characters that can’t be saved')
       return error
     }
 

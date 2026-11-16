@@ -436,7 +436,7 @@ describe('когда войти не вышло', () => {
     window.dispatchEvent(new Event('offline'))
     await flushPromises()
 
-    expect(view.text()).toContain('No internet, no sign-in')
+    expect(view.text()).toContain('Signing in needs the internet')
     expect(view.find('.warn').exists()).toBe(true)
     expect(view.findAll('button')).toHaveLength(0)
   })

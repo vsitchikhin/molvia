@@ -52,7 +52,7 @@
         "remove": "Remove the total"
       },
       "finish": {
-        "body": "{n} of {total} have no price. Enter what the receipt came to, and “Money” gets the whole of it",
+        "body": "{n} of {total} have no price. Enter the receipt total, and “Money” will count all of it",
         "label": "What did the receipt come to?"
       }
     },
@@ -71,23 +71,23 @@
       "action": "Delete the entry",
       "sheet": {
         "title": "Delete this entry?",
-        "body": "The purchases and prices go, from “Money” and the accounts too. The ratings stay",
-        "body_receipt": "The receipt total {amount} goes from “Money” and the accounts"
+        "body": "Its purchases and prices are removed, from “Money” and the accounts too. Ratings stay",
+        "body_receipt": "The receipt total {amount} is removed from “Money” and the accounts"
       },
       "empty": {
         "title": "Nothing in this entry",
-        "body": "Delete it, so no empty row is left in Purchases? If all you have is the receipt total, record it as a spending in “Money”",
+        "body": "Delete it so that no empty row is left in Purchases? If all you have is the receipt total, record it as an expense in “Money”",
         "finish": "Finish anyway",
-        "spending": "Record as a spending in “Money”"
+        "spending": "Record as an expense in “Money”"
       },
       "removed": "Entry deleted: {name}",
       "removed_announced": "Entry deleted: {name}. Undo — 10 seconds",
       "restore": "Undo",
       "restored": "The entry is back",
       "not_restored": "The entry did not come back: {name}",
-      "not_restored_open": "Another entry was started meanwhile, and only one can be open",
+      "not_restored_open": "Another entry was started in the meantime, and only one can be open",
       "not_restored_gone": "More than ten minutes have passed — the entry is deleted for good",
-      "not_restored_recorded": "This receipt was recorded again meanwhile, and one receipt is recorded only once"
+      "not_restored_recorded": "This receipt has been recorded again in the meantime, and a receipt can only be recorded once"
     },
     "empty": {
       "title": "The entry has started",
@@ -99,7 +99,7 @@
       "strip": "The server did not answer · your items are still on the phone"
     },
     "offline": {
-      "strip": "Offline · items are kept on the phone and will be sent on their own"
+      "strip": "Offline · items are kept on the phone and will be sent automatically"
     },
     "none": {
       "action": "Start the entry"
@@ -120,7 +120,7 @@
     },
     "rejected": {
       "title": "One change was not accepted",
-      "named": "«{name}» was not accepted",
+      "named": "“{name}” was not accepted",
       "unknown": "The server did not accept the change ({code})",
       "fix": "Correct it",
       "drop": "Dismiss",
@@ -134,17 +134,17 @@
     "caveat": {
       "pending": "+ {n} item not sent yet | + {n} items not sent yet",
       "partial": "converted from {currency} only",
-      "local": "the entry has not been sent — the total comes after it has"
+      "local": "the entry has not been sent yet — the total will follow"
     },
     "rate": {
       "source_cba": "the Central Bank of Armenia",
       "source_cbr": "the Bank of Russia",
       "source_erapi": "open.er-api.com",
-      "fallback": "Not a rate of {bank} — it has been silent for over a week. Source:",
-      "stale_official": "The rate is of {date} — {bank} has published nothing since",
-      "stale_fallback": "The rate is of {date} — nothing newer has been published anywhere",
+      "fallback": "Not a rate from {bank}, which has published nothing for over a week. Source:",
+      "stale_official": "The rate is from {date} — {bank} has published nothing since",
+      "stale_fallback": "The rate is from {date} — nothing newer has been published anywhere",
       "jump_title": "The rate jumped by more than a quarter",
-      "jump_previous": "{rate} instead of {previous} of {date}",
+      "jump_previous": "{rate} instead of {previous} on {date}",
       "jump_alone": "{rate}, and there is no earlier rate beside it",
       "choose": "Choose a rate",
       "sheet_title": "Which rate should count?",
@@ -153,7 +153,7 @@
       "old": "The earlier one",
       "mine": "My own",
       "own": "enter",
-      "save": "Count by it",
+      "save": "Use this rate",
       "saving": "Saving…",
       "failed": "The choice could not be saved. Try again",
       "source_nbg": "the National Bank of Georgia",
@@ -165,12 +165,12 @@
     },
     "unsent": {
       "title": "{n} purchase has not been sent | {n} purchases have not been sent",
-      "body": "They are on the phone. They go out when there is a connection and the app is open"
+      "body": "They are on the phone and will be sent when there is a connection and the app is open"
     },
     "elsewhere": {
       "title": "An entry in {place} is already open",
       "body": "Continue the open entry, or finish it and start a new one in {mine}? Purchases for the new entry are saved on this device and will wait for your choice.",
-      "body_other": "Purchases for the new entry ({mine}) are saved on this device. Added to the open entry, they are recorded against {place} — prices of one shop must not be written down against another, they are what the comparison rests on.",
+      "body_other": "Purchases for the new entry ({mine}) are saved on this device. Added to the open entry, they will be recorded at {place} — one shop’s prices must not be recorded under another, since comparisons rely on them.",
       "join": "Add them to that entry",
       "finish": "Finish that entry",
       "choose": "Choose the entry"
@@ -190,7 +190,7 @@
       "pending": "Changes are on this device. We will send them when connected.",
       "no_purchases": "No purchases here yet. Add anything you forgot.",
       "rejected_title": "A change was not accepted",
-      "rejected_body": "Purchases remain on this device. Purchases shows the reason and lets you correct the purchase.",
+      "rejected_body": "The purchases remain on this device. The Purchases screen shows the reason and lets you correct them.",
       "review": "Review the refusal"
     },
     "manual_meta": "Recording by hand · {when}",
@@ -205,16 +205,16 @@
     "recorded": "{count} · {day}",
     "empty": {
       "title": "Your purchases will be here",
-      "body": "Record what you took and what it cost — the button below. Rate them at home, and «What to buy» will tell you what to take again."
+      "body": "Record what you bought and what it cost — the button below. Rate it at home, and “What to buy” will tell you what to buy again."
     },
     "error": {
       "title": "Purchases did not load",
       "body": "You can still record new ones — the button below"
     },
     "manual_ask": {
-      "title": "Already recording «{place}»",
+      "title": "Already recording “{place}”",
       "body": "Only one entry can be open. Continue this one — or finish it and start a new one.",
-      "continue": "Continue «{place}»",
+      "continue": "Continue “{place}”",
       "finish": "Finish and start a new one"
     },
     "capture": "Photograph a receipt",
@@ -238,8 +238,8 @@
       "not_photo": "no receipt in the photo",
       "too_large": "the photo is too large",
       "lost": "the photo wasn’t kept on this phone",
-      "other": "the server didn’t take the receipt",
-      "link": "the link did not fit",
+      "other": "the server didn’t accept the receipt",
+      "link": "the link wasn’t accepted",
       "day_limit": "{n} receipt already sent today | {n} receipts already sent today",
       "unrecorded_limit": "{n} receipt is waiting to be recorded | {n} receipts are waiting to be recorded"
     },
@@ -247,29 +247,29 @@
     "recorded_sum": "receipt total · {day}",
     "queued": {
       "waiting": "The photos are on your phone. We’ll send them once you are online — nothing to do.",
-      "parsing": "Reading is under way — you can close the app. The ready receipt goes to “Check and save”.",
-      "sending": "The photos are going to the server. If you close the app, sending goes on the next time you open it.",
-      "stuck": "The server got only some parts of this receipt, and this phone has none of them. Delete the receipt and take it again.",
-      "rejected": "The server didn’t take this receipt: {reason}. Remove it and take it again.",
+      "parsing": "The receipt is being read — you can close the app. Once ready, it moves to “Check and save”.",
+      "sending": "The photos are going to the server. If you close the app, sending resumes the next time you open it.",
+      "stuck": "The server got only some parts of this receipt, and this phone no longer has them. Delete the receipt and take it again.",
+      "rejected": "The server didn’t accept this receipt: {reason}. Remove it and take it again.",
       "rejected_day_limit": "The server did not accept this receipt: {reason}. Remove it and send the receipt tomorrow.",
       "rejected_unrecorded_limit": "The server did not accept this receipt: {reason}. Record or delete the ones waiting, remove this one and send the receipt again.",
       "link_waiting": "The link is on your phone. We will send it once there is a connection — nothing to do.",
-      "link_sending": "The link is going to the server. If you close the app, sending carries on next time you open it.",
-      "link_parsing": "Asking the Serbian tax office. A receipt just printed shows up there in a couple of minutes — you can close the app. Once ready, the receipt moves to «Check and save».",
-      "link_rejected": "The server did not accept this receipt: {reason}. Remove it and shoot the QR code or paste the link again."
+      "link_sending": "The link is going to the server. If you close the app, sending resumes the next time you open it.",
+      "link_parsing": "Asking the Serbian tax office. A receipt just printed shows up there in a couple of minutes — you can close the app. Once ready, the receipt moves to “Check and save”.",
+      "link_rejected": "The server did not accept this receipt: {reason}. Remove it and scan the QR code or paste the link again."
     },
     "delete": "Delete receipt",
-    "delete_note": "The photo goes with it",
+    "delete_note": "Its photo is deleted too",
     "deleted": "Receipt deleted with its photo",
     "empty_capture": {
-      "body": "Photograph a receipt — we read the lines, you check them and save with one button. No receipt — “Add by hand”."
+      "body": "Photograph a receipt — we read the lines, you check them and save with one tap. No receipt? Use “Add by hand”."
     },
     "error_capture": "You can still photograph a receipt or add by hand",
     "stale": "Offline · purchases as of {when}",
     "stale_untimed": "Offline · purchases saved on this phone",
     "stale_error": "The server did not answer · purchases as of {when}",
     "stale_error_untimed": "The server did not answer · purchases saved on this phone",
-    "earlier_online": "Earlier than {day} — once online",
+    "earlier_online": "Before {day} — once you’re online",
     "offline": {
       "title": "Offline",
       "body": "We’ll show your purchases once you’re online. You can record new ones now — the button below"
@@ -285,9 +285,9 @@
     "capture_link": "Receipt by link",
     "by_link": "by link",
     "asking_tax_office": "asking the tax office",
-    "missing_meta": "the tax office did not show it",
-    "invalid_meta": "the tax office does not accept it",
-    "delete_note_link": "The receipt goes together with its link"
+    "missing_meta": "the tax office hasn’t shown it",
+    "invalid_meta": "the tax office doesn’t recognise it",
+    "delete_note_link": "Its link is deleted too"
   },
   "item": {
     "search_title": "What did you pick up?",
@@ -298,7 +298,7 @@
     "group_found": "Found",
     "group_similar": "Similar spelling",
     "results_announced": "Found {n} item | Found {n} items",
-    "far_announced": "Nothing found for «{query}». {n} item with a similar spelling | Nothing found for «{query}». {n} items with a similar spelling",
+    "far_announced": "Nothing found for “{query}”. {n} item with a similar spelling | Nothing found for “{query}”. {n} items with a similar spelling",
     "quantity": "How much",
     "unit": "Unit",
     "unit_kg": "kg",
@@ -306,10 +306,10 @@
     "unit_l": "l",
     "unit_ml": "ml",
     "unit_piece": "pc",
-    "price": "Price as on the tag",
+    "price": "Price on the tag",
     "currency": "Price currency",
     "unit_price_label": "Per unit",
-    "unit_price_pending": "Worked out for you — nothing to type",
+    "unit_price_pending": "Calculated for you — nothing to type",
     "unit_price_value": "{amount}/{unit}",
     "unit_price_announced": "Per unit: {value}",
     "cheaper": {
@@ -333,31 +333,31 @@
       "action": "To Purchases"
     },
     "empty": {
-      "title": "Nothing found for «{query}»",
-      "text": "We’ll add it to the catalogue — type its name as the price tag has it",
+      "title": "Nothing found for “{query}”",
+      "text": "We’ll add it to the catalogue — type its name as it appears on the price tag",
       "action": "Suggest an item"
     },
     "not_listed": "Not here? Suggest an item",
     "propose": {
       "title": "New item",
-      "name": "As the price tag says",
+      "name": "As on the price tag",
       "note": "What sets it apart on the shelf — optional",
       "submit": "Add to the catalogue",
       "offline": "Suggesting needs a connection",
       "needs_name": "Type the name",
       "needs_unit": "Choose a unit",
       "sending": "Adding…",
-      "name_invalid": "The name holds a character the catalogue will not take — type the name again",
-      "note_invalid": "The note holds a character the catalogue will not take — type the note again",
+      "name_invalid": "The name contains a character the catalogue doesn’t accept — type the name again",
+      "note_invalid": "The note contains a character the catalogue doesn’t accept — type the note again",
       "failed": "Could not add it. Please try again",
       "code": "Code {code} will be saved with the item",
       "hint_source": "Data from Open Food Facts ↗",
       "size": "{amount} {unit} in the pack",
-      "size_drop": "Leave out how much is in the pack",
-      "taken": "This code already belongs to «{name}»",
-      "take": "Take «{name}»",
-      "name_taken": "«{name}» is already there — name the item differently, with its brand for instance",
-      "day_limited": "You have added {n} item to the catalogue today — new ones tomorrow. For now, take a similar one from the search. | You have added {n} items to the catalogue today — new ones tomorrow. For now, take a similar one from the search."
+      "size_drop": "Don’t include the pack size",
+      "taken": "This code already belongs to “{name}”",
+      "take": "Take “{name}”",
+      "name_taken": "“{name}” is already there — name the item differently, with its brand for instance",
+      "day_limited": "You have added {n} item to the catalogue today — you can add more tomorrow. For now, pick a similar one from the search. | You have added {n} items to the catalogue today — you can add more tomorrow. For now, pick a similar one from the search."
     },
     "error": {
       "title": "The server did not answer",
@@ -367,7 +367,7 @@
       "fallback_note": "For now — from your recent items"
     },
     "offline": {
-      "body": "Searching your recent items only. The full catalogue is back once you are online",
+      "body": "Searching your recent items only. The full catalogue returns once you’re online",
       "strip": "Offline · searching your recent items only. The full catalogue comes back with a connection"
     },
     "barcode": {
@@ -380,29 +380,29 @@
       "error_body": "Could not check the code {code}. Try again — or find the item by name",
       "offline_body": "None of your recent items has this code. Find the item by name — or scan it once you are online",
       "offline_strip": "Offline · searching your recent items only",
-      "found": "Found by the code {code}",
-      "found_announced": "Found by the code {code}: {name}",
-      "pending": "Code {code} is waiting for its item — pick it in the list",
-      "pending_drop": "Don't link the code",
-      "bind_question": "Link code {code} to «{name}»?",
+      "found": "Found by code {code}",
+      "found_announced": "Found by code {code}: {name}",
+      "pending": "Code {code} is waiting for its item — pick it from the list",
+      "pending_drop": "Don’t link the code",
+      "bind_question": "Link code {code} to “{name}”?",
       "bind_hint": "Everyone who scans this code will see this item",
       "bind": "Link and record",
       "bind_busy": "Linking…",
       "without_code": "Record without the code",
-      "propose_other": "It's a different item — suggest it",
-      "taken": "Code {code} already belongs to «{name}»",
-      "without_code_named": "Record «{name}» without the code",
+      "propose_other": "It’s a different item — suggest it",
+      "taken": "Code {code} already belongs to “{name}”",
+      "without_code_named": "Record “{name}” without the code",
       "bind_offline_strip": "Offline · the code is not linked. Try again with a connection — or record without the code",
       "bind_error_body": "Could not link code {code}. Try again — or record without the code",
       "not_this": "Code {code} — not this item?",
       "not_this_failed": "Could not unlink the code — check the connection",
-      "in_store": "Code {code} is a shop's own label",
-      "in_store_body": "The scales or the shop print it: another package gets another code. Find the item by its name",
-      "detach_question": "Unlink code {code} from «{name}»?",
+      "in_store": "Code {code} is a shop’s own label",
+      "in_store_body": "It’s printed by the scales or the shop, so every package gets its own code. Find the item by name",
+      "detach_question": "Unlink code {code} from “{name}”?",
       "detach_hint": "Nobody will find it by this code any more",
       "detach": "Unlink",
       "detach_busy": "Unlinking…",
-      "bind_named": "«{name}» is already in the catalogue. Link code {code} to it?"
+      "bind_named": "“{name}” is already in the catalogue. Link code {code} to it?"
     }
   },
   "sheet": {
@@ -418,7 +418,7 @@
     "group_never": "Not worth buying anywhere",
     "badge_take": "BUY",
     "badge_if_cheap": "IF CHEAP",
-    "badge_never": "DO NOT",
+    "badge_never": "AVOID",
     "cheapest_at": "Cheapest at {place}",
     "bought_at": "Bought here: {place}",
     "also_at": "Also: {places}",
@@ -441,8 +441,8 @@
       "keeps_score": "The rating stays as it was. To take it back, withdraw it",
       "withdraw": "Withdraw the rating",
       "withdrawing": "Withdrawing the rating…",
-      "withdraw_hint": "The item leaves this screen, and the purchase goes back to «Ratings»",
-      "withdraw_hint_shared": "Your rating leaves the average, and the purchase goes back to «Ratings»",
+      "withdraw_hint": "The item leaves this screen, and the purchase goes back to “Ratings”",
+      "withdraw_hint_shared": "Your rating leaves the average, and the purchase goes back to “Ratings”",
       "not_mine": "You have no rating here — refresh the list",
       "nothing_changed": "Nothing has changed",
       "failed": "Could not save it. Try again",
@@ -474,30 +474,30 @@
       "group_unrated": "Not rated yet",
       "rate": "Rate",
       "empty": {
-        "title": "No «{query}» found",
+        "title": "Nothing found for “{query}”",
         "body": "The catalogue has no such item yet. Check the spelling — Latin letters and typos are fine",
-        "body_offline": "Without a connection we search only what was rated. The whole catalogue — with a connection"
+        "body_offline": "Offline, we search only what has been rated. The whole catalogue needs a connection"
       },
-      "error_body": "The search did not go through. Try again — or clear the field: the list is still there",
+      "error_body": "The search failed. Try again — or clear the field: the list is still there",
       "offline": "Offline · searching only the list as of {when}",
-      "offline_more": "Unrated items and the whole catalogue — once there is a connection"
+      "offline_more": "Unrated items and the whole catalogue need a connection"
     },
     "home": {
       "new": {
         "title": "Record your first purchases",
-        "body": "{app} will remember what you took and what it cost. And from your ratings it will tell you at the shelf what to take again and where it is cheaper."
+        "body": "{app} will remember what you bought and what it cost. Based on your ratings, it will tell you at the shelf what to buy again and where it’s cheaper."
       },
       "pending": {
         "title": "Now rate them",
-        "body": "The purchases are recorded. Rate them at home — and this is where what to take again and where it is cheaper will show up."
+        "body": "The purchases are recorded. Rate them at home — this is where you’ll then see what to buy again and where it’s cheaper."
       },
       "next": "What comes next",
-      "step_purchases_title": "At the shop — «Purchases»",
-      "step_purchases_body": "What you took and what it cost — the price per litre and kilo is ours to work out",
-      "step_verdicts_title": "At home — «Ratings»",
+      "step_purchases_title": "At the shop — “Purchases”",
+      "step_purchases_body": "What you bought and what it cost — we work out the price per litre and per kilo",
+      "step_verdicts_title": "At home — “Ratings”",
       "step_verdicts_body": "Give each purchase 1 to 5",
-      "step_advice_title": "Here — «What to buy»",
-      "step_advice_body": "What to take again, only if cheap, never — and where it is cheaper",
+      "step_advice_title": "Here — “What to buy”",
+      "step_advice_body": "What to buy again, only if cheap, or never — and where it’s cheaper",
       "trust": "Your own ratings and prices are free, other people’s come with access. There are no ads and no paid places here, and there never will be.",
       "new_capture": {
         "title": "Photograph your first receipt",
@@ -505,11 +505,11 @@
       },
       "parsing": {
         "title": "Reading your first receipt",
-        "body": "Reading is under way — you can close the app. The receipt will appear in Purchases: check and save it there."
+        "body": "The receipt is being read — you can close the app. It will appear in Purchases: check and save it there."
       },
       "step_purchases_capture_title": "Check it in Purchases",
-      "step_purchases_capture_body": "We read the receipt lines — you check them and save with one button",
-      "manual_body": "No receipt — at the market, or if it got lost"
+      "step_purchases_capture_body": "We read the receipt lines — you check them and save with one tap",
+      "manual_body": "No receipt? At the market, or if you lost it"
     }
   },
   "verdict": {
@@ -524,11 +524,11 @@
     "scale_group": "Rating",
     "review_label": "A couple of words — if you have any",
     "review_placeholder": "Smells of starch, not meat",
-    "review_unsupported": "The review has a character that cannot be saved",
+    "review_unsupported": "The review contains a character that can’t be saved",
     "save": "Save the rating",
     "save_disabled": "Pick a rating",
     "skip": "Not now",
-    "footnote": "Rating is separate from buying: the reminder comes the next day — nobody needs it at the till",
+    "footnote": "Rating is separate from buying: the reminder comes the next day — nobody wants it at the till",
     "none": {
       "title": "Nothing to rate yet",
       "body": "Record a purchase first — we will ask here how it was",
@@ -536,8 +536,8 @@
     },
     "empty": {
       "title": "Everything is rated",
-      "body": "Thank you — the base is more accurate for it. We will remind you when a new purchase turns up",
-      "action": "Open «What to buy»"
+      "body": "Thank you — that makes the data more accurate. We’ll remind you when there’s a new purchase",
+      "action": "Open “What to buy”"
     },
     "error": {
       "title": "The rating did not go through",
@@ -545,8 +545,8 @@
     },
     "offline": {
       "title": "The rating is saved",
-      "body": "It will go on its own once you are back online. You can close the app",
-      "strip": "Offline · your rating is saved on the phone and will go by itself"
+      "body": "It will be sent automatically once you’re back online. You can close the app",
+      "strip": "Offline · your rating is saved on the phone and will be sent automatically"
     },
     "stale": "The list as of {when} — we will refresh it once you are back online",
     "stale_error": "The list as of {when} — the server did not answer",
@@ -556,9 +556,9 @@
     },
     "load_offline": {
       "title": "The list of purchases will appear once you are online",
-      "body": "Saved ratings are safe on the phone and will go on their own"
+      "body": "Saved ratings are safe on the phone and will be sent automatically"
     },
-    "returned": "The rating for «{name}» was not accepted — it comes back next",
+    "returned": "The rating for “{name}” was not accepted — it’s next in line again",
     "sending": "Sending the rating…",
     "checking": "Checking what else is waiting to be rated…"
   },
@@ -614,21 +614,21 @@
     },
     "foreign_part": "Including {amount} (≈ {counted})",
     "uncounted": "Not counted: {amounts} — no rate for that day",
-    "unsent": "Not counted yet: {n} spending is being sent | Not counted yet: {n} spendings are being sent",
+    "unsent": "Not counted yet: {n} expense is being sent | Not counted yet: {n} expenses are being sent",
     "income": "Came in",
     "income_uncounted": "and {amounts} not counted",
     "income_shifted_in": "with the salary of {days}",
-    "income_shifted_out": "the salary of {days} counts next month",
+    "income_shifted_out": "the salary of {days} counts towards next month",
     "rest_spendable": "without savings ≈ {amount}",
     "rest_uncounted": "not counted: {accounts}",
     "rest_operations": "{n} operation not counted | {n} operations not counted",
     "rest_from": "Accounts start on {day}",
     "rest_add": "Add an account",
-    "rest_removed": "Accounts removed — bring back",
+    "rest_removed": "Accounts removed — restore",
     "rate_live_mine": "At my rate of {rate} today",
     "rate_live_official": "At the {bank} rate of {rate} today",
-    "rate_live_fallback": "At {rate} today — not a rate of the {bank}: it has been silent for over a week",
-    "rate_frozen": "At the rate of {date}: {rate}. Past months are not recounted",
+    "rate_live_fallback": "At {rate} today — not a rate from the {bank}, which has published nothing for over a week",
+    "rate_frozen": "At the rate of {date}: {rate}. Past months are not recalculated",
     "rate_none": "No rate to convert by yet",
     "rate_value": "{amount} per 1 {sign}",
     "categories_title": "Where it went",
@@ -643,22 +643,22 @@
       "donut_more": "{n} more slice in Charts | {n} more slices in Charts",
       "donut_label": "Where it went: {list}. Open charts",
       "donut_later": "Shares appear once the month is refreshed",
-      "donut_uncounted": "Shares appear once the spending has a rate",
-      "donut_empty": "No spendings in {month} yet",
-      "donut_empty_body": "Shares appear with the first spending. The year is in Charts",
-      "donut_pending": "The first spending of {month} is on its way",
+      "donut_uncounted": "Shares appear once the expense has a rate",
+      "donut_empty": "No expenses in {month} yet",
+      "donut_empty_body": "Shares appear with the first expense. The year is in Charts",
+      "donut_pending": "The first expense of {month} is on its way",
       "donut_pending_body": "Shares appear once it arrives. The year is in Charts",
-      "donut_empty_label": "Where it went: no spendings in {month} yet. Open charts",
-      "add": "Add spending",
-      "offline_strip": "Offline · figures as of {when}. New spendings are kept on the phone",
-      "refused": "{n} spending not accepted | {n} spendings not accepted",
-      "refused_body": "The server did not accept it — fix or remove it in Spendings",
-      "refused_open": "Open Spendings"
+      "donut_empty_label": "Where it went: no expenses in {month} yet. Open charts",
+      "add": "Add an expense",
+      "offline_strip": "Offline · figures as of {when}. New expenses are kept on the phone",
+      "refused": "{n} expense not accepted | {n} expenses not accepted",
+      "refused_body": "The server did not accept it — fix or remove it in Expenses",
+      "refused_open": "Open Expenses"
     },
     "charts": {
       "title": "Charts",
       "spent_title": "Spending by month",
-      "spent_hint": "Tap a bar or slide a finger along the chart. Each month at that month's rate",
+      "spent_hint": "Tap a bar or slide a finger along the chart. Each month at that month’s rate",
       "bar_label": "{month}, {amount}",
       "income_title": "In and out",
       "spent_legend": "Out",
@@ -679,26 +679,26 @@
       "spent_uncounted": "Out, not counted: {amounts}",
       "uncounted": "not counted: {amounts}",
       "category_average": "{amount} on average",
-      "category_missing": "That category is not on the charts — showing «{name}»",
+      "category_missing": "That category is not on the charts — showing “{name}”",
       "empty": {
-        "title": "Charts appear with your first spending",
-        "body": "At least one month of spending or income is needed. Purchases from a shop come here by themselves"
+        "title": "Charts appear with your first expense",
+        "body": "At least one month of expenses or income is needed. Purchases from a shop come here automatically"
       },
       "load_error": {
-        "title": "Couldn't load the charts",
-        "body": "The server didn't answer. Your spending and income are safe — try again"
+        "title": "Couldn’t load the charts",
+        "body": "The server didn’t answer. Your expenses and income are safe — try again"
       },
       "error_strip": "The server did not answer — charts as of {when}",
       "offline": {
         "strip": "Offline · charts as of {when}",
-        "body": "Charts appear when the internet is back"
+        "body": "Charts will appear when the internet is back"
       },
       "rest": "Others",
       "mode": "Period",
       "mode_month": "Month",
       "mode_year": "Year",
       "year_center": "{year} · {n} month | {year} · {n} months",
-      "year_rate_note": "Each month at that month's rate",
+      "year_rate_note": "Each month at that month’s rate",
       "year_no_rate_one": "no rate for {month}",
       "year_no_rate_many": "no rate for {n} month | no rate for {n} months",
       "year_change": "{change} against the average",
@@ -707,10 +707,10 @@
       "year_avg_running": "{amount} on average, {from} to {to}, without the running month",
       "year_avg_few": "The average comes after {month}: three closed months are needed",
       "year_avg_short": "Too few closed months for an average: {n} of 3",
-      "year_avg_uncounted": "No average: every closed month has spending with no rate",
+      "year_avg_uncounted": "No average: every closed month has expenses with no rate",
       "year_avg_beyond": "No average: the months add up to more than can be counted",
       "year_flow_note": "Difference for {year} {amount}. All in {currency}, the income currency",
-      "year_flow_missing": "The difference for {year} can't be counted: not everything converted — {months}. All in {currency}, the income currency",
+      "year_flow_missing": "The difference for {year} can’t be counted: not everything was converted — {months}. All in {currency}, the income currency",
       "category_months_title": "Category by month",
       "category_avg": "Dashed line: the average of closed months",
       "center_running": "{month} · ongoing",
@@ -741,19 +741,19 @@
       "pace_spoken_few": "{date}: {amount}",
       "few_title_none": "No comparison for this month",
       "pace_few_none": "There is no usual month for this one.",
-      "pace_uncounted": "No dashed line: every closed month has spending with no rate."
+      "pace_uncounted": "No dashed line: every closed month has expenses with no rate."
     },
     "share_tiny": "<1 %",
     "categories_link": "Categories",
     "day_today": "Today · {date}",
     "day_yesterday": "Yesterday · {date}",
-    "row_open": "Open spending:",
+    "row_open": "Open expense:",
     "row_open_trip": "Open purchases:",
     "trip_row_title": "Purchases at “{place}”",
     "trip_row_meta": "{category} · {n} item | {category} · {n} items",
     "trip_row_sum": "{category} · receipt total",
     "uncounted_row": "not counted",
-    "more": "And {n} more spending over {range} | And {n} more spendings over {range}",
+    "more": "And {n} more expense over {range} | And {n} more expenses over {range}",
     "more_retry": "Load the rest",
     "month_empty": "Nothing spent this month",
     "pending": "Sending…",
@@ -762,22 +762,22 @@
     "removed": "Deleted: {title} · {amount}",
     "removed_announced": "Deleted: {title} · {amount}. Undo — 10 seconds",
     "restore": "Undo",
-    "restored": "Spending restored",
-    "saved_offline": "Spending saved on the phone, we will send it later",
+    "restored": "Expense restored",
+    "saved_offline": "Expense saved on the phone, we will send it later",
     "empty": {
-      "title": "Add your first spending",
-      "body": "Barber, rent, café, taxi — anything that is not a shop. Recorded purchases land here by themselves"
+      "title": "Add your first expense",
+      "body": "Barber, rent, café, taxi — anything that is not a shop. Recorded purchases appear here automatically"
     },
     "load_error": {
-      "title": "Could not load spending",
-      "body": "The server did not answer. Saved spending is not lost — try again"
+      "title": "Could not load expenses",
+      "body": "The server did not answer. Saved expenses are not lost — try again"
     },
     "offline": {
       "title": "No connection",
-      "body": "Spending will appear when the internet is back. You can record a new one now",
-      "body_read": "Spending will appear when the internet is back"
+      "body": "Expenses will appear when the internet is back. You can record a new one now",
+      "body_read": "Expenses will appear when the internet is back"
     },
-    "error_strip": "The server did not answer — spending as of {when}",
+    "error_strip": "The server did not answer — expenses as of {when}",
     "rejected_other": {
       "title": "The server did not accept an action",
       "unknown": "The server answered: {code}"
@@ -832,19 +832,19 @@
       "RSD": "Dinars"
     },
     "sheet": {
-      "title_add": "New spending",
-      "title_edit": "Spending",
+      "title_add": "New expense",
+      "title_edit": "Expense",
       "meta_edit": "Added by hand · {date}",
       "amount": "Amount",
       "amount_placeholder": "0",
-      "currency": "Currency of the spending",
+      "currency": "Currency of the expense",
       "conversion_mine": "≈ {amount} at my rate of {rate}",
       "conversion_official": "≈ {amount} at the {bank} rate of {rate}",
-      "conversion_fallback": "≈ {amount} at {rate}, not a rate of the {bank}",
+      "conversion_fallback": "≈ {amount} at {rate}, not a rate from the {bank}",
       "conversion_later": "Counted at the rate of the day",
       "conversion_counted": "≈ {amount} at the rate of the day",
       "category": "Category",
-      "add_category": "Own",
+      "add_category": "Custom",
       "more": "More…",
       "more_title": "Category",
       "date": "When",
@@ -860,20 +860,20 @@
       "details_label": "Date, note, place: {value}",
       "details_done": "Done",
       "shop_title": "A purchase in a shop?",
-      "shop_body": "Record it in Purchases — the item goes into the catalogue and ratings, and the spending lands here by itself",
+      "shop_body": "Record it in Purchases — the item goes into the catalogue and ratings, and the expense appears here automatically",
       "shop_action": "Purchases ›",
       "bad_amount": "Enter an amount above zero",
       "bad_category": "Choose a category",
       "bad_day": "Choose a day no later than today",
-      "bad_text": "This has characters that cannot be saved",
+      "bad_text": "This contains characters that can’t be saved",
       "offline": "No connection. We will keep it on the phone and send it when the internet is back",
-      "save": "Save the spending",
-      "refused": "The server did not accept the spending: {reason}. Fix it and save again",
-      "refused_conflict": "The spending was changed on another device. This is what you entered — save again over it",
+      "save": "Save the expense",
+      "refused": "The server did not accept the expense: {reason}. Fix it and save again",
+      "refused_conflict": "The expense was changed on another device. This is what you entered — save again over it",
       "dismiss": "Discard",
-      "remove": "Delete the spending",
+      "remove": "Delete the expense",
       "trip_meta": "{date} · {n} item | {date} · {n} items",
-      "trip_note": "This spending came from Purchases and is changed there — with the prices and ratings of the items",
+      "trip_note": "This expense came from Purchases and is changed there — along with the prices and ratings of the items",
       "trip_open": "Open in Purchases",
       "trip_items_offline": "The items will appear when the connection is back",
       "trip_items_error": "Could not load the items",
@@ -888,7 +888,7 @@
       "remove_label": "Take out the category “{name}”",
       "restore_label": "Bring back the category “{name}”",
       "add": "Add a category",
-      "note": "A category taken out leaves the choice but stays with its spending and in past months",
+      "note": "A category taken out is no longer offered but stays with its expenses and in past months",
       "load_error": {
         "title": "Could not load the categories",
         "body": "The server did not answer. Try again"
@@ -929,16 +929,16 @@
     },
     "rest_on": "On accounts {date}",
     "list": {
-      "title": "Spendings",
+      "title": "Expenses",
       "refused": "Not accepted",
       "refused_more": "And {n} more, marked in the journal below | And {n} more, marked in the journal below",
       "refused_below": "{n} marked in the journal below — show | {n} marked in the journal below — show",
-      "count": "{n} spending | {n} spendings",
-      "unsent": "{n} spending not counted yet | {n} spendings not counted yet",
-      "offline_strip": "Offline · spendings as of {when}. New ones are kept on the phone",
+      "count": "{n} expense | {n} expenses",
+      "unsent": "{n} expense not counted yet | {n} expenses not counted yet",
+      "offline_strip": "Offline · expenses as of {when}. New ones are kept on the phone",
       "empty": {
-        "title": "No spendings in {month}",
-        "body": "Add a spending or record purchases in Purchases — they will show up here by themselves"
+        "title": "No expenses in {month}",
+        "body": "Add an expense or record purchases in Purchases — they will show up here automatically"
       }
     },
     "entry_value": "{name}, {value}"
@@ -949,20 +949,20 @@
     "basis_weighted": "average of what is left · since {date}",
     "basis_last": "by the last exchange · since {date}",
     "basis_income": "by the last income · since {date}",
-    "estimated": "part of it at the {bank} rate of the days of exchanges and incomes: what that money cost was never recorded",
+    "estimated": "partly at the {bank} rate on the days of the exchanges and incomes: what that money cost was never recorded",
     "base_since": "Counting in {base} since {date} — earlier exchanges in another currency are not in the rate and stay as they were",
     "cost_line": "{rate} · {basis}",
     "cost_line_estimated": "{rate} · {basis} · part at the {bank} rate",
-    "no_wallet": "No {quote} has come in yet, by exchange or income — new purchases count by the {bank} rate",
-    "wallet_out_of_band": "Your exchanges put the rate of {quote} per {base} beyond what an entry can keep — check their amounts. New purchases count by the {bank} rate",
-    "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no recent {dayBank} rate for that day. New purchases count by the {bank} rate until you record an exchange of a known price or an income on a day with a fresh {bank} rate",
-    "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New purchases count by the {bank} rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh {bank} rate",
-    "wallet_unknown_income": "Rate unknown: the {quote} income of {date} has nothing to be valued by — there is no recent {bank} rate for that day. New purchases count by the {bank} rate until you record an exchange of a known price or an income on a day with a fresh {bank} rate",
-    "wallet_old_reckoning_income": "Rate unknown: the {quote} received on {date} have no price in {base} — after a change of the currency of conversion the old reckoning is not re-counted. New purchases count by the {bank} rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh {bank} rate",
-    "preference_legend": "New purchases count",
-    "preference_personal": "by my rate",
-    "preference_official": "by the {bank} rate",
-    "preference_hint": "My rate comes from exchanges and incomes; until there is one, purchases take the {bank} rate anyway",
+    "no_wallet": "No {quote} has come in yet from an exchange or income — new purchases use the {bank} rate",
+    "wallet_out_of_band": "Your exchanges give a rate of {quote} per {base} beyond what can be stored — check their amounts. New purchases use the {bank} rate",
+    "wallet_unknown": "Rate unknown: the {given} → {quote} exchange of {date} has nothing to be valued by — there is no recent {dayBank} rate for that day. New purchases use the {bank} rate until you record an exchange at a known price or an income on a day with a fresh {bank} rate",
+    "wallet_old_reckoning": "Rate unknown: the {quote} bought on {date} with {given} has no price in {base} — after the conversion currency changes, old calculations are not redone. New purchases use the {bank} rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh {bank} rate",
+    "wallet_unknown_income": "Rate unknown: the {quote} income of {date} has nothing to be valued by — there is no recent {bank} rate for that day. New purchases use the {bank} rate until you record an exchange at a known price or an income on a day with a fresh {bank} rate",
+    "wallet_old_reckoning_income": "Rate unknown: the {quote} received on {date} has no price in {base} — after the conversion currency changes, old calculations are not redone. New purchases use the {bank} rate until you record an exchange paid in {base} or an income in {quote} after the change, on a day with a fresh {bank} rate",
+    "preference_legend": "New purchases use",
+    "preference_personal": "my rate",
+    "preference_official": "the {bank} rate",
+    "preference_hint": "My rate comes from exchanges and incomes; until there is one, purchases use the {bank} rate anyway",
     "record": "Record an exchange",
     "record_offline": "Recording an exchange needs a connection",
     "error_strip": "The server did not answer — exchanges as of {when}",
@@ -991,7 +991,7 @@
     "conflict_stale": "This exchange is already recorded — do not record it again. It will show once the server can be reached",
     "empty": {
       "title": "No exchanges yet",
-      "body": "Record what you gave and what you got — the rate is worked out for you. Until you have a rate of your own, purchases count by the {bank} rate"
+      "body": "Record what you gave and what you got — the rate is worked out for you. Until you have a rate of your own, purchases use the {bank} rate"
     },
     "offline": {
       "title": "No connection",
@@ -1013,12 +1013,12 @@
       "same_currency": "The same currency on both sides is not an exchange",
       "day": "Day of the exchange",
       "held": "{currency} held before the exchange",
-      "held_hint": "Optional. With it the rate accounts for what the money left over cost; without it the rate of this exchange is taken",
-      "held_estimate": "By the recorded spending ≈ {amount}",
-      "held_estimate_last": "Of the last exchange ≈ {amount} is left by the recorded spending",
-      "held_estimate_last_income": "Of the last income ≈ {amount} is left by the recorded spending",
+      "held_hint": "Optional. With it, the rate accounts for what the remaining money cost; without it, this exchange’s rate is used",
+      "held_estimate": "By the recorded expenses ≈ {amount}",
+      "held_estimate_last": "Of the last exchange ≈ {amount} is left, by the recorded expenses",
+      "held_estimate_last_income": "Of the last income ≈ {amount} is left, by the recorded expenses",
       "note": "Where, and a note",
-      "note_placeholder": "Say, «VTB cash machine» or «from memory»",
+      "note_placeholder": "e.g. “VTB cash machine” or “from memory”",
       "bad_note": "There is nothing here to keep — write at least a word or leave the field empty",
       "history": "Earlier versions",
       "version": "until {until}: {amounts} · {date}",
@@ -1037,8 +1037,8 @@
       "current_held": "held before {amount}",
       "saving": "Saving the exchange…",
       "bad_day": "Choose the day of the exchange",
-      "channel": "How it was changed",
-      "channel_none": "Not said",
+      "channel": "How you exchanged",
+      "channel_none": "Not specified",
       "channel_bankCash": "Bank, cash",
       "channel_bankNoncash": "Non-cash",
       "channel_exchanger": "Exchange office",
@@ -1088,7 +1088,7 @@
       "where_bankNoncash": "at banks non-cash",
       "where_banksAll": "at banks (all clients)",
       "where_exchanger": "at exchange offices",
-      "pending": "The central bank publishes exchange offices of this day later — the line will update itself",
+      "pending": "The central bank publishes exchange office rates for this day later — the line will update automatically",
       "currency": "Currency",
       "tab": "{sign} {name}",
       "cb": "Central bank {rate}",
@@ -1120,13 +1120,13 @@
       "count_worse": "{n} worse",
       "count_even": "{n} the same",
       "legend_up": "up — got more",
-      "legend_line": "as at that day’s market",
+      "legend_line": "same as that day’s market",
       "legend_down": "down — less",
       "bars_legend": "Exchange by exchange",
       "places": "Where you exchanged",
       "place_count": "× {n}",
       "none_said": "not compared · no market or rate for that day",
-      "incomes_only": "Record the first — and this will show whether you beat the market or not"
+      "incomes_only": "Record your first exchange — this will show whether you beat the market"
     },
     "rate_chart": {
       "title": {
@@ -1172,13 +1172,13 @@
       "spoken_mine": "Week to {day}: {market}; my exchange {date}: {mine}, {change}",
       "spoken_mine_day": "{day}: {market}; my exchange: {mine}, {change}",
       "note_week_bankBuys": "The line is the market: what banks paid all clients for the currency at the end of each week, by the Central Bank of Armenia. Dots are your exchanges: above the line — you got more drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a week",
-      "note_day_bankBuys": "The line is the market: what banks paid all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday's. Dots are your exchanges: above the line — you got more drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day",
+      "note_day_bankBuys": "The line is the market: what banks paid all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday’s. Dots are your exchanges: above the line — you got more drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day",
       "note_week_bankSells": "The line is the market: what banks charged all clients for the currency at the end of each week, by the Central Bank of Armenia. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a week",
-      "note_day_bankSells": "The line is the market: what banks charged all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday's. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day",
+      "note_day_bankSells": "The line is the market: what banks charged all clients for the currency that day, by the Central Bank of Armenia; at weekends, Friday’s. Dots are your exchanges: below the line — you gave fewer drams. The mark leads to the market the exchange was compared with: your way of exchanging, or the best that day. Tap the chart to see a day",
       "y_hint": "↑ higher — more ֏ for 1 {sign}"
     },
     "list": {
-      "pending_note": "The CBA publishes exchange office rates for recent days with a delay — the difference with the market will update by itself",
+      "pending_note": "The CBA publishes exchange office rates for recent days with a delay — the difference with the market will update automatically",
       "no_place": "no place"
     },
     "my_rate_line": {
@@ -1244,16 +1244,16 @@
       "meta": "How much came in and when — in any of the four currencies",
       "amount": "Amount",
       "currency": "Currency",
-      "bought_hint": "Bought this money with {base}? Record it as an exchange — the rate will count your price",
+      "bought_hint": "Bought this money with {base}? Record it as an exchange — the rate will reflect what you paid",
       "source": "From",
       "source_placeholder": "Choose",
       "no_source": "Choose where the money came from",
       "day": "Day received",
       "bad_day": "Choose the day it came in",
       "held": "{currency} held before it came in",
-      "held_hint": "Optional. With it the rate counts what the money already held cost; without it we take the {bank} rate of that day",
+      "held_hint": "Optional. With it, the rate accounts for what the money you already held cost; without it, we use the {bank} rate of that day",
       "note": "Note",
-      "note_placeholder": "For example, «for September»",
+      "note_placeholder": "For example, “for September”",
       "bad_note": "There is nothing to save in the note — write a word or leave it empty",
       "history": "Earlier versions",
       "version": "until {until}: {amount} · {source} · {date}",
@@ -1296,7 +1296,7 @@
     "ended": "The session on {device} has ended",
     "ended_unknown": "The session on an unknown device has ended",
     "more": "Showing the latest {shown} of {total}",
-    "note": "A device whose session was ended asks to sign in again the next time it is opened. What is saved on the device itself is beyond the server's reach.",
+    "note": "A device whose session was ended asks to sign in again the next time it is opened. What is saved on the device itself is beyond the server’s reach.",
     "load_error": {
       "title": "The list did not load",
       "body": "The server did not answer. Try again."
@@ -1309,14 +1309,14 @@
   "bot": {
     "title": "Telegram bot",
     "group_messages": "Messages",
-    "blocked": "The bot is blocked in Telegram, so no messages arrive. Unblock the bot and they come back.",
+    "blocked": "The bot is blocked in Telegram, so no messages arrive. Unblock the bot to get them again.",
     "reminders": {
       "label": "Remind me to rate",
-      "hint": "The evening after a purchase the bot asks how it was. Leave it unanswered and it asks less often, then keeps quiet for half a year."
+      "hint": "The evening after a purchase, the bot asks how it was. If you don’t answer, it asks less often and then stays quiet for six months."
     },
     "receipts": {
       "label": "Tell me when a receipt is read",
-      "hint": "If you left the screen while it was being read. The message names the shop or the receipt’s date and the number of items — no sums, no products."
+      "hint": "If you left the screen while it was being read. The message gives the shop or the receipt’s date and the number of items — no amounts, no products."
     },
     "load_error": {
       "title": "The bot settings did not load",
@@ -1338,10 +1338,10 @@
   },
   "erase": {
     "title": "Delete all your data?",
-    "goes": "Everything Molvia knows about you goes: purchases, spendings and their categories, currency exchanges, incomes, accounts and checks, ratings and reviews, search picks, visit marks, settings and sign-ins on every device.",
-    "stays": "Your items in the shared catalogue are deleted if nobody else uses them. Those someone else has already bought, rated or picked in search stay, without your name — as do the shops, the barcodes and the shops’ memory — which item stands behind a receipt line and the shelf price. One number stays too: how many people who came in the same week deleted their data.",
+    "goes": "Everything Molvia knows about you is deleted: purchases, expenses and their categories, currency exchanges, incomes, accounts and checks, ratings and reviews, search picks, visit marks, settings and sign-ins on every device.",
+    "stays": "Your items in the shared catalogue are deleted if nobody else uses them. Those someone else has already bought, rated or picked in search stay, without your name — as do the shops, the barcodes and the shops’ memory (which item a receipt line stands for, and the shelf price). One number stays too: how many people who joined in the same week deleted their data.",
     "devices": "What is saved on this device is erased. Copies on other devices stay until the app or the site data is deleted there.",
-    "final": "This cannot be undone. You can download a copy first: «Download my data».",
+    "final": "This cannot be undone. You can download a copy first: “Download my data”.",
     "confirm": "Delete for good",
     "confirm_busy": "Deleting…",
     "offline": "Deleting needs a connection.",
@@ -1364,30 +1364,30 @@
     "promise": "What to buy in a new place — and where",
     "offer": {
       "title": "Sign in with your Telegram",
-      "body": "Your purchases and ratings then survive a change of phone. We store neither your name nor your phone number."
+      "body": "Then your purchases and ratings survive a change of phone. We store neither your name nor your phone number."
     },
     "start": "Sign in with Telegram",
     "starting": "Opening Telegram…",
     "waiting": {
-      "title": "Open Telegram and tap «Sign in»",
-      "body": "The link lives five minutes. Come back here — the app will recognise you by itself."
+      "title": "Open Telegram and tap “Sign in”",
+      "body": "The link is valid for five minutes. Come back here — the app will recognise you by itself."
     },
     "open": "Open Telegram",
     "restart": "Start again",
     "welcome": {
       "title": "Signed in. Is this your account?",
-      "body": "Everything you write from here lands in it.",
+      "body": "Everything you record from now on goes into it.",
       "created": "Account created: {day}"
     },
     "confirm": "Yes, that is me",
     "refuse": "That is not me",
     "unavailable": {
       "title": "This link no longer works",
-      "body": "Five minutes may have passed, or the login has been collected. Start again."
+      "body": "Five minutes may have passed, or the sign-in has already been used. Start again."
     },
     "rate_limited": {
       "title": "Too many sign-in attempts",
-      "body": "That is everybody's requests together. Try in a minute."
+      "body": "That counts everyone’s requests together. Try again in a minute."
     },
     "disabled": {
       "title": "Signing in with Telegram is not set up",
@@ -1398,11 +1398,11 @@
       "body": "Something got in the way. Try again."
     },
     "offline": {
-      "title": "No internet, no sign-in",
-      "body": "We will try by ourselves once the connection is back."
+      "title": "Signing in needs the internet",
+      "body": "We’ll try again automatically once the connection is back."
     },
     "erased": "Your data has been deleted. You can sign in again, and it will be a new, empty account.",
-    "erase_unknown": "We do not know whether your data was deleted: the server's answer was lost. Sign in: if the account is empty, it was deleted; if not, delete it again.",
+    "erase_unknown": "We do not know whether your data was deleted: the server’s answer was lost. Sign in: if the account is empty, it was deleted; if not, delete it again.",
     "erase_kept": "The sign-in on this device had already ended, and this tap deleted nothing. Sign in: if the account is empty, the data is already deleted; if not, delete it again."
   },
   "dev": {
@@ -1432,10 +1432,10 @@
       "states_sheet": "States in a sheet",
       "open_wide_sheet": "Open a sheet of long names",
       "wide_title": "Electroequipmentofindustrialimplementations",
-      "wide_meta": "Account «Raiffeisenbanksavingsaccountforholidaysandgifts»",
+      "wide_meta": "Account “Raiffeisenbanksavingsaccountforholidaysandgifts”",
       "wide_line": "SOFT DRINK COCA-COLA ZERO 0.33L CAN PROMO 2+1 DISCOUNT 24.10.2026",
       "long_row": "Row {n}",
-      "sample_milk": "Milk «Ashkhar»",
+      "sample_milk": "Milk “Ashkhar”",
       "sample_meta": "UHT, 2.5%",
       "date": "Date",
       "scanned": "Read: {code}",
@@ -1456,7 +1456,7 @@
       "row_long": "Lori cheese, brined, from Shirak, by weight at the market counter",
       "row_long_meta": "The title wraps, and the meta keeps to two lines at most: anything longer ends in an ellipsis, so the row never grows without end",
       "row_whole": "An explanation — the meta whole",
-      "row_whole_meta": "A step explains, and one cut by an ellipsis explains nothing: with whole the meta stands whole, in as many lines as it takes — as the newcomer’s steps on «What to buy» on a phone 320 wide",
+      "row_whole_meta": "A step explains, and one cut by an ellipsis explains nothing: with whole the meta stands whole, in as many lines as it takes — as the newcomer’s steps on “What to buy” on a phone 320 wide",
       "row_warn": "Receipt of 27 Sep, 18:10",
       "row_warn_meta": "couldn’t be read — tone=\"warn\"",
       "row_good": "Yerevan City",
@@ -1479,8 +1479,8 @@
       "row_link_inactive": "A link while offline",
       "row_link_offline": "Opens once there is a connection",
       "search": "Search field",
-      "search_clear": "«What to buy» · «Clear»",
-      "search_scan": "«What did you pick up?» · scanner",
+      "search_clear": "“What to buy” · “Clear”",
+      "search_scan": "“What did you pick up?” · scanner",
       "search_readonly": "Read-only",
       "search_sample": "cheese",
       "search_scanner": "The scanner in the field"
@@ -1501,14 +1501,14 @@
     "trip_open": "Another entry is still open",
     "internal": "Something went wrong",
     "trip_context_required": "Set the entry’s city and currencies before sending",
-    "login_unavailable": "This login request is no longer available. Start again",
+    "login_unavailable": "This sign-in request is no longer available. Start again",
     "login_forbidden": "Open sign-in from the app",
-    "login_rate_limited": "Too many login requests. Try again in a minute",
+    "login_rate_limited": "Too many sign-in requests. Try again in a minute",
     "login_disabled": "Telegram sign-in is not configured yet",
     "bot_unauthorized": "The bot could not authenticate",
     "exchange_in_future": "An exchange cannot be dated in the future",
     "income_in_future": "An income cannot be dated in the future",
-    "spending_in_future": "A spending cannot be dated in the future",
+    "spending_in_future": "An expense cannot be dated in the future",
     "spending_category_unknown": "There is no such category — choose another",
     "spending_category_taken": "A category with this name already exists",
     "money_account_in_future": "An account cannot start in the future",
@@ -1519,21 +1519,21 @@
     "transfer_account": "This account is gone or in another currency — choose another",
     "spending_of_transfer": "This is a transfer fee — it changes together with the transfer, in its sheet",
     "barcode_shape": "A barcode has 8, 12 or 13 digits",
-    "barcode_check_digit": "The digits don't add up — check the code",
+    "barcode_check_digit": "The digits don’t add up — check the code",
     "barcodes_full": "This item already holds twenty codes — no more can be added",
-    "barcode_in_store": "This is a shop's own label — such a code is not saved to the catalogue",
+    "barcode_in_store": "This is a shop’s own label — such a code is not saved to the catalogue",
     "receipt_not_photo": "This is not a photo of a receipt. Take it again",
     "receipt_too_large": "The photo is too large. Take the receipt again",
     "receipt_not_ready": "The receipt has not been read yet, so it cannot be recorded",
     "receipt_recorded_before": "This receipt has already been recorded",
-    "receipt_in_future": "The receipt's date has not come yet",
-    "receipt_total_required": "Enter the receipt's total — without it there is nothing to record",
+    "receipt_in_future": "The receipt’s date is in the future",
+    "receipt_total_required": "Enter the receipt’s total — without it there is nothing to record",
     "receipt_link_invalid": "This is not a link from a Serbian tax receipt, or it is damaged",
-    "receipts_day_limited": "Many receipts already sent today. Send the receipt tomorrow",
-    "receipts_unrecorded_limited": "Many receipts are waiting to be recorded. Record or delete them",
-    "items_day_limited": "Many items added today already. New ones tomorrow",
+    "receipts_day_limited": "You’ve sent a lot of receipts today. Send this one tomorrow",
+    "receipts_unrecorded_limited": "A lot of receipts are waiting to be recorded. Record or delete them first",
+    "items_day_limited": "You’ve added a lot of items today. You can add more tomorrow",
     "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow",
-    "feedback_picture_invalid": "The picture would not do — choose another one",
+    "feedback_picture_invalid": "This picture can’t be used — choose another one",
     "feedback_picture_too_large": "The picture is too large — choose another one",
     "client_errors_rate_limited": "Too many failure reports. Try again in a minute"
   },
@@ -1585,7 +1585,7 @@
     "city_hint": "Used for new entries and prices near you",
     "city_current": "Now: {city}",
     "city_not_listed": "This city is not in the list — keep it or choose an available one",
-    "city_changed": "What to buy will show prices for the new city. Your previous purchases will stay.",
+    "city_changed": "“What to buy” will show prices for the new city. Your previous purchases will stay.",
     "spend_hint": "The default for new entries. Each purchase can use a different currency.",
     "same_currencies": "The currencies match — no conversion needed",
     "changed": "changed",
@@ -1617,7 +1617,7 @@
     "group_data": "Your data",
     "analytics": {
       "label": "Count me in the statistics",
-      "hint": "Marks that you opened “What to buy”, the count of ratings and the measure of the search by your queries — this is how we learn whether Molvia is needed and whether the search finds what you need. Turn it off and past marks are deleted."
+      "hint": "Marks of your visits to “What to buy”, the count of your ratings, and how well the search does on your queries — this is how we learn whether Molvia is needed and whether the search finds what you need. Turn it off and past marks are deleted."
     },
     "export": {
       "label": "Download my data",
@@ -1650,17 +1650,17 @@
       "hint": "How days and times are written on this device"
     },
     "tap": {
-      "offline": "Cannot save without a connection — the switch comes back with it.",
+      "offline": "Can’t save without a connection — the switch will work again once it’s back.",
       "save_failed": "Not saved. Check the connection and try again.",
       "unsure": "No answer came — we do not know whether it was saved. Checking again.",
       "waiting": "Saving — no answer yet. We will show it when it comes.",
       "load_error": "The setting could not be loaded."
     },
     "salary_shift": {
-      "label": "Salary counts in the next month",
+      "label": "Count salary in the next month",
       "day": "From which day",
       "day_option": "from day {day}",
-      "hint": "A salary received on this day or later counts in «Came in» of the next month. The day it came in and the account balances stay as they are."
+      "hint": "A salary received on this day or later counts in “Came in” of the next month. The day it came in and the account balances stay as they are."
     },
     "bot": {
       "hint": "Reminders and receipts"
@@ -1680,15 +1680,15 @@
     "title_error": "Report a problem",
     "kind_label": "About",
     "kinds": {
-      "bug": "Broken",
+      "bug": "Bug",
       "idea": "Idea",
       "other": "Other"
     },
     "text_label": "Message",
     "placeholder": {
       "bug": "What you did and what went wrong",
-      "idea": "What's missing",
-      "any": "Write it as it is"
+      "idea": "What’s missing",
+      "any": "Just write it"
     },
     "attached": "Sent along:",
     "attached_build": "version {build}",
@@ -1727,36 +1727,36 @@
     "send": "Send",
     "sending": "Sending…",
     "done": "Done",
-    "need_kind": "Choose what it's about",
+    "need_kind": "Choose what it’s about",
     "need_text": "Write a message or attach a picture",
     "need_network": "You can send it once online",
     "need_tomorrow": "You can send it tomorrow",
-    "offline": "No connection. The text is saved — send it once you're back online",
-    "unsupported": "The message has a character that can't be sent",
+    "offline": "No connection. The text is saved — send it once you’re back online",
+    "unsupported": "The message has a character that can’t be sent",
     "sent": {
-      "title": "Thanks, we'll read it",
+      "title": "Thanks, we’ll read it",
       "body": "If we reply, it will come in Telegram, from the Molvia bot"
     },
     "limit": {
-      "title": "That's a lot of messages for today",
+      "title": "That’s a lot of messages for today",
       "body": "The text is saved — send it tomorrow"
     },
     "failed": {
-      "title": "Couldn't send",
+      "title": "Couldn’t send",
       "body": "The text is still here — try again"
     }
   },
   "field": {
     "clear": "Clear",
     "left": "{n} character left | {n} characters left",
-    "full": "That's the limit: {max} characters"
+    "full": "That’s the limit: {max} characters"
   },
   "privacy": {
     "title": "Data and privacy",
     "summary": "Your list of purchases is shown to nobody. Others see prices without your name and only in a shop where at least three people bought the item, and ratings only as an average of three people. The items, shops and barcodes you added, and your word about a receipt line, everyone sees — without your name too, but with no threshold. No ads, and no third-party trackers or analytics either.",
     "operator": {
       "title": "Who is responsible for the data",
-      "text": "Molvia is made by Vladimir Sitchikhin — a private individual in Gyumri, Armenia — who is responsible for your data. To reach him — «Write to the developer» in the settings: the message goes to him in person."
+      "text": "Molvia is made by Vladimir Sitchikhin — a private individual in Gyumri, Armenia — who is responsible for your data. To reach him — “Write to the developer” in the settings: the message goes to him in person."
     },
     "stored": {
       "title": "What we keep",
@@ -1770,27 +1770,27 @@
       },
       "exchanges": {
         "term": "Money exchanges",
-        "text": "How much you changed, of which currency and when, and the note of where, if you write one — your own rate is worked out from them. When you amend an exchange, the version before it is kept beside it for as long as the exchange itself. Only you see them."
+        "text": "How much you exchanged, of which currency and when, and the note of where, if you write one — your own rate is worked out from them. When you amend an exchange, the version before it is kept beside it for as long as the exchange itself. Only you see them."
       },
       "incomes": {
         "term": "Income",
         "text": "How much came in, in which currency, when and from where, and the note if you write one — your rate is worked out from these too. When you amend an income, the earlier version is kept beside it for as long as the income exists. Only you see it."
       },
       "spendings": {
-        "term": "Spending outside shop purchases",
-        "text": "How much, in what, when, in which category, and «what» and «where» if you write them — and your own categories. Spending in another currency keeps the rate of its day, and a past month the rate of its last day, worked out from your exchanges. Only you see it."
+        "term": "Expenses outside shop purchases",
+        "text": "How much, in what currency, when, in which category, and “what” and “where” if you write them — and your own categories. An expense in another currency keeps the rate of its day, and a past month the rate of its last day, worked out from your exchanges. Only you see it."
       },
       "receipts": {
         "term": "Receipts",
-        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; if reading receipts by the Claude model is on for you, the whole photo goes to it — to Anthropic (see «Who the data goes to»). No other outside service sees the photo. A Serbian receipt comes as the link of its QR code, with no photo: the phone reads the QR code, and the shot does not leave it — see «A Serbian receipt by its link». On our server the photo is deleted as soon as you record the receipt, and a receipt left unrecorded goes whole 28 days after it was sent. Except a receipt the model did not read whole: its photo and what the model read are kept by the developer for up to 21 days after reading — after recording and after «Retake» too — to find why lines were not read and to fix the reading; then they are deleted. The developer gets a message in Telegram about such a receipt: the start of its number, the country, how many lines were not read and why — no products, sums or shop. Not in the nightly copy, not in the logs; your data copy shows what is kept, until when and why. Delete the receipt or your data, and they go with it. A photo sent to Anthropic lives there up to 30 days, or up to 2 years if its check flags it (see «Who the data goes to»). The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them; a receipt read by the model has no lines cut out. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off. A recorded receipt is kept while its record is in «Purchases»: delete the record, and ten minutes later the receipt goes too, with all its lines. Delete one purchase, and its line goes at once. With the record or the purchase goes your word on the line in the shop’s memory; if another purchase of yours at the same shop recorded the same line, the word is taken from it again — its item, price and day. Lines you chose not to record are deleted when you record the receipt. We also keep how many receipts you sent on your own day: you can send at most 40 a day and keep at most 20 unrecorded at once — so the photos do not fill the server. If the model reads your receipts, we also keep how much of your share — $2 a month — is counted: past it the model does not read your receipts, and our server reads the rest. Where the model did not answer in time or the connection broke, the call’s price is not known and the highest it could be is counted, so what is counted may be more than was paid."
+        "text": "The photo of a receipt you sent and what was read from it: the shop’s taxpayer number, the date, the lines and the total. Our own server reads it; if reading receipts by the Claude model is on for you, the whole photo goes to it — to Anthropic (see “Who the data goes to”). No other outside service sees the photo. A Serbian receipt comes as the link of its QR code, with no photo: the phone reads the QR code, and the shot does not leave it — see “A Serbian receipt by its link”. On our server the photo is deleted as soon as you record the receipt, and a receipt left unrecorded is deleted entirely 28 days after it was sent. Except a receipt the model did not read whole: its photo and what the model read are kept by the developer for up to 21 days after reading — after recording and after “Retake” too — to find why lines were not read and to fix the reading; then they are deleted. The developer gets a message in Telegram about such a receipt: the start of its number, the country, how many lines were not read and why — no products, sums or shop. Not in the nightly copy, not in the logs; your data copy shows what is kept, until when and why. Delete the receipt or your data, and they go with it. A photo sent to Anthropic lives there up to 30 days, or up to 2 years if its check flags it (see “Who the data goes to”). The item lines cut out of the photo (without the head, where your name may be printed, and without the total) are kept no longer than 28 days after recording — recognition learns from them; a receipt read by the model has no lines cut out. If you left the screen while a receipt was being read, the Molvia bot tells you in Telegram that it is ready: the message names the shop or the receipt’s date and the number of items — no sums, no products — and Telegram sees that message. Kept here: how you learned the receipt was ready — in the app or from the bot — and whether that message is off. A recorded receipt is kept while its record is in “Purchases”: delete the record, and ten minutes later the receipt goes too, with all its lines. Delete one purchase, and its line goes at once. With the record or the purchase goes your word on the line in the shop’s memory; if another purchase of yours at the same shop recorded the same line, the word is taken from it again — its item, price and day. Lines you chose not to record are deleted when you record the receipt. We also keep how many receipts you sent on your own day: you can send at most 40 a day and keep at most 20 unrecorded at once — so the photos do not fill the server. If the model reads your receipts, we also keep how much of your share — $2 a month — is counted: past it the model does not read your receipts, and our server reads the rest. Where the model did not answer in time or the connection broke, the call’s price is not known and the highest it could be is counted, so what is counted may be more than was paid."
       },
       "accounts": {
         "term": "Accounts",
-        "text": "An account’s name, its currency, the «savings» mark, the balance on its start day and your checks against the fact — what you counted and what the app counted; for spending, income, exchanges and purchases — which account and how much was charged. The balance is not stored but worked out. Only you see it."
+        "text": "An account’s name, its currency, the “savings” mark, the balance on its start day and your checks against reality — what you counted and what the app counted; for expenses, income, exchanges and purchases — which account and how much was charged. The balance is not stored but worked out. Only you see it."
       },
       "items": {
         "term": "Items in the catalogue",
-        "text": "Items you added with «Suggest an item», and the new items of a receipt you recorded — named as the reading proposed or as you typed it yourself — are in the shared catalogue: everyone searches by them, but whose they are is shown to nobody. So put nothing personal in an item's name. We also keep how many new items you added on your own day — with «Suggest an item» (at most 60) and from receipts you recorded (at most 300) — so the catalogue is not flooded. If you delete your data, an item goes with it when nobody else uses it (see «Delete everything»)."
+        "text": "Items you added with “Suggest an item”, and the new items of a receipt you recorded — named as the reading proposed or as you typed it yourself — are in the shared catalogue: everyone searches by them, but whose they are is shown to nobody. So put nothing personal in an item’s name. We also keep how many new items you added on your own day — with “Suggest an item” (at most 60) and from receipts you recorded (at most 300) — so the catalogue is not flooded. If you delete your data, an item goes with it when nobody else uses it (see “Delete everything”)."
       },
       "places": {
         "term": "Shops",
@@ -1802,7 +1802,7 @@
       },
       "ratings": {
         "term": "Ratings and reviews",
-        "text": "Only you see your review. Others see a rating only inside an average of three people. A rating you withdrew stays with us as a row without its review — why is said under «Statistics — with your consent». If two item cards turned out to be one and were merged, and a rating given by the old card landed over your rating of the other, the earlier one — its score and dates, without the review — is kept while the merge can be undone: undoing it brings that rating back."
+        "text": "Only you see your review. Others see a rating only inside an average of three people. A rating you withdrew stays with us as a row without its review — why is said under “Statistics — with your consent”. If two item cards turned out to be one and were merged, and a rating given by the old card landed over your rating of the other, the earlier one — its score and dates, without the review — is kept while the merge can be undone: undoing it brings that rating back."
       },
       "reminders": {
         "term": "Rating reminders",
@@ -1810,15 +1810,15 @@
       },
       "feedback": {
         "term": "Messages to the developer",
-        "text": "What you wrote in «Write to the developer» or in reply to the developer’s answer in the Molvia bot, its kind, and what goes with the text: the app version, the screen, the phone’s system and whether it is the app or a browser, the language, and from an error screen its code. Screenshots, if you attached them yourself: everything in the file but the picture is removed before it is sent, where it was taken included. A screenshot is kept only until it reaches the developer in Telegram, and no longer than a week; Telegram sees it, as it sees the text, and a copy stays in the developer’s chat. And the developer’s replies, each with the number of the Telegram message it reached you as: that is how your answer joins the same conversation. Only the developer reads them. A copy of the message reaches the developer in Telegram without your name or account number, and stays in that chat even after the message is deleted here. Kept for a year from the last message of the conversation."
+        "text": "What you wrote in “Write to the developer” or in reply to the developer’s answer in the Molvia bot, its kind, and what goes with the text: the app version, the screen, the phone’s system and whether it is the app or a browser, the language, and from an error screen its code. Screenshots, if you attached them yourself: everything in the file but the picture is removed before it is sent, where it was taken included. A screenshot is kept only until it reaches the developer in Telegram, and no longer than a week; Telegram sees it, as it sees the text, and a copy stays in the developer’s chat. And the developer’s replies, each with the number of the Telegram message it reached you as: that is how your answer joins the same conversation. Only the developer reads them. A copy of the message reaches the developer in Telegram without your name or account number, and stays in that chat even after the message is deleted here. Kept for a year from the last message of the conversation."
       },
       "search": {
         "term": "Search picks",
-        "text": "What you took for which query, so that next time it comes first. And a query that found nothing, if you then found the item by another word — so that next time your word finds it. Other people do not see your pairs. With your consent, the developer measures the search by them, and a query that found nothing may join the search's shared dictionary — without your name, and only from three people; see «Statistics — with your consent»."
+        "text": "What you took for which query, so that next time it comes first. And a query that found nothing, if you then found the item by another word — so that next time your word finds it. Other people do not see your pairs. With your consent, the developer measures the search by them, and a query that found nothing may join the search’s shared dictionary — without your name, and only from three people; see “Statistics — with your consent”."
       },
       "visits": {
         "term": "Visit marks",
-        "text": "Whether you opened “What to buy” — at most once a day. For the statistics only, and only with your consent — see «Statistics — with your consent»."
+        "text": "Whether you opened “What to buy” — at most once a day. For the statistics only, and only with your consent — see “Statistics — with your consent”."
       },
       "devices": {
         "term": "Sign-in devices",
@@ -1830,22 +1830,22 @@
       },
       "consent": {
         "term": "Consent to the terms",
-        "text": "Which edition of the Terms of use and of this page you accepted, and when — so that we can ask you again when they change in a way that matters. We keep neither your age nor your date of birth."
+        "text": "Which edition of the Terms of use and of this page you accepted, and when — so that we can ask you again when they change significantly. We keep neither your age nor your date of birth."
       }
     },
     "bases": {
       "title": "Why, and on what basis",
-      "text": "Almost everything in the list above is needed for Molvia to work: you accepted the «Terms of use», and that is our agreement. You cannot refuse this data and stay in Molvia — you can only delete the account.\nOne thing rests on your separate consent: the statistics, described in the next section.\nWhat we do with the data: receive it from you, keep it, show it to you, work out average ratings and prices for others from it — without your name, pass it to those named under «Who the data goes to», and delete it."
+      "text": "Almost everything in the list above is needed for Molvia to work: you accepted the “Terms of use”, and that is our agreement. You cannot refuse this data and stay in Molvia — you can only delete the account.\nOne thing rests on your separate consent: the statistics, described in the next section.\nWhat we do with the data: receive it from you, keep it, show it to you, work out average ratings and prices for others from it — without your name, pass it to those named under “Who the data goes to”, and delete it."
     },
     "statistics": {
       "title": "Statistics — with your consent",
-      "text": "To learn whether people need Molvia, the developer counts two things: whether people come back — by the visit marks — and how many ratings are given, withdrawn ones included. He counts in numbers, without names and without what you rated.\nHe also measures the search: whether it puts first what people then take — by what you took for which query. For this the developer exports such pairs to himself — without your name or account number, the query as the search keeps it (no capitals, one spelling: «молоко» is moloko) — and deletes the export after the measure. Numbers go into the result, and one kind of word: a query that found nothing, where you then found the item by another word, may join the search's shared dictionary — without your name, and only if at least three people said the same.\nThe consent holds while «Count me in the statistics» is on in the settings — and it is on until you turn it off. You can turn it off at any moment: the visit marks are deleted at once and no new ones are written, and your ratings and queries stop being counted in that count. You can turn it back on in the same place: ratings and queries are counted again, those made while it was off too.\nApart from that, with no one’s name or number — only as numbers by day — we count how many sign-ins began and finished, how many receipts were read, how soon after sending they were recorded and how many of their lines were put right or left out, how many reminders went out, how many ratings were given in reply and how many times reminders were turned off — by the button, in the settings or by blocking the bot: this is how we see whether sign-in, receipt reading and reminders work. There is no one in these numbers, so the switch does not touch them.\nA rating you withdrew stays with us as a row — without its review, but with the rating itself and the moment you gave it: it is how the bot knows not to ask you to rate a purchase whose rating you withdrew. It stays after the statistics are turned off too, but is no longer counted, and it goes with the account."
+      "text": "To learn whether people need Molvia, the developer counts two things: whether people come back — by the visit marks — and how many ratings are given, withdrawn ones included. He counts in numbers, without names and without what you rated.\nHe also measures the search: whether it puts first what people then take — by what you took for which query. For this the developer exports such pairs to himself — without your name or account number, the query as the search keeps it (no capitals, one spelling: “молоко” is moloko) — and deletes the export after the measure. Numbers go into the result, and one kind of word: a query that found nothing, where you then found the item by another word, may join the search’s shared dictionary — without your name, and only if at least three people said the same.\nThe consent holds while “Count me in the statistics” is on in the settings — and it is on until you turn it off. You can turn it off at any moment: the visit marks are deleted at once and no new ones are written, and your ratings and queries stop being counted in that count. You can turn it back on in the same place: ratings and queries are counted again, those made while it was off too.\nApart from that, with no one’s name or number — only as numbers by day — we count how many sign-ins began and finished, how many receipts were read, how soon after sending they were recorded and how many of their lines were put right or left out, how many reminders went out, how many ratings were given in reply and how many times reminders were turned off — by the button, in the settings or by blocking the bot: this is how we see whether sign-in, receipt reading and reminders work. There is no one in these numbers, so the switch does not touch them.\nA rating you withdrew stays with us as a row — without its review, but with the rating itself and the moment you gave it: it is how the bot knows not to ask you to rate a purchase whose rating you withdrew. It stays after the statistics are turned off too, but is no longer counted, and it goes with the account."
     },
     "recipients": {
       "title": "Who the data goes to",
       "people": {
         "term": "Other people",
-        "text": "Average ratings of three people and prices without your name — to those who have access to other people’s figures. With no access and no threshold of three, everyone sees the items, shops and barcodes you added to the shared catalogue, and your word about a receipt — which item stands behind a line and which shop it is: it is offered to anyone who reads a receipt of the same shop, even if only you said it. And, with your consent to the statistics, a query that found nothing — in the search's shared dictionary, if at least three people said the same. All of it without your name. Your list of purchases, your spendings and your money — to nobody."
+        "text": "Average ratings of three people and prices without your name — to those who have access to other people’s figures. With no access and no threshold of three, everyone sees the items, shops and barcodes you added to the shared catalogue, and your word about a receipt — which item stands behind a line and which shop it is: it is offered to anyone who reads a receipt of the same shop, even if only you said it. And, with your consent to the statistics, a query that found nothing — in the search’s shared dictionary, if at least three people said the same. All of it without your name. Your list of purchases, your expenses and your money — to nobody."
       },
       "telegram": {
         "term": "Telegram",
@@ -1853,7 +1853,7 @@
       },
       "contabo": {
         "term": "Contabo, server in France",
-        "text": "The host: the database lies on its server."
+        "text": "The host: the database is stored on its server."
       },
       "cloudflare": {
         "term": "Cloudflare",
@@ -1869,7 +1869,7 @@
       },
       "anthropic": {
         "term": "Anthropic: USA and other countries",
-        "text": "The whole photo of a receipt — only if reading receipts by the Claude model is on for you; the photo may print your name if the shop prints it. Anthropic stores what is sent in the USA and computes it in any country where it has capacity; which one, we do not know in advance either. The model gives back the lines, the total and the shop, and they are kept by us, as any receipt read. At Anthropic the photo and the model’s answer live up to 30 days, or, if its automated check flags the request as breaking its rules, up to 2 years, and the score of that check up to 7 years. This is a transfer abroad, and it rests on your consent to this edition: without it a receipt is read by our own server alone. Under Anthropic’s terms for its API, what is sent is not used to train its models."
+        "text": "The whole photo of a receipt — only if reading receipts by the Claude model is on for you; the photo may show your name if the shop prints it. Anthropic stores what is sent in the USA and computes it in any country where it has capacity; which one, we do not know in advance either. The model gives back the lines, the total and the shop, and they are kept by us, as any receipt read. At Anthropic the photo and the model’s answer live up to 30 days, or, if its automated check flags the request as breaking its rules, up to 2 years, and the score of that check up to 7 years. This is a transfer abroad, and it rests on your consent to this edition: without it a receipt is read by our own server alone. Under Anthropic’s terms for its API, what is sent is not used to train its models."
       },
       "nobody": {
         "term": "Nobody else",
@@ -1878,7 +1878,7 @@
     },
     "logs": {
       "title": "Server logs",
-      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach the server's error log — and it too lives there no longer than 14 days — and the server's memory: along with an app failure — see «App failures» — and for a couple of minutes when you start signing in, so that one address cannot start too many sign-ins. And the server keeps metrics: how many requests reached each part of it and how fast it answered — every 15 seconds, without a name, an address or what you searched for: this is how we see whether something broke. The last 30 days of them can be read, and they leave the disk month by month — within two months."
+      "text": "Kept for no longer than 14 days. Requests are written to them without your IP address and without what you searched for. An IP address can reach the server’s error log — and it too lives there no longer than 14 days — and the server’s memory: along with an app failure — see “App failures” — and for a couple of minutes when you start signing in, so that one address cannot start too many sign-ins. And the server keeps metrics: how many requests reached each part of it and how fast it answered — every 15 seconds, without a name, an address or what you searched for: this is how we see whether something broke. The last 30 days of them can be read, and they leave the disk month by month — within two months."
     },
     "failures": {
       "title": "App failures",
@@ -1890,31 +1890,31 @@
     },
     "barcodes": {
       "title": "An unknown barcode",
-      "text": "If the catalogue does not know a scanned code, the server asks Open Food Facts, an open database of products, about it. Only the code itself and our server's address go there: not you, not your phone and not your sign-in. A shop's own label code never goes there. The name and size from there are only a hint, which you confirm or correct; items suggested with a code Open Food Facts knows are marked. The link «Data from Open Food Facts» opens the product's page there — from your phone, when you tap it. Open Food Facts data is open under the ODbL licence: we will send an export of what the catalogue took from there on request."
+      "text": "If the catalogue does not know a scanned code, the server asks Open Food Facts, an open database of products, about it. Only the code itself and our server’s address go there: not you, not your phone and not your sign-in. A shop’s own label code never goes there. The name and size from there are only a hint, which you confirm or correct; items suggested with a code Open Food Facts knows are marked. The link “Data from Open Food Facts” opens the product’s page there — from your phone, when you tap it. Open Food Facts data is open under the ODbL licence: we will send an export of what the catalogue took from there on request."
     },
     "serbian_receipts": {
       "title": "A Serbian receipt by its link",
-      "text": "You hand over a Serbian receipt as the link of its QR code, with no photo: your phone reads the QR code off the shot, and the shot stays on it and is kept nowhere — or you paste the link yourself. The receipt is kept by the Serbian tax office (Poreska uprava), and our server takes its lines from there: it sends the tax office that link, then opens the receipt’s page by it and asks for the list of products — with the receipt’s number and a key from that very page — for the products’ codes. The tax office sees the link and our server’s address — not you, your phone or your sign-in. The link carries the receipt’s total, time and number, and the buyer’s number if the receipt names one — a firm’s or yours; the tax office holds all of it already. Of its answer we keep the seller’s tax number, the shop’s code and name, the town, the lines — with the products’ codes where the shop passed them on — the total and the time; the cashier’s name, the buyer’s number and the way of payment we do not take. A product’s code from the receipt becomes a barcode in the shared catalogue only if you tap «Link and record». We also keep whether the phone read the QR code or the link was pasted, and whether the camera missed before — that is how we see whether the QR code reads well. The link itself is erased as soon as the tax office answers, and never written to logs. A receipt just printed shows up there in a couple of minutes: the server asks again for two days, then says the receipt was not found."
+      "text": "You hand over a Serbian receipt as the link of its QR code, with no photo: your phone reads the QR code off the shot, and the shot stays on it and is kept nowhere — or you paste the link yourself. The receipt is kept by the Serbian tax office (Poreska uprava), and our server takes its lines from there: it sends the tax office that link, then opens the receipt’s page by it and asks for the list of products — with the receipt’s number and a key from that very page — for the products’ codes. The tax office sees the link and our server’s address — not you, your phone or your sign-in. The link carries the receipt’s total, time and number, and the buyer’s number if the receipt names one — a firm’s or yours; the tax office holds all of it already. Of its answer we keep the seller’s tax number, the shop’s code and name, the town, the lines — with the products’ codes where the shop passed them on — the total and the time; the cashier’s name, the buyer’s number and the way of payment we do not take. A product’s code from the receipt becomes a barcode in the shared catalogue only if you tap “Link and record”. We also keep whether the phone read the QR code or the link was pasted, and whether the camera missed before — that is how we see whether the QR code reads well. The link itself is erased as soon as the tax office answers, and never written to logs. A receipt just printed shows up there in a couple of minutes: the server asks again for two days, then says the receipt was not found."
     },
     "storage": {
-      "title": "Cookies and the phone's memory",
+      "title": "Cookies and the phone’s memory",
       "text": "Two cookies: the sign-in, and one more for five minutes while you sign in. The phone keeps what you saw last and what has not reached the server yet. All of it is needed for the app to work, so there is no banner. Signing out in Settings erases all of it from the phone."
     },
     "copy": {
       "title": "A copy of your data",
-      "text": "In the settings — «Download my data»: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked, the receipts read — without their photos — your messages to the developer — without their screenshots — and the earlier ratings kept until a merge is undone. A rating you withdrew is there too: without its review it stays with us — why is said under «Statistics — with your consent». What you removed and can still bring back is there as well, marked. The file holds no login keys."
+      "text": "In the settings — “Download my data”: a file with everything about you in the database, including the earlier versions of exchanges and incomes you corrected, the items you added to the shared catalogue, the barcodes you linked, the receipts read — without their photos — your messages to the developer — without their screenshots — and the earlier ratings kept until a merge is undone. A rating you withdrew is there too: without its review it stays with us — why is said under “Statistics — with your consent”. What you removed and can still bring back is there as well, marked. The file holds no login keys."
     },
     "erase": {
       "title": "Delete everything",
-      "text": "In Settings, «Delete my data», or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they stay, without your name. The items you added to the shared catalogue go, with the barcodes you linked to them and the shops’ memory of them, if nobody else stands on them: nobody else bought, rated or picked them in search, linked a barcode to them or is reading them on a receipt, they were never merged with another item of the catalogue and are not in its common list of names. A merged item stays as a second name of the one it was merged with. Your other items, the barcodes you linked and the shops’ memory — which item stands behind a receipt line and the shelf price — stay, without your name. Deletion does not reach the receipt photos the Claude model read: at Anthropic they and the model’s answers live their own term — up to 30 days, up to 2 years if its check flagged them, the check’s score up to 7 years (see «Who the data goes to»). Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site's data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who came in the same week as you deleted their data, and how many of those accounts were deleted by themselves, after two years without a visit. It is there so that whether Molvia gets used is counted honestly."
+      "text": "In Settings, “Delete my data”, or send /delete to the bot you sign in with and confirm. Data is deleted from the database immediately and for good, and from the backups within 14 days: everything in the list above goes except the shops — they stay, without your name. The items you added to the shared catalogue go, with the barcodes you linked to them and the shops’ memory of them, if nobody else stands on them: nobody else bought, rated or picked them in search, linked a barcode to them or is reading them on a receipt, they were never merged with another item of the catalogue and are not in its common list of names. A merged item stays as a second name of the one it was merged with. Your other items, the barcodes you linked and the shops’ memory — which item stands behind a receipt line and the shelf price — stay, without your name. Deletion does not reach the receipt photos the Claude model read: at Anthropic they and the model’s answers live their own term — up to 30 days, up to 2 years if its check flagged them, the check’s score up to 7 years (see “Who the data goes to”). Deleting from Settings also erases the copies on the phone you deleted from; on other devices, and after /delete, they may remain: to remove them, delete the app there or clear the site’s data — or sign out there in Settings beforehand. You can sign in again, but it will be a new, empty account. One number without a name remains after deletion: how many people who joined in the same week as you deleted their data, and how many of those accounts were deleted by themselves, after two years without a visit. It is there so that whether Molvia gets used is counted honestly."
     },
     "inactive": {
       "title": "An inactive account",
-      "text": "If you do not open Molvia for two years, the account is deleted by itself — just as by «Delete my data». The Molvia bot warns you 30 and 7 days before; to keep the account, opening the app is enough — and signing in, if it asks. If you have blocked the bot, there is no way to warn you, and the account is deleted without a warning."
+      "text": "If you do not open Molvia for two years, the account is deleted by itself — just as by “Delete my data”. The Molvia bot warns you 30 and 7 days before; to keep the account, opening the app is enough — and signing in, if it asks. If you have blocked the bot, there is no way to warn you, and the account is deleted without a warning."
     },
     "rights": {
       "title": "Your rights",
-      "text": "To learn what is kept about you and get a copy — «Download my data». To correct — edit: a purchase’s quantity and sum, a record’s receipt total, and ratings, reviews, exchanges, incomes, spendings, accounts and settings. A purchase’s item and a record’s shop or day cannot be edited — delete such a record and enter it again. To delete everything — «Delete my data» or /delete in the bot. To withdraw the consent to the statistics — «Count me in the statistics». All of this works at once, with no request. If you need something else, write to the developer: the answer comes within five working days at most."
+      "text": "To learn what is kept about you and get a copy — “Download my data”. To correct — edit: a purchase’s quantity and sum, a record’s receipt total, and ratings, reviews, exchanges, incomes, expenses, accounts and settings. A purchase’s item and a record’s shop or day cannot be edited — delete such a record and enter it again. To delete everything — “Delete my data” or /delete in the bot. To withdraw the consent to the statistics — “Count me in the statistics”. All of this works at once, with no request. If you need something else, write to the developer: the answer comes within five working days at most."
     },
     "complaints": {
       "title": "Where to complain",
@@ -1937,7 +1937,7 @@
     },
     "yours": {
       "title": "Your records",
-      "text": "Your purchases, spendings, exchanges and accounts are seen by you alone. Others see ratings and prices without a name, and only once at least three people have recorded them. In detail — «Data and privacy»."
+      "text": "Your purchases, expenses, exchanges and accounts are seen by you alone. Others see ratings and prices without a name, and only once at least three people have recorded them. In detail — “Data and privacy”."
     },
     "write": {
       "title": "What to write",
@@ -1961,11 +1961,11 @@
     },
     "changes": {
       "title": "Deletion and changes",
-      "text": "You can delete everything at any time: in Settings, or with /delete in the bot. If the terms or «Data and privacy» change in a way that matters, the app will ask for your consent again the next time you open it."
+      "text": "You can delete everything at any time: in Settings, or with /delete in the bot. If the terms or “Data and privacy” change significantly, the app will ask for your consent again the next time you open it."
     },
     "contact": {
       "title": "Contact",
-      "text": "«Write to the developer» in Settings."
+      "text": "“Write to the developer” in Settings."
     }
   },
   "policy": {
@@ -1980,15 +1980,15 @@
       "changes": "What changed"
     },
     "changes": {
-      "2": "The person responsible for your data is named — Vladimir Sitchikhin, Gyumri. The statistics — visit marks and the count of ratings — now rest on your consent, and «Count me in the statistics» withdraws it. The edition before promised others see only what three people recorded — corrected: the items, shops and barcodes you added, and your word about a receipt line, everyone sees, without your name but with no threshold. Added: your rights, where to complain, who the data goes to — the Serbian tax office among them, for receipts by link — how long an inactive account is kept, and what we do if the data leaks.",
+      "2": "The person responsible for your data is named — Vladimir Sitchikhin, Gyumri. The statistics — visit marks and the count of ratings — now rest on your consent, and “Count me in the statistics” withdraws it. The edition before promised others see only what three people recorded — corrected: the items, shops and barcodes you added, and your word about a receipt line, everyone sees, without your name but with no threshold. Added: your rights, where to complain, who the data goes to — the Serbian tax office among them, for receipts by link — how long an inactive account is kept, and what we do if the data leaks.",
       "3": "A new recipient — Anthropic (USA): for those who have reading receipts by the Claude model on, the whole photo of a receipt goes to it, and the photo may print the buyer’s name. Until you accept this edition, your receipts are read by our own server alone.",
       "4": "A new purpose: if the model did not read a receipt whole, the developer keeps its photo and what the model read for up to 21 days after reading — after recording or a retake too — to find why lines were not read, and gets a message about it in Telegram, with no products, sums or shop. Until you accept this edition, the photo of your receipt is deleted when you record it, as before.",
       "5": "Where your data is. The Molvia server is in France, not in Germany as the edition before said. Anthropic stores a receipt’s photo in the USA and computes it in any country where it has capacity, and keeps the photo and the model’s answer up to 30 days (up to 2 years if its check flags them, and the check’s score up to 7 years). Until you accept this edition, your receipts are read by our own server alone.",
-      "6": "A new purpose: with your consent to the statistics, the developer measures the search by what you took for which query — without your name or account number — and deletes the export for the measure after it. Queries made before this edition are in the measure too. A query that found nothing may join the search's shared dictionary — without your name, and only if at least three people said the same. Until you accept this edition, your queries are not in the measure — nor are they while «Count me in the statistics» is off."
+      "6": "A new purpose: with your consent to the statistics, the developer measures the search by what you took for which query — without your name or account number — and deletes the export for the measure after it. Queries made before this edition are in the measure too. A query that found nothing may join the search’s shared dictionary — without your name, and only if at least three people said the same. Until you accept this edition, your queries are not in the measure — nor are they while “Count me in the statistics” is off."
     },
     "statistics": {
       "title": "Statistics",
-      "text": "We count whether people come back and how many ratings they give, and measure the search by what you took for a query — in numbers, without names; a query that found nothing may join the search's shared dictionary if at least three people said the same. Your visit marks, ratings, withdrawn ones included, and queries are in that count while «Count me in the statistics» is on. You can turn it off in the settings at any moment."
+      "text": "We count whether people come back and how many ratings they give, and measure the search by what you took for a query — in numbers, without names; a query that found nothing may join the search’s shared dictionary if at least three people said the same. Your visit marks, ratings, withdrawn ones included, and queries are in that count while “Count me in the statistics” is on. You can turn it off in the settings at any moment."
     },
     "age": "I am 16 or older",
     "accept": "I accept",
@@ -2019,8 +2019,8 @@
     "total": "Total",
     "total_foot": "Spendable {spendable} · savings {savings}",
     "stale": "Offline · balances as of {when}",
-    "unassigned": "{n} entry isn't in any balance | {n} entries aren't in any balance",
-    "load_failed": "Couldn't load balances",
+    "unassigned": "{n} entry isn’t in any balance | {n} entries aren’t in any balance",
+    "load_failed": "Couldn’t load balances",
     "done": "Done",
     "savings": "Savings",
     "for_spending": "For spending",
@@ -2028,10 +2028,10 @@
     "no_operations": "No entries yet",
     "currency_spending": "{currency} · for spending",
     "currency_savings": "{currency} · savings",
-    "error_body": "The server didn't answer. Nothing you saved is lost — try again",
+    "error_body": "The server didn’t answer. Nothing you saved is lost — try again",
     "offer": {
       "title": "Where is your money?",
-      "body": "Add cash and cards — balances will keep themselves up to date"
+      "body": "Add cash and cards — balances will stay up to date automatically"
     },
     "unassigned_sheet": {
       "title": "Not in any balance",
@@ -2047,10 +2047,10 @@
       "add": "Add account",
       "archived": "Put away ({n})",
       "archived_row": "{currency} · {amount} · put away {date}",
-      "archived_note": "A put-away account isn’t offered for new spending, income or exchanges. Its history and balance are kept",
+      "archived_note": "A put-away account isn’t offered for new expenses, income or exchanges. Its history and balance are kept",
       "restore": "Restore",
       "restoring": "Restoring…",
-      "restore_wait": "Will bring back once online",
+      "restore_wait": "Will restore once online",
       "restored": "“{name}” is back in the list",
       "removed": "Deleted: {name}",
       "removed_announced": "Deleted: {name}. Undo within 10 seconds",
@@ -2058,10 +2058,10 @@
       "offline": "Offline · balances as of {when}. Accounts and checks wait for a connection",
       "unanswered": "The server did not answer · balances as of {when}",
       "empty": {
-        "body": "Add cash and cards — balances will follow your spending, income, exchanges and purchases"
+        "body": "Add cash and cards — balances will follow your expenses, income, exchanges and purchases"
       },
       "error": {
-        "title": "Couldn't load accounts"
+        "title": "Couldn’t load accounts"
       },
       "offline_empty": "The accounts will show once the connection is back",
       "uncounted": "{n} account not counted — no rate | {n} accounts not counted — no rate",
@@ -2086,10 +2086,10 @@
       "exchange_from": "from “{name}”: {amount}",
       "exchange_to": "to “{name}”: {amount}",
       "reconcile_row": "Other · check",
-      "reconcile_out": "spending from a check",
+      "reconcile_out": "expense from a check",
       "reconcile_in": "income from a check",
       "empty": {
-        "body": "Spending, income, exchanges and purchases on this account will show up here. For now the balance is the start"
+        "body": "Expenses, income, exchanges and purchases on this account will show up here. For now the balance is the starting one"
       },
       "reconcile": "Check against reality",
       "not_found": "No such account",
@@ -2097,10 +2097,10 @@
       "title": "Account",
       "unanswered": "The server did not answer",
       "error": {
-        "title": "Couldn't load the account"
+        "title": "Couldn’t load the account"
       },
       "row_open": "Open entry:",
-      "archived": "Taken out of the choice on {date}. Its history and balance stay",
+      "archived": "Put away on {date}. Its history and balance stay",
       "transfer": "Transfer"
     },
     "sheet": {
@@ -2113,10 +2113,10 @@
       "currency": "Currency",
       "currency_option": "{name} · {code}",
       "kind": "What for",
-      "kind_hint": "Savings aren't counted as spendable",
+      "kind_hint": "Savings aren’t counted as spendable",
       "start_day": "As of",
-      "start_hint": "Today — the balance when the account was made: everything recorded on it after changes it. A past day — the balance that evening",
-      "start_amount": "Held at the start",
+      "start_hint": "Today — the balance when the account is created; everything recorded on it afterwards changes it. A past day — the balance on that evening",
+      "start_amount": "Starting balance",
       "start_now": "now {amount}",
       "save": "Save",
       "saving": "Saving…",
@@ -2124,7 +2124,7 @@
       "offline": "Offline. Accounts change only with a connection — what you typed stays here",
       "added": "Account “{name}” added",
       "saved": "Account saved",
-      "failed": "Couldn't save the account — try again",
+      "failed": "Couldn’t save the account — try again",
       "conflict": "The account changed on another device",
       "no_name": "Name the account",
       "name_taken": "“{name}” already exists — pick another name",
@@ -2142,7 +2142,7 @@
       "title": "Reconciliation",
       "meta": "{name} · {currency}",
       "question": "How much is there right now?",
-      "hint": "Count the cash or look in the bank. We'll show what the app counts afterwards — so you don't adjust to it",
+      "hint": "Count the cash or look in the bank. We’ll show what the app counts afterwards — so you aren’t swayed by it",
       "no_fact": "Enter an amount — 0 is fine",
       "check": "Check",
       "checking": "Checking…",
@@ -2151,21 +2151,21 @@
       "offline_result": "No connection. The check is counted — the difference can be recorded once online",
       "offline_counted": "No connection. The check is counted",
       "match_title": "Matches the app",
-      "match_body": "We'll remember this check for today, {date}. The next one starts from here",
+      "match_body": "We’ll remember this check for today, {date}. The next one starts from here",
       "mismatch": "The app counts {app}, the account has {fact}",
       "difference": "Difference",
       "edit_fact": "Enter another amount",
       "causes_title": "What could explain it since {date}",
       "causes_hint": "Fix an entry — the difference updates",
-      "cause_no_account_spending": "Spending {amount} with no account",
+      "cause_no_account_spending": "Expense {amount} with no account",
       "cause_no_account_income": "Income {amount} with no account",
       "cause_no_account_exchange": "Exchange {amount} with no account",
       "cause_no_charged": "{title} in {sign} with no “charged”",
-      "cause_no_charged_meta": "{amount} · {date} · counted at the day's rate",
+      "cause_no_charged_meta": "{amount} · {date} · counted at the day’s rate",
       "cause_trip_unpriced": "Purchases on {date} with no total",
       "cause_trip_unpriced_meta": "{place} · {n} item without a price | {place} · {n} items without a price",
-      "no_causes_title": "Looks like some spending wasn't recorded",
-      "no_causes_body": "Since {date} every entry {currency} has an account, amounts and “charged” are in place. Think of what you might have paid outside the app",
+      "no_causes_title": "Looks like some expenses weren’t recorded",
+      "no_causes_body": "Since {date}, every entry {currency} has an account, and the amounts and “charged” are in place. Think of what you might have paid for outside the app",
       "write_difference": "Record the difference as “Other · check”",
       "writing": "Recording the difference…",
       "write_wait_online": "Will record once online",
@@ -2174,10 +2174,10 @@
       "retry_wait_online": "Will retry once online",
       "retry_after_recount": "Will retry after the recount",
       "retry_after_answer": "Will retry after your answer in Purchases",
-      "write_out_note": "We'll record spending of {amount} on “{name}”",
-      "write_in_note": "We'll record income of {amount} “Other” on “{name}”",
-      "recounting": "We will count again once the corrections reach the server",
-      "trips_held": "An entry is waiting for your answer in Purchases — record the difference after it: until then the server counts without it",
+      "write_out_note": "We’ll record an expense of {amount} on “{name}”",
+      "write_in_note": "We’ll record an “Other” income of {amount} on “{name}”",
+      "recounting": "We’ll recount once the corrections reach the server",
+      "trips_held": "An entry is waiting for your answer in Purchases — record the difference after that: until then the server counts without it",
       "recounted": "Saved — difference updated",
       "written": "Recorded “Other · check”: {amount}",
       "saved_match": "Check saved",
@@ -2196,25 +2196,25 @@
       "row_trip": "Purchases account",
       "row_open": "Choose account:",
       "none": "No account",
-      "none_hint": "Doesn't move any balance",
+      "none_hint": "Doesn’t move any balance",
       "meta": "Balances as of now",
       "group_same": "Accounts {currency}",
       "group_other": "Other currencies",
       "note_loose": "An account in another currency adds a “Charged to account” field",
-      "note_strict": "Only accounts {currency}: money comes and goes in the account's currency",
+      "note_strict": "Only accounts {currency}: money comes and goes in the account’s currency",
       "note_strict_none": "No accounts {currency} — the entry will have no account",
       "trip_saved": "Purchases account: {name}",
       "trip_saved_none": "Purchases account: none",
-      "note_transfer_to": "Only accounts {currency}, except «{name}». Moving to another currency is an «Exchange»",
-      "note_transfer_from": "An account in another currency — «To» will need choosing again"
+      "note_transfer_to": "Only accounts {currency}, except “{name}”. Moving to another currency is an “Exchange”",
+      "note_transfer_from": "An account in another currency — you’ll need to choose “To” again"
     },
     "charged": {
       "label": "Charged to account, {sign}",
-      "hint_empty": "Empty — we'll use the day's rate, about {amount}",
+      "hint_empty": "Empty — we’ll use the day’s rate, about {amount}",
       "hint_filled": "“{name}” goes down by exactly {amount}",
       "hint_empty_plain": "Empty — it will be counted at the rate of the day"
     },
-    "trip_hint": "Items without a price don’t reduce the balance. Prices are edited in Purchases, the account here — the choice saves right away",
+    "trip_hint": "Items without a price don’t reduce the balance. Prices are edited in Purchases, the account here — your choice is saved right away",
     "trip_unpriced": "no price",
     "currency_in": {
       "AMD": "in drams",
@@ -2236,7 +2236,7 @@
     "apply": "Update",
     "applying": "Updating…",
     "failed": {
-      "title": "The update did not take",
+      "title": "The update didn’t apply",
       "body": "Close Molvia completely and open it again. iPhone: swipe it up in the app switcher. Android: Recents — swipe Molvia away."
     }
   },
@@ -2251,26 +2251,26 @@
     "done": "Done",
     "try_again": "Check again",
     "insecure_title": "The camera needs a secure connection",
-    "insecure_body": "Open the app at an https address — or type the code's digits in.",
+    "insecure_body": "Open the app at an https address — or type the code’s digits in.",
     "denied_title": "No access to the camera",
-    "denied_body": "iPhone: Settings → Apps → Safari → Camera → “Allow”. Android: the icon left of the address → Permissions → Camera. Or type the code's digits in.",
+    "denied_body": "iPhone: Settings → Apps → Safari → Camera → “Allow”. Android: the icon left of the address → Permissions → Camera. Or type the code’s digits in.",
     "none_title": "No camera",
-    "none_body": "This device has no camera. Type the code's digits in.",
+    "none_body": "This device has no camera. Type the code’s digits in.",
     "error_title": "The camera did not start",
     "error_body": "Another app may be holding it. Close it and try again.",
     "reader_title": "The scanner is not responding",
-    "reader_body": "Try again — or type the code's digits in.",
+    "reader_body": "Try again — or type the code’s digits in.",
     "camera_hint_title": "Camera without asking",
     "camera_hint_app_body": "Safari asks for the camera every time Molvia starts. To stop it asking, allow the camera in Settings:",
     "camera_hint_app_path": "Settings → Apps → Safari → Camera → “Allow”",
     "camera_hint_app_search": "Quicker: search Settings for “Safari”.",
     "camera_hint_app_price": "This allows the camera for every website in Safari, not only Molvia.",
-    "camera_hint_app_otherwise": "If nothing is changed, Safari will ask on every start — then just answer it “Allow”.",
+    "camera_hint_app_otherwise": "If you change nothing, Safari will ask on every start — then just tap “Allow”.",
     "camera_hint_tab_body": "Safari asks for the camera every time the page loads again. To stop it asking, allow the camera for this website:",
     "camera_hint_tab_path": "The page menu by the address bar → Website Settings → Camera → “Allow”",
     "camera_hint_tab_or": "Or for every website: Settings → Apps → Safari → Camera → “Allow”.",
     "camera_hint_tab_price": "This allows it for Molvia only.",
-    "camera_hint_tab_otherwise": "If nothing is changed, Safari will ask after every reload — then just answer it “Allow”.",
+    "camera_hint_tab_otherwise": "If you change nothing, Safari will ask after every reload — then just tap “Allow”.",
     "camera_hint_ok": "Got it",
     "camera_hint_offer": "Safari asks every time? How to stop it"
   },
@@ -2278,22 +2278,22 @@
     "title": "Budget",
     "offline_strip": "Offline · budget as of {when}",
     "error_strip": "The server did not answer — budget as of {when}",
-    "offline_body": "This month's budget has not been loaded on this phone yet. It will appear once the connection is back",
+    "offline_body": "This month’s budget has not been loaded on this phone yet. It will appear once the connection is back",
     "load_error": {
       "title": "The budget did not load",
-      "body": "The month's plan and spendings did not come. Try again"
+      "body": "The month’s plan and expenses didn’t load. Try again"
     },
     "empty": {
       "title": "No plan yet",
-      "body": "Set how much you are ready to spend on a category a month — as a sum or a share of what came in. The plan carries over to the next months by itself"
+      "body": "Set how much you are ready to spend on a category a month — as a sum or a share of what came in. The plan carries over to the following months automatically"
     },
     "total": {
       "left": "Left of the plan",
       "over": "Over the plan",
       "planned": "Plan",
       "unplanned": "Outside the plan",
-      "not_whole": "Not all counted: some spendings or incomes have no rate",
-      "awaiting": "A share of income comes once something comes in this month",
+      "not_whole": "Not all counted: some expenses or incomes have no rate",
+      "awaiting": "A share of income is counted once something comes in this month",
       "planned_more": "{amount} and more"
     },
     "row": {
@@ -2313,15 +2313,15 @@
       "so_far": "{percent} so far",
       "of": "Difference {difference} of {income}",
       "no_income": "Nothing has come in this month yet",
-      "not_whole": "Cannot count: some spendings or incomes have no rate"
+      "not_whole": "Cannot count: some expenses or incomes have no rate"
     },
     "entry": {
       "none": "not set",
       "left": "{amount} left",
       "over": "{amount} over"
     },
-    "saved": "Plan «{name}» saved",
-    "removed": "Plan «{name}» removed",
+    "saved": "Plan “{name}” saved",
+    "removed": "Plan “{name}” removed",
     "sheet": {
       "meta": "Plan for a month",
       "title_choose": "New plan",
@@ -2331,8 +2331,8 @@
       "amount": "Sum a month",
       "percent": "Share of income",
       "amount_hint": "How much you are ready to spend on this category in a month",
-      "share_hint": "A share of the month's «Came in» at the month's rate: more comes in — the plan grows too",
-      "savings_hint": "How much of what came in you want to keep. Compared with «came in − went out»",
+      "share_hint": "A share of the month’s “Came in” at the month’s rate: the more comes in, the bigger the plan",
+      "savings_hint": "How much of what came in you want to keep. Compared with “came in − went out”",
       "from": "From {month} on. {before} stays as it was",
       "bad_amount": "Enter a sum, for example 250 000",
       "bad_percent": "Enter a whole number from 0 to {max}",
@@ -2346,11 +2346,11 @@
       "removing": "Removing the plan…",
       "remove_offline": "Removing needs a connection",
       "other_currency": "The plan was {amount}, before the spending currency changed. Enter a sum in {sign}",
-      "too_big": "Too large a sum for a month's plan"
+      "too_big": "Too large a sum for a month’s plan"
     }
   },
   "place": {
-    "quoted": "«{place}»",
+    "quoted": "“{place}”",
     "in_city": "{place} {where}",
     "in_unknown_city": "{place} ({city})",
     "cities_in": {
@@ -2365,8 +2365,8 @@
   "receipt": {
     "edges": {
       "title": "Receipt edges",
-      "hint": "Drag the corners to the receipt's edges. For a part of a long receipt — to the overlap line",
-      "not_found": "Couldn't find the edges — drag the corners to the receipt's edges yourself",
+      "hint": "Drag the corners to the receipt’s edges. For a part of a long receipt — to the overlap line",
+      "not_found": "Couldn’t find the edges — drag the corners to the receipt’s edges yourself",
       "flat": "The corners don’t make a receipt — spread them to its edges",
       "corner": "Corner: {corner}. Move it with the arrow keys",
       "corners": {
@@ -2398,7 +2398,7 @@
       "max": "Four parts is the limit. If the receipt didn’t fit, retake the parts from a little further away",
       "retake": "Retake",
       "remove_part": "Remove part",
-      "offline": "No connection — the photos wait on your phone and go by themselves",
+      "offline": "No connection — the photos wait on your phone and will be sent automatically",
       "bad_file": "This file didn’t open as a photo. Choose a picture of the receipt — or take a new one",
       "not_kept": "The photo wasn’t kept on this phone. Free some space and try again",
       "preparing": "Preparing the photo…",
@@ -2439,17 +2439,17 @@
       "cashback": "Cashback to the card",
       "redeemed": "Paid with the card’s bonus",
       "service": "Service",
-      "repaired_note": "Figures put right — check them against the paper",
+      "repaired_note": "Figures corrected — check them against the paper",
       "approx": "≈ {amount} at the {day} rate",
       "diff": "{amount} off — probably in the “{line}” line. You can save it anyway",
       "diff_unknown": "{amount} off — we couldn’t find the line. You can save it anyway",
       "diff_blank": "{amount} short — {n} line has no figures. You can save it anyway | {amount} short — {n} lines have no figures. You can save it anyway",
       "photo_note": "We delete the photo after saving — the lines stay",
       "photo_note_sum": "We delete the photo after saving",
-      "partly_total": "Not all of it was read: the lines make {lines} of {total}, {short} short. If the print is faint, a retake will not help — correct the lines",
+      "partly_total": "Not all of it was read: the lines add up to {lines} of {total}, {short} short. If the print is faint, a retake will not help — correct the lines",
       "no_items": "This receipt lists no items — we will save its total. You can add the purchases later, in the record",
       "slip": "This is a card payment slip — it lists no items. The sum was read in one place — check it against the paper",
-      "partly_read_total": "Not all of it was read: the lines make {lines} of about {total}, about {short} short. If the print is faint, a retake will not help — correct the lines",
+      "partly_read_total": "Not all of it was read: the lines add up to {lines} of about {total}, about {short} short. If the print is faint, a retake will not help — correct the lines",
       "partly_lines": "Not all of it was read: {n} of {total} lines add up. If the print is faint, a retake will not help — correct the lines",
       "partly_check": "Not all of it was read — check the lines against the paper. If the print is faint, a retake will not help: add what is missing later, in the record",
       "to_developer": "Send the receipt to the developer",
@@ -2463,7 +2463,7 @@
       "cancel_record_offline": "You can cancel once online: the record may already have reached the server",
       "cancel_record_failed": "The server did not answer — try cancelling again",
       "refused": "Not saved: {reason}. Fix it and save again",
-      "refused_items_day": "This receipt has more new items than the catalogue takes today: up to {max} a day from receipts. Pick similar items from the search for the new lines, or save the receipt tomorrow — your edits are kept",
+      "refused_items_day": "This receipt has more new items than the catalogue accepts today: up to {max} a day from receipts. Pick similar items from the search for the new lines, or save the receipt tomorrow — your edits are kept",
       "offline": "Offline · receipt from this phone. Line edits are kept here",
       "unanswered": "The server did not answer · receipt from this phone. Line edits are kept here",
       "error": {
@@ -2478,7 +2478,7 @@
     "added": {
       "add": "Add a line",
       "title": "New line",
-      "meta": "It is not among the lines read — type it from the paper",
+      "meta": "It isn’t among the lines read — copy it from the paper",
       "item_missing": "Pick an item — a line cannot be recorded without one",
       "figures_note": "May be left empty: only the item is required",
       "remove": "Remove the line",
@@ -2496,17 +2496,17 @@
       "check_warn": "Not a sure match: the receipt says “{text}”. Check the item or pick another",
       "name": "Name it",
       "name_note": "The catalogue has no such item — saving adds it",
-      "spelled_note": "Words our dictionary lacks are spelt in the receipt's letters",
+      "spelled_note": "Words our dictionary lacks are spelt in the receipt’s letters",
       "unspell": "Drop the name — keep it as printed",
       "find": "Find in the catalogue",
-      "price": "Price for all, as on the receipt",
+      "price": "Total price, as on the receipt",
       "weight_hint": "{qty} × {price} — we work out the unit price",
       "mismatch": "The receipt says {printed} for this line, but {qty} × {price} is {sum}. Fix the price or quantity — or leave it: it doesn’t stop saving",
       "remembered": "Last time it was {price} here — check the digits",
       "save": "Save",
       "skip": "Don’t save this line",
       "unskip": "Save this line",
-      "skipped": "This line isn’t saved. It stays in the receipt sum — it was paid for",
+      "skipped": "This line isn’t saved. It stays in the receipt total — it was paid for",
       "discount_hint": "On the receipt: {price} − {discount}"
     },
     "pick": {
@@ -2540,9 +2540,9 @@
     },
     "codes": {
       "title": "Link the barcodes?",
-      "body": "The tax office passed on the products’ codes from the receipt. A linked code finds the product by the scanner — for you and for everyone who scans it",
+      "body": "The tax office passed on the products’ codes from the receipt. With a linked code, the scanner finds the product — for you and for everyone who scans it",
       "skip": "Record without codes",
-      "held": "Code {code} already belongs to «{name}» — it was not linked to the purchase"
+      "held": "Code {code} already belongs to “{name}” — it was not linked to the purchase"
     },
     "failed": {
       "meta": "{parts} · taken {day}, {time}",
@@ -2559,7 +2559,7 @@
         "invalid_title": "The tax office does not accept this receipt",
         "invalid_body": "The tax office’s check says the receipt is not valid. You can record the purchases by hand.",
         "unreadable_title": "The receipt was not read",
-        "unreadable_body": "You can record the purchases by hand or shoot the receipt’s QR code again."
+        "unreadable_body": "You can record the purchases by hand or scan the receipt’s QR code again."
       }
     },
     "duplicate": {
@@ -2584,27 +2584,27 @@
       }
     },
     "qr": {
-      "hint_qr": "Shoot the QR code at the bottom of the receipt — close and sharp",
+      "hint_qr": "Photograph the QR code at the bottom of the receipt — close up and sharp",
       "hint_light": "Even light, no glare on the QR code",
       "hint_private": "Only the link in the QR code is sent — the photo stays on your phone",
       "have_link": "Already copied the link?",
       "paste_short": "Paste",
       "paste": "Paste the link",
-      "take": "Shoot the QR",
+      "take": "Photograph the QR",
       "reading": "Looking for the QR…",
       "missed_title": "No QR code found",
-      "missed_body": "Come closer, so the QR code fills a third of the frame. Hold the phone until the camera focuses, and shoot in even light.",
-      "retake": "Shoot again",
-      "take_other": "Shoot another",
+      "missed_body": "Come closer, so the QR code fills a third of the frame. Hold the phone until the camera focuses, and take the photo in even light.",
+      "retake": "Retake",
+      "take_other": "Take another",
       "or_take": "The camera can read the QR code",
-      "offline": "No connection — the link from the QR code goes by itself once there is one",
+      "offline": "No connection — the link from the QR code will be sent automatically once there is one",
       "not_kept": "The link wasn’t kept: you are signed out. Sign in again and send the receipt once more"
     }
   },
   "transfer": {
     "title": "Transfer",
     "title_amend": "Edit transfer",
-    "meta": "Between your own accounts in one currency. Not counted in the month's spending",
+    "meta": "Between your own accounts in one currency. Not counted in the month’s expenses",
     "amount": "Amount",
     "from": "From",
     "to": "To",
@@ -2612,9 +2612,9 @@
     "no_peer_value": "No {sign} account",
     "no_peer": "No other account {currency}",
     "fee": "Fee",
-    "fee_hint": "Spending «Other» from «{name}»",
-    "fee_hint_none": "Spending «Other» from the account you transfer from",
-    "fee_total": "{amount} leaves in all",
+    "fee_hint": "An “Other” expense from “{name}”",
+    "fee_hint_none": "An “Other” expense from the account you transfer from",
+    "fee_total": "{amount} leaves the account in total",
     "day": "Day",
     "today": "Today",
     "note": "Note",
@@ -2625,20 +2625,20 @@
     "save": "Save",
     "saving": "Saving…",
     "need_from": "Choose where from",
-    "need_peer": "Needs a second account {currency}",
+    "need_peer": "You need a second account {currency}",
     "need_amount": "Enter the amount",
     "need_to": "Choose where to",
-    "wait_online": "We'll transfer once online",
-    "wait_online_save": "We'll save once online",
-    "offline": "No connection. You can transfer once online — what you've entered stays here",
-    "failed": "The transfer didn't go through",
+    "wait_online": "We’ll transfer once online",
+    "wait_online_save": "We’ll save once online",
+    "offline": "No connection. You can transfer once online — what you’ve entered stays here",
+    "failed": "The transfer didn’t go through",
     "failed_retry": "Try again",
-    "gone": "«{name}» was deleted on another phone. Choose another — the amount, fee and note are still here",
-    "done": "Transferred: {amount} to «{name}»",
+    "gone": "“{name}” was deleted on another phone. Choose another — the amount, fee and note are still here",
+    "done": "Transferred: {amount} to “{name}”",
     "saved": "Transfer saved",
     "remove": "Delete transfer",
     "removing": "Deleting…",
-    "remove_wait": "We'll delete once online",
+    "remove_wait": "We’ll delete once online",
     "remove_note": "Together with the fee. You can undo it right after",
     "removed": "Transfer deleted",
     "removed_sub": "Together with the fee",
@@ -2646,13 +2646,13 @@
     "restore_late": "Too late: the transfer is deleted for good",
     "restore_failed": "The transfer didn’t come back — check the connection and tap “Undo” again",
     "written_title": "The transfer is already recorded",
-    "written": "The answer was lost, but {amount} to «{name}» is recorded. Save to write your figures over it — there will be no second transfer",
+    "written": "The answer was lost, but {amount} to “{name}” is recorded. Save to write your figures over it — there will be no second transfer",
     "conflict_title": "The transfer was edited on another phone",
     "amend_conflict": "Recorded now: {details}. Save to write your figures over it",
     "current_fee": "fee {amount}",
     "unavailable": "The transfer didn’t open — the server didn’t answer",
     "unread_offline": "The transfer will open once you are online",
-    "unread_gone": "Its rows have left the journal. If it was deleted just now, “Undo” on the screen brings it back",
+    "unread_gone": "Its rows are no longer in the journal. If it was deleted just now, “Undo” on the screen brings it back",
     "vanished_title": "The transfer is gone — it was deleted",
     "vanished": "There is nothing to save. If it was deleted just now, “Undo” on the screen brings it back",
     "vanished_button": "Nothing to save",
