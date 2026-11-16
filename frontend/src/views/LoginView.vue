@@ -36,6 +36,13 @@
             {{ t('dev.login_seam') }}
           </AppButton>
           <p v-if="insecure" class="hint">{{ t('dev.login_insecure') }}</p>
+          <!-- The other language, named in itself, before anything is asked (MOL-398, owner's В-2 «а»):
+               the setting is behind this door, and whoever cannot read the phone's language could
+               not reach it. The same choice as «Язык» in the settings — it stays after signing in.
+               Apart from the way in, by a gap of its own (the owner's note on the plan). -->
+          <AppButton class="language" variant="ghost" :lang="other" @click="speakOther">
+            {{ t(`settings.locale.${other}`) }}
+          </AppButton>
         </div>
       </template>
 
@@ -151,6 +158,7 @@
 <script lang="ts">
 import { computed, defineComponent, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { pickLocale } from '@molvia/model'
 import IconAlert from '~icons/mdi/alert-circle-outline'
 import IconCheck from '~icons/mdi/check'
 import IconSend from '~icons/mdi/send'
@@ -162,6 +170,7 @@ import ScreenState from '@/components/ScreenState.vue'
 import UpdateBand from '@/components/UpdateBand.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
+import { useLocale } from '@/composables/useLocale'
 import { useReconnect } from '@/composables/useReconnect'
 import { provideStateStrip } from '@/composables/useStateStrip'
 import { purchaseDay } from '@/days'
@@ -301,10 +310,17 @@ export default defineComponent({
       withdraw?.()
     })
 
+    const { choose } = useLocale()
+    const other = computed(() => (pickLocale(locale.value) === 'ru' ? 'en' : 'ru'))
+
     return {
       t,
       root,
       phase,
+      other,
+      speakOther: () => {
+        choose(other.value)
+      },
       offered,
       seam,
       insecure,
@@ -409,6 +425,11 @@ export default defineComponent({
 
   .button:first-of-type {
     margin-top: var(--space-2);
+  }
+
+  .language {
+    align-self: center;
+    margin-top: var(--space-4);
   }
 }
 

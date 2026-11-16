@@ -7,7 +7,8 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
 import type { ActorView, LoginPoll, LoginStarted } from '@molvia/model'
-import { createAppI18n } from '@/i18n'
+import { LOCALE_KEY } from '@/composables/useLocale'
+import { createAppI18n, i18n } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
 import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
@@ -233,6 +234,26 @@ describe('первый экран — имя и обещание (MOL-216)', () 
     expect(view.findAll('h1').map((one) => one.text())).toEqual([en.login.title])
     expect(view.find('img.mark').exists()).toBe(false)
     expect(view.text()).not.toContain(en.login.promise)
+  })
+})
+
+describe('другой язык на первом экране (MOL-398, В-2 «а»)', () => {
+  it('назван на себе самом, и нажатие — тот же выбор, что «Язык» в настройках', async () => {
+    const { view } = await render()
+    const other = button(view, 'Русский')
+    expect(other.attributes('lang')).toBe('ru')
+
+    await other.trigger('click')
+    expect(localStorage.getItem(LOCALE_KEY)).toBe('ru')
+    expect(i18n.global.locale.value).toBe('ru')
+  })
+
+  it('только до входа: следующий шаг его не держит', async () => {
+    const { view } = await render()
+    pollLogin.mockResolvedValue({ status: 'pending', expiresAt: REQUEST.expiresAt })
+    await button(view, 'Sign in with Telegram').trigger('click')
+    await flushPromises()
+    expect(view.findAll('button').some((one) => one.text() === 'Русский')).toBe(false)
   })
 })
 
