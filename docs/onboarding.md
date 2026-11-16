@@ -5970,7 +5970,7 @@ Cloudflare Access** (В-1 «а»): сервис `tunnel` (`cloudflare/cloudflare
 копии: поддельная подпись, чужие `aud`/`iss`, истёкший, `alg: none`, без заголовка — 401; `aud` массивом, как у Access,
 читается; **шаблон тревоги `$__env{…}` не подставляет**, так что адрес «Дашборд — https://grafana.molvia.net» пишет
 `start.sh`, как chatid. **Сторож проверяет замок** (В-3 «а»): Worker `molvia-watch` спрашивает `grafana.<DOMAIN>` без
-пропуска, всё кроме редиректа на вход Access или 401/403 — `/fail` «grafana open», три из четырёх, **своя проверка
+пропуска, всё кроме редиректа на вход Access — `/fail` («grafana open» или код, 403 вызова Cloudflare тоже), три из четырёх, **своя проверка
 `molvia-grafana-lock`** (`HC_LOCK_URL`): замок открытый — состояние надолго, на `molvia-up` оно глушило бы падение сайта.
 `tunnel` — в группе метрик `deploy.sh`, выкат не судит. Dependabot двигает `cloudflared` раз в месяц, только его (В-5 «а»).
 Логов в Grafana нет (В-4 «а»). Цены: Cloudflare видит страницы Grafana (цифры машины, ничьих данных); политика Access и

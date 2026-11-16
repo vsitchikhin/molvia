@@ -421,7 +421,8 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   owner is a user of their own, a Viewer** (Р-1), made from the pass's e-mail: what runs is what the
   repository says. `admin` and Explore stay behind the SSH tunnel, the way in when Cloudflare is down
   (Р-3). **The lock is watched from outside** (В-3 «а»): the Worker asks `grafana.<DOMAIN>` with no pass,
-  and anything but Access's redirect or refusal is `/fail` of `molvia-grafana-lock`, a check of its own —
+  and anything but Access's redirect to its sign-in is `/fail` of `molvia-grafana-lock` — a `403` too, which
+  may be Cloudflare's challenge a browser passes (adversarial А5) — a check of its own, never the site's —
   the policy and the ingress live in Cloudflare's dashboard, where no test of the repository reaches.
   **The prices, named:** Cloudflare sees Grafana's pages — figures of the machine and routes' templates,
   nothing of a person, so no recipient of anyone's data; who gets a pass is Access's policy alone — a pass

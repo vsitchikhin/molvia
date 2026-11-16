@@ -530,11 +530,15 @@ on GitHub, hourly: its check waits a day and an hour.
   check flips. A certificate that could not be read is the site's matter and sends nothing to
   `molvia-cert`.
 - **The lock of Grafana** (MOL-399, В-3). `GET https://grafana.<DOMAIN>/` with no pass, the redirect
-  not followed, must be Cloudflare Access's: a redirect to `https://<team>.cloudflareaccess.com/…`, or
-  `401`/`403`. Anything else is the lock off — `grafana open 200` or `302` is Grafana answering by itself
-  (its second lock, the pass, still holds), `grafana 530` and the like is no Access in front either — by
-  the same three of four, told to `molvia-grafana-lock`, a check of its own: a lock left off is a state
-  that lasts, and on `molvia-up` it would keep a fall of the site silent, as the certificate's term did.
+  not followed, must be Cloudflare Access's redirect to `https://<team>.cloudflareaccess.com/…` — what
+  Access does with every request carrying no pass. `grafana open 200` or `302` is Grafana answering by
+  itself (its second lock, the pass, still holds); anything else — `grafana 530`, or `403`, which may be a
+  challenge or the firewall of Cloudflare a browser passes to the Grafana behind it (adversarial А5) —
+  says nothing of the lock and is no lock seen either. By the same three of four, told to
+  `molvia-grafana-lock`, a check of its own — never `HC_UP_URL`'s, which the round refuses (adversarial
+  А4): a lock left off is a state that lasts, and on `molvia-up` it would keep a fall of the site silent,
+  as the certificate's term did. Bot Fight Mode or «I'm Under Attack» on the zone answers the Worker
+  `403` and keeps the check down — the challenge stands before the lock and hides it.
 - **A rollout does not wake anyone.** `/fail` raises the alarm at once, with no grace, and every
   merge leaves the API silent for seconds. So once a check fails, four are made half a minute
   apart, and three failing is a `/fail` saying what they saw: `health 503`, `pwa 000`. A rollout
@@ -639,7 +643,8 @@ certificate that really ends.
 **`molvia-grafana-lock`** (MOL-399). Grafana's address answered without Access — the application of
 Access deleted, its hostname changed or its policy made «Bypass». Grafana still lets in nobody without
 Access's signed pass, but its login page faces the internet: put the application back (Metrics, «Where
-it is set»), or `docker compose … stop tunnel` until then. `grafana 530`, `grafana 502` on its own — the tunnel and
+it is set»), or `docker compose … stop tunnel` until then. `grafana 403` — a challenge or the firewall of
+Cloudflare answered before Access did: Security → Events of the zone names it. `grafana 530`, `grafana 502` on its own — the tunnel and
 Access both away: Zero Trust → Networks → Tunnels shows whether `molvia-grafana` is healthy.
 
 **`molvia-cert`.** The `/fail` says when it expires. Caddy's renewal failed:
@@ -847,7 +852,7 @@ node-exporter`, and `✅ Прошло` follows.
   3. Networks → Tunnels → Create → Cloudflared, named `molvia-grafana`, environment Docker — its token is the
      long string after `--token` in the command it shows. Public hostname: `grafana` · `molvia.net` →
      service `HTTP` · `grafana:3000`. Cloudflare writes the DNS record itself.
-  4. Into `~/molvia/.env.prod`: `GRAFANA_ACCESS_TEAM=<team>`, `GRAFANA_ACCESS_AUD=<tag>` and the token —
+  4. Into `~/molvia/.env.prod`: `GRAFANA_ACCESS_DOMAIN=<team>.cloudflareaccess.com`, `GRAFANA_ACCESS_AUD=<tag>` and the token —
      typed at `read -rs T`, then `printf 'CLOUDFLARE_TUNNEL_TOKEN=%s\n' "$T" >>.env.prod`: `printf` is
      the shell's own, so the token is in no command's arguments («Rotating the secrets»).
   5. The check `molvia-grafana-lock` in healthchecks.io (period 10 min, grace 10 min, the Telegram
