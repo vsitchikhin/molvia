@@ -126,7 +126,14 @@ export function explainedReading(
   return {
     shown: {
       ...text,
-      lines: witness === undefined ? shown : witnessed(checked, witness.lines),
+      lines:
+        witness === undefined
+          ? shown
+          : witnessed(
+              checked,
+              witness.lines,
+              (line) => verifiedLine(line, true, text.layout, byModel).line,
+            ),
       balanced: proven,
     },
     lines: checked.map((one) => one.reason),
@@ -135,12 +142,13 @@ export function explainedReading(
 }
 
 /**
- * Which of two readings of one receipt goes to the review (MOL-405, owner's В-1 «а», rule R3 of the bench): the one
- * proven whole; else the one that found lines, where the other found none (adversarial А1: a section of one sum
- * would take the lines read); else the one with a total shown; else the one with more lines shown as read; a tie —
- * the first. The code knows no truth, only what each reading proves: a second reading with more lines and no total
- * took four wrong figures and lost a total on the bench (am-34, am-07b), where the total comes before the count — and
- * a reading with the total and fewer lines takes the lines it lost with it, the price named (`receipts.md`).
+ * Which of two readings of one receipt goes to the review (MOL-405): the bench's rule R3 (owner's В-1 «а») — the one
+ * proven whole; else the one with a total shown; else the one with more lines shown as read; a tie, the first — with
+ * one step before the total, adversarial А1 and Б1's: **the one that shows a line as read, where the other shows
+ * none** — a section of one sum, or lines found with no figure read, would take the lines the other read and showed.
+ * The code knows no truth, only what each reading proves: a second reading with more lines and no total took four wrong
+ * figures and lost a total on the bench (am-34, am-07b), where the total comes before the count — and a reading with
+ * the total and fewer lines shown takes the lines it lost with it, the price named (`receipts.md`).
  */
 export function betterReading(
   first: ExplainedReading,
@@ -150,7 +158,7 @@ export function betterReading(
     proves(first) === proves(second) ? null : proves(second) ? 'second' : 'first'
   return (
     by((one) => one.receipt === null) ??
-    by((one) => one.shown.lines.length > 0) ??
+    by((one) => shownAsRead(one) > 0) ??
     by((one) => one.shown.totalHundredths !== null) ??
     (shownAsRead(second) > shownAsRead(first) ? 'second' : 'first')
   )
@@ -166,6 +174,7 @@ const WITNESSED = [
   'sumHundredths',
   'discountHundredths',
 ] as const
+type Witnessed = (typeof WITNESSED)[number]
 
 /**
  * The check's reasons a witness answers: a line whose figures hold, emptied only for want of a second source (MOL-255
@@ -189,25 +198,40 @@ const WITNESS_ANSWERS: ReadonlySet<ReceiptLineReason> = new Set([
 function witnessed(
   checked: readonly (CheckedLine & { readonly read: ReceiptTextLine })[],
   witness: readonly ReceiptTextLine[],
+  /** The line as the check shows it on a receipt proven whole: a figure even proof would not show is never vouched. */
+  asProven: (line: ReceiptTextLine) => ReceiptTextLine,
 ): ReceiptTextLine[] {
+  const shown: ReceiptTextLine[] = []
+  // in order: a witness line is never one before the last taken
   let next = 0
-  return checked.map(({ read: line, line: kept, reason }) => {
+  for (const { read: line, line: kept, reason } of checked) {
     const answered =
       reason !== null && WITNESS_ANSWERS.has(reason) && WITNESSED.every((key) => kept[key] === null)
-    if (!answered) return kept
-    const at = witness.findIndex((other, k) => k >= next && agrees(line, other))
-    if (at < 0) return kept
+    const at = answered ? witness.findIndex((other, k) => k >= next && agrees(line, other)) : -1
+    if (at < 0) {
+      shown.push(kept)
+      continue
+    }
     next = at + 1
-    const back = Object.fromEntries(
-      WITNESSED.map((key) => {
-        const figure = line[key]
-        return [key, figure !== null && !String(figure).includes('6') ? figure : null]
-      }),
-    ) as Pick<ReceiptTextLine, (typeof WITNESSED)[number]>
-    return WITNESSED.every((key) => back[key] === null)
-      ? kept
-      : { ...kept, ...back, repaired: true }
-  })
+    const proven = asProven(line)
+    // a gift's price and discount are one number twice, never shown even on a receipt proven whole (adversarial Б2)
+    const back = (key: Witnessed): number | null => {
+      const figure = line[key]
+      return figure !== null && proven[key] === figure && !String(figure).includes('6')
+        ? figure
+        : null
+    }
+    const again: Record<Witnessed, number | null> = {
+      quantityMilli: back('quantityMilli'),
+      priceHundredths: back('priceHundredths'),
+      sumHundredths: back('sumHundredths'),
+      discountHundredths: back('discountHundredths'),
+    }
+    shown.push(
+      WITNESSED.every((key) => again[key] === null) ? kept : { ...kept, ...again, repaired: true },
+    )
+  }
+  return shown
 }
 
 /** The very same figures, none missing on one side alone — and the same article, where both print one. */

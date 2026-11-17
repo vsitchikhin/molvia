@@ -498,6 +498,20 @@ describe('the second reading as a witness (MOL-405, owner’s В-4 «а», В-5 
     }
   })
 
+  // adversarial Б2: a gift's price and discount are one number twice, never shown even on a receipt proven whole
+  it('shows again of a gift by the card its quantity and sum alone, as proof would', () => {
+    const gift = line({
+      quantityMilli: 1_000,
+      priceHundredths: 54_000,
+      sumHundredths: 0,
+      discountHundredths: 54_000,
+    })
+    const got = witnessed([gift], [gift])
+    expect(got.lines).toEqual(['one_alike_unproven'])
+    expect(figures(got.shown.lines[0]!)).toEqual([1_000, null, 0, null, false])
+    expect(got.shown.lines[0]!.repaired).toBe(true)
+  })
+
   // adversarial А3а, А3б
   it('is no witness of another article, nor of a line read in part', () => {
     const bread = alike(33_000)
@@ -555,10 +569,17 @@ describe('which of two readings goes to the review (MOL-405, owner’s В-1 «а
     expect(betterReading(whole, read([line(), line()], null))).toBe('first')
   })
 
-  // adversarial А1: a section of one sum would take both lines the first read and showed
-  it('takes the one that found lines over one that found none, whatever its total', () => {
+  // adversarial А1, Б1: a section of one sum, or lines found with no figure read, would take both lines the first
+  // read and showed
+  it('takes the one that shows a line as read over one that shows none, whatever its total', () => {
     expect(betterReading(read([line(), line()], null), read([], 148_000))).toBe('first')
-    expect(betterReading(read([], 148_000), read([unsettled], null))).toBe('second')
+    expect(betterReading(read([], 148_000), read([line()], null))).toBe('second')
+    const unread = line({ priceHundredths: null, sumHundredths: null, asPrinted: false })
+    expect(betterReading(read([line(), line()], null), read([unread, unread], 148_000))).toBe(
+      'first',
+    )
+    // neither shows a line as read: the total decides, as R3
+    expect(betterReading(read([unsettled], null), read([], 148_000))).toBe('second')
   })
 
   it('takes the one with a total over one with more lines (am-34, am-07b)', () => {
