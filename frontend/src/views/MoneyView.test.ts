@@ -325,7 +325,7 @@ describe('MoneyView: the four states', () => {
     moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('12000') })
     const view = await render()
     expect(view.text()).not.toContain(en.spending.empty.title)
-    expect(view.text()).toContain('No spendings in September yet')
+    expect(view.text()).toContain('No expenses in September yet')
   })
 })
 
@@ -447,7 +447,7 @@ describe('MoneyView: the month', () => {
         note: 'Taxi',
       })
       await flushPromises()
-      expect(view.text()).toContain('Not counted yet: 1 spending is being sent')
+      expect(view.text()).toContain('Not counted yet: 1 expense is being sent')
       expect(view.find('.change').exists()).toBe(false)
     })
 
@@ -575,7 +575,7 @@ describe('MoneyView: «Остаток» and «Пришло» (MOL-134)', () => {
     moneyMonth.mockResolvedValue(month({ shiftedIn: ['2026-08-31'], shiftedOut: ['2026-09-26'] }))
     const text = plain((await render()).get('.tiles .tile').text())
     expect(text).toContain('with the salary of Aug 31')
-    expect(text).toContain('the salary of Sep 26 counts next month')
+    expect(text).toContain('the salary of Sep 26 counts towards next month')
   })
 })
 
@@ -715,7 +715,7 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
       {
         href: '/money/spendings',
         text: `${en.spending.list.title}43`,
-        label: 'Spendings, 43',
+        label: 'Expenses, 43',
       },
       {
         href: '/money/budget',
@@ -789,7 +789,7 @@ describe('MoneyView: the ways out, one figure each (MOL-81, MOL-159)', () => {
     })
     moneyMonth.mockResolvedValue(month({ rate: rate('fallback') }))
     const fallback = await render()
-    expect(fallback.text()).toContain('not a rate of the National Bank of Georgia')
+    expect(fallback.text()).toContain('not a rate from the National Bank of Georgia')
     expect(fallback.text()).not.toContain('At the National Bank of Georgia rate')
 
     moneyMonth.mockResolvedValue(month({ rate: rate('official') }))
@@ -977,7 +977,7 @@ describe('MoneyView: the summary of the month (MOL-159)', () => {
     moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
     recordSpending.mockReturnValue(new Promise(() => undefined))
     const view = await render()
-    expect(view.get('.donut').text()).toContain('No spendings in September yet')
+    expect(view.get('.donut').text()).toContain('No expenses in September yet')
     useSpendingQueueStore().record({
       id: 'eeeeeeee-0000-4000-8000-000000000009',
       spentOn: '2026-09-27',
@@ -986,9 +986,9 @@ describe('MoneyView: the summary of the month (MOL-159)', () => {
       note: 'Taxi',
     })
     await flushPromises()
-    expect(view.get('.donut').text()).not.toContain('No spendings in September yet')
-    expect(view.get('.donut').text()).toContain('The first spending of September is on its way')
-    expect(view.text()).toContain('Not counted yet: 1 spending is being sent')
+    expect(view.get('.donut').text()).not.toContain('No expenses in September yet')
+    expect(view.get('.donut').text()).toContain('The first expense of September is on its way')
+    expect(view.text()).toContain('Not counted yet: 1 expense is being sent')
   })
 })
 
@@ -1031,7 +1031,7 @@ describe('MoneyView: what the review of MOL-159 found', () => {
       else moneyMonth.mockReturnValue(new Promise(() => undefined))
       const view = await render()
       await refused(day)
-      expect(view.text()).toContain('1 spending not accepted')
+      expect(view.text()).toContain('1 expense not accepted')
       expect(view.text()).not.toContain(en.spending.rejected_other.title)
       expect(view.findAll('button').some((one) => one.text() === en.spending.sheet.dismiss)).toBe(
         false,
@@ -1072,7 +1072,7 @@ describe('MoneyView: what the review of MOL-159 found', () => {
       expect(queue.rejected).toHaveLength(1)
     })
     await flushPromises()
-    expect(view.text()).toContain('1 spending not accepted')
+    expect(view.text()).toContain('1 expense not accepted')
     expect(view.text()).not.toContain(en.spending.rejected_other.title)
   })
 

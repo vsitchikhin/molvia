@@ -1119,7 +1119,7 @@ test('a month with nothing spent keeps «Куда ушли» as tall as with a s
   expect(Math.round(spent?.height ?? 0)).toBe(Math.round(empty?.height ?? 0))
 })
 
-test('«зарплата — в следующий месяц»: the salary counts next month, and «Пришло» says so (MOL-134)', async ({
+test('«зарплата — в следующий месяц»: the salary counts towards next month, and «Пришло» says so (MOL-134)', async ({
   page,
 }) => {
   await signedIn(page)

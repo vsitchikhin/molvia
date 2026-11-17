@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ISSUE } from '#model/support/errors'
+import { LOCALES } from '#model/support/locale'
 import { telegramUserIdSchema } from '#model/entities/actor'
 import { itemSchema } from '#model/entities/item'
 import { placeSchema } from '#model/entities/place'
@@ -25,11 +26,13 @@ export type ReminderItem = z.infer<typeof reminderItemSchema>
 /**
  * A reminder the API has handed to the bot to send, and marked as sent (Р-2). The chat is the
  * person's Telegram id — a private chat with the bot has the user's id — and nothing else of theirs
- * travels: no actor id, no language, no step.
+ * travels but the language their app last spoke (MOL-398, В-1 «в»), absent where it named none: no
+ * actor id, no step. Optional, so a bot of the new version reads the API of the old one.
  */
 export const reminderSchema = z
   .strictObject({
     telegramUserId: telegramUserIdSchema,
+    language: z.enum(LOCALES).optional(),
     items: z.array(reminderItemSchema).min(1).max(REMINDER_ITEMS),
     /** How many items wait in «Оценки» from the days asked about, the ones shown included. */
     total: z.int().positive(),

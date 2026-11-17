@@ -77,6 +77,7 @@ import { useI18n } from 'vue-i18n'
 import IconCheck from '~icons/mdi/check'
 import {
   DEFAULT_SPENDING_ICON,
+  LOCALES,
   SPENDING_CATEGORY_COLOURS,
   SPENDING_CATEGORY_NAME_MAX,
   SPENDING_ICONS,
@@ -166,7 +167,11 @@ export default defineComponent({
 
     function taken(typed: string): boolean {
       const identity = nameIdentity(typed)
-      const presets = SPENDING_PRESETS.map((preset) => t(`spending.category.${preset}`))
+      // A preset in every language the app speaks: one's own named as a preset in the other would stand
+      // beside it as its twin after a switch of the language (MOL-398, adversarial А3).
+      const presets = SPENDING_PRESETS.flatMap((preset) =>
+        LOCALES.map((locale) => t(`spending.category.${preset}`, {}, { locale })),
+      )
       const own = props.categories.flatMap((category) =>
         category.preset === null &&
         !category.archived &&

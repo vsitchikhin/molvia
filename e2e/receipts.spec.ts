@@ -334,7 +334,7 @@ test('a line put right goes with «Записать»; recorded with no connecti
   await page.locator('.receipt-line').first().click()
   await expect(sheet(page)).toContainText('Receipt line')
   await page.waitForTimeout(400)
-  await sheet(page).getByLabel('Price for all, as on the receipt').fill('777')
+  await sheet(page).getByLabel('Total price, as on the receipt').fill('777')
   await sheet(page).getByRole('button', { name: 'Save', exact: true }).click()
   await expect(sheet(page)).toHaveCount(0)
   await expect(page.locator('.receipt-line').first()).toContainText('777')
@@ -405,7 +405,7 @@ test('a line the reader lost, typed on the review, is one purchase more of the r
     .click()
   await expect(sheet(page)).toHaveCount(1)
   await expect(sheet(page)).toContainText(name)
-  await sheet(page).getByLabel('Price for all, as on the receipt').fill('500')
+  await sheet(page).getByLabel('Total price, as on the receipt').fill('500')
   await sheet(page).getByRole('button', { name: 'Done' }).click()
   await expect(sheet(page)).toHaveCount(0)
 

@@ -1,6 +1,8 @@
 import {
   DomainError,
   ERROR,
+  LOCALES,
+  LOCALE_HEADER,
   SESSION_COOKIE,
   TODAY_HEADER,
   ZONE_HEADER,
@@ -8,13 +10,16 @@ import {
   timeZoneOf,
   todayFrom,
 } from '@molvia/model'
-import type { Actor } from '@molvia/model'
+import type { Actor, AppLocale } from '@molvia/model'
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import { clearSessionCookie, readCookieValues, setSessionCookie } from '@/cookie'
 import type { Authenticated } from '@/usecases/authenticate'
 
-/** Turning a session token into the owner behind it — the use case, already bound. */
-export type SessionLookup = (token: string) => Promise<Authenticated>
+/**
+ * Turning a session token into the owner behind it — the use case, already bound — with the language
+ * the phone named, if it named one of ours (MOL-398).
+ */
+export type SessionLookup = (token: string, locale: AppLocale | undefined) => Promise<Authenticated>
 
 declare module 'fastify' {
   interface FastifyRequest {
@@ -87,7 +92,12 @@ export function withActor(app: FastifyInstance, lookup: SessionLookup): void {
 
     let authenticated: Authenticated
     try {
-      authenticated = await lookup(token)
+      // One of our languages or none: a header sent twice, or anything else, is no language (MOL-398).
+      const named = request.headers[LOCALE_HEADER.toLowerCase()]
+      authenticated = await lookup(
+        token,
+        LOCALES.find((one) => one === named),
+      )
     } catch (error) {
       // The cookie that was refused is put out with the refusal (Р-4): a dead secret stops
       // riding on every request and stops sitting on the disk. Three conditions, and each one
