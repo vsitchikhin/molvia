@@ -77,7 +77,10 @@ export async function spelledBrands(
     report({ kind: 'brands_passed', reason: 'size' })
     return taken
   }
-  const worst = modelCallMicroUsd({ input_tokens: input, output_tokens: BRANDS_OUTPUT_MAX })
+  const worst = modelCallMicroUsd(
+    { input_tokens: input, output_tokens: BRANDS_OUTPUT_MAX },
+    reader.model,
+  )
   const month = spendMonthOf(now())
   const call = { actorId, capMicroUsd, shareMicroUsd }
   const reserved = await spend.reserve(month, worst, call, now())
