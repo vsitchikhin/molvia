@@ -131,7 +131,7 @@ async function signIn(page: Page, browserName: string): Promise<void> {
 
 /** The screens with a `<select>` — WebKit's own report of one is the one `csp.ts` lets go. */
 const WITH_A_SELECT = [
-  ['/money/spendings', 'Spendings'],
+  ['/money/spendings', 'Expenses'],
   ['/money/budget', 'Budget'],
   ['/money/exchange', 'Money exchange'],
   ['/money/incomes', 'Income'],
@@ -176,7 +176,7 @@ test.describe('signed in', () => {
     await page.getByRole('button', { name: 'Write to the developer' }).click()
     await risen(page)
     const sheet = page.getByRole('dialog')
-    await sheet.getByText('Broken', { exact: true }).click()
+    await sheet.getByText('Bug', { exact: true }).click()
     await sheet
       .locator('input[type="file"]')
       .setInputFiles({ name: 'screen.jpg', mimeType: 'image/jpeg', buffer: await aPhoto(page) })

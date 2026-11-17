@@ -1,5 +1,5 @@
 {
-  "id": "2a2933e8-ef15-4dc6-8704-ae2b4361faff",
+  "id": "180d2610-8f75-47b8-8532-b2361a95ffe1",
   "prevId": "dbd5f9d7-db7e-424a-b3f5-5bfa5b94d0b3",
   "version": "7",
   "dialect": "postgresql",
@@ -463,6 +463,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "locale": {
+          "name": "locale",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp with time zone",
@@ -537,6 +543,10 @@
         "actors_reminders_off_known": {
           "name": "actors_reminders_off_known",
           "value": "\"actors\".\"reminders_off\" in ('chosen', 'blocked')"
+        },
+        "actors_locale_known": {
+          "name": "actors_locale_known",
+          "value": "\"actors\".\"locale\" in ('ru', 'en')"
         },
         "actors_receipts_sent_not_negative": {
           "name": "actors_receipts_sent_not_negative",
@@ -6019,7 +6029,7 @@
         },
         "receipts_country_known": {
           "name": "receipts_country_known",
-          "value": "\"receipts\".\"country\" in ('AM', 'GE', 'RS')"
+          "value": "\"receipts\".\"country\" in ('AM', 'RS')"
         },
         "receipts_language_known": {
           "name": "receipts_language_known",

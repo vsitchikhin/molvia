@@ -146,7 +146,9 @@ export const ru = {
   'remind.in.Белград': 'в Белграде',
   'remind.in.Нови-Сад': 'в Нови-Саде',
   /** Under the last message of the day, when more items wait than the three asked about. */
-  'remind.more': 'Ещё {n} ждут в «Оценках»: {url}',
+  'remind.more.one': 'Ещё {n} ждёт в «Оценках»: {url}',
+  'remind.more.few': 'Ещё {n} ждут в «Оценках»: {url}',
+  'remind.more.many': 'Ещё {n} ждут в «Оценках»: {url}',
   /** Written under the question after a press; the scale stays, so a slip is one more press. */
   'rate.done': 'Записали: {score} из 5. Промахнулись — нажмите другую цифру.',
   'rate.failed': 'Не дождался ответа. Нажмите ещё раз через минуту.',

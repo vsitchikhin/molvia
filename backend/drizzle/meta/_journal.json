@@ -614,8 +614,15 @@
     {
       "idx": 87,
       "version": "7",
-      "when": 1794852133808,
-      "tag": "0087_receipts_georgia",
+      "when": 1794851407890,
+      "tag": "0087_actor_locale",
+      "breakpoints": true
+    },
+    {
+      "idx": 88,
+      "version": "7",
+      "when": 1794900643803,
+      "tag": "0088_receipts_georgia",
       "breakpoints": true
     }
   ]

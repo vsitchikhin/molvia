@@ -159,6 +159,23 @@ describe('ступень 1 — вечером следующего дня', () =
     })
   })
 
+  it('несёт язык, которым говорило приложение человека; не названный — не несёт (MOL-398)', async () => {
+    const anna = await person({ locale: 'en' })
+    const boris = await person()
+    const milk = await item('Молоко Ашхар 1 л')
+    await bought(anna, milk, yerevan('2026-07-13', '10:00'))
+    await bought(boris, milk, yerevan('2026-07-13', '10:00'))
+
+    const due = await evening('2026-07-14')
+    const languages = Object.fromEntries(
+      due.reminders.map((reminder) => [reminder.telegramUserId, reminder.language]),
+    )
+    expect(languages).toEqual({ [anna.tg]: 'en', [boris.tg]: undefined })
+    expect(
+      due.reminders.find((reminder) => reminder.telegramUserId === boris.tg),
+    ).not.toHaveProperty('language')
+  })
+
   it('в 21:59 ещё присылает, с 22:00 — день пропал', async () => {
     const anna = await person()
     const boris = await person()

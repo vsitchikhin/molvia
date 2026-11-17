@@ -109,7 +109,7 @@ async function addItem(page: Page, word: string, price: string): Promise<void> {
   await expect(sheet(page)).toContainText(word)
   await page.waitForTimeout(400)
   await sheet(page).getByLabel('How much').fill('1')
-  await sheet(page).getByLabel('Price as on the tag').fill(price)
+  await sheet(page).getByLabel('Price on the tag').fill(price)
   await sheet(page).getByRole('button', { name: 'Record' }).click()
   // The path, not the whole address: what the query string carries is not this test's business.
   expect(new URL(page.url()).pathname).toBe('/purchases/manual')
@@ -146,7 +146,7 @@ test.describe('the trip', () => {
 
     await row(page).first().click()
     await page.waitForTimeout(400)
-    await sheet(page).getByLabel('Price as on the tag').fill('580')
+    await sheet(page).getByLabel('Price on the tag').fill('580')
     await sheet(page).getByRole('button', { name: 'Save' }).click()
     await expect(sheet(page)).toBeHidden()
     await expect(row(page).first()).toContainText('֏580')
@@ -225,7 +225,7 @@ test.describe('the trip', () => {
     // The sheet takes no tap while it rises, nor in the double-tap floor after it (MOL-69).
     await page.waitForTimeout(400)
     await sheet(page).getByLabel('How much').fill('0.9')
-    await sheet(page).getByLabel('Price as on the tag').fill('580')
+    await sheet(page).getByLabel('Price on the tag').fill('580')
     await sheet(page).getByRole('button', { name: 'Record' }).click()
     await expect(sheet(page)).toBeHidden()
     release()
@@ -675,7 +675,7 @@ test('a record finished in «Pets» lands there, and «Spendings» move it to ca
 
   // «Траты» of the month: the trip's summary changes it at once, through the trip's queue
   await page.getByRole('link', { name: 'Money', exact: true }).click()
-  await page.getByRole('link', { name: /^Spendings/ }).click()
+  await page.getByRole('link', { name: /^Expenses/ }).click()
   await page.getByRole('button', { name: /Purchases at “Зоомагазин”/ }).click()
   await page.waitForTimeout(400)
   await expect(sheet(page).getByRole('button', { name: /^Category/ })).toContainText('Pets')
@@ -722,7 +722,7 @@ test.describe('the receipt total (MOL-78)', () => {
     // «Деньги» file the record by its receipt, every purchase behind it (Р-4) — a row of «Траты»
     // since MOL-159.
     await page.getByRole('link', { name: 'Money', exact: true }).click()
-    await page.getByRole('link', { name: /^Spendings/ }).click()
+    await page.getByRole('link', { name: /^Expenses/ }).click()
     // The row of the journal by its role and name — one element, so the strict mode holds (review 6).
     const line = page.getByRole('button', { name: /Purchases at “Ереван Сити”/ })
     await expect(line).toContainText('1,400', { timeout: 15_000 })
@@ -783,10 +783,10 @@ test.describe('the receipt total (MOL-78)', () => {
     await page.getByRole('button', { name: 'Finish', exact: true }).click()
     await expect(sheet(page)).toContainText('Nothing in this entry')
     await page.waitForTimeout(400)
-    await sheet(page).getByRole('button', { name: 'Record as a spending in “Money”' }).click()
+    await sheet(page).getByRole('button', { name: 'Record as an expense in “Money”' }).click()
 
     await expect(page).toHaveURL(/\/money/)
-    await expect(sheet(page)).toContainText('New spending')
+    await expect(sheet(page)).toContainText('New expense')
     // The shop is behind «Date, note, place», and its line says it (MOL-199).
     await expect(
       sheet(page).getByRole('button', { name: /^Date, note, place: .+ · Рынок$/ }),

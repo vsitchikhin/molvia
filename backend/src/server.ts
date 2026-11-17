@@ -1210,7 +1210,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     void instance.register((guarded, _guardedOptions, guardedDone) => {
       // Before the session is looked up: a foreign page or a link moves nothing (MOL-368).
       guarded.addHook('onRequest', refuseOutsideTheApp)
-      withActor(guarded, (token) => authenticate(sessions, actors, token))
+      withActor(guarded, (token, locale) => authenticate(sessions, actors, token, locale))
       // the model reads for the person now: no key, no model; one more call of the largest request fits their share
       // and the month's cap, as the queue reserves it (MOL-408, adversarial А3, Р2-А1)
       actorMeRoute(guarded, (id) =>

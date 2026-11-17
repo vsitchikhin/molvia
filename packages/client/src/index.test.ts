@@ -8,6 +8,7 @@ import {
   TODAY_HEADER,
   VERSION_HEADER,
   ZONE_HEADER,
+  LOCALE_HEADER,
 } from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
@@ -317,11 +318,29 @@ describe('the phone’s today on every request (MOL-121)', () => {
     expect(sent[0]?.get(ZONE_HEADER)).toBe('Europe/Moscow')
   })
 
+  it('names the language of the phone’s screens, asked at each request (MOL-398)', async () => {
+    const sent: Headers[] = []
+    let language = 'ru'
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: (_url, init) => {
+        sent.push(new Headers(init?.headers))
+        return Promise.resolve(new Response(null, { status: 204 }))
+      },
+      locale: () => language,
+    })
+    await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
+    language = 'en'
+    await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
+    expect(sent.map((headers) => headers.get(LOCALE_HEADER))).toEqual(['ru', 'en'])
+  })
+
   it('names none where no day was given — the bot', async () => {
     const { client, sent } = clientWith()
     await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
     expect(sent[0]?.headers.has(TODAY_HEADER)).toBe(false)
     expect(sent[0]?.headers.has(ZONE_HEADER)).toBe(false)
+    expect(sent[0]?.headers.has(LOCALE_HEADER)).toBe(false)
   })
 
   it('a finish carries the day of its tap beside the moment', async () => {

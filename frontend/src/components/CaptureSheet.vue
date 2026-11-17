@@ -164,7 +164,7 @@ import IconImage from '~icons/mdi/image-outline'
 import IconImageOff from '~icons/mdi/image-off-outline'
 import IconLayers from '~icons/mdi/layers-outline'
 import IconReceipt from '~icons/mdi/receipt-text-outline'
-import { LOCALES, RECEIPT_PARTS_MAX } from '@molvia/model'
+import { RECEIPT_PARTS_MAX, pickLocale } from '@molvia/model'
 import type { PhotoReceiptCountry } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
@@ -337,7 +337,8 @@ export default defineComponent({
       if (sending.value || preparing.value || parts.value.length === 0) return
       sending.value = true
       try {
-        const language = LOCALES.find((one) => one === locale.value) ?? 'ru'
+        // The language, not the tag the screen formats by: `en-GB` is English (MOL-398).
+        const language = pickLocale(locale.value)
         const kept = await queue.capture(
           {
             id: newId(),

@@ -133,6 +133,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       receiptsModelUntil: at(6),
       silenceWarning: 30,
       silenceWarnedAt: at(7),
+      locale: 'en',
       receiptsDay: '2026-09-20',
       receiptsSent: 3,
       itemsDay: '2026-09-21',

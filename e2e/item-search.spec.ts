@@ -256,7 +256,7 @@ test.describe('nothing found', () => {
     await field(page).fill(word)
     // The heading of the state, not the live region, which says the same words (MOL-64).
     await expect(
-      page.getByRole('heading', { name: `Nothing found for «${word}»`, exact: true }),
+      page.getByRole('heading', { name: `Nothing found for “${word}”`, exact: true }),
     ).toBeVisible()
 
     const statuses: number[] = []
@@ -270,7 +270,7 @@ test.describe('nothing found', () => {
       await page.getByRole('button', { name: 'Suggest an item' }).click()
       const sheet = page.getByRole('dialog', { name: 'New item' })
       await expect(sheet).toBeVisible()
-      await expect(sheet.getByLabel('As the price tag says')).toHaveValue(word)
+      await expect(sheet.getByLabel('As on the price tag')).toHaveValue(word)
 
       // Not now says why, and stays in the focus order (MOL-213, Ф-6).
       const waiting = sheet.getByRole('button', { name: 'Choose a unit' })
@@ -327,7 +327,7 @@ test.describe('nothing close found (MOL-46)', () => {
     await field(page).fill(typo)
 
     // The card's own words, not the live region, which says the same (MOL-64).
-    await expect(page.locator('.far-title')).toHaveText(`Nothing found for «${typo}»`)
+    await expect(page.locator('.far-title')).toHaveText(`Nothing found for “${typo}”`)
     await expect(options(page).first()).toContainText(name)
     // The list is named by its heading; the live region says «…with a similar spelling» too, and
     // `getByText` would hold only while `exact` happened to tell them apart (MOL-64).

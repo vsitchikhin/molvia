@@ -578,7 +578,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The rating reminder: the API decides and marks the step as it hands it out, the bot only
   sends** (MOL-101) — at most once; 19:00 of the person's day, then 3 and 7 days, then six months
   of silence, and any own verdict starts over; a press is the verdict of `ctx.from.id` and keeps
-  the scale.
+  the scale. **It speaks the language the app last spoke** (`actors.locale`, MOL-398), Russian where
+  none is known; a press answers in the language read off the message, the buttons as before — a
+  rollback's bot reads them all; the other notices stay in both.
 - **The reminders' switch is `actors.reminders_off`, and it says why** (MOL-103): `chosen` or
   `blocked`; a block never overwrites «chosen», an unblock turns on only what blocking turned off,
   **the settings never lift a block** (В-5), and «on» starts the ladder over unless it reminded
@@ -654,6 +656,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The scheme is the device's** (MOL-111): `molvia.scheme`, set before the first paint by the script
   in `index.html` — the one reader of storage outside `storage.ts`; the person's choice wins both ways
   by selectors, and the status bar follows by `media`, the manifest never.
+- **The language is the device's too** (MOL-398): `molvia.locale` and, for English, the order of its day
+  (`molvia.date-style`) make one tag — `ru`, `en-GB`, `en-US` — that is vue-i18n's locale and every
+  `Intl`'s; what crosses the wire is the language, `pickLocale` of it, never the tag; every request
+  names it (`LOCALE_HEADER`) for the bot's reminder; the login screen offers the other one.
 - **The floor of the browsers is `build.target`, written out in `vite.config.ts`** (MOL-231): the
   script after `#app` in `index.html` checks markers of exactly that floor (`browserFloor.test.ts`),
   and below it draws the locales' line, and the app neither starts nor reports. An API above the floor

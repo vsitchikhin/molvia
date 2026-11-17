@@ -1238,7 +1238,7 @@ describe('AdviceView', () => {
       await typed(view, 'кускус')
 
       await vi.waitFor(() => {
-        expect(view.text()).toContain('No «кускус» found')
+        expect(view.text()).toContain('Nothing found for “кускус”')
       })
       expect(view.get('.state').classes()).toContain('quiet')
       expect(view.getComponent({ name: 'ScreenState' }).props('icon')).toBe(IconMagnify)
@@ -1252,7 +1252,7 @@ describe('AdviceView', () => {
       await typed(view, 'пельмени')
 
       await vi.waitFor(() => {
-        expect(view.get('.miss').text()).toBe('No «пельмени» found')
+        expect(view.get('.miss').text()).toBe('Nothing found for “пельмени”')
       })
       expect(view.text()).toContain(plait.name)
     })
