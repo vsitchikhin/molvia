@@ -543,26 +543,33 @@ receipt proven whole, and its lines of one piece went empty.
   receipt of an outage was lost for good. A waiting receipt of a country no Tesseract reads (`modelAlone`) rests
   (`ReceiptRepository.rest`), so an Armenian receipt behind it reaches Tesseract past its own ten minutes; one of
   Armenia is released and stops the round as before. **And it is asked less and less often** (adversarial Р2-А1, owner's
-  В-9 «а»): no sooner than `next_attempt_at` — the column the queue of links asks again by — as long again as the
-  person's oldest waiting receipt of the country has waited, 1, 2, 4… minutes, an hour at most
-  (`RECEIPT_MODEL_ALONE_RETRY_MIN_MS`, `…_MAX_MS`). A time out is paid in doubt, its worst kept in the person's share
-  (MOL-367), and asked every minute a day one receipt took the month's share in under four hours; now some thirty tries
-  a day, ≈ $0,27 at worst. **The rest is the person's, never a receipt's** (adversarial Р3-А1): `claimNext` takes none of
-  a person's receipts of a country while one of them rests, so the twenty the quota lets wait (`RECEIPTS_UNRECORDED_MAX`)
-  pay one try a time, not twenty — per receipt they took the share in six hours. Which country rests is the use case's
-  to know (`modelAlone`), the repository's only whose receipts rest with the one tried. **A rest over goes to the
-  person's receipt tried longest ago, one never tried first** (`next_attempt_at nulls first`, adversarial Р4-А1): to the
-  oldest, a receipt the model fails on by itself — an answer longer than its time out — took every try of the day and
-  held the receipts behind it a day while the model read everybody else's. **A receipt never tried passes the rest**
-  (owner's В-10 «а», adversarial Р5-А1), a try of the person's in the country a minute at most: the rest cannot tell the
-  model away from the model failing on one receipt alone, and with a receipt that did so resting its hour, every new
-  receipt of the person waited up to it while a neighbour's was read at once. **The prices, named:** in an outage each
-  receipt pays one try of its own, a minute apart — a batch of twenty some $0,18 more of the share over a day, one
-  receipt nothing; at one count of the last hour, the order puts any receipt with no rest behind it — never tried, or
-  of a country that never rests — before one back from a rest, of anyone, however older (review №23); a receipt of an
-  outage arrives within an hour of the model's return, hours later — the person's others with it, in that round;
-  past the day, `unreadable`; each person granted pays their own tries, so an outage costs some thirty worst prices a
-  person with a Georgian receipt waiting, not one for everybody.
+  В-9 «а»): no sooner than `next_attempt_at` — the column the queue of links asks again by — as long again as it has
+  waited, 1, 2, 4… minutes, an hour at most (`RECEIPT_MODEL_ALONE_RETRY_MIN_MS`, `…_MAX_MS`). A time out is paid in
+  doubt, its worst kept in the person's share (MOL-367), and asked every minute a day one receipt took the month's share
+  in under four hours; now some thirty tries a day, ≈ $0,27 at worst. Which country rests is the use case's to know
+  (`modelAlone`), the repository's only which receipts rest. The rest was refined over four rounds of the adversarial
+  review, each closing a delay the one before left:
+  - **Through an outage the person's receipts of the country rest together** (Р3-А1): `claimNext` takes none of them
+    while one rests, so the twenty the quota lets wait (`RECEIPTS_UNRECORDED_MAX`) pay one try a time, not twenty — per
+    receipt they took the share in six hours.
+  - **Only through an outage** (owner's В-11 «а», Р6-А1): the model has read no receipt since that try
+    (`reader_version` of `RECEIPT_MODEL`, by `read_at`). Once it has, the failure was the receipt's own — an answer
+    longer than the time out — and the receipt rests alone, by its own age: by the oldest's, a new receipt failing
+    once rested an hour behind a slow one, read two hours later.
+  - **A rest over goes to the person's receipt that rested longest ago, one that never rested first**
+    (`next_attempt_at nulls first`, Р4-А1): to the oldest, a receipt the model fails on by itself took every try of the
+    day.
+  - **A receipt that never rested passes the person's rest**, a try of theirs in the country a minute at most (owner's
+    В-10 «а», Р5-А1): the rest cannot tell an outage from the model failing on one receipt before it answers anything.
+
+  **The prices, named:** in an outage each receipt pays one try of its own, a minute apart — a batch of twenty some
+  $0,18 more of the share over a day, one receipt nothing; whether the model answered is read off every receipt's
+  `read_at` once a claim, with no index of its own (cheap at today's numbers); at one count of the last hour, the order
+  puts any receipt with no rest behind it — never rested, or of a country that never rests — before one back from a
+  rest, of anyone, however older (review №23); a receipt of an outage arrives within an hour of the model's return,
+  hours later; past the day, `unreadable`; each person granted pays their own tries, so an outage costs some thirty
+  worst prices a person with a Georgian receipt waiting, not one for everybody.
+
 - **The camera in Georgia is for whom the model reads now** (В-2 «а», adversarial А3): `/actors/me` says
   `receiptsByModel` — the grant to come and edition 5 (`READS_BY_MODEL`, one condition with the queue's), one more call
   of the largest request fitting the person's share of the month and the month's cap (`readsReceiptsByModel`, the use
