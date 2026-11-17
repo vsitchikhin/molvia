@@ -24,6 +24,8 @@ import MoneyCategoriesView from '@/views/MoneyCategoriesView.vue'
 import MoneyChartsView from '@/views/MoneyChartsView.vue'
 import { sameScreen, watchBrowserAnimatedBack } from '@/transitions'
 import { atNextFf, ffOn } from '@/stores/ff'
+import { settleColdStart } from '@/navigation'
+import { sheetOpen } from '@/composables/useSheetHistory'
 
 /**
  * The five sections of the tab bar. «advice» is home (MOL-128): at the shelf a person reads, at
@@ -319,7 +321,10 @@ export const scrollBehavior: RouterScrollBehavior = (to, from, saved) => {
  *
  * What the phone last heard may be older than the API: a link opened cold is judged before any answer
  * (adversarial А2). So the next answer decides: naming the фф on, it takes the person where the link was
- * going — if they are still where this move landed, behind the door too, which stands over the route.
+ * going — if they are still where this move landed, behind the door too, which stands over the route, and
+ * no sheet is open there: the answer may come minutes later, and a sheet holds what was typed in memory
+ * only (adversarial Б1). The screen takes home's entry, and its chain is laid under it as under a screen
+ * opened cold, so «back» never leaves the app (Б2).
  */
 export function closedByFf(router: Router): NavigationGuard {
   return (to) => {
@@ -327,9 +332,9 @@ export function closedByFf(router: Router): NavigationGuard {
     if (ff === undefined || ffOn(ff)) return true
     const wanted = to.fullPath
     atNextFf(() => {
-      if (ffOn(ff) && router.currentRoute.value.redirectedFrom?.fullPath === wanted) {
-        void router.replace(wanted)
-      }
+      if (!ffOn(ff) || sheetOpen(router)) return
+      if (router.currentRoute.value.redirectedFrom?.fullPath !== wanted) return
+      void router.replace(wanted).then(() => settleColdStart(router))
     })
     return '/'
   }

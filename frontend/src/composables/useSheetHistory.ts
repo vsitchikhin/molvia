@@ -315,6 +315,11 @@ export function useSheetHistory(onLeft: () => void): {
  *
  * Installed once, at start — where a reload lands — and then on every pop.
  */
+/** Whether a sheet stands open over the screen — someone at work there, whom no answer moves (MOL-382). */
+export function sheetOpen(router: Router): boolean {
+  return stackOf(router).length > 0
+}
+
 export function installSheetEntryGuard(router: Router): () => void {
   const history = router.options.history
   const stack = stackOf(router)

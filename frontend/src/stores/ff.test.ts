@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { nextTick } from 'vue'
-import { createMemoryHistory, createRouter } from 'vue-router'
+import { defineComponent, h, nextTick } from 'vue'
+import { mount } from '@vue/test-utils'
+import { createMemoryHistory, createRouter, createWebHistory } from 'vue-router'
 import type { FfName } from '@molvia/model'
 
 /** The store as a new page loads it: what the device kept is read once, at import. */
@@ -12,7 +13,12 @@ async function freshPage() {
 /** The same with the app's router, whose screens take seconds to import on a busy runner. */
 async function freshRouter() {
   vi.resetModules()
-  return { ff: await import('@/stores/ff'), router: await import('@/router') }
+  return {
+    ff: await import('@/stores/ff'),
+    router: await import('@/router'),
+    navigation: await import('@/navigation'),
+    sheets: await import('@/composables/useSheetHistory'),
+  }
 }
 
 // A first import pays for the transform: 728 ms here for the store, 3.2 s once for the router with
@@ -153,24 +159,28 @@ describe('the фф the phone heard (MOL-382)', () => {
 })
 
 describe('a screen under an фф', () => {
-  async function routerAt(on: readonly FfName[]) {
+  const probe = {
+    path: '/venues-probe',
+    name: 'venues-probe',
+    component: { render: () => null },
+    meta: { titleKey: 'advice.title', parent: 'advice', ff: 'venues' },
+  } as const
+
+  /**
+   * The app's router at «Настройки», by the device's `on`. A web history where the entry underneath is
+   * read — only it writes `history.state.back`, as the app's does.
+   */
+  async function routerAt(on: readonly FfName[], web = false) {
     const page = await freshRouter()
     page.ff.hearFf(new Set(on))
+    if (web) window.history.replaceState(null, '', '/settings')
     const router = createRouter({
-      history: createMemoryHistory(),
-      routes: [
-        ...page.router.routes,
-        {
-          path: '/venues-probe',
-          name: 'venues-probe',
-          component: { render: () => null },
-          meta: { titleKey: 'advice.title', parent: 'advice', ff: 'venues' },
-        },
-      ],
+      history: web ? createWebHistory() : createMemoryHistory(),
+      routes: [...page.router.routes, probe],
     })
     router.beforeEach(page.router.closedByFf(router))
     await router.push('/settings')
-    return { router, ff: page.ff }
+    return { router, ff: page.ff, sheets: page.sheets }
   }
 
   it('is home while its фф is off, the move an unknown address makes', async () => {
@@ -201,7 +211,7 @@ describe('a screen under an фф', () => {
 
   // A link opened cold is judged by what the device kept, before any answer (adversarial А2).
   it('opens once the next answer names its фф on, the person still home', async () => {
-    const { router, ff } = await routerAt([])
+    const { router, ff } = await routerAt([], true)
     await router.push('/venues-probe?from=bot')
     expect(router.currentRoute.value.path).toBe('/')
     ff.hearFf(new Set(['venues']))
@@ -224,6 +234,58 @@ describe('a screen under an фф', () => {
     // the answer's listener runs as it is heard: a move not asked for by then is never asked for
     expect(replace).not.toHaveBeenCalled()
     expect(router.currentRoute.value.path).toBe('/')
+  }, 60_000)
+
+  // The answer may come minutes after the tap, once the connection is back; a sheet holds what was typed
+  // in memory only, and a move of the router closes it (adversarial Б1).
+  it('does not move a person with a sheet open, though still home', async () => {
+    const { router, ff, sheets } = await routerAt([])
+    await router.push('/venues-probe')
+    let closed = 0
+    const Sheet = defineComponent({
+      setup() {
+        sheets
+          .useSheetHistory(() => {
+            closed += 1
+          })
+          .lay()
+        return () => h('div')
+      },
+    })
+    const wrapper = mount(Sheet, { global: { plugins: [router] } })
+    try {
+      const replace = vi.spyOn(router, 'replace')
+      ff.hearFf(new Set(['venues']))
+      expect(replace).not.toHaveBeenCalled()
+      expect(router.currentRoute.value.path).toBe('/')
+      expect(closed).toBe(0)
+    } finally {
+      wrapper.unmount()
+    }
+  }, 60_000)
+
+  // A cold link has nothing of the app under home: the screen takes home's entry, and home is laid under
+  // it as under any screen opened cold, so the system «back» stays in the app (adversarial Б2).
+  it('opened cold by the next answer, has its parent underneath', async () => {
+    const page = await freshRouter()
+    window.history.replaceState(null, '', '/venues-probe')
+    const router = createRouter({
+      history: createWebHistory(),
+      routes: [...page.router.routes, probe],
+    })
+    router.beforeEach(page.router.closedByFf(router))
+    await router.push('/venues-probe')
+    await page.navigation.settleColdStart(router)
+    expect(router.currentRoute.value.path).toBe('/')
+
+    page.ff.hearFf(new Set(['venues']))
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.fullPath).toBe('/venues-probe')
+      expect(router.options.history.state.back).toBe('/')
+    })
+    expect(page.navigation.backTarget(router, router.currentRoute.value)).toMatchObject({
+      step: true,
+    })
   }, 60_000)
 
   it('does not take a person who has moved on since', async () => {
