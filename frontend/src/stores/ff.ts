@@ -4,13 +4,14 @@ import { ffFromHeader, ffHeaderOf } from '@molvia/model'
 import type { FfName } from '@molvia/model'
 import { readHeld, writeWhereDiffers } from '@/stores/storage'
 
+/** The device's key: no owner in its name, so no sweep of an owner takes it. */
+const KEY = 'molvia.ff'
+
 /**
  * The «фф» that are on, as the API last named them (MOL-382, В-1 «а»): every answer carries them, and
  * the phone keeps the last list on the device — the server's, not the person's, so «Выйти» and erasure
  * leave it, as they leave the scheme. Nothing heard and nothing kept — all are off.
  */
-const KEY = 'molvia.ff'
-
 const on = shallowRef<ReadonlySet<FfName>>(ffFromHeader(readHeld(KEY) ?? ''))
 
 let next: (() => void) | null = null

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
+import type { FfName } from '@molvia/model'
 
 /** The store as a new page loads it: what the device kept is read once, at import. */
 async function freshPage() {
@@ -104,6 +105,24 @@ describe('the фф the phone heard (MOL-382)', () => {
     expect(localStorage.getItem('molvia.ff')).toBe('venues')
   })
 
+  // Safari's private mode, a full quota: the shared shelf refuses and still holds its older list, which
+  // the next launch would read first (review 1).
+  it('take the older list off a shelf that refuses the new one', async () => {
+    localStorage.setItem('molvia.ff', 'venues')
+    const { ff } = await freshPage()
+    const refusing = vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+      throw new DOMException('full', 'QuotaExceededError')
+    })
+    try {
+      ff.hearFf(new Set())
+    } finally {
+      refusing.mockRestore()
+    }
+    expect(localStorage.getItem('molvia.ff')).toBeNull()
+    const next = await freshPage()
+    expect(next.ff.ffOn('venues')).toBe(false)
+  })
+
   it('write «none is on» once, however often it is heard', async () => {
     const { ff } = await freshPage()
     ff.hearFf(new Set())
@@ -134,7 +153,7 @@ describe('the фф the phone heard (MOL-382)', () => {
 })
 
 describe('a screen under an фф', () => {
-  async function routerAt(on: readonly ('venues' | 'payments')[]) {
+  async function routerAt(on: readonly FfName[]) {
     const page = await freshRouter()
     page.ff.hearFf(new Set(on))
     const router = createRouter({

@@ -50,14 +50,16 @@ export function readHeld(key: string): string | null {
 /**
  * Writes every shelf that holds another value, and none that holds this one: a value heard over and
  * over is written once, and one another window wrote over since is written again (adversarial А3 of
- * MOL-382) — never judged by the window's own memory.
+ * MOL-382) — never judged by the window's own memory. A shelf that refuses the write loses the key,
+ * which needs no room: kept, its older value is what `readHeld` finds first at the next launch, as
+ * `writeEverywhere` says (review 1 of MOL-382).
  */
 export function writeWhereDiffers(key: string, value: string): void {
   for (const shelf of shelves()) {
     try {
       if (shelf.getItem(key) !== value) shelf.setItem(key, value)
     } catch {
-      // Try the next one.
+      keepWhatIsTrue(shelf, key, undefined)
     }
   }
 }
