@@ -32,6 +32,37 @@ function shelves(): Storage[] {
 }
 
 /**
+ * The first shelf that holds `key`, an empty value too: for a key whose empty value is an answer of its
+ * own — «none of the фф is on» (MOL-382) — where `read` would pass it by for the tab's own, older one.
+ */
+export function readHeld(key: string): string | null {
+  for (const shelf of shelves()) {
+    try {
+      const value = shelf.getItem(key)
+      if (value !== null) return value
+    } catch {
+      // Try the next one.
+    }
+  }
+  return null
+}
+
+/**
+ * Writes every shelf that holds another value, and none that holds this one: a value heard over and
+ * over is written once, and one another window wrote over since is written again (adversarial А3 of
+ * MOL-382) — never judged by the window's own memory.
+ */
+export function writeWhereDiffers(key: string, value: string): void {
+  for (const shelf of shelves()) {
+    try {
+      if (shelf.getItem(key) !== value) shelf.setItem(key, value)
+    } catch {
+      // Try the next one.
+    }
+  }
+}
+
+/**
  * `ownFirst` asks this window's own shelf before the shared one. What a draft is for is the
  * window that is editing it, and two windows write one key: without this a reload of the one
  * editing the city came back holding the other one's currency, and «the answer may have been

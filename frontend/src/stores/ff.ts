@@ -2,7 +2,7 @@ import { computed, shallowRef } from 'vue'
 import type { ComputedRef } from 'vue'
 import { ffFromHeader, ffHeaderOf } from '@molvia/model'
 import type { FfName } from '@molvia/model'
-import { read, write } from '@/stores/storage'
+import { readHeld, writeWhereDiffers } from '@/stores/storage'
 
 /**
  * The «фф» that are on, as the API last named them (MOL-382, В-1 «а»): every answer carries them, and
@@ -11,14 +11,27 @@ import { read, write } from '@/stores/storage'
  */
 const KEY = 'molvia.ff'
 
-const on = shallowRef<ReadonlySet<FfName>>(ffFromHeader(read(KEY) ?? ''))
+const on = shallowRef<ReadonlySet<FfName>>(ffFromHeader(readHeld(KEY) ?? ''))
 
-/** What an answer named: kept only when it changed, so a list heard a hundred times is written once. */
+let next: (() => void) | null = null
+
+/**
+ * What an answer named. The device is written whenever a shelf holds another list — never by this
+ * window's memory alone: another window may have written an older one since (adversarial А3) — so a list
+ * heard a hundred times is written once. Empty is a list too, «none is on», read as one at the start.
+ */
 export function hearFf(heard: ReadonlySet<FfName>): void {
   const named = ffHeaderOf(heard)
-  if (named === ffHeaderOf(on.value)) return
-  on.value = heard
-  write(KEY, named)
+  if (named !== ffHeaderOf(on.value)) on.value = heard
+  writeWhereDiffers(KEY, named)
+  const told = next
+  next = null
+  told?.()
+}
+
+/** Told once, at the next answer that names the фф — whatever it names; a later call replaces it. */
+export function atNextFf(listener: () => void): void {
+  next = listener
 }
 
 /** Whether an фф is on now, for a guard that asks once. */

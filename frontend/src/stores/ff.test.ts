@@ -75,6 +75,49 @@ describe('the фф the phone heard (MOL-382)', () => {
     }
   })
 
+  // Another window wrote an older list since this one last changed its own (adversarial А3).
+  it('write the list heard over another window’s older one', async () => {
+    const a = await freshPage()
+    const b = await freshPage()
+    a.ff.hearFf(new Set(['venues']))
+    b.ff.hearFf(new Set(['venues']))
+    a.ff.hearFf(new Set())
+    b.ff.hearFf(new Set(['venues']))
+    expect(localStorage.getItem('molvia.ff')).toBe('venues')
+  })
+
+  // In a browser each tab has its own `sessionStorage`: the device's word is the shared shelf, and the
+  // tab's own may be older — another window wrote «off» there since (adversarial А3).
+  it('take the shared shelf’s empty list over the tab’s own older one', async () => {
+    localStorage.setItem('molvia.ff', '')
+    sessionStorage.setItem('molvia.ff', 'venues')
+    const { ff } = await freshPage()
+    expect(ff.ffOn('venues')).toBe(false)
+  })
+
+  it('write the shared shelf over another window’s word though this tab’s own agrees', async () => {
+    const { ff } = await freshPage()
+    ff.hearFf(new Set(['venues']))
+    // another window heard «off» and wrote the shared shelf, never this tab's own
+    localStorage.setItem('molvia.ff', '')
+    ff.hearFf(new Set(['venues']))
+    expect(localStorage.getItem('molvia.ff')).toBe('venues')
+  })
+
+  it('write «none is on» once, however often it is heard', async () => {
+    const { ff } = await freshPage()
+    ff.hearFf(new Set())
+    expect(localStorage.getItem('molvia.ff')).toBe('')
+    const setItem = vi.spyOn(Storage.prototype, 'setItem')
+    try {
+      ff.hearFf(new Set())
+      ff.hearFf(new Set())
+      expect(setItem).not.toHaveBeenCalled()
+    } finally {
+      setItem.mockRestore()
+    }
+  })
+
   it('read past a name a later build kept', async () => {
     localStorage.setItem('molvia.ff', 'tips,payments')
     const { ff } = await freshPage()
@@ -106,15 +149,15 @@ describe('a screen under an фф', () => {
         },
       ],
     })
-    router.beforeEach(page.router.closedByFf)
+    router.beforeEach(page.router.closedByFf(router))
     await router.push('/settings')
-    return router
+    return { router, ff: page.ff }
   }
 
   it('is home while its фф is off, the move an unknown address makes', async () => {
-    const off = await routerAt([])
+    const { router: off } = await routerAt([])
     await off.push('/venues-probe')
-    const unknown = await routerAt([])
+    const { router: unknown } = await routerAt([])
     await unknown.push('/nowhere')
     expect(off.currentRoute.value.path).toBe('/')
     expect(off.currentRoute.value.fullPath).toBe(unknown.currentRoute.value.fullPath)
@@ -126,14 +169,51 @@ describe('a screen under an фф', () => {
   }, 60_000)
 
   it('opens while its фф is on', async () => {
-    const router = await routerAt(['venues'])
+    const { router } = await routerAt(['venues'])
     await router.push('/venues-probe')
     expect(router.currentRoute.value.name).toBe('venues-probe')
   }, 60_000)
 
   it('leaves every screen without an фф alone', async () => {
-    const router = await routerAt([])
+    const { router } = await routerAt([])
     await router.push('/money')
+    expect(router.currentRoute.value.name).toBe('money')
+  }, 60_000)
+
+  // A link opened cold is judged by what the device kept, before any answer (adversarial А2).
+  it('opens once the next answer names its фф on, the person still home', async () => {
+    const { router, ff } = await routerAt([])
+    await router.push('/venues-probe?from=bot')
+    expect(router.currentRoute.value.path).toBe('/')
+    ff.hearFf(new Set(['venues']))
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.fullPath).toBe('/venues-probe?from=bot')
+    })
+    // in place of home: «back» leads where the person was before the link
+    router.back()
+    await vi.waitFor(() => {
+      expect(router.currentRoute.value.name).toBe('settings')
+    })
+  }, 60_000)
+
+  it('stays home when the next answer names it off, and a later one does not reopen it', async () => {
+    const { router, ff } = await routerAt([])
+    await router.push('/venues-probe')
+    const replace = vi.spyOn(router, 'replace')
+    ff.hearFf(new Set())
+    ff.hearFf(new Set(['venues']))
+    // the answer's listener runs as it is heard: a move not asked for by then is never asked for
+    expect(replace).not.toHaveBeenCalled()
+    expect(router.currentRoute.value.path).toBe('/')
+  }, 60_000)
+
+  it('does not take a person who has moved on since', async () => {
+    const { router, ff } = await routerAt([])
+    await router.push('/venues-probe')
+    await router.push('/money')
+    const replace = vi.spyOn(router, 'replace')
+    ff.hearFf(new Set(['venues']))
+    expect(replace).not.toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('money')
   }, 60_000)
 })

@@ -62,7 +62,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 ## frontend · stores
 
-- `frontend/src/stores/ff.ts` — The «фф» the API last named (MOL-382): heard from every answer, kept on the device as `molvia.ff` past «Выйти», `useFf` for an entry's `v-if` and `ffOn` for the router's `closedByFf`.
+- `frontend/src/stores/ff.ts` — The «фф» the API last named (MOL-382): heard from every answer, kept on the device as `molvia.ff` past «Выйти», written whenever the device holds another list, `useFf` for an entry's `v-if`, `ffOn` for the router's `closedByFf` and `atNextFf` for its next answer.
 - `frontend/src/stores/storage.ts` — The one gateway to browser storage: both shelves, write-everywhere with salvage, sweeps and rewrites of keys.
 
 ## frontend · other
@@ -102,7 +102,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 - `frontend/src/navigation.ts` — Navigation rules: how a tab tap is written into history (home — «Что брать»), where the back chevron leads — behind the login a public screen's leads to the door (MOL-216) — up to the parent, cold-start parent laying, guarded step back and `afterStep`.
 - `frontend/src/optimizeDeps.test.ts` — Test: every package a worker imports, through the modules of `src` it loads, stands in `optimizeDeps.include` of `vite.config.ts`, so the dev server never optimizes one in the middle of an end-to-end run (MOL-217).
 - `frontend/src/pwaUpdate.ts` — Service-worker registration and update: quietly while hidden with no sheet, or by «Обновить»; looks every 15 min and on a new server build; `phase` for the app, `build` — the first build the API named to the page (MOL-147).
-- `frontend/src/router.ts` — The router: every route with its title key, tab and parent, redirects of old addresses (`/trip*`, `/advice`), the dev-only kit route, and the scroll behaviour.
+- `frontend/src/router.ts` — The router: every route with its title key, tab and parent, redirects of old addresses (`/trip*`, `/advice`), the dev-only kit route, the scroll behaviour, and `closedByFf` — a screen whose «фф» is off goes home, reopened by the next answer naming it on (MOL-382).
 - `frontend/src/styles/_fonts.scss` — Font faces: self-hosted Nunito (800 only) and Onest subsets, and the dram sign's own face.
 - `frontend/src/styles/_mixins.scss` — SCSS mixins injected into every component: display type (Nunito at its one weight), touch target, wider-than-phone, pinned bar, visually hidden, focus ring, field focus (the edge and halo of a kit field), appear (a fade-in with a short rise on insertion), icon (an icon at its font-size, 1em), work breath (the icon of a receipt being read).
 - `frontend/src/styles/_tokens.scss` — Design tokens: every colour, size, radius and duration as custom properties, light and dark schemes.

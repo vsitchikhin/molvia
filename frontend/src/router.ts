@@ -1,5 +1,5 @@
 import { START_LOCATION, createRouter, createWebHistory } from 'vue-router'
-import type { NavigationGuard, RouteRecordRaw, RouterScrollBehavior } from 'vue-router'
+import type { NavigationGuard, RouteRecordRaw, Router, RouterScrollBehavior } from 'vue-router'
 import type { FfName } from '@molvia/model'
 import SettingsView from '@/views/SettingsView.vue'
 import PrivacyView from '@/views/PrivacyView.vue'
@@ -23,7 +23,7 @@ import AccountsView from '@/views/AccountsView.vue'
 import MoneyCategoriesView from '@/views/MoneyCategoriesView.vue'
 import MoneyChartsView from '@/views/MoneyChartsView.vue'
 import { sameScreen, watchBrowserAnimatedBack } from '@/transitions'
-import { ffOn } from '@/stores/ff'
+import { atNextFf, ffOn } from '@/stores/ff'
 
 /**
  * The five sections of the tab bar. «advice» is home (MOL-128): at the shelf a person reads, at
@@ -316,9 +316,24 @@ export const scrollBehavior: RouterScrollBehavior = (to, from, saved) => {
  * A screen whose «фф» is off is not there (MOL-382): home, as `/:rest(.*)` sends an address the app does
  * not have — the same move, so nothing says the feature exists. Asked of the фф the phone last heard; a
  * screen already open stays until it is left.
+ *
+ * What the phone last heard may be older than the API: a link opened cold is judged before any answer
+ * (adversarial А2). So the next answer decides: naming the фф on, it takes the person where the link was
+ * going — if they are still where this move landed, behind the door too, which stands over the route.
  */
-export const closedByFf: NavigationGuard = (to) =>
-  to.meta.ff === undefined || ffOn(to.meta.ff) ? true : '/'
+export function closedByFf(router: Router): NavigationGuard {
+  return (to) => {
+    const ff = to.meta.ff
+    if (ff === undefined || ffOn(ff)) return true
+    const wanted = to.fullPath
+    atNextFf(() => {
+      if (ffOn(ff) && router.currentRoute.value.redirectedFrom?.fullPath === wanted) {
+        void router.replace(wanted)
+      }
+    })
+    return '/'
+  }
+}
 
 export const router = createRouter({
   history: createWebHistory(),
@@ -326,4 +341,4 @@ export const router = createRouter({
   // eslint-disable-next-line @typescript-eslint/no-deprecated -- its replacement is still vue-router/experimental
   scrollBehavior,
 })
-router.beforeEach(closedByFf)
+router.beforeEach(closedByFf(router))
