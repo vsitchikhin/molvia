@@ -9,6 +9,7 @@ import {
   RECEIPT_CODES_HEADER,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
+  RECEIPTS_BY_MODEL_HEADER,
   RECEIPT_REPAIRED_HEADER,
   RECEIPT_RETAKE_HEADER,
   RECEIPT_SPELLED_HEADER,
@@ -700,7 +701,10 @@ export function createClient(options: ClientOptions): MolviaClient {
       // 0.2 gate. A cold VPS answering slowly is the ordinary case, not the failure.
       request('/dev/login', actorCodec, { method: 'POST', timeout: null }),
 
-    me: () => request('/actors/me', actorCodec),
+    me: () =>
+      request('/actors/me', actorCodec, {
+        headers: new Headers({ [RECEIPTS_BY_MODEL_HEADER]: '1' }),
+      }),
     sessions: async () => request('/sessions', sessionsResponseCodec),
     exportMine: async (options = {}) => {
       const file = await request('/actors/me/export', exportEnvelopeSchema, {

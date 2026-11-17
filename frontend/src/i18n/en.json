@@ -501,7 +501,8 @@
       "trust": "Your own ratings and prices are free, other people’s come with access. There are no ads and no paid places here, and there never will be.",
       "new_capture": {
         "title": "Photograph your first receipt",
-        "body": "{app} reads and translates it — you check and save. And from your ratings it tells you at the shelf what to buy again and where it’s cheaper."
+        "body": "{app} reads and translates it — you check and save. And from your ratings it tells you at the shelf what to buy again and where it’s cheaper.",
+        "body_untranslated": "{app} reads it — you check and save. And from your ratings it tells you at the shelf what to buy again and where it’s cheaper."
       },
       "parsing": {
         "title": "Reading your first receipt",

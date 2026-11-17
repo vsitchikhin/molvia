@@ -144,8 +144,9 @@ IMAGE_TAG="$tag" "${compose[@]}" pull -q backend bot frontend receipt-reader
 
 # The metrics (MOL-145) are pulled before anything changes too, the upstream exporters included, but
 # they never judge a rollout (adversarial А4): a registry's refusal — Docker Hub's limit for an
-# anonymous pull — is a warning, and they are started only once the application is healthy.
-metrics=(victoria node-exporter cadvisor postgres-exporter grafana)
+# anonymous pull — is a warning, and they are started only once the application is healthy. The tunnel
+# to Grafana is theirs (MOL-399): Grafana from outside is a look at the figures, never the site.
+metrics=(victoria node-exporter cadvisor postgres-exporter grafana tunnel)
 IMAGE_TAG="$tag" "${compose[@]}" pull -q "${metrics[@]}" ||
   echo "warning: the metrics' images were not all pulled" >&2
 

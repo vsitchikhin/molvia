@@ -1,5 +1,5 @@
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
-import { actorSchema, telegramUserIdSchema } from '@molvia/model'
+import { MODEL_CONSENT_EDITION, actorSchema, telegramUserIdSchema } from '@molvia/model'
 import type { Actor, ActorPatch, AppLocale, NewActor, TelegramUserId } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -63,6 +63,13 @@ export interface ActorRepository {
    */
   markLocale(id: string, locale: AppLocale): Promise<boolean>
 }
+
+/**
+ * The model reads a person's receipts while `receipts_model_until` is to come and edition `MODEL_CONSENT_EDITION` is
+ * accepted (MOL-272): one condition for the queue that reads and the phone that offers the camera (MOL-408).
+ */
+export const READS_BY_MODEL = sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp()
+  and ${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}, false)`
 
 /**
  * A row becomes an entity only by passing the domain's own schema. The cost is that a row

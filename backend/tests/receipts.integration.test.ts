@@ -256,10 +256,19 @@ describe('«Отправить чек»', () => {
     expect((await send(me, receipt)).statusCode).toBe(409)
   })
 
-  it('refuses an id in capitals and a country not read yet', async () => {
+  it('refuses an id in capitals, a country read by its link and one not read yet', async () => {
     const me = await owner()
     expect((await send(me, body({ id: randomUUID().toUpperCase() }))).statusCode).toBe(400)
-    expect((await send(me, body({ country: 'GE' }))).statusCode).toBe(400)
+    expect((await send(me, body({ country: 'RS' }))).statusCode).toBe(400)
+    expect((await send(me, body({ country: 'TR' }))).statusCode).toBe(400)
+  })
+
+  it('takes a Georgian photo (MOL-408): the database knows the country', async () => {
+    const me = await owner()
+    const receipt = body({ country: 'GE' })
+    expect((await send(me, receipt)).statusCode).toBe(201)
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, receipt.id)))
+    expect([row?.country, row?.currency]).toEqual(['GE', 'GEL'])
   })
 })
 
@@ -719,6 +728,20 @@ describe('the queue', () => {
       failure: 'unreadable',
     })
     expect(list.find((r) => r.id === good)).toMatchObject({ status: 'parsed' })
+  }, 15_000)
+
+  it('fails a Georgian receipt the model did not read as unreadable, and never asks Tesseract (MOL-408)', async () => {
+    const me = await owner()
+    const id = await queued(me, { country: 'GE' })
+    const reader = benchReader()
+    expect(await readAll(reader)).toMatchObject([
+      { kind: 'read', status: 'failed', failure: 'unreadable', reader: 'ocr' },
+    ])
+    // must not: no layout of Tesseract's reads Georgia — its «0 lines» would say «переснимите»
+    expect(reader.asked).toBe(0)
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
+    expect([row?.status, row?.failure]).toEqual(['failed', 'unreadable'])
+    expect(await days()).toMatchObject([{ unreadable: 1, reshoot: 0, read: 0 }])
   }, 15_000)
 
   it('leaves the receipt in the queue, its attempt uncounted, while the reader is away', async () => {

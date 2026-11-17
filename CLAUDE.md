@@ -717,6 +717,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   month (`actors.model_spent_micro_usd`, MOL-367); refused, cut, malformed, over the cap or the share or
   away past its wait — Tesseract in `services/receipt-reader`, a container with no database
   and no disk. The API holds the queue, the photos and the parse, one receipt at a time.
+- **Georgia is read by the model alone** (MOL-408): its card has no Tesseract (`tesseractReads`) — a receipt the model
+  did not read fails `unreadable`, the model away waited for a day, asked hourly at most, a person's receipts of the
+  country resting together through an outage, the round going on past them — the camera there only for whom
+  `/actors/me` says `receiptsByModel` (a header: grant, share, cap), the digits of the tax and fiscal numbers the
+  card's, every item a Georgian line finds «проверьте»; no tax number printed, no shop memory (MOL-438).
 - **A model's answer goes through the parse's own gate** (MOL-272): `receiptTextOfModel` into
   `ReceiptText`, then `verifiedReading(text, { byModel: true })` — every number as printed, the layout and
   the total our code's by the card's words, never the model's; a figure in any spelling it writes it, a
@@ -887,7 +892,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   is required.
 - **The metrics never judge a rollout** (MOL-145, adversarial А4): pulled before anything changes,
   started only once the application is healthy, a failure of theirs a warning; a rollback leaves them as
-  they run. The one port they publish is Grafana's, on the loopback.
+  they run. The one port they publish is Grafana's, on the loopback; **from outside it is the dashboard
+  shared by link, through a Cloudflare Tunnel behind Access** (MOL-399): the tunnel's routes are the compose
+  file's — the shared dashboard's paths alone — `tunnel` in `alerts` alone, never `metrics`, and nobody from
+  outside is a user of Grafana.
 
 ## Tracker and documentation
 

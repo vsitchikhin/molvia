@@ -127,6 +127,7 @@
 <script lang="ts">
 import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { receiptCard } from '@molvia/model'
 import IconCart from '~icons/mdi/cart-outline'
 import IconLightbulb from '~icons/mdi/lightbulb-on-outline'
 import IconStar from '~icons/mdi/star-outline'
@@ -205,8 +206,16 @@ export default defineComponent({
     const INTRO = computed(() => ({
       pending: { title: 'advice.home.pending.title', body: 'advice.home.pending.body' },
       parsing: { title: 'advice.home.parsing.title', body: 'advice.home.parsing.body' },
+      // «и переведёт» only where the catalogue has the till's language: Georgia's and Serbia's lines are not
+      // translated (MOL-408)
       new: country.value
-        ? { title: 'advice.home.new_capture.title', body: 'advice.home.new_capture.body' }
+        ? {
+            title: 'advice.home.new_capture.title',
+            body:
+              receiptCard(country.value).nameLanguage === null
+                ? 'advice.home.new_capture.body_untranslated'
+                : 'advice.home.new_capture.body',
+          }
         : { title: 'advice.home.new.title', body: 'advice.home.new.body' },
     }))
     return {

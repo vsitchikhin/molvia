@@ -10,6 +10,7 @@ import type {
   AdviceResponse,
   AdviceRow,
   AdviceSearchResponse,
+  Currency,
   PendingVerdicts,
   Rating,
   ReceiptsResponse,
@@ -165,15 +166,42 @@ function openTrip() {
   })
 }
 
-async function render({ identity = true, country = 'AM', trip = false } = {}) {
+async function render({
+  identity = true,
+  country = 'AM',
+  city = 'Гюмри',
+  spendCurrency = 'AMD',
+  trip = false,
+  receiptsByModel,
+}: {
+  identity?: boolean
+  country?: string
+  city?: string
+  spendCurrency?: Currency
+  trip?: boolean
+  /** What `/actors/me` said of the model (MOL-408); left out, the store holds no answer. */
+  receiptsByModel?: boolean
+} = {}) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
     `molvia.settings.${ME}`,
-    JSON.stringify({ country, city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+    JSON.stringify({ country, city, spendCurrency, incomeCurrency: 'RUB' }),
   )
   const pinia = createPinia()
   setActivePinia(pinia)
   useActorStore().id = identity ? ME : null
+  if (receiptsByModel !== undefined) {
+    useActorStore().actor = {
+      id: ME,
+      country,
+      city,
+      spendCurrency,
+      incomeCurrency: 'RUB',
+      createdAt: new Date('2026-10-01T10:00:00.000Z'),
+      updatedAt: new Date('2026-10-01T10:00:00.000Z'),
+      receiptsByModel,
+    }
+  }
   if (trip) useTripStore().current = openTrip()
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/')
@@ -629,6 +657,46 @@ describe('AdviceView', () => {
   })
 
   describe('the newcomer (MOL-128, handoff `02`)', () => {
+    it('a Georgian newcomer the model reads for: «reads it», no «translates», and the camera (MOL-408)', async () => {
+      advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Тбилиси' } }))
+      const { view } = await render({
+        country: 'GE',
+        city: 'Тбилиси',
+        spendCurrency: 'GEL',
+        receiptsByModel: true,
+      })
+      const app = en.app.name
+      expect(view.text()).toContain(en.advice.home.new_capture.title)
+      expect(view.text()).toContain(
+        en.advice.home.new_capture.body_untranslated.replace('{app}', app),
+      )
+      expect(view.get('.dock').text()).toContain(en.purchases.capture)
+    })
+
+    it('a Georgian newcomer the model does not read for: the newcomer with no receipt, no camera (MOL-408)', async () => {
+      advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Тбилиси' } }))
+      const { view } = await render({
+        country: 'GE',
+        city: 'Тбилиси',
+        spendCurrency: 'GEL',
+        receiptsByModel: false,
+      })
+      expect(view.text()).toContain(en.advice.home.new.title)
+      expect(view.text()).not.toContain(en.advice.home.new_capture.title)
+      expect(view.get('.dock').text()).not.toContain(en.purchases.capture)
+    })
+
+    it('says no «translates» where the catalogue has not the till’s language — a Serbian receipt (MOL-408)', async () => {
+      advice.mockResolvedValue(answer([], { geography: { country: 'RS', city: 'Гюмри' } }))
+      const { view } = await render({ country: 'RS' })
+      const app = en.app.name
+      expect(view.text()).toContain(en.advice.home.new_capture.title)
+      expect(view.text()).toContain(
+        en.advice.home.new_capture.body_untranslated.replace('{app}', app),
+      )
+      expect(view.text()).not.toContain(en.advice.home.new_capture.body.replace('{app}', app))
+    })
+
     it('nothing rated: an offer to act — first purchases, the cycle, «Записать покупки» below', async () => {
       advice.mockResolvedValue(answer([]))
       const { view, router } = await render()

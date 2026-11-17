@@ -656,7 +656,7 @@ for (const failing of [true, false]) {
   })
 }
 
-// 1l-0: where no receipt is read, the cold offline records purchases from the strip (Ф-14).
+// 1l-0: Georgia without the model (MOL-408) — no camera: the cold offline records purchases from the strip (Ф-14).
 test('the cold offline without receipts offers «Record purchases» below, never red', async ({
   page,
   context,

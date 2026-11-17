@@ -476,7 +476,7 @@ import { useReceiptQueueStore } from '@/stores/receiptQueue'
 
 /** The language a receipt of a country is printed in, for the system's face to pick its glyphs. */
 // the language a till prints its lines in, for the browser's choice of glyphs and hyphens
-const PRINTED_LANG: Readonly<Record<ReceiptCountry, string>> = { AM: 'hy', RS: 'sr' }
+const PRINTED_LANG: Readonly<Record<ReceiptCountry, string>> = { AM: 'hy', GE: 'ka', RS: 'sr' }
 
 /**
  * A receipt before it is recorded (MOL-127, handoff 05, 06): its place and day, its lines as read
