@@ -552,10 +552,13 @@ receipt proven whole, and its lines of one piece went empty.
   - **Through an outage the person's receipts of the country rest together** (Р3-А1): `claimNext` takes none of them
     while one rests, so the twenty the quota lets wait (`RECEIPTS_UNRECORDED_MAX`) pay one try a time, not twenty — per
     receipt they took the share in six hours.
-  - **Only through an outage** (owner's В-11 «а», Р6-А1): the model has read no receipt since that try
-    (`reader_version` of `RECEIPT_MODEL`, by `read_at`). Once it has, the failure was the receipt's own — an answer
-    longer than the time out — and the receipt rests alone, by its own age: by the oldest's, a new receipt failing
-    once rested an hour behind a slow one, read two hours later.
+  - **Only through an outage or a slow API** (owner's В-11 «а», В-12 «а», Р6-А1, Р7-А1): the model has read none of
+    the person's receipts of the country since that try (`readByModelSql`, the SQL form of `byModel`, by `read_at`).
+    Once it has, the failure was the receipt's own — an answer longer than the time out — and the receipt rests alone,
+    by its own age: by the oldest's, a new receipt failing once rested an hour behind a slow one. **Never anyone's
+    receipt**: a slow API answers short receipts in time and times out long ones, and with other people's reads
+    lifting the rest the person's twenty long receipts paid a try each at every read — the whole share in nine hours
+    with a read a minute.
   - **A rest over goes to the person's receipt that rested longest ago, one that never rested first**
     (`next_attempt_at nulls first`, Р4-А1): to the oldest, a receipt the model fails on by itself took every try of the
     day.
@@ -563,8 +566,9 @@ receipt proven whole, and its lines of one piece went empty.
     В-10 «а», Р5-А1): the rest cannot tell an outage from the model failing on one receipt before it answers anything.
 
   **The prices, named:** in an outage each receipt pays one try of its own, a minute apart — a batch of twenty some
-  $0,18 more of the share over a day, one receipt nothing; whether the model answered is read off every receipt's
-  `read_at` once a claim, with no index of its own (cheap at today's numbers); at one count of the last hour, the order
+  $0,18 more of the share over a day, one receipt nothing; while a receipt the model fails on by itself rests, a new
+  one of the person that also fails once waits for that rest, up to an hour, unless another receipt of theirs is read
+  meanwhile (В-12 «а»); at one count of the last hour, the order
   puts any receipt with no rest behind it — never rested, or of a country that never rests — before one back from a
   rest, of anyone, however older (review №23); a receipt of an outage arrives within an hour of the model's return,
   hours later; past the day, `unreadable`; each person granted pays their own tries, so an outage costs some thirty
