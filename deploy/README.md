@@ -453,6 +453,36 @@ whole; without it, until now. A day is Yerevan's; a moment needs its offset.
 
 In a working copy the same thing is `make gates FROM=2026-10-05 [TO=2026-10-31]`.
 
+## Feature flags — «фф» (MOL-382)
+
+A finished feature reaches people with its release (MOL-376, В-1 «в»); an фф closes only a thing they
+should not see yet — venues until their chain is whole, payment until the bank is connected. The list is
+`packages/model/src/contracts/ff.ts`: a name, what it closes, the task that takes it off.
+
+- **Production's value is a line of `.env.prod`**, `FF_<NAME>=on` or `off`, and the compose file passes
+  each by name with `off` as its default. Anything else — `ON`, `true`, a typo — stops the API's start
+  with the variable named in its log (`docker compose … logs backend`): the line is put right and the API
+  started again.
+- **Turning one on is the owner's word**, then the line and a restart of the API alone — no release, no
+  merge:
+
+  ```bash
+  # on the machine, after the owner's word; the file is the owner's to write
+  sed -i 's/^FF_VENUES=off$/FF_VENUES=on/' .env.prod
+  docker compose -f docker-compose.prod.yml --env-file .env.prod up -d backend
+  curl -sI https://molvia.net/api/health | grep -i x-molvia-ff   # → x-molvia-ff: venues
+  ```
+
+  `/health` answers `503` for the seconds the API restarts, as at any rollout. An open page learns of it
+  with its next answer — every answer names the фф that are on in `X-Molvia-Ff` — and shows the feature
+  without a reload; a phone offline keeps the last list it heard.
+
+- **Off again is the same line back and the same restart**: the routes are gone at once, the phone's
+  entries with its next answer; a screen of the feature already open stays until it is left.
+- **Taken off by its task** (`removedBy`): once the feature has been on, a task removes the flag from
+  the code, the list, the compose file and `.env.prod.example`; the line in `.env.prod` goes after that
+  rollout — nothing reads it any more.
+
 ## The merge of twins (MOL-106)
 
 Every night from 04:30 Yerevan, half an hour after the copy of the database, the API merges what is

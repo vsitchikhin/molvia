@@ -1337,7 +1337,15 @@ people as one release. The mechanics and their reasons are in `.claude/rules/dep
 
 0.3 ships openly (owner's В-1 «в»): a finished feature reaches people with its release. **An фф closes only
 a thing people should not see yet** — a chain not whole (venues before «Что заказать»), a channel not live
-(payment before the bank) — and is taken off by a task once it is on. The mechanism is MOL-382.
+(payment before the bank) — and is taken off by a task once it is on. The mechanism is MOL-382, its rules
+`.claude/rules/deploy.md`:
+
+- **One list in the domain, each entry naming its removal task** (`contracts/ff.ts`, `removedBy`); the value is
+  `FF_<NAME>` of the API's environment, strictly `on` or `off` — anything else stops the start; turned on by
+  `.env.prod` and a restart, no release.
+- **Off, a feature's routes are not registered**, so it is an address the API has not got, before any session.
+- **The phone hears them in `X-Molvia-Ff` of every answer**, never a body, keeps the last list on the device
+  past «Выйти», `useFf` for an entry and `meta.ff` for a screen; end-to-end runs all on, `ffOff` for «off».
 
 ### Talking to the owner
 

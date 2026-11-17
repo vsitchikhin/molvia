@@ -66,6 +66,10 @@ services:
       # The nightly merge of twins (MOL-106): `report` says each morning what it would merge, `on`
       # merges — the owner's word, one line in .env.prod (В-3).
       CATALOGUE_MERGE: ${CATALOGUE_MERGE:-report}
+      # The «фф» (MOL-382): `on` shows a feature, `off` keeps it an address the API has not got — one line
+      # a flag in .env.prod and `up -d backend`, no release; anything else stops the API's start.
+      FF_VENUES: ${FF_VENUES:-off}
+      FF_PAYMENTS: ${FF_PAYMENTS:-off}
       # Optional: empty leaves the Open Food Facts hint off (MOL-162).
       OPEN_FOOD_FACTS_CONTACT: ${OPEN_FOOD_FACTS_CONTACT:-}
       PURS_CONTACT: ${PURS_CONTACT:-}
