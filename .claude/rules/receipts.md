@@ -550,8 +550,12 @@ receipt proven whole, and its lines of one piece went empty.
   a day, ≈ $0,27 at worst. **The rest is the person's, never a receipt's** (adversarial Р3-А1): `claimNext` takes none of
   a person's receipts of a country while one of them rests, so the twenty the quota lets wait (`RECEIPTS_UNRECORDED_MAX`)
   pay one try a time, not twenty — per receipt they took the share in six hours. Which country rests is the use case's
-  to know (`modelAlone`), the repository's only whose receipts rest with the one tried. **The prices, named:** a receipt
-  of an outage arrives within an hour of the model's return, hours later — the person's others with it, in that round;
+  to know (`modelAlone`), the repository's only whose receipts rest with the one tried. **A rest over goes to the
+  person's receipt tried longest ago, one never tried first** (`next_attempt_at nulls first`, adversarial Р4-А1): to the
+  oldest, a receipt the model fails on by itself — an answer longer than its time out — took every try of the day and
+  held the receipts behind it a day while the model read everybody else's. **The prices, named:** a receipt sent while
+  the person's receipts rest waits for the rest, up to an hour, even with the model up for others; a receipt of an
+  outage arrives within an hour of the model's return, hours later — the person's others with it, in that round;
   past the day, `unreadable`; each person granted pays their own tries, so an outage costs some thirty worst prices a
   person with a Georgian receipt waiting, not one for everybody.
 - **The camera in Georgia is for whom the model reads now** (В-2 «а», adversarial А3): `/actors/me` says
