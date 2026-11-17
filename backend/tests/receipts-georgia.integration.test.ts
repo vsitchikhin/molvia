@@ -20,7 +20,7 @@ import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createModelSpendRepository } from '@/db/model-spend-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
-import { actors, modelSpend, receipts } from '@/db/schema'
+import { actors, modelSpend, receiptParts, receipts } from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
 import { ModelUnavailable } from '@/receipts/model-reader'
 import type { ModelReading, ReceiptModel } from '@/receipts/model-reader'
@@ -195,6 +195,14 @@ async function readAll(model: ReceiptModel, now: () => Date): Promise<void> {
   })
 }
 
+const photoOf = async (id: string) =>
+  onlyRow(
+    await db
+      .select({ photo: receiptParts.photo })
+      .from(receiptParts)
+      .where(eq(receiptParts.receiptId, id)),
+  )?.photo
+
 const receiptOf = async (id: string) =>
   onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
 
@@ -204,6 +212,14 @@ async function restOver(me: Person): Promise<void> {
     .update(receipts)
     .set({ nextAttemptAt: new Date(Date.now() - 1_000) })
     .where(and(eq(receipts.actorId, me.id), isNotNull(receipts.nextAttemptAt)))
+}
+
+/** The person's last try a minute and a second back, their rest left as it is: the minute a receipt never tried waits. */
+async function triedAMinuteAgo(me: Person): Promise<void> {
+  await db
+    .update(receipts)
+    .set({ readingAt: new Date(Date.now() - 61_000) })
+    .where(and(eq(receipts.actorId, me.id), isNotNull(receipts.readingAt)))
 }
 
 /** The receipt arrived `agoMs` before now. */
@@ -305,9 +321,13 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
       .where(and(eq(receipts.actorId, me.id), isNotNull(receipts.nextAttemptAt)))
     expect(rested).toHaveLength(1)
     expect(await restsMinutes(onlyRow(rested)?.id ?? '')).toBeGreaterThan(29)
-    // must not: none of the three is asked while one rests
+    // must not: none of the three is asked while one rests and the try was within the minute
     await readAll(model, now)
     expect(model.asked).toBe(2)
+    // a minute on, a receipt never tried passes the rest — one, never two in a minute (В-10 «а»)
+    await triedAMinuteAgo(me)
+    await readAll(model, now)
+    expect(model.asked).toBe(3)
 
     // the model back, past the rest: the whole batch is read in one round
     await restOver(me)
@@ -321,11 +341,11 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
   it('gives the try after the rest to the receipt not tried: one the model fails on by itself holds no other (Р4-А1)', async () => {
     const me = await granted('GE')
     const slow = await queued(me)
-    // the photo's last byte before its end tells the slow receipt to the fake (`jpeg`)
-    const slowByte = photos % 256
+    const slowPhoto = await photoOf(slow)
     const next = await queued(me)
+    // the slow receipt told by its photo as the queue hands it over
     const model = fakeModel((parts) =>
-      parts[0]?.at(-4) === slowByte
+      slowPhoto !== undefined && parts[0]?.equals(slowPhoto) === true
         ? Promise.reject(new ModelUnavailable('timeout', null))
         : Promise.resolve(NIKORA_READ),
     )
@@ -342,6 +362,32 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
     expect(model.asked).toBe(3)
     expect((await receiptOf(next))?.status).toBe('parsed')
     expect((await receiptOf(slow))?.status).toBe('queued')
+  }, 30_000)
+
+  it('reads a receipt sent while one the model fails on by itself rests its hour: never tried, it passes (В-10 «а», Р5-А1)', async () => {
+    const me = await granted('GE')
+    const slow = await queued(me)
+    const slowPhoto = await photoOf(slow)
+    await arrived(slow, 2 * 60 * 60_000)
+    // the slow receipt told by its photo as the queue hands it over
+    const model = fakeModel((parts) =>
+      slowPhoto !== undefined && parts[0]?.equals(slowPhoto) === true
+        ? Promise.reject(new ModelUnavailable('timeout', null))
+        : Promise.resolve(NIKORA_READ),
+    )
+    const now = () => new Date()
+    await readAll(model, now)
+    expect(model.asked).toBe(1)
+    expect(await restsMinutes(slow)).toBeGreaterThan(59)
+
+    const sent = await queued(me)
+    await triedAMinuteAgo(me)
+    await readAll(model, now)
+    // the new one read at its first try; the slow one keeps its hour, not asked again
+    expect(model.asked).toBe(2)
+    expect((await receiptOf(sent))?.status).toBe('parsed')
+    expect((await receiptOf(slow))?.status).toBe('queued')
+    expect(await restsMinutes(slow)).toBeGreaterThan(58)
   }, 30_000)
 
   it('must not rest an Armenian receipt between tries: Tesseract takes it past its ten minutes as before', async () => {

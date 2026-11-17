@@ -1491,25 +1491,29 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
 
     async claimNext() {
       return db.transaction(async (tx) => {
-        // each person in turn: the one read least in the last hour first, then the oldest receipt —
-        // a person's next receipt waits behind everyone else's first (review А10)
+        // each person in turn: the one read least in the last hour first (review А10) — a person's next receipt waits
+        // behind everyone else's first; then a receipt never tried, then the one tried longest ago (Р4-А1), then the
+        // oldest. The second key is across people too: at one count, any receipt with no rest behind it — never tried,
+        // or of a country that never rests — goes before one back from a rest, however older (MOL-408, review №23)
         const [next] = await tx.execute<{ id: string }>(sql`
           select waiting.id from ${receipts} waiting
           where waiting.status = 'queued' and waiting.source = 'photo' and waiting.deleted_at is null
             and not exists (
-              select 1 from ${receipts} resting
-              where resting.actor_id = waiting.actor_id and resting.country = waiting.country
-                and resting.status = 'queued' and resting.source = 'photo' and resting.deleted_at is null
-                and resting.next_attempt_at > clock_timestamp()
+              select 1 from ${receipts} sibling
+              where sibling.actor_id = waiting.actor_id and sibling.country = waiting.country
+                and sibling.status = 'queued' and sibling.source = 'photo' and sibling.deleted_at is null
+                and sibling.next_attempt_at > clock_timestamp()
+                -- a receipt never tried passes the person's rest, a try of theirs in the country a minute at most: the
+                -- model may be up and fail on one receipt alone (owner's В-10 «а», adversarial Р5-А1)
+                and (waiting.reading_at is not null
+                  or sibling.reading_at > clock_timestamp()
+                    - make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MIN_MS / 1000}))
             )
           order by (
             select count(*) from ${receipts} served
             where served.actor_id = waiting.actor_id
               and served.reading_at > clock_timestamp() - interval '1 hour'
-          ),
-          -- a rest over goes to the person's receipt tried longest ago, a receipt never tried first: one the model
-          -- fails on by itself must not take every try of the rest and hold the others a day (MOL-408, Р4-А1)
-          waiting.next_attempt_at nulls first, waiting.queued_at, waiting.id
+          ), waiting.next_attempt_at nulls first, waiting.queued_at, waiting.id
           limit 1`)
         if (next !== undefined) {
           // one runner reads, so the row is ours; the lock keeps a second process from it all the same
