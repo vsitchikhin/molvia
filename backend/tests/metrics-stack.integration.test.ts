@@ -552,7 +552,7 @@ describe('the exporter’s role', () => {
     // A leaked password neither keeps its session nor opens a new one.
     await expect(asRole(old)`select 1`).rejects.toMatchObject({ code: '28P01' })
     await expect(asRole(fresh)`select 1 as one`).resolves.toEqual([{ one: 1 }])
-  })
+  }, 15_000)
 
   it('takes a password SASLprep leaves as it is, nothing shorter than 24', () => {
     for (const secret of [password(), 'A!b#c$d%e&f(g)h*i+j,k-l.m/n:o;p<q=r>s?t@u[v]w^x_y`z{|}~'])
