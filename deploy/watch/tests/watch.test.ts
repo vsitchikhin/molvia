@@ -12,6 +12,9 @@ import type { Io } from '@/watch'
 import worker from '@/worker'
 
 const PING = 'https://hc-ping.com/0f1e2d3c-secret'
+/** Two checks by their UUIDs, as the lock's round takes them (MOL-399). */
+const UP = 'https://hc-ping.com/0f1e2d3c-4b5a-4c6d-8e7f-a0b1c2d3e4f5'
+const LOCK = 'https://hc-ping.com/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d'
 const SETTINGS = { pingUrl: PING, domain: 'molvia.net' }
 const HEALTHY = '{"status":"ok","version":"v0.1.3-45-gfebb22c8","database":"up"}'
 
@@ -393,8 +396,7 @@ describe('the ping URL', () => {
 })
 
 describe('the lock of Grafana (MOL-399)', () => {
-  const LOCK = 'https://hc-ping.com/9a8b7c6d-lock'
-  const LOCKED = { ...SETTINGS, lockUrl: LOCK }
+  const LOCKED = { ...SETTINGS, pingUrl: UP, lockUrl: LOCK }
   const SIGN_IN = 'https://molvia.cloudflareaccess.com/cdn-cgi/access/login/grafana.molvia.net'
 
   type Door = 'access' | 'grafana' | 'challenge' | 'unreachable'
@@ -483,10 +485,24 @@ describe('the lock of Grafana (MOL-399)', () => {
 
   it('refuses the site’s own check, and asks nothing (adversarial А4)', async () => {
     const { io, fetch } = door(['access'])
-    await expect(watchLock({ ...SETTINGS, lockUrl: PING }, io)).rejects.toThrow(
+    await expect(watchLock({ ...LOCKED, lockUrl: UP }, io)).rejects.toThrow(
       'HC_LOCK_URL is the same check as HC_UP_URL — the lock needs a check of its own',
     )
     expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('tells the checks apart by UUIDs alone — a check’s slug is the same check (adversarial Б2)', async () => {
+    for (const [pingUrl, lockUrl] of [
+      [UP, 'https://hc-ping.com/pk/molvia-up'],
+      ['https://hc-ping.com/pk/molvia-up', LOCK],
+      ['https://hc-ping.com/pk/molvia-up', 'https://hc-ping.com/pk/molvia-grafana-lock'],
+    ] as const) {
+      const { io, fetch } = door(['access'])
+      await expect(watchLock({ ...SETTINGS, pingUrl, lockUrl }, io), lockUrl).rejects.toThrow(
+        'HC_LOCK_URL and HC_UP_URL must both be a check’s UUID URL, or one check could be both',
+      )
+      expect(fetch).not.toHaveBeenCalled()
+    }
   })
 
   it('is read as set: the site’s settings never refuse over it', () => {
@@ -545,7 +561,6 @@ describe('the Worker', () => {
   })
 
   it('runs both rounds and fails for neither when both are told', async () => {
-    const LOCK = 'https://hc-ping.com/9a8b7c6d-lock'
     const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
       const url = urlOf(input)
       if (url === 'https://grafana.molvia.net/public-dashboards/watch')
@@ -562,14 +577,14 @@ describe('the Worker', () => {
       )
     })
     vi.spyOn(console, 'log').mockImplementation(() => undefined)
-    await worker.scheduled(undefined, { HC_UP_URL: PING, HC_LOCK_URL: LOCK })
+    await worker.scheduled(undefined, { HC_UP_URL: UP, HC_LOCK_URL: LOCK })
     expect(
       sorted(
         fetch.mock.calls
           .map(([input]) => urlOf(input))
           .filter((url) => url.startsWith('https://hc-ping')),
       ),
-    ).toEqual(sorted([LOCK, PING]))
+    ).toEqual(sorted([LOCK, UP]))
   })
 })
 
