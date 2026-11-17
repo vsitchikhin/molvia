@@ -63,3 +63,17 @@ updates:
         patterns: ['*']
     commit-message:
       prefix: 'build(deps)'
+
+  # The tunnel to Grafana (MOL-399, В-5 «а»): an upstream image of compose, by an exact tag, and the one
+  # of them that faces the internet — a release of cloudflared is supported for a year, and one left
+  # alone would stop being let in. Only it: pgvector is a contract a migration moves (MOL-105), and the
+  # exporters sit on a network with no way out. Monthly, since each move of the compose file is a copy
+  # by hand to the machine (deploy/README.md, «Deploys»).
+  - package-ecosystem: docker-compose
+    directory: /
+    schedule:
+      interval: monthly
+    allow:
+      - dependency-name: cloudflare/cloudflared
+    commit-message:
+      prefix: 'build(deps)'
