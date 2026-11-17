@@ -753,9 +753,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   reading better, never emptying what was read), a quantity or price that does not hold empty; a summary's words
   in any case but the payment's.
 - **A receipt the model read not whole, with lines, is read again by Sonnet** (MOL-405): its own worst reserved in the
-  month and the share, anything short of an answer keeps the first, never a wait; the better of the two kept — whole,
-  then a total, then more lines, a tie the first (`betterReading`) — and the other its witness: a figure the check
-  emptied that the other copied alike in a line, with no 6 in it — the font's 5 both read as one — shown «проверьте».
+  month and the share, anything short of an answer keeps the first, never a wait, away it rests ten minutes; the better
+  of the two kept — whole, then lines found, then a total, then more lines, a tie the first (`betterReading`) — and the
+  other its witness: a figure of a line the check emptied whole for want of proof, never one it proved wrong, that the
+  other copied alike in a line, with no 6 in it — the font's 5 both read as one — shown «проверьте».
 - **A total is shown only where two sources vouch for it** (MOL-244, В-1 «а»): the lines that met it every
   one as read unless two places print another sum, else two places printed — the total, the payment, a
   section's sum — by one `votedTotal` for both kinds of receipt, else the lines with one of them as read; a row
