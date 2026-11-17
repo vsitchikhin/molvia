@@ -491,15 +491,27 @@ describe('the lock of Grafana (MOL-399)', () => {
     expect(fetch).not.toHaveBeenCalled()
   })
 
-  it('tells the checks apart by UUIDs alone — a check’s slug is the same check (adversarial Б2)', async () => {
-    for (const [pingUrl, lockUrl] of [
-      [UP, 'https://hc-ping.com/pk/molvia-up'],
-      ['https://hc-ping.com/pk/molvia-up', LOCK],
-      ['https://hc-ping.com/pk/molvia-up', 'https://hc-ping.com/pk/molvia-grafana-lock'],
+  it('tells the checks apart by UUIDs alone, naming the secret not by one (adversarial Б2, review №14)', async () => {
+    const SLUG_UP = 'https://hc-ping.com/pk/molvia-up'
+    for (const [pingUrl, lockUrl, said] of [
+      [UP, 'https://hc-ping.com/pk/molvia-up', 'HC_LOCK_URL is'],
+      [SLUG_UP, LOCK, 'HC_UP_URL is'],
+      [SLUG_UP, 'https://hc-ping.com/pk/molvia-grafana-lock', 'HC_UP_URL and HC_LOCK_URL are'],
     ] as const) {
       const { io, fetch } = door(['access'])
       await expect(watchLock({ ...SETTINGS, pingUrl, lockUrl }, io), lockUrl).rejects.toThrow(
-        'HC_LOCK_URL and HC_UP_URL must both be a check’s UUID URL, or one check could be both',
+        `${said} not a check’s UUID URL — the lock’s round tells checks by their UUIDs`,
+      )
+      expect(fetch).not.toHaveBeenCalled()
+    }
+  })
+
+  it('takes one UUID under another host for the same check (adversarial Б3, review №13)', async () => {
+    const uuid = UP.slice('https://hc-ping.com/'.length)
+    for (const lockUrl of [`https://hchk.io/${uuid}`, `https://hc-ping.com./${uuid}`]) {
+      const { io, fetch } = door(['access'])
+      await expect(watchLock({ ...SETTINGS, pingUrl: UP, lockUrl }, io), lockUrl).rejects.toThrow(
+        'HC_LOCK_URL is the same check as HC_UP_URL — the lock needs a check of its own',
       )
       expect(fetch).not.toHaveBeenCalled()
     }

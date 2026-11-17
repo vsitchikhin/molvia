@@ -17,8 +17,8 @@ export const REQUEST_TIMEOUT_MS = 10_000
 /** A path the tunnel passes that no share holds: with Access off, Grafana answers it `200` itself. */
 export const LOCK_PATH = '/public-dashboards/watch'
 
-/** A check's URL by its UUID, the one form of it a check has one of. */
-const BY_UUID = /^https:\/\/[^/]+\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
+/** A check's URL by its UUID, the one form of it a check has one of; the UUID is the check, whatever the host. */
+const BY_UUID = /^https:\/\/[^/]+\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
 
 /** A ping is tried this many times before the round fails — curl's `--retry 3` before. */
 export const PING_TRIES = 4
@@ -211,14 +211,20 @@ export async function watchLock(settings: Settings, io: Io): Promise<Round> {
   const pingUrl = pingUrlOf('HC_LOCK_URL', settings.lockUrl)
   // One check for both would let the later round's ping stand for the other's (adversarial А4): a lock
   // well told after the site's `/fail` turned «molvia-up» green over a site down. A check has two URLs
-  // — its UUID and its ping key with its slug — and nothing here tells them apart (Б2), so the lock's
-  // round is told by UUIDs alone, and two different ones are two checks.
-  if (!BY_UUID.test(pingUrl) || !BY_UUID.test(settings.pingUrl)) {
+  // — its UUID and its ping key with its slug — and nothing here tells them apart (Б2), and healthchecks.io
+  // answers a UUID under more than one host (Б3), so the checks are told by their UUIDs alone.
+  const lock = BY_UUID.exec(pingUrl)?.[1]
+  const up = BY_UUID.exec(settings.pingUrl)?.[1]
+  if (lock === undefined || up === undefined) {
+    // By name, never by value: a secret on Cloudflare can be written over, not read (review №14).
+    const names = [up === undefined && 'HC_UP_URL', lock === undefined && 'HC_LOCK_URL'].filter(
+      Boolean,
+    )
     throw new Error(
-      'HC_LOCK_URL and HC_UP_URL must both be a check’s UUID URL, or one check could be both',
+      `${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} not a check’s UUID URL — the lock’s round tells checks by their UUIDs`,
     )
   }
-  if (pingUrl === settings.pingUrl) {
+  if (lock === up) {
     throw new Error(
       'HC_LOCK_URL is the same check as HC_UP_URL — the lock needs a check of its own',
     )
