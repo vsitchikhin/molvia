@@ -5,7 +5,7 @@ import type { MolviaBotClient } from '@molvia/client'
 import { cityWhereNameRepeats, settingsCityOf } from '@molvia/model'
 import type { AppLocale, Reminder, ReminderItem } from '@molvia/model'
 import type { InlineKeyboardMarkup } from 'grammy/types'
-import { hasMessage, t } from './i18n'
+import { hasMessage, pluralForm, t } from './i18n'
 import { reportDefect } from './failure'
 import { Flooded, deliver, sleep } from './deliver'
 import type { Wait } from './deliver'
@@ -173,9 +173,9 @@ export function reminderText(
 
 /** «Ещё 1 ждёт…», «1 more is waiting…»: the form by the language's own plural rule (adversarial А5). */
 function moreText(language: AppLocale, n: number, appUrl: string): string {
-  const form = new Intl.PluralRules(language).select(n)
-  const key =
-    form === 'one' ? 'remind.more.one' : form === 'few' ? 'remind.more.few' : 'remind.more.many'
+  const key = (
+    { one: 'remind.more.one', few: 'remind.more.few', many: 'remind.more.many' } as const
+  )[pluralForm(language, n)]
   return t(language, key, { n, url: `${appUrl.replace(/\/+$/, '')}/verdicts` })
 }
 
