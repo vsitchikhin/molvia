@@ -25,6 +25,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 - `backend/tests/compose-volumes.integration.test.ts` — Integration test: `frontend-volumes` and `victoria-volumes` give every volume their service mounts, and only those, to the uid and gid the Dockerfiles of Caddy and VictoriaMetrics run as, by numbers, as root on their service's image with no network and `CHOWN`, `DAC_READ_SEARCH` alone, each waited for.
 - `backend/tests/compose.ts` — Test helper: `docker-compose.prod.yml` as text and each service's block of lines, for the tests that hold its shape.
+- `backend/tests/ff-header.integration.test.ts` — Integration test: every answer names the «фф» that are on in `X-Molvia-Ff`, in the list's order — refusals, missing routes and framework errors too; a feature's route under an фф that is off answers as an address the API does not have, whatever the session and the fetch metadata (MOL-382).
 - `backend/src/db/journal.test.ts` — Unit test: the journal of migrations is numbered in order and every stamp is later than the one before it.
 - `backend/tests/migration-stamps.integration.test.ts` — Integration test: a migration drizzle skipped because its stamp is older than one applied is named, and stops the chain.
 
