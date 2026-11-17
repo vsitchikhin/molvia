@@ -892,7 +892,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   is required.
 - **The metrics never judge a rollout** (MOL-145, adversarial А4): pulled before anything changes,
   started only once the application is healthy, a failure of theirs a warning; a rollback leaves them as
-  they run. The one port they publish is Grafana's, on the loopback.
+  they run. The one port they publish is Grafana's, on the loopback; **from outside it is the dashboard
+  shared by link, through a Cloudflare Tunnel behind Access** (MOL-399): the tunnel's routes are the compose
+  file's — the shared dashboard's paths alone — `tunnel` in `alerts` alone, never `metrics`, and nobody from
+  outside is a user of Grafana.
 
 ## Tracker and documentation
 

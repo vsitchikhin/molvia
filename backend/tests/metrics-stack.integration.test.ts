@@ -70,6 +70,9 @@ const PHOTO_ROUTE = '/receipts/:receiptId/parts/:part'
  */
 const PEOPLE = 'route!~"unmatched|/health|/internal/.*"'
 
+/** The services of the metrics, which never judge a rollout (MOL-145), the tunnel to Grafana with them (MOL-399). */
+const METRICS = ['victoria', 'node-exporter', 'cadvisor', 'postgres-exporter', 'grafana', 'tunnel']
+
 describe('the compose file', () => {
   it('publishes no port but Caddy’s and Grafana’s on the loopback', () => {
     // Every entry under `ports:`, quoted any way or not at all (review №2): a test that read only
@@ -100,8 +103,12 @@ describe('the compose file', () => {
     // nobody who calls.
     expect(networks.get('grafana')).toBe('alerts, metrics')
     expect(compose).toMatch(/^ {2}alerts: \{\}$/m)
+    // The tunnel beside Grafana alone (MOL-399): whatever Cloudflare's ingress names, it reaches
+    // Grafana and nothing else — never VictoriaMetrics, which has no password.
+    expect(networks.get('tunnel')).toBe('alerts')
     for (const [name, joined] of networks)
-      if (name !== 'grafana') expect(joined ?? '', name).not.toContain('alerts')
+      if (name !== 'grafana' && name !== 'tunnel')
+        expect(joined ?? '', name).not.toContain('alerts')
     // Neither the exporters' host network nor a privileged container (Р-7, Р-8) — cAdvisor gets the
     // one capability it reads the OOM-killer with (review №1).
     expect(compose).not.toMatch(/network_mode: host|privileged: true/)
@@ -134,8 +141,77 @@ describe('the compose file', () => {
   })
 
   it('gives every service of the metrics a limit of memory', () => {
-    for (const name of ['victoria', 'node-exporter', 'cadvisor', 'postgres-exporter', 'grafana'])
-      expect(services().get(name), name).toMatch(/^ {4}mem_limit: \d+m$/m)
+    for (const name of METRICS) expect(services().get(name), name).toMatch(/^ {4}mem_limit: \d+m$/m)
+  })
+
+  it('runs the tunnel by a token from the environment, never an argument (MOL-399)', () => {
+    const tunnel = services().get('tunnel') ?? ''
+    // An exact tag of the upstream image, which Dependabot moves (В-5).
+    expect(tunnel).toMatch(/^ {4}image: cloudflare\/cloudflared:\d{4}\.\d+\.\d+$/m)
+    expect(read('.github/dependabot.yml')).toMatch(
+      /^ {2}- package-ecosystem: docker-compose\n {4}directory: \/\n(?: {4}.*\n)*? {4}allow:\n {6}- dependency-name: cloudflare\/cloudflared\n/m,
+    )
+    expect(tunnel).toMatch(/^ {6}TUNNEL_TOKEN: \$\{CLOUDFLARE_TUNNEL_TOKEN:\?/m)
+    // Every user of the machine reads the arguments in `ps`.
+    expect(tunnel).toMatch(
+      /^ {4}command: \['tunnel', '--config', '\/etc\/cloudflared\/config\.yml', 'run'\]$/m,
+    )
+    expect(read('.env.prod.example')).toMatch(/^CLOUDFLARE_TUNNEL_TOKEN=$/m)
+    expect(read('deploy/README.md')).toMatch(/^\| `CLOUDFLARE_TUNNEL_TOKEN` +\|/m)
+  })
+
+  it('passes from outside the shared dashboard alone, and lets nobody sign in there (MOL-399, В-6 «а»)', () => {
+    const tunnel = services().get('tunnel') ?? ''
+    expect(tunnel).toMatch(
+      /^ {4}configs:\n {6}- source: tunnel\n {8}target: \/etc\/cloudflared\/config\.yml$/m,
+    )
+    // The shared dashboard's page, its files and its answers, then the tunnel's own 404: no login, no
+    // API, no data source's proxy (adversarial А1–А3), whatever Access does.
+    const content =
+      /^configs:\n(?: {2}#.*\n)* {2}tunnel:\n {4}content: \|\n((?: {6}.*\n)+)/m.exec(
+        compose,
+      )?.[1] ?? ''
+    expect(content).toBe(
+      [
+        '      ingress:',
+        '        - hostname: grafana.${DOMAIN:?set DOMAIN}',
+        '          path: ^/(public-dashboards|public|api/public)/',
+        '          service: http://grafana:3000',
+        '        - service: http_status:404',
+        '',
+      ].join('\n'),
+    )
+    // The rule as written, read as cloudflared reads it — Go's regexp, which this pattern spells alike.
+    const rule = new RegExp(/^ {10}path: (.+)$/m.exec(content)?.[1] ?? '$^')
+    const passes = (path: string): boolean => rule.test(path)
+    for (const path of [
+      '/public-dashboards/abc',
+      '/public/build/app.js',
+      '/api/public/dashboards/abc',
+    ])
+      expect(passes(path), path).toBe(true)
+    for (const path of [
+      '/',
+      '/login',
+      '/api/user',
+      '/api/datasources/proxy/uid/victoria/api/v1/import/prometheus',
+      '/api/v1/provisioning/contact-points',
+      '/public',
+      '/publicx/y',
+      '/x/public/y',
+    ])
+      expect(passes(path), path).toBe(false)
+    const grafana = services().get('grafana') ?? ''
+    expect(grafana).toContain("GF_PUBLIC_DASHBOARDS_ENABLED: 'true'")
+    expect(grafana).toContain('GF_SERVER_ROOT_URL: https://grafana.${DOMAIN:?')
+    // Nobody from outside is a user of Grafana: no sign-in by a pass, none by sign-up or as anonymous.
+    expect(grafana).not.toMatch(/GF_AUTH_JWT_|GF_AUTH_PROXY_/)
+    // An alarm sends to the link it is looked at by, never to an address the tunnel answers 404
+    // (adversarial Б1): the root is no path of a shared dashboard, and the link is a secret.
+    expect(notify).toContain(
+      'Дашборд — закладка общей ссылки, deploy/README.md «Looking».{{ end }}',
+    )
+    expect(notify).not.toMatch(/https?:\/\//)
   })
 
   it('switches off everything Grafana would call home with (Р-6)', () => {
@@ -205,15 +281,14 @@ describe('the compose file', () => {
 
   it('pulls the metrics before anything changes but lets only the application judge a rollout (adversarial А4)', () => {
     const deploy = read('deploy/deploy.sh')
-    expect(deploy).toContain('metrics=(victoria node-exporter cadvisor postgres-exporter grafana)')
+    expect(deploy).toContain(`metrics=(${METRICS.join(' ')})`)
     expect(deploy).toMatch(/pull -q "\$\{metrics\[@\]\}" \|\|/)
     expect(deploy).toContain(
       'if "${compose[@]}" up -d postgres backend bot frontend receipt-reader && wait_healthy "$tag"; then',
     )
     expect(deploy).toMatch(/up -d "\$\{metrics\[@\]\}" \|\|/)
     // The list is the compose file's own services of the metrics.
-    for (const name of ['victoria', 'node-exporter', 'cadvisor', 'postgres-exporter', 'grafana'])
-      expect(services().has(name), name).toBe(true)
+    for (const name of METRICS) expect(services().has(name), name).toBe(true)
     expect(deploy).not.toMatch(/if "\$\{compose\[@\]\}" up -d && /)
   })
 })
@@ -477,7 +552,7 @@ describe('the exporter’s role', () => {
     // A leaked password neither keeps its session nor opens a new one.
     await expect(asRole(old)`select 1`).rejects.toMatchObject({ code: '28P01' })
     await expect(asRole(fresh)`select 1 as one`).resolves.toEqual([{ one: 1 }])
-  })
+  }, 15_000)
 
   it('takes a password SASLprep leaves as it is, nothing shorter than 24', () => {
     for (const secret of [password(), 'A!b#c$d%e&f(g)h*i+j,k-l.m/n:o;p<q=r>s?t@u[v]w^x_y`z{|}~'])
