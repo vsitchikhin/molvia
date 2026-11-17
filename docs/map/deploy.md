@@ -3,6 +3,10 @@
 Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it under
 `packages/model/tests/`, is covered by the source's entry.
 
+## packages/model
+
+- `packages/model/src/contracts/ff.ts` — The list of «фф» (MOL-382): each name with what it closes and its removal task (`removedBy`), the header `X-Molvia-Ff` the API names the ones that are on in and its reading, and `FF_<NAME>` of the environment, strictly `on` or `off`.
+
 ## backend · routes
 
 - `backend/src/routes/health.ts` — Route `GET /health`: the database probe and the build's version, which the deploy, the e2e run and the outside watch wait on; `503` with the same body when the database does not answer (MOL-142).
