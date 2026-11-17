@@ -59,6 +59,9 @@ describe('a country’s card (MOL-247)', () => {
     expect(countries.filter(modelAlone)).toEqual(['GE'])
     // must not: Serbia has no photo to read, so no reader of one
     expect(modelAlone('RS')).toBe(false)
+  })
+
+  it('takes every find of a line as a guess only off a photo in a language the catalogue names nothing in', () => {
     expect(findsAreGuesses(receiptCard('GE'))).toBe(true)
     expect(findsAreGuesses(receiptCard('RS'))).toBe(false)
     expect(findsAreGuesses(receiptCard('AM'))).toBe(false)

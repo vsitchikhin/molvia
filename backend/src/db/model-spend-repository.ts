@@ -1,4 +1,5 @@
 import { eq, sql } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { modelSpendStep } from '@molvia/model'
 import type { ModelShareNotice, ModelSpendNotice, ModelSpendStep } from '@molvia/model'
 import { READS_BY_MODEL } from './actors-repository'
@@ -57,8 +58,8 @@ export interface ModelSpendRepository {
   month(month: string): Promise<MonthSpend | null>
   /**
    * Whether the model reads for the person now (MOL-408, adversarial А3, Р2-А1): granted and edition 5
-   * (`READS_BY_MODEL`), and a call of `worstMicroUsd` would fit their share of the month and the month's cap — the
-   * bounds `reserve` refuses by, read by the same fragments. What `/actors/me` offers Georgia's camera by.
+   * (`READS_BY_MODEL`), and a call of `worstMicroUsd` would fit their share of the month and the month's cap — by
+   * `reserve`'s own inequality, `fits`, over the same spending. What `/actors/me` offers Georgia's camera by.
    */
   readsFor(month: string, worstMicroUsd: number, call: ModelCall): Promise<boolean>
 }
@@ -66,6 +67,10 @@ export interface ModelSpendRepository {
 /** What the person has spent of `month`, as their share counts it: a month gone is nought. */
 const spentOf = (month: string) =>
   sql`(case when ${actors.modelMonth} >= ${month}::date then ${actors.modelSpentMicroUsd} else 0 end)`
+
+/** A call of `worst` on top of `spent` within `bound`: what the share and the cap refuse by, and the camera reads. */
+const fits = (spent: SQL, worstMicroUsd: number, bound: number) =>
+  sql`${spent} + ${worstMicroUsd}::bigint <= ${bound}::bigint`
 
 /** What the month has spent of the cap. */
 const monthSpentOf = (month: string) =>
@@ -99,7 +104,7 @@ async function takeShare(
     update ${actors}
     set model_month = greatest(${actors.modelMonth}, ${month}::date),
         model_spent_micro_usd = ${spent} + ${worstMicroUsd}::bigint
-    where ${actors.id} = ${actorId} and ${spent} + ${worstMicroUsd}::bigint <= ${shareMicroUsd}::bigint
+    where ${actors.id} = ${actorId} and ${fits(spent, worstMicroUsd, shareMicroUsd)}
     returning 1`)
   return taken.length > 0
 }
@@ -111,8 +116,8 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
       const [row] = await db
         .select({
           reads: sql<boolean>`${READS_BY_MODEL}
-            and ${spentOf(month)} + ${worstMicroUsd}::bigint <= ${shareMicroUsd}::bigint
-            and ${monthSpentOf(month)} + ${worstMicroUsd}::bigint <= ${capMicroUsd}::bigint`,
+            and ${fits(spentOf(month), worstMicroUsd, shareMicroUsd)}
+            and ${fits(monthSpentOf(month), worstMicroUsd, capMicroUsd)}`,
         })
         .from(actors)
         .where(eq(actors.id, actorId))
@@ -139,11 +144,11 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
         // write, whatever runs beside it
         const counted = await tx.execute<{ spent: string }>(sql`
           insert into ${modelSpend} (month, spent_micro_usd, calls)
-          select ${month}::date, ${worstMicroUsd}::bigint, 1 where ${worstMicroUsd}::bigint <= ${capMicroUsd}::bigint
+          select ${month}::date, ${worstMicroUsd}::bigint, 1 where ${fits(sql`0`, worstMicroUsd, capMicroUsd)}
           on conflict (month) do update
             set spent_micro_usd = ${modelSpend.spentMicroUsd} + excluded.spent_micro_usd,
                 calls = ${modelSpend.calls} + 1
-            where ${modelSpend.spentMicroUsd} + excluded.spent_micro_usd <= ${capMicroUsd}::bigint
+            where ${fits(sql`${modelSpend.spentMicroUsd}`, worstMicroUsd, capMicroUsd)}
           returning spent_micro_usd as spent`)
         if (counted.length > 0) return 'reserved'
         // the share given back: the call is not made

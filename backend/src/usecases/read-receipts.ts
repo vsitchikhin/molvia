@@ -259,6 +259,25 @@ async function readOne(
 }
 
 /**
+ * Whether the model reads for the person now (MOL-408, adversarial А3, Р2-А1): a model on the server at all, and
+ * one more call of the largest request it is ever sent — no call the queue reserves costs more — fitting the
+ * person's share of this month and its cap. What `/actors/me` offers Georgia's camera by.
+ */
+export function readsReceiptsByModel(
+  deps: { readonly model: ReceiptModelDeps | null; readonly now?: () => Date },
+  actorId: string,
+): Promise<boolean> {
+  if (deps.model === null) return Promise.resolve(false)
+  const { spend, capMicroUsd, shareMicroUsd } = deps.model
+  const month = spendMonthOf((deps.now ?? (() => new Date()))())
+  return spend.readsFor(month, worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX), {
+    actorId,
+    capMicroUsd,
+    shareMicroUsd,
+  })
+}
+
+/**
  * Reads one receipt by the model (MOL-272): under the month's cap — its worst price reserved before the
  * call, its own put in place after, paid whatever came back (Т-3, Т-4) — every part in one request, the
  * answer into the parse's reading and through the one check (`verifiedReading`, MOL-255). `null` where
@@ -689,10 +708,8 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
   const now = deps.now ?? (() => new Date())
   await tellHeld(deps, now())
   let read = 0
-  // receipts of a country the model alone reads, left waiting for it: the round goes on past them (MOL-408, В-8 «а»)
-  const passed: string[] = []
   for (;;) {
-    const claimed = await deps.receipts.claimNext(passed)
+    const claimed = await deps.receipts.claimNext()
     if (claimed === null) return read
     const started = performance.now()
     let outcome: ReadOutcome
@@ -702,11 +719,14 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       const done = await readOne(deps, claimed)
       if (done === 'wait') {
         // the model away (Р-9): the receipt keeps its place and its attempt, the round stops, and the
-        // minute's timer asks again — past its wait Tesseract reads it. A receipt no Tesseract reads is stepped
-        // over instead: it waits a day, and the receipts behind it reach Tesseract past their ten minutes
-        await deps.receipts.release(claimed.id)
-        if (!modelAlone(claimed.country)) return read
-        passed.push(claimed.id)
+        // minute's timer asks again — past its wait Tesseract reads it. A receipt no Tesseract reads rests instead,
+        // the person's others of its country with it, and the round goes on: it waits a day, asked less and less
+        // often, and the receipts behind it reach Tesseract past their ten minutes (MOL-408, В-8 «а», В-9 «а»)
+        if (!modelAlone(claimed.country)) {
+          await deps.receipts.release(claimed.id)
+          return read
+        }
+        await deps.receipts.rest(claimed.id)
         continue
       }
       outcome = done.outcome

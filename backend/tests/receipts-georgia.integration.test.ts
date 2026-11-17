@@ -1,10 +1,11 @@
 /**
- * Georgia read by the model alone (MOL-408): a receipt the model is away for waits a day, asked of it less and less
- * often, and holds no round (owner's В-8 «а», В-9 «а»), and the camera is offered only while the model reads for the person now — the share and the
- * month's cap too (adversarial А3). The model is a fake answering as Haiku copied Nikora's receipt on the bench.
+ * Georgia read by the model alone (MOL-408): a receipt the model is away for waits a day, the person's receipts of
+ * the country asked of it less and less often together, holding no round (owner's В-8 «а», В-9 «а», Р3-А1); and the
+ * camera is offered only while the model reads for the person now — the share and the month's cap too (adversarial
+ * А3). The model is a fake answering as Haiku copied Nikora's receipt on the bench.
  */
 import { randomUUID } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { and, eq, isNotNull } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   MODEL_CONSENT_EDITION,
@@ -18,7 +19,7 @@ import type { ModelReceipt } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createModelSpendRepository } from '@/db/model-spend-repository'
-import { RECEIPT_MODEL_ALONE_RETRY_MAX_MS, createReceiptRepository } from '@/db/receipts-repository'
+import { createReceiptRepository } from '@/db/receipts-repository'
 import { actors, modelSpend, receipts } from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
 import { ModelUnavailable } from '@/receipts/model-reader'
@@ -197,16 +198,26 @@ async function readAll(model: ReceiptModel, now: () => Date): Promise<void> {
 const receiptOf = async (id: string) =>
   onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
 
-/** The receipt's last try and its arrival moved back (the backoff reads the database's clock, never the test's). */
-async function tried(
-  id: string,
-  { agoMs, waitedMs }: { agoMs: number; waitedMs: number },
-): Promise<void> {
-  const at = new Date(Date.now() - agoMs)
+/** The rest of a person's receipts over, as the minutes would end it (the rest reads the database's clock). */
+async function restOver(me: Person): Promise<void> {
   await db
     .update(receipts)
-    .set({ readingAt: at, queuedAt: new Date(at.getTime() - waitedMs) })
+    .set({ nextAttemptAt: new Date(Date.now() - 1_000) })
+    .where(and(eq(receipts.actorId, me.id), isNotNull(receipts.nextAttemptAt)))
+}
+
+/** The receipt arrived `agoMs` before now. */
+async function arrived(id: string, agoMs: number): Promise<void> {
+  await db
+    .update(receipts)
+    .set({ queuedAt: new Date(Date.now() - agoMs) })
     .where(eq(receipts.id, id))
+}
+
+/** How long from now the person's receipts rest, in minutes, as the row says. */
+async function restsMinutes(id: string): Promise<number> {
+  const at = (await receiptOf(id))?.nextAttemptAt?.getTime() ?? 0
+  return (at - Date.now()) / 60_000
 }
 
 describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «а», В-9 «а»)', () => {
@@ -218,18 +229,18 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
     const queuedAt = (await receiptOf(georgian))?.queuedAt?.getTime() ?? 0
     const later = (ms: number) => () => new Date(queuedAt + ms)
 
-    // past the ten minutes: Armenia's goes to Tesseract, Georgia's keeps its place — stepped over, never the end
+    // past the ten minutes: Armenia's goes to Tesseract, Georgia's keeps its place and rests — never the end
     await readAll(away(), later(RECEIPT_MODEL_WAIT_MS + 60_000))
     expect(await receiptOf(georgian)).toMatchObject({ status: 'queued', attempts: 0 })
     expect((await receiptOf(armenian))?.status).toBe('failed')
     expect(tesseract.asked).toBeGreaterThan(0)
 
-    // the model back within the day, past the receipt's rest, reads it
-    await tried(georgian, { agoMs: RECEIPT_MODEL_ALONE_RETRY_MAX_MS, waitedMs: 0 })
+    // the model back within the day, past the rest, reads it
+    await restOver(tbilisi)
     const back = reads()
     await readAll(back, later(6 * 60 * 60 * 1000))
     expect(back.asked).toBe(1)
-    expect((await receiptOf(georgian))?.status).toBe('parsed')
+    expect(await receiptOf(georgian)).toMatchObject({ status: 'parsed', nextAttemptAt: null })
   }, 30_000)
 
   it('fails it unreadable only past a day of the model away, and never asks Tesseract', async () => {
@@ -239,13 +250,14 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
 
     await readAll(away(), () => new Date(queuedAt + RECEIPT_MODEL_ALONE_WAIT_MS - 60_000))
     expect((await receiptOf(id))?.status).toBe('queued')
-    await tried(id, { agoMs: RECEIPT_MODEL_ALONE_RETRY_MAX_MS, waitedMs: 0 })
+    // the arrival kept: the day is counted from it to the minute
+    await restOver(me)
     await readAll(away(), () => new Date(queuedAt + RECEIPT_MODEL_ALONE_WAIT_MS))
     expect(await receiptOf(id)).toMatchObject({ status: 'failed', failure: 'unreadable' })
     expect(tesseract.asked).toBe(0)
   }, 30_000)
 
-  it('asks the model away again no sooner than its wait so far after its last try, an hour at most (Р2-А1)', async () => {
+  it('rests as long again as it has waited, a minute at least and an hour at most (Р2-А1)', async () => {
     const me = await granted('GE')
     const id = await queued(me)
     const model = away()
@@ -253,23 +265,57 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
 
     await readAll(model, now)
     expect(model.asked).toBe(1)
-    // must not: the next minute's round asks nothing of a receipt that just tried
+    expect(await restsMinutes(id)).toBeGreaterThan(0.5)
+    // must not: the next minute's round asks nothing of a receipt that just rested
     await readAll(model, now)
     expect(model.asked).toBe(1)
-    // waited ten minutes before its last try: rests ten more, then is asked
-    await tried(id, { agoMs: 9 * 60_000, waitedMs: 10 * 60_000 })
-    await readAll(model, now)
-    expect(model.asked).toBe(1)
-    await tried(id, { agoMs: 11 * 60_000, waitedMs: 10 * 60_000 })
+    // waited ten minutes: rests ten more
+    await arrived(id, 10 * 60_000)
+    await restOver(me)
     await readAll(model, now)
     expect(model.asked).toBe(2)
+    expect(await restsMinutes(id)).toBeGreaterThan(9)
+    expect(await restsMinutes(id)).toBeLessThan(11)
     // waited ten hours: rests an hour, never more
-    await tried(id, { agoMs: 59 * 60_000, waitedMs: 10 * 60 * 60_000 })
-    await readAll(model, now)
-    expect(model.asked).toBe(2)
-    await tried(id, { agoMs: 61 * 60_000, waitedMs: 10 * 60 * 60_000 })
+    await arrived(id, 10 * 60 * 60_000)
+    await restOver(me)
     await readAll(model, now)
     expect(model.asked).toBe(3)
+    expect(await restsMinutes(id)).toBeGreaterThan(59)
+    expect(await restsMinutes(id)).toBeLessThan(61)
+  }, 30_000)
+
+  it('rests the person’s receipts of the country together: a batch pays one try, not one a receipt (Р3-А1)', async () => {
+    const me = await granted('GE')
+    const oldest = await queued(me)
+    const batch = [oldest, await queued(me), await queued(me)]
+    const other = await granted('GE')
+    const theirs = await queued(other)
+    // the oldest waited half an hour: the rest is counted from it, whichever receipt was tried
+    await arrived(oldest, 30 * 60_000)
+    const model = away()
+    const now = () => new Date()
+
+    await readAll(model, now)
+    // one try for the person's three, and one for another person's own: each pays for their own queue
+    expect(model.asked).toBe(2)
+    const rested = await db
+      .select({ id: receipts.id })
+      .from(receipts)
+      .where(and(eq(receipts.actorId, me.id), isNotNull(receipts.nextAttemptAt)))
+    expect(rested).toHaveLength(1)
+    expect(await restsMinutes(onlyRow(rested)?.id ?? '')).toBeGreaterThan(29)
+    // must not: none of the three is asked while one rests
+    await readAll(model, now)
+    expect(model.asked).toBe(2)
+
+    // the model back, past the rest: the whole batch is read in one round
+    await restOver(me)
+    await restOver(other)
+    const back = reads()
+    await readAll(back, now)
+    expect(back.asked).toBe(4)
+    for (const id of [...batch, theirs]) expect((await receiptOf(id))?.status).toBe('parsed')
   }, 30_000)
 
   it('must not rest an Armenian receipt between tries: Tesseract takes it past its ten minutes as before', async () => {
@@ -279,7 +325,7 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
     await readAll(model, () => new Date())
     await readAll(model, () => new Date())
     expect(model.asked).toBe(2)
-    expect((await receiptOf(id))?.status).toBe('queued')
+    expect(await receiptOf(id)).toMatchObject({ status: 'queued', nextAttemptAt: null })
   }, 30_000)
 })
 
@@ -298,7 +344,7 @@ describe('whether the model reads for the person now (MOL-408, adversarial А3, 
   const nextMonth = spendMonthOf(
     new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1)),
   )
-  // one call of the largest request, as the queue reserves it
+  // the largest request's worst: no call the queue reserves costs more
   const worst = worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX)
 
   it('says yes to a grant with its share and the month’s cap left', async () => {

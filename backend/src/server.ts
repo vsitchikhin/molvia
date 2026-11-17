@@ -17,9 +17,6 @@ import {
   errorResponseSchema,
   isWireCode,
   describeFailure,
-  spendMonthOf,
-  worstCallMicroUsd,
-  RECEIPT_MODEL_INPUT_MAX,
 } from '@molvia/model'
 import type { ErrorCode, ErrorResponse, TelegramUserId } from '@molvia/model'
 import { InvalidBody } from '@/parse'
@@ -82,7 +79,7 @@ import { previousItems } from '@/usecases/previous-items'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { mergeTick } from '@/usecases/merge-twins'
-import { readQueuedReceipts } from '@/usecases/read-receipts'
+import { readQueuedReceipts, readsReceiptsByModel } from '@/usecases/read-receipts'
 import { spelledBrands } from '@/usecases/spell-brands'
 import type { SpellReport } from '@/usecases/spell-brands'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
@@ -643,6 +640,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       options.receiptModelShareMicroUsd ?? RECEIPT_MODEL_SHARE_MICRO_USD,
       capMicroUsd,
     )
+    const modelDeps =
+      model === null ? null : { reader: model, spend: modelSpend, capMicroUsd, shareMicroUsd }
     const taxOffice =
       options.purs === undefined
         ? pursOf(instance.log, (error) => {
@@ -919,8 +918,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           PHONE_NOTICES_PER_SENDER,
           (count) => ({ kind: 'receipt_partial_muted', count }),
         )
-        const modelDeps =
-          model === null ? null : { reader: model, spend: modelSpend, capMicroUsd, shareMicroUsd }
         const brandSpellings = createBrandSpellingRepository(db)
         // the brands of a receipt the model read, asked of it (MOL-326): counts and reasons only, never a brand
         const brandReport = (event: SpellReport): void => {
@@ -1211,17 +1208,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // Before the session is looked up: a foreign page or a link moves nothing (MOL-368).
       guarded.addHook('onRequest', refuseOutsideTheApp)
       withActor(guarded, (token, locale) => authenticate(sessions, actors, token, locale))
-      // the model reads for the person now: no key, no model; one more call of the largest request fits their share
-      // and the month's cap, as the queue reserves it (MOL-408, adversarial А3, Р2-А1)
-      actorMeRoute(guarded, (id) =>
-        model === null
-          ? Promise.resolve(false)
-          : modelSpend.readsFor(
-              spendMonthOf(new Date()),
-              worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX),
-              { actorId: id, capMicroUsd, shareMicroUsd },
-            ),
-      )
+      actorMeRoute(guarded, (id) => readsReceiptsByModel({ model: modelDeps }, id))
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),
       )
