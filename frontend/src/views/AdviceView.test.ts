@@ -10,6 +10,7 @@ import type {
   AdviceResponse,
   AdviceRow,
   AdviceSearchResponse,
+  Currency,
   PendingVerdicts,
   Rating,
   ReceiptsResponse,
@@ -176,7 +177,7 @@ async function render({
   identity?: boolean
   country?: string
   city?: string
-  spendCurrency?: string
+  spendCurrency?: Currency
   trip?: boolean
   /** What `/actors/me` said of the model (MOL-408); left out, the store holds no answer. */
   receiptsByModel?: boolean
