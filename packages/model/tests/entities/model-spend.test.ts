@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   RECEIPT_MODEL_OUTPUT_MAX,
+  RECEIPT_SECOND_MODEL,
   modelCallMicroUsd,
   modelInputTokensMax,
   modelSpendStep,
@@ -21,6 +22,20 @@ describe('what a call of the model costs (MOL-272, Т-3)', () => {
     expect(modelCallMicroUsd({ ...usage, cache_creation_input_tokens: 1_000_000 })).toBe(125_000)
     expect(modelCallMicroUsd({ ...usage, cache_read_input_tokens: 1_000_000 })).toBe(10_000)
     expect(modelCallMicroUsd({ ...usage, cache_read_input_tokens: null })).toBe(0)
+  })
+
+  it('is the second reader’s at Sonnet 5.5’s price, its cache by the same shares (MOL-405)', () => {
+    // am-01's usage at Sonnet's price: $0,033062
+    expect(
+      modelCallMicroUsd({ input_tokens: 5_321, output_tokens: 2_242 }, RECEIPT_SECOND_MODEL),
+    ).toBe(33_062)
+    const usage = { input_tokens: 0, output_tokens: 0 }
+    expect(
+      modelCallMicroUsd({ ...usage, cache_creation_input_tokens: 1_000_000 }, RECEIPT_SECOND_MODEL),
+    ).toBe(2_500_000)
+    expect(
+      modelCallMicroUsd({ ...usage, cache_read_input_tokens: 1_000_000 }, RECEIPT_SECOND_MODEL),
+    ).toBe(200_000)
   })
 })
 
@@ -44,6 +59,13 @@ describe('the worst a call may cost (Т-4)', () => {
     expect(worstCallMicroUsd(10_000)).toBeGreaterThan(
       modelCallMicroUsd({ input_tokens: 10_000, output_tokens: 10_534 }),
     )
+  })
+
+  it('is the second reader’s at its own price: twenty times Haiku’s (MOL-405)', () => {
+    expect(worstCallMicroUsd(10_000, RECEIPT_SECOND_MODEL)).toBe(
+      20_000 + RECEIPT_MODEL_OUTPUT_MAX * 10,
+    )
+    expect(worstCallMicroUsd(10_000, RECEIPT_SECOND_MODEL)).toBe(20 * worstCallMicroUsd(10_000))
   })
 })
 

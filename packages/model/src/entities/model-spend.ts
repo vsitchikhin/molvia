@@ -9,16 +9,31 @@
 export const RECEIPT_MODEL = 'claude-haiku-5-5'
 
 /**
- * Its price in micro-dollars a million tokens, for a request up to `RECEIPT_MODEL_INPUT_MAX` tokens (the
- * Claude API's price list, 06.10.2026): $0,10 in, $0,50 out — thinking is output — a cache write 1.25×
- * the input, a read 0.1×.
+ * The model that reads again a receipt the first did not read whole (MOL-405): Sonnet 5.5, the same prompt and schema.
+ * On the bench it adds a fifth of the right figures and no wrong one, at ten times Haiku's price a call.
  */
-export const RECEIPT_MODEL_PRICE = {
-  input: 100_000,
-  output: 500_000,
-  cacheWrite: 125_000,
-  cacheRead: 10_000,
-} as const
+export const RECEIPT_SECOND_MODEL = 'claude-sonnet-5-5'
+
+/** A model that reads receipts. */
+export type ReceiptModelName = typeof RECEIPT_MODEL | typeof RECEIPT_SECOND_MODEL
+
+/**
+ * Each model's price in micro-dollars a million tokens, for a request up to `RECEIPT_MODEL_INPUT_MAX` tokens (the
+ * Claude API's price list): Haiku $0,10 in, $0,50 out (06.10.2026), Sonnet $2 and $10 (17.11.2026) — thinking is
+ * output — a cache write 1.25× the input, a read 0.1×.
+ */
+export const RECEIPT_MODEL_PRICES = {
+  [RECEIPT_MODEL]: { input: 100_000, output: 500_000, cacheWrite: 125_000, cacheRead: 10_000 },
+  [RECEIPT_SECOND_MODEL]: {
+    input: 2_000_000,
+    output: 10_000_000,
+    cacheWrite: 2_500_000,
+    cacheRead: 200_000,
+  },
+} as const satisfies Record<
+  ReceiptModelName,
+  { input: number; output: number; cacheWrite: number; cacheRead: number }
+>
 
 /** The tokens the price above holds for; a request past it is priced otherwise and never sent. */
 export const RECEIPT_MODEL_INPUT_MAX = 100_000
@@ -45,9 +60,12 @@ export interface ModelUsage {
 
 const MILLION = 1_000_000
 
-/** A call's price by what it used, rounded up to the micro-dollar. */
-export function modelCallMicroUsd(usage: ModelUsage): number {
-  const p = RECEIPT_MODEL_PRICE
+/** A call's price by what it used, at its model's price, rounded up to the micro-dollar. */
+export function modelCallMicroUsd(
+  usage: ModelUsage,
+  model: ReceiptModelName = RECEIPT_MODEL,
+): number {
+  const p = RECEIPT_MODEL_PRICES[model]
   const millionths =
     usage.input_tokens * p.input +
     (usage.cache_creation_input_tokens ?? 0) * p.cacheWrite +
@@ -72,9 +90,15 @@ export function modelInputTokensMax(
   )
 }
 
-/** The most a call may cost: its input at most and the whole output it may take. */
-export function worstCallMicroUsd(inputTokens: number): number {
-  return modelCallMicroUsd({ input_tokens: inputTokens, output_tokens: RECEIPT_MODEL_OUTPUT_MAX })
+/** The most a call of the model may cost: its input at most and the whole output it may take. */
+export function worstCallMicroUsd(
+  inputTokens: number,
+  model: ReceiptModelName = RECEIPT_MODEL,
+): number {
+  return modelCallMicroUsd(
+    { input_tokens: inputTokens, output_tokens: RECEIPT_MODEL_OUTPUT_MAX },
+    model,
+  )
 }
 
 /**
