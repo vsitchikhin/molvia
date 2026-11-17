@@ -12,6 +12,7 @@ import {
   SCALE_DATA,
   SWITCH_DATA,
   keyboardOf,
+  languageOfText,
   readText,
   remindDue,
   reminderText,
@@ -150,22 +151,37 @@ describe('строка выключателя и итоги в тексте (MOL
     expect(keyboardOf(scale(undefined, undefined, 'off')).offer).toBe('off')
   })
 
-  it('кнопки называют язык своего сообщения — он читается обратно, и выключатель пишется на нём (MOL-398)', () => {
-    const keyboard = scale(MILK, undefined, 'off', 'en')
-    for (const button of keyboard.inline_keyboard.flat()) {
-      const data = 'callback_data' in button ? button.callback_data : ''
-      expect(data.endsWith(':en')).toBe(true)
-      expect(new TextEncoder().encode(data).length).toBeLessThanOrEqual(64)
+  it('кнопки не несут языка — бот прежнего релиза читает их на любом; выключатель — на языке сообщения (MOL-398, А6)', () => {
+    for (const language of ['ru', 'en'] as const) {
+      const keyboard = scale(MILK, undefined, 'off', language)
+      // Exactly the form of the release before: its bot reads every one after a rollback.
+      for (const button of keyboard.inline_keyboard.flat()) {
+        const data = 'callback_data' in button ? button.callback_data : ''
+        expect(data).toMatch(/^(rate:[0-9a-f-]{36}:[1-5]|remind:off)$/)
+      }
+      expect(keyboard.inline_keyboard[1]?.[0]?.text).toBe(t(language, 'remind.stop'))
+      expect(keyboardOf(keyboard)).toEqual({ itemId: MILK, offer: 'off' })
     }
-    expect(keyboard.inline_keyboard[1]?.[0]?.text).toBe(t('en', 'remind.stop'))
-    expect(keyboardOf(keyboard)).toEqual({ itemId: MILK, offer: 'off' })
-    // Russian is named by no suffix, as every reminder before MOL-398 was: the bot of the release
-    // before reads it, so a rollback leaves Russian reminders their buttons (adversarial А6).
-    expect(scale(MILK, undefined, 'off', 'ru')).toEqual(scale(MILK, undefined, 'off'))
-    for (const button of scale(MILK, undefined, 'off', 'ru').inline_keyboard.flat()) {
-      const data = 'callback_data' in button ? button.callback_data : ''
-      expect(data).toMatch(/^(rate:[0-9a-f-]{36}:[1-5]|remind:off)$/)
-    }
+  })
+
+  it('язык напоминания читается с его текста — и с итогами, и с «ещё»; иначе русский (MOL-398)', () => {
+    const english = reminderText(item('Milk'), 2, APP, null, 'en')
+    const russian = reminderText(item('Молоко'), 2, APP, null, 'ru')
+    expect(languageOfText(english)).toBe('en')
+    expect(languageOfText(reminderText(item('Milk'), 0, APP, null, 'en'))).toBe('en')
+    expect(
+      languageOfText(
+        writeText({
+          question: english,
+          rated: t('en', 'rate.done', { score: 4 }),
+          switched: t('en', 'remind.stopped'),
+        }),
+      ),
+    ).toBe('en')
+    expect(languageOfText(russian)).toBe('ru')
+    // A message Telegram handed over with no text, and one before MOL-398 — Russian, as they were.
+    expect(languageOfText(null)).toBe('ru')
+    expect(languageOfText('Вчера · SAS\nКефир — как вам?\n1 — плохо, 5 — отлично')).toBe('ru')
   })
 
   it('итог оценки и итог выключателя не стирают друг друга, в любом порядке', () => {

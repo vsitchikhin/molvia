@@ -33,6 +33,12 @@ const QUESTION = t(undefined, 'remind.question', {
   place: 'Ереван Сити',
   name: 'Молоко Ашхар 1 л',
 })
+/** An English reminder: its language is read off its own text (MOL-398). */
+const EN_QUESTION = t('en', 'remind.question', {
+  when: t('en', 'remind.yesterday'),
+  place: 'Yerevan City',
+  name: 'Milk Ashkhar 1 l',
+})
 
 interface Call {
   readonly method: string
@@ -166,12 +172,15 @@ describe('«Не напоминать» под напоминанием (MOL-103
 
     await bot.handleUpdate(press('remind:off', { from: { ...FROM, id: 999, language_code: 'en' } }))
     await bot.handleUpdate(
-      press('remind:off:en', { from: { ...FROM, id: 999, language_code: 'ru' } }),
+      press('remind:off', {
+        text: EN_QUESTION,
+        from: { ...FROM, id: 999, language_code: 'ru' },
+      }),
     )
 
     expect(switchReminders).toHaveBeenCalledWith(999, 'off')
     expect(edits(calls)[0]?.payload.text).toBe(`${QUESTION}\n\n${t('ru', 'remind.stopped')}`)
-    expect(edits(calls)[1]?.payload.text).toBe(`${QUESTION}\n\n${t('en', 'remind.stopped')}`)
+    expect(edits(calls)[1]?.payload.text).toBe(`${EN_QUESTION}\n\n${t('en', 'remind.stopped')}`)
   })
 
   it('отказ под английским сообщением — по-английски (адверсариальное А4)', async () => {
@@ -180,7 +189,9 @@ describe('«Не напоминать» под напоминанием (MOL-103
       switchReminders: vi.fn(() => Promise.reject(new ApiError(ERROR.INTERNAL))),
     })
 
-    await bot.handleUpdate(press('remind:off:en', { from: { ...FROM, language_code: 'ru' } }))
+    await bot.handleUpdate(
+      press('remind:off', { text: EN_QUESTION, from: { ...FROM, language_code: 'ru' } }),
+    )
 
     expect(alert(calls)?.text).toBe(t('en', 'remind.switchFailed'))
   })

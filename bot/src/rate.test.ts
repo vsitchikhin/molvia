@@ -33,6 +33,12 @@ const QUESTION = t(undefined, 'remind.question', {
   place: 'Ереван Сити',
   name: 'Молоко Ашхар 1 л',
 })
+/** An English reminder: its language is read off its own text (MOL-398). */
+const EN_QUESTION = t('en', 'remind.question', {
+  when: t('en', 'remind.yesterday'),
+  place: 'Yerevan City',
+  name: 'Milk Ashkhar 1 l',
+})
 
 interface Call {
   readonly method: string
@@ -171,14 +177,16 @@ describe('кнопки 1–5 под напоминанием (MOL-101)', () => {
     )
   })
 
-  it('итог — на языке сообщения, который назвала кнопка, а не Telegram (MOL-398)', async () => {
+  it('итог — на языке сообщения, прочитанном с него самого, а не Telegram (MOL-398)', async () => {
     const rateFromBot = vi.fn(() => Promise.resolve())
     const { bot, calls } = harness({ rateFromBot })
 
-    await bot.handleUpdate(press(`rate:${MILK}:4:en`, { from: { ...FROM, language_code: 'ru' } }))
+    await bot.handleUpdate(
+      press(`rate:${MILK}:4`, { text: EN_QUESTION, from: { ...FROM, language_code: 'ru' } }),
+    )
 
     expect(edits(calls)[0]?.payload.text).toBe(
-      `${QUESTION}\n\n✓ ${t('en', 'rate.done', { score: 4 })}`,
+      `${EN_QUESTION}\n\n✓ ${t('en', 'rate.done', { score: 4 })}`,
     )
     expect(edits(calls)[0]?.payload.reply_markup).toEqual(scale(MILK, 4, undefined, 'en'))
   })
@@ -189,14 +197,14 @@ describe('кнопки 1–5 под напоминанием (MOL-101)', () => {
       rateFromBot: vi.fn(() => Promise.reject(new ApiError(ERROR.INTERNAL))),
     })
     await failing.bot.handleUpdate(
-      press(`rate:${MILK}:4:en`, { from: { ...FROM, language_code: 'ru' } }),
+      press(`rate:${MILK}:4`, { text: EN_QUESTION, from: { ...FROM, language_code: 'ru' } }),
     )
     expect(alert(failing.calls)?.text).toBe(t('en', 'rate.failed'))
 
     const gone = harness({
       rateFromBot: vi.fn(() => Promise.reject(new ApiError(ERROR.NOT_FOUND))),
     })
-    await gone.bot.handleUpdate(press(`rate:${MILK}:4:en`))
+    await gone.bot.handleUpdate(press(`rate:${MILK}:4`, { text: EN_QUESTION }))
     expect(alert(gone.calls)?.text).toBe(t('en', 'rate.gone'))
   })
 

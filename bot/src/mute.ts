@@ -6,7 +6,7 @@ import { ERROR } from '@molvia/model'
 import type { ReminderSwitch } from '@molvia/model'
 import { dropKeyboard, refuse, settleKeeping, shownText, stopSpinner } from './answer'
 import { t } from './i18n'
-import { SWITCH_DATA, keyboardOf, languageOf, readText, scale, writeText } from './remind'
+import { SWITCH_DATA, keyboardOf, languageOfText, readText, scale, writeText } from './remind'
 import { handlerOf, reportDefect } from './failure'
 
 export interface MuteDeps {
@@ -40,8 +40,8 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
 
   composer.chatType('private').callbackQuery(SWITCH_DATA, async (ctx) => {
     const offer = ctx.match[1] === 'on' ? 'on' : 'off'
-    // The message's language, from the button pressed: the outcome, a refusal, the switch rebuilt (MOL-398).
-    const language = languageOf(ctx.match)
+    // The message's language, read off it: the outcome, a refusal, the switch rebuilt (MOL-398).
+    const language = languageOfText(shownText(ctx.callbackQuery.message))
     try {
       await api.switchReminders(ctx.from.id, offer)
     } catch (error) {

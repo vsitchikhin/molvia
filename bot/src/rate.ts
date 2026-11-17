@@ -5,7 +5,7 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import { dropKeyboard, refuse, settleKeeping, shownText, stopSpinner } from './answer'
 import { t } from './i18n'
-import { SCALE_DATA, keyboardOf, languageOf, readText, scale, writeText } from './remind'
+import { SCALE_DATA, keyboardOf, languageOfText, readText, scale, writeText } from './remind'
 import { handlerOf, reportDefect } from './failure'
 
 export interface RateDeps {
@@ -25,8 +25,8 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
 
   composer.chatType('private').callbackQuery(SCALE_DATA, async (ctx) => {
     const [, itemId = '', digit = ''] = ctx.match
-    // The message's language, from the button pressed: the outcome, a refusal and the scale rebuilt (MOL-398).
-    const language = languageOf(ctx.match)
+    // The message's language, read off it: the outcome, a refusal and the scale rebuilt (MOL-398).
+    const language = languageOfText(shownText(ctx.callbackQuery.message))
     const score = Number(digit)
 
     // The API call alone is inside the `try`, as in `login.ts`: a Telegram failure after the

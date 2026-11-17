@@ -13,15 +13,13 @@ import type { Wait } from './deliver'
 /**
  * What a button of the scale carries: the item and the digit — and never whose verdict it is.
  * That is `ctx.from.id`, Telegram's word for who pressed, so a message forwarded to someone else
- * rates for them, never for the person it was sent to. And `:en` where its message is English
- * (MOL-398): the outcome, a refusal and the rebuilt switch are written in it, though the bot keeps
- * nothing. **Only English is named**: every reminder before MOL-398 was Russian, so a button that
- * names none is Russian whenever it was sent — and the bot of the release before reads every
- * Russian one still, so a rollback strips only English reminders of their buttons (adversarial А6).
- * 46 bytes of Telegram's 64.
+ * rates for them, never for the person it was sent to. 43 bytes of Telegram's 64. **Never the
+ * language** (MOL-398, adversarial А6): a button of a new form is one the bot of the release before
+ * does not know, and a rollback stripped every reminder of its buttons — the language is read off the
+ * message itself (`languageOfText`).
  */
 const PREFIX = 'rate:'
-export const SCALE_DATA = new RegExp(`^${PREFIX}([0-9a-f-]{36}):([1-5])(?::(?<language>en))?$`)
+export const SCALE_DATA = new RegExp(`^${PREFIX}([0-9a-f-]{36}):([1-5])$`)
 
 /**
  * The switch under the last reminder of the evening (MOL-103, В-2): «Не напоминать», and once it is
@@ -30,11 +28,22 @@ export const SCALE_DATA = new RegExp(`^${PREFIX}([0-9a-f-]{36}):([1-5])(?::(?<la
  */
 export type Offer = 'off' | 'on'
 const SWITCH_PREFIX = 'remind:'
-export const SWITCH_DATA = new RegExp(`^${SWITCH_PREFIX}(off|on)(?::(?<language>en))?$`)
+export const SWITCH_DATA = new RegExp(`^${SWITCH_PREFIX}(off|on)$`)
 
-/** The language of the message a pressed button stands under: English where it says so, else Russian. */
-export function languageOf(match: string | RegExpMatchArray): AppLocale {
-  return typeof match !== 'string' && match.groups?.language === 'en' ? 'en' : 'ru'
+/** The line a reminder's question ends with in a language: the scale's meaning, «1 — bad, 5 — excellent». */
+function scaleLine(language: AppLocale): string {
+  return t(language, 'remind.question').split('\n').at(-1) ?? ''
+}
+
+/**
+ * The language a reminder is written in, read off its own text — Telegram's copy is the bot's only
+ * memory (MOL-398): English where its question carries the English scale's line, else Russian, as every
+ * reminder before MOL-398 was and as one with no text to read is taken. The outcome of a press, a
+ * refusal over it and the switch rebuilt speak it — one source, the message pressed.
+ */
+export function languageOfText(text: string | null): AppLocale {
+  const lines = text === null ? [] : readText(text).question.split('\n')
+  return lines.includes(scaleLine('en')) ? 'en' : 'ru'
 }
 
 /**
@@ -49,12 +58,11 @@ export function scale(
   language: AppLocale = 'ru',
 ): InlineKeyboard {
   const keyboard = new InlineKeyboard()
-  const named = language === 'en' ? ':en' : ''
   if (itemId) {
     for (const score of [1, 2, 3, 4, 5]) {
       keyboard.text(
         score === pressed ? `${String(score)} ✓` : String(score),
-        `${PREFIX}${itemId}:${String(score)}${named}`,
+        `${PREFIX}${itemId}:${String(score)}`,
       )
     }
   }
@@ -62,7 +70,7 @@ export function scale(
     if (itemId) keyboard.row()
     keyboard.text(
       t(language, offer === 'off' ? 'remind.stop' : 'remind.resume'),
-      `${SWITCH_PREFIX}${offer}${named}`,
+      `${SWITCH_PREFIX}${offer}`,
     )
   }
   return keyboard

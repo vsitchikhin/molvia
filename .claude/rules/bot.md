@@ -56,7 +56,7 @@ press — the only channel people are given, because there Telegram already says
   substitution. The language is `pickLocale` of `packages/model`, the very rule the PWA uses:
   Telegram's `language_code` is an IETF tag like any other, and a second copy of that decision
   would be a second place to drift. **A reminder is the exception: it speaks the app's language the
-  API hands with it** (MOL-398), and the answer to a press of it speaks what its button names.
+  API hands with it** (MOL-398), and the answer to a press of it speaks the language of its message.
 - **The bot keeps no state of its own.** The login code rides in the button's `callback_data`,
   which is Telegram's memory rather than ours, and everything else is asked of the API — the
   only write path there is. So nothing survives a restart, because nothing needs to.
@@ -245,13 +245,12 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   it — always Russian): it is sent without an update, so Telegram's is not at hand, and the account keeps
   the one every request of the phone names (`actors.locale`, `LOCALE_HEADER`), handed as `language` with
   the reminder; none — Russian, as it was, and a bot of the new version reads the API of the old one.
-  **A button of an English message says so** (`:en` after the digit or the action, 46 bytes of 64): the
-  bot keeps nothing, so a press reads the language off the button pressed — one source — and its outcome,
-  a refusal over it and the switch rebuilt speak the message's. **Russian is named by no suffix** (review
-  №1–2, adversarial А6): every reminder before MOL-398 was Russian, so a button naming none is Russian
-  whenever it was sent, and the bot of the release before reads every Russian one still. **The price,
-  named:** rolled back past this release, the old bot does not know an English reminder's buttons — it
-  answers «ссылка больше не действует» and strips them; English reminders did not exist before it.
+  **A press reads the language off the message itself** (`languageOfText`): the bot keeps nothing, and
+  Telegram's copy is its memory — English where the question carries the English scale's line, else
+  Russian, as every reminder before MOL-398 was and as one handed over with no text is taken; the outcome,
+  a refusal over it and the switch rebuilt speak it. **The buttons carry no language** (adversarial А6): a
+  button of a new form is one the bot of the release before does not know, and a rollback stripped every
+  reminder sent since of its scale with «ссылка больше не действует» — so their form is the one before.
   «Ещё N ждут» picks its form by the language's plural rule (`remind.more.*`, adversarial А5). The silence
   warning, the sign-in notice and a leak's message stay Russian then English: a notice not understood is
   the harm it warns of, and a kept language may be one a stranger never read.

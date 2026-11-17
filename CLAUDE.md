@@ -579,8 +579,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   sends** (MOL-101) — at most once; 19:00 of the person's day, then 3 and 7 days, then six months
   of silence, and any own verdict starts over; a press is the verdict of `ctx.from.id` and keeps
   the scale. **It speaks the language the app last spoke** (`actors.locale`, MOL-398), Russian where
-  none is known; an English one's buttons say so, a Russian one's as before, so a press answers in it
-  and a rollback keeps every Russian reminder; the other notices stay in both.
+  none is known; a press answers in the language read off the message, the buttons as before — a
+  rollback's bot reads them all; the other notices stay in both.
 - **The reminders' switch is `actors.reminders_off`, and it says why** (MOL-103): `chosen` or
   `blocked`; a block never overwrites «chosen», an unblock turns on only what blocking turned off,
   **the settings never lift a block** (В-5), and «on» starts the ladder over unless it reminded
