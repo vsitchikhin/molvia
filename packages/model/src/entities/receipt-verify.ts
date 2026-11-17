@@ -80,7 +80,11 @@ export type ReceiptReason = (typeof RECEIPT_REASONS)[number]
 /** What goes to the review as read, and why the rest did not (MOL-309). */
 export interface ExplainedReading {
   readonly shown: ReceiptText
-  /** For each line, in their order: why it was emptied or lost its price; `null` — shown as read. */
+  /**
+   * For each line, in their order: why the check emptied it or took its price; `null` — shown as read. The check's
+   * word, whatever a witness gave back after it (MOL-405): a line it shows again stands under «проверьте» with its
+   * reason kept.
+   */
   readonly lines: readonly (ReceiptLineReason | null)[]
   /** Why the receipt is not proven whole; `null` — it is. */
   readonly receipt: ReceiptReason | null
@@ -101,7 +105,8 @@ function sumsCopied(lines: readonly ReceiptTextLine[]): boolean {
 
 /**
  * `verifiedReading`, with the reasons of what it did not show (MOL-309) — and, given another reading of the same
- * paper by a second model (MOL-405), with what that reading vouches for (`witnessed`).
+ * paper by a second model (MOL-405), with what that reading vouches for (`witnessed`): shown under «проверьте», the
+ * check's reason of the line kept.
  */
 export function explainedReading(
   text: ReceiptText,
@@ -113,12 +118,15 @@ export function explainedReading(
   // for every sum (MOL-310, round 2; owner, 13.11.2026: «улучшать чтение, а не стирать прочитанное»): a line whose
   // quantity or price does not hold keeps its sum alone
   const summed = byModel && !proven && sumsMeet(text)
-  const checked = text.lines.map((line) => verifiedLine(line, proven, text.layout, byModel, summed))
+  const checked = text.lines.map((line) => ({
+    read: line,
+    ...verifiedLine(line, proven, text.layout, byModel, summed),
+  }))
   const shown = checked.map((one) => one.line)
   return {
     shown: {
       ...text,
-      lines: witness === undefined ? shown : witnessed(text.lines, shown, witness.lines),
+      lines: witness === undefined ? shown : witnessed(checked, witness.lines),
       balanced: proven,
     },
     lines: checked.map((one) => one.reason),
@@ -128,21 +136,28 @@ export function explainedReading(
 
 /**
  * Which of two readings of one receipt goes to the review (MOL-405, owner's В-1 «а», rule R3 of the bench): the one
- * proven whole; else the one with a total shown; else the one with more lines shown as read; a tie — the first. The
- * code knows no truth, only what each reading proves: a second reading with more lines and no total took four wrong
- * figures and lost a total on the bench (am-34, am-07b), where the total comes before the count.
+ * proven whole; else the one that found lines, where the other found none (adversarial А1: a section of one sum
+ * would take the lines read); else the one with a total shown; else the one with more lines shown as read; a tie —
+ * the first. The code knows no truth, only what each reading proves: a second reading with more lines and no total
+ * took four wrong figures and lost a total on the bench (am-34, am-07b), where the total comes before the count — and
+ * a reading with the total and fewer lines takes the lines it lost with it, the price named (`receipts.md`).
  */
 export function betterReading(
   first: ExplainedReading,
   second: ExplainedReading,
 ): 'first' | 'second' {
-  const whole = (one: ExplainedReading) => one.receipt === null
-  if (whole(first) !== whole(second)) return whole(second) ? 'second' : 'first'
-  const totalled = (one: ExplainedReading) => one.shown.totalHundredths !== null
-  if (totalled(first) !== totalled(second)) return totalled(second) ? 'second' : 'first'
-  const read = (one: ExplainedReading) =>
-    one.shown.lines.filter((line) => line.sumHundredths !== null).length
-  return read(second) > read(first) ? 'second' : 'first'
+  const by = (proves: (one: ExplainedReading) => boolean): 'first' | 'second' | null =>
+    proves(first) === proves(second) ? null : proves(second) ? 'second' : 'first'
+  return (
+    by((one) => one.receipt === null) ??
+    by((one) => one.shown.lines.length > 0) ??
+    by((one) => one.shown.totalHundredths !== null) ??
+    (shownAsRead(second) > shownAsRead(first) ? 'second' : 'first')
+  )
+}
+
+function shownAsRead(one: ExplainedReading): number {
+  return one.shown.lines.filter((line) => line.sumHundredths !== null).length
 }
 
 const WITNESSED = [
@@ -153,47 +168,53 @@ const WITNESSED = [
 ] as const
 
 /**
+ * The check's reasons a witness answers: a line whose figures hold, emptied only for want of a second source (MOL-255
+ * В-2, MOL-310). Never one the check proved wrong — its arithmetic, a zero, a figure missing, a swap, the memory's doubt
+ * (adversarial А2, А3в): two readings alike do not make «2 × 335 = 770» true.
+ */
+const WITNESS_ANSWERS: ReadonlySet<ReceiptLineReason> = new Set([
+  'one_alike_unproven',
+  'no_price_unproven',
+])
+
+/**
  * A figure the check emptied, shown again where the other reading has a line of the very same figures (MOL-405,
  * owner's В-4 «а»): two models read the paper apart, and a figure both copied alike is the paper's — but for the font's
- * 5, which both read as a 6 alike, so a figure with a 6 in it is never vouched for so. On the bench, 205 right figures
- * and 4 wrong shown again; with a 6, 25 right and 35 wrong. **Shown under «проверьте»** (`repaired`, owner's В-5 «а»):
- * the check's own arithmetic did not prove it. The other reading's lines are each a witness once, in order; a line the
- * shop's memory doubts has none (MOL-291).
+ * 5, which both read as a 6 alike, so a figure with a 6 in it is never vouched for so. **Shown under «проверьте»**
+ * (`repaired`, owner's В-5 «а»): the check's own arithmetic did not prove it. Only a line the check emptied whole and for
+ * want of a second source (`WITNESS_ANSWERS`): a sum the total vouched for stays as read, and an earlier build, which
+ * gets a line under «проверьте» empty, loses none of it (adversarial А4). The other reading's lines are each a witness
+ * once, in order, and of the same article where both print one (adversarial А3).
  */
 function witnessed(
-  read: readonly ReceiptTextLine[],
-  shown: readonly ReceiptTextLine[],
+  checked: readonly (CheckedLine & { readonly read: ReceiptTextLine })[],
   witness: readonly ReceiptTextLine[],
 ): ReceiptTextLine[] {
-  const used = new Set<number>()
-  return read.map((line, i) => {
-    const kept = shown[i] ?? line
-    const at = witness.findIndex((other, k) => !used.has(k) && agrees(line, other))
+  let next = 0
+  return checked.map(({ read: line, line: kept, reason }) => {
+    const answered =
+      reason !== null && WITNESS_ANSWERS.has(reason) && WITNESSED.every((key) => kept[key] === null)
+    if (!answered) return kept
+    const at = witness.findIndex((other, k) => k >= next && agrees(line, other))
     if (at < 0) return kept
-    used.add(at)
-    if (line.remembered === 'doubted') return kept
-    const back = (key: (typeof WITNESSED)[number]): number | null => {
-      const figure = line[key]
-      return kept[key] === null && figure !== null && !String(figure).includes('6')
-        ? figure
-        : kept[key]
-    }
-    const again = {
-      ...kept,
-      quantityMilli: back('quantityMilli'),
-      priceHundredths: back('priceHundredths'),
-      sumHundredths: back('sumHundredths'),
-      discountHundredths: back('discountHundredths'),
-    }
-    return WITNESSED.every((key) => again[key] === kept[key]) ? kept : { ...again, repaired: true }
+    next = at + 1
+    const back = Object.fromEntries(
+      WITNESSED.map((key) => {
+        const figure = line[key]
+        return [key, figure !== null && !String(figure).includes('6') ? figure : null]
+      }),
+    ) as Pick<ReceiptTextLine, (typeof WITNESSED)[number]>
+    return WITNESSED.every((key) => back[key] === null)
+      ? kept
+      : { ...kept, ...back, repaired: true }
   })
 }
 
-/** Every figure the line has, the other has alike — and the line has one. */
+/** The very same figures, none missing on one side alone — and the same article, where both print one. */
 function agrees(line: ReceiptTextLine, other: ReceiptTextLine): boolean {
   return (
-    WITNESSED.some((key) => line[key] !== null) &&
-    WITNESSED.every((key) => line[key] === null || line[key] === other[key])
+    WITNESSED.every((key) => line[key] === other[key]) &&
+    (line.sku === null || other.sku === null || line.sku === other.sku)
   )
 }
 
