@@ -1,6 +1,6 @@
 import { randomInt } from 'node:crypto'
 import { expect, test } from '@playwright/test'
-import { FF_HEADER, POLICY_VERSION, SESSION_COOKIE, ffFromHeader, ffHeaderOf } from '@molvia/model'
+import { FF_HEADER, POLICY_VERSION, SESSION_COOKIE } from '@molvia/model'
 import type { FfName } from '@molvia/model'
 import type { ConsoleMessage, Page, Request, Response, Route } from '@playwright/test'
 
@@ -311,29 +311,27 @@ export async function launchOffline(page: Page, path = '/'): Promise<void> {
 
 /**
  * The phone of this page hears `names` off (MOL-382, В-2 «а»): the run's API has every «фф» on, so a
- * feature's «off» is the header every answer of the API names them in, rewritten on its way to the page.
- * Laid before `open()`, as every route a step relies on is (MOL-249). An answer without the header is
- * left as it is; a route a spec lays after it answers by itself, and the phone keeps what it heard.
+ * feature's «off» is the header every answer of the API names them in, rewritten as the page's `fetch`
+ * hands it over — inside the page, after every route: a route a spec lays and lets go on with
+ * `route.continue()` skips the routes laid before it, and one rewritten there let a feature on (adversarial
+ * А4). Laid before `open()`, as an init script is; an answer without the header is left as it is.
  */
 export async function ffOff(page: Page, names: readonly FfName[]): Promise<void> {
-  const header = FF_HEADER.toLowerCase()
-  await page.route('**/api/**', async (route) => {
-    let response: Awaited<ReturnType<Route['fetch']>>
-    try {
-      response = await route.fetch()
-    } catch {
-      // the request did not come back — the page closing under a poll in flight, the API gone — and
-      // the page is told so, as it would be with no route
-      await route.abort().catch(() => undefined)
-      return
-    }
-    const headers = response.headers()
-    const named = headers[header]
-    if (named === undefined) {
-      await route.fulfill({ response })
-      return
-    }
-    const left = new Set([...ffFromHeader(named)].filter((name) => !names.includes(name)))
-    await route.fulfill({ response, headers: { ...headers, [header]: ffHeaderOf(left) } })
-  })
+  await page.addInitScript(
+    ({ header, off }) => {
+      const fetched = window.fetch.bind(window)
+      window.fetch = async (...asked) => {
+        const response = await fetched(...asked)
+        const named = response.headers.get(header)
+        if (named === null) return response
+        const headers = new Headers(response.headers)
+        const left = named.split(',').map((word) => word.trim())
+        headers.set(header, left.filter((word) => word !== '' && !off.includes(word)).join(','))
+        // the answer itself, its url and body untouched; only what its headers say is another's
+        Object.defineProperty(response, 'headers', { value: headers })
+        return response
+      }
+    },
+    { header: FF_HEADER, off: [...names] },
+  )
 }
