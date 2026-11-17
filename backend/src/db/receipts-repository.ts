@@ -894,6 +894,14 @@ export async function recordedTwinOf(
 }
 
 export function createReceiptRepository(db: Conn): ReceiptRepository {
+  /** Back to the queue from `reading`, its attempt not counted: `release`, `releaseLink` and `rest`, with what else. */
+  async function released(id: string, also: { readonly nextAttemptAt?: SQL } = {}): Promise<void> {
+    await db
+      .update(receipts)
+      .set({ status: 'queued', attempts: sql`greatest(${receipts.attempts} - 1, 0)`, ...also })
+      .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+  }
+
   async function summaryOf(conn: Conn, id: string): Promise<ReceiptSummary> {
     const [found] = await conn
       .select(summaryColumns)
@@ -1498,7 +1506,10 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             select count(*) from ${receipts} served
             where served.actor_id = waiting.actor_id
               and served.reading_at > clock_timestamp() - interval '1 hour'
-          ), waiting.queued_at, waiting.id
+          ),
+          -- a rest over goes to the person's receipt tried longest ago, a receipt never tried first: one the model
+          -- fails on by itself must not take every try of the rest and hold the others a day (MOL-408, Р4-А1)
+          waiting.next_attempt_at nulls first, waiting.queued_at, waiting.id
           limit 1`)
         if (next !== undefined) {
           // one runner reads, so the row is ours; the lock keeps a second process from it all the same
@@ -1550,27 +1561,22 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async release(id) {
-      await db
-        .update(receipts)
-        .set({ status: 'queued', attempts: sql`greatest(${receipts.attempts} - 1, 0)` })
-        .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+      await released(id)
     },
 
     async rest(id) {
       // each try of the model away may cost its worst in the person's share (MOL-367): the rest is the person's, never
       // a receipt's, or twenty receipts paid twenty worst prices a try and took the month's share in hours (Р3-А1)
-      await db.execute(sql`
-        update ${receipts} tried
-        set status = 'queued', attempts = greatest(tried.attempts - 1, 0),
-          next_attempt_at = clock_timestamp() + least(
-            make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MAX_MS / 1000}),
-            greatest(make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MIN_MS / 1000}),
-              clock_timestamp() - (
-                select min(waiting.queued_at) from ${receipts} waiting
-                where waiting.actor_id = tried.actor_id and waiting.country = tried.country
-                  and waiting.status in ('queued', 'reading') and waiting.source = 'photo'
-                  and waiting.deleted_at is null)))
-        where tried.id = ${id} and tried.status = 'reading'`)
+      await released(id, {
+        nextAttemptAt: sql`clock_timestamp() + least(
+          make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MAX_MS / 1000}),
+          greatest(make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MIN_MS / 1000}),
+            clock_timestamp() - (
+              select min(waiting.queued_at) from ${receipts} waiting
+              where waiting.actor_id = ${receipts.actorId} and waiting.country = ${receipts.country}
+                and waiting.status in ('queued', 'reading') and waiting.source = 'photo'
+                and waiting.deleted_at is null)))`,
+      })
     },
 
     async retry(id) {
@@ -1823,10 +1829,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async releaseLink(id) {
-      await db
-        .update(receipts)
-        .set({ status: 'queued', attempts: sql`greatest(${receipts.attempts} - 1, 0)` })
-        .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+      await released(id)
     },
 
     async askLater(id, minutes) {

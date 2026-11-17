@@ -66,14 +66,16 @@ const NIKORA: ModelReceipt = {
   ],
 }
 
-function fakeModel(answer: () => Promise<ModelReading>): ReceiptModel & { asked: number } {
+function fakeModel(
+  answer: (parts: readonly Buffer[]) => Promise<ModelReading>,
+): ReceiptModel & { asked: number } {
   const model = {
     asked: 0,
     version: 'claude-haiku-5-5@v5',
     inputTokensMax: () => 10_000,
-    read: () => {
+    read: (parts: readonly Buffer[]) => {
       model.asked += 1
-      return answer()
+      return answer(parts)
     },
     brandsVersion: 'claude-haiku-5-5@brands-v1',
     brandsInputTokensMax: () => 1_000,
@@ -81,15 +83,13 @@ function fakeModel(answer: () => Promise<ModelReading>): ReceiptModel & { asked:
   }
   return model
 }
-const reads = () =>
-  fakeModel(() =>
-    Promise.resolve({
-      kind: 'read',
-      answer: NIKORA,
-      costMicroUsd: 2_180,
-      tokens: { input: 5_909, output: 3_177 },
-    }),
-  )
+const NIKORA_READ: ModelReading = {
+  kind: 'read',
+  answer: NIKORA,
+  costMicroUsd: 2_180,
+  tokens: { input: 5_909, output: 3_177 },
+}
+const reads = () => fakeModel(() => Promise.resolve(NIKORA_READ))
 const away = () => fakeModel(() => Promise.reject(new ModelUnavailable('status 529', 0)))
 
 /** Tesseract that reads no line of anything: the Armenian receipt behind the Georgian one reaches it. */
@@ -316,6 +316,32 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
     await readAll(back, now)
     expect(back.asked).toBe(4)
     for (const id of [...batch, theirs]) expect((await receiptOf(id))?.status).toBe('parsed')
+  }, 30_000)
+
+  it('gives the try after the rest to the receipt not tried: one the model fails on by itself holds no other (Р4-А1)', async () => {
+    const me = await granted('GE')
+    const slow = await queued(me)
+    // the photo's last byte before its end tells the slow receipt to the fake (`jpeg`)
+    const slowByte = photos % 256
+    const next = await queued(me)
+    const model = fakeModel((parts) =>
+      parts[0]?.at(-4) === slowByte
+        ? Promise.reject(new ModelUnavailable('timeout', null))
+        : Promise.resolve(NIKORA_READ),
+    )
+    const now = () => new Date()
+
+    // the oldest first: it times out, and the person's receipts rest
+    await readAll(model, now)
+    expect(model.asked).toBe(1)
+    expect((await receiptOf(next))?.status).toBe('queued')
+
+    // the rest over: the receipt never tried goes first and is read, the slow one after it rests again
+    await restOver(me)
+    await readAll(model, now)
+    expect(model.asked).toBe(3)
+    expect((await receiptOf(next))?.status).toBe('parsed')
+    expect((await receiptOf(slow))?.status).toBe('queued')
   }, 30_000)
 
   it('must not rest an Armenian receipt between tries: Tesseract takes it past its ten minutes as before', async () => {
