@@ -314,8 +314,11 @@ The shape worth knowing here:
     next answer, no reload; its screens carry `meta.ff`, and while it is off a move there goes home as an unknown
     address does (`closedByFf`). **The next answer decides a move closed** (adversarial А2): a link opened cold is
     judged by what the device kept, before any answer, so an answer that names the фф on takes the person where
-    the link went, if they are still where the move landed — behind the door too, which stands over the route;
-    an answer naming it off ends it.
+    the link went, if they are still where the move landed — behind the door too, which stands over the route —
+    and no sheet is open there: the answer may come minutes later, with the connection, and a move of the router
+    closes a sheet and what was typed in it (adversarial Б1). The screen takes home's entry and its chain is laid
+    under it as under a screen opened cold (`settleColdStart`), so Android's «back» stays in the app (Б2); an
+    answer naming it off ends it.
   - **The bot reads none**: it is a client of the API, and a feature of the bot is closed by the API's route.
   - **A feature's tests run in both positions** (В-2 «а»): end-to-end's API has every фф on, so a spec meets the
     feature as people will; its «off» on the phone is `ffOff(page, names)` of `e2e/session.ts`, which rewrites the
