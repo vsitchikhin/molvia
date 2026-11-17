@@ -712,7 +712,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   away past its wait — Tesseract in `services/receipt-reader`, a container with no database
   and no disk. The API holds the queue, the photos and the parse, one receipt at a time.
 - **Georgia is read by the model alone** (MOL-408): its card has no Tesseract (`tesseractReads`) — a receipt the model
-  did not read fails `unreadable`, the model away waited for a day with the round stepping past it — the camera there
+  did not read fails `unreadable`, the model away waited for a day, asked hourly at most, the round stepping past it — the camera there
   only for whom `/actors/me` says `receiptsByModel` (a header: grant, share, cap), the digits of the tax and fiscal
   numbers the card's, every item a Georgian line finds «проверьте»; no tax number printed, no shop memory (MOL-438).
 - **A model's answer goes through the parse's own gate** (MOL-272): `receiptTextOfModel` into

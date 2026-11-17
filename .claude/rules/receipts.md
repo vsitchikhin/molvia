@@ -534,24 +534,30 @@ receipt proven whole, and its lines of one piece went empty.
   key, «Записать» writes no word, and the next receipt of the shop starts from nothing: every line «проверьте» every
   time, the person's corrections repeated. A key by the shop's name the model copies is MOL-438; Tesseract for those the
   model does not read (MOL-423) waits for it (owner's word, 17.11.2026).
-- **`tesseractReads` — no Tesseract** (`languages: null`, В-2 «а»): no layout of its reads a Georgian till, so a
+- **`tesseractReads`, `modelAlone` — no Tesseract** (`languages: null`, В-2 «а»): no layout of its reads a Georgian till, so a
   Georgian receipt the model did not read — no grant, the cap, the share, an answer not taken — fails `unreadable`
   («Строки на фото не разобрать. Покупки можно записать вручную»), never «переснимите»: a retake changes nothing. Its
   photo is never sent to the reader. One predicate for the server's queue and the phone's camera (review 1, №3).
 - **The model away is waited for a day, and the round steps past the receipt** (adversarial А2, owner's В-8 «а»):
   `RECEIPT_MODEL_ALONE_WAIT_MS` — ten minutes are there to hand a receipt to Tesseract, and failed after them a Georgian
-  receipt of an outage was lost for good. A waiting receipt of a country no Tesseract reads is released and stepped
-  over (`claimNext(passed)`), so an Armenian receipt behind it reaches Tesseract past its own ten minutes; one of
-  Armenia stops the round as before. **The price, named:** a receipt of an outage arrives hours later, asked of the
-  model every minute meanwhile; past the day, `unreadable`.
+  receipt of an outage was lost for good. A waiting receipt of a country no Tesseract reads (`modelAlone`) is released
+  and stepped over (`claimNext(passed)`), so an Armenian receipt behind it reaches Tesseract past its own ten minutes;
+  one of Armenia stops the round as before. **And it is asked less and less often** (adversarial Р2-А1, owner's В-9
+  «а»): no sooner than its wait so far after its last try — 1, 2, 4… minutes, an hour at most
+  (`RECEIPT_MODEL_ALONE_RETRY_MIN_MS`, `…_MAX_MS`, by `reading_at` and `queued_at`, no column of its own). A time out
+  is paid in doubt, its worst kept in the person's share (MOL-367), and asked every minute a day one receipt took the
+  month's share in under four hours; now some thirty tries a day, ≈ $0,27 at worst. **The price, named:** a receipt of
+  an outage arrives within an hour of the model's return, hours later; past the day, `unreadable`.
 - **The camera in Georgia is for whom the model reads now** (В-2 «а», adversarial А3): `/actors/me` says
-  `receiptsByModel` — the grant to come and edition 5 (`READS_BY_MODEL`, one condition with the queue's), the person's
-  share of the month not spent, the month's cap not reached, and a model on the server at all — only to a phone that
+  `receiptsByModel` — the grant to come and edition 5 (`READS_BY_MODEL`, one condition with the queue's), one more call
+  of the largest request fitting the person's share of the month and the month's cap (`ModelSpendRepository.readsFor`,
+  by `reserve`'s own fragments — `spent < share` offered the camera with $0,002 left, which no call fits, Р2-А1), and a
+  model on the server at all — only to a phone that
   asks (`RECEIPTS_BY_MODEL_HEADER`; an earlier build reads the answer strictly), and the store keeps it over the
   settings' answer, which does not say it; one read more a request that asks. Not said — an answer of a server before
   it, a launch offline — is no camera. **The price, named:** a grant, a share or the cap that ends between the shot and
-  the reading fails the receipt as unreadable; the share is held by what is spent, not by the next call's worst, so
-  the last receipt of a month near its share may still be refused; a launch with no connection shows Georgia no camera
+  the reading fails the receipt as unreadable; the camera goes some $0,018 before the share's end, where a small photo
+  would still fit; a launch with no connection shows Georgia no camera
   until `/actors/me` answers.
 - **Every item a Georgian line finds is «проверьте»** (В-5 «б», `findsAreGuesses` of the card): the catalogue names
   nothing in Georgian, so a line goes Serbia's way — the search of its name whole, by letters across scripts and by
