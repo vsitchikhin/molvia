@@ -77,6 +77,7 @@ function fakeModel(
       model.asked += 1
       return answer(parts)
     },
+    model: 'claude-haiku-5-5' as const,
     brandsVersion: 'claude-haiku-5-5@brands-v1',
     brandsInputTokensMax: () => 1_000,
     spellBrands: () => Promise.reject(new Error('no brand is asked')),

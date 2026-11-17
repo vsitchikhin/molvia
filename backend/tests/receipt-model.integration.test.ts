@@ -212,6 +212,7 @@ function fakeModel(
       return answer()
     },
     // these tests bind with no brands asked (MOL-326)
+    model: 'claude-haiku-5-5' as const,
     brandsVersion: 'claude-haiku-5-5@brands-v1',
     brandsInputTokensMax: () => 1_000,
     spellBrands: () => Promise.reject(new Error('no brand is asked in these tests')),
@@ -1814,6 +1815,7 @@ describe('the brands and the font of a receipt the model read, and of no other (
       version: 'claude-haiku-5-5@v5',
       inputTokensMax: () => 10_000,
       read: answer,
+      model: 'claude-haiku-5-5' as const,
       brandsVersion: 'claude-haiku-5-5@brands-v1',
       brandsInputTokensMax: () => 1_000,
       spellBrands: (brands: readonly { brand: string }[]) => {
