@@ -90,6 +90,13 @@ const NIKORA_READ: ModelReading = {
   tokens: { input: 5_909, output: 3_177 },
 }
 const reads = () => fakeModel(() => Promise.resolve(NIKORA_READ))
+/** The model up, but timing out on one photo every time — a receipt it fails on by itself, told by its photo whole. */
+const failsOn = (photo: Buffer | undefined) =>
+  fakeModel((parts) =>
+    photo !== undefined && parts[0]?.equals(photo) === true
+      ? Promise.reject(new ModelUnavailable('timeout', null))
+      : Promise.resolve(NIKORA_READ),
+  )
 const away = () => fakeModel(() => Promise.reject(new ModelUnavailable('status 529', 0)))
 
 /** Tesseract that reads no line of anything: the Armenian receipt behind the Georgian one reaches it. */
@@ -222,6 +229,14 @@ async function triedAMinuteAgo(me: Person): Promise<void> {
     .where(and(eq(receipts.actorId, me.id), isNotNull(receipts.readingAt)))
 }
 
+/** This receipt's own rest over, the person's others left resting. */
+async function restOverOf(id: string): Promise<void> {
+  await db
+    .update(receipts)
+    .set({ nextAttemptAt: new Date(Date.now() - 1_000) })
+    .where(eq(receipts.id, id))
+}
+
 /** The receipt arrived `agoMs` before now. */
 async function arrived(id: string, agoMs: number): Promise<void> {
   await db
@@ -343,12 +358,7 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
     const slow = await queued(me)
     const slowPhoto = await photoOf(slow)
     const next = await queued(me)
-    // the slow receipt told by its photo as the queue hands it over
-    const model = fakeModel((parts) =>
-      slowPhoto !== undefined && parts[0]?.equals(slowPhoto) === true
-        ? Promise.reject(new ModelUnavailable('timeout', null))
-        : Promise.resolve(NIKORA_READ),
-    )
+    const model = failsOn(slowPhoto)
     const now = () => new Date()
 
     // the oldest first: it times out, and the person's receipts rest
@@ -369,12 +379,7 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
     const slow = await queued(me)
     const slowPhoto = await photoOf(slow)
     await arrived(slow, 2 * 60 * 60_000)
-    // the slow receipt told by its photo as the queue hands it over
-    const model = fakeModel((parts) =>
-      slowPhoto !== undefined && parts[0]?.equals(slowPhoto) === true
-        ? Promise.reject(new ModelUnavailable('timeout', null))
-        : Promise.resolve(NIKORA_READ),
-    )
+    const model = failsOn(slowPhoto)
     const now = () => new Date()
     await readAll(model, now)
     expect(model.asked).toBe(1)
@@ -387,6 +392,42 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
     expect(model.asked).toBe(2)
     expect((await receiptOf(sent))?.status).toBe('parsed')
     expect((await receiptOf(slow))?.status).toBe('queued')
+    expect(await restsMinutes(slow)).toBeGreaterThan(58)
+  }, 30_000)
+
+  it('rests a receipt that failed once by its own age, the model up: the person’s slow one holds it no longer (В-11 «а», Р6-А1)', async () => {
+    const me = await granted('GE')
+    const neighbour = await granted('GE')
+    const slow = await queued(me)
+    const slowPhoto = await photoOf(slow)
+    await arrived(slow, 2 * 60 * 60_000)
+    const now = () => new Date()
+    await readAll(failsOn(slowPhoto), now)
+    expect(await restsMinutes(slow)).toBeGreaterThan(59)
+
+    // the model up: the neighbour's receipt is read; the person's new one times out once, the slow one every time
+    const theirs = await queued(neighbour)
+    const sent = await queued(me)
+    const sentPhoto = await photoOf(sent)
+    let hiccup = true
+    const model = fakeModel((parts) => {
+      const slowOne = slowPhoto !== undefined && parts[0]?.equals(slowPhoto) === true
+      const once = hiccup && sentPhoto !== undefined && parts[0]?.equals(sentPhoto) === true
+      if (once) hiccup = false
+      return slowOne || once
+        ? Promise.reject(new ModelUnavailable('timeout', null))
+        : Promise.resolve(NIKORA_READ)
+    })
+    await readAll(model, now)
+    expect((await receiptOf(theirs))?.status).toBe('parsed')
+    expect((await receiptOf(sent))?.status).toBe('queued')
+    expect(await restsMinutes(sent)).toBeLessThan(2)
+
+    // its own minute over, it is asked again and read, while the slow one keeps its hour
+    await restOverOf(sent)
+    await readAll(model, now)
+    expect(model.asked).toBe(3)
+    expect((await receiptOf(sent))?.status).toBe('parsed')
     expect(await restsMinutes(slow)).toBeGreaterThan(58)
   }, 30_000)
 

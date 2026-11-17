@@ -639,15 +639,15 @@ export interface ReceiptRepository {
   /**
    * The next receipt for the reader, now `reading`; `null` for an empty queue. People in turn, the one
    * read least in the last hour first (review А10): fifty receipts of one person do not hold
-   * another's behind them. None of a person's receipts of a country one of them `rest`s in (MOL-408).
+   * another's behind them. None that `rest`s, nor, through an outage, the person's others of its country (MOL-408).
    */
   claimNext(): Promise<ClaimedReceipt | null>
   /** Back to the queue, its attempt not counted: the reader was not there, the receipt not at fault. */
   release(id: string): Promise<void>
   /**
-   * Back to the queue as `release`, and the person's receipts of its country rest with it (MOL-408, owner's В-9 «а»,
-   * adversarial Р3-А1): none is claimed before `next_attempt_at`, as long again as the oldest of them has waited — 1, 2,
-   * 4… minutes, an hour at most. Whose country rests is the caller's to know.
+   * Back to the queue as `release`, not claimed again before `next_attempt_at` — as long again as it has waited, 1, 2,
+   * 4… minutes, an hour at most (MOL-408, owner's В-9 «а») — and, while the model reads nothing, the person's receipts
+   * of its country rest with it (Р3-А1, В-11 «а»). Whose country rests is the caller's to know.
    */
   rest(id: string): Promise<void>
   /**
@@ -1492,20 +1492,27 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     async claimNext() {
       return db.transaction(async (tx) => {
         // each person in turn: the one read least in the last hour first (review А10) — a person's next receipt waits
-        // behind everyone else's first; then a receipt never tried, then the one tried longest ago (Р4-А1), then the
-        // oldest. The second key is across people too: at one count, any receipt with no rest behind it — never tried,
-        // or of a country that never rests — goes before one back from a rest, however older (MOL-408, review №23)
+        // behind everyone else's first; then a receipt that never rested, then the one rested longest ago (Р4-А1),
+        // then the oldest. The second key is across people too: at one count, any receipt with no rest behind it —
+        // never rested, or of a country that never rests — goes before one back from a rest, however older (№23)
         const [next] = await tx.execute<{ id: string }>(sql`
           select waiting.id from ${receipts} waiting
           where waiting.status = 'queued' and waiting.source = 'photo' and waiting.deleted_at is null
+            and (waiting.next_attempt_at is null or waiting.next_attempt_at <= clock_timestamp())
             and not exists (
               select 1 from ${receipts} sibling
               where sibling.actor_id = waiting.actor_id and sibling.country = waiting.country
                 and sibling.status = 'queued' and sibling.source = 'photo' and sibling.deleted_at is null
                 and sibling.next_attempt_at > clock_timestamp()
-                -- a receipt never tried passes the person's rest, a try of theirs in the country a minute at most: the
-                -- model may be up and fail on one receipt alone (owner's В-10 «а», adversarial Р5-А1)
-                and (waiting.reading_at is not null
+                -- the person's receipts rest together only through an outage: the model has read nothing since that
+                -- try, or it was about that one receipt (owner's В-11 «а», adversarial Р6-А1)
+                and sibling.reading_at >= coalesce((
+                  select max(answered.read_at) from ${receipts} answered
+                  where starts_with(answered.reader_version, ${`${RECEIPT_MODEL}@`})
+                ), '-infinity')
+                -- a receipt that never rested passes it, a try of the person's in the country a minute at most
+                -- (owner's В-10 «а», adversarial Р5-А1)
+                and (waiting.next_attempt_at is not null
                   or sibling.reading_at > clock_timestamp()
                     - make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MIN_MS / 1000}))
             )
@@ -1569,17 +1576,14 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async rest(id) {
-      // each try of the model away may cost its worst in the person's share (MOL-367): the rest is the person's, never
-      // a receipt's, or twenty receipts paid twenty worst prices a try and took the month's share in hours (Р3-А1)
+      // each try of the model away may cost its worst in the person's share (MOL-367): through an outage the person's
+      // receipts rest with it (`claimNext`), or twenty receipts paid twenty worst prices a try (Р3-А1); as long as the
+      // receipt itself has waited, so one that failed once is not held by the age of another (В-11 «а», Р6-А1)
       await released(id, {
         nextAttemptAt: sql`clock_timestamp() + least(
           make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MAX_MS / 1000}),
           greatest(make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MIN_MS / 1000}),
-            clock_timestamp() - (
-              select min(waiting.queued_at) from ${receipts} waiting
-              where waiting.actor_id = ${receipts.actorId} and waiting.country = ${receipts.country}
-                and waiting.status in ('queued', 'reading') and waiting.source = 'photo'
-                and waiting.deleted_at is null)))`,
+            clock_timestamp() - ${receipts.queuedAt}))`,
       })
     },
 
