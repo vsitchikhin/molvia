@@ -3,7 +3,7 @@ import type { Api } from 'grammy'
 import { ApiError } from '@molvia/client'
 import type { MolviaBotClient } from '@molvia/client'
 import type { SilenceNotice } from '@molvia/model'
-import { t } from './i18n'
+import { pluralForm, t } from './i18n'
 import { dayInWords } from './when'
 import { reportDefect } from './failure'
 import { Flooded, deliver, sleep } from './deliver'
@@ -17,9 +17,9 @@ import type { Wait } from './deliver'
 
 /** «30 дней», «7 days»: the form by the language's own plural rule. */
 function days(language: 'ru' | 'en', n: number): string {
-  const form = new Intl.PluralRules(language).select(n)
-  const key =
-    form === 'one' ? 'silence.days.one' : form === 'few' ? 'silence.days.few' : 'silence.days.many'
+  const key = (
+    { one: 'silence.days.one', few: 'silence.days.few', many: 'silence.days.many' } as const
+  )[pluralForm(language, n)]
   return t(language, key, { n })
 }
 

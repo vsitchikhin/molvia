@@ -1,6 +1,6 @@
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
 import { actorSchema, telegramUserIdSchema } from '@molvia/model'
-import type { Actor, ActorPatch, NewActor, TelegramUserId } from '@molvia/model'
+import type { Actor, ActorPatch, AppLocale, NewActor, TelegramUserId } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
@@ -55,6 +55,13 @@ export interface ActorRepository {
    * arriving together write once. `now()`, the database's clock, as everywhere a moment is stamped.
    */
   markSeen(id: string, afterHours: number): Promise<boolean>
+
+  /**
+   * Keeps the language the person's app named (MOL-398, В-1 «в»): the one the bot's rating reminder
+   * speaks. Writes only where it differs — the condition in the `WHERE`, as `markSeen`'s is — and
+   * answers whether it wrote. Not a change of the row: `updated_at`'s trigger leaves it out (0087).
+   */
+  markLocale(id: string, locale: AppLocale): Promise<boolean>
 }
 
 /**
@@ -192,6 +199,16 @@ export function createActorRepository(db: Conn): ActorRepository {
             sql`${actors.lastSeenAt} < now() - make_interval(hours => ${afterHours}::int)`,
           ),
         )
+        .returning({ id: actors.id })
+      return written.length > 0
+    },
+
+    async markLocale(id, locale) {
+      if (idOrNull(id) === null) return false
+      const written = await db
+        .update(actors)
+        .set({ locale })
+        .where(and(eq(actors.id, id), sql`${actors.locale} is distinct from ${locale}`))
         .returning({ id: actors.id })
       return written.length > 0
     },

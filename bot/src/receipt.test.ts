@@ -145,7 +145,7 @@ describe('текст «чек разобран» (хендофф 08)', () => {
       'Чек от 27 сентября разобран, но он уже записан — второй раз записывать не нужно.',
     )
     expect(receiptText(notice({ duplicate: true, language: 'en' }))).toBe(
-      'Your Ереван Сити receipt is read, but it is saved already — no need to save it again.',
+      'Your Ереван Сити receipt has been read, but it’s already saved — no need to save it again.',
     )
     const button = receiptMessage(notice({ duplicate: true }), APP).keyboard?.inline_keyboard.flat()
     expect(button?.map(({ text }) => text)).toEqual(['Открыть чек'])

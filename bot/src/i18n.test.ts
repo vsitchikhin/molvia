@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { en } from '@/i18n/en'
 import { ru } from '@/i18n/ru'
 import { SETTINGS_CITIES } from '@molvia/model'
-import { hasMessage, t } from './i18n'
+import { hasMessage, pluralForm, t } from './i18n'
 
 /** `{device}`, `{n}` — what a message expects to be handed when it is printed. */
 function placeholders(message: string): string[] {
@@ -64,5 +64,20 @@ describe('перевод', () => {
     expect(t(undefined, 'login.confirm')).toBe('Войти')
     // `enm` — среднеанглийский, а не английский.
     expect(t('enm', 'login.confirm')).toBe('Войти')
+  })
+})
+
+describe('pluralForm (review №7 of MOL-398)', () => {
+  it.each([
+    ['ru', 1, 'one'],
+    ['ru', 21, 'one'],
+    ['ru', 2, 'few'],
+    ['ru', 11, 'many'],
+    ['ru', 5, 'many'],
+    ['en', 1, 'one'],
+    ['en', 2, 'many'],
+    ['en', 0, 'many'],
+  ] as const)('%s, %d — %s', (language, n, form) => {
+    expect(pluralForm(language, n)).toBe(form)
   })
 })

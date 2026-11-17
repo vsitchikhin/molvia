@@ -652,7 +652,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
       yearCharts({ differenceTotal: null, differenceMissing: ['2026-08'] }),
     )
     const view = await render()
-    expect(plain(view.text())).toContain("The difference for 2026 can't be counted")
+    expect(plain(view.text())).toContain('The difference for 2026 can’t be counted')
     expect(plain(view.text())).toContain('August')
   })
 
@@ -745,7 +745,7 @@ describe('MoneyChartsView (MOL-160): «Год»', () => {
       '/money/charts?mode=year&category=ffffffff-0000-4000-8000-000000000099',
     )
     expect((view.find('select').element as HTMLSelectElement).value).toBe(GROCERIES)
-    expect(plain(view.text())).toContain('That category is not on the charts — showing «Groceries»')
+    expect(plain(view.text())).toContain('That category is not on the charts — showing “Groceries”')
   })
 
   it('a category chosen goes into the address', async () => {

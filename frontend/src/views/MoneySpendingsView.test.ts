@@ -244,7 +244,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
     expect(view.text()).toContain(en.spending.pending)
     expect(plain(view.get('.total').text())).toContain('317,800')
     // One dot between the two parts, a space on either side (adversarial Б).
-    expect(plain(view.get('.approx').text())).toBe('≈ ₽68,788 · 1 spending not counted yet')
+    expect(plain(view.get('.approx').text())).toBe('≈ ₽68,788 · 1 expense not counted yet')
   }, 10_000)
 
   it('must not fire: with no «≈» the waiting spending starts the line, with no dot before it', async () => {
@@ -260,7 +260,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
       note: 'Taxi',
     })
     await flushPromises()
-    expect(plain(view.get('.approx').text())).toBe('1 spending not counted yet')
+    expect(plain(view.get('.approx').text())).toBe('1 expense not counted yet')
   })
 
   it('С-2: brings the spending just saved into view once its row is there', async () => {
@@ -358,7 +358,7 @@ describe('MoneySpendingsView: rows and the sheet', () => {
       expect(removeSpending).toHaveBeenCalledWith(BARBER)
     })
     await vi.waitFor(() => {
-      expect(view.text()).toContain('No spendings in September')
+      expect(view.text()).toContain('No expenses in September')
     })
     expect(view.find('.undo-strip').exists()).toBe(true)
     moneyMonth.mockResolvedValue(month({ previousSpent: null, income: rub('0') }))
@@ -438,7 +438,7 @@ describe('MoneySpendingsView: the journal of the month (MOL-159)', () => {
     const view = await render('/money/spendings?month=2026-08')
     expect(moneyMonth).toHaveBeenCalledWith('2026-08', undefined)
     const total = plain(view.get('.total').text())
-    expect(total).toContain('43 spendings')
+    expect(total).toContain('43 expenses')
     expect(total).toContain('317,800')
     expect(total).toContain('≈ ₽68,788')
     expect(view.text()).toContain('Barber')
@@ -453,7 +453,7 @@ describe('MoneySpendingsView: the journal of the month (MOL-159)', () => {
   it('a month with nothing in it says so by its name, with no button inside', async () => {
     moneyMonth.mockResolvedValue({ ...empty(), previousSpent: amd('100') })
     const view = await render()
-    expect(view.text()).toContain('No spendings in September')
+    expect(view.text()).toContain('No expenses in September')
     expect(view.find('.state button').exists()).toBe(false)
     expect(button(view, en.spending.summary.add).exists()).toBe(true)
   })
@@ -465,7 +465,7 @@ describe('MoneySpendingsView: the journal of the month (MOL-159)', () => {
     online(false)
     moneyMonth.mockRejectedValue(new TypeError('network'))
     const view = await render()
-    expect(view.text()).toContain('Offline · spendings as of')
+    expect(view.text()).toContain('Offline · expenses as of')
     expect(view.text()).toContain('Barber')
   })
 
@@ -766,7 +766,7 @@ describe('MoneySpendingsView: the kit’s states, the rhythm and the day’s sum
     ;(await render()).unmount()
     moneyMonth.mockRejectedValueOnce(new ApiError(ERROR.INTERNAL)).mockResolvedValue(month())
     const view = await render()
-    expect(view.get('.strip').text()).toContain('The server did not answer — spending as of')
+    expect(view.get('.strip').text()).toContain('The server did not answer — expenses as of')
     expect(view.text()).toContain('Barber')
     const asked = moneyMonth.mock.calls.length
     await view.get('.strip button').trigger('click')
@@ -781,7 +781,7 @@ describe('MoneySpendingsView: the kit’s states, the rhythm and the day’s sum
     online(false)
     moneyMonth.mockRejectedValue(new TypeError('network'))
     const view = await render()
-    expect(view.get('.strip').text()).toContain('Offline · spendings as of')
+    expect(view.get('.strip').text()).toContain('Offline · expenses as of')
     expect(view.find('.strip button').exists()).toBe(false)
   })
 
