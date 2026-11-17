@@ -2092,6 +2092,7 @@ describe('a receipt not read whole, read again by Sonnet (MOL-405)', () => {
       now,
     })
     expect(second.asked).toBe(1)
+    expect(reports).toContainEqual({ kind: 'second_slow', ms: RECEIPT_SECOND_SLOW_MS })
     const passed = reports.filter((r) => r.kind === 'second_passed').map((r) => r.reason)
     expect(passed).toEqual(['resting', 'resting'])
     const read = reports.flatMap((r) => (r.kind === 'read' ? [r.readerVersion] : []))
@@ -2141,6 +2142,96 @@ describe('a receipt not read whole, read again by Sonnet (MOL-405)', () => {
       tin: '01234567',
     })
   }, 30_000)
+
+  // adversarial В1: none there is the word of every payment row found — a mixed payment says nothing (MOL-312)
+  it('takes no way of paying from the first where Sonnet’s reading kept says none', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const mixed = [
+      { label: 'Ընդամենը', amount: '1027.10' },
+      { label: 'Վճարված է Առձեռն', amount: '500' },
+      { label: 'Վճարված է Անկանխիկ', amount: '527.10' },
+    ]
+    // Haiku lost the card's row: no total, and «cash» alone
+    const haiku = fakeModel(
+      answered({ ...ANSWER, totals: [{ label: 'Վճարված է Առձեռն', amount: '500' }] }, 2_180),
+    )
+    await readAll(benchReader(), haiku, {
+      second: sonnet(answered({ ...ANSWER, totals: mixed }, 30_000)),
+    })
+    expect(await receiptOf(id)).toMatchObject({
+      readerVersion: 'claude-sonnet-5-5@v5',
+      balanced: true,
+      paidBy: null,
+    })
+  }, 30_000)
+
+  describe('the shop’s memory, asked of both readings by one tax number (adversarial В2, review №17)', () => {
+    const TIN = '01234567'
+    const NUTS = '1110009'
+    // the paper: 10 × 55 = 550; both read the font's 5 as 6 in both columns, and 10 × 65 = 650 holds by itself
+    const nuts: ModelReceipt['lines'][number] = {
+      printed: 'Ընկույզ «Օրինակ»',
+      code: '0802',
+      article: NUTS,
+      quantity: '10',
+      unit: 'pcs',
+      unit_price: '65',
+      discount: null,
+      sum: '650',
+    }
+    const withoutTin = ANSWER.id_rows.filter((row) => !row.startsWith('ՀՎՀՀ'))
+    const nutsOf = async (id: string) =>
+      onlyRow(
+        await db
+          .select()
+          .from(receiptLines)
+          .where(sql`${receiptLines.receiptId} = ${id} and ${receiptLines.position} = 1`),
+      )
+    const remembered = async (me: Person) => {
+      const item = await insertItem(db, { name: 'Орехи', searchKey: 'orekhi' })
+      await memory.remember(me.id, TIN, [
+        { kind: 'sku', key: NUTS, itemId: item, price: { minor: 5_500n, currency: 'AMD' } },
+      ])
+    }
+
+    it('judges the first by the second’s tax number where it read none', async () => {
+      const me = await person(LATER)
+      await remembered(me)
+      const id = await queued(me)
+      const read = { ...ANSWER, lines: [ANSWER.lines[0]!, nuts], totals: [] }
+      await readAll(benchReader(), fakeModel(answered({ ...read, id_rows: withoutTin }, 2_180)), {
+        second: sonnet(answered(read, 30_000)),
+      })
+      expect(await receiptOf(id)).toMatchObject({ readerVersion: 'claude-haiku-5-5@v5', tin: TIN })
+      expect((await nutsOf(id))?.sumMinor).not.toBe(65_000n)
+    }, 30_000)
+
+    it('judges the second by the first’s tax number where it read none', async () => {
+      const me = await person(LATER)
+      await remembered(me)
+      const id = await queued(me)
+      // Sonnet's total takes it: the paper's 740 + 550, two places — one the lines as read do not meet
+      const read = {
+        ...ANSWER,
+        lines: [ANSWER.lines[0]!, nuts],
+        totals: [
+          { label: 'Ընդամենը', amount: '1290' },
+          { label: 'Վճարված է Առձեռն', amount: '1290' },
+        ],
+      }
+      await readAll(benchReader(), fakeModel(answered({ ...read, totals: [] }, 2_180)), {
+        second: sonnet(answered({ ...read, id_rows: withoutTin }, 30_000)),
+      })
+      // the memory's own 55 puts the nuts right, and then the lines meet the total: proven whole
+      expect(await receiptOf(id)).toMatchObject({
+        readerVersion: 'claude-sonnet-5-5@v5',
+        tin: TIN,
+        balanced: true,
+      })
+      expect(await nutsOf(id)).toMatchObject({ priceMinor: 5_500n, sumMinor: 55_000n })
+    }, 30_000)
+  })
 
   it('keeps the first, Sonnet’s answer paid, where it is one not taken', async () => {
     const me = await person(LATER)

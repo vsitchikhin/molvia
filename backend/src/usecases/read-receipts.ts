@@ -237,6 +237,8 @@ export type ReadReport =
       readonly reason: ModelPassReason | 'resting'
       readonly paid?: ModelPaid
     }
+  /** The second model answered slower than `RECEIPT_SECOND_SLOW_MS`, and rests (MOL-405, adversarial Б4, review №18). */
+  | { readonly kind: 'second_slow'; readonly ms: number }
   /** Which model was away, and why: a time out, the connection (MOL-405, review №4). */
   | {
       readonly kind: 'model_unavailable'
@@ -397,19 +399,30 @@ async function readByModel(
     alone.receipt !== null && first.text.lines.length > 0
       ? await readAgain(deps, modelDeps, claimed, month, now)
       : null
-  const { kept, witness, explained } =
+  const other =
     again === null
+      ? null
+      : await modelText(deps, claimed, photoReading, {
+          answer: again.answer,
+          version: again.version,
+          currency,
+          tin: first.text.tin,
+        })
+  // both readings judged by the shop's memory under one tax number (adversarial В2): the first is read again by the
+  // second's where it read none, or the choice would weigh a reading the memory checked against one it never saw
+  const judged =
+    other !== null && first.text.tin === null && other.text.tin !== null
+      ? await modelText(deps, claimed, photoReading, {
+          answer: first.answer,
+          version: first.version,
+          currency,
+          tin: other.text.tin,
+        })
+      : first
+  const { kept, witness, explained } =
+    other === null
       ? { kept: first, witness: null, explained: alone }
-      : chosen(
-          first,
-          alone,
-          await modelText(deps, claimed, photoReading, {
-            answer: again.answer,
-            version: again.version,
-            currency,
-            tin: first.text.tin,
-          }),
-        )
+      : chosen(judged, explainedReading(judged.text, { byModel: true }), other)
   const { answer, text, version } = kept
   const paid = asked.paid
   const second = again?.paid ?? null
@@ -426,6 +439,7 @@ async function readByModel(
       modelPaidBy(photoReading, one.answer),
       datesOf(claimed),
     )
+  // of the witness's head only what the check never touches is taken (`filledHead`): its text as read will do
   const head =
     witness === null
       ? headOfModel(kept, shown)
@@ -537,8 +551,10 @@ function chosen(
 
 /**
  * The head of the reading kept, what it did not read taken from the other reading of the same paper (MOL-405,
- * adversarial Б3): the tax number, the day with its time, the receipt's number, the city, how it was paid — a day out
- * of the window is none for either (MOL-305). Never a sum: the total goes with the lines it was judged by.
+ * adversarial Б3): the tax number, the day with its time, the receipt's number, the city — fields whose none is «not
+ * found» — a day out of the window is none for either (MOL-305). Never a sum: the total goes with the lines it was
+ * judged by. Never how it was paid: none there is the word of every payment row the reading found — two ways, or a
+ * mixed payment, say nothing (MOL-312) — and a reading that lost one would suggest the wrong account (adversarial В1).
  */
 function filledHead(head: ReceiptHead, other: ReceiptHead): ReceiptHead {
   return {
@@ -549,7 +565,6 @@ function filledHead(head: ReceiptHead, other: ReceiptHead): ReceiptHead {
     tin: head.tin ?? other.tin,
     receiptNo: head.receiptNo ?? other.receiptNo,
     city: head.city ?? other.city,
-    paidBy: head.paidBy ?? other.paidBy ?? null,
   }
 }
 
@@ -647,16 +662,14 @@ async function readAgain(
   const started = now().getTime()
   const asked = await askModel(deps, modelDeps, second.reader, claimed, month, now)
   // slow is away in all but the answer, which is still taken (adversarial Б4)
-  if (asked.kind !== 'away' && now().getTime() - started >= RECEIPT_SECOND_SLOW_MS) {
-    second.rest.away(now())
-  }
+  const ms = now().getTime() - started
+  const slow = asked.kind !== 'away' && ms >= RECEIPT_SECOND_SLOW_MS
+  if (asked.kind === 'away' || slow) second.rest.away(now())
+  if (slow) report({ kind: 'second_slow', ms })
   if (asked.kind === 'read') {
     return { answer: asked.answer, paid: asked.paid, version: second.reader.version }
   }
-  if (asked.kind === 'away') {
-    second.rest.away(now())
-    report({ kind: 'second_passed', reason: 'away' })
-  }
+  if (asked.kind === 'away') report({ kind: 'second_passed', reason: 'away' })
   if (asked.kind === 'passed') {
     report({ kind: 'second_passed', reason: asked.reason, ...paidOf(asked) })
   }

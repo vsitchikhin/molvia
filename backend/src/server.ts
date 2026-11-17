@@ -922,6 +922,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               },
               'receipt not read again by the second model',
             )
+          } else if (event.kind === 'second_slow') {
+            instance.log.warn({ ms: event.ms }, 'receipt second model slow, resting')
           } else if (event.kind === 'model_unavailable') {
             instance.log.warn(
               { model: event.model, reason: event.reason },
