@@ -480,7 +480,7 @@ should not see yet — venues until their chain is whole, payment until the bank
   any rollout. An open page learns of it with its next answer — every answer names the фф that are on in
   `X-Molvia-Ff` — and shows the feature without a reload; a phone offline keeps the last list it heard,
   and a link into the feature opened before its first answer opens with that answer — unless the person
-  has moved on or opened a sheet meanwhile.
+  has touched the app meanwhile.
 
 - **Off again is `./ff.sh venues off` and the same restart**: the routes are gone at once, the phone's
   entries with its next answer; a screen of the feature already open stays until it is left.

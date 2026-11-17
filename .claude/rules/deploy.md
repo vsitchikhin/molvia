@@ -315,10 +315,12 @@ The shape worth knowing here:
     address does (`closedByFf`). **The next answer decides a move closed** (adversarial А2): a link opened cold is
     judged by what the device kept, before any answer, so an answer that names the фф on takes the person where
     the link went, if they are still where the move landed — behind the door too, which stands over the route —
-    and no sheet is open there: the answer may come minutes later, with the connection, and a move of the router
-    closes a sheet and what was typed in it (adversarial Б1). The screen takes home's entry and its chain is laid
-    under it as under a screen opened cold (`settleColdStart`), so Android's «back» stays in the app (Б2); an
-    answer naming it off ends it.
+    have not touched the page since (a tap, a key, typing, the wheel) and no sheet is open there: the answer may
+    come minutes later, with the connection, and what was typed in a sheet or the search, a list scrolled, would
+    go with home (adversarial Б1, В1). One move of the mounted app (В2): over a home that stands alone — a cold
+    start — the screen is pushed, so Android's «back» steps home and never out of the app (Б2); over an entry of
+    the app it takes home's place. A parent deeper than home is not laid under it — the chevron reaches it by its
+    `replace`. An answer naming it off ends it.
   - **The bot reads none**: it is a client of the API, and a feature of the bot is closed by the API's route.
   - **A feature's tests run in both positions** (В-2 «а»): end-to-end's API has every фф on, so a spec meets the
     feature as people will; its «off» on the phone is `ffOff(page, names)` of `e2e/session.ts`, which rewrites the

@@ -1347,7 +1347,7 @@ a thing people should not see yet** — a chain not whole (venues before «Чт�
   a feature's path no route's that stays, held by a test over every route an фф adds.
 - **The phone hears them in `X-Molvia-Ff` of every answer**, never a body, keeps the last list on the device
   past «Выйти», `useFf` for an entry and `meta.ff` for a screen, a link closed reopened by the next answer
-  unless a sheet is open, with its chain under it;
+  unless the page was touched since, in one move;
   end-to-end runs all on, `ffOff` for «off», in the page's `fetch`, never a route.
 
 ### Talking to the owner
