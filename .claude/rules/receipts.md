@@ -2469,20 +2469,28 @@ right does. A second source can — the total, the shop's memory, or a second re
   (the owner hears of that one): never Tesseract, never a wait, since the first is paid and checked. `second_passed` in
   the log says why, `model_unavailable` names the model away, and the `read` line names the reading kept
   (`readerVersion`) and the second call's price and tokens apart from the first's (review №3).
-- **Away once, Sonnet rests ten minutes** (`RECEIPT_SECOND_REST_MS`, `modelRest`, adversarial А5): asked on every
-  receipt read not whole, an outage held the one reader of the queue its whole wait (120 s) on each and left its worst,
-  $0,18, in every owner's share — ten time outs were 91 % of a person's month. Resting, the receipt keeps its first
-  reading (`second_passed: resting`). The rest is the API's memory: a restart asks once more. **The price:** in an
-  outage one receipt in ten minutes still waits its 120 s, and one person a while pays the worst of a call that may
-  never have been paid (MOL-367, В-6).
-- **Of the two the better goes to the review** (`betterReading`, rule R3, owner's В-1 «а»): the one proven whole; else
-  the one that found lines, where the other found none (adversarial А1: Sonnet's section of one sum took both lines
-  Haiku read and showed); else the one with a total shown; else more lines shown as read; a tie — the first. The code
-  knows no truth: counting lines first took a second reading with more lines and no total, four wrong figures with it
-  (am-34), and lost a total on a tie (am-07b). **The price, named** (adversarial А1, its variant): a reading with the
-  total and fewer lines wins, and a line only the other read is typed by hand — the bench had no such receipt, and
-  counting lines before the total is what lost am-34. `reader_version` is the reading kept — `claude-sonnet-5-5@v5`
-  counts as the model's in 0.2r (`MODEL_READER_PREFIXES`), its own row of `model_receipt_days`.
+- **Away once, or slower than a minute, Sonnet rests ten minutes** (`RECEIPT_SECOND_REST_MS`, `RECEIPT_SECOND_SLOW_MS`,
+  `modelRest`, adversarial А5, Б4): asked on every receipt read not whole, an outage held the one reader of the queue
+  its whole wait (120 s) on each and left its worst, $0,18, in every owner's share — ten time outs were 91 % of a
+  person's month; an overloaded model answers near its time out rather than refusing, and held it as long (the bench's
+  slowest answer 22 s, p90 17 s). A slow answer is still taken. Resting, the receipt keeps its first reading
+  (`second_passed: resting`). The rest is the API's memory: a restart asks once more. **The price:** in an outage one
+  receipt in ten minutes still waits its 120 s, and one person a while pays the worst of a call that may never have been
+  paid (MOL-367, В-6).
+- **Of the two the better goes to the review** (`betterReading`): the bench's rule R3 (owner's В-1 «а») — the one proven
+  whole; else the one with a total shown; else more lines shown as read; a tie, the first — **with one step before the
+  total, adversarial А1's and Б1's, not the bench's**: the one that shows a line as read, where the other shows none
+  (Sonnet's section of one sum, or its lines found with no figure read, took both lines Haiku read and showed). On the
+  bench it changes nothing. The code knows no truth: counting lines first took a second reading with more lines and no
+  total, four wrong figures with it (am-34), and lost a total on a tie (am-07b). **The price, named** (adversarial А1,
+  its variant): a reading with the total and fewer lines shown wins, and a line only the other read is typed by hand —
+  the bench had no such receipt, and counting lines before the total is what lost am-34. `reader_version` is the reading
+  kept — `claude-sonnet-5-5@v5` counts as the model's in 0.2r (`MODEL_READER_PREFIXES`), its own row of
+  `model_receipt_days`.
+- **The head is the kept reading's, what it did not read the other's** (`filledHead`, adversarial Б3): the tax number,
+  the day with its time, the receipt's number, the city, how it was paid — the same paper read twice; a day out of the
+  window is none for either (MOL-305). Never a sum: the total goes with the lines it judged. The shop's memory votes in
+  the kept reading's digits by the other's tax number where it read none.
 - **The other is its witness** (`explainedReading({ witness })`, owner's В-4 «а»): a figure the check emptied is shown
   again where the other reading has a line of the very same figures — quantity, price, sum and discount, none on one
   side alone, the same article where both print one; each line a witness once, in order — **and the figure has no 6**:
@@ -2491,13 +2499,15 @@ right does. A second source can — the total, the shop's memory, or a second re
   «проверьте»** (`repaired`, owner's В-5 «а»), as MOL-290's and MOL-291's: the check's own arithmetic proved none of it
   — so an earlier build gets it empty and the memory takes no shelf price from it. The reasons of MOL-309 stay the
   check's.
-- **A witness answers only a want of proof, never a proof of wrong** (`WITNESS_ANSWERS`, adversarial А2–А4): a line
+- **A witness answers only a want of proof, never a proof of wrong** (`WITNESS_ANSWERS`, adversarial А2–А4, Б2): a line
   emptied whole as one number twice (`one_alike_unproven`) or as a bill with no price (`no_price_unproven`). Never one
   whose arithmetic does not hold, a sum of nothing, a quantity of none, a figure missing, a swap, the memory's doubt —
   «2 × 335 = 770» copied alike by both is still wrong — nor a line whose sum the total vouched for (MOL-310): an earlier
-  build would get it empty, its sum gone. **The price:** 64 · 64 right figures the witness showed before stay empty, to
-  keep 3 · 3 wrong ones off the review; two lines of the very same figures, one of them lost by the reader kept, may
-  still vouch one for the other where no article is read.
+  build would get it empty, its sum gone. **Only a figure the check would show on a receipt proven whole**: a gift's
+  price and discount are one number twice and never shown (MOL-255, round 4, А11 «а»), so a gift gets its quantity and
+  sum. **The price:** 64 · 64 right figures the witness showed before stay empty, to keep 3 · 3 wrong ones off the
+  review; two lines of the very same figures, one of them lost by the reader kept, may still vouch one for the other
+  where no article is read.
 - **Measured, the cascade through the domain** (run 1 · run 2): right 674 · 721 → 891 · 911, wrong shown 2 · 1 → 2 · 2
   (R3 alone: 836 · 860, 1 · 1), totals 44 · 44 → 44 · 45, whole 21 · 23 → 24 · 26; Sonnet kept on 7 · 8 receipts of the
   23 · 21 read again.
