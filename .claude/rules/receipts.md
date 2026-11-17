@@ -538,21 +538,27 @@ receipt proven whole, and its lines of one piece went empty.
   Georgian receipt the model did not read — no grant, the cap, the share, an answer not taken — fails `unreadable`
   («Строки на фото не разобрать. Покупки можно записать вручную»), never «переснимите»: a retake changes nothing. Its
   photo is never sent to the reader. One predicate for the server's queue and the phone's camera (review 1, №3).
-- **The model away is waited for a day, and the round steps past the receipt** (adversarial А2, owner's В-8 «а»):
+- **The model away is waited for a day, and the round goes on past the receipt** (adversarial А2, owner's В-8 «а»):
   `RECEIPT_MODEL_ALONE_WAIT_MS` — ten minutes are there to hand a receipt to Tesseract, and failed after them a Georgian
-  receipt of an outage was lost for good. A waiting receipt of a country no Tesseract reads (`modelAlone`) is released
-  and stepped over (`claimNext(passed)`), so an Armenian receipt behind it reaches Tesseract past its own ten minutes;
-  one of Armenia stops the round as before. **And it is asked less and less often** (adversarial Р2-А1, owner's В-9
-  «а»): no sooner than its wait so far after its last try — 1, 2, 4… minutes, an hour at most
-  (`RECEIPT_MODEL_ALONE_RETRY_MIN_MS`, `…_MAX_MS`, by `reading_at` and `queued_at`, no column of its own). A time out
-  is paid in doubt, its worst kept in the person's share (MOL-367), and asked every minute a day one receipt took the
-  month's share in under four hours; now some thirty tries a day, ≈ $0,27 at worst. **The price, named:** a receipt of
-  an outage arrives within an hour of the model's return, hours later; past the day, `unreadable`.
+  receipt of an outage was lost for good. A waiting receipt of a country no Tesseract reads (`modelAlone`) rests
+  (`ReceiptRepository.rest`), so an Armenian receipt behind it reaches Tesseract past its own ten minutes; one of
+  Armenia is released and stops the round as before. **And it is asked less and less often** (adversarial Р2-А1, owner's
+  В-9 «а»): no sooner than `next_attempt_at` — the column the queue of links asks again by — as long again as the
+  person's oldest waiting receipt of the country has waited, 1, 2, 4… minutes, an hour at most
+  (`RECEIPT_MODEL_ALONE_RETRY_MIN_MS`, `…_MAX_MS`). A time out is paid in doubt, its worst kept in the person's share
+  (MOL-367), and asked every minute a day one receipt took the month's share in under four hours; now some thirty tries
+  a day, ≈ $0,27 at worst. **The rest is the person's, never a receipt's** (adversarial Р3-А1): `claimNext` takes none of
+  a person's receipts of a country while one of them rests, so the twenty the quota lets wait (`RECEIPTS_UNRECORDED_MAX`)
+  pay one try a time, not twenty — per receipt they took the share in six hours. Which country rests is the use case's
+  to know (`modelAlone`), the repository's only whose receipts rest with the one tried. **The prices, named:** a receipt
+  of an outage arrives within an hour of the model's return, hours later — the person's others with it, in that round;
+  past the day, `unreadable`; each person granted pays their own tries, so an outage costs some thirty worst prices a
+  person with a Georgian receipt waiting, not one for everybody.
 - **The camera in Georgia is for whom the model reads now** (В-2 «а», adversarial А3): `/actors/me` says
   `receiptsByModel` — the grant to come and edition 5 (`READS_BY_MODEL`, one condition with the queue's), one more call
-  of the largest request fitting the person's share of the month and the month's cap (`ModelSpendRepository.readsFor`,
-  by `reserve`'s own fragments — `spent < share` offered the camera with $0,002 left, which no call fits, Р2-А1), and a
-  model on the server at all — only to a phone that
+  of the largest request fitting the person's share of the month and the month's cap (`readsReceiptsByModel`, the use
+  case, by `ModelSpendRepository.readsFor` and `reserve`'s own inequality, `fits` — `spent < share` offered the camera
+  with $0,002 left, which no call fits, Р2-А1), and a model on the server at all — only to a phone that
   asks (`RECEIPTS_BY_MODEL_HEADER`; an earlier build reads the answer strictly), and the store keeps it over the
   settings' answer, which does not say it; one read more a request that asks. Not said — an answer of a server before
   it, a launch offline — is no camera. **The price, named:** a grant, a share or the cap that ends between the shot and
