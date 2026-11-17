@@ -426,13 +426,15 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   **The lock is watched from outside** (В-3 «а»): the Worker asks a shared dashboard's path with no pass,
   and anything but Access's redirect to its sign-in is `/fail` of `molvia-grafana-lock` — Grafana's own
   `200` is Access off, a `403` may be Cloudflare's challenge a browser passes (adversarial А5) — a check of
-  its own, never the site's (А4). **The prices, named:** Cloudflare sees the dashboard — figures of the
-  machine and routes' templates, nothing of a person, so no recipient of anyone's data; the share is made
-  once by `admin` and lives in Grafana's volume, not the repository — a volume made anew needs a new link,
-  and the link is the lock behind Access; from the phone only the dashboard, never the alarms' list; a tunnel
-  made in Zero Trust's dashboard by mistake would pass what its routes say, and nothing here would tell;
-  Cloudflare down, Grafana is the SSH tunnel's; the image is another's and trivy does not read it. No logs in
-  Grafana (В-4 «а»): Caddy's errors may carry a visitor's address, and Cloudflare would see them.
+  its own, never the site's (А4), both told by their UUIDs alone — a check's slug is the same check (Б2). An
+  alarm names no address: the root is the tunnel's 404, the link a secret (Б1). **The prices, named:**
+  Cloudflare sees the dashboard — figures of the machine and routes' templates, nothing of a person, so no
+  recipient of anyone's data; the share is made once by `admin` and lives in Grafana's volume, not the
+  repository — a volume made anew needs a new link, and the link is the lock behind Access; from the phone
+  only the dashboard, never the alarms' list; a tunnel made in Zero Trust's dashboard by mistake would pass
+  what its routes say, and nothing here would tell; Cloudflare down, Grafana is the SSH tunnel's; the image
+  is another's and trivy does not read it. No logs in Grafana (В-4 «а»): Caddy's errors may carry a
+  visitor's address, and Cloudflare would see them.
 - **Grafana calls nobody home** (Р-6): usage reports, update checks, the news, gravatar, plugin keys
   and the five plugins it would install at every start, snapshots and feedback links are switched off —
   a test holds each setting. No sign-up, no anonymous view. **The admin's password is

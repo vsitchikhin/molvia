@@ -531,9 +531,9 @@ on GitHub, hourly: its check waits a day and an hour.
   `molvia-cert`.
 - **The lock of Grafana** (MOL-399, В-3). `GET https://grafana.<DOMAIN>/public-dashboards/watch` — a path
   the tunnel passes — with no pass, the redirect not followed, must be Cloudflare Access's redirect to
-  `https://<team>.cloudflareaccess.com/…`, what Access does with every request carrying none. `grafana
-open 200` is Grafana answering by itself: Access is off, and the dashboard's link is the one secret
-  left; anything else — `grafana 530`, or `403`, which may be a
+  `https://<team>.cloudflareaccess.com/…`, what Access does with every request carrying none.
+  `grafana open 200` is Grafana answering by itself: Access is off, and the dashboard's link is the one
+  secret left; anything else — `grafana 530`, or `403`, which may be a
   challenge or the firewall of Cloudflare a browser passes to the Grafana behind it (adversarial А5) —
   says nothing of the lock and is no lock seen either. By the same three of four, told to
   `molvia-grafana-lock`, a check of its own — never `HC_UP_URL`'s, which the round refuses (adversarial
@@ -583,7 +583,10 @@ open 200` is Grafana answering by itself: Access is off, and the dashboard's lin
 - `molvia-grafana-lock`'s ping URL is the Worker's secret `HC_LOCK_URL`, set and kept as `HC_UP_URL`,
   under the same rules (MOL-399). Read by the lock's round alone: without it, or malformed, the site's
   round goes as before and the Worker's round then fails, `HC_LOCK_URL is not …` — and the check, never
-  pinged, stays grey, so see it turn green once set.
+  pinged, stays grey, so see it turn green once set. **Both secrets by the check's UUID**,
+  `https://hc-ping.com/<uuid>`, never by its ping key and slug (adversarial Б2): one check has both URLs,
+  and the round can tell two checks apart only by their UUIDs — so it refuses another form, and a
+  `HC_UP_URL` set by slug is changed to its UUID URL with `HC_LOCK_URL`.
 - **The Worker is rolled out by the release** after green CI on master (`watcher` in `release.yml`),
   with the environment `production`'s secret `CLOUDFLARE_API_TOKEN` — an account token, «Workers
   Scripts: Edit» and nothing else — and its variable `CLOUDFLARE_ACCOUNT_ID`. By hand, with the same
@@ -840,10 +843,10 @@ node-exporter`, and `✅ Прошло` follows.
 - **Grafana 13.0 and the chat id**: `deploy/grafana/start.sh` writes `OWNER_TELEGRAM_ID` into the
   contact point as text before Grafana starts, since Grafana turned it into a number and refused it
   (grafana/alerting #558). A Grafana that takes a numeric chat — after 13.0.2 — no longer needs it.
-  **The address an alarm names** (`Дашборд — https://grafana.molvia.net`) is written by it too, from
-  `GF_SERVER_ROOT_URL`: Grafana reads no environment inside a template (MOL-399).
-- **Grafana from outside** (MOL-399, В-6 «а»): what the tunnel passes is the compose file's (`configs:
-tunnel`), held by a test; who gets past Access is Cloudflare's dashboard, held by the watch
+  **An alarm names no address** (MOL-399, adversarial Б1): «Дашборд — закладка общей ссылки» — the root of
+  `grafana.molvia.net` is the tunnel's 404, and the shared link is a secret that would sit in Telegram.
+- **Grafana from outside** (MOL-399, В-6 «а»): what the tunnel passes is the compose file's
+  (`configs: tunnel`), held by a test; who gets past Access is Cloudflare's dashboard, held by the watch
   (`molvia-grafana-lock`, «Signals»); the shared link is Grafana's volume. **The tunnel is managed
   locally, so it is made with `cloudflared` on the owner's computer, never in Zero Trust → Tunnels**: a
   tunnel made there takes its routes from Cloudflare's dashboard, and they would replace the compose
@@ -854,16 +857,27 @@ tunnel`), held by a test; who gets past Access is Cloudflare's dashboard, held b
      and a team's name.
   2. Access → Applications → Add → Self-hosted: domain `grafana.molvia.net`, session **one month**;
      sign-in «One-time PIN» alone; a policy **Allow** — Emails: the owner's e-mail, nothing else.
-  3. On the owner's computer: `brew install cloudflared`, then `cloudflared tunnel login` (the browser,
-     `molvia.net`), `cloudflared tunnel create molvia-grafana`, `cloudflared tunnel route dns
-molvia-grafana grafana.molvia.net` — the DNS record — and `cloudflared tunnel token molvia-grafana`,
-     the token. `~/.cloudflared/cert.pem` makes tunnels on the account: delete it once done.
+  3. On the owner's computer — the browser opens at `login`, choose `molvia.net`; the last prints the
+     token. `~/.cloudflared/cert.pem` makes tunnels on the account: delete it once done.
+
+     ```bash
+     brew install cloudflared
+     cloudflared tunnel login
+     cloudflared tunnel create molvia-grafana
+     cloudflared tunnel route dns molvia-grafana grafana.molvia.net
+     cloudflared tunnel token molvia-grafana
+     ```
+
   4. Into `~/molvia/.env.prod` on the machine: the token typed at `read -rs T`, then
      `printf 'CLOUDFLARE_TUNNEL_TOKEN=%s\n' "$T" >>.env.prod` — `printf` is the shell's own, so the token is
      in no command's arguments («Rotating the secrets»).
   5. The check `molvia-grafana-lock` in healthchecks.io (period 10 min, grace 10 min, the Telegram
-     integration), its URL the Worker's secret `HC_LOCK_URL` («Signals», «Where it is set»).
-  6. The compose file and `deploy/deploy.sh` copied to the machine, then the release.
+     integration), its UUID URL the Worker's secret `HC_LOCK_URL` — and `HC_UP_URL` by its UUID too
+     («Signals», «Where it is set»).
+  6. **Compose 2.23.1 or later on the machine** — `configs` with `content`, which the tunnel's routes are,
+     came then; an older one reads none of the file, and no release goes out, the application's included:
+     `docker compose version`, and `sudo apt-get install --only-upgrade docker-compose-plugin` if older.
+     Then the compose file and `deploy/deploy.sh` copied to the machine, and the release.
   7. **The shared link**, once, by the SSH tunnel as `admin`: Dashboards → «Молвия» → Share → Share
      externally → «Anyone with the link», the time range picker on → copy the link, bookmark it on the
      phone. It lives in Grafana's volume: a volume made anew needs a new link, and «Revoke» there takes a
@@ -1064,9 +1078,17 @@ written as their documentation has them and not drilled.
   **`ALERTS_BOT_TOKEN`** the same for the alarms' bot, then `$C up -d grafana`.
 - **`CLOUDFLARE_TUNNEL_TOKEN`** (MOL-399): whoever holds it can run a connector of the tunnel — put their
   own machine behind `grafana.<DOMAIN>`, Access still in front, and take a share of the requests. The
-  tunnel made anew on the owner's computer: `cloudflared tunnel cleanup molvia-grafana`, `cloudflared
-tunnel delete molvia-grafana`, then `create`, `route dns --overwrite-dns` and `token` as in «Metrics»,
-  «Where it is set», the new token into the line by `read -rs` as above, `$C up -d tunnel`. Not drilled.
+  tunnel made anew on the owner's computer, after `cloudflared tunnel login` («Metrics», «Where it is
+  set»), then the new token into the line by `read -rs` as above, `$C up -d tunnel`. Not drilled.
+
+  ```bash
+  cloudflared tunnel cleanup molvia-grafana
+  cloudflared tunnel delete molvia-grafana
+  cloudflared tunnel create molvia-grafana
+  cloudflared tunnel route dns --overwrite-dns molvia-grafana grafana.molvia.net
+  cloudflared tunnel token molvia-grafana
+  ```
+
 - **The shared dashboard's link** (MOL-399): Access stands before it, but the link is the second lock.
   By the SSH tunnel as `admin`: Dashboards → Shared dashboards → «Revoke», and a new one shared as in
   «Metrics», «Where it is set», step 7.
