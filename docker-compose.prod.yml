@@ -328,7 +328,7 @@ services:
       # From any device of the owner (MOL-399, В-6 «а»): the dashboard shared by link, which `tunnel`
       # below brings to `grafana.<DOMAIN>` behind Cloudflare Access. A visitor of the link signs in to
       # nothing — it runs the dashboard's own panels and no other query, no API, no proxy — so nobody
-      # from outside is a user of Grafana. The address the link and the alarms name is the root's.
+      # from outside is a user of Grafana. The link Grafana makes is the root's.
       GF_SERVER_ROOT_URL: https://grafana.${DOMAIN:?set DOMAIN}
       GF_PUBLIC_DASHBOARDS_ENABLED: 'true'
       # The alarms' own bot (В-3), never the product's: the login's token stays out of a container

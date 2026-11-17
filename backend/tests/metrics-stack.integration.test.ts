@@ -167,9 +167,11 @@ describe('the compose file', () => {
     )
     // The shared dashboard's page, its files and its answers, then the tunnel's own 404: no login, no
     // API, no data source's proxy (adversarial А1–А3), whatever Access does.
-    expect(
-      /^configs:\n(?: {2}#.*\n)* {2}tunnel:\n {4}content: \|\n((?: {6}.*\n)+)/m.exec(compose)?.[1],
-    ).toBe(
+    const content =
+      /^configs:\n(?: {2}#.*\n)* {2}tunnel:\n {4}content: \|\n((?: {6}.*\n)+)/m.exec(
+        compose,
+      )?.[1] ?? ''
+    expect(content).toBe(
       [
         '      ingress:',
         '        - hostname: grafana.${DOMAIN:?set DOMAIN}',
@@ -180,7 +182,7 @@ describe('the compose file', () => {
       ].join('\n'),
     )
     // The rule as written, read as cloudflared reads it — Go's regexp, which this pattern spells alike.
-    const rule = new RegExp(/^ {10}path: (.+)$/m.exec(compose)?.[1] ?? '$^')
+    const rule = new RegExp(/^ {10}path: (.+)$/m.exec(content)?.[1] ?? '$^')
     const passes = (path: string): boolean => rule.test(path)
     for (const path of [
       '/public-dashboards/abc',
@@ -204,13 +206,12 @@ describe('the compose file', () => {
     expect(grafana).toContain('GF_SERVER_ROOT_URL: https://grafana.${DOMAIN:?')
     // Nobody from outside is a user of Grafana: no sign-in by a pass, none by sign-up or as anonymous.
     expect(grafana).not.toMatch(/GF_AUTH_JWT_|GF_AUTH_PROXY_/)
-    // An alarm names the address it is looked at by, not a tunnel to set up first (Т-8) — written by
-    // `start.sh`, since Grafana reads no environment inside a template.
-    const place = '{{/* GF_SERVER_ROOT_URL, written by start.sh */}}'
-    expect(notify).toContain(`Дашборд — ${place}{{ end }}`)
-    expect(read('deploy/grafana/start.sh')).toContain(
-      `s#${place.replaceAll('*', '\\*')}#\${GF_SERVER_ROOT_URL}#`,
+    // An alarm sends to the link it is looked at by, never to an address the tunnel answers 404
+    // (adversarial Б1): the root is no path of a shared dashboard, and the link is a secret.
+    expect(notify).toContain(
+      'Дашборд — закладка общей ссылки, deploy/README.md «Looking».{{ end }}',
     )
+    expect(notify).not.toMatch(/https?:\/\//)
   })
 
   it('switches off everything Grafana would call home with (Р-6)', () => {
