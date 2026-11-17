@@ -18,6 +18,8 @@ import {
   isWireCode,
   describeFailure,
   spendMonthOf,
+  worstCallMicroUsd,
+  RECEIPT_MODEL_INPUT_MAX,
 } from '@molvia/model'
 import type { ErrorCode, ErrorResponse, TelegramUserId } from '@molvia/model'
 import { InvalidBody } from '@/parse'
@@ -1209,15 +1211,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // Before the session is looked up: a foreign page or a link moves nothing (MOL-368).
       guarded.addHook('onRequest', refuseOutsideTheApp)
       withActor(guarded, (token) => authenticate(sessions, actors, token))
-      // the model reads for the person now: no key, no model; the share and the cap as the queue holds them (MOL-408)
+      // the model reads for the person now: no key, no model; one more call of the largest request fits their share
+      // and the month's cap, as the queue reserves it (MOL-408, adversarial А3, Р2-А1)
       actorMeRoute(guarded, (id) =>
         model === null
           ? Promise.resolve(false)
-          : actors.readsReceiptsByModel(id, {
-              month: spendMonthOf(new Date()),
-              capMicroUsd,
-              shareMicroUsd,
-            }),
+          : modelSpend.readsFor(
+              spendMonthOf(new Date()),
+              worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX),
+              { actorId: id, capMicroUsd, shareMicroUsd },
+            ),
       )
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),

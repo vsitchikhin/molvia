@@ -22,6 +22,7 @@ import {
   receiptTimeOf,
   receiptLineOf,
   receiptLineCodec,
+  modelAlone,
   spendMonthOf,
   tesseractReads,
   dayIn,
@@ -301,9 +302,9 @@ async function readByModel(
       report({ kind: 'model_unavailable', reason: error.reason })
       if (error.broken !== undefined) report({ kind: 'model_broken', error: error.broken })
       const waited = now().getTime() - (claimed.queuedAt ?? now()).getTime()
-      const patience = tesseractReads(photoReading)
-        ? RECEIPT_MODEL_WAIT_MS
-        : RECEIPT_MODEL_ALONE_WAIT_MS
+      const patience = modelAlone(claimed.country)
+        ? RECEIPT_MODEL_ALONE_WAIT_MS
+        : RECEIPT_MODEL_WAIT_MS
       if (waited < patience) return 'wait'
       report({ kind: 'model_passed', reason: 'away' })
       return null
@@ -704,8 +705,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
         // minute's timer asks again — past its wait Tesseract reads it. A receipt no Tesseract reads is stepped
         // over instead: it waits a day, and the receipts behind it reach Tesseract past their ten minutes
         await deps.receipts.release(claimed.id)
-        const photo = receiptCard(claimed.country).photo
-        if (photo === null || tesseractReads(photo)) return read
+        if (!modelAlone(claimed.country)) return read
         passed.push(claimed.id)
         continue
       }

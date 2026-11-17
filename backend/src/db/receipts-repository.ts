@@ -21,6 +21,8 @@ import {
   receiptClockOf,
   serbianReceiptLink,
   withoutItems,
+  modelAlone,
+  receiptCountrySchema,
 } from '@molvia/model'
 import type {
   Currency,
@@ -538,6 +540,10 @@ async function keepMiss(
   }
   return kept?.keepUntil ?? null
 }
+
+/** The least and the most a receipt the model alone reads rests between two tries of it away (MOL-408, В-9 «а»). */
+export const RECEIPT_MODEL_ALONE_RETRY_MIN_MS = 60 * 1000
+export const RECEIPT_MODEL_ALONE_RETRY_MAX_MS = 60 * 60 * 1000
 
 export interface ReceiptRepository {
   /**
@@ -1472,6 +1478,22 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async claimNext(passed = []) {
+      // a receipt the model alone reads, left waiting for it, is asked again no sooner than its wait so far after its
+      // last try — 1, 2, 4… minutes, an hour at most (MOL-408, owner's В-9 «а»): each try a time out may cost the
+      // worst price in the person's share, and every minute for a day took the month's share in hours (Р2-А1)
+      const alone = receiptCountrySchema.options.filter(modelAlone)
+      const resting =
+        alone.length === 0
+          ? sql`false`
+          : sql`waiting.country in (${sql.join(
+              alone.map((country) => sql`${country}`),
+              sql`, `,
+            )})
+            and waiting.reading_at is not null
+            and clock_timestamp() < waiting.reading_at + least(
+              make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MAX_MS / 1000}),
+              greatest(make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MIN_MS / 1000}),
+                waiting.reading_at - waiting.queued_at))`
       const stepped =
         passed.length === 0
           ? sql`true`
@@ -1485,7 +1507,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         const [next] = await tx.execute<{ id: string }>(sql`
           select waiting.id from ${receipts} waiting
           where waiting.status = 'queued' and waiting.source = 'photo' and waiting.deleted_at is null
-            and ${stepped}
+            and ${stepped} and not (${resting})
           order by (
             select count(*) from ${receipts} served
             where served.actor_id = waiting.actor_id

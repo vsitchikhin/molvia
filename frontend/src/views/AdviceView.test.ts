@@ -168,11 +168,15 @@ function openTrip() {
 async function render({
   identity = true,
   country = 'AM',
+  city = 'Гюмри',
+  spendCurrency = 'AMD',
   trip = false,
   receiptsByModel,
 }: {
   identity?: boolean
   country?: string
+  city?: string
+  spendCurrency?: string
   trip?: boolean
   /** What `/actors/me` said of the model (MOL-408); left out, the store holds no answer. */
   receiptsByModel?: boolean
@@ -180,7 +184,7 @@ async function render({
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
     `molvia.settings.${ME}`,
-    JSON.stringify({ country, city: 'Гюмри', spendCurrency: 'AMD', incomeCurrency: 'RUB' }),
+    JSON.stringify({ country, city, spendCurrency, incomeCurrency: 'RUB' }),
   )
   const pinia = createPinia()
   setActivePinia(pinia)
@@ -189,8 +193,8 @@ async function render({
     useActorStore().actor = {
       id: ME,
       country,
-      city: 'Гюмри',
-      spendCurrency: 'AMD',
+      city,
+      spendCurrency,
       incomeCurrency: 'RUB',
       createdAt: new Date('2026-10-01T10:00:00.000Z'),
       updatedAt: new Date('2026-10-01T10:00:00.000Z'),
@@ -653,8 +657,13 @@ describe('AdviceView', () => {
 
   describe('the newcomer (MOL-128, handoff `02`)', () => {
     it('a Georgian newcomer the model reads for: «reads it», no «translates», and the camera (MOL-408)', async () => {
-      advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Гюмри' } }))
-      const { view } = await render({ country: 'GE', receiptsByModel: true })
+      advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Тбилиси' } }))
+      const { view } = await render({
+        country: 'GE',
+        city: 'Тбилиси',
+        spendCurrency: 'GEL',
+        receiptsByModel: true,
+      })
       const app = en.app.name
       expect(view.text()).toContain(en.advice.home.new_capture.title)
       expect(view.text()).toContain(
@@ -664,8 +673,13 @@ describe('AdviceView', () => {
     })
 
     it('a Georgian newcomer the model does not read for: the newcomer with no receipt, no camera (MOL-408)', async () => {
-      advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Гюмри' } }))
-      const { view } = await render({ country: 'GE', receiptsByModel: false })
+      advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Тбилиси' } }))
+      const { view } = await render({
+        country: 'GE',
+        city: 'Тбилиси',
+        spendCurrency: 'GEL',
+        receiptsByModel: false,
+      })
       expect(view.text()).toContain(en.advice.home.new.title)
       expect(view.text()).not.toContain(en.advice.home.new_capture.title)
       expect(view.get('.dock').text()).not.toContain(en.purchases.capture)

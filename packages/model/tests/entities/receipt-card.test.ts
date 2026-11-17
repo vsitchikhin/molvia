@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { PARSED_FRACTION_DIGITS, RECEIPT_CARDS, receiptCard } from '#model/entities/receipt-card'
+import {
+  PARSED_FRACTION_DIGITS,
+  RECEIPT_CARDS,
+  findsAreGuesses,
+  modelAlone,
+  receiptCard,
+} from '#model/entities/receipt-card'
 import type { ReceiptWords } from '#model/entities/receipt-card'
 import { receiptCountrySchema, receiptSourceOf } from '#model/entities/receipt'
 import { parseReceiptText, rowsOf } from '#model/entities/receipt-text'
@@ -47,6 +53,15 @@ describe('a country’s card (MOL-247)', () => {
     // must not: no swap of the model's until the bench measures one
     expect(receiptCard('GE').photo?.modelSwaps).toEqual({})
     expect(receiptCard('AM').photo?.tinDigits).toEqual([8])
+  })
+
+  it('says which country the model alone reads: Georgia, never Armenia nor a country read by its link', () => {
+    expect(countries.filter(modelAlone)).toEqual(['GE'])
+    // must not: Serbia has no photo to read, so no reader of one
+    expect(modelAlone('RS')).toBe(false)
+    expect(findsAreGuesses(receiptCard('GE'))).toBe(true)
+    expect(findsAreGuesses(receiptCard('RS'))).toBe(false)
+    expect(findsAreGuesses(receiptCard('AM'))).toBe(false)
   })
 
   it('names only formats of numbers the parse reads', () => {

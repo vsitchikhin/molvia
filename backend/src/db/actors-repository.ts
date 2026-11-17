@@ -4,7 +4,7 @@ import type { Actor, ActorPatch, NewActor, TelegramUserId } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
-import { actors, modelSpend } from './schema'
+import { actors } from './schema'
 import { lockTelegramAccount } from './telegram-lock'
 
 export interface ActorRepository {
@@ -55,26 +55,12 @@ export interface ActorRepository {
    * arriving together write once. `now()`, the database's clock, as everywhere a moment is stamped.
    */
   markSeen(id: string, afterHours: number): Promise<boolean>
-
-  /**
-   * Whether the model reads this owner's receipts now (MOL-408, adversarial А3): granted and edition 5
-   * (`READS_BY_MODEL`, by the database's clock), the person's share of the month not spent and the month's cap not
-   * reached — what the queue refuses by, short of a call's own worst price.
-   */
-  readsReceiptsByModel(id: string, limits: ModelLimits): Promise<boolean>
 }
 
 /**
  * The model reads a person's receipts while `receipts_model_until` is to come and edition `MODEL_CONSENT_EDITION` is
  * accepted (MOL-272): one condition for the queue that reads and the phone that offers the camera (MOL-408).
  */
-/** The month of the model's spending (UTC, its first day) and the cap and share it is held to (MOL-367). */
-export interface ModelLimits {
-  readonly month: string
-  readonly capMicroUsd: number
-  readonly shareMicroUsd: number
-}
-
 export const READS_BY_MODEL = sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp()
   and ${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}, false)`
 
@@ -185,23 +171,6 @@ export function createActorRepository(db: Conn): ActorRepository {
     },
 
     consentVersion,
-
-    async readsReceiptsByModel(id, { month, capMicroUsd, shareMicroUsd }) {
-      if (idOrNull(id) === null) return false
-      // the person's spending of this month, as the queue's share counts it (`takeShare`), and the month's
-      const spent = sql`(case when ${actors.modelMonth} >= ${month}::date
-        then ${actors.modelSpentMicroUsd} else 0 end)`
-      const monthSpent = sql`coalesce((select ${modelSpend.spentMicroUsd} from ${modelSpend}
-        where ${modelSpend.month} = ${month}::date), 0)`
-      const [row] = await db
-        .select({
-          byModel: sql<boolean>`${READS_BY_MODEL} and ${spent} < ${shareMicroUsd}::bigint
-            and ${monthSpent} < ${capMicroUsd}::bigint`,
-        })
-        .from(actors)
-        .where(eq(actors.id, id))
-      return row?.byModel ?? false
-    },
 
     async acceptConsent(id, version) {
       if (idOrNull(id) === null) return null

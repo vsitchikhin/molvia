@@ -1,6 +1,6 @@
 /**
- * Georgia read by the model alone (MOL-408): a receipt the model is away for waits a day and holds no round
- * (owner's В-8 «а»), and the camera is offered only while the model reads for the person now — the share and the
+ * Georgia read by the model alone (MOL-408): a receipt the model is away for waits a day, asked of it less and less
+ * often, and holds no round (owner's В-8 «а», В-9 «а»), and the camera is offered only while the model reads for the person now — the share and the
  * month's cap too (adversarial А3). The model is a fake answering as Haiku copied Nikora's receipt on the bench.
  */
 import { randomUUID } from 'node:crypto'
@@ -9,14 +9,16 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   MODEL_CONSENT_EDITION,
   RECEIPTS_BY_MODEL_HEADER,
+  RECEIPT_MODEL_INPUT_MAX,
   RECEIPT_MODEL_SHARE_MICRO_USD,
   spendMonthOf,
+  worstCallMicroUsd,
 } from '@molvia/model'
 import type { ModelReceipt } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createModelSpendRepository } from '@/db/model-spend-repository'
-import { createReceiptRepository } from '@/db/receipts-repository'
+import { RECEIPT_MODEL_ALONE_RETRY_MAX_MS, createReceiptRepository } from '@/db/receipts-repository'
 import { actors, modelSpend, receipts } from '@/db/schema'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
 import { ModelUnavailable } from '@/receipts/model-reader'
@@ -103,7 +105,12 @@ let app: FastifyInstance
 let photos = 0
 
 beforeAll(async () => {
-  app = buildServer({ db, receiptReader: null, receiptModel: reads() })
+  app = buildServer({
+    db,
+    receiptReader: null,
+    receiptModel: reads(),
+    receiptModelCapMicroUsd: CAP,
+  })
   await app.ready()
 })
 beforeEach(async () => {
@@ -190,7 +197,19 @@ async function readAll(model: ReceiptModel, now: () => Date): Promise<void> {
 const receiptOf = async (id: string) =>
   onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
 
-describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «а»)', () => {
+/** The receipt's last try and its arrival moved back (the backoff reads the database's clock, never the test's). */
+async function tried(
+  id: string,
+  { agoMs, waitedMs }: { agoMs: number; waitedMs: number },
+): Promise<void> {
+  const at = new Date(Date.now() - agoMs)
+  await db
+    .update(receipts)
+    .set({ readingAt: at, queuedAt: new Date(at.getTime() - waitedMs) })
+    .where(eq(receipts.id, id))
+}
+
+describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «а», В-9 «а»)', () => {
   it('waits past the ten minutes, the Armenian receipt behind it goes to Tesseract, and the model back reads it', async () => {
     const tbilisi = await granted('GE')
     const gyumri = await granted('AM')
@@ -205,7 +224,8 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
     expect((await receiptOf(armenian))?.status).toBe('failed')
     expect(tesseract.asked).toBeGreaterThan(0)
 
-    // the model back within the day reads it
+    // the model back within the day, past the receipt's rest, reads it
+    await tried(georgian, { agoMs: RECEIPT_MODEL_ALONE_RETRY_MAX_MS, waitedMs: 0 })
     const back = reads()
     await readAll(back, later(6 * 60 * 60 * 1000))
     expect(back.asked).toBe(1)
@@ -219,13 +239,51 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
 
     await readAll(away(), () => new Date(queuedAt + RECEIPT_MODEL_ALONE_WAIT_MS - 60_000))
     expect((await receiptOf(id))?.status).toBe('queued')
+    await tried(id, { agoMs: RECEIPT_MODEL_ALONE_RETRY_MAX_MS, waitedMs: 0 })
     await readAll(away(), () => new Date(queuedAt + RECEIPT_MODEL_ALONE_WAIT_MS))
     expect(await receiptOf(id)).toMatchObject({ status: 'failed', failure: 'unreadable' })
     expect(tesseract.asked).toBe(0)
   }, 30_000)
+
+  it('asks the model away again no sooner than its wait so far after its last try, an hour at most (Р2-А1)', async () => {
+    const me = await granted('GE')
+    const id = await queued(me)
+    const model = away()
+    const now = () => new Date()
+
+    await readAll(model, now)
+    expect(model.asked).toBe(1)
+    // must not: the next minute's round asks nothing of a receipt that just tried
+    await readAll(model, now)
+    expect(model.asked).toBe(1)
+    // waited ten minutes before its last try: rests ten more, then is asked
+    await tried(id, { agoMs: 9 * 60_000, waitedMs: 10 * 60_000 })
+    await readAll(model, now)
+    expect(model.asked).toBe(1)
+    await tried(id, { agoMs: 11 * 60_000, waitedMs: 10 * 60_000 })
+    await readAll(model, now)
+    expect(model.asked).toBe(2)
+    // waited ten hours: rests an hour, never more
+    await tried(id, { agoMs: 59 * 60_000, waitedMs: 10 * 60 * 60_000 })
+    await readAll(model, now)
+    expect(model.asked).toBe(2)
+    await tried(id, { agoMs: 61 * 60_000, waitedMs: 10 * 60 * 60_000 })
+    await readAll(model, now)
+    expect(model.asked).toBe(3)
+  }, 30_000)
+
+  it('must not rest an Armenian receipt between tries: Tesseract takes it past its ten minutes as before', async () => {
+    const me = await granted('AM')
+    const id = await queued(me, 'AM')
+    const model = away()
+    await readAll(model, () => new Date())
+    await readAll(model, () => new Date())
+    expect(model.asked).toBe(2)
+    expect((await receiptOf(id))?.status).toBe('queued')
+  }, 30_000)
 })
 
-describe('whether the model reads for the person now (MOL-408, adversarial А3)', () => {
+describe('whether the model reads for the person now (MOL-408, adversarial А3, Р2-А1)', () => {
   async function said(me: Person, server: FastifyInstance = app): Promise<boolean | undefined> {
     const answer = await server.inject({
       method: 'GET',
@@ -234,7 +292,14 @@ describe('whether the model reads for the person now (MOL-408, adversarial А3)'
     })
     return answer.json<{ receiptsByModel?: boolean }>().receiptsByModel
   }
-  const month = () => spendMonthOf(new Date())
+  // the month the server reads by is its own clock's: a row of this month and of the next holds at its turn too
+  const thisMonth = spendMonthOf(new Date())
+  const today = new Date()
+  const nextMonth = spendMonthOf(
+    new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1)),
+  )
+  // one call of the largest request, as the queue reserves it
+  const worst = worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX)
 
   it('says yes to a grant with its share and the month’s cap left', async () => {
     expect(await said(await granted())).toBe(true)
@@ -265,12 +330,18 @@ describe('whether the model reads for the person now (MOL-408, adversarial А3)'
     expect(Object.keys(answer.json<Record<string, unknown>>())).not.toContain('receiptsByModel')
   }, 10_000)
 
-  it('must not say yes once the person’s share of the month is spent', async () => {
+  it('says yes while one more call fits the person’s share, and no once it does not', async () => {
     const me = await granted()
-    await db
-      .update(actors)
-      .set({ modelMonth: month(), modelSpentMicroUsd: RECEIPT_MODEL_SHARE_MICRO_USD })
-      .where(eq(actors.id, me.id))
+    // the month that counts: the next one is «at least this one» for either clock (`model_month >= month`)
+    const spent = (micro: number) =>
+      db
+        .update(actors)
+        .set({ modelMonth: nextMonth, modelSpentMicroUsd: micro })
+        .where(eq(actors.id, me.id))
+    await spent(RECEIPT_MODEL_SHARE_MICRO_USD - worst)
+    expect(await said(me)).toBe(true)
+    // must not: a share a call short of its worst, though not spent whole (Р2-А1)
+    await spent(RECEIPT_MODEL_SHARE_MICRO_USD - worst + 1)
     expect(await said(me)).toBe(false)
     // a share spent in a month gone counts nothing now
     await db
@@ -280,9 +351,12 @@ describe('whether the model reads for the person now (MOL-408, adversarial А3)'
     expect(await said(me)).toBe(true)
   }, 10_000)
 
-  it('must not say yes once the month’s cap is reached', async () => {
+  it('must not say yes once the month’s cap has no room for a call', async () => {
     const me = await granted()
-    await db.insert(modelSpend).values({ month: month(), spentMicroUsd: CAP })
+    await db.insert(modelSpend).values([
+      { month: thisMonth, spentMicroUsd: CAP - worst + 1 },
+      { month: nextMonth, spentMicroUsd: CAP - worst + 1 },
+    ])
     expect(await said(me)).toBe(false)
   }, 10_000)
 

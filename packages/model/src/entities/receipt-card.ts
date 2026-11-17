@@ -267,7 +267,7 @@ const SUL = `(?<![${GEORGIAN.small}])სულ(?![${GEORGIAN.small}])`
 
 /**
  * Georgia (MOL-408): read off its photo by the model alone — `languages` none (owner's В-2 «а»). **Every word names the
- * receipt it was seen on** — the five photos of MOL-229 (`samples/foreign/ge-01…05`) and its draft card
+ * receipt it was seen on** — the five photos of MOL-229 (`.scratch/receipts/foreign/ge-01…05.jpg`) and its draft card
  * (`research/MOL-229/cards/GE.json`) — and a word no Georgian receipt has shown is `NEVER`, as is what Georgia prints
  * no counterpart of (the card's cashback, the sum since the year's start): a word without a paper behind it would
  * decide what a total is. The model's swaps are none until measured. The pharmacies' three decimals, «23.868 ლარი», are
@@ -355,6 +355,15 @@ export type TesseractReading = PhotoReading & { readonly languages: string }
  */
 export function tesseractReads(reading: PhotoReading): reading is TesseractReading {
   return reading.languages !== null
+}
+
+/**
+ * Whether the model alone reads the country's receipts (MOL-408): read off a photo, and Tesseract reads none of it. A
+ * country read by its link has no photo to read — Serbia's — and is no such country.
+ */
+export function modelAlone(country: ReceiptCountry): boolean {
+  const { photo } = receiptCard(country)
+  return photo !== null && !tesseractReads(photo)
 }
 
 /**

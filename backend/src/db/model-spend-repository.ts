@@ -1,7 +1,9 @@
-import { sql } from 'drizzle-orm'
+import { eq, sql } from 'drizzle-orm'
 import { modelSpendStep } from '@molvia/model'
 import type { ModelShareNotice, ModelSpendNotice, ModelSpendStep } from '@molvia/model'
+import { READS_BY_MODEL } from './actors-repository'
 import type { Conn, Db } from './index'
+import { idOrNull } from './rows'
 import { actors, modelSpend, ownerNotices } from './schema'
 
 /** A month's spending as the table holds it. */
@@ -53,7 +55,21 @@ export interface ModelSpendRepository {
    */
   keepInMonth(month: string, worstMicroUsd: number, call: ModelCall): Promise<void>
   month(month: string): Promise<MonthSpend | null>
+  /**
+   * Whether the model reads for the person now (MOL-408, adversarial А3, Р2-А1): granted and edition 5
+   * (`READS_BY_MODEL`), and a call of `worstMicroUsd` would fit their share of the month and the month's cap — the
+   * bounds `reserve` refuses by, read by the same fragments. What `/actors/me` offers Georgia's camera by.
+   */
+  readsFor(month: string, worstMicroUsd: number, call: ModelCall): Promise<boolean>
 }
+
+/** What the person has spent of `month`, as their share counts it: a month gone is nought. */
+const spentOf = (month: string) =>
+  sql`(case when ${actors.modelMonth} >= ${month}::date then ${actors.modelSpentMicroUsd} else 0 end)`
+
+/** What the month has spent of the cap. */
+const monthSpentOf = (month: string) =>
+  sql`coalesce((select ${modelSpend.spentMicroUsd} from ${modelSpend} where ${modelSpend.month} = ${month}::date), 0)`
 
 async function tell(
   tx: Conn,
@@ -78,7 +94,7 @@ async function takeShare(
   worstMicroUsd: number,
   { actorId, shareMicroUsd }: ModelCall,
 ): Promise<boolean> {
-  const spent = sql`(case when ${actors.modelMonth} >= ${month}::date then ${actors.modelSpentMicroUsd} else 0 end)`
+  const spent = spentOf(month)
   const taken = await tx.execute(sql`
     update ${actors}
     set model_month = greatest(${actors.modelMonth}, ${month}::date),
@@ -90,6 +106,19 @@ async function takeShare(
 
 export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRepository {
   return {
+    async readsFor(month, worstMicroUsd, { actorId, capMicroUsd, shareMicroUsd }) {
+      if (idOrNull(actorId) === null) return false
+      const [row] = await db
+        .select({
+          reads: sql<boolean>`${READS_BY_MODEL}
+            and ${spentOf(month)} + ${worstMicroUsd}::bigint <= ${shareMicroUsd}::bigint
+            and ${monthSpentOf(month)} + ${worstMicroUsd}::bigint <= ${capMicroUsd}::bigint`,
+        })
+        .from(actors)
+        .where(eq(actors.id, actorId))
+      return row?.reads ?? false
+    },
+
     async reserve(month, worstMicroUsd, call, at) {
       const { actorId, capMicroUsd, shareMicroUsd } = call
       return db.transaction(async (tx) => {

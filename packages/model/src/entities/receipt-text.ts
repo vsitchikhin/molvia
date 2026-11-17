@@ -219,7 +219,8 @@ function lexiconOf(reading: PhotoReading): Lexicon {
   }
   const w = reading.words
   // the tax number's and the fiscal number's digits are the card's (MOL-408): Armenia's eight
-  const [tin, fiscal] = [digitCounts(reading.tinDigits), digitCounts(reading.fiscalDigits)]
+  const tin = digitCounts(reading.tinDigits)
+  const fiscal = digitCounts(reading.fiscalDigits)
   const u = w.units
   // a word that captures moves the figures the parse reads after it by their groups: the total read as the
   // word, NaN (adversarial А1) — refused, as a format it cannot read is
@@ -274,10 +275,10 @@ function lexiconOf(reading: PhotoReading): Lexicon {
       'gu',
     ),
     cardTotal: new RegExp(`${word(w.total)}\\s+(\\d[\\d ]*\\.\\d{1,2})\\b`, 'u'),
-    cardTin: new RegExp(
-      `${word(w.tin)}.{0,4}:?\\s*\\S+|:\\s*0(?:${digitCounts(reading.tinDigits.map((n) => n - 1))})`,
-      'u',
-    ),
+    // «Ереван Сити»'s card, a layout of the parse's own: the tax number after its word, or after a bare colon where
+    // OCR lost the word — then only with its leading nought, which no other figure of the head has; the length is the
+    // card's (MOL-408)
+    cardTin: new RegExp(`${word(w.tin)}.{0,4}:?\\s*\\S+|:\\s*(?=0)(?:${tin})`, 'u'),
     cardTinDigits: new RegExp(`(${tin})\\b`, 'u'),
     cardNo: new RegExp(`${word(w.fiscal)}\\s+\\S+\\s+(\\d{6,})`, 'u'),
     tableEnd: new RegExp(any([w.total, w.control, w.fiscalSign]), 'u'),

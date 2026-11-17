@@ -102,7 +102,6 @@ function deps(world: World = {}) {
     consentVersion: () => Promise.reject(new Error('consentVersion was not expected')),
     acceptConsent: () => Promise.reject(new Error('acceptConsent was not expected')),
     markSeen: () => Promise.reject(new Error('markSeen was not expected')),
-    readsReceiptsByModel: () => Promise.reject(new Error('readsReceiptsByModel was not expected')),
   }
 
   const verdicts: VerdictRepository = {
