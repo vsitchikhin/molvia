@@ -61,10 +61,7 @@ export interface ModelUsage {
 const MILLION = 1_000_000
 
 /** A call's price by what it used, at its model's price, rounded up to the micro-dollar. */
-export function modelCallMicroUsd(
-  usage: ModelUsage,
-  model: ReceiptModelName = RECEIPT_MODEL,
-): number {
+export function modelCallMicroUsd(usage: ModelUsage, model: ReceiptModelName): number {
   const p = RECEIPT_MODEL_PRICES[model]
   const millionths =
     usage.input_tokens * p.input +
@@ -91,10 +88,7 @@ export function modelInputTokensMax(
 }
 
 /** The most a call of the model may cost: its input at most and the whole output it may take. */
-export function worstCallMicroUsd(
-  inputTokens: number,
-  model: ReceiptModelName = RECEIPT_MODEL,
-): number {
+export function worstCallMicroUsd(inputTokens: number, model: ReceiptModelName): number {
   return modelCallMicroUsd(
     { input_tokens: inputTokens, output_tokens: RECEIPT_MODEL_OUTPUT_MAX },
     model,

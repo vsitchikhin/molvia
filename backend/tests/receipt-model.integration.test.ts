@@ -39,8 +39,8 @@ import { ModelRejected, ModelUnavailable, receiptModel } from '@/receipts/model-
 import type { ModelReading, ReceiptModel } from '@/receipts/model-reader'
 import type { ReaderReading, ReceiptReader } from '@/receipts/reader'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
-import { RECEIPT_MODEL_WAIT_MS, readQueuedReceipts } from '@/usecases/read-receipts'
-import type { ReadReceiptsDeps, ReadReport } from '@/usecases/read-receipts'
+import { RECEIPT_MODEL_WAIT_MS, modelRest, readQueuedReceipts } from '@/usecases/read-receipts'
+import type { ModelRest, ReadReceiptsDeps, ReadReport } from '@/usecases/read-receipts'
 import { receiptMisses as receiptMissesCommand } from '@/receipt-misses'
 import {
   PHONE_NOTICES_PER_HOUR,
@@ -236,6 +236,7 @@ async function readAll(
     told,
     receipts = repository,
     second = null,
+    rest = modelRest(),
   }: {
     cap?: number
     share?: number
@@ -243,6 +244,7 @@ async function readAll(
     told?: ReadReceiptsDeps['told']
     receipts?: ReadReceiptsDeps['receipts']
     second?: ReceiptModel | null
+    rest?: ModelRest
   } = {},
 ): Promise<ReadReport[]> {
   const reports: ReadReport[] = []
@@ -261,7 +263,13 @@ async function readAll(
     model:
       model === null
         ? null
-        : { reader: model, second, spend, capMicroUsd: cap, shareMicroUsd: share },
+        : {
+            reader: model,
+            second: second === null ? null : { reader: second, rest },
+            spend,
+            capMicroUsd: cap,
+            shareMicroUsd: share,
+          },
     storeMemory: memory,
     ...(now === undefined ? {} : { now }),
     ...(told === undefined ? {} : { told }),
@@ -590,7 +598,11 @@ describe('the model away (Р-9)', () => {
     const model = Object.assign(real, { inputTokensMax: () => 10_000 })
     const reports = await readAll(benchReader(), model)
     expect(await receiptOf(id)).toMatchObject({ status: 'queued', attempts: 0 })
-    expect(reports).toContainEqual({ kind: 'model_unavailable', reason: 'dropped' })
+    expect(reports).toContainEqual({
+      kind: 'model_unavailable',
+      model: 'claude-haiku-5-5',
+      reason: 'dropped',
+    })
     expect(reports.some((r) => r.kind === 'model_broken')).toBe(true)
     expect((await month())?.spentMicroUsd).toBe(9_000)
   }, 30_000)
@@ -604,7 +616,11 @@ describe('the model away (Р-9)', () => {
     expect(reader.asked).toBe(0)
     expect(await receiptOf(id)).toMatchObject({ status: 'queued', attempts: 0 })
     expect((await month())?.spentMicroUsd).toBe(0)
-    expect(reports).toContainEqual({ kind: 'model_unavailable', reason: 'status 529' })
+    expect(reports).toContainEqual({
+      kind: 'model_unavailable',
+      model: 'claude-haiku-5-5',
+      reason: 'status 529',
+    })
   }, 30_000)
 
   it('keeps the worst counted for a time out, whose price is not known — in the month and the share alike', async () => {
@@ -2032,7 +2048,78 @@ describe('a receipt not read whole, read again by Sonnet (MOL-405)', () => {
     })
     expect((await receiptOf(id))?.status).toBe('parsed')
     expect(reports).toContainEqual({ kind: 'second_passed', reason: 'away' })
+    expect(reports).toContainEqual({
+      kind: 'model_unavailable',
+      model: 'claude-sonnet-5-5',
+      reason: 'timeout',
+    })
     expect(await spentOf(me)).toBe(2_180 + SONNET_WORST)
+  }, 30_000)
+
+  // adversarial А5: away, asked on every receipt it would hold the one reader of the queue its whole wait on each,
+  // and leave its worst in every owner's share
+  it('rests Sonnet once away: the receipts after it keep their first reading, nobody else paying its worst', async () => {
+    const people = [await person(LATER), await person(LATER), await person(LATER)]
+    for (const me of people) await queued(me)
+    const second = sonnet(() => Promise.reject(new ModelUnavailable('timeout', null)))
+    const reports = await readAll(benchReader(), fakeModel(answered(NOT_WHOLE, 2_180)), {
+      second,
+    })
+    expect(second.asked).toBe(1)
+    const passed = reports.filter((r) => r.kind === 'second_passed').map((r) => r.reason)
+    expect(passed).toEqual(['away', 'resting', 'resting'])
+    const spent = await Promise.all(people.map(spentOf))
+    expect(sorted(spent)).toEqual([2_180, 2_180, 2_180 + SONNET_WORST])
+  }, 30_000)
+
+  it('keeps the first, Sonnet’s answer paid, where it is one not taken', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const invalid = (): Promise<ModelReading> =>
+      Promise.resolve({ kind: 'invalid', costMicroUsd: 500, tokens: TOKENS })
+    const reports = await readAll(benchReader(), fakeModel(answered(NOT_WHOLE, 2_180)), {
+      second: sonnet(invalid),
+    })
+    expect((await receiptOf(id))?.readerVersion).toBe('claude-haiku-5-5@v5')
+    expect(reports).toContainEqual({
+      kind: 'second_passed',
+      reason: 'invalid',
+      paid: { costMicroUsd: 500, tokens: TOKENS },
+    })
+    expect(await spentOf(me)).toBe(2_680)
+  }, 30_000)
+
+  it('asks nothing of Sonnet for a receipt the first found no line on: none is there by design', async () => {
+    const me = await person(LATER)
+    await queued(me)
+    const second = sonnet(answered(ANSWER, 30_000))
+    await readAll(benchReader(), fakeModel(answered({ ...ANSWER, lines: [] }, 2_180)), { second })
+    expect(second.asked).toBe(0)
+  }, 30_000)
+
+  // adversarial А1: «отдел» of one sum would have taken both lines the first read and showed
+  it('keeps the first’s lines over Sonnet’s total with none', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const second = sonnet(answered({ ...ANSWER, lines: [] }, 30_000))
+    const report = await readAll(
+      benchReader(),
+      fakeModel(answered({ ...ANSWER, totals: [] }, 2_180)),
+      {
+        second,
+      },
+    )
+    expect(second.asked).toBe(1)
+    expect(await receiptOf(id)).toMatchObject({
+      readerVersion: 'claude-haiku-5-5@v5',
+      layout: 'card',
+    })
+    expect((await linesOf(id)).map((line) => line.sumMinor)).toEqual([74_000n, 28_710n])
+    expect(report.find((r) => r.kind === 'read')).toMatchObject({
+      readerVersion: 'claude-haiku-5-5@v5',
+      costMicroUsd: 2_180,
+      second: { costMicroUsd: 30_000, tokens: TOKENS },
+    })
   }, 30_000)
 
   it('asks nothing of Sonnet where its worst does not fit the person’s share, the first kept', async () => {
@@ -2047,5 +2134,19 @@ describe('a receipt not read whole, read again by Sonnet (MOL-405)', () => {
     expect((await receiptOf(id))?.readerVersion).toBe('claude-haiku-5-5@v5')
     expect(reports).toContainEqual({ kind: 'second_passed', reason: 'share' })
     expect(await spentOf(me)).toBe(2_180)
+  }, 30_000)
+
+  it('asks nothing of Sonnet where its worst does not fit the month’s cap, the first kept', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const second = sonnet(answered(ANSWER, 30_000))
+    const reports = await readAll(benchReader(), fakeModel(answered(NOT_WHOLE, 2_180)), {
+      second,
+      cap: 2_180 + SONNET_WORST - 1,
+    })
+    expect(second.asked).toBe(0)
+    expect((await receiptOf(id))?.readerVersion).toBe('claude-haiku-5-5@v5')
+    expect(reports).toContainEqual({ kind: 'second_passed', reason: 'cap' })
+    expect((await month())?.spentMicroUsd).toBe(2_180)
   }, 30_000)
 })

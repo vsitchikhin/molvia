@@ -29,14 +29,17 @@ import {
   explainedReading,
   betterReading,
   worstCallMicroUsd,
+  RECEIPT_MODEL,
 } from '@molvia/model'
 import type {
   Currency,
+  ExplainedReading,
   ModelReceipt,
   OwnerNotice,
   PhotoReading,
   ReceiptLineReason,
   ReceiptLine,
+  ReceiptModelName,
   ReceiptDateWindow,
   ReceiptPaidBy,
   ReceiptText,
@@ -97,16 +100,46 @@ export const RECEIPT_MODEL_ALONE_WAIT_MS = 24 * 60 * 60 * 1000
 export type ModelPaid = Pick<ModelReading, 'costMicroUsd' | 'tokens'>
 
 /**
+ * Why a model did not read a receipt: its worst past the cap or the share, the photos past what its price holds, its
+ * answer one we did not take, or the model away (MOL-272, MOL-367).
+ */
+export type ModelPassReason = 'cap' | 'share' | 'size' | 'refused' | 'cut' | 'invalid' | 'away'
+
+/**
+ * How long the second model rests once it was away (MOL-405, adversarial А5): never asked meanwhile, so an outage of
+ * it holds the one reader of the queue one call's wait in this while, not a wait on every receipt — and leaves its
+ * worst in one person's share, never a share of every receipt's owner. The first reading stays; nothing waits.
+ */
+export const RECEIPT_SECOND_REST_MS = 10 * 60 * 1000
+
+/** Whether the second model rests now, and its rest begun once it was away (MOL-405). */
+export interface ModelRest {
+  resting(now: Date): boolean
+  away(now: Date): void
+}
+
+/** The second model's rest, in the API's memory: a restart forgets it, and asks once more. */
+export function modelRest(ms = RECEIPT_SECOND_REST_MS): ModelRest {
+  let until = Number.NEGATIVE_INFINITY
+  return {
+    resting: (now) => now.getTime() < until,
+    away: (now) => {
+      until = now.getTime() + ms
+    },
+  }
+}
+
+/**
  * The model that reads receipts, and its month's spending under the cap (MOL-272) and each person's share of it
  * (MOL-367).
  */
 export interface ReceiptModelDeps {
   readonly reader: ReceiptModel
   /**
-   * The model that reads again a receipt the first did not read whole (MOL-405): Sonnet, the same key. Absent or
-   * `null`, the first reading is all there is.
+   * The model that reads again a receipt the first did not read whole (MOL-405): Sonnet, the same key, with its rest
+   * once away. Absent or `null`, the first reading is all there is.
    */
-  readonly second?: ReceiptModel | null
+  readonly second?: { readonly reader: ReceiptModel; readonly rest: ModelRest } | null
   readonly spend: ModelSpendRepository
   readonly capMicroUsd: number
   readonly shareMicroUsd: number
@@ -162,8 +195,12 @@ export type ReadReport =
       readonly ms: number
       /** Who read it (MOL-272), and what the model cost and used where it read it (Т-8). */
       readonly reader: 'model' | 'ocr'
+      /** The reading kept: whose and which version — the second model's where its reading was taken (MOL-405). */
+      readonly readerVersion: string | null
       readonly costMicroUsd: number | null
       readonly tokens: ModelPaid['tokens'] | null
+      /** What the second model's reading cost and used, apart from the first's (MOL-405, review №3). */
+      readonly second: ModelPaid | null
       /** How many of the model's figures no rule read (MOL-294): a count, never the figures (Т-8). */
       readonly unparsed: number | null
       /**
@@ -179,21 +216,26 @@ export type ReadReport =
    */
   | {
       readonly kind: 'model_passed'
-      readonly reason: 'cap' | 'share' | 'size' | 'refused' | 'cut' | 'invalid' | 'away'
+      readonly reason: ModelPassReason
       /** What an answer not taken cost and used: paid all the same (review №6). */
       readonly paid?: ModelPaid
     }
   /**
-   * The second model did not read again a receipt the first did not read whole, for this reason (MOL-405): the first
-   * reading stays — never Tesseract, never a wait.
+   * The second model did not read again a receipt the first did not read whole, for this reason — or rested, away a
+   * while before (MOL-405): the first reading stays, never Tesseract, never a wait. A request refused or a fault of
+   * ours is told as the first model's is, by its own report alone.
    */
   | {
       readonly kind: 'second_passed'
-      readonly reason:
-        'cap' | 'share' | 'size' | 'refused' | 'cut' | 'invalid' | 'away' | 'rejected'
+      readonly reason: ModelPassReason | 'resting'
       readonly paid?: ModelPaid
     }
-  | { readonly kind: 'model_unavailable'; readonly reason: string }
+  /** Which model was away, and why: a time out, the connection (MOL-405, review №4). */
+  | {
+      readonly kind: 'model_unavailable'
+      readonly model: ReceiptModelName
+      readonly reason: string
+    }
   /**
    * An answer torn on its way, or a fault of ours in the client that looks just like one (review №8): the
    * receipt still waits, and the owner hears of it as a failure — the first time in a build, then at 10,
@@ -244,7 +286,7 @@ function headOf(
 async function readOne(
   deps: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
-): Promise<{ outcome: ReadOutcome; paid: ModelPaid | null; unparsed: number | null } | 'wait'> {
+): Promise<ModelRead | 'wait'> {
   const { photo: photoReading } = receiptCard(claimed.country)
   if (claimed.parts.length === 0 || photoReading === null) {
     // restored from a nightly copy, which holds no photos (В-2); a country read by its link has no
@@ -255,7 +297,7 @@ async function readOne(
       readerVersion: null,
       head: null,
     }
-    return { outcome, paid: null, unparsed: null }
+    return { outcome, paid: null, second: null, unparsed: null }
   }
   if (claimed.byModel && deps.model) {
     const byModel = await readByModel(deps, deps.model, claimed, photoReading)
@@ -270,9 +312,10 @@ async function readOne(
       readerVersion: null,
       head: null,
     }
-    return { outcome, paid: null, unparsed: null }
+    return { outcome, paid: null, second: null, unparsed: null }
   }
-  return { outcome: await readByOcr(deps, claimed, photoReading), paid: null, unparsed: null }
+  const outcome = await readByOcr(deps, claimed, photoReading)
+  return { outcome, paid: null, second: null, unparsed: null }
 }
 
 /**
@@ -287,112 +330,73 @@ export function readsReceiptsByModel(
   if (deps.model === null) return Promise.resolve(false)
   const { spend, capMicroUsd, shareMicroUsd } = deps.model
   const month = spendMonthOf((deps.now ?? (() => new Date()))())
-  return spend.readsFor(month, worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX), {
+  // the queue's own threshold is the first reader's: the second is no condition of reading (MOL-405)
+  return spend.readsFor(month, worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX, RECEIPT_MODEL), {
     actorId,
     capMicroUsd,
     shareMicroUsd,
   })
 }
 
+/** A receipt read, and what each model's call of it cost and used (none — Tesseract's). */
+interface ModelRead {
+  readonly outcome: ReadOutcome
+  readonly paid: ModelPaid | null
+  readonly second: ModelPaid | null
+  readonly unparsed: number | null
+}
+
 /**
- * Reads one receipt by the model (MOL-272): under the month's cap — its worst price reserved before the
- * call, its own put in place after, paid whatever came back (Т-3, Т-4) — every part in one request, the
- * answer into the parse's reading and through the one check (`verifiedReading`, MOL-255) — a receipt not read whole
- * read again by the second model, the better of the two kept and the other its witness (MOL-405). `null` where
- * Tesseract is to read it instead (В-1 «а»): the cap, photos past what the price holds, an answer not
- * taken, the request refused for what it is, the model away past its wait; `'wait'` while it is away
- * within it (Р-9).
+ * Reads one receipt by the model (MOL-272): every part in one request (`askModel`), the answer into the parse's
+ * reading and through the one check (`verifiedReading`, MOL-255) — a receipt not read whole read again by the second
+ * model, the better of the two kept and the other its witness (MOL-405). `null` where Tesseract is to read it instead
+ * (В-1 «а»): the cap, photos past what the price holds, an answer not taken, the request refused for what it is, the
+ * model away past its wait; `'wait'` while it is away within it (Р-9).
  */
 async function readByModel(
   deps: ReadReceiptsDeps,
   modelDeps: ReceiptModelDeps,
   claimed: ClaimedReceipt,
   photoReading: PhotoReading,
-): Promise<{ outcome: ReadOutcome; paid: ModelPaid; unparsed: number } | 'wait' | null> {
+): Promise<ModelRead | 'wait' | null> {
   const { report } = deps
-  const { reader: model, spend, capMicroUsd, shareMicroUsd } = modelDeps
   const now = deps.now ?? (() => new Date())
-  const parts = claimed.parts.map((part) => part.photo)
-  const input = model.inputTokensMax(parts)
-  if (input === null || input > RECEIPT_MODEL_INPUT_MAX) {
-    report({ kind: 'model_passed', reason: 'size' })
-    return null
-  }
-  const worst = worstCallMicroUsd(input)
   const month = spendMonthOf(now())
-  // the receipt's owner pays from their share, whatever the model is asked for them (MOL-367)
-  const call = { actorId: claimed.actorId, capMicroUsd, shareMicroUsd }
-  const reserved = await spend.reserve(month, worst, call, now())
-  if (reserved !== 'reserved') {
-    report({ kind: 'model_passed', reason: reserved })
+  const asked = await askModel(deps, modelDeps, modelDeps.reader, claimed, month, now)
+  if (asked.kind === 'away') {
+    const waited = now().getTime() - (claimed.queuedAt ?? now()).getTime()
+    const patience = modelAlone(claimed.country)
+      ? RECEIPT_MODEL_ALONE_WAIT_MS
+      : RECEIPT_MODEL_WAIT_MS
+    if (waited < patience) return 'wait'
+    report({ kind: 'model_passed', reason: 'away' })
     return null
   }
-  let reading
-  try {
-    reading = await model.read(parts)
-  } catch (error) {
-    if (error instanceof ModelUnavailable) {
-      // a time out may have been paid: its worst stays counted, in the month and the person's share alike — a request
-      // that never left costs nothing (MOL-367, В-6 «а» on adversarial Б1)
-      if (error.costMicroUsd !== null) {
-        await spend.settle(month, worst, error.costMicroUsd, call, now())
-      }
-      report({ kind: 'model_unavailable', reason: error.reason })
-      if (error.broken !== undefined) report({ kind: 'model_broken', error: error.broken })
-      const waited = now().getTime() - (claimed.queuedAt ?? now()).getTime()
-      const patience = modelAlone(claimed.country)
-        ? RECEIPT_MODEL_ALONE_WAIT_MS
-        : RECEIPT_MODEL_WAIT_MS
-      if (waited < patience) return 'wait'
-      report({ kind: 'model_passed', reason: 'away' })
-      return null
-    }
-    if (error instanceof ModelRejected) {
-      // refused for what it is, before the model: nothing paid
-      await spend.settle(month, worst, 0, call, now())
-      report({ kind: 'model_rejected', error })
-      return null
-    }
-    // anything else is ours, and the receipt is not at fault: the owner hears of it, Tesseract reads, and the
-    // worst stays in the month — whether it was paid is not known (review №4) — never in the person's share
-    report({ kind: 'error', error })
-    await spend.keepInMonth(month, worst, call)
-    return null
-  }
-  let paid: ModelPaid = { costMicroUsd: reading.costMicroUsd, tokens: reading.tokens }
-  await spend.settle(month, worst, reading.costMicroUsd, call, now())
-  if (reading.kind !== 'read') {
-    report({ kind: 'model_passed', reason: reading.kind, paid })
+  if (asked.kind === 'failed') return null
+  if (asked.kind === 'passed') {
+    report({ kind: 'model_passed', reason: asked.reason, ...paidOf(asked) })
     return null
   }
   const { currency } = receiptCard(claimed.country)
-  let kept = await modelText(deps, claimed, photoReading, reading.answer, currency)
-  let version = model.version
-  let explained = explainedReading(kept.text, { byModel: true })
+  const first = await modelText(deps, claimed, photoReading, {
+    answer: asked.answer,
+    version: modelDeps.reader.version,
+    currency,
+  })
+  const alone = explainedReading(first.text, { byModel: true })
   // a receipt not read whole, with lines, is read again by the second model (MOL-405): of the two the better goes to
   // the review, the other its witness — a slip or a section has no lines by design, and is whole as it is
   const again =
-    explained.receipt !== null && kept.text.lines.length > 0
+    alone.receipt !== null && first.text.lines.length > 0
       ? await readAgain(deps, modelDeps, claimed, month, now)
       : null
-  if (again !== null) {
-    paid = {
-      costMicroUsd: paid.costMicroUsd + again.paid.costMicroUsd,
-      tokens: {
-        input: paid.tokens.input + again.paid.tokens.input,
-        output: paid.tokens.output + again.paid.tokens.output,
-      },
-    }
-    const other = await modelText(deps, claimed, photoReading, again.answer, currency)
-    const better = betterReading(explained, explainedReading(other.text, { byModel: true }))
-    const witness = better === 'first' ? other : kept
-    if (better === 'second') {
-      kept = other
-      version = again.version
-    }
-    explained = explainedReading(kept.text, { byModel: true, witness: witness.text })
-  }
-  const { answer, text } = kept
+  const { kept, explained } =
+    again === null
+      ? { kept: first, explained: alone }
+      : chosen(first, alone, await modelText(deps, claimed, photoReading, { ...again, currency }))
+  const { answer, text, version } = kept
+  const paid = asked.paid
+  const second = again?.paid ?? null
   const unparsed = unparsedFigures(photoReading, answer)
   const { shown } = explained
   // the photo and the answer, for the developer's review where the person has something to type and accepted
@@ -414,7 +418,7 @@ async function readByModel(
       ...(miss === undefined ? {} : { miss }),
       tell: true,
     }
-    return { outcome, paid, unparsed }
+    return { outcome, paid, second, unparsed }
   }
   // no boxes: a model's lines are cut out for no training (Р-4)
   const outcome = await parsed(deps, claimed, {
@@ -429,6 +433,7 @@ async function readByModel(
     return {
       outcome: { ...outcome, ...(miss === undefined ? {} : { miss }), tell: true },
       paid,
+      second,
       unparsed,
     }
   }
@@ -442,8 +447,20 @@ async function readByModel(
         : {}),
     },
     paid,
+    second,
     unparsed,
   }
+}
+
+/** What an answer not taken cost, where it was asked at all: paid all the same (review №6). */
+const paidOf = (asked: { readonly paid?: ModelPaid }): { paid?: ModelPaid } =>
+  asked.paid === undefined ? {} : { paid: asked.paid }
+
+/** A model's reading as the parse reads it, and whose it is. */
+interface ModelText {
+  readonly answer: ModelReceipt
+  readonly text: ReceiptText
+  readonly version: string
 }
 
 /** A model's answer as the parse reads it, the shop's memory voting in its digits (MOL-291). */
@@ -451,26 +468,106 @@ async function modelText(
   deps: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
   photoReading: PhotoReading,
-  answer: ModelReceipt,
-  currency: Currency,
-): Promise<{ readonly answer: ModelReceipt; readonly text: ReceiptText }> {
+  {
+    answer,
+    version,
+    currency,
+  }: { readonly answer: ModelReceipt; readonly version: string; readonly currency: Currency },
+): Promise<ModelText> {
   const first = receiptTextOfModel(photoReading, answer)
   // the tax number and the articles are the reading's: the memory is asked once they are known (MOL-291)
   const prices = await rememberedPrices(deps, claimed, first, currency)
   const text = prices.size === 0 ? first : receiptTextOfModel(photoReading, answer, prices)
-  return { answer, text }
+  return { answer, text, version }
+}
+
+/** Of two readings the better kept (`betterReading`), the other its witness (MOL-405). */
+function chosen(
+  first: ModelText,
+  alone: ExplainedReading,
+  other: ModelText,
+): { readonly kept: ModelText; readonly explained: ExplainedReading } {
+  const better = betterReading(alone, explainedReading(other.text, { byModel: true }))
+  const [kept, witness] = better === 'second' ? [other, first] : [first, other]
+  return { kept, explained: explainedReading(kept.text, { byModel: true, witness: witness.text }) }
+}
+
+/** What came of asking a model: what it answered, or why there is nothing to take. */
+type Asked =
+  | { readonly kind: 'read'; readonly answer: ModelReceipt; readonly paid: ModelPaid }
+  | {
+      readonly kind: 'passed'
+      readonly reason: Exclude<ModelPassReason, 'away'>
+      readonly paid?: ModelPaid
+    }
+  /** Away: a time out, the connection — `model_unavailable` told. */
+  | { readonly kind: 'away' }
+  /** Refused for what it is, or a fault of ours — told by its own report. */
+  | { readonly kind: 'failed' }
+
+/**
+ * One call of a model under the month's cap and the person's share — the first reader's and the second's alike
+ * (MOL-272, MOL-367, MOL-405): every part in one request, its worst at its own model's price reserved before the call
+ * and its own price put in place after, paid whatever came back (Т-3, Т-4). A time out may have been paid: its worst
+ * stays counted, in the month and the person's share alike — a request that never left costs nothing (В-6 «а» on
+ * adversarial Б1). Refused for what it is, before the model: nothing paid. Anything else is ours, and the receipt is
+ * not at fault: the owner hears of it, and the worst stays in the month — whether it was paid is not known (review
+ * №4) — never in the person's share. Why the model did not read is the caller's to tell.
+ */
+async function askModel(
+  deps: ReadReceiptsDeps,
+  { spend, capMicroUsd, shareMicroUsd }: ReceiptModelDeps,
+  model: ReceiptModel,
+  claimed: ClaimedReceipt,
+  month: string,
+  now: () => Date,
+): Promise<Asked> {
+  const { report } = deps
+  const parts = claimed.parts.map((part) => part.photo)
+  const input = model.inputTokensMax(parts)
+  if (input === null || input > RECEIPT_MODEL_INPUT_MAX) return { kind: 'passed', reason: 'size' }
+  const worst = worstCallMicroUsd(input, model.model)
+  // the receipt's owner pays from their share, whatever the model is asked for them (MOL-367)
+  const call = { actorId: claimed.actorId, capMicroUsd, shareMicroUsd }
+  const reserved = await spend.reserve(month, worst, call, now())
+  if (reserved !== 'reserved') return { kind: 'passed', reason: reserved }
+  let reading
+  try {
+    reading = await model.read(parts)
+  } catch (error) {
+    if (error instanceof ModelUnavailable) {
+      if (error.costMicroUsd !== null) {
+        await spend.settle(month, worst, error.costMicroUsd, call, now())
+      }
+      report({ kind: 'model_unavailable', model: model.model, reason: error.reason })
+      if (error.broken !== undefined) report({ kind: 'model_broken', error: error.broken })
+      return { kind: 'away' }
+    }
+    if (error instanceof ModelRejected) {
+      await spend.settle(month, worst, 0, call, now())
+      report({ kind: 'model_rejected', error })
+      return { kind: 'failed' }
+    }
+    report({ kind: 'error', error })
+    await spend.keepInMonth(month, worst, call)
+    return { kind: 'failed' }
+  }
+  const paid: ModelPaid = { costMicroUsd: reading.costMicroUsd, tokens: reading.tokens }
+  await spend.settle(month, worst, reading.costMicroUsd, call, now())
+  if (reading.kind !== 'read') return { kind: 'passed', reason: reading.kind, paid }
+  return { kind: 'read', answer: reading.answer, paid }
 }
 
 /**
- * The second model's reading of a receipt the first did not read whole (MOL-405): under the same month's cap and the
- * person's share — its own worst reserved before the call, its own price after, paid whatever came back. `null` where
- * there is none to take, and the first reading stays (owner's Р-3): no second model, its worst past the cap or the
- * share, the photos past its price, the model away or refusing, its answer not taken. Never a wait: the first reading
- * is paid and checked already.
+ * The second model's reading of a receipt the first did not read whole (MOL-405), asked as the first is
+ * (`askModel`). `null` where there is none to take, and the first reading stays (owner's Р-3): no second model, the
+ * model resting, its worst past the cap or the share, the photos past its price, the model away or refusing, its
+ * answer not taken. Never a wait: the first reading is paid and checked already — and away, the model rests a while
+ * (adversarial А5).
  */
 async function readAgain(
   deps: ReadReceiptsDeps,
-  { second, spend, capMicroUsd, shareMicroUsd }: ReceiptModelDeps,
+  modelDeps: ReceiptModelDeps,
   claimed: ClaimedReceipt,
   month: string,
   now: () => Date,
@@ -479,51 +576,25 @@ async function readAgain(
   readonly paid: ModelPaid
   readonly version: string
 } | null> {
+  const { second } = modelDeps
   if (!second) return null
   const { report } = deps
-  const parts = claimed.parts.map((part) => part.photo)
-  const input = second.inputTokensMax(parts)
-  if (input === null || input > RECEIPT_MODEL_INPUT_MAX) {
-    report({ kind: 'second_passed', reason: 'size' })
+  if (second.rest.resting(now())) {
+    report({ kind: 'second_passed', reason: 'resting' })
     return null
   }
-  const worst = worstCallMicroUsd(input, second.model)
-  const call = { actorId: claimed.actorId, capMicroUsd, shareMicroUsd }
-  const reserved = await spend.reserve(month, worst, call, now())
-  if (reserved !== 'reserved') {
-    report({ kind: 'second_passed', reason: reserved })
-    return null
+  const asked = await askModel(deps, modelDeps, second.reader, claimed, month, now)
+  if (asked.kind === 'read') {
+    return { answer: asked.answer, paid: asked.paid, version: second.reader.version }
   }
-  let reading
-  try {
-    reading = await second.read(parts)
-  } catch (error) {
-    if (error instanceof ModelUnavailable) {
-      // as the first: a time out may have been paid, and its worst stays counted (MOL-367)
-      if (error.costMicroUsd !== null) {
-        await spend.settle(month, worst, error.costMicroUsd, call, now())
-      }
-      report({ kind: 'second_passed', reason: 'away' })
-      if (error.broken !== undefined) report({ kind: 'model_broken', error: error.broken })
-      return null
-    }
-    if (error instanceof ModelRejected) {
-      await spend.settle(month, worst, 0, call, now())
-      report({ kind: 'second_passed', reason: 'rejected' })
-      report({ kind: 'model_rejected', error })
-      return null
-    }
-    report({ kind: 'error', error })
-    await spend.keepInMonth(month, worst, call)
-    return null
+  if (asked.kind === 'away') {
+    second.rest.away(now())
+    report({ kind: 'second_passed', reason: 'away' })
   }
-  const paid: ModelPaid = { costMicroUsd: reading.costMicroUsd, tokens: reading.tokens }
-  await spend.settle(month, worst, reading.costMicroUsd, call, now())
-  if (reading.kind !== 'read') {
-    report({ kind: 'second_passed', reason: reading.kind, paid })
-    return null
+  if (asked.kind === 'passed') {
+    report({ kind: 'second_passed', reason: asked.reason, ...paidOf(asked) })
   }
-  return { answer: reading.answer, paid, version: second.version }
+  return null
 }
 
 /**
@@ -835,6 +906,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
     const started = performance.now()
     let outcome: ReadOutcome
     let paid: ModelPaid | null = null
+    let second: ModelPaid | null = null
     let unparsed: number | null = null
     try {
       const done = await readOne(deps, claimed)
@@ -852,6 +924,7 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       }
       outcome = done.outcome
       paid = done.paid
+      second = done.second
       unparsed = done.unparsed
     } catch (error) {
       if (error instanceof ReaderUnavailable) {
@@ -890,8 +963,10 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       partly: outcome.kind === 'parsed' && outcome.partly,
       ms: Math.round(performance.now() - started),
       reader: paid === null ? 'ocr' : 'model',
+      readerVersion: outcome.readerVersion,
       costMicroUsd: paid?.costMicroUsd ?? null,
       tokens: paid?.tokens ?? null,
+      second,
       unparsed,
       remembered: outcome.kind === 'parsed' ? (outcome.voice ?? SILENT) : SILENT,
     })

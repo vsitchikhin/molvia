@@ -10,6 +10,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   MODEL_CONSENT_EDITION,
   RECEIPTS_BY_MODEL_HEADER,
+  RECEIPT_MODEL,
   RECEIPT_MODEL_INPUT_MAX,
   RECEIPT_MODEL_SHARE_MICRO_USD,
   spendMonthOf,
@@ -469,7 +470,7 @@ describe('whether the model reads for the person now (MOL-408, adversarial А3, 
     new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() + 1, 1)),
   )
   // the largest request's worst: no call the queue reserves costs more
-  const worst = worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX)
+  const worst = worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX, RECEIPT_MODEL)
 
   it('says yes to a grant with its share and the month’s cap left', async () => {
     expect(await said(await granted())).toBe(true)

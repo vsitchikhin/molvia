@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { RECEIPT_MODEL_INPUT_MAX, worstCallMicroUsd } from '@molvia/model'
+import { RECEIPT_MODEL, RECEIPT_MODEL_INPUT_MAX, worstCallMicroUsd } from '@molvia/model'
 import type { ModelCall, ModelSpendRepository } from '@/db/model-spend-repository'
 import type { ReceiptModel } from '@/receipts/model-reader'
-import { readsReceiptsByModel } from './read-receipts'
+import { modelRest, readsReceiptsByModel } from './read-receipts'
 
 const refused = (what: string) => () => Promise.reject(new Error(`${what} is not asked`))
 
@@ -37,7 +37,7 @@ describe('readsReceiptsByModel (MOL-408, adversarial А3, Р2-А1)', () => {
     expect(spend.asked).toEqual([
       {
         month: '2026-11-01',
-        worst: worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX),
+        worst: worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX, RECEIPT_MODEL),
         call: { actorId: 'a-person', capMicroUsd: 200_000_000, shareMicroUsd: 2_000_000 },
       },
     ])
@@ -53,5 +53,25 @@ describe('readsReceiptsByModel (MOL-408, adversarial А3, Р2-А1)', () => {
 
   it('must not ask anything with no model on the server: no camera', async () => {
     expect(await readsReceiptsByModel({ model: null }, 'a-person')).toBe(false)
+  })
+})
+
+describe('the second model’s rest once away (MOL-405, adversarial А5)', () => {
+  const at = (ms: number) => new Date(Date.UTC(2026, 10, 17, 12) + ms)
+
+  it('rests from the moment it was away, for its while and not a moment past it', () => {
+    const rest = modelRest(600_000)
+    expect(rest.resting(at(0))).toBe(false)
+    rest.away(at(0))
+    expect(rest.resting(at(0))).toBe(true)
+    expect(rest.resting(at(599_999))).toBe(true)
+    expect(rest.resting(at(600_000))).toBe(false)
+  })
+
+  it('rests from the last time it was away', () => {
+    const rest = modelRest(600_000)
+    rest.away(at(0))
+    rest.away(at(600_000))
+    expect(rest.resting(at(900_000))).toBe(true)
   })
 })

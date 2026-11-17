@@ -79,7 +79,7 @@ import { previousItems } from '@/usecases/previous-items'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { mergeTick } from '@/usecases/merge-twins'
-import { readQueuedReceipts, readsReceiptsByModel } from '@/usecases/read-receipts'
+import { modelRest, readQueuedReceipts, readsReceiptsByModel } from '@/usecases/read-receipts'
 import { spelledBrands } from '@/usecases/spell-brands'
 import type { SpellReport } from '@/usecases/spell-brands'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
@@ -650,7 +650,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         ? null
         : {
             reader: model,
-            second: options.receiptSecondModel ?? null,
+            second: options.receiptSecondModel
+              ? { reader: options.receiptSecondModel, rest: modelRest() }
+              : null,
             spend: modelSpend,
             capMicroUsd,
             shareMicroUsd,
@@ -886,9 +888,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 partly: event.partly,
                 ms: event.ms,
                 reader: event.reader,
+                readerVersion: event.readerVersion,
                 costMicroUsd: event.costMicroUsd,
                 inputTokens: event.tokens?.input,
                 outputTokens: event.tokens?.output,
+                secondCostMicroUsd: event.second?.costMicroUsd,
+                secondInputTokens: event.second?.tokens.input,
+                secondOutputTokens: event.second?.tokens.output,
                 unparsed: event.unparsed,
                 rememberedConfirmed: event.remembered.confirmed,
                 rememberedRepaired: event.remembered.repaired,
@@ -917,7 +923,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               'receipt not read again by the second model',
             )
           } else if (event.kind === 'model_unavailable') {
-            instance.log.warn({ reason: event.reason }, 'receipt model unavailable')
+            instance.log.warn(
+              { model: event.model, reason: event.reason },
+              'receipt model unavailable',
+            )
           } else if (event.kind === 'model_broken') {
             failures.report(event.error, job('receipt-model'), 'receipt model answer torn')
           } else if (event.kind === 'model_rejected') {
