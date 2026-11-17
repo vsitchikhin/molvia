@@ -2478,15 +2478,16 @@ right does. A second source can — the total, the shop's memory, or a second re
   **The price:** in an outage one receipt in ten minutes still waits its 120 s, and one person a while pays the worst of
   a call that may never have been paid (MOL-367, В-6).
 - **Of the two the better goes to the review** (`betterReading`): the bench's rule R3 (owner's В-1 «а») — the one proven
-  whole; else the one with a total shown; else more lines shown as read; a tie, the first — **with one step before the
-  total, adversarial А1's and Б1's, not the bench's**: the one that shows a line as read, where the other shows none
-  (Sonnet's section of one sum, or its lines found with no figure read, took both lines Haiku read and showed). On the
-  bench it changes nothing. The code knows no truth: counting lines first took a second reading with more lines and no
-  total, four wrong figures with it (am-34), and lost a total on a tie (am-07b). **The price, named** (adversarial А1,
-  its variant): a reading with the total and fewer lines shown wins, and a line only the other read is typed by hand —
-  the bench had no such receipt, and counting lines before the total is what lost am-34. `reader_version` is the reading
-  kept — `claude-sonnet-5-5@v5` counts as the model's in 0.2r (`MODEL_READER_PREFIXES`), its own row of
-  `model_receipt_days`.
+  whole; else the one with a total shown; else more lines shown as read; a tie, the first — **with two steps before the
+  total, adversarial А1's, Б1's and Г1's, not the bench's**: the one that found lines, where the other found none — a
+  section of one sum only where no reading found a line (MOL-227), or Sonnet's section took the lines Haiku found, shown
+  or to type; then the one that shows a line as read, where the other shows none — its lines found with no figure read
+  took both lines Haiku read and showed. On the bench it changes nothing. The code knows no truth: counting lines first
+  took a second reading with more lines and no total, four wrong figures with it (am-34), and lost a total on a tie
+  (am-07b). **The price, named** (adversarial А1, its variant): a reading with the total and fewer lines shown wins, and
+  a line only the other read is typed by hand — the bench had no such receipt, and counting lines before the total is
+  what lost am-34. `reader_version` is the reading kept — `claude-sonnet-5-5@v5` counts as the model's in 0.2r
+  (`MODEL_READER_PREFIXES`), its own row of `model_receipt_days`.
 - **The head is the kept reading's, what it did not read the other's** (`filledHead`, adversarial Б3): the tax number,
   the day with its time, the receipt's number, the city — fields whose none means «not found» — the same paper read
   twice; a day out of the window is none for either (MOL-305). Never a sum: the total goes with the lines it judged.
