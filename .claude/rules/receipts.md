@@ -2473,10 +2473,10 @@ right does. A second source can — the total, the shop's memory, or a second re
   `modelRest`, adversarial А5, Б4): asked on every receipt read not whole, an outage held the one reader of the queue
   its whole wait (120 s) on each and left its worst, $0,18, in every owner's share — ten time outs were 91 % of a
   person's month; an overloaded model answers near its time out rather than refusing, and held it as long (the bench's
-  slowest answer 22 s, p90 17 s). A slow answer is still taken. Resting, the receipt keeps its first reading
-  (`second_passed: resting`). The rest is the API's memory: a restart asks once more. **The price:** in an outage one
-  receipt in ten minutes still waits its 120 s, and one person a while pays the worst of a call that may never have been
-  paid (MOL-367, В-6).
+  slowest answer 22 s, p90 17 s). A slow answer is still taken, and told (`second_slow`, with its time). Resting, the
+  receipt keeps its first reading (`second_passed: resting`). The rest is the API's memory: a restart asks once more.
+  **The price:** in an outage one receipt in ten minutes still waits its 120 s, and one person a while pays the worst of
+  a call that may never have been paid (MOL-367, В-6).
 - **Of the two the better goes to the review** (`betterReading`): the bench's rule R3 (owner's В-1 «а») — the one proven
   whole; else the one with a total shown; else more lines shown as read; a tie, the first — **with one step before the
   total, adversarial А1's and Б1's, not the bench's**: the one that shows a line as read, where the other shows none
@@ -2488,9 +2488,14 @@ right does. A second source can — the total, the shop's memory, or a second re
   kept — `claude-sonnet-5-5@v5` counts as the model's in 0.2r (`MODEL_READER_PREFIXES`), its own row of
   `model_receipt_days`.
 - **The head is the kept reading's, what it did not read the other's** (`filledHead`, adversarial Б3): the tax number,
-  the day with its time, the receipt's number, the city, how it was paid — the same paper read twice; a day out of the
-  window is none for either (MOL-305). Never a sum: the total goes with the lines it judged. The shop's memory votes in
-  the kept reading's digits by the other's tax number where it read none.
+  the day with its time, the receipt's number, the city — fields whose none means «not found» — the same paper read
+  twice; a day out of the window is none for either (MOL-305). Never a sum: the total goes with the lines it judged.
+  **Never how it was paid** (adversarial В1): none there is the word of every payment row the reading found — a mixed
+  payment says nothing (MOL-312) — and a reading that lost the card's row would suggest the cash account.
+- **Both readings are judged by the shop's memory under one tax number** (adversarial В2, review №17): the one that read
+  none is read again by the other's before the choice — or the choice weighs a reading the memory checked against one it
+  never saw, and «10 × 65 = 650» the person's own 55 empties stands as read. **The price:** a second query of the memory
+  and a second parse where the first read no tax number.
 - **The other is its witness** (`explainedReading({ witness })`, owner's В-4 «а»): a figure the check emptied is shown
   again where the other reading has a line of the very same figures — quantity, price, sum and discount, none on one
   side alone, the same article where both print one; each line a witness once, in order — **and the figure has no 6**:
