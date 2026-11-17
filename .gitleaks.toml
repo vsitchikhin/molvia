@@ -7,13 +7,15 @@
 useDefault = true
 
 # A ping URL of healthchecks.io: whoever has one can say «alive» for the check (deploy.md). By its uuid
-# or by a project's ping key and a slug; the placeholders of the tests (`0f1e2d3c-secret`, `pk/…`) are
-# neither.
+# or by a project's ping key and a slug, on any host healthchecks.io answers a ping at — `hc-ping.com`,
+# the same as a full name `hc-ping.com.`, and the old `hchk.io` — in any case, as DNS takes a host
+# (MOL-399, adversarial round 4, Б4). The placeholders of the tests (`0f1e2d3c-secret`, `pk/…`) are
+# neither form; the two uuids of the watch's tests are, and only the allowlist below lets them go.
 [[rules]]
 id = "healthchecks-ping-url"
 description = "healthchecks.io ping URL"
-regex = '''hc-ping\.com/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9_-]{22}/[a-z0-9-]+)'''
-keywords = ["hc-ping.com"]
+regex = '''(?i)(?:hc-ping\.com\.?|hchk\.io)/(?:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|[A-Za-z0-9_-]{22}/[a-z0-9-]+)'''
+keywords = ["hc-ping.com", "hchk.io"]
 
 # A Telegram bot's token by its shape alone: the default rule wants `telegr…` in the name beside it, and a
 # token pasted as `const TOKEN = '…'` passed it. Its colon is out of the generic rule's reach too. Bounded on
@@ -52,9 +54,9 @@ condition = "AND"
 paths = ['''^backend/src/embeddings/model\.json$''']
 regexes = ['''^[0-9a-f]{64}$''']
 
-# The two made-up checks of the watch's tests (MOL-399, review round 2, Б2): the lock's round takes check
+# The two made-up checks of the watch's tests (MOL-399, adversarial round 2, Б2): the lock's round takes check
 # URLs by their uuid alone, so its tests need two in that form. Let go by their exact value and for the ping
-# rule alone — any other uuid of hc-ping.com is still found.
+# rule alone — any other uuid, on any host of the rule, is still found.
 [[allowlists]]
 description = "The watch's test checks by uuid"
 targetRules = ["healthchecks-ping-url"]
