@@ -2143,6 +2143,39 @@ describe('a receipt not read whole, read again by Sonnet (MOL-405)', () => {
     })
   }, 30_000)
 
+  // adversarial Г1: a section of one sum only where no reading found a line (MOL-227)
+  it('keeps the first’s lines, though none shown as read, over Sonnet’s total with none', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    // bread 1 × 540 and water 1 × 330: one number twice each, emptied with no total (MOL-255, В-2 «а»)
+    const lines: ModelReceipt['lines'] = [
+      { ...ANSWER.lines[1]!, unit_price: '540', discount: null, sum: '540' },
+      {
+        ...ANSWER.lines[1]!,
+        printed: 'Ջուր «Օրինակ» 0.5լ',
+        code: '2201',
+        article: '1100200',
+        unit_price: '330',
+        discount: null,
+        sum: '330',
+      },
+    ]
+    const totals = [
+      { label: 'Ընդամենը', amount: '870' },
+      { label: 'Վճարված է Առձեռն', amount: '870' },
+    ]
+    const second = sonnet(answered({ ...ANSWER, lines: [], totals }, 30_000))
+    await readAll(benchReader(), fakeModel(answered({ ...ANSWER, lines, totals: [] }, 2_180)), {
+      second,
+    })
+    expect(second.asked).toBe(1)
+    expect(await receiptOf(id)).toMatchObject({
+      readerVersion: 'claude-haiku-5-5@v5',
+      layout: 'class',
+    })
+    expect((await linesOf(id)).map((line) => line.position)).toEqual([0, 1])
+  }, 30_000)
+
   // adversarial В1: none there is the word of every payment row found — a mixed payment says nothing (MOL-312)
   it('takes no way of paying from the first where Sonnet’s reading kept says none', async () => {
     const me = await person(LATER)
@@ -2204,7 +2237,8 @@ describe('a receipt not read whole, read again by Sonnet (MOL-405)', () => {
         second: sonnet(answered(read, 30_000)),
       })
       expect(await receiptOf(id)).toMatchObject({ readerVersion: 'claude-haiku-5-5@v5', tin: TIN })
-      expect((await nutsOf(id))?.sumMinor).not.toBe(65_000n)
+      // as printed, 5↔6 off the person's own price: emptied (MOL-291, В-2 «б»)
+      expect(await nutsOf(id)).toMatchObject({ priceMinor: null, sumMinor: null })
     }, 30_000)
 
     it('judges the second by the first’s tax number where it read none', async () => {

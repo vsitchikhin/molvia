@@ -422,7 +422,11 @@ async function readByModel(
   const { kept, witness, explained } =
     other === null
       ? { kept: first, witness: null, explained: alone }
-      : chosen(judged, explainedReading(judged.text, { byModel: true }), other)
+      : chosen(
+          judged,
+          judged === first ? alone : explainedReading(judged.text, { byModel: true }),
+          other,
+        )
   const { answer, text, version } = kept
   const paid = asked.paid
   const second = again?.paid ?? null

@@ -144,8 +144,10 @@ export function explainedReading(
 /**
  * Which of two readings of one receipt goes to the review (MOL-405): the bench's rule R3 (owner's В-1 «а») — the one
  * proven whole; else the one with a total shown; else the one with more lines shown as read; a tie, the first — with
- * one step before the total, adversarial А1 and Б1's: **the one that shows a line as read, where the other shows
- * none** — a section of one sum, or lines found with no figure read, would take the lines the other read and showed.
+ * two steps before the total, adversarial А1's, Б1's and Г1's: **the one that found lines, where the other found
+ * none** — a section of one sum would take the lines the other found, shown or to type (MOL-227: a section only where no
+ * reading found a line); **then the one that shows a line as read, where the other shows none** — lines found with no
+ * figure read would take the lines the other read and showed.
  * The code knows no truth, only what each reading proves: a second reading with more lines and no total took four wrong
  * figures and lost a total on the bench (am-34, am-07b), where the total comes before the count — and a reading with
  * the total and fewer lines shown takes the lines it lost with it, the price named (`receipts.md`).
@@ -158,6 +160,7 @@ export function betterReading(
     proves(first) === proves(second) ? null : proves(second) ? 'second' : 'first'
   return (
     by((one) => one.receipt === null) ??
+    by((one) => one.shown.lines.length > 0) ??
     by((one) => shownAsRead(one) > 0) ??
     by((one) => one.shown.totalHundredths !== null) ??
     (shownAsRead(second) > shownAsRead(first) ? 'second' : 'first')

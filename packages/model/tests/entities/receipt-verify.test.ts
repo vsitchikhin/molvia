@@ -578,8 +578,14 @@ describe('which of two readings goes to the review (MOL-405, owner’s В-1 «а
     expect(betterReading(read([line(), line()], null), read([unread, unread], 148_000))).toBe(
       'first',
     )
-    // neither shows a line as read: the total decides, as R3
-    expect(betterReading(read([unsettled], null), read([], 148_000))).toBe('second')
+    // neither shows a line as read, both found some: the total decides, as R3
+    expect(betterReading(read([unsettled], null), read([unread], 148_000))).toBe('second')
+  })
+
+  // adversarial Г1: a section of one sum would take the lines the other found, though none was shown as read
+  it('takes the one that found lines over one that found none, though it shows none as read', () => {
+    expect(betterReading(read([unsettled, unsettled], null), read([], 87_000))).toBe('first')
+    expect(betterReading(read([], 87_000), read([unsettled], null))).toBe('second')
   })
 
   it('takes the one with a total over one with more lines (am-34, am-07b)', () => {
