@@ -4,7 +4,7 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance, InjectOptions } from 'fastify'
-import { FF_HEADER, type FfName } from '@molvia/model'
+import { FF_HEADER, FF_NAMES, type FfName } from '@molvia/model'
 import { buildServer } from '@/server'
 
 const FF = FF_HEADER.toLowerCase()
@@ -25,17 +25,24 @@ async function serverWith(ff: ReadonlySet<FfName>): Promise<FastifyInstance> {
 let none: FastifyInstance
 let venues: FastifyInstance
 let both: FastifyInstance
+/** The server as production composes it with every фф on, and nothing a test adds. */
+let all: FastifyInstance
+let bare: FastifyInstance
 
 beforeAll(async () => {
+  all = buildServer({ ff: new Set(FF_NAMES) })
+  bare = buildServer({ ff: new Set() })
   ;[none, venues, both] = await Promise.all([
     serverWith(new Set()),
     serverWith(new Set(['venues'])),
     serverWith(new Set(['payments', 'venues'])),
+    all.ready(),
+    bare.ready(),
   ])
 })
 
 afterAll(async () => {
-  await Promise.all([none.close(), venues.close(), both.close()])
+  await Promise.all([none.close(), venues.close(), both.close(), all.close(), bare.close()])
 })
 
 // Every way an answer leaves the API, as the build's header (MOL-132): the phone hears the фф from
@@ -97,5 +104,83 @@ describe('a feature whose фф is off', () => {
     const response = await venues.inject({ method: 'GET', url: '/probe/venues' })
     expect(response.statusCode).toBe(200)
     expect(response.json()).toEqual({ venues: [] })
+  })
+})
+
+/** Every route a server has, as `GET /trips/:tripId`, read off the tree Fastify prints. */
+function routesOf(app: FastifyInstance): Set<string> {
+  const routes = new Set<string>()
+  const path: string[] = []
+  for (const line of app.printRoutes({ commonPrefix: false }).split('\n')) {
+    const at = line.search(/[├└]── /)
+    if (at < 0) continue
+    const [, segment = '', methods] = /── (.*?)(?: \(([^)]*)\))?$/.exec(line.slice(at)) ?? []
+    path.length = at / 4
+    path.push(segment)
+    for (const method of methods?.split(', ') ?? []) {
+      if (method !== 'HEAD') routes.add(`${method} ${path.join('')}`)
+    }
+  }
+  return routes
+}
+
+/** What `on` has and `off` has not: the routes its фф add. */
+function featureRoutes(on: FastifyInstance, off: FastifyInstance): string[] {
+  const kept = routesOf(off)
+  return [...routesOf(on)].filter((route) => !kept.has(route))
+}
+
+/**
+ * Each of `routes` asked of `off`, its parameters filled, that does not answer as an address the API has
+ * not got — with no session, since a session would be looked up in a database here.
+ */
+async function answeredOtherwise(off: FastifyInstance, routes: string[]): Promise<string[]> {
+  const ways = [
+    { 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'cors' },
+    { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'cors' },
+    { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate' },
+  ]
+  const otherwise: string[] = []
+  for (const route of routes) {
+    const [method = 'GET', template = '/'] = route.split(' ')
+    const url = template
+      .replaceAll(/:[^/]+/g, '0f1e2d3c-4b5a-4987-a6b5-c4d3e2f1a0b9')
+      .replaceAll('*', 'x')
+    for (const headers of ways) {
+      const as = { method: method as NonNullable<InjectOptions['method']>, headers }
+      const [feature, nowhere] = await Promise.all([
+        off.inject({ ...as, url }),
+        off.inject({ ...as, url: '/nowhere' }),
+      ])
+      if (feature.statusCode !== nowhere.statusCode || feature.body !== nowhere.body) {
+        otherwise.push(`${route} → ${String(feature.statusCode)}`)
+      }
+    }
+  }
+  return otherwise
+}
+
+// The probe above proves the mechanism at the root, where no other route matches. A feature's path
+// beside a route that stays — `/trips/venues` beside `/trips/:tripId` — is that route's while the фф is
+// off: its 401, the fetch guard's 404 (adversarial А1). So every route an фф adds is asked here.
+describe('every route an фф adds, while it is off', () => {
+  it('answers as an address the API has not got', async () => {
+    // the reading of the tree, on what is surely there
+    expect(routesOf(bare)).toContain('GET /trips/:tripId')
+    expect(featureRoutes(venues, none)).toEqual(['GET /probe/venues'])
+    expect(await answeredOtherwise(none, featureRoutes(venues, none))).toEqual([])
+    expect(await answeredOtherwise(bare, featureRoutes(all, bare))).toEqual([])
+  })
+
+  it('is caught where a route that stays takes its path', async () => {
+    const beside = buildServer({ ff: new Set(['venues']) })
+    beside.get('/trips/venues', () => ({ venues: [] }))
+    await beside.ready()
+    try {
+      expect(featureRoutes(beside, bare)).toEqual(['GET /trips/venues'])
+      expect(await answeredOtherwise(bare, featureRoutes(beside, bare))).not.toEqual([])
+    } finally {
+      await beside.close()
+    }
   })
 })
