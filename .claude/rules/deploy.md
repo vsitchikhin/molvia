@@ -10,6 +10,8 @@ paths:
   - 'backend/src/routes/health.ts'
   - 'bot/src/pulse.ts'
   - '.env.prod.example'
+  - 'packages/model/src/contracts/ff.ts'
+  - 'frontend/src/stores/ff.ts'
   - 'deploy/grafana/**'
   - 'deploy/victoria/**'
 ---
@@ -268,6 +270,72 @@ The shape worth knowing here:
     named:** a Dependabot merge is a rollout of its own and not the day's release. A tag of either form
     names the images (`release.yml`) and rolls back (`deploy.sh`, whose copy on the machine is the
     owner's to bring).
+- **A feature people should not see yet is closed by an «фф», and only such a one** (MOL-382; owner's В-1 «в» of
+  MOL-376, В-1…В-4 «а» of MOL-382): 0.3 ships openly, a finished feature reaching people with its release, and since
+  `v0.2.0` nothing half-done ships (MOL-298) — so an фф stands where a chain is not whole yet or a channel not live
+  (venues before «Что заказать», payment before the bank). Out of scope, by Jira: a flag per person or per share of
+  people (no hypothesis), and a switch without a restart.
+  - **One list, in the domain** (`packages/model/src/contracts/ff.ts`): a name in Latin `snake_case`, what it
+    closes, and **the task that takes it off, filed with the entry** (`removedBy`, В-3 «а») — a test refuses an
+    entry without one and two entries with one task. From it come the variable `FF_<NAME>`, the header's words,
+    the type of a name and the environment of end-to-end; a new фф is an entry, a line of `docker-compose.prod.yml`
+    (`${FF_<NAME>:-off}`) and of `.env.prod.example`. Today `venues` (MOL-439) and `payments` (MOL-440), both
+    off (В-4 «а»).
+  - **The value is the API's environment, strictly `on` or `off`, `off` unset**: `ON`, `true`, `1` or a typo stop
+    the start (`ffEnvironmentSchema`), naming the variable — a payment silently off is worse than an API that
+    does not start and says why. Turned on by the owner's word, a line of `.env.prod` and `up -d backend`: no release
+    (`deploy/README.md`, «Feature flags»). **A typo in the name never reaches the API** (adversarial А5): compose
+    passes each фф by name, and `FF_PAYMNETS=on` is dropped with payment left off. So **the line is written by
+    `deploy/ff.sh`**, which asks compose what it reads (`config --environment`, never a parse) and refuses any
+    name of an фф the compose file does not pass, writing nothing; it replaces the line or adds it — production's
+    file was made before MOL-382 and has none, where a `sed` of the line changed nothing, silently (А6). Its copy
+    on the machine is the owner's, as `deploy.sh`'s. **The price, named:** a line typed by hand past it is still
+    silent until `./ff.sh` reads the file, or the header after the restart says what is on.
+  - **Off, a feature's routes and timers are not registered at all** — `if (ff.has(name))` at the composition
+    point of `server.ts`, never a check inside a route — so what answers is the API's «no such address», word for
+    word: before the session and the fetch metadata, no `401` that puts the cookie out, `unmatched` in the
+    metrics; nothing says the feature exists. A feature that is a branch inside a route that stays (a café's
+    receipt, a dish's rating) takes `ff` among its use case's dependencies, and off it answers and behaves exactly
+    as before it — its own task says how. `options.ff` of `buildServer` is the environment's unless a test names
+    its own (`ff-header.integration.test.ts`). **A feature's path must be no route's that stays** (adversarial
+    А1): `/trips/venues` unregistered is `/trips/:tripId`'s — its `401`, the fetch guard's 404 with a body of its
+    own. The test holds every route the server has with every фф on and has not with none: asked of the server
+    with none, each answers as `/nowhere` does — so a feature's route is held the day it is registered.
+  - **The phone hears them from every answer, never from a body** (В-1 «а»): `X-Molvia-Ff` beside
+    `X-Molvia-Version`, in `onSend` and `frameworkErrors`, the names on in the list's order, empty for none — an
+    answer too. Not a field of `/actors/me`: its schema is strict, and every open page of the build before would
+    have failed «who am I» until «Обновить»; and it is read behind the door only. The client reads the header
+    before the body (`onFf`); an answer without it — a proxy, a portal — changes nothing, a name this build does not
+    know is passed over.
+  - **The phone keeps the last list on the device** (`molvia.ff`, `stores/ff.ts`): the server's, not the
+    person's, so «Выйти» and erasure leave it, as the scheme; nothing heard and nothing kept is all off. Written
+    whenever the device holds another list, never by the window's memory alone — another window may have written an
+    older one since (adversarial А3). A feature's entries are `v-if` by `useFf(name)` and come and go with the
+    next answer, no reload; its screens carry `meta.ff`, and while it is off a move there goes home as an unknown
+    address does (`closedByFf`). **The next answer decides a move closed** (adversarial А2): a link opened cold is
+    judged by what the device kept, before any answer, so an answer that names the фф on takes the person where
+    the link went, if they are still where the move landed — behind the door too, which stands over the route —
+    have not touched the page since (a tap, a key, typing, the wheel) and no sheet is open there: the answer may
+    come minutes later, with the connection, and what was typed in a sheet or the search, a list scrolled, would
+    go with home (adversarial Б1, В1). A touch is the line: reading the screen without one — a screen reader moves
+    only the focus — does not hold the link back. One move of the mounted app (В2): over a home that stands alone —
+    a cold start — the screen is pushed, so Android's «back» steps home and never out of the app (Б2); over an entry
+    of the app it takes home's place. Its parents are not laid under it: a screen whose chain goes through home
+    has home underneath, so the chevron and «back» step home past its parent (`backTarget` steps to the first
+    ancestor underneath); one whose chain ends at another tab's root has none of it underneath, and the chevron
+    puts the parent in its place (`step: false`). An answer naming it off ends it.
+  - **The bot reads none**: it is a client of the API, and a feature of the bot is closed by the API's route.
+  - **A feature's tests run in both positions** (В-2 «а»): end-to-end's API has every фф on, so a spec meets the
+    feature as people will; its «off» on the phone is `ffOff(page, names)` of `e2e/session.ts`, which rewrites the
+    header in the page's own `fetch`, an init script laid before `open()` — never a route: a route a spec lays
+    after it and lets go on with `route.continue()` skips every route before it, and the phone heard the
+    feature on (adversarial А4); the server's «off» is the integration tests', a route off answering as an
+    unknown address.
+  - **The prices, named:** the code of a feature that is off ships in the bundle and the image — the repository
+    is public anyway; turning one on is a restart, seconds of `503` on `/health`; a page open meanwhile learns of
+    it with its next answer, and a screen of a feature turned off stays until it is left; the names of the фф
+    that are on are in every answer — they are about to be visible anyway; and a feature that is a branch inside
+    a route that stays is held by its own task, since no route of its own is there for the test to find.
 - **Production is watched from outside, never from the machine (MOL-142; MOL-149, В-4).** A watch on
   the same machine does not notice the machine is down. **The Worker `molvia-watch` on Cloudflare**
   (`deploy/watch`, MOL-221) asks every five minutes for `/api/health` and the page and pings the
