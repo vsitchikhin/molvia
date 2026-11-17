@@ -41,6 +41,7 @@ function harness(
   const spellBrands = vi.fn<ReceiptModel['spellBrands']>(answer)
   const reader = {
     version: 'claude-haiku-5-5@v5',
+    model: 'claude-haiku-5-5' as const,
     brandsVersion: 'claude-haiku-5-5@brands-v1',
     inputTokensMax: () => null,
     read: () => Promise.reject(new Error('no reading here')),
