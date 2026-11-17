@@ -476,7 +476,8 @@ function openFoodFactsOf(log: FastifyBaseLogger): OpenFoodFacts | null {
 }
 
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
-  const namedFf = ffHeaderOf(options.ff ?? FF_ON)
+  const ff = options.ff ?? FF_ON
+  const namedFf = ffHeaderOf(ff)
   const app = Fastify({
     logger: {
       // Fastify's default serializers write no headers at all, so today this hides nothing; it

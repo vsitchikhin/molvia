@@ -10,8 +10,9 @@ import { buildServer } from '@/server'
 const FF = FF_HEADER.toLowerCase()
 
 /**
- * A server whose фф are `ff`, with a feature's route registered the way a feature registers its own:
- * only while its фф is on (MOL-382, requirement 5).
+ * A server whose фф are `ff`, with a probe at the root present only while `venues` is on — after
+ * `buildServer`, outside the guarded scope, so off it is a path no route has, as a feature's own is
+ * meant to be (MOL-382, requirement 5); the routes the фф add in `buildServer` are asked below.
  */
 async function serverWith(ff: ReadonlySet<FfName>): Promise<FastifyInstance> {
   const app = buildServer({ ff })
@@ -79,9 +80,11 @@ describe('the фф every answer names (MOL-382)', () => {
   })
 })
 
-// Off, a feature's route is not there at all: what answers is the API's «no such address», word for
-// word — never a refusal that would say the feature exists, nor a 401 that puts the cookie out.
-describe('a feature whose фф is off', () => {
+// A path no route has answers alike whatever the request carries — a session, another site, a link —
+// with Fastify's 404 before the session and the fetch guard: never a refusal that would say the path
+// exists, nor a 401 that puts the cookie out. That is what a feature's path answers while its фф is off,
+// once nothing that stays takes it (the next block).
+describe('an address the API has not got, as a feature whose фф is off', () => {
   const asked: [string, Record<string, string>][] = [
     ['by the app with no session', { 'sec-fetch-site': 'same-origin', 'sec-fetch-mode': 'cors' }],
     ['with a session', { cookie: `__Host-molvia_session=${'a'.repeat(43)}` }],
@@ -89,7 +92,7 @@ describe('a feature whose фф is off', () => {
     ['by a navigation', { 'sec-fetch-site': 'none', 'sec-fetch-mode': 'navigate' }],
   ]
 
-  it.each(asked)('answers %s as an address the API does not have', async (_name, headers) => {
+  it.each(asked)('answers %s as one 404 before any session', async (_name, headers) => {
     const [feature, nowhere] = await Promise.all([
       none.inject({ method: 'GET', url: '/probe/venues', headers }),
       none.inject({ method: 'GET', url: '/nowhere', headers }),

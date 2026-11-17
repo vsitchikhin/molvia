@@ -6,7 +6,6 @@ import {
   ffEnvironmentSchema,
   ffFromHeader,
   ffHeaderOf,
-  isFfName,
   type FfName,
 } from '#model/contracts/ff'
 
@@ -29,13 +28,6 @@ describe('the list of фф', () => {
 
   it('declares venues and payments, the first two (В-4 «а»)', () => {
     expect(FF_NAMES).toEqual(['venues', 'payments'])
-  })
-
-  it('knows its own names and nothing of the prototype', () => {
-    expect(isFfName('venues')).toBe(true)
-    expect(isFfName('Venues')).toBe(false)
-    expect(isFfName('toString')).toBe(false)
-    expect(isFfName('')).toBe(false)
   })
 })
 

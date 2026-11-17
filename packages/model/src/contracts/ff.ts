@@ -34,10 +34,6 @@ export const FF_NAMES = Object.keys(FF) as readonly FfName[]
  */
 export const FF_HEADER = 'X-Molvia-Ff'
 
-export function isFfName(name: string): name is FfName {
-  return Object.hasOwn(FF, name)
-}
-
 /** The header's value for the фф that are on, in the list's order. */
 export function ffHeaderOf(on: ReadonlySet<FfName>): string {
   return FF_NAMES.filter((name) => on.has(name)).join(',')
@@ -61,7 +57,7 @@ export function ffEnvName(name: FfName): string {
  * One фф in the environment: `on` or `off`, nothing else (В-2 of the requirements). `ON`, `true`, a typo
  * stop the API's boot — a payment silently off is worse than a rollout that failed and was rolled back.
  */
-export const ffSwitchSchema = z.enum(['on', 'off'])
+const ffSwitchSchema = z.enum(['on', 'off'])
 
 /** The environment read into the фф that are on: each `FF_<NAME>` of the list, `off` when unset. */
 export const ffEnvironmentSchema = z
