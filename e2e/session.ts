@@ -318,7 +318,7 @@ export async function launchOffline(page: Page, path = '/'): Promise<void> {
  */
 export async function ffOff(page: Page, names: readonly FfName[]): Promise<void> {
   await page.addInitScript(
-    ({ header, off }) => {
+    ({ header, off }: { header: string; off: readonly string[] }) => {
       const fetched = window.fetch.bind(window)
       window.fetch = async (...asked) => {
         const response = await fetched(...asked)
@@ -332,6 +332,6 @@ export async function ffOff(page: Page, names: readonly FfName[]): Promise<void>
         return response
       }
     },
-    { header: FF_HEADER, off: [...names] },
+    { header: FF_HEADER, off: names },
   )
 }
