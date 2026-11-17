@@ -284,14 +284,23 @@ The shape worth knowing here:
   - **The value is the API's environment, strictly `on` or `off`, `off` unset**: `ON`, `true`, `1` or a typo stop
     the start (`ffEnvironmentSchema`), naming the variable — a payment silently off is worse than an API that
     does not start and says why. Turned on by the owner's word, a line of `.env.prod` and `up -d backend`: no release
-    (`deploy/README.md`, «Feature flags»).
+    (`deploy/README.md`, «Feature flags»). **A typo in the name never reaches the API** (adversarial А5): compose
+    passes each фф by name, and `FF_PAYMNETS=on` is dropped with payment left off. So **the line is written by
+    `deploy/ff.sh`**, which asks compose what it reads (`config --environment`, never a parse) and refuses any
+    name of an фф the compose file does not pass, writing nothing; it replaces the line or adds it — production's
+    file was made before MOL-382 and has none, where a `sed` of the line changed nothing, silently (А6). Its copy
+    on the machine is the owner's, as `deploy.sh`'s. **The price, named:** a line typed by hand past it is still
+    silent until `./ff.sh` reads the file, or the header after the restart says what is on.
   - **Off, a feature's routes and timers are not registered at all** — `if (ff.has(name))` at the composition
     point of `server.ts`, never a check inside a route — so what answers is the API's «no such address», word for
     word: before the session and the fetch metadata, no `401` that puts the cookie out, `unmatched` in the
     metrics; nothing says the feature exists. A feature that is a branch inside a route that stays (a café's
     receipt, a dish's rating) takes `ff` among its use case's dependencies, and off it answers and behaves exactly
     as before it — its own task says how. `options.ff` of `buildServer` is the environment's unless a test names
-    its own (`ff-header.integration.test.ts`).
+    its own (`ff-header.integration.test.ts`). **A feature's path must be no route's that stays** (adversarial
+    А1): `/trips/venues` unregistered is `/trips/:tripId`'s — its `401`, the fetch guard's 404 with a body of its
+    own. The test holds every route the server has with every фф on and has not with none: asked of the server
+    with none, each answers as `/nowhere` does — so a feature's route is held the day it is registered.
   - **The phone hears them from every answer, never from a body** (В-1 «а»): `X-Molvia-Ff` beside
     `X-Molvia-Version`, in `onSend` and `frameworkErrors`, the names on in the list's order, empty for none — an
     answer too. Not a field of `/actors/me`: its schema is strict, and every open page of the build before would
@@ -299,19 +308,26 @@ The shape worth knowing here:
     before the body (`onFf`); an answer without it — a proxy, a portal — changes nothing, a name this build does not
     know is passed over.
   - **The phone keeps the last list on the device** (`molvia.ff`, `stores/ff.ts`): the server's, not the
-    person's, so «Выйти» and erasure leave it, as the scheme; nothing heard and nothing kept is all off. A
-    feature's entries are `v-if` by `useFf(name)` and come and go with the next answer, no reload; its screens
-    carry `meta.ff`, and while it is off a move there goes home as an unknown address does (`closedByFf`).
+    person's, so «Выйти» and erasure leave it, as the scheme; nothing heard and nothing kept is all off. Written
+    whenever the device holds another list, never by the window's memory alone — another window may have written an
+    older one since (adversarial А3). A feature's entries are `v-if` by `useFf(name)` and come and go with the
+    next answer, no reload; its screens carry `meta.ff`, and while it is off a move there goes home as an unknown
+    address does (`closedByFf`). **The next answer decides a move closed** (adversarial А2): a link opened cold is
+    judged by what the device kept, before any answer, so an answer that names the фф on takes the person where
+    the link went, if they are still where the move landed — behind the door too, which stands over the route;
+    an answer naming it off ends it.
   - **The bot reads none**: it is a client of the API, and a feature of the bot is closed by the API's route.
   - **A feature's tests run in both positions** (В-2 «а»): end-to-end's API has every фф on, so a spec meets the
     feature as people will; its «off» on the phone is `ffOff(page, names)` of `e2e/session.ts`, which rewrites the
-    header on its way to the page, laid before `open()`; the server's «off» is the integration tests', a route
-    off answering as an unknown address.
+    header in the page's own `fetch`, an init script laid before `open()` — never a route: a route a spec lays
+    after it and lets go on with `route.continue()` skips every route before it, and the phone heard the
+    feature on (adversarial А4); the server's «off» is the integration tests', a route off answering as an
+    unknown address.
   - **The prices, named:** the code of a feature that is off ships in the bundle and the image — the repository
     is public anyway; turning one on is a restart, seconds of `503` on `/health`; a page open meanwhile learns of
     it with its next answer, and a screen of a feature turned off stays until it is left; the names of the фф
-    that are on are in every answer — they are about to be visible anyway; and the server's «off» is proved on a
-    probe route in the integration tests, so a feature's own route is held there by its own task.
+    that are on are in every answer — they are about to be visible anyway; and a feature that is a branch inside
+    a route that stays is held by its own task, since no route of its own is there for the test to find.
 - **Production is watched from outside, never from the machine (MOL-142; MOL-149, В-4).** A watch on
   the same machine does not notice the machine is down. **The Worker `molvia-watch` on Cloudflare**
   (`deploy/watch`, MOL-221) asks every five minutes for `/api/health` and the page and pings the
