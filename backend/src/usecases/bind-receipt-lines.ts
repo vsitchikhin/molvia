@@ -6,9 +6,11 @@ import {
   isServiceClass,
   lineFitter,
   newLineName,
+  findsAreGuesses,
   receiptCard,
   receiptLineName,
   receiptLineParts,
+  receiptSourceOf,
   serbianServiceLine,
 } from '@molvia/model'
 import type {
@@ -137,7 +139,10 @@ export async function bindReceiptLines(
    */
   { byModel = false }: { readonly byModel?: boolean } = {},
 ): Promise<LineBinding[]> {
-  const names = receiptCard(country).nameLanguage
+  const card = receiptCard(country)
+  const names = card.nameLanguage
+  const byLink = receiptSourceOf(country) === 'tax'
+  const guesses = findsAreGuesses(card)
   const nodes = names === null ? [] : await items.nodes(names)
   if (names !== null && nodes.length === 0) namesMissing?.(new CatalogueNamesMissing(names))
   const matcher = createLineMatcher(nodes, TILL_WORDS_RU)
@@ -152,25 +157,24 @@ export async function bindReceiptLines(
   const bound: LineBinding[] = []
   for (const [position, line] of lines.entries()) {
     if (names === null) {
-      const code = codes[position] ?? null
-      const held = code === null ? null : await findByBarcode(items, code)
-      if (held !== null) {
-        bound.push({ itemId: held.id, match: 'search', translation: null })
-        continue
+      // the tax office's lines (Serbia, MOL-232): a package's code first, and a service line is no product
+      if (byLink) {
+        const code = codes[position] ?? null
+        const held = code === null ? null : await findByBarcode(items, code)
+        if (held !== null) {
+          bound.push({ itemId: held.id, match: 'search', translation: null })
+          continue
+        }
+        // a delivery or a tip is no product: «проверьте», never a new item in silence (MOL-232, А6)
+        if (serbianServiceLine(line.printed)) {
+          bound.push({ itemId: null, match: 'weak', translation: null })
+          continue
+        }
       }
-      // a delivery or a tip is no product: «проверьте», never a new item in silence (MOL-232, А6)
-      if (serbianServiceLine(line.printed)) {
-        bound.push({ itemId: null, match: 'weak', translation: null })
-        continue
-      }
-      // a country with no names of its own in the catalogue, Serbia: its till prints the name in full,
-      // the same every time, and the search — by meaning too — reads it as typed (MOL-232, В-3)
+      // a country with no names of its own in the catalogue: the search — by meaning too — reads the line's name
+      // whole (MOL-232, В-3); read off a photo, what it finds is a guess, «проверьте» (MOL-408, В-5 «б»)
       const searched = await bySearch(receiptLineName(line.printed, country))
-      // Georgia's lines are a script the catalogue names nothing in, its items found by letters across scripts and
-      // by meaning: every one «проверьте» (MOL-408, owner's В-5 «б»)
-      bound.push(
-        country === 'GE' && searched.match === 'search' ? { ...searched, match: 'weak' } : searched,
-      )
+      bound.push(guesses && searched.match === 'search' ? { ...searched, match: 'weak' } : searched)
       continue
     }
     const mended = mendedLines[position] ?? null

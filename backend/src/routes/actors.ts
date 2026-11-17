@@ -7,7 +7,7 @@ import {
   exportFileCodec,
   yerevanDate,
 } from '@molvia/model'
-import type { Actor, ExportFile, TelegramUserId } from '@molvia/model'
+import type { Actor, ActorView, ExportFile, TelegramUserId } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { clearSessionCookie } from '@/cookie'
 import { parseQuery } from '@/parse'
@@ -30,7 +30,10 @@ import { refuseAnyBody } from './empty-body'
  * not the account itself any more. It is still one person's settings sitting in a file a shared
  * cache may hand to the next reader, which is reason enough on a reply that names somebody.
  */
-export function answerWithActor(reply: FastifyReply, actor: Actor): FastifyReply {
+export function answerWithActor(
+  reply: FastifyReply,
+  actor: Actor & Pick<ActorView, 'receiptsByModel'>,
+): FastifyReply {
   return reply.header('cache-control', 'no-store').send(z.encode(actorCodec, actor))
 }
 
@@ -49,15 +52,16 @@ export function actorMeRoute(
     // — the hook guarantees it, and a reader should not have to know that to trust this.
     const actor = request.actor
     if (!actor) throw new DomainError(ERROR.NO_ACTOR)
-    // whether the model reads the person's receipts, only to a phone that asks: an earlier build reads the answer
-    // strictly (MOL-408)
+    // Whether the model reads the person's receipts, only to a phone that asks: an earlier build reads the answer
+    // strictly (MOL-408). It costs this request one read more — the grant, the person's share and the month's cap are
+    // no fields of the entity the hook holds.
     if (request.headers[RECEIPTS_BY_MODEL_HEADER.toLowerCase()] !== '1') {
       return answerWithActor(reply, actor)
     }
-    const receiptsByModel = await readsReceiptsByModel(actor.id)
-    return reply
-      .header('cache-control', 'no-store')
-      .send(z.encode(actorCodec, { ...actor, receiptsByModel }))
+    return answerWithActor(reply, {
+      ...actor,
+      receiptsByModel: await readsReceiptsByModel(actor.id),
+    })
   })
 }
 

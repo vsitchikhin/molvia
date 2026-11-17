@@ -17,6 +17,7 @@ import {
   errorResponseSchema,
   isWireCode,
   describeFailure,
+  spendMonthOf,
 } from '@molvia/model'
 import type { ErrorCode, ErrorResponse, TelegramUserId } from '@molvia/model'
 import { InvalidBody } from '@/parse'
@@ -633,6 +634,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const reader = options.receiptReader ?? null
     const model = options.receiptModel ?? null
     const modelSpend = createModelSpendRepository(db, owner !== null)
+    const capMicroUsd =
+      options.receiptModelCapMicroUsd ?? Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000)
+    // a share above the cap is the cap: lowering the cap stays one line (MOL-367, adversarial А3)
+    const shareMicroUsd = Math.min(
+      options.receiptModelShareMicroUsd ?? RECEIPT_MODEL_SHARE_MICRO_USD,
+      capMicroUsd,
+    )
     const taxOffice =
       options.purs === undefined
         ? pursOf(instance.log, (error) => {
@@ -908,14 +916,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           PHONE_NOTICES_PER_HOUR,
           PHONE_NOTICES_PER_SENDER,
           (count) => ({ kind: 'receipt_partial_muted', count }),
-        )
-        const capMicroUsd =
-          options.receiptModelCapMicroUsd ??
-          Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000)
-        // a share above the cap is the cap: lowering the cap stays one line (MOL-367, adversarial А3)
-        const shareMicroUsd = Math.min(
-          options.receiptModelShareMicroUsd ?? RECEIPT_MODEL_SHARE_MICRO_USD,
-          capMicroUsd,
         )
         const modelDeps =
           model === null ? null : { reader: model, spend: modelSpend, capMicroUsd, shareMicroUsd }
@@ -1209,7 +1209,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // Before the session is looked up: a foreign page or a link moves nothing (MOL-368).
       guarded.addHook('onRequest', refuseOutsideTheApp)
       withActor(guarded, (token) => authenticate(sessions, actors, token))
-      actorMeRoute(guarded, (id) => actors.readsReceiptsByModel(id))
+      // the model reads for the person now: no key, no model; the share and the cap as the queue holds them (MOL-408)
+      actorMeRoute(guarded, (id) =>
+        model === null
+          ? Promise.resolve(false)
+          : actors.readsReceiptsByModel(id, {
+              month: spendMonthOf(new Date()),
+              capMicroUsd,
+              shareMicroUsd,
+            }),
+      )
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),
       )

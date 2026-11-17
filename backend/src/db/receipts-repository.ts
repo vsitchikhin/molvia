@@ -635,9 +635,9 @@ export interface ReceiptRepository {
   /**
    * The next receipt for the reader, now `reading`; `null` for an empty queue. People in turn, the one
    * read least in the last hour first (review А10): fifty receipts of one person do not hold
-   * another's behind them.
+   * another's behind them. `passed`: receipts this round has stepped over, waiting for the model (MOL-408).
    */
-  claimNext(): Promise<ClaimedReceipt | null>
+  claimNext(passed?: readonly string[]): Promise<ClaimedReceipt | null>
   /** Back to the queue, its attempt not counted: the reader was not there, the receipt not at fault. */
   release(id: string): Promise<void>
   /**
@@ -1471,13 +1471,21 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
       })
     },
 
-    async claimNext() {
+    async claimNext(passed = []) {
+      const stepped =
+        passed.length === 0
+          ? sql`true`
+          : sql`waiting.id not in (${sql.join(
+              passed.map((id) => sql`${id}::uuid`),
+              sql`, `,
+            )})`
       return db.transaction(async (tx) => {
         // each person in turn: the one read least in the last hour first, then the oldest receipt —
         // a person's next receipt waits behind everyone else's first (review А10)
         const [next] = await tx.execute<{ id: string }>(sql`
           select waiting.id from ${receipts} waiting
           where waiting.status = 'queued' and waiting.source = 'photo' and waiting.deleted_at is null
+            and ${stepped}
           order by (
             select count(*) from ${receipts} served
             where served.actor_id = waiting.actor_id

@@ -160,8 +160,8 @@ export function tellsQuietly(now: Date, timeZone: string): boolean {
 /**
  * The countries a receipt is read in — each with its card (`RECEIPT_CARDS`, MOL-247). Serbia's receipts
  * are not read off a photo at all but by the link of their QR code — the tax office gives their lines
- * (MOL-232); where a receipt's QR gives its lines, the QR, else the photo (MOL-408, owner's В-1 «а»). Georgia
- * is read off its photo by the model alone (MOL-408).
+ * (MOL-232). The owner's rule (MOL-408, В-1 «а»): where a receipt's QR gives its lines, the QR, else the photo — a
+ * Serbian photo where its QR does not read is MOL-424. Georgia is read off its photo by the model alone (MOL-408).
  */
 export const photoReceiptCountrySchema = z.enum(['AM', 'GE'])
 export const linkReceiptCountrySchema = z.enum(['RS'])

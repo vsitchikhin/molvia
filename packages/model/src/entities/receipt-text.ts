@@ -13,7 +13,7 @@
 // with a word in it is built from the card, once a card. The tills' layouts stay the parse's own.
 
 import type { ReceiptPaidBy } from '#model/entities/receipt'
-import { PARSED_FRACTION_DIGITS } from '#model/entities/receipt-card'
+import { PARSED_FRACTION_DIGITS, digitCounts } from '#model/entities/receipt-card'
 import type { DateOrder, PhotoReading } from '#model/entities/receipt-card'
 
 /** A line's four figures: thousandths of its unit, hundredths of money. */
@@ -162,6 +162,8 @@ interface Lexicon {
   readonly digitLikeAt: RegExp
   readonly cardTotal: RegExp
   readonly cardTin: RegExp
+  readonly cardTinDigits: RegExp
+  readonly departmentTinTill: RegExp
   readonly cardNo: RegExp
   readonly tableEnd: RegExp
   readonly tableTotal: RegExp
@@ -216,6 +218,8 @@ function lexiconOf(reading: PhotoReading): Lexicon {
     )
   }
   const w = reading.words
+  // the tax number's and the fiscal number's digits are the card's (MOL-408): Armenia's eight
+  const [tin, fiscal] = [digitCounts(reading.tinDigits), digitCounts(reading.fiscalDigits)]
   const u = w.units
   // a word that captures moves the figures the parse reads after it by their groups: the total read as the
   // word, NaN (adversarial А1) — refused, as a format it cannot read is
@@ -270,13 +274,17 @@ function lexiconOf(reading: PhotoReading): Lexicon {
       'gu',
     ),
     cardTotal: new RegExp(`${word(w.total)}\\s+(\\d[\\d ]*\\.\\d{1,2})\\b`, 'u'),
-    cardTin: new RegExp(`${word(w.tin)}.{0,4}:?\\s*\\S+|:\\s*0\\d{7}`, 'u'),
+    cardTin: new RegExp(
+      `${word(w.tin)}.{0,4}:?\\s*\\S+|:\\s*0(?:${digitCounts(reading.tinDigits.map((n) => n - 1))})`,
+      'u',
+    ),
+    cardTinDigits: new RegExp(`(${tin})\\b`, 'u'),
     cardNo: new RegExp(`${word(w.fiscal)}\\s+\\S+\\s+(\\d{6,})`, 'u'),
     tableEnd: new RegExp(any([w.total, w.control, w.fiscalSign]), 'u'),
     tableTotal: new RegExp(`${word(w.total)}:?\\s+(\\d[\\d ]*[.,]\\d{2})`, 'u'),
     // the table prints its unit in brackets, in either case: «20կգ(Կգ)», «կԳ(ԿԳ)»
     tableWeighed: new RegExp(`${word(u.kg)}\\)`, 'iu'),
-    tableTin: new RegExp(`${any([w.tin, ...w.tinMisread])}\\S{0,2}\\s*(\\d{8})`, 'u'),
+    tableTin: new RegExp(`${any([w.tin, ...w.tinMisread])}\\S{0,2}\\s*(${tin})`, 'u'),
     tableNo: new RegExp(`${word(w.fiscal)}\\s*\\S*\\s+(\\d{6,})`, 'u'),
     tableReceiptNo: new RegExp(`${word(w.receiptNumber)}:?\\s*(\\d[\\d ]{2,})`, 'u'),
     classTail,
@@ -285,7 +293,7 @@ function lexiconOf(reading: PhotoReading): Lexicon {
     classTotal: new RegExp(`${word(w.total)}:?\\s+(\\d[\\d ]*(?:[.,]\\d{1,2})?)(?![\\d.,])`, 'u'),
     // a count before its unit: «1հատ», «4 հատ», «0.742 կգ»
     classUnit: new RegExp(`(\\d+(?:[.,]\\d+)?)\\s*(${word(u.piece)}|${word(u.kg)})`, 'u'),
-    classTin: new RegExp(`${word(w.tin)}\\S{0,2}\\s*(\\d{8})(?!\\d)`, 'u'),
+    classTin: new RegExp(`${word(w.tin)}\\S{0,2}\\s*(${tin})(?!\\d)`, 'u'),
     classNo: new RegExp(
       `${word(w.fiscal)}\\S*(?:\\s+\\S*${word(w.fiscalNumber)}\\S*)?\\s+(\\d{6,})`,
       'u',
@@ -316,11 +324,15 @@ function lexiconOf(reading: PhotoReading): Lexicon {
       `${classMark.source}|\\(\\d{4}\\)\\s*\\p{L}|(?<!\\d)\\d{4}\\s*/\\s*\\d{6,}|Անուն.{0,20}Քան`,
       'u',
     ),
+    // The tax number: after its word first, anywhere; else before the till's registration number on the same
+    // row, however OCR read the word, «CUCC: 57311783 9/С: 31028805» — never the receipt's own number
+    // «ԿՀ: 00000049» on the row above it (review 1, № 1).
+    departmentTinTill: new RegExp(`(?<!\\d)(${tin})\\s+\\S{1,3}\\/\\S{1,3}:?\\s*\\d{6,}`, 'u'),
     // the tax number after its word, anywhere — never the receipt's own number «ԿՀ: 00000049»
-    tinWord: new RegExp(`${word(w.tin)}\\S{0,2}\\s*(\\d{8})(?!\\d)`, 'u'),
+    tinWord: new RegExp(`${word(w.tin)}\\S{0,2}\\s*(${tin})(?!\\d)`, 'u'),
     fiscal: new RegExp(word(w.fiscal), 'iu'),
     // «ՖԻՍԿԱԼ ՀԱՄԱՐ 04143299», in capitals as often as not
-    fiscalNo: new RegExp(`${word(w.fiscal)}\\S*\\s+\\S*\\s*(\\d{8})(?!\\d)`, 'iu'),
+    fiscalNo: new RegExp(`${word(w.fiscal)}\\S*\\s+\\S*\\s*(${fiscal})(?!\\d)`, 'iu'),
     sectionTax: new RegExp(any(w.sectionTax), 'u'),
     totalKept: new RegExp(word(w.totalKept), 'u'),
     discountKept: new RegExp(word(w.discountKept), 'u'),
@@ -1019,7 +1031,7 @@ function cardReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
       ? sliced(budget, f.qtyS, f.paidS, f.discS, f.priceS)
       : out
   })
-  const tin = /(\d{8})\b/.exec(lx.cardTin.exec(text)?.[0] ?? '')?.[1] ?? null
+  const tin = lx.cardTinDigits.exec(lx.cardTin.exec(text)?.[0] ?? '')?.[1] ?? null
   // whether the reading by its own total took a slice (MOL-246): `bestReading` lets no such total vouch
   let tookSlice = false
   const judge = (byTotal: boolean): ReceiptText => {
@@ -1689,10 +1701,6 @@ function classReceipt(rows: readonly TextRow[], lx: Lexicon): Laid {
 
 // «Բաժին 1», as OCR reads it: «Ււսժին 1]», «Բայժին 11» — the section and its number.
 export const DEPARTMENT = /(?:Բա|Բայ|Ււս)ժին\s*\d/u
-// The tax number: after its word first, anywhere; else before the till's registration number on the same
-// row, however OCR read the word, «CUCC: 57311783 9/С: 31028805» — never the receipt's own number
-// «ԿՀ: 00000049» on the row above it (review 1, № 1).
-const DEPARTMENT_TIN_TILL = /(?<!\d)(\d{8})\s+\S{1,3}\/\S{1,3}:?\s*\d{6,}/u
 const DEPARTMENT_DATE = /(?<!\d)(\d{2})[-.]\s?(\d{2})[-.]\s?(\d{2})\s+(\d{2}):(\d{2})/g
 // the same, to ask of one row (`test` of a global pattern carries its place from row to row)
 const DEPARTMENT_MOMENT = new RegExp(DEPARTMENT_DATE.source)
@@ -1898,7 +1906,9 @@ export function departmentReceipt(
         .slice(end + 1)
         .some(
           (text) =>
-            DEPARTMENT_MOMENT.test(text) || lx.tinWord.test(text) || DEPARTMENT_TIN_TILL.test(text),
+            DEPARTMENT_MOMENT.test(text) ||
+            lx.tinWord.test(text) ||
+            lx.departmentTinTill.test(text),
         )
     )
   }
@@ -1917,7 +1927,7 @@ export function departmentReceipt(
   // the tax number of every head a reading holds, row by row
   const tins = texts.map((rows) =>
     rows.flatMap((text) => {
-      const found = lx.tinWord.exec(text)?.[1] ?? DEPARTMENT_TIN_TILL.exec(text)?.[1]
+      const found = lx.tinWord.exec(text)?.[1] ?? lx.departmentTinTill.exec(text)?.[1]
       return found === undefined ? [] : [found]
     }),
   )
@@ -1929,7 +1939,7 @@ export function departmentReceipt(
     ? tins.some((found) => found.length > 1) && new Set(tins.flat()).size === 1
       ? (tins.flat()[0] ?? null)
       : null
-    : agreed(texts.map((rows) => firstOf(rows, lx.tinWord) ?? firstOf(rows, DEPARTMENT_TIN_TILL)))
+    : agreed(texts.map((rows) => firstOf(rows, lx.tinWord) ?? firstOf(rows, lx.departmentTinTill)))
   return {
     layout: 'department',
     tin,

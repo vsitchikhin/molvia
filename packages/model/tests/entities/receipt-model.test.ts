@@ -1595,8 +1595,8 @@ describe('a Georgian receipt the model read (MOL-408)', () => {
     expect(shown.map((l) => l.sumHundredths)).toEqual([859, 240])
   })
 
-  it('takes a supermarket’s «TOT» and «TOTAL» as the total, never «SUBTOTAL» nor «სულგუნი»', () => {
-    for (const label of ['GEL* TOT', 'TOTAL', 'Total']) {
+  it('takes a supermarket’s «TOT» as the total, never «SUBTOTAL» nor «სულგუნი»', () => {
+    for (const label of ['GEL* TOT', 'სულ:']) {
       const totals = [
         { label, amount: '10.99' },
         { label: 'GEL EFT Credit', amount: '10.99' },

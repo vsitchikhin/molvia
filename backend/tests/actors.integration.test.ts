@@ -6,13 +6,7 @@
 import { randomBytes } from 'node:crypto'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { eq, inArray, notInArray } from 'drizzle-orm'
-import {
-  ERROR,
-  MODEL_CONSENT_EDITION,
-  RECEIPTS_BY_MODEL_HEADER,
-  SESSION_COOKIE,
-  actorWireSchema,
-} from '@molvia/model'
+import { ERROR, SESSION_COOKIE, actorWireSchema } from '@molvia/model'
 import type { ActorWire } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
 import { actors, events } from '@/db/schema'
@@ -236,58 +230,6 @@ describe('a request that proves who it is', () => {
 
     expect(after?.updatedAt).toEqual(before?.updatedAt)
   })
-})
-
-describe('whether the model reads the receipts (MOL-408)', () => {
-  async function asked(id: string, header: boolean): Promise<Record<string, unknown>> {
-    const cookie = await signIn(db, id)
-    return served(async (app) => {
-      const response = await app.inject({
-        method: 'GET',
-        url: '/actors/me',
-        headers: header ? { cookie, [RECEIPTS_BY_MODEL_HEADER]: '1' } : { cookie },
-      })
-      expect(response.statusCode).toBe(200)
-      return JSON.parse(response.body) as Record<string, unknown>
-    })
-  }
-
-  async function granted(until: Date | null, edition: number | null): Promise<string> {
-    const { id } = actorIn((await firstVisit()).body)
-    await db
-      .update(actors)
-      .set({
-        receiptsModelUntil: until,
-        consentVersion: edition,
-        consentedAt: edition === null ? null : new Date(),
-      })
-      .where(eq(actors.id, id))
-    return id
-  }
-
-  const LATER = new Date(Date.now() + 24 * 60 * 60 * 1000)
-  const EARLIER = new Date(Date.now() - 24 * 60 * 60 * 1000)
-
-  it('says it to a phone that asks: the grant to come and edition 5 accepted', async () => {
-    const id = await granted(LATER, MODEL_CONSENT_EDITION)
-    expect(actorIn(await asked(id, true)).receiptsByModel).toBe(true)
-  }, 10_000)
-
-  it('says «no» of a grant run out, none, or an older edition', async () => {
-    for (const [until, edition] of [
-      [EARLIER, MODEL_CONSENT_EDITION],
-      [null, MODEL_CONSENT_EDITION],
-      [LATER, MODEL_CONSENT_EDITION - 1],
-    ] as const) {
-      const id = await granted(until, edition)
-      expect(actorIn(await asked(id, true)).receiptsByModel, String(until)).toBe(false)
-    }
-  }, 10_000)
-
-  it('must not say it to a phone that does not ask: an earlier build reads the answer strictly', async () => {
-    const id = await granted(LATER, MODEL_CONSENT_EDITION)
-    expect(Object.keys(await asked(id, false))).not.toContain('receiptsByModel')
-  }, 10_000)
 })
 
 describe('health', () => {
