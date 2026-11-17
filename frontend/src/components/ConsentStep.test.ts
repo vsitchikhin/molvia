@@ -140,7 +140,7 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(view.get('.statistics').text()).toContain(en.consent.statistics.title)
     expect(view.get('.statistics').text()).toContain(en.consent.statistics.text)
     // The switch that withdraws it is named by its own words.
-    expect(en.consent.statistics.text).toContain(`«${en.settings.analytics.label}»`)
+    expect(en.consent.statistics.text).toContain(`“${en.settings.analytics.label}”`)
     expect(view.find('.changes').exists()).toBe(false)
   })
 
@@ -219,7 +219,7 @@ describe('«Условия и приватность» (MOL-95)', () => {
     expect(ru.consent.changes['6']).toMatch(/выгрузку для замера удаляет после него/)
     expect(ru.consent.changes['6']).toContain(`«${ru.settings.analytics.label}»`)
     expect(en.consent.changes['6']).toMatch(/^A new purpose: /)
-    expect(en.consent.changes['6']).toContain(`«${en.settings.analytics.label}»`)
+    expect(en.consent.changes['6']).toContain(`“${en.settings.analytics.label}”`)
     // And the card on the step names it beside the visits and the ratings.
     expect(view.get('.statistics').text()).toContain(en.consent.statistics.text)
     expect(ru.consent.statistics.text).toMatch(/меряем поиск по тому, что вы брали по запросу/)

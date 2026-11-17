@@ -736,7 +736,7 @@ for (const locale of ['ru-RU', 'en-US'])
     }) => {
       await page.setViewportSize({ width: 320, height: 720 })
       await open(page, '/_kit')
-      const name = locale === 'ru-RU' ? 'Как меняли' : 'How it was changed'
+      const name = locale === 'ru-RU' ? 'Как меняли' : 'How you exchanged'
       const track = page.getByRole('group', { name }).locator('.track')
       await track.scrollIntoViewIfNeeded()
       const look = () =>

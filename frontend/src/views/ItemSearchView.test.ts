@@ -392,7 +392,7 @@ describe('«What did you pick up?»', () => {
     const view = await render()
     await field(view).setValue('кефр')
     await vi.waitFor(() => {
-      expect(view.get('.live').text()).toContain('Nothing found for «кефр»')
+      expect(view.get('.live').text()).toContain('Nothing found for “кефр”')
     })
 
     await field(view).setValue('кефри')
@@ -403,7 +403,7 @@ describe('«What did you pick up?»', () => {
 
     second([])
     await vi.waitFor(() => {
-      expect(view.get('.live').text()).toContain('Nothing found for «кефри»')
+      expect(view.get('.live').text()).toContain('Nothing found for “кефри”')
     })
   }, 15_000)
 
@@ -484,7 +484,7 @@ describe('«What did you pick up?»', () => {
 
       await vi.waitFor(() => {
         expect(view.get('.live').text()).toBe(
-          'Nothing found for «пельмени». 1 item with a similar spelling',
+          'Nothing found for “пельмени”. 1 item with a similar spelling',
         )
       })
     }, 10_000)

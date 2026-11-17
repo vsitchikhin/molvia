@@ -136,6 +136,6 @@ test('a refund’s QR is said by its reason, and nothing is queued', async ({ pa
   await signedIn(page, '/purchases')
   await shoot(page, link(1))
   await expect(sheet(page)).toContainText('This is a refund receipt — it is not recorded', READ)
-  await expect(sheet(page).getByRole('button', { name: 'Shoot another' })).toBeVisible()
+  await expect(sheet(page).getByRole('button', { name: 'Take another' })).toBeVisible()
   await expect(page.locator('.list-row').filter({ hasText: 'by link' })).toHaveCount(0)
 })

@@ -205,7 +205,7 @@ describe('IncomeSheet', () => {
     expect(view.text()).not.toContain('held before it came in')
     await fill(view, '200000', 'AMD')
     expect(view.text()).toContain('held before it came in')
-    expect(view.text()).toContain('By the recorded spending ≈')
+    expect(view.text()).toContain('By the recorded expenses ≈')
     // Before the drams had a price, nothing held weighs anything.
     await field(view, en.income.sheet.day).get('input').setValue('2026-08-30')
     expect(view.text()).not.toContain('held before it came in')

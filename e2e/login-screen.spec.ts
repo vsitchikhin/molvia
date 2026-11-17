@@ -101,7 +101,7 @@ test('вход целиком, и человек оказывается там, 
 
   await expect(page.getByRole('heading', { level: 1 })).toHaveText('Molvia')
   const code = await start(page)
-  await expect(page.getByRole('heading', { name: 'Open Telegram and tap «Sign in»' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Open Telegram and tap “Sign in”' })).toBeVisible()
 
   await confirm(request, code)
   await comeBack(page)
@@ -126,7 +126,7 @@ test('перезагрузка посреди круга не теряет за�
   const code = await start(page)
 
   await page.reload()
-  await expect(page.getByRole('heading', { name: 'Open Telegram and tap «Sign in»' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Open Telegram and tap “Sign in”' })).toBeVisible()
 
   await confirm(request, code)
   await comeBack(page)

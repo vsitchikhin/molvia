@@ -5,7 +5,7 @@ import {
   SESSION_LIFETIME_DAYS,
   SESSION_TOUCH_AFTER_HOURS,
 } from '@molvia/model'
-import type { Actor } from '@molvia/model'
+import type { Actor, AppLocale } from '@molvia/model'
 import type { ActorRepository } from '@/db/actors-repository'
 import type { SessionRepository } from '@/db/sessions-repository'
 
@@ -45,8 +45,9 @@ export interface Authenticated {
  */
 export async function authenticate(
   sessions: SessionRepository,
-  actors: Pick<ActorRepository, 'markSeen'>,
+  actors: Pick<ActorRepository, 'markSeen' | 'markLocale'>,
   token: string,
+  locale?: AppLocale,
 ): Promise<Authenticated> {
   const live = await sessions.liveByToken(token)
   if (!live) throw new DomainError(ERROR.NO_ACTOR)
@@ -62,6 +63,11 @@ export async function authenticate(
   // and one statement locking a session and then its owner could wait on it the other way round.
   if (live.actorSeenAt.getTime() < now - ACCOUNT_SEEN_AFTER_HOURS * 3_600_000) {
     await actors.markSeen(live.actor.id, ACCOUNT_SEEN_AFTER_HOURS)
+  }
+  // The language the phone named (MOL-398), written only where the read in hand says it changed — a
+  // request naming the same, or none, sends no statement.
+  if (locale !== undefined && locale !== live.actorLocale) {
+    await actors.markLocale(live.actor.id, locale)
   }
 
   return { actor: live.actor, sessionId: live.session.id, refreshedUntil }

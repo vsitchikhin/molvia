@@ -1208,7 +1208,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     void instance.register((guarded, _guardedOptions, guardedDone) => {
       // Before the session is looked up: a foreign page or a link moves nothing (MOL-368).
       guarded.addHook('onRequest', refuseOutsideTheApp)
-      withActor(guarded, (token) => authenticate(sessions, actors, token))
+      withActor(guarded, (token, locale) => authenticate(sessions, actors, token, locale))
       actorMeRoute(guarded)
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),

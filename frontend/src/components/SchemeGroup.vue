@@ -1,24 +1,17 @@
 <template>
-  <section class="group">
-    <SectionCaption>{{ t('settings.group_scheme') }}</SectionCaption>
-    <SegmentedControl
-      :model-value="scheme"
-      :options="options"
-      :legend="t('settings.group_scheme')"
-      hide-legend
-      fit
-      :aria-describedby="`${id}-hint`"
-      @update:model-value="pick"
-    />
-    <p :id="`${id}-hint`" class="hint">{{ t('settings.scheme.hint') }}</p>
-  </section>
+  <DeviceChoiceGroup
+    :caption="t('settings.group_scheme')"
+    :hint="t('settings.scheme.hint')"
+    :options="options"
+    :model-value="scheme"
+    @update:model-value="pick"
+  />
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, useId } from 'vue'
+import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
-import SectionCaption from '@/components/SectionCaption.vue'
-import SegmentedControl from '@/components/SegmentedControl.vue'
+import DeviceChoiceGroup from '@/components/DeviceChoiceGroup.vue'
 import type { Segment } from '@/components/SegmentedControl.vue'
 import { useColorScheme } from '@/composables/useColorScheme'
 import type { Scheme } from '@/composables/useColorScheme'
@@ -34,7 +27,7 @@ const SCHEMES: readonly Scheme[] = ['system', 'light', 'dark']
  */
 export default defineComponent({
   name: 'SchemeGroup',
-  components: { SectionCaption, SegmentedControl },
+  components: { DeviceChoiceGroup },
   setup() {
     const { t } = useI18n()
     const { scheme, choose } = useColorScheme()
@@ -45,16 +38,7 @@ export default defineComponent({
       const chosen = SCHEMES.find((known) => known === value)
       if (chosen) choose(chosen)
     }
-    return { t, id: useId(), scheme, options, pick }
+    return { t, scheme, options, pick }
   },
 })
 </script>
-
-<style scoped lang="scss">
-.hint {
-  margin: var(--space-2) 0 0;
-  padding: 0 var(--space-1);
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
-}
-</style>

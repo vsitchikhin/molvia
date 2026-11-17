@@ -77,7 +77,7 @@ test('whoever accepted edition 1 is asked again, told what changed in 2 and 3, a
   await expect(page.getByText(/A new recipient — Anthropic \(USA\)/)).toBeVisible()
   // The consent to the statistics stands on the step itself, apart from the pages (В-2).
   await expect(page.getByText('Statistics', { exact: true })).toBeVisible()
-  await expect(page.getByText(/while «Count me in the statistics» is on/)).toBeVisible()
+  await expect(page.getByText(/while “Count me in the statistics” is on/)).toBeVisible()
 
   const accepted = page.waitForRequest(
     (request) => request.url().endsWith('/api/actors/me/consent') && request.method() === 'PUT',

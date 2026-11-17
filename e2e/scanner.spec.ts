@@ -234,10 +234,10 @@ test.describe('with no camera', () => {
     // Under the field, taken outside the sheet's live region (`e2e.md`): the focus stays in the field, so the
     // same words are said there too (MOL-333) — and that is held as well.
     await expect(
-      scanner(page).locator('form').getByText("The digits don't add up — check the code"),
+      scanner(page).locator('form').getByText('The digits don’t add up — check the code'),
     ).toBeVisible()
     await expect(scanner(page).locator('.region')).toContainText(
-      "The digits don't add up — check the code",
+      'The digits don’t add up — check the code',
     )
     await expect(scanner(page)).toBeVisible()
     // The edge doubled, as a row of the kit draws an error: a hairline is lost in bad light (MOL-211).
@@ -359,7 +359,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     await typeCode(page, '20000011')
 
     await expect(
-      page.locator('.code-card').getByText("Code 20000011 is a shop's own label", { exact: true }),
+      page.locator('.code-card').getByText('Code 20000011 is a shop’s own label', { exact: true }),
     ).toBeVisible()
     await expect(page.getByRole('button', { name: 'Suggest an item' })).toHaveCount(0)
   })
@@ -376,7 +376,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     await page.getByRole('button', { name: 'Suggest an item' }).click()
     const form = page.getByRole('dialog', { name: 'New item' })
     await expect(form.getByText(`Code ${code} will be saved with the item`)).toBeVisible()
-    await form.getByLabel('As the price tag says').fill(name)
+    await form.getByLabel('As on the price tag').fill(name)
     const kilo = form.getByRole('radio', { name: 'kg', exact: true })
     await expect(async () => {
       await form.getByText('kg', { exact: true }).click()
@@ -408,7 +408,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
 
     await page.getByRole('button', { name: 'Suggest an item' }).click()
     const form = page.getByRole('dialog', { name: 'New item' })
-    await expect(form.getByLabel('As the price tag says')).toHaveValue(name)
+    await expect(form.getByLabel('As on the price tag')).toHaveValue(name)
     await expect(form.getByRole('radio', { name: 'kg', exact: true })).toBeChecked()
     await expect(form.getByText('0.325 kg in the pack')).toBeVisible()
     await expect(form.getByRole('link', { name: 'Data from Open Food Facts ↗' })).toHaveAttribute(
@@ -477,7 +477,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     await expect(missingOf(page, code)).toBeVisible()
     await page.getByRole('button', { name: 'Suggest an item' }).click()
     const form = page.getByRole('dialog', { name: 'New item' })
-    const name = form.getByLabel('As the price tag says')
+    const name = form.getByLabel('As on the price tag')
     await expect(name).toHaveValue('')
     await page.waitForTimeout(400)
     const before = await name.boundingBox()
@@ -509,11 +509,11 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     await expect(missingOf(page, code)).toBeVisible()
     await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(name)
     await expect(
-      page.getByText(`Code ${code} is waiting for its item — pick it in the list`),
+      page.getByText(`Code ${code} is waiting for its item — pick it from the list`),
     ).toBeVisible()
     await page.getByRole('option', { name: new RegExp(name) }).click()
     await expect(
-      page.locator('.code-card').getByText(`Link code ${code} to «${name}»?`),
+      page.locator('.code-card').getByText(`Link code ${code} to “${name}”?`),
     ).toBeVisible()
     await page.getByRole('button', { name: 'Link and record' }).click()
 
@@ -524,7 +524,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
     await typeCode(page, code)
     const found = await sheetOf(page, name)
     await found.getByRole('button', { name: `Code ${code} — not this item?` }).click()
-    await expect(found.getByText(`Unlink code ${code} from «${name}»?`)).toBeVisible()
+    await expect(found.getByText(`Unlink code ${code} from “${name}”?`)).toBeVisible()
     await found.getByRole('button', { name: 'Unlink', exact: true }).click()
 
     await expect(found).toBeHidden()
@@ -631,7 +631,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
         await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(name)
         await page.getByRole('option', { name: new RegExp(name) }).click()
         await expect(
-          page.locator('.code-card').getByText(`Link code ${code} to «${name}»?`),
+          page.locator('.code-card').getByText(`Link code ${code} to “${name}”?`),
         ).toBeVisible()
         await expect.poll(async () => (await focused(page)).text).toBe('Link and record')
       } finally {
@@ -675,7 +675,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       // The block on the screen, not the live region, which says the same words (`e2e.md`): on a
       // loaded machine both are there at once.
       await expect(
-        page.locator('.code-title').getByText("Code 20000011 is a shop's own label"),
+        page.locator('.code-title').getByText('Code 20000011 is a shop’s own label'),
       ).toBeVisible()
       await expect.poll(async () => (await focused(page)).body).toBe(false)
     })
@@ -687,7 +687,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       await expect(missingOf(page, code)).toBeVisible()
       await page.getByRole('combobox', { name: 'What did you pick up?' }).fill(`Кефир ${tag}`)
 
-      await page.getByRole('button', { name: "Don't link the code" }).click()
+      await page.getByRole('button', { name: 'Don’t link the code' }).click()
 
       await expect.poll(async () => (await focused(page)).field).toBe(true)
     })
@@ -736,7 +736,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
           ),
       ).toBeVisible()
       await expect(
-        page.locator('.code-title').getByText(`Link code ${code} to «Кефир ${tag} ф2»?`),
+        page.locator('.code-title').getByText(`Link code ${code} to “Кефир ${tag} ф2”?`),
       ).toBeVisible()
       await expect.poll(async () => (await focused(page)).text).toBe('Try again')
       await context.setOffline(false)
@@ -757,7 +757,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
 
       await expect
         .poll(async () => (await focused(page)).text)
-        .toBe(`Record «${name}» without the code`)
+        .toBe(`Record “${name}” without the code`)
     })
 
     // MOL-318, adversarial Б2: the one button left is the page's width, and a name of one word stood
@@ -776,7 +776,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       )
       await page.keyboard.press('Enter')
 
-      const button = page.getByRole('button', { name: `Record «${name}» without the code` })
+      const button = page.getByRole('button', { name: `Record “${name}” without the code` })
       await expect(button).toBeVisible()
       const look = await button.evaluate((one) => {
         const range = document.createRange()
@@ -805,7 +805,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       const form = page.getByRole('dialog', { name: 'New item' })
       await expect(form).toBeVisible()
       await page.waitForTimeout(400)
-      await form.getByLabel('As the price tag says').fill(`Варенец ${tag}`)
+      await form.getByLabel('As on the price tag').fill(`Варенец ${tag}`)
       const kilo = form.getByRole('radio', { name: 'kg', exact: true })
       await expect(async () => {
         await form.getByText('kg', { exact: true }).click()
@@ -815,12 +815,12 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
 
       await page.keyboard.press('Enter')
 
-      await expect(form.getByText(`This code already belongs to «${holder}»`)).toBeVisible()
+      await expect(form.getByText(`This code already belongs to “${holder}”`)).toBeVisible()
       await expect
         .poll(async () => focused(page))
         .toMatchObject({
           inSheet: true,
-          text: `Take «${holder}»`,
+          text: `Take “${holder}”`,
         })
     })
 
@@ -851,7 +851,7 @@ test.describe('a code written to the catalogue (MOL-100)', () => {
       const form = page.getByRole('dialog', { name: 'New item' })
       await expect(form).toBeVisible()
       await page.waitForTimeout(400)
-      await form.getByLabel('As the price tag says').fill(name)
+      await form.getByLabel('As on the price tag').fill(name)
       const kilo = form.getByRole('radio', { name: 'kg', exact: true })
       await expect(async () => {
         await form.getByText('kg', { exact: true }).click()

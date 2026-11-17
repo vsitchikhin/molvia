@@ -12,6 +12,7 @@ import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { answeredAt, localDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
+import ru from '@/i18n/ru.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
@@ -39,7 +40,7 @@ const initial = actorCodec.parse({
   updatedAt: '2026-09-01T00:00:00Z',
 })
 const views: VueWrapper[] = []
-async function render(cached = true, online?: boolean) {
+async function render(cached = true, online?: boolean, locale: 'en' | 'ru' = 'en') {
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -48,7 +49,7 @@ async function render(cached = true, online?: boolean) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/settings')
   if (online !== undefined) vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online)
-  const view = mount(SettingsView, { global: { plugins: [pinia, router, createAppI18n('en')] } })
+  const view = mount(SettingsView, { global: { plugins: [pinia, router, createAppI18n(locale)] } })
   views.push(view)
   await flushPromises()
   return Object.assign(view, { router, pinia })
@@ -398,7 +399,7 @@ it.each([
   expect(entry?.attributes('href')).toBe('/settings/devices')
   expect(view.text()).toContain(en.settings.group_account)
 })
-it('«Тема» stands in every state, under «Бот» and over «Аккаунт» (MOL-111)', async () => {
+it('«Тема» and «Язык» stand in every state, under «Бот» and over «Аккаунт» (MOL-111, MOL-398)', async () => {
   const captions = (view: VueWrapper) => view.findAll('h2').map((caption) => caption.text())
   const loading = await (async () => {
     me.mockReturnValue(new Promise(() => undefined))
@@ -418,7 +419,24 @@ it('«Тема» stands in every state, under «Бот» and over «Аккаун
   const loaded = captions(await render())
   const at = loaded.indexOf(en.settings.group_scheme)
   expect(loaded[at - 1]).toBe(en.settings.group_bot)
-  expect(loaded[at + 1]).toBe(en.settings.group_account)
+  // In English the order of its days stands under the language.
+  expect(loaded.slice(at + 1, at + 4)).toEqual([
+    en.settings.group_locale,
+    en.settings.group_date_style,
+    en.settings.group_account,
+  ])
+  for (const view of [loading, offline, failed]) {
+    expect(captions(view)).toContain(en.settings.group_locale)
+  }
+})
+
+it('asks no order of a day in Russian: it has one (MOL-398, owner’s В-3)', async () => {
+  me.mockResolvedValue(initial)
+  const captions = (await render(true, undefined, 'ru'))
+    .findAll('h2')
+    .map((caption) => caption.text())
+  expect(captions).toContain(ru.settings.group_locale)
+  expect(captions).not.toContain(ru.settings.group_date_style)
 })
 
 describe('«Write to the developer» (MOL-147)', () => {
