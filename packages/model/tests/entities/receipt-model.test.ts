@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { ARMENIAN_RECEIPTS } from '#model/entities/receipt-card'
+import { ARMENIAN_RECEIPTS, GEORGIAN_RECEIPTS } from '#model/entities/receipt-card'
 import { needsReshoot, receiptCityOf } from '#model/entities/receipt'
 import {
   MODEL_RECEIPT_LINES_MAX,
@@ -1552,5 +1552,89 @@ describe('how the model’s summary says the receipt was paid (MOL-312)', () => 
     expect(paid(['Վճարված է Yandex', '8676.00'])).toBeNull()
     expect(paid(['Վճարված է Առևտուր', '16539.00'])).toBeNull()
     expect(paid(['Վճարված է Առձեռն', '0'], ['Վճարված է PosTerminal', '3741.00'])).toBe('card')
+  })
+})
+
+describe('a Georgian receipt the model read (MOL-408)', () => {
+  // made-up figures and numbers in the shapes of MOL-229's receipts: Nikora's «სულ:», a card's «BOG_Cards»
+  const georgian = (over: Partial<ModelReceipt> = {}): ModelReceipt =>
+    answer({
+      shop: 'შპს «მაგალითი»',
+      address: 'თბილისი',
+      id_rows: ['ს/კ: 405123456'],
+      lines: [
+        line({
+          printed: 'სენდვიჩი 1ც',
+          code: null,
+          article: null,
+          quantity: '1',
+          unit_price: '8.59',
+          sum: '8.59',
+        }),
+        line({
+          printed: 'წყალი 0.5ლ',
+          code: null,
+          article: null,
+          quantity: '2',
+          unit_price: '1.20',
+          sum: '2.40',
+        }),
+      ],
+      totals: [
+        { label: 'BOG_Cards', amount: '10.99' },
+        { label: 'სულ:', amount: '10.99' },
+      ],
+      ...over,
+    })
+  const readGe = (a: ModelReceipt) => receiptTextOfModel(GEORGIAN_RECEIPTS, a)
+
+  it('finds the total by «სულ» and proves the receipt whole, so its line of one piece keeps its figures', () => {
+    const text = readGe(georgian())
+    expect([text.totalHundredths, text.balanced]).toEqual([1_099, true])
+    const shown = verifiedReading(text, { byModel: true }).lines
+    expect(shown.map((l) => l.sumHundredths)).toEqual([859, 240])
+  })
+
+  it('takes a supermarket’s «TOT» as the total, never «SUBTOTAL» nor «სულგუნი»', () => {
+    for (const label of ['GEL* TOT', 'სულ:']) {
+      const totals = [
+        { label, amount: '10.99' },
+        { label: 'GEL EFT Credit', amount: '10.99' },
+      ]
+      expect(readGe(georgian({ totals })).totalHundredths, label).toBe(1_099)
+    }
+    // must not: a subtotal and a cheese are no total, and the lines of one piece go empty unproven
+    for (const label of ['SUBTOTAL', 'სულგუნი']) {
+      const text = readGe(georgian({ totals: [{ label, amount: '10.99' }] }))
+      expect(text.totalHundredths, label).toBeNull()
+      expect(verifiedReading(text, { byModel: true }).lines[0]?.sumHundredths, label).toBeNull()
+    }
+  })
+
+  it('reads the tax number of nine or eleven digits after «ს/კ», and no other count', () => {
+    const tin = (row: string) => readGe(georgian({ id_rows: [row] })).tin
+    expect(tin('ს/კ: 405123456')).toBe('405123456')
+    expect(tin('ს.კ. 01012345678')).toBe('01012345678')
+    // must not: eight, ten and twelve digits are no Georgian code
+    for (const row of ['ს/კ: 40512345', 'ს/კ: 4051234567', 'ს/კ: 405123456789']) {
+      expect(tin(row), row).toBeNull()
+    }
+    // and Armenia's stays eight: nine digits after «ՀՎՀՀ» are none
+    expect(read(answer({ id_rows: ['ՀՎՀՀ: 012345678'] })).tin).toBeNull()
+  })
+
+  it('names no receipt number: Georgia’s word for it is not known yet (Р-5)', () => {
+    expect(
+      readGe(georgian({ id_rows: ['ს/კ: 405123456', 'ჩეკი № 00012345'] })).receiptNo,
+    ).toBeNull()
+  })
+
+  it('says how it was paid by the card’s words: a bank’s «Cards» is a card, «ნაღდი» cash', () => {
+    expect(modelPaidBy(GEORGIAN_RECEIPTS, georgian())).toBe('card')
+    const cash = [
+      { label: 'ნაღდი', amount: '20.00' },
+      { label: 'სულ:', amount: '10.99' },
+    ]
+    expect(modelPaidBy(GEORGIAN_RECEIPTS, georgian({ totals: cash }))).toBe('cash')
   })
 })

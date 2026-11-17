@@ -124,8 +124,19 @@ export interface ReceiptWords {
 
 /** What reading a country's receipt off a photo needs. */
 export interface PhotoReading {
-  /** Tesseract's languages, one country's set: every script at once is slower and mixes them (MOL-114). */
-  readonly languages: string
+  /**
+   * Tesseract's languages, one country's set: every script at once is slower and mixes them (MOL-114). `null` — the
+   * model alone reads the country (MOL-408, owner's В-2 «а»): no layout of Tesseract's finds its lines, and a receipt
+   * the model does not read fails as unreadable, never «переснимите».
+   */
+  readonly languages: string | null
+  /**
+   * How many digits the seller's tax number has after its word (MOL-408): Armenia's eight, Georgia's nine of a
+   * company and eleven of a sole trader — the model's rows and Tesseract's layouts are read by it alike.
+   */
+  readonly tinDigits: readonly number[]
+  /** How many digits the receipt's fiscal number has after its word: Armenia's eight; none read, none (MOL-408). */
+  readonly fiscalDigits: readonly number[]
   readonly numbers: readonly NumberFormat[]
   /** Digits OCR confuses in the tills' font: a figure is tried with each of them swapped in. */
   readonly swaps: Readonly<Record<string, string>>
@@ -152,6 +163,18 @@ export interface PhotoReading {
   readonly words: ReceiptWords
 }
 
+/**
+ * A number of so many digits as a fragment of a regular expression, for a capturing group: «\d{9}|\d{11}»; none — a
+ * fragment that matches nothing, never an empty one, which matches everything.
+ */
+export function digitCounts(counts: readonly number[]): string {
+  // the longer first: a pattern with no end after it takes the first alternative that fits
+  const longestFirst = [...counts].sort((a, b) => b - a)
+  return longestFirst.length === 0
+    ? '(?!)'
+    : longestFirst.map((count) => `\\d{${String(count)}}`).join('|')
+}
+
 /** The orders of a date's parts a card may name: one so far, the next with the country that prints it. */
 export type DateOrder = 'day-first'
 
@@ -169,6 +192,8 @@ export interface ReceiptCard {
  */
 export const ARMENIAN_RECEIPTS: PhotoReading = {
   languages: 'hye+rus+eng',
+  tinDigits: [8],
+  fiscalDigits: [8],
   // «5 403,12 ֏», «688.09դրամ»: a point or a comma before the hundredths, thousands apart by a space
   numbers: [{ fractionDigits: 2 }],
   swaps: { 5: '6', 6: '5', 1: '4', 4: '1', 3: '8', 8: '3', 0: '9', 9: '0' },
@@ -231,16 +256,121 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
   },
 }
 
+/** A word a country's tills never print: a field of the card no rule of that country reads. */
+const NEVER = '(?!)'
+
+/** Georgia's letters: Mkhedruli, which has no case, and Mtavruli, its capitals for headings. */
+const GEORGIAN = { capital: 'Ა-ᲺᲽ-Ჿ', small: 'ა-ჺჽ-ჿ' }
+
+/** «სულ», the total — never inside a word: «სულგუნი» is a cheese. */
+const SUL = `(?<![${GEORGIAN.small}])სულ(?![${GEORGIAN.small}])`
+
+/**
+ * Georgia (MOL-408): read off its photo by the model alone — `languages` none (owner's В-2 «а»). **Every word names the
+ * receipt it was seen on** — the five photos of MOL-229 (`.scratch/receipts/foreign/ge-01…05.jpg`) and its draft card
+ * (`research/MOL-229/cards/GE.json`) — and a word no Georgian receipt has shown is `NEVER`, as is what Georgia prints
+ * no counterpart of (the card's cashback, the sum since the year's start): a word without a paper behind it would
+ * decide what a total is. The model's swaps are none until measured. The pharmacies' three decimals, «23.868 ლარი», are
+ * not read: such a figure stays empty (MOL-421).
+ */
+export const GEORGIAN_RECEIPTS: PhotoReading = {
+  languages: null,
+  // «ს/კ» — the identification code the law has a seller print; none of the five photos prints it, so the shop's
+  // memory learns only from a receipt that does (owner's В-6 «а»): nine digits of a company, eleven of a sole trader
+  tinDigits: [9, 11],
+  // the receipt's number «ქვითარი 1687592» (ge-02) is not read yet (Р-5, MOL-422)
+  fiscalDigits: [],
+  numbers: [{ fractionDigits: 2 }],
+  swaps: {},
+  modelSwaps: {},
+  modelRepairSwaps: {},
+  digitLike: {},
+  // «25.05.2024», «19.07.2008» (ge-02, ge-01)
+  dateOrder: 'day-first',
+  words: {
+    // «სულ» (ge-01, ge-02), Carrefour's «GEL* TOT» (ge-03)
+    total: `${SUL}|\\bTOT\\b`,
+    totalKept: `${SUL}|\\bTOT\\b`,
+    discountKept: NEVER,
+    sinceStart: NEVER,
+    cashback: NEVER,
+    taxed: NEVER,
+    redeemed: NEVER,
+    prepayment: NEVER,
+    service: NEVER,
+    billTotal: NEVER,
+    slipTerminal: NEVER,
+    slipAmount: NEVER,
+    // «გადახდა» (ge-01), «BOG_Cards» (ge-02), «EFT» (ge-03), «ნაღდი», «ბარათი» (GE.json); the change «ხურდა» is no
+    // payment and prints below nought (ge-01)
+    paid: ['ნაღდ', 'ბარათ', 'გადახდ', 'Cards?\\b', '\\bEFT\\b'],
+    cash: ['ნაღდ'],
+    cashless: ['ბარათ', 'Cards?\\b', '\\bEFT\\b'],
+    sectionTax: [NEVER],
+    control: NEVER,
+    fiscalSign: NEVER,
+    tin: 'ს[/.]\\s?კ\\.?',
+    tinMisread: [],
+    fiscal: NEVER,
+    fiscalNumber: NEVER,
+    receiptNumber: NEVER,
+    head: [NEVER],
+    // «ლარი», «₾», «GEL» (GE.json; ge-03, ge-04)
+    sumSign: 'ლარ',
+    currency: ['ლარი', '₾', 'GEL'],
+    // «1ც» (ge-02), «100 ცალი» (ge-05), «100მლ» (ge-04), «50 გრ» (ge-02); no kilogram or litre seen
+    units: {
+      piece: `ც(?:ალი)?(?![${GEORGIAN.small}])`,
+      pieceCut: NEVER,
+      kg: NEVER,
+      ml: 'მლ',
+      litre: NEVER,
+      gram: `გრ(?![${GEORGIAN.small}])`,
+    },
+    letters: { ...GEORGIAN, any: `${GEORGIAN.small}${GEORGIAN.capital}` },
+  },
+}
+
 /**
  * The countries a receipt is read in. Serbia's receipts are not read off a photo but asked of the tax
  * office by their link (MOL-232), and its names have no language of their own in the catalogue yet
- * (MOL-232, В-3); Georgia joins with its card (MOL-248).
+ * (MOL-232, В-3); nor have Georgia's (MOL-408).
  */
 export const RECEIPT_CARDS: Readonly<Record<ReceiptCountry, ReceiptCard>> = {
   AM: { currency: 'AMD', nameLanguage: 'hy', photo: ARMENIAN_RECEIPTS },
+  GE: { currency: 'GEL', nameLanguage: null, photo: GEORGIAN_RECEIPTS },
   RS: { currency: 'RSD', nameLanguage: null, photo: null },
 }
 
 export function receiptCard(country: ReceiptCountry): ReceiptCard {
   return RECEIPT_CARDS[country]
+}
+
+/** A reading Tesseract does too: a card that names its languages. */
+export type TesseractReading = PhotoReading & { readonly languages: string }
+
+/**
+ * Whether Tesseract reads the country's photos (MOL-408): where not, the model alone does — the server fails what it
+ * did not read as unreadable, and the phone offers the camera only to whom it reads. One rule for both.
+ */
+export function tesseractReads(reading: PhotoReading): reading is TesseractReading {
+  return reading.languages !== null
+}
+
+/**
+ * Whether the model alone reads the country's receipts (MOL-408): read off a photo, and Tesseract reads none of it. A
+ * country read by its link has no photo to read — Serbia's — and is no such country.
+ */
+export function modelAlone(country: ReceiptCountry): boolean {
+  const { photo } = receiptCard(country)
+  return photo !== null && !tesseractReads(photo)
+}
+
+/**
+ * Whether an item a line found is a guess (MOL-408, owner's В-5 «б»): a receipt read off a photo in a country the
+ * catalogue names nothing in — its line goes by the search of its name whole, by letters across scripts and by
+ * meaning, and a find is «проверьте». The tax office's lines are its own words (Serbia, MOL-232), and stay as found.
+ */
+export function findsAreGuesses(card: ReceiptCard): boolean {
+  return card.photo !== null && card.nameLanguage === null
 }

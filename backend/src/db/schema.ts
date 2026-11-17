@@ -2856,7 +2856,8 @@ export const receipts = pgTable(
     source: text('source').$type<ReceiptSource>().notNull().default('photo'),
     parts: smallint('parts').notNull(),
     country: char('country', { length: 2 }).$type<ReceiptCountry>().notNull(),
-    // When the tax office is asked next about a receipt it did not show yet (MOL-232, Р-2).
+    // When the tax office is asked next about a receipt it did not show yet (MOL-232, Р-2); on a photo of a country
+    // the model alone reads, until when the person's receipts of that country rest from it, away (MOL-408, `rest`).
     nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
     // How a receipt's link reached the phone, and whether the camera missed before it (MOL-234): the
     // measure of the risk of MOL-233. Empty on a photo, and on a link a phone of an earlier build sent.

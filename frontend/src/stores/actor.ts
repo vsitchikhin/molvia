@@ -130,13 +130,24 @@ export const useActorStore = defineStore('actor', () => {
    */
   let revision = 0
 
+  /**
+   * The answer, with what the store knew of the model kept where the answer does not say (MOL-408): only `/actors/me`
+   * says `receiptsByModel`, and the settings' answer, the same owner's, would put Georgia's camera away.
+   */
+  function withModel(loaded: ActorView): ActorView {
+    const known = actor.value?.id === loaded.id ? actor.value.receiptsByModel : undefined
+    return loaded.receiptsByModel === undefined && known !== undefined
+      ? { ...loaded, receiptsByModel: known }
+      : loaded
+  }
+
   function settle(loaded: ActorView): void {
     revision += 1
     const was = currentIdentity()
     if (actor.value?.id === loaded.id && actor.value.updatedAt > loaded.updatedAt) return
     const heardAt = new Date()
     settingsReadAt.value = heardAt
-    actor.value = loaded
+    actor.value = withModel(loaded)
     id.value = loaded.id
     // Written down because the app needs it **before** the server can be asked: at the shelf
     // with no signal the trip queue and the recent items are found by this key, and there is
@@ -417,7 +428,7 @@ export const useActorStore = defineStore('actor', () => {
     )
       return
     settingsReadAt.value = new Date()
-    actor.value = loaded
+    actor.value = withModel(loaded)
     state.value = 'ready'
   }
 

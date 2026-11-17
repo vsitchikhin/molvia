@@ -1,0 +1,2 @@
+ALTER TABLE "receipts" DROP CONSTRAINT "receipts_country_known";--> statement-breakpoint
+ALTER TABLE "receipts" ADD CONSTRAINT "receipts_country_known" CHECK ("receipts"."country" in ('AM', 'GE', 'RS'));

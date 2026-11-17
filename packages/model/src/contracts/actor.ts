@@ -42,15 +42,25 @@ export const SESSION_COOKIE = '__Host-molvia_session'
  * The rule it enforces is the epic's: only Telegram's numeric id is *stored*, not shown, and
  * «who am I» is a question about settings.
  */
-export const actorViewSchema = actorSchema.pick({
-  id: true,
-  country: true,
-  city: true,
-  spendCurrency: true,
-  incomeCurrency: true,
-  createdAt: true,
-  updatedAt: true,
-})
+export const actorViewSchema = actorSchema
+  .pick({
+    id: true,
+    country: true,
+    city: true,
+    spendCurrency: true,
+    incomeCurrency: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    /**
+     * Whether the model reads this person's receipts now (MOL-408, owner's В-2 «а»): Georgia's receipts are read by
+     * it alone, so its camera is there only for them. Sent by `/actors/me` alone, and only to a phone that asks
+     * (`RECEIPTS_BY_MODEL_HEADER`): an installed app of an earlier build reads the answer strictly. Absent is
+     * «not said», never «no».
+     */
+    receiptsByModel: z.boolean().optional(),
+  })
 export type ActorView = z.infer<typeof actorViewSchema>
 
 /**
@@ -99,3 +109,6 @@ export const actorCodec = z.codec(actorWireSchema, actorViewSchema, {
     updatedAt: actor.updatedAt.toISOString(),
   }),
 })
+
+/** The header a phone asks `/actors/me` for `receiptsByModel` by (MOL-408). */
+export const RECEIPTS_BY_MODEL_HEADER = 'X-Molvia-Receipts-By-Model'

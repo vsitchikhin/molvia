@@ -22,7 +22,9 @@ import {
   receiptTimeOf,
   receiptLineOf,
   receiptLineCodec,
+  modelAlone,
   spendMonthOf,
+  tesseractReads,
   dayIn,
   explainedReading,
   worstCallMicroUsd,
@@ -38,6 +40,7 @@ import type {
   ReceiptText,
   RememberedPrice,
   RememberedPrices,
+  TesseractReading,
   TextRow,
 } from '@molvia/model'
 import { z } from 'zod'
@@ -81,6 +84,12 @@ const STRIPS_PER_REQUEST = 32
  * was queued, Tesseract reads it (В-1 «а»).
  */
 export const RECEIPT_MODEL_WAIT_MS = 10 * 60 * 1000
+
+/**
+ * How long a receipt of a country the model alone reads waits for it away (MOL-408, owner's В-8 «а»): no Tesseract
+ * takes it after ten minutes, and failed it would be lost for an outage — a day, and the round steps past it meanwhile.
+ */
+export const RECEIPT_MODEL_ALONE_WAIT_MS = 24 * 60 * 60 * 1000
 
 /** What a call of the model cost and used. */
 export type ModelPaid = Pick<ModelReading, 'costMicroUsd' | 'tokens'>
@@ -209,7 +218,8 @@ function headOf(
 
 /**
  * Reads one receipt: by the model where it is granted and its key set (MOL-272), else — or where the
- * model is not the one to — by Tesseract. A receipt with no item line fails as `reshoot`, unless it is a
+ * model is not the one to — by Tesseract, in a country it reads (a card with its `languages`; Georgia's has none,
+ * MOL-408: its receipt fails as `unreadable`). A receipt with no item line fails as `reshoot`, unless it is a
  * section printed with no items, read whole with its sum (MOL-227); one with any is read, however little
  * of it (MOL-222, В-1), and Tesseract's has its item lines cut out for the reader's training (MOL-169).
  * `'wait'`: the model is away, and the receipt waits for it in the queue.
@@ -234,7 +244,37 @@ async function readOne(
     const byModel = await readByModel(deps, deps.model, claimed, photoReading)
     if (byModel !== null) return byModel
   }
+  if (!tesseractReads(photoReading)) {
+    // a country the model alone reads (MOL-408, В-2 «а»): no layout of Tesseract's finds its lines, so a receipt the
+    // model did not read is said so — the purchases typed by hand — never «переснимите»
+    const outcome: ReadOutcome = {
+      kind: 'failed',
+      failure: 'unreadable',
+      readerVersion: null,
+      head: null,
+    }
+    return { outcome, paid: null, unparsed: null }
+  }
   return { outcome: await readByOcr(deps, claimed, photoReading), paid: null, unparsed: null }
+}
+
+/**
+ * Whether the model reads for the person now (MOL-408, adversarial А3, Р2-А1): a model on the server at all, and
+ * one more call of the largest request it is ever sent — no call the queue reserves costs more — fitting the
+ * person's share of this month and its cap. What `/actors/me` offers Georgia's camera by.
+ */
+export function readsReceiptsByModel(
+  deps: { readonly model: ReceiptModelDeps | null; readonly now?: () => Date },
+  actorId: string,
+): Promise<boolean> {
+  if (deps.model === null) return Promise.resolve(false)
+  const { spend, capMicroUsd, shareMicroUsd } = deps.model
+  const month = spendMonthOf((deps.now ?? (() => new Date()))())
+  return spend.readsFor(month, worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX), {
+    actorId,
+    capMicroUsd,
+    shareMicroUsd,
+  })
 }
 
 /**
@@ -281,7 +321,10 @@ async function readByModel(
       report({ kind: 'model_unavailable', reason: error.reason })
       if (error.broken !== undefined) report({ kind: 'model_broken', error: error.broken })
       const waited = now().getTime() - (claimed.queuedAt ?? now()).getTime()
-      if (waited < RECEIPT_MODEL_WAIT_MS) return 'wait'
+      const patience = modelAlone(claimed.country)
+        ? RECEIPT_MODEL_ALONE_WAIT_MS
+        : RECEIPT_MODEL_WAIT_MS
+      if (waited < patience) return 'wait'
       report({ kind: 'model_passed', reason: 'away' })
       return null
     }
@@ -369,7 +412,7 @@ async function readByModel(
 async function readByOcr(
   deps: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
-  photoReading: PhotoReading,
+  photoReading: TesseractReading,
 ): Promise<ReadOutcome> {
   const { reader, report } = deps
   const { currency } = receiptCard(claimed.country)
@@ -676,9 +719,15 @@ export async function readQueuedReceipts(deps: ReadReceiptsDeps): Promise<number
       const done = await readOne(deps, claimed)
       if (done === 'wait') {
         // the model away (Р-9): the receipt keeps its place and its attempt, the round stops, and the
-        // minute's timer asks again — past its wait Tesseract reads it
-        await deps.receipts.release(claimed.id)
-        return read
+        // minute's timer asks again — past its wait Tesseract reads it. A receipt no Tesseract reads rests instead,
+        // the person's others of its country with it, and the round goes on: it waits a day, asked less and less
+        // often, and the receipts behind it reach Tesseract past their ten minutes (MOL-408, В-8 «а», В-9 «а»)
+        if (!modelAlone(claimed.country)) {
+          await deps.receipts.release(claimed.id)
+          return read
+        }
+        await deps.receipts.rest(claimed.id)
+        continue
       }
       outcome = done.outcome
       paid = done.paid

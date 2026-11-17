@@ -427,9 +427,9 @@ there is by the line's text only.
 currency; `moneyOfHundredths` turns them into the currency's minor units by its exponent. Quantities
 are thousandths. A float is a ratio that ranks candidates, never money.
 
-**The languages are the country's** — its card's (below). Armenia `hye+rus+eng`; Georgia has its language
-files in the reader, and joins with its card (MOL-248); Serbia is read by its link, not by the reader (MOL-232).
-Every alphabet at once is slower and mixes the scripts.
+**The languages are the country's** — its card's (below). Armenia `hye+rus+eng`; Georgia has none — the model alone
+reads it (MOL-408, below); Serbia is read by its link, not by the reader (MOL-232). Every alphabet at once is slower
+and mixes the scripts.
 
 ## A country's card (MOL-247)
 
@@ -507,6 +507,109 @@ narrows. **The prices, named:** a price the person typed on the sheet is doubted
 Tesseract's, which master let go; and a phone of a build before the А2 fix doubts by one
 digit alone, so the model's «660» against other people's 550 shows no hint there, as on master, until the app updates
 (`pwaUpdate.ts`).
+
+## Georgia: read by the model alone (MOL-408)
+
+**The scanner opens in Georgia, by photo, for whom the model reads** (owner, 15–16.11.2026, В-1…В-5 of
+`.scratch/tasks/requirements/MOL-408.md`). «Haiku reads any language» held for the copy — the model copied Georgian
+receipts as well as Armenian ones (the bench, below) — but the copy is only half: the total, the payment, the tax
+number and the layout are our code's, by the card's words (MOL-247), and without Georgia's no total was found, no
+receipt proven whole, and its lines of one piece went empty.
+
+- **Its card is `GEORGIAN_RECEIPTS`, and every word names the receipt it was seen on** (review 1, №5): MOL-229's five
+  photos and its draft card — the total «სულ» (never inside a word: «სულგუნი» is a cheese) and Carrefour's «TOT»; the
+  payment «გადახდა», «BOG_Cards», «EFT», «ნაღდი», «ბარათი»; the change «ხურდა» is no payment and prints below nought;
+  GEL, the day first. **A word no Georgian receipt has shown is `NEVER`**, a fragment that matches nothing — never an
+  empty one, which matches every row: a word without a paper behind it decides what a total is, and the bill words
+  and «Service» the first draft took from Armenia's card would have. So is what Georgia prints no counterpart of —
+  the card's cashback, the sum since the year's start. **No swap of the model's**: one 5↔6 was seen (Carrefour), and
+  the repair it would feed cannot reach a line of a sum alone (MOL-420).
+- **The digits of the tax number and the fiscal number are the card's** (`tinDigits`, `fiscalDigits`, `digitCounts`),
+  for the model's rows and Tesseract's layouts alike (review 1, №4): Armenia's eight and eight, Georgia's nine of a
+  company and eleven of a sole trader after «ს/კ», and no fiscal number. **No receipt number yet** (Р-5): with no
+  key a Georgian receipt is held by its id alone, and the same paper recorded twice is not caught — Nikora prints
+  «ქვითარი 1687592»; its word joins with a measure (MOL-422).
+- **The shop's memory learns only from a receipt that prints its tax number** (adversarial А1, owner's В-6 «а»): none of
+  the five photos prints «ს/კ» — the law's abbreviation is kept for the receipt that does — so a Georgian receipt has no
+  key, «Записать» writes no word, and the next receipt of the shop starts from nothing: every line «проверьте» every
+  time, the person's corrections repeated. A key by the shop's name the model copies is MOL-438; Tesseract for those the
+  model does not read (MOL-423) waits for it (owner's word, 17.11.2026).
+- **`tesseractReads`, `modelAlone` — no Tesseract** (`languages: null`, В-2 «а»): no layout of its reads a Georgian till, so a
+  Georgian receipt the model did not read — no grant, the cap, the share, an answer not taken — fails `unreadable`
+  («Строки на фото не разобрать. Покупки можно записать вручную»), never «переснимите»: a retake changes nothing. Its
+  photo is never sent to the reader. One predicate for the server's queue and the phone's camera (review 1, №3).
+- **The model away is waited for a day, and the round goes on past the receipt** (adversarial А2, owner's В-8 «а»):
+  `RECEIPT_MODEL_ALONE_WAIT_MS` — ten minutes are there to hand a receipt to Tesseract, and failed after them a Georgian
+  receipt of an outage was lost for good. A waiting receipt of a country no Tesseract reads (`modelAlone`) rests
+  (`ReceiptRepository.rest`), so an Armenian receipt behind it reaches Tesseract past its own ten minutes; one of
+  Armenia is released and stops the round as before. **And it is asked less and less often** (adversarial Р2-А1, owner's
+  В-9 «а»): no sooner than `next_attempt_at` — the column the queue of links asks again by — as long again as it has
+  waited, 1, 2, 4… minutes, an hour at most (`RECEIPT_MODEL_ALONE_RETRY_MIN_MS`, `…_MAX_MS`). A time out is paid in
+  doubt, its worst kept in the person's share (MOL-367), and asked every minute a day one receipt took the month's share
+  in under four hours; now some thirty tries a day, ≈ $0,27 at worst. Which country rests is the use case's to know
+  (`modelAlone`), the repository's only which receipts rest. The rest was refined over four rounds of the adversarial
+  review, each closing a delay the one before left:
+  - **Through an outage the person's receipts of the country rest together** (Р3-А1): `claimNext` takes none of them
+    while one rests, so the twenty the quota lets wait (`RECEIPTS_UNRECORDED_MAX`) pay one try a time, not twenty — per
+    receipt they took the share in six hours.
+  - **Only through an outage or a slow API** (owner's В-11 «а», В-12 «а», Р6-А1, Р7-А1): the model has read none of
+    the person's receipts of the country since that try (`readByModelSql`, the SQL form of `byModel`, by `read_at`).
+    Once it has, the failure was the receipt's own — an answer longer than the time out — and the receipt rests alone,
+    by its own age: by the oldest's, a new receipt failing once rested an hour behind a slow one. **Never anyone's
+    receipt**: a slow API answers short receipts in time and times out long ones, and with other people's reads
+    lifting the rest the person's twenty long receipts paid a try each at every read — the whole share in nine hours
+    with a read a minute.
+  - **A rest over goes to the person's receipt that rested longest ago, one that never rested first**
+    (`next_attempt_at nulls first`, Р4-А1): to the oldest, a receipt the model fails on by itself took every try of the
+    day.
+  - **A receipt that never rested passes the person's rest**, a try of theirs in the country a minute at most (owner's
+    В-10 «а», Р5-А1): the rest cannot tell an outage from the model failing on one receipt before it answers anything.
+
+  **The prices, named:** in an outage each receipt pays one try of its own, a minute apart — a batch of twenty some
+  $0,18 more of the share over a day, one receipt nothing; while a receipt the model fails on by itself rests, a new
+  one of the person that also fails once waits for that rest, up to an hour, unless another receipt of theirs is read
+  meanwhile (В-12 «а»); at one count of the last hour, the order
+  puts any receipt with no rest behind it — never rested, or of a country that never rests — before one back from a
+  rest, of anyone, however older (review №23); a receipt of an outage arrives within an hour of the model's return,
+  hours later; past the day, `unreadable`; each person granted pays their own tries, so an outage costs some thirty
+  worst prices a person with a Georgian receipt waiting, not one for everybody.
+
+- **The camera in Georgia is for whom the model reads now** (В-2 «а», adversarial А3): `/actors/me` says
+  `receiptsByModel` — the grant to come and edition 5 (`READS_BY_MODEL`, one condition with the queue's), one more call
+  of the largest request fitting the person's share of the month and the month's cap (`readsReceiptsByModel`, the use
+  case, by `ModelSpendRepository.readsFor` and `reserve`'s own inequality, `fits` — `spent < share` offered the camera
+  with $0,002 left, which no call fits, Р2-А1), and a model on the server at all — only to a phone that
+  asks (`RECEIPTS_BY_MODEL_HEADER`; an earlier build reads the answer strictly), and the store keeps it over the
+  settings' answer, which does not say it; one read more a request that asks. Not said — an answer of a server before
+  it, a launch offline — is no camera. **The price, named:** a grant, a share or the cap that ends between the shot and
+  the reading fails the receipt as unreadable; the camera goes some $0,018 before the share's end, where a small photo
+  would still fit; a launch with no connection shows Georgia no camera
+  until `/actors/me` answers.
+- **Every item a Georgian line finds is «проверьте»** (В-5 «б», `findsAreGuesses` of the card): the catalogue names
+  nothing in Georgian, so a line goes Serbia's way — the search of its name whole, by letters across scripts and by
+  meaning — and a find is a guess. The steps of the tax office's lines — a package's code, a delivery or a tip — stay
+  Serbia's (`receiptSourceOf`). **The price, named:** every line is flagged, «Кока-кола» too, and with no memory
+  (above) on every receipt.
+- **The newcomer is not promised a translation** where the card names no language of the catalogue — Georgia, Serbia:
+  «прочитает чек», not «прочитает и переведёт».
+- **0.2r counts Georgia with Armenia** (В-3 «в», confirmed as В-7 «б» after adversarial А1): `receipt_days` and
+  `model_receipt_days` have no country; `receipt_reason_days` tells the countries apart. **The price, named:** with no
+  memory in Georgia the same corrections count on every receipt of a shop, so the share of lines put right leans toward
+  the stop by Georgia's memory, not the reading — «Haiku has to cope with it» (owner, 17.11.2026).
+- **The prices, named:** a pharmacy's three decimals («23.868 ლარი») are no figure the parse reads, and such a line's
+  figures stay empty (Р-2, MOL-421); a rollback to a build before this task cannot list a person's receipts once one of
+  them is Georgian (Р-4); Serbia stays its link — a photo where the QR does not read is MOL-424 (В-1 «а»).
+
+**The bench** (`.scratch/tasks/research/MOL-408.md`, `tasks/status/MOL-408/`: the product's reader on 273 receipts of
+nine sets, $0,37): **the model copies any script about as well as Armenian** — Georgian 50 fields right of 51, Serbian
+126 of 132, Russian 374 of 391, Icelandic 1 175 of 1 195, the total copied right in 5 of 5, 38 of 39, 38 of 40 — and
+**our code is what loses it**: Georgia shows 12 fields right and none wrong, sums on 6 lines of 35 — a line lost leaves
+the total in one place (MOL-244), a till of sums alone has no arithmetic for MOL-290's repair to try (MOL-420), the
+pharmacies' three decimals. Russia with a card of the bench: totals 33 right and none wrong of 40, 28 proven whole,
+dates 37 of 37 (MOL-414). A tax on top, a total rounded to 5 sen and thousands with a point in a currency with no cents
+showed wrong totals or none (Malaysia, Indonesia, Iceland) — none of today's countries, MOL-426; two receipts on one
+photo, a total of the other one (MOL-425); and the model orders an ambiguous date's day and month itself, 2 of 16 on
+ReceiptBench, all of Georgia's, Russia's, Iceland's and Vietnam's right — MOL-305's price, measured now.
 
 ## What a line is (MOL-126)
 

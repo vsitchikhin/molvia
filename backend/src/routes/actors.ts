@@ -1,6 +1,13 @@
 import { z } from 'zod'
-import { DomainError, ERROR, actorCodec, exportFileCodec, yerevanDate } from '@molvia/model'
-import type { Actor, ExportFile, TelegramUserId } from '@molvia/model'
+import {
+  DomainError,
+  ERROR,
+  RECEIPTS_BY_MODEL_HEADER,
+  actorCodec,
+  exportFileCodec,
+  yerevanDate,
+} from '@molvia/model'
+import type { Actor, ActorView, ExportFile, TelegramUserId } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { clearSessionCookie } from '@/cookie'
 import { parseQuery } from '@/parse'
@@ -23,7 +30,10 @@ import { refuseAnyBody } from './empty-body'
  * not the account itself any more. It is still one person's settings sitting in a file a shared
  * cache may hand to the next reader, which is reason enough on a reply that names somebody.
  */
-export function answerWithActor(reply: FastifyReply, actor: Actor): FastifyReply {
+export function answerWithActor(
+  reply: FastifyReply,
+  actor: Actor & Pick<ActorView, 'receiptsByModel'>,
+): FastifyReply {
   return reply.header('cache-control', 'no-store').send(z.encode(actorCodec, actor))
 }
 
@@ -32,15 +42,26 @@ export function answerWithActor(reply: FastifyReply, actor: Actor): FastifyReply
  * every other route that needs an owner — which is the point: the safe place has to be the
  * one routes are added to anyway, not one hidden inside another module.
  */
-export function actorMeRoute(app: FastifyInstance): void {
-  app.get('/actors/me', (request, reply) => {
+export function actorMeRoute(
+  app: FastifyInstance,
+  readsReceiptsByModel: (actorId: string) => Promise<boolean>,
+): void {
+  app.get('/actors/me', async (request, reply) => {
     // The row the hook already read: asking for it again would be a second trip to the
     // database for an answer this request is already holding. Checked rather than asserted
     // — the hook guarantees it, and a reader should not have to know that to trust this.
     const actor = request.actor
     if (!actor) throw new DomainError(ERROR.NO_ACTOR)
-
-    return answerWithActor(reply, actor)
+    // Whether the model reads the person's receipts, only to a phone that asks: an earlier build reads the answer
+    // strictly (MOL-408). It costs this request one read more — the grant, the person's share and the month's cap are
+    // no fields of the entity the hook holds.
+    if (request.headers[RECEIPTS_BY_MODEL_HEADER.toLowerCase()] !== '1') {
+      return answerWithActor(reply, actor)
+    }
+    return answerWithActor(reply, {
+      ...actor,
+      receiptsByModel: await readsReceiptsByModel(actor.id),
+    })
   })
 }
 

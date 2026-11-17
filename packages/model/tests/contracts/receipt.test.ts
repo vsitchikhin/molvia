@@ -27,8 +27,13 @@ describe('«Отправить чек»', () => {
     expect(receiptBodySchema.safeParse({ ...body, id: body.id.toUpperCase() }).success).toBe(false)
   })
 
-  it('refuses a country whose receipts are not read yet, and a language the app has not', () => {
-    expect(receiptBodySchema.safeParse({ ...body, country: 'GE' }).success).toBe(false)
+  it('takes a Georgian photo (MOL-408), and refuses a country read by its link or not read yet', () => {
+    expect(receiptBodySchema.safeParse({ ...body, country: 'GE' }).success).toBe(true)
+    expect(receiptBodySchema.safeParse({ ...body, country: 'RS' }).success).toBe(false)
+    expect(receiptBodySchema.safeParse({ ...body, country: 'TR' }).success).toBe(false)
+  })
+
+  it('refuses a language the app has not', () => {
     expect(receiptBodySchema.safeParse({ ...body, language: 'hy' }).success).toBe(false)
   })
 

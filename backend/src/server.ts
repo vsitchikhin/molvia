@@ -79,7 +79,7 @@ import { previousItems } from '@/usecases/previous-items'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { mergeTick } from '@/usecases/merge-twins'
-import { readQueuedReceipts } from '@/usecases/read-receipts'
+import { readQueuedReceipts, readsReceiptsByModel } from '@/usecases/read-receipts'
 import { spelledBrands } from '@/usecases/spell-brands'
 import type { SpellReport } from '@/usecases/spell-brands'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
@@ -633,6 +633,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const reader = options.receiptReader ?? null
     const model = options.receiptModel ?? null
     const modelSpend = createModelSpendRepository(db, owner !== null)
+    const capMicroUsd =
+      options.receiptModelCapMicroUsd ?? Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000)
+    // a share above the cap is the cap: lowering the cap stays one line (MOL-367, adversarial А3)
+    const shareMicroUsd = Math.min(
+      options.receiptModelShareMicroUsd ?? RECEIPT_MODEL_SHARE_MICRO_USD,
+      capMicroUsd,
+    )
+    const modelDeps =
+      model === null ? null : { reader: model, spend: modelSpend, capMicroUsd, shareMicroUsd }
     const taxOffice =
       options.purs === undefined
         ? pursOf(instance.log, (error) => {
@@ -909,16 +918,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           PHONE_NOTICES_PER_SENDER,
           (count) => ({ kind: 'receipt_partial_muted', count }),
         )
-        const capMicroUsd =
-          options.receiptModelCapMicroUsd ??
-          Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000)
-        // a share above the cap is the cap: lowering the cap stays one line (MOL-367, adversarial А3)
-        const shareMicroUsd = Math.min(
-          options.receiptModelShareMicroUsd ?? RECEIPT_MODEL_SHARE_MICRO_USD,
-          capMicroUsd,
-        )
-        const modelDeps =
-          model === null ? null : { reader: model, spend: modelSpend, capMicroUsd, shareMicroUsd }
         const brandSpellings = createBrandSpellingRepository(db)
         // the brands of a receipt the model read, asked of it (MOL-326): counts and reasons only, never a brand
         const brandReport = (event: SpellReport): void => {
@@ -1209,7 +1208,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // Before the session is looked up: a foreign page or a link moves nothing (MOL-368).
       guarded.addHook('onRequest', refuseOutsideTheApp)
       withActor(guarded, (token, locale) => authenticate(sessions, actors, token, locale))
-      actorMeRoute(guarded)
+      actorMeRoute(guarded, (id) => readsReceiptsByModel({ model: modelDeps }, id))
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),
       )
