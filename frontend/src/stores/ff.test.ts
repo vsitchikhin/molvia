@@ -278,15 +278,44 @@ describe('a screen under an фф', () => {
     await page.navigation.settleColdStart(router)
     expect(router.currentRoute.value.path).toBe('/')
 
+    // one move of the mounted app, never home again between two of the feature's screen (adversarial В2)
+    const moves: string[] = []
+    router.afterEach((landed) => {
+      moves.push(landed.fullPath)
+    })
     page.ff.hearFf(new Set(['venues']))
     await vi.waitFor(() => {
       expect(router.currentRoute.value.fullPath).toBe('/venues-probe')
       expect(router.options.history.state.back).toBe('/')
     })
+    expect(moves).toEqual(['/venues-probe'])
     expect(page.navigation.backTarget(router, router.currentRoute.value)).toMatchObject({
       step: true,
     })
   }, 60_000)
+
+  // Typing in the search at home, a finger on a row: whatever the person does there would go with home
+  // (adversarial В1) — the answer may come minutes after the tap.
+  it.each(['input', 'pointerdown', 'keydown'])(
+    'does not move a person who touched the page since (%s)',
+    async (kind) => {
+      const { router, ff } = await routerAt([])
+      await router.push('/venues-probe')
+      const field = document.body.appendChild(document.createElement('input'))
+      try {
+        field.dispatchEvent(new Event(kind, { bubbles: true }))
+        const replace = vi.spyOn(router, 'replace')
+        const push = vi.spyOn(router, 'push')
+        ff.hearFf(new Set(['venues']))
+        expect(replace).not.toHaveBeenCalled()
+        expect(push).not.toHaveBeenCalled()
+        expect(router.currentRoute.value.path).toBe('/')
+      } finally {
+        field.remove()
+      }
+    },
+    60_000,
+  )
 
   it('does not take a person who has moved on since', async () => {
     const { router, ff } = await routerAt([])

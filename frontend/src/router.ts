@@ -24,7 +24,6 @@ import MoneyCategoriesView from '@/views/MoneyCategoriesView.vue'
 import MoneyChartsView from '@/views/MoneyChartsView.vue'
 import { sameScreen, watchBrowserAnimatedBack } from '@/transitions'
 import { atNextFf, ffOn } from '@/stores/ff'
-import { settleColdStart } from '@/navigation'
 import { sheetOpen } from '@/composables/useSheetHistory'
 
 /**
@@ -314,6 +313,9 @@ export const scrollBehavior: RouterScrollBehavior = (to, from, saved) => {
   return saved ?? (sameScreen(from, to) ? false : { top: 0 })
 }
 
+/** What a person does to the page, never what the app does to it: a scroll or a focus may be the app's. */
+const TOUCHES = ['pointerdown', 'touchstart', 'keydown', 'wheel', 'input'] as const
+
 /**
  * A screen whose «фф» is off is not there (MOL-382): home, as `/:rest(.*)` sends an address the app does
  * not have — the same move, so nothing says the feature exists. Asked of the фф the phone last heard; a
@@ -322,19 +324,38 @@ export const scrollBehavior: RouterScrollBehavior = (to, from, saved) => {
  * What the phone last heard may be older than the API: a link opened cold is judged before any answer
  * (adversarial А2). So the next answer decides: naming the фф on, it takes the person where the link was
  * going — if they are still where this move landed, behind the door too, which stands over the route, and
- * no sheet is open there: the answer may come minutes later, and a sheet holds what was typed in memory
- * only (adversarial Б1). The screen takes home's entry, and its chain is laid under it as under a screen
- * opened cold, so «back» never leaves the app (Б2).
+ * have not touched the page since, nor has a sheet opened there: the answer may come minutes later, with
+ * the connection, and what is typed in a sheet or the search, a list scrolled, a finger over a row would go
+ * with the screen (adversarial Б1, В1). One move (В2): over a home that stands alone — a cold start — it is
+ * laid on top, so «back» steps home and never out of the app (Б2); over an entry of the app it takes home's
+ * place, so «back» leads where the person was.
  */
 export function closedByFf(router: Router): NavigationGuard {
   return (to) => {
     const ff = to.meta.ff
     if (ff === undefined || ffOn(ff)) return true
     const wanted = to.fullPath
+    const touched = new AbortController()
+    for (const kind of TOUCHES) {
+      document.addEventListener(
+        kind,
+        () => {
+          touched.abort()
+        },
+        {
+          capture: true,
+          passive: true,
+          signal: touched.signal,
+        },
+      )
+    }
     atNextFf(() => {
-      if (!ffOn(ff) || sheetOpen(router)) return
+      const moved = touched.signal.aborted
+      touched.abort()
+      if (moved || !ffOn(ff) || sheetOpen(router)) return
       if (router.currentRoute.value.redirectedFrom?.fullPath !== wanted) return
-      void router.replace(wanted).then(() => settleColdStart(router))
+      const below: unknown = router.options.history.state.back
+      void (typeof below === 'string' ? router.replace(wanted) : router.push(wanted))
     })
     return '/'
   }
