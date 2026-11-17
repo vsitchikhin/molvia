@@ -398,6 +398,11 @@ export interface ServerOptions {
    * a fake — no test asks the model.
    */
   readonly receiptModel?: ReceiptModel | null
+  /**
+   * The model that reads again a receipt the first did not read whole (MOL-405): Sonnet, built beside the first from
+   * the same key. Absent or `null`, the first reading is all there is.
+   */
+  readonly receiptSecondModel?: ReceiptModel | null
   /** The month's cap of the model in micro-dollars; absent, `RECEIPT_MODEL_MONTHLY_CAP_USD`'s. */
   readonly receiptModelCapMicroUsd?: number
   /** A person's share of it in micro-dollars (MOL-367); absent, `RECEIPT_MODEL_SHARE_MICRO_USD`. */
@@ -641,7 +646,15 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       capMicroUsd,
     )
     const modelDeps =
-      model === null ? null : { reader: model, spend: modelSpend, capMicroUsd, shareMicroUsd }
+      model === null
+        ? null
+        : {
+            reader: model,
+            second: options.receiptSecondModel ?? null,
+            spend: modelSpend,
+            capMicroUsd,
+            shareMicroUsd,
+          }
     const taxOffice =
       options.purs === undefined
         ? pursOf(instance.log, (error) => {
@@ -892,6 +905,16 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 outputTokens: event.paid?.tokens.output,
               },
               'receipt not read by the model',
+            )
+          } else if (event.kind === 'second_passed') {
+            instance.log.info(
+              {
+                reason: event.reason,
+                costMicroUsd: event.paid?.costMicroUsd,
+                inputTokens: event.paid?.tokens.input,
+                outputTokens: event.paid?.tokens.output,
+              },
+              'receipt not read again by the second model',
             )
           } else if (event.kind === 'model_unavailable') {
             instance.log.warn({ reason: event.reason }, 'receipt model unavailable')

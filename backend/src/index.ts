@@ -20,6 +20,7 @@ import { refreshAtBoot, startSchedule } from '@/rates/schedule'
 import { apiFailureReporter } from '@/failure-reporter'
 import { marketRatesRefresh } from '@/usecases/refresh-market-rates'
 import { officialRatesRefresh } from '@/usecases/refresh-official-rates'
+import { RECEIPT_SECOND_MODEL } from '@molvia/model'
 import { receiptModel } from '@/receipts/model-reader'
 import { receiptReader } from '@/receipts/reader'
 import { httpMetrics, processMetrics } from '@/metrics'
@@ -47,6 +48,15 @@ const app = buildServer({
     env.CLAUDE_API_KEY === undefined
       ? null
       : receiptModel({ apiKey: env.CLAUDE_API_KEY, workspaceId: env.CLAUDE_WORKSPACE_ID }),
+  // a receipt the first did not read whole is read again by Sonnet, the same key (MOL-405)
+  receiptSecondModel:
+    env.CLAUDE_API_KEY === undefined
+      ? null
+      : receiptModel({
+          apiKey: env.CLAUDE_API_KEY,
+          workspaceId: env.CLAUDE_WORKSPACE_ID,
+          model: RECEIPT_SECOND_MODEL,
+        }),
 })
 
 // Migrations run at boot rather than as a separate deploy step: there is one instance,
