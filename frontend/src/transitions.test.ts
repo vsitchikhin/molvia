@@ -12,7 +12,7 @@ import { routes } from '@/router'
 import {
   direction,
   installArrival,
-  nameScreen,
+  screenNamer,
   installHeightHold,
   installViewTransitions,
   releaseHeightHold,
@@ -318,11 +318,7 @@ describe('installArrival', () => {
     const router = routerAt()
     await router.push('/')
     const i18n = createAppI18n('en')
-    installArrival(
-      router,
-      (key) => i18n.global.t(key),
-      () => i18n.global.locale.value,
-    )
+    installArrival(router, (key) => i18n.global.t(key))
     expect(document.title).toBe(`${en.advice.title} · ${en.app.name}`)
     i18n.global.locale.value = 'ru'
     await nextTick()
@@ -333,7 +329,7 @@ describe('installArrival', () => {
     await nextTick()
     expect(document.title).toBe('Вход · Molvia')
     // The door gives it back by the route, in the language spoken now.
-    expect(nameScreen()).toBe(true)
+    screenNamer()?.()
     expect(document.title).toBe(`${en.advice.title} · ${en.app.name}`)
   })
 

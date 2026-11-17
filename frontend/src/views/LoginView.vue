@@ -174,7 +174,7 @@ import { useLocale } from '@/composables/useLocale'
 import { useReconnect } from '@/composables/useReconnect'
 import { provideStateStrip } from '@/composables/useStateStrip'
 import { purchaseDay } from '@/days'
-import { focusScreenTitle, nameScreen } from '@/transitions'
+import { focusScreenTitle, screenNamer } from '@/transitions'
 import { usePwaUpdate } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { takeErasureNote } from '@/stores/identity'
@@ -314,7 +314,11 @@ export default defineComponent({
     // Given back by the route, in the language spoken now — the one kept as the door came was the
     // language before a choice made here (MOL-398, adversarial А1).
     onBeforeUnmount(() => {
-      if (document.title === own.value && !nameScreen()) document.title = before
+      if (document.title === own.value) {
+        const rename = screenNamer()
+        if (rename) rename()
+        else document.title = before
+      }
       withdraw?.()
     })
 

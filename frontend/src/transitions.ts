@@ -235,12 +235,11 @@ let renameScreen: (() => void) | undefined
 
 /**
  * The tab named by the route's screen again, in the language spoken now — for the door, which named it
- * itself and gives it back (MOL-398, adversarial А1). Answers whether there was a name to give: none
- * before `installArrival`.
+ * itself and gives it back (MOL-398, adversarial А1). Undefined before `installArrival`: then there is
+ * no name to give.
  */
-export function nameScreen(): boolean {
-  renameScreen?.()
-  return renameScreen !== undefined
+export function screenNamer(): (() => void) | undefined {
+  return renameScreen
 }
 
 /**
@@ -255,11 +254,7 @@ export function nameScreen(): boolean {
  * the month, the period, the category keep the focus, and the next Enter or arrow is theirs — taken
  * to the heading, the second tap on «‹» went into the title (MOL-136, adversarial Ф).
  */
-export function installArrival(
-  router: Router,
-  t: (key: string) => string,
-  language: () => string = () => '',
-): void {
+export function installArrival(router: Router, t: (key: string) => string): void {
   // The first route that never settled is the router's start, with no meta at all: the app's name
   // alone, or the throw would stop the start before the app is mounted (adversarial Б2 of MOL-144).
   const name = (to: RouteLocationNormalized): string => {
@@ -268,7 +263,8 @@ export function installArrival(
   }
 
   // What this wrote last: a language chosen renames the tab only while it is still the route's — the
-  // door names its own (MOL-398, adversarial А1).
+  // door names its own (MOL-398, adversarial А1). The name is watched itself: `t` reads the language
+  // as it changes, so nothing else has to be passed for it (review №8).
   let written = name(router.currentRoute.value)
   const write = (to: RouteLocationNormalized): void => {
     written = name(to)
@@ -278,9 +274,12 @@ export function installArrival(
   renameScreen = () => {
     write(router.currentRoute.value)
   }
-  watch(language, () => {
-    if (document.title === written) write(router.currentRoute.value)
-  })
+  watch(
+    () => name(router.currentRoute.value),
+    () => {
+      if (document.title === written) write(router.currentRoute.value)
+    },
+  )
   router.afterEach(async (to, from, failure) => {
     if (failure || to.fullPath === from.fullPath || sameScreen(from, to)) return
     write(to)
