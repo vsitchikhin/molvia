@@ -207,16 +207,17 @@ by itself; the owner's decisions are В-1…В-5 in `.scratch/tasks/plans/MOL-36
   are its defaults and ours** (`.gitleaks.toml`): a ping URL of healthchecks.io — on each host it answers a ping
   at, `hc-ping.com`, `hc-ping.com.` and `hchk.io`, in any case, with a port and JSON's `\/` (MOL-399, adversarial
   Б4, Б5) — and a Telegram bot's token by its shape alone — the default wants `telegr…` in the name beside it, and
-  the local check of the red path passed `const TOKEN = '…'` until this rule — bounded on the left alone, by what is
-  no digit, not `\b`: Bot API's address puts it after `…/bot` (А4), its last sign may be `-` (А5), and a bound on the
-  right took the comma before a second token, which then went unfound and unredacted (В1). **A test's value is let go by its value, for the generic rule
-  alone** (Р-2): a path such as `*.test.ts` would pass a real token pasted into a test, and a pattern given to every
-  rule would silence the ping URL, whose path is a uuid. On 10.11.2026 the history of master held sixteen such
-  findings and every branch the audit's thirty-three: none after the allowlist. **The prices, named:** the
-  configuration is the pull request's own, so a pull request may loosen it for itself — a change of `.gitleaks.toml`,
-  `.gitleaksignore` or `.gitattributes` is review's; only what a rule knows is found, and a binary's text only where
-  it lies bare (a zip or an xlsx is compressed); a merge of master reads what master brought again, so a secret
-  rotated and left in a file reddens every branch merging it — the secret goes out of the file with its rotation.
+  the local check of the red path passed `const TOKEN = '…'` until this rule — bounded on the left alone, by what
+  is no digit, not `\b`: Bot API's address puts it after `…/bot` (А4), its last sign may be `-` (А5), and a bound
+  on the right took the comma before a second token, which then went unfound and unredacted (В1). **A test's value
+  is let go by its value, for the generic rule alone** (Р-2): a path such as `*.test.ts` would pass a real token
+  pasted into a test, and a pattern given to every rule would silence the ping URL, whose path is a uuid. On
+  10.11.2026 the history of master held sixteen such findings and every branch the audit's thirty-three: none after
+  the allowlist. **The prices, named:** the configuration is the pull request's own, so a pull request may loosen
+  it for itself — a change of `.gitleaks.toml`, `.gitleaksignore` or `.gitattributes` is review's; only what a rule
+  knows is found, and a binary's text only where it lies bare (a zip or an xlsx is compressed); a merge of master
+  reads what master brought again, so a secret rotated and left in a file reddens every branch merging it — the
+  secret goes out of the file with its rotation.
 - **`npm audit` of what ships is judged by `bin/npm-audit.mjs`** in `static` (owner's В-4 «б»): a high or critical
   advisory is red unless `bin/npm-audit-accepted.json` accepts it — its GHSA, the reason and the day to look again,
   a day of the calendar a year ahead at most (adversarial Б2), red once more the day after. **What ships is read

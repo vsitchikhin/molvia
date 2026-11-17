@@ -6,12 +6,12 @@
 [extend]
 useDefault = true
 
-# A ping URL of healthchecks.io: whoever has one can say «alive» for the check (deploy.md). By its uuid
-# or by a project's ping key and a slug, on any host healthchecks.io answers a ping at — `hc-ping.com`,
-# the same as a full name `hc-ping.com.`, and the old `hchk.io` — in any case, as DNS takes a host
-# (MOL-399, adversarial round 4, Б4); with its port written out, and a slash escaped as JSON may write it,
-# `\/` (round 5, Б5). The placeholders of the tests (`0f1e2d3c-secret`, `pk/…`) are
-# neither form; the two uuids of the watch's tests are, and only the allowlist below lets them go.
+# A ping URL of healthchecks.io: whoever has one can say «alive» for the check (deploy.md). By its uuid or by
+# a project's ping key and a slug, on any host healthchecks.io answers a ping at — `hc-ping.com`, the same as
+# a full name `hc-ping.com.`, and the old `hchk.io` — in any case, as DNS takes a host (MOL-399, adversarial
+# round 4, Б4); with its port written out, and a slash escaped as JSON may write it, `\/` (round 5, Б5). The
+# placeholders of the tests (`0f1e2d3c-secret`, `pk/…`) are neither form; the two uuids of the watch's tests
+# are, and only the allowlist below lets them go.
 [[rules]]
 id = "healthchecks-ping-url"
 description = "healthchecks.io ping URL"
