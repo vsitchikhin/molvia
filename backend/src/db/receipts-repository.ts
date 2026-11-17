@@ -5,6 +5,7 @@ import {
   DomainError,
   ERROR,
   RECEIPT_MODEL,
+  RECEIPT_SECOND_MODEL,
   REVIEW_CONSENT_EDITION,
   placeSchema,
   RECEIPT_KEEP_DAYS,
@@ -421,19 +422,25 @@ const tally = (
   readerVersion: string | null = null,
 ) => addToDay(db, byModel(readerVersion) ? modelReceiptDays : receiptDays, counts, day, source)
 
-/** How every `reader_version` the model wrote begins (`model-reader.ts`): the model's own name and «@». */
-const MODEL_READER_PREFIX = `${RECEIPT_MODEL}@`
+/**
+ * How every `reader_version` a model wrote begins (`model-reader.ts`): the model's own name and «@» — Haiku's, or
+ * Sonnet's where its reading again was kept (MOL-405).
+ */
+const MODEL_READER_PREFIXES = [`${RECEIPT_MODEL}@`, `${RECEIPT_SECOND_MODEL}@`] as const
 
 /**
  * The model read the receipt (MOL-272), by its `reader_version`; Tesseract, a link, none. One rule in two forms: this,
  * and `readByModelSql` for a query (MOL-408).
  */
 export const byModel = (readerVersion: string | null): boolean =>
-  readerVersion?.startsWith(MODEL_READER_PREFIX) ?? false
+  MODEL_READER_PREFIXES.some((prefix) => readerVersion?.startsWith(prefix) ?? false)
 
 /** `byModel` in SQL, over a `reader_version` column of the query's. */
 const readByModelSql = (readerVersion: SQL) =>
-  sql`starts_with(${readerVersion}, ${MODEL_READER_PREFIX})`
+  sql`(${sql.join(
+    MODEL_READER_PREFIXES.map((prefix) => sql`starts_with(${readerVersion}, ${prefix})`),
+    sql` or `,
+  )})`
 
 /** Adds to `tax_receipt_days`: the receipts by their link (MOL-234). */
 const tallyTax = (db: Conn, counts: TaxReceiptDayCounts, day: SQL, source: SQL = sql``) =>

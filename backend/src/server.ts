@@ -79,7 +79,7 @@ import { previousItems } from '@/usecases/previous-items'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { mergeTick } from '@/usecases/merge-twins'
-import { readQueuedReceipts, readsReceiptsByModel } from '@/usecases/read-receipts'
+import { modelRest, readQueuedReceipts, readsReceiptsByModel } from '@/usecases/read-receipts'
 import { spelledBrands } from '@/usecases/spell-brands'
 import type { SpellReport } from '@/usecases/spell-brands'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
@@ -398,6 +398,11 @@ export interface ServerOptions {
    * a fake — no test asks the model.
    */
   readonly receiptModel?: ReceiptModel | null
+  /**
+   * The model that reads again a receipt the first did not read whole (MOL-405): Sonnet, built beside the first from
+   * the same key. Absent or `null`, the first reading is all there is.
+   */
+  readonly receiptSecondModel?: ReceiptModel | null
   /** The month's cap of the model in micro-dollars; absent, `RECEIPT_MODEL_MONTHLY_CAP_USD`'s. */
   readonly receiptModelCapMicroUsd?: number
   /** A person's share of it in micro-dollars (MOL-367); absent, `RECEIPT_MODEL_SHARE_MICRO_USD`. */
@@ -641,7 +646,17 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       capMicroUsd,
     )
     const modelDeps =
-      model === null ? null : { reader: model, spend: modelSpend, capMicroUsd, shareMicroUsd }
+      model === null
+        ? null
+        : {
+            reader: model,
+            second: options.receiptSecondModel
+              ? { reader: options.receiptSecondModel, rest: modelRest() }
+              : null,
+            spend: modelSpend,
+            capMicroUsd,
+            shareMicroUsd,
+          }
     const taxOffice =
       options.purs === undefined
         ? pursOf(instance.log, (error) => {
@@ -873,9 +888,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 partly: event.partly,
                 ms: event.ms,
                 reader: event.reader,
+                readerVersion: event.readerVersion,
                 costMicroUsd: event.costMicroUsd,
                 inputTokens: event.tokens?.input,
                 outputTokens: event.tokens?.output,
+                secondCostMicroUsd: event.second?.costMicroUsd,
+                secondInputTokens: event.second?.tokens.input,
+                secondOutputTokens: event.second?.tokens.output,
                 unparsed: event.unparsed,
                 rememberedConfirmed: event.remembered.confirmed,
                 rememberedRepaired: event.remembered.repaired,
@@ -893,8 +912,23 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               },
               'receipt not read by the model',
             )
+          } else if (event.kind === 'second_passed') {
+            instance.log.info(
+              {
+                reason: event.reason,
+                costMicroUsd: event.paid?.costMicroUsd,
+                inputTokens: event.paid?.tokens.input,
+                outputTokens: event.paid?.tokens.output,
+              },
+              'receipt not read again by the second model',
+            )
+          } else if (event.kind === 'second_slow') {
+            instance.log.warn({ ms: event.ms }, 'receipt second model slow, resting')
           } else if (event.kind === 'model_unavailable') {
-            instance.log.warn({ reason: event.reason }, 'receipt model unavailable')
+            instance.log.warn(
+              { model: event.model, reason: event.reason },
+              'receipt model unavailable',
+            )
           } else if (event.kind === 'model_broken') {
             failures.report(event.error, job('receipt-model'), 'receipt model answer torn')
           } else if (event.kind === 'model_rejected') {
