@@ -99,8 +99,14 @@ function sumsCopied(lines: readonly ReceiptTextLine[]): boolean {
   )
 }
 
-/** `verifiedReading`, with the reasons of what it did not show (MOL-309). */
-export function explainedReading(text: ReceiptText, { byModel = false } = {}): ExplainedReading {
+/**
+ * `verifiedReading`, with the reasons of what it did not show (MOL-309) — and, given another reading of the same
+ * paper by a second model (MOL-405), with what that reading vouches for (`witnessed`).
+ */
+export function explainedReading(
+  text: ReceiptText,
+  { byModel = false, witness }: { byModel?: boolean; witness?: ReceiptText } = {},
+): ExplainedReading {
   const receipt = notWhole(text)
   const proven = receipt === null
   // a model's sums as copied that meet the total shown — on a receipt not proven whole, one two places print — vouch
@@ -108,11 +114,87 @@ export function explainedReading(text: ReceiptText, { byModel = false } = {}): E
   // quantity or price does not hold keeps its sum alone
   const summed = byModel && !proven && sumsMeet(text)
   const checked = text.lines.map((line) => verifiedLine(line, proven, text.layout, byModel, summed))
+  const shown = checked.map((one) => one.line)
   return {
-    shown: { ...text, lines: checked.map((one) => one.line), balanced: proven },
+    shown: {
+      ...text,
+      lines: witness === undefined ? shown : witnessed(text.lines, shown, witness.lines),
+      balanced: proven,
+    },
     lines: checked.map((one) => one.reason),
     receipt,
   }
+}
+
+/**
+ * Which of two readings of one receipt goes to the review (MOL-405, owner's В-1 «а», rule R3 of the bench): the one
+ * proven whole; else the one with a total shown; else the one with more lines shown as read; a tie — the first. The
+ * code knows no truth, only what each reading proves: a second reading with more lines and no total took four wrong
+ * figures and lost a total on the bench (am-34, am-07b), where the total comes before the count.
+ */
+export function betterReading(
+  first: ExplainedReading,
+  second: ExplainedReading,
+): 'first' | 'second' {
+  const whole = (one: ExplainedReading) => one.receipt === null
+  if (whole(first) !== whole(second)) return whole(second) ? 'second' : 'first'
+  const totalled = (one: ExplainedReading) => one.shown.totalHundredths !== null
+  if (totalled(first) !== totalled(second)) return totalled(second) ? 'second' : 'first'
+  const read = (one: ExplainedReading) =>
+    one.shown.lines.filter((line) => line.sumHundredths !== null).length
+  return read(second) > read(first) ? 'second' : 'first'
+}
+
+const WITNESSED = [
+  'quantityMilli',
+  'priceHundredths',
+  'sumHundredths',
+  'discountHundredths',
+] as const
+
+/**
+ * A figure the check emptied, shown again where the other reading has a line of the very same figures (MOL-405,
+ * owner's В-4 «а»): two models read the paper apart, and a figure both copied alike is the paper's — but for the font's
+ * 5, which both read as a 6 alike, so a figure with a 6 in it is never vouched for so. On the bench, 205 right figures
+ * and 4 wrong shown again; with a 6, 25 right and 35 wrong. **Shown under «проверьте»** (`repaired`, owner's В-5 «а»):
+ * the check's own arithmetic did not prove it. The other reading's lines are each a witness once, in order; a line the
+ * shop's memory doubts has none (MOL-291).
+ */
+function witnessed(
+  read: readonly ReceiptTextLine[],
+  shown: readonly ReceiptTextLine[],
+  witness: readonly ReceiptTextLine[],
+): ReceiptTextLine[] {
+  const used = new Set<number>()
+  return read.map((line, i) => {
+    const kept = shown[i] ?? line
+    const at = witness.findIndex((other, k) => !used.has(k) && agrees(line, other))
+    if (at < 0) return kept
+    used.add(at)
+    if (line.remembered === 'doubted') return kept
+    const back = (key: (typeof WITNESSED)[number]): number | null => {
+      const figure = line[key]
+      return kept[key] === null && figure !== null && !String(figure).includes('6')
+        ? figure
+        : kept[key]
+    }
+    const again = {
+      ...kept,
+      quantityMilli: back('quantityMilli'),
+      priceHundredths: back('priceHundredths'),
+      sumHundredths: back('sumHundredths'),
+      discountHundredths: back('discountHundredths'),
+    }
+    return WITNESSED.every((key) => again[key] === kept[key]) ? kept : { ...again, repaired: true }
+  })
+}
+
+/** Every figure the line has, the other has alike — and the line has one. */
+function agrees(line: ReceiptTextLine, other: ReceiptTextLine): boolean {
+  return (
+    WITNESSED.some((key) => line[key] !== null) &&
+    WITNESSED.every((key) => line[key] === null || line[key] === other[key])
+  )
 }
 
 function notWhole(text: ReceiptText): ReceiptReason | null {
