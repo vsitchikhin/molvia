@@ -395,7 +395,7 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
     expect(await restsMinutes(slow)).toBeGreaterThan(58)
   }, 30_000)
 
-  it('rests a receipt that failed once by its own age, the model up: the person’s slow one holds it no longer (В-11 «а», Р6-А1)', async () => {
+  it('lifts the person’s shared rest by a receipt of theirs read, never by another’s (В-11 «а», В-12 «а», Р6-А1, Р7-А1)', async () => {
     const me = await granted('GE')
     const neighbour = await granted('GE')
     const slow = await queued(me)
@@ -405,7 +405,7 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
     await readAll(failsOn(slowPhoto), now)
     expect(await restsMinutes(slow)).toBeGreaterThan(59)
 
-    // the model up: the neighbour's receipt is read; the person's new one times out once, the slow one every time
+    // the neighbour's receipt is read; the person's new one times out once, the slow one every time
     const theirs = await queued(neighbour)
     const sent = await queued(me)
     const sentPhoto = await photoOf(sent)
@@ -418,17 +418,27 @@ describe('a Georgian receipt while the model is away (MOL-408, owner’s В-8 «
         ? Promise.reject(new ModelUnavailable('timeout', null))
         : Promise.resolve(NIKORA_READ)
     })
+    await triedAMinuteAgo(me)
     await readAll(model, now)
     expect((await receiptOf(theirs))?.status).toBe('parsed')
     expect((await receiptOf(sent))?.status).toBe('queued')
+    // rested by its own age, a minute — not the slow one's hour
     expect(await restsMinutes(sent)).toBeLessThan(2)
 
-    // its own minute over, it is asked again and read, while the slow one keeps its hour
+    // must not: its own minute over, another person's receipt read proves nothing of a slow API's long answers
     await restOverOf(sent)
     await readAll(model, now)
-    expect(model.asked).toBe(3)
+    expect(model.asked).toBe(2)
+    expect((await receiptOf(sent))?.status).toBe('queued')
+
+    // a receipt of the person's own read lifts the rest: the one that failed once is read in the same round
+    const another = await queued(me)
+    await triedAMinuteAgo(me)
+    await readAll(model, now)
+    expect(model.asked).toBe(4)
+    expect((await receiptOf(another))?.status).toBe('parsed')
     expect((await receiptOf(sent))?.status).toBe('parsed')
-    expect(await restsMinutes(slow)).toBeGreaterThan(58)
+    expect(await restsMinutes(slow)).toBeGreaterThan(57)
   }, 30_000)
 
   it('must not rest an Armenian receipt between tries: Tesseract takes it past its ten minutes as before', async () => {

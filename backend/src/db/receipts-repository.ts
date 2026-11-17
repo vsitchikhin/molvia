@@ -421,9 +421,19 @@ const tally = (
   readerVersion: string | null = null,
 ) => addToDay(db, byModel(readerVersion) ? modelReceiptDays : receiptDays, counts, day, source)
 
-/** The model read the receipt (MOL-272), by its `reader_version`; Tesseract, a link, none. */
+/** How every `reader_version` the model wrote begins (`model-reader.ts`): the model's own name and «@». */
+const MODEL_READER_PREFIX = `${RECEIPT_MODEL}@`
+
+/**
+ * The model read the receipt (MOL-272), by its `reader_version`; Tesseract, a link, none. One rule in two forms: this,
+ * and `readByModelSql` for a query (MOL-408).
+ */
 export const byModel = (readerVersion: string | null): boolean =>
-  readerVersion?.startsWith(`${RECEIPT_MODEL}@`) ?? false
+  readerVersion?.startsWith(MODEL_READER_PREFIX) ?? false
+
+/** `byModel` in SQL, over a `reader_version` column of the query's. */
+const readByModelSql = (readerVersion: SQL) =>
+  sql`starts_with(${readerVersion}, ${MODEL_READER_PREFIX})`
 
 /** Adds to `tax_receipt_days`: the receipts by their link (MOL-234). */
 const tallyTax = (db: Conn, counts: TaxReceiptDayCounts, day: SQL, source: SQL = sql``) =>
@@ -1504,11 +1514,13 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               where sibling.actor_id = waiting.actor_id and sibling.country = waiting.country
                 and sibling.status = 'queued' and sibling.source = 'photo' and sibling.deleted_at is null
                 and sibling.next_attempt_at > clock_timestamp()
-                -- the person's receipts rest together only through an outage: the model has read nothing since that
-                -- try, or it was about that one receipt (owner's В-11 «а», adversarial Р6-А1)
+                -- a resting receipt holds the person's others only while the model has read none of the person's
+                -- receipts of the country since its try — an outage, or a slow API (owner's В-11 «а», В-12 «а»,
+                -- adversarial Р6-А1, Р7-А1); once it has, the failure was that receipt's own, and it rests alone
                 and sibling.reading_at >= coalesce((
                   select max(answered.read_at) from ${receipts} answered
-                  where starts_with(answered.reader_version, ${`${RECEIPT_MODEL}@`})
+                  where answered.actor_id = sibling.actor_id and answered.country = sibling.country
+                    and ${readByModelSql(sql`answered.reader_version`)}
                 ), '-infinity')
                 -- a receipt that never rested passes it, a try of the person's in the country a minute at most
                 -- (owner's В-10 «а», adversarial Р5-А1)
