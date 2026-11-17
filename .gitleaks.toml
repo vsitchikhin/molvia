@@ -51,3 +51,14 @@ targetRules = ["generic-api-key"]
 condition = "AND"
 paths = ['''^backend/src/embeddings/model\.json$''']
 regexes = ['''^[0-9a-f]{64}$''']
+
+# The two made-up checks of the watch's tests (MOL-399, review round 2, Б2): the lock's round takes check
+# URLs by their uuid alone, so its tests need two in that form. Let go by their exact value and for the ping
+# rule alone — any other uuid of hc-ping.com is still found.
+[[allowlists]]
+description = "The watch's test checks by uuid"
+targetRules = ["healthchecks-ping-url"]
+regexes = [
+  '''^hc-ping\.com/0f1e2d3c-4b5a-4c6d-8e7f-a0b1c2d3e4f5$''',
+  '''^hc-ping\.com/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d$''',
+]
