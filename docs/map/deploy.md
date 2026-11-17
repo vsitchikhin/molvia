@@ -3,6 +3,10 @@
 Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it under
 `packages/model/tests/`, is covered by the source's entry.
 
+## packages/model
+
+- `packages/model/src/contracts/ff.ts` — The list of «фф» (MOL-382): each name with what it closes and its removal task (`removedBy`), the header `X-Molvia-Ff` the API names the ones that are on in and its reading, and `FF_<NAME>` of the environment, strictly `on` or `off`.
+
 ## backend · routes
 
 - `backend/src/routes/health.ts` — Route `GET /health`: the database probe and the build's version, which the deploy, the e2e run and the outside watch wait on; `503` with the same body when the database does not answer (MOL-142).
@@ -21,6 +25,8 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 - `backend/tests/compose-volumes.integration.test.ts` — Integration test: `frontend-volumes` and `victoria-volumes` give every volume their service mounts, and only those, to the uid and gid the Dockerfiles of Caddy and VictoriaMetrics run as, by numbers, as root on their service's image with no network and `CHOWN`, `DAC_READ_SEARCH` alone, each waited for.
 - `backend/tests/compose.ts` — Test helper: `docker-compose.prod.yml` as text and each service's block of lines, for the tests that hold its shape.
+- `backend/tests/ff-header.integration.test.ts` — Integration test: every answer names the «фф» that are on in `X-Molvia-Ff`, in the list's order — refusals, missing routes and framework errors too; a feature's route under an фф that is off answers as an address the API does not have, whatever the session and the fetch metadata; every route the server has with every фф on and not with none answers so with none, and a path a route that stays takes is caught (MOL-382).
+- `backend/tests/ff-script.integration.test.ts` — Test: `deploy/ff.sh` run as it is beside the compose file and production's `.env.prod`, through the real `docker compose` — a line added where there was none, replaced and a second dropped, the file's mode kept; a name the compose file does not pass, in the arguments or in the file by any spelling, and a value but `on` or `off`, refused with nothing written (MOL-382).
 - `backend/src/db/journal.test.ts` — Unit test: the journal of migrations is numbered in order and every stamp is later than the one before it.
 - `backend/tests/migration-stamps.integration.test.ts` — Integration test: a migration drizzle skipped because its stamp is older than one applied is named, and stops the chain.
 
@@ -48,7 +54,7 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 
 ## repository
 
-- `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret, the bot's pulse URL, Grafana's password and the alarms' bot (MOL-145), the tunnel's token (MOL-399).
+- `.env.prod.example` — Template of the server's `.env.prod`: domain, Postgres credentials, the production bot's token and username, the bot–API secret, the bot's pulse URL, Grafana's password and the alarms' bot (MOL-145), the tunnel's token (MOL-399), the «фф» (MOL-382).
 - `.github/workflows/release.yml` — Release workflow: after green CI on master builds the six images — the receipt reader's and the metrics' two (MOL-145) too — and rolls them out over ssh; a version tag — a release's and a hotfix's named one too (MOL-381) — names built images; the outside watch goes to Cloudflare in a job of its own (MOL-221); trivy scans the images beside the rollout, never judging it, through `scan.yml` (MOL-369).
 - `.github/workflows/release-night.yml` — The day's release (MOL-381): at 03:00 Yerevan and by «Run workflow», the owner's «выпускай»; decides by `bin/release.mjs` — the branch differs from master by its files, and at night no release went out by hand within 24 hours — finds or opens the pull request of the release branch into master, waits up to an hour for both gates of CI on its head and merges that commit, the night's subject marked `(night)`; by the app `molvia-release`, since a merge by GitHub's own token starts no CI; its outcome to healthchecks.io `molvia-release`.
 - `.github/workflows/after-release.yml` — After CI on master (MOL-381): for a merge of `release/*` or `hotfix/*` — read off the merge commit by `bin/release.mjs after` — waits until `/api/health` names the commit, tags it, and cuts the next release branch and deletes those older than the one before it, or merges master into the next release branch after a hotfix; whoever merged; a run again finishes what a failure left; a failure to healthchecks.io `molvia-release`.
@@ -60,13 +66,14 @@ Rules: `.claude/rules/deploy.md`. A test beside its source, or mirroring it unde
 - `bin/bundle.mjs` — esbuild bundler for the API and bot images; the API also gets its forget, seed-catalogue, gates, failures, merge, notify, repack-receipts and rename-receipt-items tools.
 - `deploy/Caddyfile` — Caddy config: TLS for the domain, `/api` stripped and proxied to the API, internal routes closed, SPA fallback, headers — `frame-ancestors 'none'` and HSTS but on localhost (MOL-363) — no access log.
 - `backend/tests/caddyfile.integration.test.ts` — Test of the Caddyfile as text (MOL-363): the audit's three headers kept, the one CSP of Caddy is `frame-ancestors 'none'`, HSTS a year with no preload or subdomains and never for localhost.
-- `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, signals, the metrics and their alarms (MOL-145), backups and restore, the Postgres image and its move off alpine.
+- `deploy/README.md` — Operations guide: new machine, deploys and the deploy key, login setup, local prod stack, erasure, seeding, gates, signals, the metrics and their alarms (MOL-145), the «фф» (MOL-382), backups and restore, the Postgres image and its move off alpine.
 - `deploy/backup/backup.env.example` — Template of the server's `backup.env`: age recipient, R2 remote, healthchecks.io URL, retention days.
 - `deploy/backup/backup.sh` — Nightly backup: `pg_dump` in the container without the data of receipt photos and cut-out lines (MOL-125), encrypted to the owner's age key, streamed to R2, pinged to healthchecks.io.
 - `deploy/backup/molvia-backup.service` — systemd unit running the nightly backup script as the deploy user.
 - `deploy/backup/molvia-backup.timer` — systemd timer: the backup at 04:00 Yerevan time, catching up a night the machine was off.
 - `deploy/backup/restore.sh` — Restore from the owner's machine: list copies, drill into a throwaway Postgres — every table against the live one but those `backup.sh` excludes, which must come back empty (MOL-368) — or replace production under a deploy hold.
 - `backend/tests/restore-drill.integration.test.ts` — Test: `restore.sh --drill` run as it is beside a `backup.sh`, `ssh` and `age` stand-ins in `PATH` — a match, an excluded table not empty or not there, a count differing, no list read (MOL-368).
+- `deploy/ff.sh` — The «фф» of production (MOL-382): `./ff.sh <name> on|off` writes the line of `.env.prod` in place of its own or adds it, `./ff.sh` checks; every фф compose reads from the file, asked of compose, is a name the compose file passes with `on` or `off`, or nothing is written.
 - `deploy/deploy.sh` — The deploy key's forced command: rolls out one published image tag, judged by the application alone — the metrics pulled before anything changes and started after it is healthy, a failure of theirs a warning (MOL-145) — checks health, rolls back on failure without the receipt reader or the metrics, which a tag before them lacks; honours `deploy.hold`.
 - `deploy/reindex-text.sql` — Rebuilds every index whose key is text or an expression by the rules of the libc the database now runs under — the block of `0038` for a move a migration cannot make (MOL-105).
 - `deploy/window-duplicates.sql` — After a rolled-back deploy (MOL-105): what the old API wrote twice into indexes of another libc — search picks merged, a login code dropped, every other pair of a unique text key named; index scans off.

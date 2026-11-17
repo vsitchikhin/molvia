@@ -14,13 +14,15 @@ import {
   LOGIN_WINDOW_LIMIT,
   RECEIPT_MODEL_SHARE_MICRO_USD,
   VERSION_HEADER,
+  FF_HEADER,
+  ffHeaderOf,
   errorResponseSchema,
   isWireCode,
   describeFailure,
 } from '@molvia/model'
-import type { ErrorCode, ErrorResponse, TelegramUserId } from '@molvia/model'
+import type { ErrorCode, ErrorResponse, FfName, TelegramUserId } from '@molvia/model'
 import { InvalidBody } from '@/parse'
-import { VERSION, env, loginConfig } from '@/env'
+import { FF_ON, VERSION, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
@@ -419,6 +421,12 @@ export interface ServerOptions {
    * metrics port serves, and a test the one it reads.
    */
   readonly metrics?: HttpMetrics
+  /**
+   * The «фф» that are on (MOL-382). Absent, the environment's (`FF_<NAME>`); a test names its own. A
+   * feature's routes and timers are registered only while its фф is on, so off it is an address the
+   * API does not have — the same 404, before any session.
+   */
+  readonly ff?: ReadonlySet<FfName>
 }
 
 /**
@@ -473,6 +481,8 @@ function openFoodFactsOf(log: FastifyBaseLogger): OpenFoodFacts | null {
 }
 
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
+  const ff = options.ff ?? FF_ON
+  const namedFf = ffHeaderOf(ff)
   const app = Fastify({
     logger: {
       // Fastify's default serializers write no headers at all, so today this hides nothing; it
@@ -504,6 +514,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
       // No hook runs for these, the one below included.
       void reply.header(VERSION_HEADER, NAMED_BUILD)
+      void reply.header(FF_HEADER, namedFf)
       // Both are the caller's: a path that does not decode, and one past a raised header limit.
       if (error.code === 'FST_ERR_BAD_URL' || error.code === 'FST_ERR_MAX_PARAM_LENGTH') {
         void reply
@@ -542,8 +553,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // page that meets another build than the one it first met knows the server was rolled out
   // under it, and looks for its own new version at once — on the very answer it may no longer
   // read (MOL-132). `onSend`, not `onRequest`: a reply the error handler builds anew keeps it.
+  // The фф that are on ride beside it (MOL-382, В-1 «а»): the phone hears them before the login, and
+  // learns of a change with its next answer.
   app.addHook('onSend', (_request, reply, payload, next) => {
     void reply.header(VERSION_HEADER, NAMED_BUILD)
+    void reply.header(FF_HEADER, namedFf)
     next(null, payload)
   })
 

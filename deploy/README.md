@@ -453,6 +453,41 @@ whole; without it, until now. A day is Yerevan's; a moment needs its offset.
 
 In a working copy the same thing is `make gates FROM=2026-10-05 [TO=2026-10-31]`.
 
+## Feature flags — «фф» (MOL-382)
+
+A finished feature reaches people with its release (MOL-376, В-1 «в»); an фф closes only a thing they
+should not see yet — venues until their chain is whole, payment until the bank is connected. The list is
+`packages/model/src/contracts/ff.ts`: a name, what it closes, the task that takes it off.
+
+- **Production's value is a line of `.env.prod`**, `FF_<NAME>=on` or `off`, and the compose file passes
+  each by name with `off` as its default. A value other than those — `ON`, `true` — stops the API's start
+  with the variable named in its log (`docker compose … logs backend`). **A typo in the name never reaches
+  the API** — compose passes only the names it knows, and `FF_PAYMNETS=on` leaves payment off, saying
+  nothing — so the line is written by `ff.sh`, never by hand: it asks compose what it reads from the file,
+  refuses a name the compose file does not pass, wherever it stands in the file, and writes nothing then.
+  Its copy on the machine is the owner's to bring, as `deploy.sh`'s: `scp deploy/ff.sh molvia:molvia/ff.sh`.
+- **Turning one on is the owner's word**, then the line and a restart of the API alone — no release, no
+  merge:
+
+  ```bash
+  # on the machine, in ~/molvia, after the owner's word; the file is the owner's to write
+  ./ff.sh venues on   # FF_VENUES=on in place of its line, or added: production's file has none
+  docker compose -f docker-compose.prod.yml --env-file .env.prod up -d backend
+  curl -sI https://molvia.net/api/health | grep -i x-molvia-ff   # → x-molvia-ff: venues
+  ```
+
+  `./ff.sh` alone only checks the file. `/health` answers `503` for the seconds the API restarts, as at
+  any rollout. An open page learns of it with its next answer — every answer names the фф that are on in
+  `X-Molvia-Ff` — and shows the feature without a reload; a phone offline keeps the last list it heard,
+  and a link into the feature opened before its first answer opens with that answer — unless the person
+  has touched the app meanwhile.
+
+- **Off again is `./ff.sh venues off` and the same restart**: the routes are gone at once, the phone's
+  entries with its next answer; a screen of the feature already open stays until it is left.
+- **Taken off by its task** (`removedBy`): once the feature has been on, a task removes the flag from
+  the code, the list, the compose file and `.env.prod.example`; the line in `.env.prod` goes after that
+  rollout — nothing reads it any more.
+
 ## The merge of twins (MOL-106)
 
 Every night from 04:30 Yerevan, half an hour after the copy of the database, the API merges what is
