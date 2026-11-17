@@ -39,7 +39,12 @@ import { ModelRejected, ModelUnavailable, receiptModel } from '@/receipts/model-
 import type { ModelReading, ReceiptModel } from '@/receipts/model-reader'
 import type { ReaderReading, ReceiptReader } from '@/receipts/reader'
 import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
-import { RECEIPT_MODEL_WAIT_MS, modelRest, readQueuedReceipts } from '@/usecases/read-receipts'
+import {
+  RECEIPT_MODEL_WAIT_MS,
+  RECEIPT_SECOND_SLOW_MS,
+  modelRest,
+  readQueuedReceipts,
+} from '@/usecases/read-receipts'
 import type { ModelRest, ReadReceiptsDeps, ReadReport } from '@/usecases/read-receipts'
 import { receiptMisses as receiptMissesCommand } from '@/receipt-misses'
 import {
@@ -2070,6 +2075,71 @@ describe('a receipt not read whole, read again by Sonnet (MOL-405)', () => {
     expect(passed).toEqual(['away', 'resting', 'resting'])
     const spent = await Promise.all(people.map(spentOf))
     expect(sorted(spent)).toEqual([2_180, 2_180, 2_180 + SONNET_WORST])
+  }, 30_000)
+
+  // adversarial Б4: an overloaded model answers near its time out rather than refusing
+  it('rests Sonnet after an answer slower than a minute, that answer still taken', async () => {
+    const people = [await person(LATER), await person(LATER), await person(LATER)]
+    for (const me of people) await queued(me)
+    let clock = Date.now()
+    const now = () => new Date(clock)
+    const second = sonnet(() => {
+      clock += RECEIPT_SECOND_SLOW_MS
+      return answered(ANSWER, 30_000)()
+    })
+    const reports = await readAll(benchReader(), fakeModel(answered(NOT_WHOLE, 2_180)), {
+      second,
+      now,
+    })
+    expect(second.asked).toBe(1)
+    const passed = reports.filter((r) => r.kind === 'second_passed').map((r) => r.reason)
+    expect(passed).toEqual(['resting', 'resting'])
+    const read = reports.flatMap((r) => (r.kind === 'read' ? [r.readerVersion] : []))
+    expect(sorted(read)).toEqual([
+      'claude-haiku-5-5@v5',
+      'claude-haiku-5-5@v5',
+      'claude-sonnet-5-5@v5',
+    ])
+  }, 30_000)
+
+  it('asks Sonnet again after an answer within the minute', async () => {
+    const people = [await person(LATER), await person(LATER)]
+    for (const me of people) await queued(me)
+    let clock = Date.now()
+    const now = () => new Date(clock)
+    const second = sonnet(() => {
+      clock += RECEIPT_SECOND_SLOW_MS - 1
+      return answered(NOT_WHOLE, 30_000)()
+    })
+    await readAll(benchReader(), fakeModel(answered(NOT_WHOLE, 2_180)), { second, now })
+    expect(second.asked).toBe(2)
+  }, 30_000)
+
+  // adversarial Б3: the head of the reading kept, what it did not read taken from the other
+  it('takes the day and the tax number of the first where Sonnet’s reading kept has none', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    // Sonnet whole, but 2026 read as 2025 — out of the window, no day — and the line of «ՀՎՀՀ» missed
+    const second = sonnet(
+      answered(
+        {
+          ...ANSWER,
+          date: '2025-10-08',
+          id_rows: ANSWER.id_rows.filter((row) => !row.startsWith('ՀՎՀՀ')),
+        },
+        30_000,
+      ),
+    )
+    await readAll(benchReader(), fakeModel(answered({ ...ANSWER, totals: [] }, 2_180)), {
+      second,
+    })
+    expect(await receiptOf(id)).toMatchObject({
+      readerVersion: 'claude-sonnet-5-5@v5',
+      status: 'parsed',
+      balanced: true,
+      printedOn: '2026-10-08',
+      tin: '01234567',
+    })
   }, 30_000)
 
   it('keeps the first, Sonnet’s answer paid, where it is one not taken', async () => {

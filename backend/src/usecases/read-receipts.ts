@@ -112,6 +112,13 @@ export type ModelPassReason = 'cap' | 'share' | 'size' | 'refused' | 'cut' | 'in
  */
 export const RECEIPT_SECOND_REST_MS = 10 * 60 * 1000
 
+/**
+ * A second reading slower than this rests the second model as being away does (MOL-405, adversarial Б4): an overloaded
+ * model answers near its time out rather than refusing, and held the queue as long on every receipt. The bench's
+ * slowest was 22 s, its p90 17 s; its answer is still taken.
+ */
+export const RECEIPT_SECOND_SLOW_MS = 60 * 1000
+
 /** Whether the second model rests now, and its rest begun once it was away (MOL-405). */
 export interface ModelRest {
   resting(now: Date): boolean
@@ -390,10 +397,19 @@ async function readByModel(
     alone.receipt !== null && first.text.lines.length > 0
       ? await readAgain(deps, modelDeps, claimed, month, now)
       : null
-  const { kept, explained } =
+  const { kept, witness, explained } =
     again === null
-      ? { kept: first, explained: alone }
-      : chosen(first, alone, await modelText(deps, claimed, photoReading, { ...again, currency }))
+      ? { kept: first, witness: null, explained: alone }
+      : chosen(
+          first,
+          alone,
+          await modelText(deps, claimed, photoReading, {
+            answer: again.answer,
+            version: again.version,
+            currency,
+            tin: first.text.tin,
+          }),
+        )
   const { answer, text, version } = kept
   const paid = asked.paid
   const second = again?.paid ?? null
@@ -402,13 +418,18 @@ async function readByModel(
   // the photo and the answer, for the developer's review where the person has something to type and accepted
   // the edition that says so (MOL-309)
   const miss = claimed.reviewable ? { reading: answer, parts: claimed.parts } : undefined
-  const head = headOf(
-    shown,
-    currency,
-    [modelHeadRows(answer)],
-    modelPaidBy(photoReading, answer),
-    datesOf(claimed),
-  )
+  const headOfModel = (one: ModelText, read: ReceiptText) =>
+    headOf(
+      read,
+      currency,
+      [modelHeadRows(one.answer)],
+      modelPaidBy(photoReading, one.answer),
+      datesOf(claimed),
+    )
+  const head =
+    witness === null
+      ? headOfModel(kept, shown)
+      : filledHead(headOfModel(kept, shown), headOfModel(witness, witness.text))
   if (needsReshoot(text)) {
     const outcome: ReadOutcome = {
       kind: 'failed',
@@ -463,7 +484,10 @@ interface ModelText {
   readonly version: string
 }
 
-/** A model's answer as the parse reads it, the shop's memory voting in its digits (MOL-291). */
+/**
+ * A model's answer as the parse reads it, the shop's memory voting in its digits (MOL-291) — asked by the tax number
+ * the other reading of the paper read, where this one read none (MOL-405, adversarial Б3).
+ */
 async function modelText(
   deps: ReadReceiptsDeps,
   claimed: ClaimedReceipt,
@@ -472,11 +496,22 @@ async function modelText(
     answer,
     version,
     currency,
-  }: { readonly answer: ModelReceipt; readonly version: string; readonly currency: Currency },
+    tin = null,
+  }: {
+    readonly answer: ModelReceipt
+    readonly version: string
+    readonly currency: Currency
+    readonly tin?: string | null
+  },
 ): Promise<ModelText> {
   const first = receiptTextOfModel(photoReading, answer)
   // the tax number and the articles are the reading's: the memory is asked once they are known (MOL-291)
-  const prices = await rememberedPrices(deps, claimed, first, currency)
+  const prices = await rememberedPrices(
+    deps,
+    claimed,
+    first.tin === null ? { ...first, tin } : first,
+    currency,
+  )
   const text = prices.size === 0 ? first : receiptTextOfModel(photoReading, answer, prices)
   return { answer, text, version }
 }
@@ -486,10 +521,36 @@ function chosen(
   first: ModelText,
   alone: ExplainedReading,
   other: ModelText,
-): { readonly kept: ModelText; readonly explained: ExplainedReading } {
+): {
+  readonly kept: ModelText
+  readonly witness: ModelText
+  readonly explained: ExplainedReading
+} {
   const better = betterReading(alone, explainedReading(other.text, { byModel: true }))
   const [kept, witness] = better === 'second' ? [other, first] : [first, other]
-  return { kept, explained: explainedReading(kept.text, { byModel: true, witness: witness.text }) }
+  return {
+    kept,
+    witness,
+    explained: explainedReading(kept.text, { byModel: true, witness: witness.text }),
+  }
+}
+
+/**
+ * The head of the reading kept, what it did not read taken from the other reading of the same paper (MOL-405,
+ * adversarial Б3): the tax number, the day with its time, the receipt's number, the city, how it was paid — a day out
+ * of the window is none for either (MOL-305). Never a sum: the total goes with the lines it was judged by.
+ */
+function filledHead(head: ReceiptHead, other: ReceiptHead): ReceiptHead {
+  return {
+    ...head,
+    ...(head.printedOn === null
+      ? { printedOn: other.printedOn, printedTime: other.printedTime }
+      : {}),
+    tin: head.tin ?? other.tin,
+    receiptNo: head.receiptNo ?? other.receiptNo,
+    city: head.city ?? other.city,
+    paidBy: head.paidBy ?? other.paidBy ?? null,
+  }
 }
 
 /** What came of asking a model: what it answered, or why there is nothing to take. */
@@ -583,7 +644,12 @@ async function readAgain(
     report({ kind: 'second_passed', reason: 'resting' })
     return null
   }
+  const started = now().getTime()
   const asked = await askModel(deps, modelDeps, second.reader, claimed, month, now)
+  // slow is away in all but the answer, which is still taken (adversarial Б4)
+  if (asked.kind !== 'away' && now().getTime() - started >= RECEIPT_SECOND_SLOW_MS) {
+    second.rest.away(now())
+  }
   if (asked.kind === 'read') {
     return { answer: asked.answer, paid: asked.paid, version: second.reader.version }
   }
