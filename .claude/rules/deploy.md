@@ -317,10 +317,13 @@ The shape worth knowing here:
     the link went, if they are still where the move landed — behind the door too, which stands over the route —
     have not touched the page since (a tap, a key, typing, the wheel) and no sheet is open there: the answer may
     come minutes later, with the connection, and what was typed in a sheet or the search, a list scrolled, would
-    go with home (adversarial Б1, В1). One move of the mounted app (В2): over a home that stands alone — a cold
-    start — the screen is pushed, so Android's «back» steps home and never out of the app (Б2); over an entry of
-    the app it takes home's place. A parent deeper than home is not laid under it — the chevron reaches it by its
-    `replace`. An answer naming it off ends it.
+    go with home (adversarial Б1, В1). A touch is the line: reading the screen without one — a screen reader moves
+    only the focus — does not hold the link back. One move of the mounted app (В2): over a home that stands alone —
+    a cold start — the screen is pushed, so Android's «back» steps home and never out of the app (Б2); over an entry
+    of the app it takes home's place. Its parents are not laid under it: a screen whose chain goes through home
+    has home underneath, so the chevron and «back» step home past its parent (`backTarget` steps to the first
+    ancestor underneath); one whose chain ends at another tab's root has none of it underneath, and the chevron
+    puts the parent in its place (`step: false`). An answer naming it off ends it.
   - **The bot reads none**: it is a client of the API, and a feature of the bot is closed by the API's route.
   - **A feature's tests run in both positions** (В-2 «а»): end-to-end's API has every фф on, so a spec meets the
     feature as people will; its «off» on the phone is `ffOff(page, names)` of `e2e/session.ts`, which rewrites the
