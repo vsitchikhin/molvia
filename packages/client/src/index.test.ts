@@ -9,6 +9,8 @@ import {
   VERSION_HEADER,
   ZONE_HEADER,
   LOCALE_HEADER,
+  FF_HEADER,
+  type FfName,
 } from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
@@ -222,6 +224,48 @@ describe('everything the client throws is an ApiError', () => {
       version: '1.0.0',
       database: 'up',
     })
+  })
+})
+
+describe('the фф an answer names (MOL-382)', () => {
+  function clientHearing(headers: Record<string, string>, status = 200) {
+    const heard: ReadonlySet<FfName>[] = []
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: () =>
+        Promise.resolve(
+          new Response(JSON.stringify(status === 200 ? actorWire : { code: ERROR.NOT_FOUND }), {
+            status,
+            headers: { 'content-type': 'application/json', ...headers },
+          }),
+        ),
+      onFf: (on) => heard.push(on),
+    })
+    return { client, heard }
+  }
+
+  it('is heard as the set of фф the list knows', async () => {
+    const { client, heard } = clientHearing({ [FF_HEADER]: 'venues,tips' })
+    await client.me()
+    expect(heard).toEqual([new Set(['venues'])])
+  })
+
+  it('is heard empty, which is an answer: none is on', async () => {
+    const { client, heard } = clientHearing({ [FF_HEADER]: '' })
+    await client.me()
+    expect(heard).toEqual([new Set()])
+  })
+
+  it('is heard on a refusal too', async () => {
+    const { client, heard } = clientHearing({ [FF_HEADER]: 'payments' }, 404)
+    expect(await codeOf(client.me())).toBe(ERROR.NOT_FOUND)
+    expect(heard).toEqual([new Set(['payments'])])
+  })
+
+  it('says nothing for an answer without it', async () => {
+    const { client, heard } = clientHearing({})
+    await client.me()
+    expect(heard).toEqual([])
   })
 })
 

@@ -4,6 +4,7 @@ import type { MolviaClient } from '@molvia/client'
 import type { WireCode } from '@molvia/model'
 import { localDay } from '@/days'
 import { i18n } from '@/i18n'
+import { hearFf } from '@/stores/ff'
 
 // Nothing about identity is passed in, and that is the change MOL-53 made: what proves a
 // request is the session cookie, which the browser attaches and no script can read.
@@ -17,6 +18,8 @@ const client = createClient({
   onVersion: (version) => {
     heard?.(version)
   },
+  // The «фф» that are on, from every answer (MOL-382): what the phone shows of a feature.
+  onFf: hearFf,
   // The phone's today on every request (MOL-121): the server counts «today» of money by it.
   today: () => localDay(),
   // Where the phone's days begin and end (MOL-121, adversarial round 4 У, Ч): by name, as the

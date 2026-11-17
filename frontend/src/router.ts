@@ -1,5 +1,6 @@
 import { START_LOCATION, createRouter, createWebHistory } from 'vue-router'
-import type { RouteRecordRaw, RouterScrollBehavior } from 'vue-router'
+import type { NavigationGuard, RouteRecordRaw, RouterScrollBehavior } from 'vue-router'
+import type { FfName } from '@molvia/model'
 import SettingsView from '@/views/SettingsView.vue'
 import PrivacyView from '@/views/PrivacyView.vue'
 import TermsView from '@/views/TermsView.vue'
@@ -22,6 +23,7 @@ import AccountsView from '@/views/AccountsView.vue'
 import MoneyCategoriesView from '@/views/MoneyCategoriesView.vue'
 import MoneyChartsView from '@/views/MoneyChartsView.vue'
 import { sameScreen, watchBrowserAnimatedBack } from '@/transitions'
+import { ffOn } from '@/stores/ff'
 
 /**
  * The five sections of the tab bar. «advice» is home (MOL-128): at the shelf a person reads, at
@@ -77,6 +79,11 @@ declare module 'vue-router' {
      * приватность» alone (MOL-58).
      */
     public?: boolean
+    /**
+     * A screen of a feature under an «фф» (MOL-382): while it is off, the screen is an address the app
+     * does not have, and a move there lands home as any unknown one does (`closedByFf`).
+     */
+    ff?: FfName
   }
 }
 
@@ -305,9 +312,18 @@ export const scrollBehavior: RouterScrollBehavior = (to, from, saved) => {
   return saved ?? (sameScreen(from, to) ? false : { top: 0 })
 }
 
+/**
+ * A screen whose «фф» is off is not there (MOL-382): home, as `/:rest(.*)` sends an address the app does
+ * not have — the same move, so nothing says the feature exists. Asked of the фф the phone last heard; a
+ * screen already open stays until it is left.
+ */
+export const closedByFf: NavigationGuard = (to) =>
+  to.meta.ff === undefined || ffOn(to.meta.ff) ? true : '/'
+
 export const router = createRouter({
   history: createWebHistory(),
   routes,
   // eslint-disable-next-line @typescript-eslint/no-deprecated -- its replacement is still vue-router/experimental
   scrollBehavior,
 })
+router.beforeEach(closedByFf)

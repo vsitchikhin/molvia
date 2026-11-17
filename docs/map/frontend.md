@@ -62,6 +62,7 @@ Rules: `.claude/rules/frontend.md`. A test beside its source, or mirroring it un
 
 ## frontend · stores
 
+- `frontend/src/stores/ff.ts` — The «фф» the API last named (MOL-382): heard from every answer, kept on the device as `molvia.ff` past «Выйти», `useFf` for an entry's `v-if` and `ffOn` for the router's `closedByFf`.
 - `frontend/src/stores/storage.ts` — The one gateway to browser storage: both shelves, write-everywhere with salvage, sweeps and rewrites of keys.
 
 ## frontend · other
