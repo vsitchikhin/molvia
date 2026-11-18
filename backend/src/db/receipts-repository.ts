@@ -17,6 +17,7 @@ import {
   RECEIPT_TELL_WITHIN_HOURS,
   RECEIPT_UNDO_MINUTES,
   RECEIPTS_DAY_MAX,
+  RECEIPTS_MODEL_MONTH_MAX,
   RECEIPTS_UNRECORDED_MAX,
   RECEIPT_TRIAL,
   receiptCard,
@@ -919,12 +920,42 @@ export async function recordedTwinOf(
   return twin ?? null
 }
 
+/** Whether the person's reading is paid now, and the trial left (MOL-275): what a count is decided by. */
+async function personOf(
+  tx: Conn,
+  actorId: string,
+): Promise<{ readonly paid: boolean; readonly trial: number } | null> {
+  const [person] = await tx.execute<{ paid: boolean; trial: number }>(sql`
+    select ${PAID_BY_MODEL} as paid, ${actors.trialReceiptsLeft} as trial
+    from ${actors} where ${actors.id} = ${actorId}`)
+  return person ?? null
+}
+
+/**
+ * A count taken: a place in the hundred of the later of the month the receipt was sent in and the person's — the month
+ * only moves on, as the share's — and a trial receipt where `by` is the trial's.
+ */
+async function takeCount(
+  tx: Conn,
+  actorId: string,
+  sentMonth: string,
+  by: ReceiptCount,
+): Promise<void> {
+  await tx.execute(sql`
+    update ${actors}
+    set model_receipts_read =
+          (case when ${actors.modelReceiptsMonth} >= ${sentMonth}::date then ${actors.modelReceiptsRead} else 0 end) + 1,
+        model_receipts_month = greatest(${actors.modelReceiptsMonth}, ${sentMonth}::date),
+        trial_receipts_left = ${actors.trialReceiptsLeft} - ${by === 'trial' ? 1 : 0}::smallint
+    where ${actors.id} = ${actorId}`)
+}
+
 /**
  * A receipt the model read to the review counts among its person's (MOL-275): once, and never where a receipt of
  * theirs of the same tax number and number counted before and was not given back by «Переснять» — a removed one still
- * in the table too; a receipt with neither is its own. Counted in the later of the month it was sent in and the
- * person's (the month only moves on, as the share's): a trial receipt while nothing is paid and one is left, else a
- * place alone — and the receipt keeps which (`counted`), so «Переснять» gives back what it took (В-4 «а»).
+ * in the table too; a receipt with neither is its own. A trial receipt while nothing is paid and one is left, else a
+ * place alone — a reading in flight past the trial too — and the receipt keeps which (`counted`), so «Переснять» gives
+ * back what it took (В-4 «а»).
  */
 async function countModelReceipt(tx: Conn, id: string): Promise<void> {
   const [receipt] = await tx.execute<{ actorId: string; month: string }>(sql`
@@ -936,25 +967,18 @@ async function countModelReceipt(tx: Conn, id: string): Promise<void> {
           and twin.counted is not null and twin.retaken_at is null
           and twin.tin = r.tin and twin.receipt_no = r.receipt_no)`)
   if (receipt === undefined) return
-  const [person] = await tx.execute<{ paid: boolean; trial: number }>(sql`
-    select ${PAID_BY_MODEL} as paid, ${actors.trialReceiptsLeft} as trial
-    from ${actors} where ${actors.id} = ${receipt.actorId}`)
-  if (person === undefined) return
+  const person = await personOf(tx, receipt.actorId)
+  if (person === null) return
   const by: ReceiptCount = !person.paid && person.trial > 0 ? 'trial' : 'month'
-  await tx.execute(sql`
-    update ${actors}
-    set model_receipts_read =
-          (case when ${actors.modelReceiptsMonth} >= ${receipt.month}::date then ${actors.modelReceiptsRead} else 0 end) + 1,
-        model_receipts_month = greatest(${actors.modelReceiptsMonth}, ${receipt.month}::date),
-        trial_receipts_left = ${actors.trialReceiptsLeft} - ${by === 'trial' ? 1 : 0}::smallint
-    where ${actors.id} = ${receipt.actorId}`)
+  await takeCount(tx, receipt.actorId, receipt.month, by)
   await tx.update(receipts).set({ counted: by }).where(eq(receipts.id, id))
 }
 
 /**
- * What a counted receipt took, given back as «Переснять» removes it (MOL-275, owner's В-4 «а»): its place in the hundred
- * while the person's month is not past the one it counted in — `>=`, as every reader of the count compares — and its
- * trial receipt if it took one. One paper, one count, whatever key the model copied of each shot.
+ * What a counted receipt took, given back as «Переснять» removes it (MOL-275, owner's В-4 «а»): its place in the
+ * person's month, wherever that is not before the one it was sent in — the month it counted in is not kept, so at the
+ * turn of a month it is the new month's place — and its trial receipt if it took one. One paper, one count, whatever key
+ * the model copied of each shot.
  */
 async function giveBack(
   tx: Conn,
@@ -970,28 +994,26 @@ async function giveBack(
 }
 
 /**
- * What «Вернуть» of a receipt «Переснять» gave back takes again (MOL-275, adversarial Б1): its place, and its trial
- * receipt — a trial spent meanwhile, a paid reading takes the place alone and the receipt is counted so; neither, none:
- * a trial receipt given back and spent on another paper is never one twice. Says how it is counted now, or none.
+ * What «Вернуть» of a receipt «Переснять» gave back takes again (MOL-275, adversarial Б1, В2): its place, and its trial
+ * receipt — a trial spent meanwhile, a paid reading takes the place alone and the receipt is counted so. None where the
+ * month's hundred is read meanwhile, nor where neither is there: a trial receipt or a place given back and spent on
+ * another paper is never one twice. Says how it is counted now, or none.
  */
 async function takeAgain(
   tx: Conn,
   row: { readonly actorId: string; readonly sentMonth: string; readonly counted: ReceiptCount },
 ): Promise<ReceiptCount | null> {
-  const [person] = await tx.execute<{ paid: boolean; trial: number }>(sql`
-    select ${PAID_BY_MODEL} as paid, ${actors.trialReceiptsLeft} as trial
+  const person = await personOf(tx, row.actorId)
+  if (person === null) return null
+  const [full] = await tx.execute<{ full: boolean }>(sql`
+    select coalesce(${actors.modelReceiptsMonth} >= ${row.sentMonth}::date
+      and ${actors.modelReceiptsRead} >= ${RECEIPTS_MODEL_MONTH_MAX}::int, false) as full
     from ${actors} where ${actors.id} = ${row.actorId}`)
-  if (person === undefined) return null
+  if (full?.full !== false) return null
   const by: ReceiptCount | null =
     row.counted === 'month' || person.paid ? 'month' : person.trial > 0 ? 'trial' : null
   if (by === null) return null
-  await tx.execute(sql`
-    update ${actors}
-    set model_receipts_read =
-          (case when ${actors.modelReceiptsMonth} >= ${row.sentMonth}::date then ${actors.modelReceiptsRead} else 0 end) + 1,
-        model_receipts_month = greatest(${actors.modelReceiptsMonth}, ${row.sentMonth}::date),
-        trial_receipts_left = ${actors.trialReceiptsLeft} - ${by === 'trial' ? 1 : 0}::smallint
-    where ${actors.id} = ${row.actorId}`)
+  await takeCount(tx, row.actorId, row.sentMonth, by)
   return by
 }
 
@@ -1491,39 +1513,42 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           .for('update')
         if (held === undefined) return
         if (held.tripId !== null) throw new DomainError(ERROR.CONFLICT)
+        const counted = retake ? held.counted : null
+        // another shot of the same paper the model read takes the count over, never a reading of it left free
+        // (adversarial Б2, В1): on the review, recorded, or removed and still to be brought back — never one whose own
+        // count «Переснять» gave back. One paper, one count
+        const [heir] =
+          counted === null
+            ? []
+            : await tx
+                .select({ id: receipts.id })
+                .from(receipts)
+                .where(
+                  and(
+                    eq(receipts.actorId, actorId),
+                    sql`${receipts.id} <> ${own}`,
+                    sql`${receipts.counted} is null and ${receipts.retakenAt} is null`,
+                    sql`${receipts.status} in ('parsed', 'recorded')`,
+                    readByModelSql(sql`${receipts.readerVersion}`),
+                    sql`${receipts.tin} = ${held.tin} and ${receipts.receiptNo} = ${held.receiptNo}`,
+                  ),
+                )
+                .orderBy(asc(receipts.createdAt), asc(receipts.id))
+                .limit(1)
+                .for('update')
         await tx
           .update(receipts)
           .set({
             deletedAt: sql`clock_timestamp()`,
             ...(retake ? { retakenAt: sql`clock_timestamp()` } : {}),
+            ...(heir === undefined ? {} : { counted: null }),
           })
           .where(eq(receipts.id, own))
-        const counted = retake ? held.counted : null
         if (counted !== null) {
-          // a live shot of the same paper the model read takes the count over, never a reading of it left free
-          // (adversarial Б2): one paper, one count
-          const [heir] = await tx
-            .select({ id: receipts.id })
-            .from(receipts)
-            .where(
-              and(
-                eq(receipts.actorId, actorId),
-                sql`${receipts.id} <> ${own}`,
-                sql`${receipts.deletedAt} is null`,
-                sql`${receipts.counted} is null`,
-                eq(receipts.status, 'parsed'),
-                readByModelSql(sql`${receipts.readerVersion}`),
-                sql`${receipts.tin} = ${held.tin} and ${receipts.receiptNo} = ${held.receiptNo}`,
-              ),
-            )
-            .orderBy(asc(receipts.createdAt), asc(receipts.id))
-            .limit(1)
-            .for('update')
           if (heir === undefined) {
             await giveBack(tx, { actorId, sentMonth: held.sentMonth, counted })
           } else {
             await tx.update(receipts).set({ counted }).where(eq(receipts.id, heir.id))
-            await tx.update(receipts).set({ counted: null }).where(eq(receipts.id, own))
           }
         }
         // «Переснять»: the review of the receipt it replaces stays (MOL-309, owner's В-6 «а»)

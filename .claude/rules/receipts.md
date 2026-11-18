@@ -424,14 +424,16 @@ and MOL-283, the screen MOL-276.
   retakes — two readings of one paper by the model give one key on 21 receipts of 46 (MOL-272's bench), the faded ones
   that make people retake least of all — so a counted receipt removed by «Переснять» (`remove(…, { retake: true })`,
   the account's lock first, `retaken_at` marked on any) returns its trial receipt, if it took one, and its place in the
-  hundred while the person's month is not past the one it counted in (`giveBack`, `>=` as every reader of the count);
-  the new shot counts as any. One paper, one count, whatever key each shot copied. **A live shot of the same paper the
-  model read takes the count over instead** (adversarial Б2): a repeat read and not counted, left on the review while
-  the counted one gave its count back, was a reading free. A count given back stands for no repeat; «Удалить» gives
-  nothing back.
-- **«Вернуть» takes it again, or is refused** (`takeAgain`, adversarial Б1): the place, and the trial receipt — a trial
-  given back and spent since on another paper is never one twice, so with none left «Вернуть» is a 409 and the receipt
-  stays removed; paid meanwhile, it takes the place alone and is counted `month`. The phone's «Переснять» offers no
+  person's month wherever that is not before the one it was sent in (`giveBack`, `>=` as every reader of the count — the
+  month it counted in is not kept); the new shot counts as any. One paper, one count, whatever key each shot copied.
+  **Another shot of the same paper the model read takes the count over instead** (adversarial Б2, В1) — on the review,
+  recorded, or removed and still to be brought back, never one whose own count «Переснять» gave back: a repeat read and
+  not counted, left anywhere while the counted one gave its count back, was a reading free. A count given back stands
+  for no repeat; «Удалить» gives nothing back.
+- **«Вернуть» takes it again, or is refused** (`takeAgain`, adversarial Б1, В2): the place, and the trial receipt — a
+  trial or a place given back and spent since on another paper is never one twice, so with no trial left, or the month's
+  hundred read, «Вернуть» is a 409 and the receipt stays removed; paid meanwhile, it takes the place alone and is
+  counted `month`. The phone's «Переснять» offers no
   «Вернуть»; the refusal holds the API, where any client may ask.
 - **Checked before the call, counted after it** (Р-5): the claim decides, `reserve` holds the money, `finish` counts.
 - **Near the cap the trial stops first** (owner's В-3 «а»): a person with nothing paid is held to half the month's cap
@@ -454,7 +456,8 @@ and MOL-283, the screen MOL-276.
 - **The person's**: the three counts on `actors` and a receipt's `sent_month`, `counted` and `retaken_at` go with the person and the
   receipt, into the copy (version 36), and `/privacy` says them under «Чеки» (a revision); not a change of the row —
   `updated_at` does not see them (0089). The 0.3 gate's cohort reads `shared_until` alone, as before.
-- **The prices, named:** a reading «Переснять» threw away was paid for by the owner — it cannot be kept, the receipt
+- **The prices, named:** «Переснять» at the turn of a month gives back a place of the new month, the month a receipt
+  counted in not kept; a reading «Переснять» threw away was paid for by the owner — it cannot be kept, the receipt
   gone and «Вернуть» counting it again — bounded by forty receipts a day and the $2 share; a receipt «Удалить» removed,
   shot again later than ten minutes after, counts again, its row gone; a reading in flight as the hundredth or the tenth
   lands may make one over — the queue reads one receipt at a time; an account erased and signed in again starts with a

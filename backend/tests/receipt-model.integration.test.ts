@@ -2632,6 +2632,99 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     expect(await countsOf(me)).toMatchObject({ trial: 9, read: 1 })
   }, 60_000)
 
+  it('passes the count to a shot of the same paper removed or recorded, never leaving its reading free (adversarial В1)', async () => {
+    const me = await person(null, MODEL_CONSENT_EDITION, 10)
+    // removed by «Удалить» and brought back after the counted shot's «Переснять»
+    const first = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    const removed = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    await repository.remove(me.id, removed)
+    await repository.remove(me.id, first, { retake: true })
+    expect((await receiptOf(removed))?.counted).toBe('trial')
+    expect(await repository.restore(me.id, removed)).toBe(true)
+    expect(await receiptOf(removed)).toMatchObject({ counted: 'trial', deletedAt: null })
+    expect(await countsOf(me)).toMatchObject({ trial: 9, read: 1 })
+
+    // recorded before the counted shot's «Переснять»
+    const other = (fiscal: string) =>
+      fakeModel(() =>
+        Promise.resolve({
+          kind: 'read',
+          answer: { ...ANSWER, id_rows: ['ՀՎՀՀ: 01234567', `Ֆիսկալ համար ${fiscal}`] },
+          costMicroUsd: 2_180,
+          tokens: TOKENS,
+        }),
+      )
+    const second = await queued(me)
+    await readAll(benchReader(), other('39999999'))
+    const recorded = await queued(me)
+    await readAll(benchReader(), other('39999999'))
+    const placeId = await insertPlace(db, { name: 'Օրինակ В1' })
+    const tripId = await insertTrip(db, { actorId: me.id, placeId })
+    await repository.markRecorded(recorded, {
+      tripId,
+      expenses: [],
+      confirmed: [],
+      priced: [],
+      edits: {
+        lines: 1,
+        edited: 0,
+        skipped: 0,
+        item: 0,
+        figures: 0,
+        totalCorrected: false,
+        added: 0,
+      },
+      source: 'photo',
+      codesWritten: 0,
+    })
+    expect((await receiptOf(recorded))?.status).toBe('recorded')
+    await repository.remove(me.id, second, { retake: true })
+    expect((await receiptOf(recorded))?.counted).toBe('trial')
+    expect(await countsOf(me)).toMatchObject({ trial: 8, read: 2 })
+  }, 60_000)
+
+  it('refuses «Вернуть» whose place in the hundred another paper took meanwhile (adversarial В2)', async () => {
+    const me = await person(LATER)
+    const first = await queued(me)
+    const month = await sentMonthOf(first)
+    if (month === undefined) throw new Error('the receipt has no month')
+    await db
+      .update(actors)
+      .set({ modelReceiptsMonth: month, modelReceiptsRead: 99 })
+      .where(eq(actors.id, me.id))
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    await repository.remove(me.id, first, { retake: true })
+    expect((await countsOf(me))?.read).toBe(99)
+    const other = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({
+          kind: 'read',
+          answer: { ...ANSWER, id_rows: ['ՀՎՀՀ: 01234567', 'Ֆիսկալ համար 39999999'] },
+          costMicroUsd: 2_180,
+          tokens: TOKENS,
+        }),
+      ),
+    )
+    expect((await receiptOf(other))?.counted).toBe('month')
+    expect((await countsOf(me))?.read).toBe(100)
+    await expect(repository.restore(me.id, first)).rejects.toMatchObject({ code: ERROR.CONFLICT })
+    expect((await receiptOf(first))?.deletedAt).not.toBeNull()
+    expect((await countsOf(me))?.read).toBe(100)
+  }, 60_000)
+
   it('reads the hundredth of the month, leaves the next to Tesseract, and reads again in a month after', async () => {
     const me = await person(LATER)
     const hundredth = await queued(me)
