@@ -91,14 +91,25 @@ export interface ExplainedReading {
 }
 
 /**
- * Every line copied with a sum of its own, above nought, and none put right by the font's swaps (MOL-310, round 2): a
- * sum the swaps chose was chosen to meet the total, so it vouches for nothing.
+ * A line put right by the total alone (MOL-290): the one choice that meets a total two places print — never the shop's
+ * memory's, whose price was chosen by nothing but itself (MOL-291).
+ */
+const byTotal = (line: ReceiptTextLine): boolean =>
+  line.repaired === true && line.remembered === undefined
+
+/**
+ * Every line copied with a sum of its own, above nought, and none put right by the memory (MOL-310, round 2): a sum
+ * the memory chose was chosen to meet the total, so it vouches for nothing. One the total chose is the total's own
+ * second source, the one choice that met it (MOL-420): a sum alone misread by 5↔6 is no line lost.
  */
 function sumsCopied(lines: readonly ReceiptTextLine[]): boolean {
   return (
     lines.length > 0 &&
     lines.every(
-      (line) => line.sumHundredths !== null && line.sumHundredths > 0 && line.repaired !== true,
+      (line) =>
+        line.sumHundredths !== null &&
+        line.sumHundredths > 0 &&
+        (line.repaired !== true || byTotal(line)),
     )
   )
 }
@@ -250,8 +261,9 @@ function notWhole(text: ReceiptText): ReceiptReason | null {
   if (text.totalHundredths === null) return 'no_total'
   // a line the memory doubts is no line proven (MOL-291)
   if (text.lines.some((line) => line.remembered === 'doubted')) return 'line_doubted'
+  // a sum alone the total chose holds no arithmetic of its own: no line proven (MOL-420)
   const asRead = (line: ReceiptTextLine) =>
-    (line.asPrinted || line.repaired === true) && line.sumHundredths !== null
+    (line.asPrinted || line.repaired === true) && line.settled && line.sumHundredths !== null
   if (!text.lines.every(asRead)) return 'line_not_as_printed'
   // a card that sends its discount to the card prints the total without it (MOL-289)
   const total = linesTotalHundredths(text, text.totalHundredths)
@@ -282,9 +294,17 @@ function verifiedLine(
 ): CheckedLine {
   const { quantityMilli: qty, priceHundredths: price, sumHundredths: sum } = line
   const discount = line.discountHundredths ?? 0
+  // a sum the total chose keeps its «проверьте» shown alone (MOL-420): else it reads as copied
   const emptied = (reason: ReceiptLineReason): CheckedLine =>
     summed && sum !== null && sum > 0
-      ? { line: { ...blank(line), sumHundredths: sum }, reason }
+      ? {
+          line: {
+            ...blank(line),
+            sumHundredths: sum,
+            ...(byTotal(line) ? { repaired: true } : {}),
+          },
+          reason,
+        }
       : { line: blank(line), reason }
   // a line put right by the font's swaps stands only on the receipt it proved whole (MOL-290); one the shop's
   // memory put right, on its own word; one it doubts, never (MOL-291, owner's В-2 «б»)

@@ -696,6 +696,19 @@ function swappable(
   )
 }
 
+/**
+ * A line the till printed with its sum alone — no quantity, no price, no discount (Georgia's Carrefour, MOL-420): no
+ * arithmetic of its own to hold, so only the total judges it.
+ */
+function sumOnly(line: ModelReceipt['lines'][number]): boolean {
+  return (
+    line.quantity === null &&
+    line.unit_price === null &&
+    line.discount === null &&
+    figureOf(line.sum, 2) !== null
+  )
+}
+
 /** The digits the repair swaps on a model's line: the font's, and those seen only where the total put it right. */
 const repairSwapsOf = (reading: PhotoReading): Readonly<Record<string, string>> => ({
   ...reading.modelSwaps,
@@ -740,6 +753,10 @@ function slippedQuantities(
  * short of it — a line with no reading, two choices meeting the total, none — and the reading is as the model
  * copied it, its lines emptied by the check as before. The model is never asked to do the sum:
  * copying, it bends the digits to fit (MOL-268); the arithmetic is ours.
+ *
+ * **A line of a sum alone takes part** (MOL-420, owner's В-1 «а»): read as copied, and at most one such line of the
+ * receipt moved by one swap of its sum — the choice the total makes among them is one more of the choices, so two
+ * lines a swap could move alike are a doubt. Before, one such line put no line of its receipt right.
  */
 function repaired(
   reading: PhotoReading,
@@ -758,8 +775,23 @@ function repaired(
   let read = 0
   // how far the lines read whole as copied may be off, each read whole by the swaps as well: 0 where none is
   let shifts = new Set([0])
+  // a line of a sum alone moved by one swap (MOL-420): by how much, and which line to which sum
+  const moves = new Map<number, { i: number; sum: number }[]>()
   for (const [i, line] of lines.entries()) {
     const copied = answer.lines[i]
+    if (copied !== undefined && line.sumHundredths !== null && sumOnly(copied)) {
+      const own = line.sumHundredths
+      read += own
+      options.push(null)
+      const swapped = readingsOf(swaps, copied.sum, 2).filter((one) => one.swaps === 1)
+      if (swapped.length > budget.left) return null
+      budget.left -= swapped.length
+      for (const { value } of swapped) {
+        if (value === null || value === own) continue
+        moves.set(value - own, [...(moves.get(value - own) ?? []), { i, sum: value }])
+      }
+      continue
+    }
     if (line.settled) {
       const own = line.sumHundredths ?? 0
       read += own
@@ -787,25 +819,32 @@ function repaired(
   // makes it with a line read whole moved by its swaps is a second (review round 2, Б2: a bun copied 96 for 95
   // pays for the juice read 105 for 106), and the one choice must make it with them as copied
   const broken = options.flatMap((found, i) => (found === null ? [] : [{ i, found }]))
-  const lowest = Math.min(...shifts)
+  // no sum alone moved, or one of them: every line a move of that size would take is a way of its own
+  const sizes: [number, readonly ({ i: number; sum: number } | null)[]][] = [[0, [null]], ...moves]
+  // a sum alone moved down lowers what the other lines may make
+  const lowest = Math.min(...shifts) + Math.min(0, ...moves.keys())
   const picks: number[] = []
   // what the walk found, read after it: a state of the walk, never narrowed by the flow around it
-  const choice: { ways: number; steps: number; picked: number[]; shift: number } = {
-    ways: 0,
-    steps: 0,
-    picked: [],
-    shift: 0,
-  }
+  const choice: {
+    ways: number
+    steps: number
+    picked: number[]
+    shift: number
+    moved: { i: number; sum: number } | null
+  } = { ways: 0, steps: 0, picked: [], shift: 0, moved: null }
   const walk = (k: number, sum: number): void => {
     if (choice.ways > 1 || choice.steps > REPAIR_ASSIGNMENTS_MAX) return
     choice.steps += 1
     repairTries.chose += 1
     const at = broken[k]
     if (at === undefined) {
-      if (shifts.has(owed - sum)) {
-        choice.ways += 1
+      const need = owed - sum
+      for (const [delta, moved] of sizes) {
+        if (!shifts.has(need - delta)) continue
+        choice.ways += moved.length
         choice.picked = [...picks]
-        choice.shift = owed - sum
+        choice.shift = need - delta
+        choice.moved = moved[0] ?? null
       }
       return
     }
@@ -818,7 +857,13 @@ function repaired(
   }
   walk(0, read)
   if (choice.ways !== 1 || choice.shift !== 0 || choice.steps > REPAIR_ASSIGNMENTS_MAX) return null
+  const { moved } = choice
+  // the lines as copied met the total: nothing to put right
+  if (broken.length === 0 && moved === null) return null
   return lines.map((line, i) => {
+    // a sum alone stays a sum alone: no arithmetic of its own holds it, and only the total chose it
+    if (moved?.i === i)
+      return { ...line, sumHundredths: moved.sum, asPrinted: false, repaired: true }
     const k = broken.findIndex((one) => one.i === i)
     const one = k < 0 ? undefined : broken[k]?.found[choice.picked[k] ?? -1]
     if (one === undefined) return line
@@ -921,7 +966,8 @@ export function receiptTextOfModel(
     readTotalHundredths: read ?? slip,
     balanced:
       met ||
-      fixed !== null ||
+      // a sum alone the total chose is no line proven: its quantity was never printed (MOL-420)
+      fixed?.every((line) => line.settled) === true ||
       (owed !== null &&
         lines.length > 0 &&
         lines.every((line) => line.settled) &&
