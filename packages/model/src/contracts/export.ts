@@ -10,6 +10,7 @@ import { spendingPresetSchema } from '#model/entities/spending-category'
 import { rateChoiceSchema } from '#model/entities/trip'
 import { decimalFromScaled, scaledFromDecimal } from '#model/support/decimal'
 import { ERROR } from '#model/support/errors'
+import { LOCALES } from '#model/support/locale'
 import { currencySchema, signedMoneyCodec } from '#model/values/money'
 import { RATE_DIGITS, rateProviderSchema, rateSourceSchema } from '#model/values/rates'
 import { baseUnitSchema } from '#model/values/units'
@@ -63,8 +64,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // reached it (MOL-367). 32: a receipt's `service`, a café's service the lines make the total less (MOL-310). 33: the
 // account's `receiptItemsDay` and `receiptItemsNew`, the items put into the shared catalogue by «Записать» of the
 // person's receipts on their day, which its own quota counts (MOL-373). 34: a trip's `categoryId`, the category
-// «Деньги» count it in, chosen at «Записать», «Закончить» or in «Траты» (MOL-400).
-export const EXPORT_VERSION = 34
+// «Деньги» count it in, chosen at «Записать», «Закончить» or in «Траты» (MOL-400). 35: the account's `locale`,
+// the language the person's app last spoke, which the bot's rating reminder is written in (MOL-398).
+export const EXPORT_VERSION = 35
 
 const day = z.iso.date()
 
@@ -151,6 +153,7 @@ const accountSchema = z.strictObject({
   lastSeenAt: isoDate,
   silenceWarning: z.int().nullable(),
   silenceWarnedAt: isoDate.nullable(),
+  locale: z.enum(LOCALES).nullable(),
   receiptsDay: day.nullable(),
   receiptsSent: z.int(),
   itemsDay: day.nullable(),

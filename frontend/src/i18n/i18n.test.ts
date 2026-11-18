@@ -418,6 +418,9 @@ describe('словарь: повторяющиеся тексты', () => {
       Undo: ['spending.restore', 'trip.remove.restore'],
       'What to buy': ['advice.title', 'nav.advice'],
       Ratings: ['nav.verdicts', 'verdict.title'],
+      // The language a message is written in and the language of the app: both name it in English, and
+      // the setting names every language in itself (MOL-398).
+      English: ['feedback.languages.en', 'settings.locale.en'],
       Settings: ['nav.settings', 'settings.title'],
       Money: ['nav.money', 'settings.group_money', 'spending.title'],
       Save: [
@@ -454,11 +457,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'trip.error.title',
       ],
       // MOL-189, as in Russian.
-      'Will bring back once online': [
-        'accounts.screen.restore_wait',
-        'exchange.restore_offline',
-        'income.restore_offline',
-      ],
+      'Will bring back once online': ['exchange.restore_offline', 'income.restore_offline'],
       'Will save once online': [
         'accounts.sheet.wait_online',
         'exchange.sheet.save_offline',
@@ -526,6 +525,10 @@ describe('словарь: повторяющиеся тексты', () => {
       // the button of an account's screen are one word in English.
       From: ['income.sheet.source', 'transfer.from'],
       Note: ['income.sheet.note', 'transfer.note'],
+      // «Ничего не нашли по …» of the advice's search and of the catalogue's: one phrase in English (MOL-398).
+      'Nothing found for “{query}”': ['advice.search.empty.title', 'item.empty.title'],
+      // «Переснять» of a receipt's part and of the QR code: one verb in English (MOL-398).
+      Retake: ['receipt.capture.retake', 'receipt.qr.retake'],
       Transfer: ['accounts.account.transfer', 'transfer.row_meta', 'transfer.title'],
       'Try again': ['state.retry', 'transfer.failed_retry'],
     })

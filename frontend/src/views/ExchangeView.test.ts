@@ -429,7 +429,7 @@ describe('ExchangeView: the rate and the list', () => {
     const receipt = { id: row().id, currency: 'AMD' as const, on: '2026-09-15', priced: true }
     exchanges.mockResolvedValue(overview({ wallet: null, receipts: [receipt] }))
     const view = await render()
-    expect(view.text()).toContain('beyond what an entry can keep')
+    expect(view.text()).toContain('beyond what can be stored')
     expect(view.text()).not.toContain('has come in yet')
 
     // Must not fire: nothing of the spending currency priced — then it has not come in.
@@ -437,7 +437,7 @@ describe('ExchangeView: the rate and the list', () => {
       overview({ wallet: null, exchanges: [row()], receipts: [{ ...receipt, priced: false }] }),
     )
     const other = await render()
-    expect(other.text()).not.toContain('beyond what an entry can keep')
+    expect(other.text()).not.toContain('beyond what can be stored')
   })
 
   it('says why the rate is unknown, not «no exchanges yet» above a list of them (С-4)', async () => {
@@ -468,7 +468,7 @@ describe('ExchangeView: the rate and the list', () => {
     )
     const taken = await render()
     expect(taken.text()).toContain('by the last income')
-    expect(taken.text()).toContain('days of exchanges and incomes')
+    expect(taken.text()).toContain('days of the exchanges and incomes')
   })
 
   it('names the old reckoning as the reason, not a missing bank rate (Н1)', async () => {
@@ -481,7 +481,7 @@ describe('ExchangeView: the rate and the list', () => {
     )
     const view = await render()
     expect(view.text()).toContain('Rate unknown: the ֏ bought on')
-    expect(view.text()).toContain('with € have no price in ₽')
+    expect(view.text()).toContain('with € has no price in ₽')
     expect(view.text()).not.toContain('exchanges yet')
     expect(view.text()).not.toContain('Central Bank of Armenia rate for that day')
   })

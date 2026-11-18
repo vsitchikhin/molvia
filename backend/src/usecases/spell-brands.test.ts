@@ -41,6 +41,7 @@ function harness(
   const spellBrands = vi.fn<ReceiptModel['spellBrands']>(answer)
   const reader = {
     version: 'claude-haiku-5-5@v5',
+    model: 'claude-haiku-5-5' as const,
     brandsVersion: 'claude-haiku-5-5@brands-v1',
     inputTokensMax: () => null,
     read: () => Promise.reject(new Error('no reading here')),
@@ -52,7 +53,13 @@ function harness(
     spellings,
     model: {
       reader,
-      spend: { reserve, settle, keepInMonth, month: () => Promise.resolve(null) },
+      spend: {
+        reserve,
+        settle,
+        keepInMonth,
+        month: () => Promise.resolve(null),
+        readsFor: () => Promise.reject(new Error('readsFor is not asked of brands')),
+      },
       capMicroUsd: CALL.capMicroUsd,
       shareMicroUsd: CALL.shareMicroUsd,
     },

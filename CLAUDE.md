@@ -578,7 +578,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The rating reminder: the API decides and marks the step as it hands it out, the bot only
   sends** (MOL-101) — at most once; 19:00 of the person's day, then 3 and 7 days, then six months
   of silence, and any own verdict starts over; a press is the verdict of `ctx.from.id` and keeps
-  the scale.
+  the scale. **It speaks the language the app last spoke** (`actors.locale`, MOL-398), Russian where
+  none is known; a press answers in the language read off the message, the buttons as before — a
+  rollback's bot reads them all; the other notices stay in both.
 - **The reminders' switch is `actors.reminders_off`, and it says why** (MOL-103): `chosen` or
   `blocked`; a block never overwrites «chosen», an unblock turns on only what blocking turned off,
   **the settings never lift a block** (В-5), and «on» starts the ladder over unless it reminded
@@ -654,6 +656,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The scheme is the device's** (MOL-111): `molvia.scheme`, set before the first paint by the script
   in `index.html` — the one reader of storage outside `storage.ts`; the person's choice wins both ways
   by selectors, and the status bar follows by `media`, the manifest never.
+- **The language is the device's too** (MOL-398): `molvia.locale` and, for English, the order of its day
+  (`molvia.date-style`) make one tag — `ru`, `en-GB`, `en-US` — that is vue-i18n's locale and every
+  `Intl`'s; what crosses the wire is the language, `pickLocale` of it, never the tag; every request
+  names it (`LOCALE_HEADER`) for the bot's reminder; the login screen offers the other one.
 - **The floor of the browsers is `build.target`, written out in `vite.config.ts`** (MOL-231): the
   script after `#app` in `index.html` checks markers of exactly that floor (`browserFloor.test.ts`),
   and below it draws the locales' line, and the app neither starts nor reports. An API above the floor
@@ -711,6 +717,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   month (`actors.model_spent_micro_usd`, MOL-367); refused, cut, malformed, over the cap or the share or
   away past its wait — Tesseract in `services/receipt-reader`, a container with no database
   and no disk. The API holds the queue, the photos and the parse, one receipt at a time.
+- **Georgia is read by the model alone** (MOL-408): its card has no Tesseract (`tesseractReads`) — a receipt the model
+  did not read fails `unreadable`, the model away waited for a day, asked hourly at most, a person's receipts of the
+  country resting together through an outage, the round going on past them — the camera there only for whom
+  `/actors/me` says `receiptsByModel` (a header: grant, share, cap), the digits of the tax and fiscal numbers the
+  card's, every item a Georgian line finds «проверьте»; no tax number printed, no shop memory (MOL-438).
 - **A model's answer goes through the parse's own gate** (MOL-272): `receiptTextOfModel` into
   `ReceiptText`, then `verifiedReading(text, { byModel: true })` — every number as printed, the layout and
   the total our code's by the card's words, never the model's; a figure in any spelling it writes it, a
@@ -741,6 +752,12 @@ that are easiest to break; the file holds every rule of the area and the reason 
   one. **A model's sums as copied that meet a total two places vouch for keep their sums** (MOL-310, round 2:
   reading better, never emptying what was read), a quantity or price that does not hold empty; a summary's words
   in any case but the payment's.
+- **A receipt the model read not whole, with lines, is read again by Sonnet** (MOL-405): its own worst reserved in the
+  month and the share, anything short of an answer keeps the first, never a wait, away or slow it rests ten minutes; the
+  better of the two kept — whole, then lines found, then a line shown as read, then a total, then more lines, a tie the
+  first (`betterReading`), its head filled from the other — and the other its witness: a figure of a line the check
+  emptied whole for want of proof, never one it proved wrong, that the other copied alike in a line, with no 6 in it —
+  the font's 5 both read as one — shown «проверьте».
 - **A total is shown only where two sources vouch for it** (MOL-244, В-1 «а»): the lines that met it every
   one as read unless two places print another sum, else two places printed — the total, the payment, a
   section's sum — by one `votedTotal` for both kinds of receipt, else the lines with one of them as read; a row
@@ -881,7 +898,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   is required.
 - **The metrics never judge a rollout** (MOL-145, adversarial А4): pulled before anything changes,
   started only once the application is healthy, a failure of theirs a warning; a rollback leaves them as
-  they run. The one port they publish is Grafana's, on the loopback.
+  they run. The one port they publish is Grafana's, on the loopback; **from outside it is the dashboard
+  shared by link, through a Cloudflare Tunnel behind Access** (MOL-399): the tunnel's routes are the compose
+  file's — the shared dashboard's paths alone — `tunnel` in `alerts` alone, never `metrics`, and nobody from
+  outside is a user of Grafana.
 
 ## Tracker and documentation
 
@@ -1323,7 +1343,18 @@ people as one release. The mechanics and their reasons are in `.claude/rules/dep
 
 0.3 ships openly (owner's В-1 «в»): a finished feature reaches people with its release. **An фф closes only
 a thing people should not see yet** — a chain not whole (venues before «Что заказать»), a channel not live
-(payment before the bank) — and is taken off by a task once it is on. The mechanism is MOL-382.
+(payment before the bank) — and is taken off by a task once it is on. The mechanism is MOL-382, its rules
+`.claude/rules/deploy.md`:
+
+- **One list in the domain, each entry naming its removal task** (`contracts/ff.ts`, `removedBy`); the value is
+  `FF_<NAME>` of the API's environment, strictly `on` or `off` — anything else stops the start; turned on by
+  `deploy/ff.sh`, which refuses a name compose would drop, and a restart, no release.
+- **Off, a feature's routes are not registered**, so it is an address the API has not got, before any session —
+  a feature's path no route's that stays, held by a test over every route an фф adds.
+- **The phone hears them in `X-Molvia-Ff` of every answer**, never a body, keeps the last list on the device
+  past «Выйти», `useFf` for an entry and `meta.ff` for a screen, a link closed reopened by the next answer
+  unless the page was touched since, in one move;
+  end-to-end runs all on, `ffOff` for «off», in the page's `fetch`, never a route.
 
 ### Talking to the owner
 

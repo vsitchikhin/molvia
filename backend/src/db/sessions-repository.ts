@@ -1,6 +1,6 @@
 import { and, desc, eq, gt, sql } from 'drizzle-orm'
 import { actorSchema, deviceNameOrNull, newSessionSchema, sessionSchema } from '@molvia/model'
-import type { Actor, Session, TelegramUserId } from '@molvia/model'
+import type { Actor, AppLocale, Session, TelegramUserId } from '@molvia/model'
 import { sha256Hex } from './digest'
 import { secretOrNull } from '@/secret'
 import { translateFailures } from './failure'
@@ -18,6 +18,11 @@ export interface LiveSession {
    * nothing past the guard reads it.
    */
   readonly actorSeenAt: Date
+  /**
+   * The language the owner's app last named (MOL-398), from the same read: the guard writes a new one
+   * only where it differs, so a request that names the same costs no statement.
+   */
+  readonly actorLocale: AppLocale | null
 }
 
 /** A page of an owner's sessions and how many there are past it. */
@@ -191,6 +196,7 @@ export function createSessionRepository(db: Conn): SessionRepository {
             session: toSession(row.session),
             actor: actorSchema.parse(row.actor),
             actorSeenAt: row.actor.lastSeenAt,
+            actorLocale: row.actor.locale,
           }
         : null
     },

@@ -163,7 +163,11 @@ file holds what belongs to no single area, and what the audit found missing.
   refuses one left out, since a digest nobody moves is frozen for good (adversarial В1). A security update of
   npm comes in one pull request (`security`, `applies-to: security-updates`), Playwright's apart, as its
   version updates. A patch of Alpine or Debian under the same tag comes with
-  every release since MOL-365 — the stage `runtime` brings the distribution up to date and is built afresh (`deploy.md`). **Not watched**: the images of
+  every release since MOL-365 — the stage `runtime` brings the distribution up to date and is built afresh (`deploy.md`). **The one image of compose watched is `cloudflare/cloudflared`** (MOL-399, owner's В-5 «а»), monthly,
+  its entry `allow`ing nothing else: it faces the internet, and a release of it is supported a year. The
+  ecosystem reads `docker-compose.prod.yml`: its names are `(docker-)?compose(-\w+)?(\.[\w-]+)?\.ya?ml`
+  (`FILENAME_REGEX` of `docker/lib/dependabot/docker_compose/file_fetcher.rb`, dependabot-core `e6b53ec8`). **Not
+  watched**: the other images of
   compose (`pgvector` — a contract of ICU and glibc that a migration moves, `deploy.md`; the exporters and
   cAdvisor on `metrics`, which has no way out — each move of `docker-compose.prod.yml` a copy by hand to the
   machine) and `services:`/`container:` of `ci.yml`, the Playwright image held by its own check (`e2e.md`).
@@ -200,18 +204,20 @@ by itself; the owner's decisions are В-1…В-5 in `.scratch/tasks/plans/MOL-36
   too** (А6), as public as its diff and out of gitleaks' git mode: a file per commit through `gitleaks dir`, its
   fingerprint `/messages/<commit>:<rule>:<line>`. **`gitleaks:allow` in a line silences nothing**
   (`--ignore-gitleaks-allow`, А2): a comment in code is no change of the configuration review watches. **Its rules
-  are its defaults and ours** (`.gitleaks.toml`): a ping URL of healthchecks.io, and a Telegram bot's token by its
-  shape alone — the default wants `telegr…` in the name beside it, and the local check of the red path passed
-  `const TOKEN = '…'` until this rule — bounded on the left alone, by what is no digit, not `\b`: Bot API's address
-  puts it after `…/bot` (А4), its last sign may be `-` (А5), and a bound on the right took the comma before a second
-  token, which then went unfound and unredacted (В1). **A test's value is let go by its value, for the generic rule
-  alone** (Р-2): a path such as `*.test.ts` would pass a real token pasted into a test, and a pattern given to every
-  rule would silence the ping URL, whose path is a uuid. On 10.11.2026 the history of master held sixteen such
-  findings and every branch the audit's thirty-three: none after the allowlist. **The prices, named:** the
-  configuration is the pull request's own, so a pull request may loosen it for itself — a change of `.gitleaks.toml`,
-  `.gitleaksignore` or `.gitattributes` is review's; only what a rule knows is found, and a binary's text only where
-  it lies bare (a zip or an xlsx is compressed); a merge of master reads what master brought again, so a secret
-  rotated and left in a file reddens every branch merging it — the secret goes out of the file with its rotation.
+  are its defaults and ours** (`.gitleaks.toml`): a ping URL of healthchecks.io — on each host it answers a ping
+  at, `hc-ping.com`, `hc-ping.com.` and `hchk.io`, in any case, with a port and JSON's `\/` (MOL-399, adversarial
+  Б4, Б5) — and a Telegram bot's token by its shape alone — the default wants `telegr…` in the name beside it, and
+  the local check of the red path passed `const TOKEN = '…'` until this rule — bounded on the left alone, by what
+  is no digit, not `\b`: Bot API's address puts it after `…/bot` (А4), its last sign may be `-` (А5), and a bound
+  on the right took the comma before a second token, which then went unfound and unredacted (В1). **A test's value
+  is let go by its value, for the generic rule alone** (Р-2): a path such as `*.test.ts` would pass a real token
+  pasted into a test, and a pattern given to every rule would silence the ping URL, whose path is a uuid. On
+  10.11.2026 the history of master held sixteen such findings and every branch the audit's thirty-three: none after
+  the allowlist. **The prices, named:** the configuration is the pull request's own, so a pull request may loosen
+  it for itself — a change of `.gitleaks.toml`, `.gitleaksignore` or `.gitattributes` is review's; only what a rule
+  knows is found, and a binary's text only where it lies bare (a zip or an xlsx is compressed); a merge of master
+  reads what master brought again, so a secret rotated and left in a file reddens every branch merging it — the
+  secret goes out of the file with its rotation.
 - **`npm audit` of what ships is judged by `bin/npm-audit.mjs`** in `static` (owner's В-4 «б»): a high or critical
   advisory is red unless `bin/npm-audit-accepted.json` accepts it — its GHSA, the reason and the day to look again,
   a day of the calendar a year ahead at most (adversarial Б2), red once more the day after. **What ships is read

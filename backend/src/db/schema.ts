@@ -424,6 +424,14 @@ export const actors = pgTable(
      */
     silenceWarning: smallint('silence_warning').$type<SilenceStep>(),
     silenceWarnedAt: timestamp('silence_warned_at', { withTimezone: true }),
+    /**
+     * The language the person's app last spoke (MOL-398, owner's В-1 «в»): every request of the phone
+     * names it (`LOCALE_HEADER`), and the guard writes it only where it differs. The bot's rating
+     * reminder speaks it; empty — no request named one yet — is Russian, as it was. The language,
+     * never the order of an English day: that is the device's alone. Not a change of the row, as the
+     * visit is not (0087).
+     */
+    locale: text('locale').$type<AppLocale>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
@@ -449,6 +457,7 @@ export const actors = pgTable(
       sql`${table.salaryShiftDay} between 1 and ${sql.raw(String(SALARY_SHIFT_DAY_MAX))}`,
     ),
     check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
+    check('actors_locale_known', oneOf(table.locale, LOCALES)),
     check('actors_receipts_sent_not_negative', sql`${table.receiptsSent} >= 0`),
     check('actors_items_proposed_not_negative', sql`${table.itemsProposed} >= 0`),
     check('actors_receipt_items_new_not_negative', sql`${table.receiptItemsNew} >= 0`),
@@ -2847,7 +2856,8 @@ export const receipts = pgTable(
     source: text('source').$type<ReceiptSource>().notNull().default('photo'),
     parts: smallint('parts').notNull(),
     country: char('country', { length: 2 }).$type<ReceiptCountry>().notNull(),
-    // When the tax office is asked next about a receipt it did not show yet (MOL-232, Р-2).
+    // When the tax office is asked next about a receipt it did not show yet (MOL-232, Р-2); on a photo of a country
+    // the model alone reads, until when the person's receipts of that country rest from it, away (MOL-408, `rest`).
     nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
     // How a receipt's link reached the phone, and whether the camera missed before it (MOL-234): the
     // measure of the risk of MOL-233. Empty on a photo, and on a link a phone of an earlier build sent.

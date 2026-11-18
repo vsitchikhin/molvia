@@ -10,6 +10,9 @@ import {
   TRIP_HISTORY_CATEGORY_HEADER,
   VERSION_HEADER,
   ZONE_HEADER,
+  LOCALE_HEADER,
+  FF_HEADER,
+  type FfName,
 } from '@molvia/model'
 import { ApiError, createClient } from '#client/index'
 
@@ -226,6 +229,48 @@ describe('everything the client throws is an ApiError', () => {
   })
 })
 
+describe('the фф an answer names (MOL-382)', () => {
+  function clientHearing(headers: Record<string, string>, status = 200) {
+    const heard: ReadonlySet<FfName>[] = []
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: () =>
+        Promise.resolve(
+          new Response(JSON.stringify(status === 200 ? actorWire : { code: ERROR.NOT_FOUND }), {
+            status,
+            headers: { 'content-type': 'application/json', ...headers },
+          }),
+        ),
+      onFf: (on) => heard.push(on),
+    })
+    return { client, heard }
+  }
+
+  it('is heard as the set of фф the list knows', async () => {
+    const { client, heard } = clientHearing({ [FF_HEADER]: 'venues,tips' })
+    await client.me()
+    expect(heard).toEqual([new Set(['venues'])])
+  })
+
+  it('is heard empty, which is an answer: none is on', async () => {
+    const { client, heard } = clientHearing({ [FF_HEADER]: '' })
+    await client.me()
+    expect(heard).toEqual([new Set()])
+  })
+
+  it('is heard on a refusal too', async () => {
+    const { client, heard } = clientHearing({ [FF_HEADER]: 'payments' }, 404)
+    expect(await codeOf(client.me())).toBe(ERROR.NOT_FOUND)
+    expect(heard).toEqual([new Set(['payments'])])
+  })
+
+  it('says nothing for an answer without it', async () => {
+    const { client, heard } = clientHearing({})
+    await client.me()
+    expect(heard).toEqual([])
+  })
+})
+
 describe('the build an answer names (MOL-132)', () => {
   function clientHearing(body: BodyInit | null, init: ResponseInit) {
     const heard: string[] = []
@@ -319,11 +364,29 @@ describe('the phone’s today on every request (MOL-121)', () => {
     expect(sent[0]?.get(ZONE_HEADER)).toBe('Europe/Moscow')
   })
 
+  it('names the language of the phone’s screens, asked at each request (MOL-398)', async () => {
+    const sent: Headers[] = []
+    let language = 'ru'
+    const client = createClient({
+      baseUrl: 'http://api',
+      fetch: (_url, init) => {
+        sent.push(new Headers(init?.headers))
+        return Promise.resolve(new Response(null, { status: 204 }))
+      },
+      locale: () => language,
+    })
+    await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
+    language = 'en'
+    await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
+    expect(sent.map((headers) => headers.get(LOCALE_HEADER))).toEqual(['ru', 'en'])
+  })
+
   it('names none where no day was given — the bot', async () => {
     const { client, sent } = clientWith()
     await client.finishTrip('0b7e2c1a-4d5f-4a6b-8c9d-0e1f2a3b4c5d')
     expect(sent[0]?.headers.has(TODAY_HEADER)).toBe(false)
     expect(sent[0]?.headers.has(ZONE_HEADER)).toBe(false)
+    expect(sent[0]?.headers.has(LOCALE_HEADER)).toBe(false)
   })
 
   it('a finish carries the day of its tap beside the moment', async () => {

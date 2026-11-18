@@ -1,6 +1,7 @@
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { defineConfig, devices } from '@playwright/test'
+import { FF_NAMES, ffEnvName } from '@molvia/model'
 
 // Ports come from this working copy's .env, so e2e in one copy never drives another's stack.
 try {
@@ -209,6 +210,10 @@ export default defineConfig({
         PURS_URL: `http://127.0.0.1:${pursPort}`,
         PURS_CONTACT: 'e2e@molvia.test',
         PURS_PER_MINUTE: '600',
+        // Every «фф» on (MOL-382, В-2 «а»): a feature runs here as people will meet it once it is
+        // turned on, and its «off» on the phone is `ffOff` of `e2e/session.ts`; the server's «off» —
+        // no route at all — is held by the integration tests.
+        ...Object.fromEntries(FF_NAMES.map((name) => [ffEnvName(name), 'on'])),
       },
       // Never reuse: on these ports there is nothing of ours to reuse, and a server left by
       // a crashed run must fail loudly instead of quietly answering with old code.

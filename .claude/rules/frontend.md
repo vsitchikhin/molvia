@@ -862,6 +862,26 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   came; always drawn, a journal in its own currency would come shorter than its bars — the page under the
   month's switcher, which MOL-138 holds. **The price, named** (adversarial round 4 of MOL-176): a row whose
   words wrap is taller than its bars — on a card of 256 by 17 to 34 px — since the bars know no text.
+- **The language is the device's, chosen on «Настройки» and at the door** (MOL-398, owner's В-1…В-3).
+  «Язык» under «Тема» — «Как на устройстве · Русский · English», each language named in itself and in
+  its own `lang` — and, while the screens speak English, «Date format»: British by default, American by
+  choice, each named by a sample `Intl` writes. Kept in `molvia.locale` and `molvia.date-style` on both
+  shelves as the scheme is, followed from other windows, left by «Выйти» and erasure (`useLocale.ts`);
+  «Как на устройстве» is `pickLocale` as before and follows `languagechange`. **One tag, not a language
+  and a format beside it**: `ru`, `en-GB` or `en-US` is vue-i18n's locale — English is one dictionary
+  under three names — so every `Intl.*(locale.value)` of a screen takes the order of the day by itself.
+  **What crosses the wire is the language, never the tag**: `pickLocale(locale.value)` for a receipt,
+  the hint of Open Food Facts, a message to the developer, and `LOCALE_HEADER` on every request — the
+  account keeps the last one for the bot's reminder (`bot.md`). Applied on the tap with no reload: no
+  screen is kept alive, so the next one mounts in the new language; a sheet's decimal separator is taken
+  at its opening, and none is open on «Настройки». **The tab's title follows too** (adversarial А1):
+  `installArrival` renames it while it is still the route's, the door names its own and gives the tab back
+  by the route (`screenNamer`), never a string kept from before the choice; a note the door shows once —
+  the erasure's — is words of the language spoken now (А2). **A category of one's own is refused a
+  ready-made name in either language** (А3): after a switch the two would stand as twins; the server does
+  not know the presets' names, so what was created before stays. The login screen offers the other language under its
+  way in, apart from it (the owner's note on the plan), on the first step only. The line of a browser
+  below the floor stays `pickLocale`'s: the app never started there, so nothing could have been chosen.
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a

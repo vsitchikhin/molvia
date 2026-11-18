@@ -304,6 +304,7 @@ function fakeRepositories(
       requeueInterrupted: unexpected('receipts.requeueInterrupted'),
       claimNext: unexpected('receipts.claimNext'),
       release: unexpected('receipts.release'),
+      rest: unexpected('receipts.rest'),
       retry: unexpected('receipts.retry'),
       finish: unexpected('receipts.finish'),
       requeueInterruptedLinks: unexpected('receipts.requeueInterruptedLinks'),

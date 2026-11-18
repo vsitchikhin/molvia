@@ -34,3 +34,13 @@ export function t(
     name in params ? String(params[name]) : whole,
   )
 }
+
+/**
+ * Which of a count's three keys a language takes for `n`, by its own plural rule: Russian «1 позиция,
+ * 2 позиции, 5 позиций», English «1 item, 2 items». One place for how `Intl`'s form lands on the keys
+ * (review №7 of MOL-398); a caller keeps its keys whole, so the type checker sees each.
+ */
+export function pluralForm(language: string, n: number): 'one' | 'few' | 'many' {
+  const form = new Intl.PluralRules(language).select(n)
+  return form === 'one' ? 'one' : form === 'few' ? 'few' : 'many'
+}

@@ -169,7 +169,7 @@ test('rates the purchases one by one, puts one off, and ends at «Everything is 
   }
   expect(verdict.review).toBe('Мягкий\nна второй день тоже')
 
-  await page.getByRole('button', { name: 'Open «What to buy»' }).click()
+  await page.getByRole('button', { name: 'Open “What to buy”' }).click()
   await expect(page.getByRole('heading', { name: 'What to buy' })).toBeVisible()
 })
 
@@ -237,7 +237,7 @@ test('7: rated without a connection and the app closed — kept on the phone, an
   // Kept on the phone: the attempt failed (`lost`), the strip over the next card says the rating is
   // kept (Ф-14, MOL-214), and its draft waits in the drawer — the only one there.
   await expect(page.locator('.strip')).toHaveText(
-    'Offline · your rating is saved on the phone and will go by itself',
+    'Offline · your rating is saved on the phone and will be sent automatically',
   )
   expect(await drawer(page, who.id)).toEqual([{ itemId: rated, state: 'saved', score: 3 }])
   await page.close()
@@ -301,7 +301,7 @@ test('Е-5: nothing bought yet — «Nothing to rate yet», and on to «Purchase
 
   await expect(page.getByRole('heading', { name: 'Nothing to rate yet' })).toBeVisible()
   await expect(page.getByRole('heading', { name: 'Everything is rated' })).toHaveCount(0)
-  await expect(page.getByRole('button', { name: 'Open «What to buy»' })).toHaveCount(0)
+  await expect(page.getByRole('button', { name: 'Open “What to buy”' })).toHaveCount(0)
   await page.getByRole('button', { name: 'To purchases' }).click()
 
   await expect(page).toHaveURL(/\/purchases$/)
@@ -329,7 +329,7 @@ test('Ф-14: rated offline with a card left — one strip over the next card, no
   await expect(question(page)).toContainText('Простокваша')
   await expect(strip).toHaveCount(1)
   await expect(strip).toHaveText(
-    'Offline · your rating is saved on the phone and will go by itself',
+    'Offline · your rating is saved on the phone and will be sent automatically',
   )
   await expect(strip.getByRole('button')).toHaveCount(0)
   await expect(page.getByRole('heading', { name: 'The rating is saved' })).toHaveCount(0)

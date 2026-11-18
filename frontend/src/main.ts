@@ -6,12 +6,13 @@ import { belowFloor } from '@/browserFloor'
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from '@/App.vue'
-import { applyDocumentLang, i18n } from '@/i18n'
+import { i18n } from '@/i18n'
 import { settleColdStart } from '@/navigation'
 import { router } from '@/router'
 import { installArrival, installHeightHold, installViewTransitions } from '@/transitions'
 import { installSheetEntryGuard } from '@/composables/useSheetHistory'
 import { installColorScheme } from '@/composables/useColorScheme'
+import { installLocale } from '@/composables/useLocale'
 import { sessionEnded, useActorStore } from '@/stores/actor'
 import { forgetTheInviteDoor } from '@/stores/identity'
 import { onMissingActor, onServerVersion } from '@/api'
@@ -62,9 +63,10 @@ function start(): void {
   const app = createApp(App)
 
   // `index.html` ships `lang="ru"`, which is right until the app boots and wrong the moment the
-  // chosen locale is anything else. Done here rather than as a side effect of importing i18n:
-  // a module that rewrites the document on import makes import order matter where it should not.
-  applyDocumentLang()
+  // locale is anything else. Done here rather than as a side effect of importing i18n: a module that
+  // rewrites the document on import makes import order matter where it should not. The language is
+  // this device's choice, else its own (MOL-398), and follows the other windows of the app.
+  installLocale()
 
   // The script in `index.html` has drawn the stored scheme already; this keeps it, and follows the
   // other windows of the app when one of them changes it (MOL-111).

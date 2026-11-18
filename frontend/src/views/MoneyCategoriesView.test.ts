@@ -186,6 +186,16 @@ describe('MoneyCategoriesView: «Добавить категорию» in the st
     expect(useSpendingQueueStore().pending).toHaveLength(0)
   })
 
+  it('a ready-made name in the other language is taken too: after a switch the two would be twins (MOL-398, А3)', async () => {
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
+    const view = await render()
+    await addThroughSheet(view, 'Продукты')
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.spending.new_category.bad_taken,
+    )
+    expect(addSpendingCategory).not.toHaveBeenCalled()
+  })
+
   // A name refused is heard (MOL-333): «Add» kept the focus, and the error under the name was unheard.
   it('a name taken: the focus goes from «Add» to the name, already marked', async () => {
     spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })

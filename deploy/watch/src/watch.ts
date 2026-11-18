@@ -1,10 +1,11 @@
-import { ATTEMPTS, judge, readSite } from '@/site'
+import { ATTEMPTS, judge, readLock, readSite } from '@/site'
 import type { Answer, Verdict } from '@/site'
 
 /**
  * One round of the outside watch (MOL-221): asks the site, then tells healthchecks.io — the check
  * «molvia-up», or its `/fail` saying what. The watch it replaces ran on GitHub's cron, which on this
- * repository came every two to six hours instead of every five minutes; the rules are the same.
+ * repository came every two to six hours instead of every five minutes; the rules are the same. Beside
+ * it the lock's round (MOL-399): `grafana.<DOMAIN>` with no pass, told to «molvia-grafana-lock».
  */
 
 /** Between tries once a check has failed: four of them span the seconds a rollout is silent. */
@@ -13,18 +14,28 @@ export const PAUSE_MS = 30_000
 /** One request is given up on after this, and counts as no answer, `000`. */
 export const REQUEST_TIMEOUT_MS = 10_000
 
+/** A path the tunnel passes that no share holds: with Access off, Grafana answers it `200` itself. */
+export const LOCK_PATH = '/public-dashboards/watch'
+
+/** A check's URL by its UUID, the one form of it a check has one of; the UUID is the check, whatever the host. */
+const BY_UUID = /^https:\/\/[^/]+\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})$/
+
 /** A ping is tried this many times before the round fails — curl's `--retry 3` before. */
 export const PING_TRIES = 4
 
-/** What the Worker is given: a secret and a plain variable, both set on Cloudflare. */
+/** What the Worker is given: two secrets and a plain variable, all set on Cloudflare. */
 export interface Environment {
   readonly HC_UP_URL?: string
+  /** The check «molvia-grafana-lock» (MOL-399): read by the lock's round alone, so the site's never waits on it. */
+  readonly HC_LOCK_URL?: string
   readonly DOMAIN?: string
 }
 
 export interface Settings {
   readonly pingUrl: string
   readonly domain: string
+  /** As set, checked by the lock's round: a line wrong there stops that round, never the site's. */
+  readonly lockUrl?: string
 }
 
 export interface Io {
@@ -59,11 +70,22 @@ const ENDPOINT = /\/(\d+|start|log|fail)$/
  * and folds `/.`, so a text that only looks right would still ping `…//fail` or `…/`.
  */
 export function settingsOf(environment: Environment): Settings {
-  const pingUrl = environment.HC_UP_URL?.trim() ?? ''
+  const lockUrl = environment.HC_LOCK_URL
+  const domain = environment.DOMAIN?.trim() ?? ''
+  return {
+    pingUrl: pingUrlOf('HC_UP_URL', environment.HC_UP_URL),
+    domain: domain === '' ? 'molvia.net' : domain,
+    ...(lockUrl === undefined ? {} : { lockUrl }),
+  }
+}
+
+/** A check's URL `/fail` can follow, or a refusal by the secret's name. */
+function pingUrlOf(name: string, value: string | undefined): string {
+  const pingUrl = value?.trim() ?? ''
   const parsed = URL.canParse(pingUrl) ? new URL(pingUrl) : undefined
   if (parsed?.protocol !== 'https:') {
     throw new Error(
-      'HC_UP_URL is not an https URL, there is nowhere to report (deploy/README.md, «Signals»)',
+      `${name} is not an https URL, there is nowhere to report (deploy/README.md, «Signals»)`,
     )
   }
   // An empty `?` or `#` parses to nothing and still takes `/fail`, so they are read on the text.
@@ -75,11 +97,10 @@ export function settingsOf(environment: Environment): Settings {
     ENDPOINT.test(parsed.pathname)
   ) {
     throw new Error(
-      'HC_UP_URL is not the check URL /fail can follow: a query, a fragment, a trailing slash, an endpoint or a form the URL parser rewrites (deploy/README.md, «Signals»)',
+      `${name} is not the check URL /fail can follow: a query, a fragment, a trailing slash, an endpoint or a form the URL parser rewrites (deploy/README.md, «Signals»)`,
     )
   }
-  const domain = environment.DOMAIN?.trim() ?? ''
-  return { pingUrl, domain: domain === '' ? 'molvia.net' : domain }
+  return pingUrl
 }
 
 /**
@@ -92,8 +113,9 @@ async function drop(response: Response): Promise<void> {
 }
 
 /**
- * A redirect is not followed — it is not the page, and curl did not follow one either. A request
- * that fails — a bad certificate too — is a `000`, unless Cloudflare answers it with its own code.
+ * A redirect is not followed — it is not the page, and curl did not follow one either; where it sends
+ * is read, for the lock of Grafana (MOL-399). A request that fails — a bad certificate too — is a `000`,
+ * unless Cloudflare answers it with its own code.
  */
 async function ask(io: Io, url: string, read: boolean): Promise<Answer> {
   try {
@@ -101,21 +123,20 @@ async function ask(io: Io, url: string, read: boolean): Promise<Answer> {
       redirect: 'manual',
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     })
-    if (read) return { status: response.status, body: await response.text() }
+    const location = response.headers.get('location') ?? ''
+    if (read) return { status: response.status, body: await response.text(), location }
     await drop(response)
-    return { status: response.status, body: '' }
+    return { status: response.status, body: '', location }
   } catch {
-    return { status: 0, body: '' }
+    return { status: 0, body: '', location: '' }
   }
 }
 
-/** The site well at the first try is one try; otherwise four, half a minute apart. */
-async function look(domain: string, io: Io): Promise<string[][]> {
+/** All well at the first try is one try; otherwise four, half a minute apart. */
+async function look(check: () => Promise<string[]>, io: Io): Promise<string[][]> {
   const attempts: string[][] = []
   for (let attempt = 1; attempt <= ATTEMPTS; attempt += 1) {
-    const health = await ask(io, `https://${domain}/api/health`, true)
-    const page = await ask(io, `https://${domain}/`, false)
-    const wrong = readSite(health, page)
+    const wrong = await check()
     attempts.push(wrong)
     if (attempt === 1 && wrong.length === 0) break
     if (attempt < ATTEMPTS) await io.wait(PAUSE_MS)
@@ -143,8 +164,8 @@ const NO_CHECK = 'OK (not found)'
  * healthchecks.io did not take — rate limited, or any word but `OK` — is tried again like a failure,
  * and its words are the kind. One that reached no check fails the round at once.
  */
-async function report(settings: Settings, verdict: Verdict, io: Io): Promise<void> {
-  const url = verdict.up ? settings.pingUrl : `${settings.pingUrl}/fail`
+async function report(pingUrl: string, verdict: Verdict, io: Io): Promise<void> {
+  const url = verdict.up ? pingUrl : `${pingUrl}/fail`
   let failure = ''
   for (let attempt = 1; attempt <= PING_TRIES; attempt += 1) {
     let said: string | undefined
@@ -170,18 +191,66 @@ async function report(settings: Settings, verdict: Verdict, io: Io): Promise<voi
   throw new Error(`the ping to healthchecks.io did not go: ${failure}`)
 }
 
-/**
- * What the tries saw is logged before the ping: a round whose ping did not go still says what the
- * site did, and that round's alarm comes only by the check's grace.
- */
+/** One round of the site: `/api/health` and the page, told to «molvia-up». */
 export async function watch(settings: Settings, io: Io): Promise<Round> {
-  const attempts = await look(settings.domain, io)
+  const { domain } = settings
+  const attempts = await look(async () => {
+    const health = await ask(io, `https://${domain}/api/health`, true)
+    const page = await ask(io, `https://${domain}/`, false)
+    return readSite(health, page)
+  }, io)
+  return told(domain, attempts, settings.pingUrl, io)
+}
+
+/**
+ * The lock of Grafana from outside (MOL-399, В-3): `grafana.<domain>` asked with no pass, by the same
+ * three failures of four as the site, told to a check of its own — a lock open is a state that can last,
+ * and on «molvia-up» it would keep a fall of the site silent (Б2 of MOL-142).
+ */
+export async function watchLock(settings: Settings, io: Io): Promise<Round> {
+  const pingUrl = pingUrlOf('HC_LOCK_URL', settings.lockUrl)
+  // One check for both would let the later round's ping stand for the other's (adversarial А4): a lock
+  // well told after the site's `/fail` turned «molvia-up» green over a site down. A check has two URLs
+  // — its UUID and its ping key with its slug — and nothing here tells them apart (Б2), and healthchecks.io
+  // answers a UUID under more than one host (Б3), so the checks are told by their UUIDs alone.
+  const lock = BY_UUID.exec(pingUrl)?.[1]
+  const up = BY_UUID.exec(settings.pingUrl)?.[1]
+  if (lock === undefined || up === undefined) {
+    // By name, never by value: a secret on Cloudflare can be written over, not read (review №14).
+    const names = [up === undefined && 'HC_UP_URL', lock === undefined && 'HC_LOCK_URL'].filter(
+      Boolean,
+    )
+    throw new Error(
+      `${names.join(' and ')} ${names.length > 1 ? 'are' : 'is'} not a check’s UUID URL — the lock’s round tells checks by their UUIDs`,
+    )
+  }
+  if (lock === up) {
+    throw new Error(
+      'HC_LOCK_URL is the same check as HC_UP_URL — the lock needs a check of its own',
+    )
+  }
+  const host = `grafana.${settings.domain}`
+  const door = `https://${host}${LOCK_PATH}`
+  const attempts = await look(async () => readLock(await ask(io, door, false)), io)
+  return told(host, attempts, pingUrl, io)
+}
+
+/**
+ * What the tries saw is logged before the ping: a round whose ping did not go still says what it found,
+ * and that round's alarm comes only by the check's grace.
+ */
+async function told(
+  name: string,
+  attempts: readonly (readonly string[])[],
+  pingUrl: string,
+  io: Io,
+): Promise<Round> {
   const verdict = judge(attempts)
   attempts.forEach((wrong, index) => {
     if (wrong.length > 0) io.log(`attempt ${String(index + 1)}: ${wrong.join('; ')}`, true)
   })
-  if (verdict.up) io.log(`${settings.domain} is well`, false)
-  else io.log(`${settings.domain}: ${verdict.said.replaceAll('\n', '; ')}`, true)
-  await report(settings, verdict, io)
+  if (verdict.up) io.log(`${name} is well`, false)
+  else io.log(`${name}: ${verdict.said.replaceAll('\n', '; ')}`, true)
+  await report(pingUrl, verdict, io)
   return { attempts, verdict }
 }

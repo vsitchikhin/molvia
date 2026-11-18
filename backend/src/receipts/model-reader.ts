@@ -12,7 +12,7 @@ import {
   modelInputTokensMax,
   modelReceiptSchema,
 } from '@molvia/model'
-import type { ModelReceipt } from '@molvia/model'
+import type { ModelReceipt, ReceiptModelName } from '@molvia/model'
 import { z } from 'zod'
 import { jpegSize } from '@/receipts/jpeg'
 import {
@@ -108,6 +108,8 @@ const brandsAnswerSchema = z.object({
 })
 
 export interface ReceiptModel {
+  /** Which model reads (MOL-405): the price of its calls. */
+  readonly model: ReceiptModelName
   /** The reader's version for `receipts.reader_version` (Р-7): the model and the prompt. */
   readonly version: string
   /** The speller's version for `brand_spellings.said` (MOL-326): the model and its prompt. */
@@ -201,10 +203,13 @@ function judgingConnection(base: typeof fetch): typeof fetch {
 export function receiptModel(options: {
   apiKey: string
   workspaceId?: string | undefined
+  /** Which model reads: Haiku, or Sonnet reading again a receipt Haiku did not read whole (MOL-405). */
+  model?: ReceiptModelName
   /** The tests' fake of the API. */
   fetch?: typeof fetch
   timeoutMs?: number
 }): ReceiptModel {
+  const model = options.model ?? RECEIPT_MODEL
   const timeoutMs = options.timeoutMs ?? MODEL_TIMEOUT_MS
   const client = new Anthropic({
     apiKey: options.apiKey,
@@ -288,8 +293,9 @@ export function receiptModel(options: {
   }
 
   return {
-    version: `${RECEIPT_MODEL}@${RECEIPT_PROMPT_VERSION}`,
-    brandsVersion: `${RECEIPT_MODEL}@${BRANDS_PROMPT_VERSION}`,
+    model,
+    version: `${model}@${RECEIPT_PROMPT_VERSION}`,
+    brandsVersion: `${model}@${BRANDS_PROMPT_VERSION}`,
 
     brandsInputTokensMax(brands) {
       return brandsTextBytes + Buffer.byteLength(brandsText(brands))
@@ -297,7 +303,7 @@ export function receiptModel(options: {
 
     async spellBrands(brands) {
       const message = await call({
-        model: RECEIPT_MODEL,
+        model,
         max_tokens: BRANDS_OUTPUT_MAX,
         system: BRANDS_SYSTEM,
         output_config: { effort: 'low', format: { type: 'json_schema', schema: brandsSchema } },
@@ -309,7 +315,7 @@ export function receiptModel(options: {
         ],
       })
       const paid = {
-        costMicroUsd: modelCallMicroUsd(message.usage),
+        costMicroUsd: modelCallMicroUsd(message.usage, model),
         tokens: { input: message.usage.input_tokens, output: message.usage.output_tokens },
       }
       if (message.stop_reason === 'refusal') return { kind: 'refused', ...paid }
@@ -345,7 +351,7 @@ export function receiptModel(options: {
 
     async read(parts) {
       const message = await call({
-        model: RECEIPT_MODEL,
+        model,
         max_tokens: RECEIPT_MODEL_OUTPUT_MAX,
         system: RECEIPT_SYSTEM,
         output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
@@ -367,7 +373,7 @@ export function receiptModel(options: {
         ],
       })
       const paid = {
-        costMicroUsd: modelCallMicroUsd(message.usage),
+        costMicroUsd: modelCallMicroUsd(message.usage, model),
         tokens: { input: message.usage.input_tokens, output: message.usage.output_tokens },
       }
       if (message.stop_reason === 'refusal') return { kind: 'refused', ...paid }
