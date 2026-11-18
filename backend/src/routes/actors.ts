@@ -8,7 +8,7 @@ import {
   exportFileCodec,
   yerevanDate,
 } from '@molvia/model'
-import type { Actor, ActorView, ExportFile, TelegramUserId } from '@molvia/model'
+import type { Actor, ActorView, ExportFile, ReceiptsAccess, TelegramUserId } from '@molvia/model'
 import type { FastifyInstance, FastifyReply } from 'fastify'
 import { clearSessionCookie } from '@/cookie'
 import { parseQuery } from '@/parse'
@@ -46,10 +46,7 @@ export function answerWithActor(
 export function actorMeRoute(
   app: FastifyInstance,
   readsReceiptsByModel: (actorId: string, today: string) => Promise<boolean>,
-  receiptsAccess: (
-    actorId: string,
-    today: string,
-  ) => Promise<NonNullable<ActorView['receiptsAccess']> | null>,
+  receiptsAccess: (actorId: string, today: string) => Promise<ReceiptsAccess | null>,
 ): void {
   app.get('/actors/me', async (request, reply) => {
     // The row the hook already read: asking for it again would be a second trip to the

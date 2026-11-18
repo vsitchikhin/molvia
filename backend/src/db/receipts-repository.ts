@@ -46,7 +46,7 @@ import type {
   TelegramUserId,
   TripReceiptSource,
 } from '@molvia/model'
-import { PAID_BY_MODEL, readsByModel } from './actors-repository'
+import { PAID_BY_MODEL, readsByModel, tariffOpens } from './actors-repository'
 import { countOfDay } from './day-count'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -89,6 +89,12 @@ export interface ClaimedReceipt {
    * read (`readsByModel`) — by the database's clock, as the claim reads it.
    */
   readonly byModel: boolean
+  /**
+   * Its owner's tariff opens the model for it (MOL-275, `tariffOpens`): paid or on the trial, the month's hundred not
+   * read — whatever the edition. With payment open, a receipt whose tariff is shut is read by nobody (adversarial А3:
+   * who has paid and not accepted edition 5 is still read by Tesseract).
+   */
+  readonly tariff: boolean
   /**
    * Its photo and reading may be kept for the developer's review if it is read not whole (MOL-309): its owner
    * accepted edition `REVIEW_CONSENT_EDITION`, which says so.
@@ -1599,6 +1605,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         const [owner] = await tx
           .select({
             byModel: readsByModel(sql`${receipts.sentMonth}`),
+            tariff: tariffOpens(sql`${receipts.sentMonth}`),
             reviewable: sql<boolean>`coalesce(${actors.consentVersion} >= ${REVIEW_CONSENT_EDITION}, false)`,
           })
           .from(actors)
@@ -1614,6 +1621,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           ...row,
           parts,
           byModel: owner?.byModel ?? false,
+          tariff: owner?.tariff ?? false,
           reviewable: owner?.reviewable ?? false,
         }
       })
@@ -1659,8 +1667,9 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         // the copy for the review is keyed to the person, and its share of the account was taken after the
         // receipt, which erasure holding the account waited for — at the strength of the count's own `UPDATE` where
         // one follows, never raised after the receipt's row is held
+        const strength = counts ? sql`for no key update` : sql`for key share`
         await tx.execute(
-          sql`select 1 from ${actors} where ${actors.id} = (select ${receipts.actorId} from ${receipts} where ${receipts.id} = ${id}) ${counts ? sql`for no key update` : sql`for key share`}`,
+          sql`select 1 from ${actors} where ${actors.id} = (select ${receipts.actorId} from ${receipts} where ${receipts.id} = ${id}) ${strength}`,
         )
         const head = outcome.head
         const [done] = await tx

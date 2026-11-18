@@ -31,6 +31,27 @@ import { RECEIPTS_MODEL_MONTH_MAX, RECEIPT_TRIAL } from '#model/entities/model-s
 export const SESSION_COOKIE = '__Host-molvia_session'
 
 /**
+ * Where a person stands with the model that reads receipts (MOL-275): until when it is paid — none where nothing is —
+ * the trial's receipts left of ten, and of the phone's month the receipts it read of a hundred. Every figure the
+ * server's, for MOL-276's screen.
+ */
+export const receiptsAccessSchema = z.strictObject({
+  until: z.date().nullable(),
+  trialLeft: z.int().min(0).max(RECEIPT_TRIAL),
+  trialOf: z.literal(RECEIPT_TRIAL),
+  /** The first day of the phone's month the count is of, `YYYY-MM-01`. */
+  month: z.iso.date(),
+  read: z.int().min(0),
+  limit: z.literal(RECEIPTS_MODEL_MONTH_MAX),
+})
+export type ReceiptsAccess = z.infer<typeof receiptsAccessSchema>
+
+/** The same on the wire, its moment as ISO. */
+const receiptsAccessWireSchema = receiptsAccessSchema.extend({
+  until: z.iso.datetime().nullable(),
+})
+
+/**
  * The owner as anyone outside the server sees them: the settings, without the identity behind
  * them (MOL-52).
  *
@@ -62,22 +83,10 @@ export const actorViewSchema = actorSchema
      */
     receiptsByModel: z.boolean().optional(),
     /**
-     * Where the person stands with the model that reads receipts (MOL-275): until when it is paid, the trial's
-     * receipts left of ten, and of the phone's month the receipts it read of a hundred. Every figure the server's, for
-     * MOL-276's screen. Sent by `/actors/me` alone, only to a phone that asks (`RECEIPTS_ACCESS_HEADER`), as
-     * `receiptsByModel` is.
+     * Where the person stands with the model that reads receipts (MOL-275, `receiptsAccessSchema`). Sent by
+     * `/actors/me` alone, only to a phone that asks (`RECEIPTS_ACCESS_HEADER`), as `receiptsByModel` is.
      */
-    receiptsAccess: z
-      .strictObject({
-        until: z.date().nullable(),
-        trialLeft: z.int().min(0).max(RECEIPT_TRIAL),
-        trialOf: z.literal(RECEIPT_TRIAL),
-        /** The first day of the phone's month the count is of, `YYYY-MM-01`. */
-        month: z.iso.date(),
-        read: z.int().min(0),
-        limit: z.literal(RECEIPTS_MODEL_MONTH_MAX),
-      })
-      .optional(),
+    receiptsAccess: receiptsAccessSchema.optional(),
   })
 export type ActorView = z.infer<typeof actorViewSchema>
 
@@ -102,11 +111,6 @@ export type ActorView = z.infer<typeof actorViewSchema>
  * being shown — travels with the answer that carries them, as `scope`. It joins the wire with
  * the screen that grants or sells access, by being named in the view, not by being derived.
  */
-const receiptsAccessWireSchema = z.strictObject({
-  ...actorViewSchema.shape.receiptsAccess.unwrap().shape,
-  until: z.iso.datetime().nullable(),
-})
-
 export const actorWireSchema = z.strictObject({
   ...actorViewSchema.shape,
   createdAt: z.iso.datetime(),

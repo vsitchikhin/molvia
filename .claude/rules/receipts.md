@@ -399,9 +399,9 @@ of 18.11.2026 in `.scratch/tasks/requirements/MOL-275.md`): every receipt the mo
 reads for whoever pays — $2 a month, up to a hundred receipts — and for a newcomer's first ten. Payment itself is MOL-277
 and MOL-283, the screen MOL-276.
 
-- **One condition, `readsByModel(month)`** (`actors-repository.ts`): edition 5, and the reading paid
-  (`receipts_model_until` to come, `PAID_BY_MODEL`) or the trial not spent (`actors.trial_receipts_left` > 0), and the
-  hundred of `month` not read. The claim asks it of the receipt's month, `/actors/me` of the phone's today — Georgia's
+- **One condition, `readsByModel(month)`** (`actors-repository.ts`): edition 5 and the tariff open (`tariffOpens`) —
+  the reading paid (`receipts_model_until` to come, `PAID_BY_MODEL`) or the trial not spent
+  (`actors.trial_receipts_left` > 0), and the hundred of `month` not read. The claim asks it of the receipt's month, `/actors/me` of the phone's today — Georgia's
   camera with it (MOL-408). **No column `receipts_until`** (Р-1): `receipts_model_until` meant it already, and a rename
   goes out in two releases (`deploy.md`); MOL-283 extends this one.
 - **The trial is ten receipts of a person's life** (`RECEIPT_TRIAL`): a count on the person that only goes down, every
@@ -423,11 +423,14 @@ and MOL-283, the screen MOL-276.
 - **Near the cap the trial stops first** (owner's В-3 «а»): a person with nothing paid is held to half the month's cap
   (`RECEIPT_TRIAL_CAP_PERCENT`, `trialCapMicroUsd`) in `reserve`'s own statement — refused there, `trial`, the share given
   back and **no stop told**, the whole cap still the paid's; refused by the whole cap, `cap` and the stop as before. Half
-  is the owner's first notice, so he hears on the day the trial stops. `readsFor` holds the camera to the same.
+  is the owner's first notice, so he hears on the day the trial stops — **told there, at the first refusal, once a
+  month** (adversarial А1): a month the trial alone reads settles below half for good, each call's worst reserved above
+  its own price, and `settle`'s half never came. `readsFor` holds the camera to the same.
 - **Who reads past them, by the фф `payments`** (owner's В-1 «в»): off, as today, Tesseract reads whom the model does
   not; on — payment open, MOL-277 — nobody does: such a receipt fails `unreadable`, as Georgia's (MOL-408), and the
   purchases are typed by hand; Tesseract stays the reader of whom the model was to read and did not (the cap, the share,
-  the trial's half, an answer not taken, the model away). MOL-440 takes the branch «off» away with the фф.
+  the trial's half, an answer not taken, the model away) — and of whom the tariff opens and edition 5 does not: the
+  claim carries the tariff apart (`tariffOpens`, adversarial А3), and who has paid is never read by nobody. MOL-440 takes the branch «off» away with the фф.
 - **The trial reaches everyone with the release** (owner's В-2 «а»): it is whole by itself — no фф. Edition 5 named
   Anthropic as the recipient «если вам включено» already; the trial is a reading that is on, so the privacy page took a
   revision, not an edition.

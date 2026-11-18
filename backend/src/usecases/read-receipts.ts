@@ -35,7 +35,6 @@ import {
   RECEIPTS_MODEL_MONTH_MAX,
 } from '@molvia/model'
 import type {
-  ActorView,
   Currency,
   ExplainedReading,
   ModelReceipt,
@@ -44,6 +43,7 @@ import type {
   ReceiptLineReason,
   ReceiptLine,
   ReceiptModelName,
+  ReceiptsAccess,
   ReceiptDateWindow,
   ReceiptPaidBy,
   ReceiptText,
@@ -53,6 +53,7 @@ import type {
   TextRow,
 } from '@molvia/model'
 import { z } from 'zod'
+import type { ActorRepository } from '@/db/actors-repository'
 import type { ModelSpendRepository } from '@/db/model-spend-repository'
 import type { OwnerNoticeRepository } from '@/db/owner-notices-repository'
 import { memoryKey } from '@/db/store-memory-repository'
@@ -183,17 +184,14 @@ export interface ReadReceiptsDeps {
     readonly budget: PhoneNoticeBudget
   } | null
   /**
-   * Payment is open (MOL-275, owner's В-1 «в»: фф `payments`, taken off by MOL-440): a receipt of someone the model does
-   * not read — no paid access, the trial spent, the month's hundred read — is read by nobody, the purchases typed by
-   * hand, as Georgia's are; Tesseract stays the reader of whom the model was to read and did not. Off, it reads them
-   * all, as before the trial.
+   * Payment is open (MOL-275, owner's В-1 «в»: фф `payments`, taken off by MOL-440): a receipt whose tariff is shut —
+   * no paid access, the trial spent, the month's hundred read — is read by nobody, the purchases typed by hand, as
+   * Georgia's are; Tesseract stays the reader of whom the model was to read and did not, and of whom the tariff opens
+   * and edition 5 is not accepted (adversarial А3). Off, it reads them all, as before the trial.
    */
   readonly payments?: boolean
   readonly now?: () => Date
 }
-
-/** What `/actors/me` says of the person and the model (MOL-275). */
-type ReceiptsAccess = NonNullable<ActorView['receiptsAccess']>
 
 /** How many lines the shop's memory confirmed, put right and doubted on a reading (MOL-291). */
 export interface RememberedVoice {
@@ -331,7 +329,7 @@ async function readOne(
   // no free reader once a person can pay (MOL-275, В-1 «в»), nor in a country the model alone reads (MOL-408, В-2 «а»):
   // no layout of Tesseract's finds a Georgian receipt's lines, so a receipt the model did not read is said so — the
   // purchases typed by hand — never «переснимите»
-  if (!tesseractReads(photoReading) || (deps.payments === true && !claimed.byModel)) {
+  if (!tesseractReads(photoReading) || (deps.payments === true && !claimed.tariff)) {
     const outcome: ReadOutcome = {
       kind: 'failed',
       failure: 'unreadable',
@@ -360,10 +358,9 @@ export function readsReceiptsByModel(
   // the queue's own threshold is the first reader's: the second is no condition of reading (MOL-405); the hundred is
   // of the phone's month, as a receipt sent today counts in it (MOL-275)
   return spend.readsFor(
-    month,
+    { spend: month, receipts: receiptsMonthOf(phoneDay) },
     worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX, RECEIPT_MODEL),
     { actorId, capMicroUsd, shareMicroUsd },
-    receiptsMonthOf(phoneDay),
   )
 }
 
@@ -372,12 +369,12 @@ export function readsReceiptsByModel(
  * trial's receipts left of ten, the month's read of a hundred — every figure the server's. None for nobody.
  */
 export async function receiptsAccessOf(
-  spend: Pick<ModelSpendRepository, 'access'>,
+  actors: Pick<ActorRepository, 'modelAccess'>,
   actorId: string,
   phoneDay: string,
 ): Promise<ReceiptsAccess | null> {
   const month = receiptsMonthOf(phoneDay)
-  const access = await spend.access(actorId, month)
+  const access = await actors.modelAccess(actorId, month)
   if (access === null) return null
   return {
     until: access.until,

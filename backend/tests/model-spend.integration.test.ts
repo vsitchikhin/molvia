@@ -268,12 +268,12 @@ describe('the trial’s part of the cap and where a person stands (MOL-275, owne
     shareMicroUsd: 2 * CAP,
   })
 
-  it('lets a trial’s call through to half the cap exactly, and refuses the next — the share given back, no stop told', async () => {
+  it('lets a trial’s call through to half the cap exactly, and refuses the next — the share given back, the half told once, no stop (А1)', async () => {
     const anna = await onTrial()
     expect(await spend.reserve(MONTH, CAP / 2 - 8_000, anna, at)).toBe('reserved')
     expect(await spend.reserve(MONTH, 8_001, anna, at)).toBe('trial')
     expect(await spend.reserve(MONTH, 8_000, anna, at)).toBe('reserved')
-    expect(await spend.month(MONTH)).toEqual({ spentMicroUsd: CAP / 2, calls: 2, noticed: 0 })
+    expect(await spend.month(MONTH)).toEqual({ spentMicroUsd: CAP / 2, calls: 2, noticed: 50 })
     expect(
       onlyRow(
         await db
@@ -282,7 +282,17 @@ describe('the trial’s part of the cap and where a person stands (MOL-275, owne
           .where(eq(actors.id, anna.actorId)),
       )?.spent,
     ).toBe(CAP / 2)
-    expect(await told()).toEqual([])
+    // the half at the trial's stop, once: the refusals after it tell nothing, and the stop is the cap's alone
+    expect(await spend.reserve(MONTH, 8_001, anna, at)).toBe('trial')
+    expect(await told()).toEqual([
+      {
+        kind: 'model_spend',
+        month: MONTH,
+        step: 50,
+        spentMicroUsd: CAP / 2 - 8_000,
+        capMicroUsd: CAP,
+      },
+    ])
     // the paid read on past it, to the cap
     expect(await spend.reserve(MONTH, CAP / 2, mine, at)).toBe('reserved')
   })
@@ -295,7 +305,8 @@ describe('the trial’s part of the cap and where a person stands (MOL-275, owne
 
   it('offers the camera by the same rule: the trial or the grant, the hundred, the trial’s part', async () => {
     const worst = 9_000
-    const readsFor = (call: ModelCall) => spend.readsFor(MONTH, worst, call, '2026-10-01')
+    const readsFor = (call: ModelCall) =>
+      spend.readsFor({ spend: MONTH, receipts: '2026-10-01' }, worst, call)
     const consented = { consentVersion: MODEL_CONSENT_EDITION, consentedAt: new Date() }
     const fresh = { ...(await onTrial()), actorId: await insertActor(db, consented) }
     expect(await readsFor(fresh)).toBe(true)
@@ -325,19 +336,5 @@ describe('the trial’s part of the cap and where a person stands (MOL-275, owne
       .where(eq(modelSpend.month, MONTH))
     expect(await readsFor(trial)).toBe(false)
     expect(await readsFor(paid)).toBe(true)
-  })
-
-  it('says until when it is paid, the trial left and the month’s count — a grant gone is none', async () => {
-    const until = PAID.receiptsModelUntil
-    const paid = await insertActor(db, { ...PAID, trialReceiptsLeft: 4 })
-    await db
-      .update(actors)
-      .set({ modelReceiptsMonth: '2026-10-01', modelReceiptsRead: 7 })
-      .where(eq(actors.id, paid))
-    expect(await spend.access(paid, '2026-10-01')).toEqual({ until, trialLeft: 4, read: 7 })
-    expect(await spend.access(paid, '2026-11-01')).toEqual({ until, trialLeft: 4, read: 0 })
-    const gone = await insertActor(db, { receiptsModelUntil: new Date(Date.now() - 1_000) })
-    expect(await spend.access(gone, '2026-10-01')).toEqual({ until: null, trialLeft: 10, read: 0 })
-    expect(await spend.access('00000000-0000-4000-8000-000000000275', '2026-10-01')).toBeNull()
   })
 })

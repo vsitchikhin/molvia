@@ -21,7 +21,7 @@ function harness(
   {
     said = new Map<string, string | null>(),
     refused,
-  }: { said?: Map<string, string | null>; refused?: 'cap' | 'share' } = {},
+  }: { said?: Map<string, string | null>; refused?: 'cap' | 'share' | 'trial' } = {},
 ) {
   const remembered: BrandSpelt[] = []
   const spellings: BrandSpellingRepository = {
@@ -59,7 +59,6 @@ function harness(
         keepInMonth,
         month: () => Promise.resolve(null),
         readsFor: () => Promise.reject(new Error('readsFor is not asked of brands')),
-        access: () => Promise.reject(new Error('access is not asked of brands')),
       },
       capMicroUsd: CALL.capMicroUsd,
       shareMicroUsd: CALL.shareMicroUsd,
@@ -124,6 +123,14 @@ describe('the brands of a receipt the model read, asked of it (MOL-326, В-1 «�
     expect(over.settle).not.toHaveBeenCalled()
     expect(over.remembered).toEqual([])
     expect(over.reports).toEqual([{ kind: 'brands_passed', reason: 'share' }])
+  })
+
+  it('asks nothing of a person on the trial past its half of the cap, the brands spelt in letters (MOL-275)', async () => {
+    const h = harness(() => read(['Felix']), { refused: 'trial' })
+    expect(await spelledBrands(h.deps, [FELIX], ASK)).toEqual(new Map())
+    expect(h.spellBrands).not.toHaveBeenCalled()
+    expect(h.remembered).toEqual([])
+    expect(h.reports).toEqual([{ kind: 'brands_passed', reason: 'trial' }])
   })
 
   it('remembers nothing of a refusal, a cut answer or one of no schema — each paid', async () => {

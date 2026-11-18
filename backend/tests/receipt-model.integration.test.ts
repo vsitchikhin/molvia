@@ -2345,6 +2345,25 @@ describe('a receipt not read whole, read again by Sonnet (MOL-405)', () => {
     expect(await spentOf(me)).toBe(2_180)
   }, 30_000)
 
+  it('asks nothing of Sonnet for a person on the trial whose worst passes the trial’s half, the first kept (MOL-275)', async () => {
+    const now = () => new Date('2026-11-10T12:00:00Z')
+    // Haiku's worst fits the trial's half of the cap, Sonnet's does not
+    await db.insert(modelSpend).values({ month: '2026-11-01', spentMicroUsd: CAP / 2 - 20_000 })
+    const me = await person(null, MODEL_CONSENT_EDITION, 10)
+    const id = await queued(me)
+    const second = sonnet(answered(ANSWER, 30_000))
+    const reports = await readAll(benchReader(), fakeModel(answered(NOT_WHOLE, 2_180)), {
+      second,
+      now,
+    })
+    expect(second.asked).toBe(0)
+    expect(reports).toContainEqual({ kind: 'second_passed', reason: 'trial' })
+    expect(await receiptOf(id)).toMatchObject({
+      readerVersion: 'claude-haiku-5-5@v5',
+      counted: true,
+    })
+  }, 30_000)
+
   it('asks nothing of Sonnet where its worst does not fit the month’s cap, the first kept', async () => {
     const me = await person(LATER)
     const id = await queued(me)
@@ -2424,6 +2443,19 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     })
   }, 30_000)
 
+  it('leaves to Tesseract whom the tariff opens and edition 5 does not, payment open (adversarial А3)', async () => {
+    const me = await person(LATER, MODEL_CONSENT_EDITION - 1, 10)
+    const id = await queued(me)
+    const model = fakeModel(() => read())
+    await readAll(benchReader(), model, { payments: true })
+    expect(model.asked).toBe(0)
+    expect(await receiptOf(id)).toMatchObject({
+      status: 'parsed',
+      readerVersion: 'tesseract 5.5.0 · test',
+      counted: false,
+    })
+  }, 30_000)
+
   it('spends no trial while the reading is paid, and counts the month all the same', async () => {
     const me = await person(LATER, MODEL_CONSENT_EDITION, 10)
     const id = await queued(me)
@@ -2481,12 +2513,13 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     const me = await person(LATER)
     const hundredth = await queued(me)
     const month = await sentMonthOf(hundredth)
+    if (month === undefined) throw new Error('the receipt has no month')
     const counted = (at: string, read: number) =>
       db
         .update(actors)
         .set({ modelReceiptsMonth: at, modelReceiptsRead: read })
         .where(eq(actors.id, me.id))
-    await counted(month ?? '', 99)
+    await counted(month, 99)
     // each a paper of its own: one fiscal number again would be a repeat, which counts nothing
     let papers = 0
     const model = fakeModel(() =>
@@ -2517,7 +2550,7 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     expect(await countsOf(me)).toMatchObject({ month, read: 1 })
   }, 60_000)
 
-  it('stops the trial at half the month’s cap and tells no stop, while the paid read on (В-3 «а»)', async () => {
+  it('stops the trial at half the month’s cap, telling the half and no stop, while the paid read on (В-3 «а», А1)', async () => {
     // 10 000 tokens in and the whole output: the worst of the fake model's call
     const worst = 9_000
     const now = () => new Date('2026-11-10T12:00:00Z')
@@ -2532,7 +2565,20 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     )
     expect((await receiptOf(onTrial))?.readerVersion).toBe('tesseract 5.5.0 · test')
     expect(reports).toContainEqual({ kind: 'model_passed', reason: 'trial' })
-    expect((await spend.month('2026-11-01'))?.noticed).toBe(0)
+    expect((await spend.month('2026-11-01'))?.noticed).toBe(50)
+    const notices = await db
+      .select({ payload: ownerNotices.payload })
+      .from(ownerNotices)
+      .orderBy(ownerNotices.id)
+    expect(notices.map((row) => ownerNoticeSchema.parse(row.payload))).toEqual([
+      {
+        kind: 'model_spend',
+        month: '2026-11-01',
+        step: 50,
+        spentMicroUsd: CAP / 2 - worst + 1,
+        capMicroUsd: CAP,
+      },
+    ])
     expect((await countsOf(trial))?.trial).toBe(10)
 
     const onPay = await queued(paid)

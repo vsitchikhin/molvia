@@ -14,6 +14,15 @@ export interface MonthSpend {
   readonly noticed: number
 }
 
+/**
+ * The two months of a person's reading (MOL-275): the spending's — UTC, the bill's — and the phone's a receipt counts
+ * its hundred in. Named apart, so they are never passed one for the other.
+ */
+export interface ModelMonths {
+  readonly spend: string
+  readonly receipts: string
+}
+
 /** Whose call it is and what holds it (MOL-367): the month's cap and the person's share of it. */
 export interface ModelCall {
   readonly actorId: string
@@ -27,15 +36,6 @@ export interface ModelCall {
  */
 export type ModelReserved = 'reserved' | 'share' | 'cap' | 'trial'
 
-/** Where a person stands with the model (MOL-275): the figures of `receiptsAccess` on `/actors/me`. */
-export interface ModelAccess {
-  /** Until when it is paid; none where nothing is, a moment gone included. */
-  readonly until: Date | null
-  readonly trialLeft: number
-  /** Read of `month` — the person's count, where it is that month's. */
-  readonly read: number
-}
-
 /**
  * The month's spending on the model that reads receipts (MOL-272): the cap is held here, in one statement
  * a call, and the owner's notices are queued in the same transaction as the step they tell of. `owner` says
@@ -48,7 +48,7 @@ export interface ModelSpendRepository {
    * says which refused it: the share leaves the month untouched, the cap gives the share back. The owner hears
    * of the stop once a month, and of a person's share reached once a person a month. **A person on the trial is held
    * to the trial's part of the cap** (MOL-275, owner's В-3 «а»): refused there, `'trial'`, the share given back and
-   * no stop told — the month still takes the paid.
+   * no stop told — the month still takes the paid — but the half told once a month, if it was not (adversarial А1).
    */
   reserve(month: string, worstMicroUsd: number, call: ModelCall, at: Date): Promise<ModelReserved>
   /**
@@ -72,18 +72,11 @@ export interface ModelSpendRepository {
   month(month: string): Promise<MonthSpend | null>
   /**
    * Whether the model reads for the person now (MOL-408, adversarial А3, Р2-А1; MOL-275): `readsByModel` of the
-   * phone's month `receiptsMonth` — edition 5, paid or on the trial, the hundred not read — and a call of
-   * `worstMicroUsd` would fit their share of the month and the month's cap, the trial's part of it on the trial — by
-   * `reserve`'s own inequality, `fits`, over the same spending. What `/actors/me` offers Georgia's camera by.
+   * phone's month — edition 5, paid or on the trial, the hundred not read — and a call of `worstMicroUsd` would fit
+   * their share of the spending's month and its cap, the trial's part of it on the trial — by `reserve`'s own
+   * inequality, `fits`, over the same spending. What `/actors/me` offers Georgia's camera by.
    */
-  readsFor(
-    month: string,
-    worstMicroUsd: number,
-    call: ModelCall,
-    receiptsMonth: string,
-  ): Promise<boolean>
-  /** Where the person stands with the model in the phone's month `receiptsMonth` (MOL-275); none for nobody. */
-  access(actorId: string, receiptsMonth: string): Promise<ModelAccess | null>
+  readsFor(months: ModelMonths, worstMicroUsd: number, call: ModelCall): Promise<boolean>
 }
 
 /** What the person has spent of `month`, as their share counts it: a month gone is nought. */
@@ -121,7 +114,7 @@ async function takeShare(
   month: string,
   worstMicroUsd: number,
   { actorId, shareMicroUsd }: ModelCall,
-): Promise<boolean | null> {
+): Promise<{ readonly paid: boolean } | null> {
   const spent = spentOf(month)
   const [taken] = await tx.execute<{ paid: boolean }>(sql`
     update ${actors}
@@ -129,12 +122,13 @@ async function takeShare(
         model_spent_micro_usd = ${spent} + ${worstMicroUsd}::bigint
     where ${actors.id} = ${actorId} and ${fits(spent, worstMicroUsd, shareMicroUsd)}
     returning ${PAID_BY_MODEL} as paid`)
-  return taken === undefined ? null : taken.paid
+  return taken === undefined ? null : { paid: taken.paid }
 }
 
 export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRepository {
   return {
-    async readsFor(month, worstMicroUsd, { actorId, capMicroUsd, shareMicroUsd }, receiptsMonth) {
+    async readsFor({ spend: month, receipts: receiptsMonth }, worstMicroUsd, call) {
+      const { actorId, capMicroUsd, shareMicroUsd } = call
       if (idOrNull(actorId) === null) return false
       const [row] = await db
         .select({
@@ -152,8 +146,8 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
       const { actorId, capMicroUsd, shareMicroUsd } = call
       return db.transaction(async (tx) => {
         // the account first, as every lock is taken (privacy.md)
-        const paid = await takeShare(tx, month, worstMicroUsd, call)
-        if (paid === null) {
+        const taken = await takeShare(tx, month, worstMicroUsd, call)
+        if (taken === null) {
           // once a month, and never again for a month told before a later one (adversarial А4б)
           const reached = await tx.execute(sql`
             update ${actors} set model_share_told = ${month}::date
@@ -167,7 +161,7 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
         }
         // one statement takes the month's row and holds the cap — the trial's part of it on the trial (MOL-275): no
         // second call fits between a read and a write, whatever runs beside it
-        const bound = paid ? capMicroUsd : Math.min(capMicroUsd, trialCapMicroUsd(capMicroUsd))
+        const bound = taken.paid ? capMicroUsd : trialCapMicroUsd(capMicroUsd)
         const counted = await tx.execute<{ spent: string }>(sql`
           insert into ${modelSpend} (month, spent_micro_usd, calls)
           select ${month}::date, ${worstMicroUsd}::bigint, 1 where ${fits(sql`0`, worstMicroUsd, bound)}
@@ -181,12 +175,34 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
         await tx.execute(sql`
           update ${actors} set model_spent_micro_usd = ${actors.modelSpentMicroUsd} - ${worstMicroUsd}::bigint
           where ${actors.id} = ${actorId}`)
-        // refused by the trial's part alone, the cap still takes the paid: no stop to tell
-        if (!paid) {
+        // refused by the trial's part alone, the cap still takes the paid: no stop to tell — but the half, once a
+        // month, here: a month the trial alone reads settles below it for good, the worst reserved above its own
+        // price, and the owner would hear neither (MOL-275, adversarial А1)
+        if (!taken.paid) {
           const [fitsCap] = await tx.execute<{ fits: boolean }>(
             sql`select ${fits(monthSpentOf(month), worstMicroUsd, capMicroUsd)} as fits`,
           )
-          if (fitsCap?.fits === true) return 'trial'
+          if (fitsCap?.fits === true) {
+            const [half] = await tx.execute<{ spent: string }>(sql`
+              insert into ${modelSpend} (month, noticed) values (${month}::date, 50)
+              on conflict (month) do update set noticed = 50 where ${modelSpend.noticed} < 50
+              returning spent_micro_usd as spent`)
+            if (half !== undefined) {
+              await tell(
+                tx,
+                owner,
+                {
+                  kind: 'model_spend',
+                  month,
+                  step: 50,
+                  spentMicroUsd: Number(half.spent),
+                  capMicroUsd,
+                },
+                at,
+              )
+            }
+            return 'trial'
+          }
         }
         const stopped = await tx.execute<{ spent: string }>(sql`
           insert into ${modelSpend} (month, noticed) values (${month}::date, 100)
@@ -246,24 +262,6 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
         update ${actors}
         set model_spent_micro_usd = greatest(${actors.modelSpentMicroUsd} - ${worstMicroUsd}::bigint, 0)
         where ${actors.id} = ${actorId} and ${actors.modelMonth} = ${month}::date`)
-    },
-
-    async access(actorId, receiptsMonth) {
-      if (idOrNull(actorId) === null) return null
-      const [row] = await db
-        .select({
-          // empty and past are one answer, as `shared_until`'s: nothing paid
-          until:
-            sql<Date | null>`case when ${PAID_BY_MODEL} then ${actors.receiptsModelUntil} end`.mapWith(
-              actors.receiptsModelUntil,
-            ),
-          trialLeft: actors.trialReceiptsLeft,
-          read: sql<number>`(case when ${actors.modelReceiptsMonth} >= ${receiptsMonth}::date
-            then ${actors.modelReceiptsRead} else 0 end)::int`,
-        })
-        .from(actors)
-        .where(eq(actors.id, actorId))
-      return row ?? null
     },
 
     async month(month) {

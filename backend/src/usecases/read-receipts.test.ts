@@ -16,8 +16,7 @@ function spendAnswering(reads: boolean): ModelSpendRepository & {
     settle: refused('settle'),
     keepInMonth: refused('keepInMonth'),
     month: refused('month'),
-    access: refused('access'),
-    readsFor: (month, worst, call, receiptsMonth) => {
+    readsFor: ({ spend: month, receipts: receiptsMonth }, worst, call) => {
       asked.push({ month, worst, call, receiptsMonth })
       return Promise.resolve(reads)
     },
@@ -63,13 +62,13 @@ describe('receiptsAccessOf (MOL-275)', () => {
   it('names the phone’s month, the ten and the hundred beside the person’s figures', async () => {
     const until = new Date('2026-12-20T08:00:00.000Z')
     const asked: string[] = []
-    const spend = {
-      access: (_actorId: string, month: string) => {
+    const actors = {
+      modelAccess: (_actorId: string, month: string) => {
         asked.push(month)
         return Promise.resolve({ until, trialLeft: 4, read: 6 })
       },
     }
-    expect(await receiptsAccessOf(spend, 'a-person', '2026-11-30')).toEqual({
+    expect(await receiptsAccessOf(actors, 'a-person', '2026-11-30')).toEqual({
       until,
       trialLeft: 4,
       trialOf: 10,
@@ -81,8 +80,8 @@ describe('receiptsAccessOf (MOL-275)', () => {
   })
 
   it('says nothing of nobody', async () => {
-    const spend = { access: () => Promise.resolve(null) }
-    expect(await receiptsAccessOf(spend, 'gone', '2026-11-30')).toBeNull()
+    const actors = { modelAccess: () => Promise.resolve(null) }
+    expect(await receiptsAccessOf(actors, 'gone', '2026-11-30')).toBeNull()
   })
 })
 

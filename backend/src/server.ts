@@ -1266,7 +1266,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       actorMeRoute(
         guarded,
         (id, today) => readsReceiptsByModel({ model: modelDeps }, id, today),
-        (id, today) => receiptsAccessOf(modelSpend, id, today),
+        (id, today) => receiptsAccessOf(actors, id, today),
       )
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),
