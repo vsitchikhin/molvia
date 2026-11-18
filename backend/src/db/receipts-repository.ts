@@ -17,7 +17,6 @@ import {
   RECEIPT_TELL_WITHIN_HOURS,
   RECEIPT_UNDO_MINUTES,
   RECEIPTS_DAY_MAX,
-  RECEIPTS_MODEL_MONTH_MAX,
   RECEIPTS_UNRECORDED_MAX,
   RECEIPT_TRIAL,
   receiptCard,
@@ -49,7 +48,7 @@ import type {
   TelegramUserId,
   TripReceiptSource,
 } from '@molvia/model'
-import { PAID_BY_MODEL, readsByModel, tariffOpens } from './actors-repository'
+import { PAID_BY_MODEL, hundredRead, readsByModel, tariffOpens } from './actors-repository'
 import { countOfDay } from './day-count'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -920,13 +919,18 @@ export async function recordedTwinOf(
   return twin ?? null
 }
 
-/** Whether the person's reading is paid now, and the trial left (MOL-275): what a count is decided by. */
+/**
+ * Whether the person's reading is paid now, the trial left and whether the hundred of `sentMonth` is read (MOL-275): what
+ * a count is decided by.
+ */
 async function personOf(
   tx: Conn,
   actorId: string,
-): Promise<{ readonly paid: boolean; readonly trial: number } | null> {
-  const [person] = await tx.execute<{ paid: boolean; trial: number }>(sql`
-    select ${PAID_BY_MODEL} as paid, ${actors.trialReceiptsLeft} as trial
+  sentMonth: string,
+): Promise<{ readonly paid: boolean; readonly trial: number; readonly full: boolean } | null> {
+  const [person] = await tx.execute<{ paid: boolean; trial: number; full: boolean }>(sql`
+    select ${PAID_BY_MODEL} as paid, ${actors.trialReceiptsLeft} as trial,
+      ${hundredRead(sql`${sentMonth}::date`)} as full
     from ${actors} where ${actors.id} = ${actorId}`)
   return person ?? null
 }
@@ -967,7 +971,7 @@ async function countModelReceipt(tx: Conn, id: string): Promise<void> {
           and twin.counted is not null and twin.retaken_at is null
           and twin.tin = r.tin and twin.receipt_no = r.receipt_no)`)
   if (receipt === undefined) return
-  const person = await personOf(tx, receipt.actorId)
+  const person = await personOf(tx, receipt.actorId, receipt.month)
   if (person === null) return
   const by: ReceiptCount = !person.paid && person.trial > 0 ? 'trial' : 'month'
   await takeCount(tx, receipt.actorId, receipt.month, by)
@@ -1003,13 +1007,8 @@ async function takeAgain(
   tx: Conn,
   row: { readonly actorId: string; readonly sentMonth: string; readonly counted: ReceiptCount },
 ): Promise<ReceiptCount | null> {
-  const person = await personOf(tx, row.actorId)
-  if (person === null) return null
-  const [full] = await tx.execute<{ full: boolean }>(sql`
-    select coalesce(${actors.modelReceiptsMonth} >= ${row.sentMonth}::date
-      and ${actors.modelReceiptsRead} >= ${RECEIPTS_MODEL_MONTH_MAX}::int, false) as full
-    from ${actors} where ${actors.id} = ${row.actorId}`)
-  if (full?.full !== false) return null
+  const person = await personOf(tx, row.actorId, row.sentMonth)
+  if (person === null || person.full) return null
   const by: ReceiptCount | null =
     row.counted === 'month' || person.paid ? 'month' : person.trial > 0 ? 'trial' : null
   if (by === null) return null
@@ -1515,8 +1514,9 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         if (held.tripId !== null) throw new DomainError(ERROR.CONFLICT)
         const counted = retake ? held.counted : null
         // another shot of the same paper the model read takes the count over, never a reading of it left free
-        // (adversarial Б2, В1): on the review, recorded, or removed and still to be brought back — never one whose own
-        // count «Переснять» gave back. One paper, one count
+        // (adversarial Б2, В1, Г1): any not counted — on the review, recorded, removed by «Удалить» or by «Переснять»
+        // and still to be brought back; one whose own count «Переснять» gave back keeps `counted`, and is none. One
+        // paper, one count
         const [heir] =
           counted === null
             ? []
@@ -1527,7 +1527,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                   and(
                     eq(receipts.actorId, actorId),
                     sql`${receipts.id} <> ${own}`,
-                    sql`${receipts.counted} is null and ${receipts.retakenAt} is null`,
+                    sql`${receipts.counted} is null`,
                     sql`${receipts.status} in ('parsed', 'recorded')`,
                     readByModelSql(sql`${receipts.readerVersion}`),
                     sql`${receipts.tin} = ${held.tin} and ${receipts.receiptNo} = ${held.receiptNo}`,
@@ -1548,7 +1548,11 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           if (heir === undefined) {
             await giveBack(tx, { actorId, sentMonth: held.sentMonth, counted })
           } else {
-            await tx.update(receipts).set({ counted }).where(eq(receipts.id, heir.id))
+            // a count it holds, not one given back: «Вернуть» of it takes nothing again
+            await tx
+              .update(receipts)
+              .set({ counted, retakenAt: null })
+              .where(eq(receipts.id, heir.id))
           }
         }
         // «Переснять»: the review of the receipt it replaces stays (MOL-309, owner's В-6 «а»)

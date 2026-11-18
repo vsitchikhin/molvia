@@ -2691,6 +2691,29 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     expect(await countsOf(me)).toMatchObject({ trial: 8, read: 2 })
   }, 60_000)
 
+  it('passes the count to a repeat «Переснять» removed with nothing to give back, and its «Вернуть» takes nothing twice (adversarial Г1)', async () => {
+    const me = await person(null, MODEL_CONSENT_EDITION, 10)
+    const first = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    const repeat = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    await repository.remove(me.id, repeat, { retake: true })
+    expect(await countsOf(me)).toMatchObject({ trial: 9, read: 1 })
+
+    await repository.remove(me.id, first, { retake: true })
+    expect(await receiptOf(repeat)).toMatchObject({ counted: 'trial', retakenAt: null })
+    expect(await countsOf(me)).toMatchObject({ trial: 9, read: 1 })
+    expect(await repository.restore(me.id, repeat)).toBe(true)
+    expect(await receiptOf(repeat)).toMatchObject({ counted: 'trial', deletedAt: null })
+    expect(await countsOf(me)).toMatchObject({ trial: 9, read: 1 })
+  }, 60_000)
+
   it('refuses «Вернуть» whose place in the hundred another paper took meanwhile (adversarial В2)', async () => {
     const me = await person(LATER)
     const first = await queued(me)

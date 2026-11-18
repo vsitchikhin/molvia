@@ -426,9 +426,11 @@ and MOL-283, the screen MOL-276.
   the account's lock first, `retaken_at` marked on any) returns its trial receipt, if it took one, and its place in the
   person's month wherever that is not before the one it was sent in (`giveBack`, `>=` as every reader of the count — the
   month it counted in is not kept); the new shot counts as any. One paper, one count, whatever key each shot copied.
-  **Another shot of the same paper the model read takes the count over instead** (adversarial Б2, В1) — on the review,
-  recorded, or removed and still to be brought back, never one whose own count «Переснять» gave back: a repeat read and
-  not counted, left anywhere while the counted one gave its count back, was a reading free. A count given back stands
+  **Another shot of the same paper the model read takes the count over instead** (adversarial Б2, В1, Г1) — any not
+  counted: on the review, recorded, removed by «Удалить» or by «Переснять» and still to be brought back; one whose own
+  count «Переснять» gave back keeps `counted`, and is none. Its `retaken_at` goes with it, the count its own, so its
+  «Вернуть» takes nothing again. Three rounds closed a path each — the review, then removed and recorded, then retaken —
+  before the rule became the state itself: not counted is what a free reading is. A count given back stands
   for no repeat; «Удалить» gives nothing back.
 - **«Вернуть» takes it again, or is refused** (`takeAgain`, adversarial Б1, В2): the place, and the trial receipt — a
   trial or a place given back and spent since on another paper is never one twice, so with no trial left, or the month's

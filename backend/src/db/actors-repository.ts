@@ -92,15 +92,21 @@ export interface ModelAccess {
 export const PAID_BY_MODEL = sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp(), false)`
 
 /**
+ * The month's hundred read (MOL-275): the person's count of `month` or a later one at `RECEIPTS_MODEL_MONTH_MAX` — the
+ * one rule the tariff and «Вернуть» close by.
+ */
+export const hundredRead = (month: SQL): SQL<boolean> =>
+  sql<boolean>`coalesce(${actors.modelReceiptsMonth} >= ${month}
+    and ${actors.modelReceiptsRead} >= ${RECEIPTS_MODEL_MONTH_MAX}, false)`
+
+/**
  * The person's tariff opens the model for a receipt of `month` (MOL-275): the reading paid (`receipts_model_until` to
  * come) or the trial not spent, and the month's hundred not read — counted in the later of `month` and the person's
  * own, as a reading lands (`receipts.counted`). Whatever the edition: who has paid and not consented is read by
  * Tesseract, never by nobody (adversarial А3).
  */
-export const tariffOpens = (month: SQL): SQL<boolean> => sql<boolean>`coalesce(
-  (${PAID_BY_MODEL} or ${actors.trialReceiptsLeft} > 0)
-  and not (${actors.modelReceiptsMonth} >= ${month} and ${actors.modelReceiptsRead} >= ${RECEIPTS_MODEL_MONTH_MAX}),
-  false)`
+export const tariffOpens = (month: SQL): SQL<boolean> =>
+  sql<boolean>`coalesce((${PAID_BY_MODEL} or ${actors.trialReceiptsLeft} > 0) and not ${hundredRead(month)}, false)`
 
 /**
  * The model reads a person's receipts of `month` (MOL-272, MOL-275): edition `MODEL_CONSENT_EDITION` accepted and the
