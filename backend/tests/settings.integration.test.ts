@@ -121,12 +121,12 @@ describe('settings and offline trip context', () => {
   })
 
   it('requires a session and rejects unsupported new geography while preserving historical values', async () => {
-    const owner = await insertActor(db, { country: 'RU', city: 'Москва' })
+    const owner = await insertActor(db, { country: 'KZ', city: 'Алматы' })
     const cookie = await signIn(db, owner)
-    const legacy = { ...initial, country: 'RU', city: 'Москва' }
+    const legacy = { ...initial, country: 'KZ', city: 'Алматы' }
     expect((await save('', legacy, legacy)).statusCode).toBe(401)
     expect((await save(cookie, legacy, { ...legacy, incomeCurrency: 'AMD' })).statusCode).toBe(200)
-    expect((await save(cookie, legacy, { ...legacy, city: 'Казань' })).statusCode).toBe(400)
+    expect((await save(cookie, legacy, { ...legacy, city: 'Астана' })).statusCode).toBe(400)
     expect((await save(cookie, { ...legacy, incomeCurrency: 'AMD' }, initial)).statusCode).toBe(200)
   })
 
@@ -152,6 +152,30 @@ describe('settings and offline trip context', () => {
     expect(trip.statusCode).toBe(201)
     expect(await db.select({ country: places.country, city: places.city }).from(places)).toEqual([
       { country: 'GE', city: 'Батуми' },
+    ])
+  })
+
+  it('moves a person to Russia, its seven cities only under it, and a trip starts in Sochi (MOL-412)', async () => {
+    const owner = await insertActor(db)
+    const cookie = await signIn(db, owner)
+    const kazan = { ...initial, country: 'RU', city: 'Казань' }
+    expect((await save(cookie, initial, { ...initial, city: 'Казань' })).statusCode).toBe(400)
+    expect((await save(cookie, initial, { ...kazan, city: 'Гюмри' })).statusCode).toBe(400)
+    expect((await save(cookie, initial, kazan)).statusCode).toBe(200)
+    expect(await db.select({ country: actors.country, city: actors.city }).from(actors)).toEqual([
+      { country: 'RU', city: 'Казань' },
+    ])
+    // a trip's own geography (MOL-65): another city of Russia, with no case of its own
+    const sochi = { ...kazan, city: 'Сочи', spendCurrency: 'RUB', incomeCurrency: 'RUB' } as const
+    const trip = await app.inject({
+      method: 'POST',
+      url: '/trips',
+      headers: { cookie },
+      payload: { id: randomUUID(), context: sochi, place: { kind: 'store', name: 'Магнит' } },
+    })
+    expect(trip.statusCode).toBe(201)
+    expect(await db.select({ country: places.country, city: places.city }).from(places)).toEqual([
+      { country: 'RU', city: 'Сочи' },
     ])
   })
 
@@ -195,7 +219,7 @@ describe('settings and offline trip context', () => {
   })
 
   it('refuses a trip in a geography the settings would refuse, and keeps the historical one', async () => {
-    const owner = await insertActor(db, { country: 'RU', city: 'Москва' })
+    const owner = await insertActor(db, { country: 'KZ', city: 'Алматы' })
     const cookie = await signIn(db, owner)
     const start = async (context: ActorSettings, name: string) =>
       app.inject({
@@ -204,7 +228,7 @@ describe('settings and offline trip context', () => {
         headers: { cookie },
         payload: { id: randomUUID(), context, place: { kind: 'store', name } },
       })
-    const legacy = { ...initial, country: 'RU', city: 'Москва' }
+    const legacy = { ...initial, country: 'KZ', city: 'Алматы' }
     // «No context» and «a context nothing may be written under» are one answer, because they
     // are one question for the person — and a 400 would have taken the trip's purchases with
     // it (review 2, замечание 9). Batumi is a city of the settings — of Georgia's, not Armenia's.
@@ -218,7 +242,7 @@ describe('settings and offline trip context', () => {
     // today's two, which is what an offline start made before a move carries.
     expect((await start(legacy, 'Гудвилл')).statusCode).toBe(201)
     expect((await start(initial, 'SAS')).statusCode).toBe(409)
-    expect(await db.select({ city: places.city }).from(places)).toEqual([{ city: 'Москва' }])
+    expect(await db.select({ city: places.city }).from(places)).toEqual([{ city: 'Алматы' }])
   })
 
   it('finds a place whose city was written in another case, and ignores a stray query parameter', async () => {

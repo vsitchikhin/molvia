@@ -260,7 +260,7 @@ describe('ступень 1 — вечером следующего дня', () =
   })
 
   it('человек из страны без часового пояса не получает ничего', async () => {
-    const anna = await person({ country: 'RU', city: 'Москва' })
+    const anna = await person({ country: 'KZ', city: 'Алматы' })
     await bought(anna, await item('Молоко'), yerevan('2026-07-13', '10:00'))
 
     expect(asked(await evening('2026-07-14'))).toEqual({})
@@ -840,6 +840,17 @@ describe('лишних выдач нет (адверсариальный В, р�
     expect(asked(await evening('2027-01-14', '21:00'))).toEqual({})
     // 22:00 in Yerevan is 19:00 in Belgrade
     expect(asked(await evening('2027-01-14', '22:00'))).toEqual({ [milan.tg]: ['Ајвар'] })
+  })
+
+  it('человек из Москвы — в 19:00 по Москве, на час позже Еревана (MOL-412)', async () => {
+    const ivan = await person({ country: 'RU', city: 'Москва' })
+    // 11:00 in Moscow on the 13th — yesterday for the evening of the 14th
+    await bought(ivan, await item('Кефир'), yerevan('2026-07-13', '12:00'))
+
+    // 19:00 in Yerevan is 18:00 in Moscow: not yet
+    expect(asked(await evening('2026-07-14', '19:00'))).toEqual({})
+    // 20:00 in Yerevan is 19:00 in Moscow
+    expect(asked(await evening('2026-07-14', '20:00'))).toEqual({ [ivan.tg]: ['Кефир'] })
   })
 
   it('человек из Тбилиси — в 19:00, как Ереван: пояс тот же круглый год (MOL-109)', async () => {
