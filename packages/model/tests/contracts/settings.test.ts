@@ -31,20 +31,40 @@ describe('settingsCityOf (MOL-120, adversarial А2)', () => {
     // a hyphen is a letter of the name, not a space: «Нови Сад» is another spelling, not this city
     expect(settingsCityOf('Нови Сад')).toBeNull()
   })
+
+  it('reads the cities of Russia too (MOL-412)', () => {
+    expect(settingsCityOf('санкт-петербург')).toBe('Санкт-Петербург')
+    expect(settingsCityOf(' МОСКВА ')).toBe('Москва')
+    // the short name is another spelling, not this city
+    expect(settingsCityOf('Петербург')).toBeNull()
+  })
 })
 
 describe('the countries of the settings and their cities (MOL-109)', () => {
-  it('offers Armenia, Georgia and Serbia, two cities each, Gyumri first as before', () => {
-    expect(SETTINGS_COUNTRIES).toEqual(['AM', 'GE', 'RS'])
+  it('offers Armenia, Georgia, Russia and Serbia, in the order of their names, Gyumri first as before', () => {
+    expect(SETTINGS_COUNTRIES).toEqual(['AM', 'GE', 'RU', 'RS'])
     expect(citiesOf('AM')).toEqual(['Гюмри', 'Ереван'])
     expect(citiesOf('GE')).toEqual(['Тбилиси', 'Батуми'])
     expect(citiesOf('RS')).toEqual(['Белград', 'Нови-Сад'])
     expect(SETTINGS_CITIES).toEqual(SETTINGS_COUNTRIES.flatMap((country) => citiesOf(country)))
   })
 
+  it('offers Russia seven cities of Moscow’s time, Moscow first (MOL-412)', () => {
+    expect(citiesOf('RU')).toEqual([
+      'Москва',
+      'Санкт-Петербург',
+      'Волгоград',
+      'Казань',
+      'Краснодар',
+      'Сочи',
+      'Домбай',
+    ])
+  })
+
   it('has no cities for a country it does not offer, nor for a key of Object', () => {
-    expect(citiesOf('RU')).toEqual([])
+    expect(citiesOf('KZ')).toEqual([])
     expect(citiesOf('am')).toEqual([])
+    expect(citiesOf('ru')).toEqual([])
     expect(citiesOf('constructor')).toEqual([])
     expect(citiesOf('__proto__')).toEqual([])
   })
@@ -69,14 +89,17 @@ describe('geographyAllowed (MOL-65, MOL-109)', () => {
     expect(geographyAllowed({ country: 'AM', city: 'Тбилиси' }, held)).toBe(false)
     expect(geographyAllowed({ country: 'GE', city: 'Гюмри' }, held)).toBe(false)
     expect(geographyAllowed({ country: 'RS', city: 'Батуми' }, held)).toBe(false)
+    expect(geographyAllowed({ country: 'RU', city: 'Гюмри' }, held)).toBe(false)
+    expect(geographyAllowed({ country: 'AM', city: 'Москва' }, held)).toBe(false)
   })
 
   it('refuses a city the settings do not offer, unless the person already has exactly it', () => {
     expect(geographyAllowed({ country: 'GE', city: 'Кутаиси' }, held)).toBe(false)
-    expect(geographyAllowed({ country: 'RU', city: 'Москва' }, held)).toBe(false)
-    const moscow = { country: 'RU', city: 'Москва' }
-    expect(geographyAllowed(moscow, moscow)).toBe(true)
-    expect(geographyAllowed({ country: 'RU', city: 'Казань' }, moscow)).toBe(false)
+    expect(geographyAllowed({ country: 'KZ', city: 'Алматы' }, held)).toBe(false)
+    expect(geographyAllowed({ country: 'RU', city: 'Самара' }, held)).toBe(false)
+    const almaty = { country: 'KZ', city: 'Алматы' }
+    expect(geographyAllowed(almaty, almaty)).toBe(true)
+    expect(geographyAllowed({ country: 'KZ', city: 'Астана' }, almaty)).toBe(false)
   })
 
   it('is the rule of a settings update', () => {
@@ -84,7 +107,9 @@ describe('geographyAllowed (MOL-65, MOL-109)', () => {
     const parse = (country: string, city: string) =>
       settingsUpdateSchema.safeParse({ previous, settings: { ...previous, country, city } }).success
     expect(parse('RS', 'Нови-Сад')).toBe(true)
+    expect(parse('RU', 'Домбай')).toBe(true)
     expect(parse('GE', 'Белград')).toBe(false)
+    expect(parse('RU', 'Ереван')).toBe(false)
   })
 })
 
@@ -93,11 +118,19 @@ describe('firstGeography (MOL-109, В-3)', () => {
     expect(firstGeography('Asia/Tbilisi')).toEqual({ country: 'GE', city: 'Тбилиси' })
     expect(firstGeography('Europe/Belgrade')).toEqual({ country: 'RS', city: 'Белград' })
     expect(firstGeography('Asia/Yerevan')).toEqual({ country: 'AM', city: 'Гюмри' })
+    expect(firstGeography('Europe/Moscow')).toEqual({ country: 'RU', city: 'Москва' })
+  })
+
+  it('takes a phone of Volgograd’s own zone to Moscow (MOL-412)', () => {
+    expect(firstGeography('Europe/Volgograd')).toEqual({ country: 'RU', city: 'Москва' })
   })
 
   it('starts everyone else in Gyumri, as every account began before', () => {
     expect(firstGeography(undefined)).toEqual({ country: 'AM', city: 'Гюмри' })
-    expect(firstGeography('Europe/Moscow')).toEqual({ country: 'AM', city: 'Гюмри' })
+    // Russia's zones beyond Moscow's clock are MOL-419's, and Kirov's is no city of the settings
+    expect(firstGeography('Europe/Samara')).toEqual({ country: 'AM', city: 'Гюмри' })
+    expect(firstGeography('Asia/Yekaterinburg')).toEqual({ country: 'AM', city: 'Гюмри' })
+    expect(firstGeography('Europe/Kirov')).toEqual({ country: 'AM', city: 'Гюмри' })
     // a zone of the same offset is another country: Baku and Dubai are not Georgia
     expect(firstGeography('Asia/Baku')).toEqual({ country: 'AM', city: 'Гюмри' })
     expect(firstGeography('')).toEqual({ country: 'AM', city: 'Гюмри' })

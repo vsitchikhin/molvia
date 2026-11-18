@@ -1,21 +1,28 @@
 import { z } from 'zod'
-import { countrySchema, citySchema, COUNTRY_TIME_ZONES } from '#model/values/geo'
+import {
+  countrySchema,
+  citySchema,
+  COUNTRY_PHONE_ZONES,
+  COUNTRY_TIME_ZONES,
+} from '#model/values/geo'
 import { currencySchema } from '#model/values/money'
 import { ISSUE } from '#model/support/errors'
 import { placeNameIdentity } from '#model/values/place-identity'
 
 /**
- * The countries a person may choose, and the cities of each (MOL-89, MOL-109): Armenia from 0.1,
- * Georgia and Serbia from 0.2. A city is its Russian name — the key of a place and of the words a
- * screen prints it with. The first city of a country is the one a change of country lands on, and
- * the one a newcomer whose phone lives in that country starts in.
+ * The countries a person may choose, and the cities of each (MOL-89, MOL-109, MOL-412): Armenia from
+ * 0.1, Georgia and Serbia from 0.2, Russia after them — in the order of their names, which is one in
+ * Russian and in English. A city is its Russian name — the key of a place and of the words a screen
+ * prints it with. The first city of a country is the one a change of country lands on, and the one a
+ * newcomer whose phone lives in that country starts in.
  */
-export const SETTINGS_COUNTRIES = ['AM', 'GE', 'RS'] as const
+export const SETTINGS_COUNTRIES = ['AM', 'GE', 'RU', 'RS'] as const
 export type SettingsCountry = (typeof SETTINGS_COUNTRIES)[number]
 
 export const COUNTRY_CITIES = {
   AM: ['Гюмри', 'Ереван'],
   GE: ['Тбилиси', 'Батуми'],
+  RU: ['Москва', 'Санкт-Петербург', 'Волгоград', 'Казань', 'Краснодар', 'Сочи', 'Домбай'],
   RS: ['Белград', 'Нови-Сад'],
 } as const satisfies Readonly<Record<SettingsCountry, readonly [string, ...string[]]>>
 export type SettingsCity = (typeof COUNTRY_CITIES)[SettingsCountry][number]
@@ -79,15 +86,17 @@ export function sameSettings(a: ActorSettings, b: ActorSettings): boolean {
  * Where a newcomer starts (MOL-109, В-3): the country their phone's time zone lives in, at its first
  * city, else Gyumri — as every account began before Georgia and Serbia. A guess, never asked about:
  * the settings change it in one tap, and it beats landing a person from Belgrade in Gyumri, where
- * their first trip would write a shop.
+ * their first trip would write a shop. A phone may name a zone of the country beside its own — a
+ * Volgograd one is in Moscow (`COUNTRY_PHONE_ZONES`, MOL-412).
  */
 export function firstGeography(zone: string | undefined): {
   readonly country: SettingsCountry
   readonly city: SettingsCity
 } {
-  const country =
-    SETTINGS_COUNTRIES.find((known) => zone !== undefined && COUNTRY_TIME_ZONES[known] === zone) ??
-    'AM'
+  const livesIn = (known: SettingsCountry): boolean =>
+    zone !== undefined &&
+    (COUNTRY_TIME_ZONES[known] === zone || (COUNTRY_PHONE_ZONES[known] ?? []).includes(zone))
+  const country = SETTINGS_COUNTRIES.find(livesIn) ?? 'AM'
   return { country, city: COUNTRY_CITIES[country][0] }
 }
 

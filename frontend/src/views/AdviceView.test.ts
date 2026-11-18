@@ -686,6 +686,21 @@ describe('AdviceView', () => {
       expect(view.get('.dock').text()).not.toContain(en.purchases.capture)
     })
 
+    it('a newcomer in Moscow: no receipt and no camera, whoever the model reads for (MOL-412)', async () => {
+      // Russia is no country a receipt is read in until MOL-414: a button that always ends in «не принят»
+      // is worse than none.
+      advice.mockResolvedValue(answer([], { geography: { country: 'RU', city: 'Москва' } }))
+      const { view } = await render({
+        country: 'RU',
+        city: 'Москва',
+        spendCurrency: 'RUB',
+        receiptsByModel: true,
+      })
+      expect(view.text()).toContain(en.advice.home.new.title)
+      expect(view.text()).not.toContain(en.advice.home.new_capture.title)
+      expect(view.get('.dock').text()).not.toContain(en.purchases.capture)
+    })
+
     it('says no «translates» where the catalogue has not the till’s language — a Serbian receipt (MOL-408)', async () => {
       advice.mockResolvedValue(answer([], { geography: { country: 'RS', city: 'Гюмри' } }))
       const { view } = await render({ country: 'RS' })
