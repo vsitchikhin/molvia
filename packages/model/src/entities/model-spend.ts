@@ -147,3 +147,10 @@ export const trialCapMicroUsd = (capMicroUsd: number): number =>
 
 /** The month a receipt sent on the phone's `day` counts in (MOL-275, MOL-121): its first day, `YYYY-MM-01`. */
 export const receiptsMonthOf = (day: string): string => `${day.slice(0, 7)}-01`
+
+/**
+ * How a receipt the model read was counted (MOL-275): `trial` — a trial receipt and a place in the hundred, `month` — a
+ * place alone, the reading paid. «Переснять» gives back what it took (owner's В-4 «а»), so it is kept.
+ */
+export const RECEIPT_COUNTS = ['trial', 'month'] as const
+export type ReceiptCount = (typeof RECEIPT_COUNTS)[number]

@@ -2360,7 +2360,7 @@ describe('a receipt not read whole, read again by Sonnet (MOL-405)', () => {
     expect(reports).toContainEqual({ kind: 'second_passed', reason: 'trial' })
     expect(await receiptOf(id)).toMatchObject({
       readerVersion: 'claude-haiku-5-5@v5',
-      counted: true,
+      counted: 'trial',
     })
   }, 30_000)
 
@@ -2402,7 +2402,7 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     expect(model.asked).toBe(1)
     expect(await receiptOf(id)).toMatchObject({
       readerVersion: 'claude-haiku-5-5@v5',
-      counted: true,
+      counted: 'trial',
     })
     expect(await countsOf(me)).toEqual({ trial: 9, month: await sentMonthOf(id), read: 1 })
   }, 30_000)
@@ -2419,7 +2419,7 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     expect(model.asked).toBe(1)
     expect(await receiptOf(free)).toMatchObject({
       readerVersion: 'tesseract 5.5.0 · test',
-      counted: false,
+      counted: null,
     })
 
     const shut = await queued(me)
@@ -2439,7 +2439,7 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     await readAll(benchReader(), refused, { payments: true })
     expect(await receiptOf(id)).toMatchObject({
       readerVersion: 'tesseract 5.5.0 · test',
-      counted: false,
+      counted: null,
     })
   }, 30_000)
 
@@ -2452,7 +2452,7 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     expect(await receiptOf(id)).toMatchObject({
       status: 'parsed',
       readerVersion: 'tesseract 5.5.0 · test',
-      counted: false,
+      counted: null,
     })
   }, 30_000)
 
@@ -2480,13 +2480,13 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
         }),
       ),
     )
-    expect(await receiptOf(nothing)).toMatchObject({ failure: 'reshoot', counted: false })
+    expect(await receiptOf(nothing)).toMatchObject({ failure: 'reshoot', counted: null })
     const refusedOne = await queued(me)
     await readAll(
       benchReader(),
       fakeModel(() => Promise.resolve({ kind: 'invalid', costMicroUsd: 1_000, tokens: TOKENS })),
     )
-    expect((await receiptOf(refusedOne))?.counted).toBe(false)
+    expect((await receiptOf(refusedOne))?.counted).toBeNull()
     expect((await countsOf(me))?.trial).toBe(10)
 
     const first = await queued(me)
@@ -2494,9 +2494,9 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
       benchReader(),
       fakeModel(() => read()),
     )
-    expect(await receiptOf(first)).toMatchObject({ tin: '01234567', counted: true })
-    // the same paper again, its first shot removed by «Переснять» meanwhile: one paper, one count
-    await db.update(receipts).set({ deletedAt: new Date() }).where(eq(receipts.id, first))
+    expect(await receiptOf(first)).toMatchObject({ tin: '01234567', counted: 'trial' })
+    // the same paper again, its first shot removed meanwhile — «Удалить», which gives nothing back: one paper, one count
+    await repository.remove(me.id, first)
     const again = await queued(me)
     await readAll(
       benchReader(),
@@ -2504,9 +2504,73 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     )
     expect(await receiptOf(again)).toMatchObject({
       readerVersion: 'claude-haiku-5-5@v5',
-      counted: false,
+      counted: null,
     })
     expect(await countsOf(me)).toMatchObject({ trial: 9, read: 1 })
+  }, 60_000)
+
+  it('gives back what «Переснять» of a counted receipt took, whatever key the retake copies, and «Вернуть» takes it again (В-4 «а»)', async () => {
+    const me = await person(null, MODEL_CONSENT_EDITION, 10)
+    const first = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    const month = await sentMonthOf(first)
+    expect(await countsOf(me)).toEqual({ trial: 9, month, read: 1 })
+
+    await repository.remove(me.id, first, { retake: true })
+    expect(await countsOf(me)).toEqual({ trial: 10, month, read: 0 })
+    expect((await receiptOf(first))?.retakenAt).not.toBeNull()
+    // the retake copied no key at all (adversarial А2 а): it counts as the paper's one count
+    const retake = await queued(me)
+    const keyless = fakeModel(() =>
+      Promise.resolve({
+        kind: 'read',
+        answer: { ...ANSWER, id_rows: ['ԳՀ: 55512345', 'ԿՀ: 000123'] },
+        costMicroUsd: 2_180,
+        tokens: TOKENS,
+      }),
+    )
+    await readAll(benchReader(), keyless)
+    expect((await receiptOf(retake))?.counted).toBe('trial')
+    expect(await countsOf(me)).toEqual({ trial: 9, month, read: 1 })
+
+    // brought back, the first shot takes its count again
+    expect(await repository.restore(me.id, first)).toBe(true)
+    expect(await countsOf(me)).toEqual({ trial: 8, month, read: 2 })
+    expect((await receiptOf(first))?.retakenAt).toBeNull()
+  }, 60_000)
+
+  it('gives back the place alone of a paid receipt, and nothing of «Удалить» or a receipt not counted', async () => {
+    const me = await person(LATER, MODEL_CONSENT_EDITION, 10)
+    const paid = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    expect((await receiptOf(paid))?.counted).toBe('month')
+    await repository.remove(me.id, paid, { retake: true })
+    expect(await countsOf(me)).toMatchObject({ trial: 10, read: 0 })
+
+    const kept = await queued(me)
+    const other = fakeModel(() =>
+      Promise.resolve({
+        kind: 'read',
+        answer: { ...ANSWER, id_rows: ['ՀՎՀՀ: 01234567', 'Ֆիսկալ համար 39999999'] },
+        costMicroUsd: 2_180,
+        tokens: TOKENS,
+      }),
+    )
+    await readAll(benchReader(), other)
+    await repository.remove(me.id, kept)
+    expect(await countsOf(me)).toMatchObject({ trial: 10, read: 1 })
+
+    // a receipt «Переснять» removed before any reading counted it gives nothing back
+    const unread = await queued(me)
+    await repository.remove(me.id, unread, { retake: true })
+    expect(await countsOf(me)).toMatchObject({ trial: 10, read: 1 })
+    expect((await receiptOf(unread))?.retakenAt).toBeNull()
   }, 60_000)
 
   it('reads the hundredth of the month, leaves the next to Tesseract, and reads again in a month after', async () => {

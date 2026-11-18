@@ -36,6 +36,7 @@ import {
   LOCALES,
   LOGIN_CODE_MAX,
   MERGE_SUBJECTS,
+  RECEIPT_COUNTS,
   RECEIPT_TRIAL,
   REMINDERS_OFF,
   baseUnitSchema,
@@ -82,6 +83,7 @@ import {
   spendingPresetSchema,
 } from '@molvia/model'
 import type {
+  ReceiptCount,
   ReceiptLayout,
   BaseUnit,
   Currency,
@@ -2932,9 +2934,13 @@ export const receipts = pgTable(
     sentMonth: date('sent_month')
       .notNull()
       .default(sql`(date_trunc('month', now() at time zone 'Asia/Yerevan'))::date`),
-    // Counted among the model's receipts of its person (MOL-275): its reading by the model reached the review, and no
-    // receipt of theirs of the same tax number and number was counted before — a repeat costs nothing.
-    counted: boolean('counted').notNull().default(false),
+    // Counted among the model's receipts of its person, and how (MOL-275, `RECEIPT_COUNTS`): its reading by the model
+    // reached the review, and no receipt of theirs of the same tax number and number was counted before — a repeat
+    // costs nothing. None — not counted.
+    counted: text('counted').$type<ReceiptCount>(),
+    // When «Переснять» removed it (MOL-275, owner's В-4 «а»): what its count took was given back, and «Вернуть» takes it
+    // again. A count given back stands for no repeat.
+    retakenAt: timestamp('retaken_at', { withTimezone: true }),
     // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
     city: text('city').$type<ReceiptCity>(),
     recordedAt: timestamp('recorded_at', { withTimezone: true }),
@@ -3009,6 +3015,7 @@ export const receipts = pgTable(
     check('receipts_country_known', oneOf(table.country, receiptCountrySchema.options)),
     check('receipts_language_known', oneOf(table.language, LOCALES)),
     check('receipts_currency_known', oneOf(table.currency, currencySchema.options)),
+    check('receipts_counted_known', oneOf(table.counted, RECEIPT_COUNTS)),
     check(
       'receipts_whole_when_queued',
       sql`${table.status} = 'uploading' or ${table.queuedAt} is not null`,

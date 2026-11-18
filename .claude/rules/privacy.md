@@ -219,7 +219,7 @@ The detail behind the privacy lines of `CLAUDE.md`.
   settings on the owner's word. The device's choice and the order of an English day stay on the device.
 - **What the model read of a person is counted on the account** (MOL-275, `receipts.md`): the trial's receipts left,
   the month and the receipts read in it (`actors.trial_receipts_left`, `model_receipts_month`, `model_receipts_read`),
-  and on a receipt the month it counts in and whether it was counted (`sent_month`, `counted`) — not a change of the
+  and on a receipt the month it counts in, how it was counted and when «Переснять» gave that back (`sent_month`, `counted`, `retaken_at`) — not a change of the
   row (0089), in the copy (version 36), gone with the row and the receipt. The page says them under «Чеки», and that
   the model reads the first ten too — a revision, not an edition: edition 5 named Anthropic for a reading that is on,
   and the trial is one. **The record of processing** (12091393) gains them in the line of the receipts on the owner's

@@ -417,8 +417,16 @@ and MOL-283, the screen MOL-276.
   first and at the count's strength): a model's reading `parsed`, read whole or in part. **Not counted:** «переснимите»,
   a failure, an answer not taken and Tesseract's reading after it, the second reading of Sonnet and the brands — the same
   receipt — its parts — one receipt — a Serbian receipt by its link, and **a repeat**: the tax number and the number of
-  another receipt of the person's counted before, still in the table, a removed one included (Р-4), so «Переснять» of a
-  receipt read counts nothing. A receipt with no key counts as its own.
+  another receipt of the person's counted before, still in the table, a removed one included (Р-4). A receipt with no
+  key counts as its own. The receipt keeps how it was counted (`counted`: `trial` — a trial receipt and a place, `month`
+  — a place alone).
+- **«Переснять» gives back what the count took** (owner's В-4 «а», adversarial А2): the key alone missed about half the
+  retakes — two readings of one paper by the model give one key on 21 receipts of 46 (MOL-272's bench), the faded ones
+  that make people retake least of all — so a counted receipt removed by «Переснять» (`remove(…, { retake: true })`,
+  the account's lock first) returns its trial receipt, if it took one, and its place in the hundred while the person's
+  month is the one it was sent in, marked `retaken_at`; the new shot counts as any. One paper, one count, whatever key
+  each shot copied. **«Вернуть» takes them again** (`restore`); a count given back stands for no repeat. «Удалить»
+  gives nothing back.
 - **Checked before the call, counted after it** (Р-5): the claim decides, `reserve` holds the money, `finish` counts.
 - **Near the cap the trial stops first** (owner's В-3 «а»): a person with nothing paid is held to half the month's cap
   (`RECEIPT_TRIAL_CAP_PERCENT`, `trialCapMicroUsd`) in `reserve`'s own statement — refused there, `trial`, the share given
@@ -437,14 +445,15 @@ and MOL-283, the screen MOL-276.
 - **Where a person stands is the server's, to a phone that asks** (`RECEIPTS_ACCESS_HEADER`, `receiptsAccess` of
   `/actors/me`, `receiptsAccessOf`): until when it is paid — none for a grant gone — the trial left of ten, the phone's
   month and what was read of a hundred. An earlier build reads the answer strictly, as with `receiptsByModel`.
-- **The person's**: the three counts on `actors` and a receipt's `sent_month` and `counted` go with the person and the
+- **The person's**: the three counts on `actors` and a receipt's `sent_month`, `counted` and `retaken_at` go with the person and the
   receipt, into the copy (version 36), and `/privacy` says them under «Чеки» (a revision); not a change of the row —
   `updated_at` does not see them (0089). The 0.3 gate's cohort reads `shared_until` alone, as before.
-- **The prices, named:** a removed receipt's row is deleted ten minutes after its removal, so a retake read after that
-  counts again — «Переснять» is read within a minute or two as a rule; a reading in flight as the hundredth or the tenth
+- **The prices, named:** a reading «Переснять» threw away was paid for by the owner — it cannot be kept, the receipt
+  gone and «Вернуть» counting it again — bounded by forty receipts a day and the $2 share; a receipt «Удалить» removed,
+  shot again later than ten minutes after, counts again, its row gone; a reading in flight as the hundredth or the tenth
   lands may make one over — the queue reads one receipt at a time; an account erased and signed in again starts with a
-  new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt has no number (MOL-422), so its
-  retake counts; with payment open, the review says «Строки на фото не разобрать» of a receipt nobody read until MOL-276
+  new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt has no number (MOL-422), so a
+  shot of it again after «Удалить» counts; with payment open, the review says «Строки на фото не разобрать» of a receipt nobody read until MOL-276
   stands the sheet «пробные чеки закончились» before the shot.
 
 ## The class code (MOL-226)

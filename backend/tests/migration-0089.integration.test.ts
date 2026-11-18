@@ -123,7 +123,7 @@ describe('0089: the trial and the months of everything already there', () => {
     expect(after?.updated).toEqual(new Date(UPDATED))
   }, 60_000)
 
-  it('refuses a trial past its ten or below nought, and a count below nought', async () => {
+  it('refuses a trial past its ten or below nought, a count below nought, and a count of no kind', async () => {
     const boris = await owner()
     await expect(
       sql`update actors set trial_receipts_left = 11 where id = ${boris}`,
@@ -134,5 +134,10 @@ describe('0089: the trial and the months of everything already there', () => {
     await expect(
       sql`update actors set model_receipts_read = -1 where id = ${boris}`,
     ).rejects.toThrow(/actors_model_receipts_read_not_negative/u)
+    // a receipt is counted by the trial or by a place, or not at all
+    const kept = await receipt(boris, new Date().toISOString())
+    await expect(sql`update receipts set counted = 'free' where id = ${kept}`).rejects.toThrow(
+      /receipts_counted_known/u,
+    )
   }, 10_000)
 })

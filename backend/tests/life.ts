@@ -178,7 +178,9 @@ export async function aLife(
       balanced: true,
       // the month it counts in, and counted among the model's (MOL-275): fields of the copy, filled in some row
       sentMonth: '2026-09-01',
-      counted: true,
+      counted: 'trial',
+      // as «Переснять» left a receipt it gave the count of back: a field of the copy, filled in some row
+      retakenAt: at,
       recordedAt: at,
       tripId,
     },

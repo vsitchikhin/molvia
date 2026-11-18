@@ -1,5 +1,5 @@
 {
-  "id": "815074a0-a915-442a-bda5-de6821a54336",
+  "id": "3e19a213-7a52-49e9-99dd-6203e67f9412",
   "prevId": "d2994711-0e07-4ebe-82a2-baab20bd6622",
   "version": "7",
   "dialect": "postgresql",
@@ -5868,10 +5868,15 @@
         },
         "counted": {
           "name": "counted",
-          "type": "boolean",
+          "type": "text",
           "primaryKey": false,
-          "notNull": true,
-          "default": false
+          "notNull": false
+        },
+        "retaken_at": {
+          "name": "retaken_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
         },
         "city": {
           "name": "city",
@@ -6080,6 +6085,10 @@
         "receipts_currency_known": {
           "name": "receipts_currency_known",
           "value": "\"receipts\".\"currency\" in ('AMD', 'RUB', 'USD', 'EUR', 'GEL', 'RSD')"
+        },
+        "receipts_counted_known": {
+          "name": "receipts_counted_known",
+          "value": "\"receipts\".\"counted\" in ('trial', 'month')"
         },
         "receipts_whole_when_queued": {
           "name": "receipts_whole_when_queued",

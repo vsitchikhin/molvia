@@ -67,8 +67,8 @@ export const EXPORT_FORMAT = 'molvia-export'
 // «Деньги» count it in, chosen at «Записать», «Закончить» or in «Траты» (MOL-400). 35: the account's `locale`,
 // the language the person's app last spoke, which the bot's rating reminder is written in (MOL-398). 36: the account's
 // `trialReceiptsLeft`, `modelReceiptsMonth` and `modelReceiptsRead`, the trial's receipts left and the receipts the
-// model read in the person's month, and a receipt's `sentMonth` and `counted`, the month it counts in and whether it
-// was counted (MOL-275).
+// model read in the person's month, and a receipt's `sentMonth`, `counted` and `retakenAt`, the month it counts in, how
+// it was counted and when «Переснять» gave that back (MOL-275).
 export const EXPORT_VERSION = 36
 
 const day = z.iso.date()
@@ -414,7 +414,8 @@ const receiptSchema = z.strictObject({
   paidBy: z.string().nullable(),
   balanced: z.boolean(),
   sentMonth: day,
-  counted: z.boolean(),
+  counted: z.string().nullable(),
+  retakenAt: isoDate.nullable(),
   city: z.string().nullable(),
   recordedAt: isoDate.nullable(),
   heard: receiptHeardSchema.nullable(),
