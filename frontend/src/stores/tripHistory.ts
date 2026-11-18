@@ -285,6 +285,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   watch(
     () => actor.id,
     () => {
+      // another person's last answer says nothing of this one's page (MOL-406, adversarial Р4-Г2)
+      lastAnswer.value = null
       restore()
     },
   )

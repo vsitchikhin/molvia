@@ -430,6 +430,24 @@ describe('whether the server has answered an empty history (MOL-77)', () => {
     expect(restart().categoryUnconfirmed()).toEqual(new Set())
   })
 
+  it('another person’s last answer says nothing of the next one’s page in the same window (MOL-406, Р4-Г2)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), categoryId: null }],
+      nextCursor: null,
+    })
+    await store.load()
+    // The next person's shelf, kept from their own visit before: the trip in «Кафе».
+    const shelf = localStorage.getItem(SHELF) ?? ''
+    const theirs = shelf.replace('"categoryId":null', `"categoryId":"${CAFE}"`)
+    expect(theirs).not.toBe(shelf)
+    localStorage.setItem(`molvia.trip-history.${B}`, theirs)
+    useActorStore().id = B
+    await nextTick()
+    expect(store.page.trips[0]?.categoryId).toBe(CAFE)
+    expect(store.categoryUnconfirmed()).toEqual(new Set())
+  })
+
   it('a record with no purchases keeps «0» and no sum on the shelf, not «unknown» (MOL-307)', async () => {
     const store = useTripHistoryStore()
     tripHistory.mockResolvedValueOnce({
