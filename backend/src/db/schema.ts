@@ -2938,8 +2938,9 @@ export const receipts = pgTable(
     // reached the review, and no receipt of theirs of the same tax number and number was counted before — a repeat
     // costs nothing. None — not counted.
     counted: text('counted').$type<ReceiptCount>(),
-    // When «Переснять» removed it (MOL-275, owner's В-4 «а»): what its count took was given back, and «Вернуть» takes it
-    // again. A count given back stands for no repeat.
+    // Set by «Переснять» (MOL-275, owner's В-4 «а»): what its count took was given back, and «Вернуть» takes it again.
+    // Cleared where the receipt inherits the count of another shot of the paper (adversarial Г1) — a count it holds, not
+    // one given back. A count given back stands for no repeat.
     retakenAt: timestamp('retaken_at', { withTimezone: true }),
     // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
     city: text('city').$type<ReceiptCity>(),

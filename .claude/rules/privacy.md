@@ -217,13 +217,13 @@ The detail behind the privacy lines of `CLAUDE.md`.
   names it under «Ваши настройки» — a revision, not an edition: a setting beside the settings, with no new
   recipient or purpose. **The record of processing** (Confluence 12091393) gains it in the line of the
   settings on the owner's word. The device's choice and the order of an English day stay on the device.
-- **What the model read of a person is counted on the account** (MOL-275, `receipts.md`): the trial's receipts left,
-  the month and the receipts read in it (`actors.trial_receipts_left`, `model_receipts_month`, `model_receipts_read`),
-  and on a receipt the month it counts in, how it was counted and when «Переснять» gave that back (`sent_month`, `counted`, `retaken_at`) — not a change of the
-  row (0089), in the copy (version 36), gone with the row and the receipt. The page says them under «Чеки», and that
-  the model reads the first ten too — a revision, not an edition: edition 5 named Anthropic for a reading that is on,
-  and the trial is one. **The record of processing** (12091393) gains them in the line of the receipts on the owner's
-  word.
+- **What the model read of a person is counted on the account** (MOL-275, `receipts.md`): the trial's receipts left, the
+  month and the receipts read in it (`actors.trial_receipts_left`, `model_receipts_month`, `model_receipts_read`), and
+  on a receipt the month it counts in, how it was counted and when «Переснять» gave that back (`sent_month`, `counted`,
+  `retaken_at`) — not a change of the row (0089), in the copy (version 36), gone with the row and the receipt. The page
+  says them under «Чеки», and that the model reads the first ten too — a revision, not an edition: edition 5 named
+  Anthropic for a reading that is on, and the trial is one. **The record of processing** (12091393) gains them in the
+  line of the receipts on the owner's word.
 - **Two years of silence erase the account** (MOL-239, owner's В-2 of MOL-97; decisions of 28.10.2026 in
   `.scratch/tasks/requirements/MOL-239.md`): `last_seen_at` plus two calendar years (`SILENCE_YEARS`, Postgres's
   `make_interval`) is the day, and the page is the specification — «за 30 и за 7 дней бот предупредит… если бот

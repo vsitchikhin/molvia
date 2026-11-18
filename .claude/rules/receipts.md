@@ -162,18 +162,18 @@ Postgres refuses, «2099» and «99:99».
 
 ## The model reads (MOL-272)
 
-**Claude Haiku 5.5 reads the receipts of those it is granted to, and everyone's first ten** (owner, 18.10.2026; the cap 19.10; the trial MOL-275, below;
-the decisions В-1…В-6 of 20.10 in `.scratch/tasks/requirements/MOL-272.md`). `backend/src/receipts/model-reader.ts`:
-every part in one message, the answer by a schema (structured output), `effort: medium`, the prompt
-`model-prompt.ts` — its version beside the model in `reader_version`, `claude-haiku-5-5@v5`.
+**Claude Haiku 5.5 reads the receipts of those it is granted to, and everyone's first ten** (owner, 18.10.2026; the cap
+19.10; the trial MOL-275, below; the decisions В-1…В-6 of 20.10 in `.scratch/tasks/requirements/MOL-272.md`).
+`backend/src/receipts/model-reader.ts`: every part in one message, the answer by a schema (structured output), `effort:
+medium`, the prompt `model-prompt.ts` — its version beside the model in `reader_version`, `claude-haiku-5-5@v5`.
 
 **Who it reads for is a column, the trial and an edition** (В-4, Р-12, MOL-275): `actors.receipts_model_until` still to
 come — a moment, as `shared_until` is, set by hand with `psql` until the paid layer (MOL-271, MOL-283) — or the trial's
 receipts not spent, the month's hundred not read (`readsByModel`, below), and `MODEL_CONSENT_EDITION` (5) accepted,
-since the photo goes to Anthropic, stored in the USA and computed in any country it has capacity in, kept there up to
-30 days (Т-9, MOL-319; edition 3 named the USA alone). Empty, past or ending now with the trial spent, the hundred read,
-or an older edition: Tesseract — or nobody once payment is open (below). **Without `CLAUDE_API_KEY` nobody is read by it.** A person's
-key (`sk-ant-usr-…`) is refused by the API without its workspace, so `CLAUDE_WORKSPACE_ID` names it.
+since the photo goes to Anthropic, stored in the USA and computed in any country it has capacity in, kept there up to 30
+days (Т-9, MOL-319; edition 3 named the USA alone). Empty, past or ending now with the trial spent, the hundred read, or
+an older edition: Tesseract — or nobody once payment is open (below). **Without `CLAUDE_API_KEY` nobody is read by it.**
+A person's key (`sk-ant-usr-…`) is refused by the API without its workspace, so `CLAUDE_WORKSPACE_ID` names it.
 
 **The model copies, our code decides** (MOL-268, «Дальше»): every number of a line in its place — the
 quantity and unit, the shelf price, the line's discount, what was paid — and every amount of the summary
@@ -396,30 +396,30 @@ in `receipt_days`.
 
 **The tariff of receipts, the server's half** (MOL-271, owner's decisions of 20.10.2026; the task's В-1…В-3 and Р-1…Р-8
 of 18.11.2026 in `.scratch/tasks/requirements/MOL-275.md`): every receipt the model reads costs the owner money, so it
-reads for whoever pays — $2 a month, up to a hundred receipts — and for a newcomer's first ten. Payment itself is MOL-277
-and MOL-283, the screen MOL-276.
+reads for whoever pays — $2 a month, up to a hundred receipts — and for a newcomer's first ten. Payment itself is
+MOL-277 and MOL-283, the screen MOL-276.
 
-- **One condition, `readsByModel(month)`** (`actors-repository.ts`): edition 5 and the tariff open (`tariffOpens`) —
-  the reading paid (`receipts_model_until` to come, `PAID_BY_MODEL`) or the trial not spent
-  (`actors.trial_receipts_left` > 0), and the hundred of `month` not read. The claim asks it of the receipt's month, `/actors/me` of the phone's today — Georgia's
-  camera with it (MOL-408). **No column `receipts_until`** (Р-1): `receipts_model_until` meant it already, and a rename
-  goes out in two releases (`deploy.md`); MOL-283 extends this one.
+- **One condition, `readsByModel(month)`** (`actors-repository.ts`): edition 5 and the tariff open (`tariffOpens`) — the
+  reading paid (`receipts_model_until` to come, `PAID_BY_MODEL`) or the trial not spent (`actors.trial_receipts_left` >
+  0), and the hundred of `month` not read. The claim asks it of the receipt's month, `/actors/me` of the phone's today —
+  Georgia's camera with it (MOL-408). **No column `receipts_until`** (Р-1): `receipts_model_until` meant it already, and
+  a rename goes out in two releases (`deploy.md`); MOL-283 extends this one.
 - **The trial is ten receipts of a person's life** (`RECEIPT_TRIAL`): a count on the person that only goes down, every
-  account starting with ten — those before 0089 too — spent only while nothing is paid; paid, a reading leaves it as it is
-  (Р-2's twin: the trial waits for a month unpaid).
+  account starting with ten — those before 0089 too — spent only while nothing is paid; paid, a reading leaves it as it
+  is (Р-2's twin: the trial waits for a month unpaid).
 - **The hundred is of the phone's month the receipt was sent in** (`RECEIPTS_MODEL_MONTH_MAX`, Р-3, MOL-121): the queue
   reads later and has no phone, so `receipts.sent_month` is written as the receipt is taken — the day of its count of
-  the day (`countOfDay`), so it only moves on — and the person's `model_receipts_month` and `model_receipts_read` count it,
-  the month only moving on as the share's does (А4 of MOL-367): a receipt of a month before, read late, counts in the
-  later. **Access granted by hand is under it too** (Р-2), the owner's included. The share keeps its month in UTC — the
-  bill's — so the two months part for four hours at the turn of a month in Yerevan.
+  the day (`countOfDay`), so it only moves on — and the person's `model_receipts_month` and `model_receipts_read` count
+  it, the month only moving on as the share's does (А4 of MOL-367): a receipt of a month before, read late, counts in
+  the later. **Access granted by hand is under it too** (Р-2), the owner's included. The share keeps its month in UTC —
+  the bill's — so the two months part for four hours at the turn of a month in Yerevan.
 - **A reading counts once it reaches the review** (`countModelReceipt` in `finish`, its transaction, the account's lock
   first and at the count's strength): a model's reading `parsed`, read whole or in part. **Not counted:** «переснимите»,
-  a failure, an answer not taken and Tesseract's reading after it, the second reading of Sonnet and the brands — the same
-  receipt — its parts — one receipt — a Serbian receipt by its link, and **a repeat**: the tax number and the number of
-  another receipt of the person's counted before, still in the table, a removed one included (Р-4). A receipt with no
-  key counts as its own. The receipt keeps how it was counted (`counted`: `trial` — a trial receipt and a place, `month`
-  — a place alone).
+  a failure, an answer not taken and Tesseract's reading after it, the second reading of Sonnet and the brands — the
+  same receipt — its parts — one receipt — a Serbian receipt by its link, and **a repeat**: the tax number and the
+  number of another receipt of the person's counted before, still in the table, a removed one included (Р-4). A receipt
+  with no key counts as its own. The receipt keeps how it was counted (`counted`: `trial` — a trial receipt and a place,
+  `month` — a place alone).
 - **«Переснять» gives back what the count took** (owner's В-4 «а», adversarial А2): the key alone missed about half the
   retakes — two readings of one paper by the model give one key on 21 receipts of 46 (MOL-272's bench), the faded ones
   that make people retake least of all — so a counted receipt removed by «Переснять» (`remove(…, { retake: true })`,
@@ -439,33 +439,34 @@ and MOL-283, the screen MOL-276.
   «Вернуть»; the refusal holds the API, where any client may ask.
 - **Checked before the call, counted after it** (Р-5): the claim decides, `reserve` holds the money, `finish` counts.
 - **Near the cap the trial stops first** (owner's В-3 «а»): a person with nothing paid is held to half the month's cap
-  (`RECEIPT_TRIAL_CAP_PERCENT`, `trialCapMicroUsd`) in `reserve`'s own statement — refused there, `trial`, the share given
-  back and **no stop told**, the whole cap still the paid's; refused by the whole cap, `cap` and the stop as before. Half
-  is the owner's first notice, so he hears on the day the trial stops — **told there, at the first refusal, once a
-  month** (adversarial А1): a month the trial alone reads settles below half for good, each call's worst reserved above
-  its own price, and `settle`'s half never came. `readsFor` holds the camera to the same.
+  (`RECEIPT_TRIAL_CAP_PERCENT`, `trialCapMicroUsd`) in `reserve`'s own statement — refused there, `trial`, the share
+  given back and **no stop told**, the whole cap still the paid's; refused by the whole cap, `cap` and the stop as
+  before. Half is the owner's first notice, so he hears on the day the trial stops — **told there, at the first refusal,
+  once a month** (adversarial А1): a month the trial alone reads settles below half for good, each call's worst reserved
+  above its own price, and `settle`'s half never came. `readsFor` holds the camera to the same.
 - **Who reads past them, by the фф `payments`** (owner's В-1 «в»): off, as today, Tesseract reads whom the model does
   not; on — payment open, MOL-277 — nobody does: such a receipt fails `unreadable`, as Georgia's (MOL-408), and the
   purchases are typed by hand; Tesseract stays the reader of whom the model was to read and did not (the cap, the share,
   the trial's half, an answer not taken, the model away) — and of whom the tariff opens and edition 5 does not: the
-  claim carries the tariff apart (`tariffOpens`, adversarial А3), and who has paid is never read by nobody. MOL-440 takes the branch «off» away with the фф.
+  claim carries the tariff apart (`tariffOpens`, adversarial А3), and who has paid is never read by nobody. MOL-440
+  takes the branch «off» away with the фф.
 - **The trial reaches everyone with the release** (owner's В-2 «а»): it is whole by itself — no фф. Edition 5 named
   Anthropic as the recipient «если вам включено» already; the trial is a reading that is on, so the privacy page took a
   revision, not an edition.
 - **Where a person stands is the server's, to a phone that asks** (`RECEIPTS_ACCESS_HEADER`, `receiptsAccess` of
   `/actors/me`, `receiptsAccessOf`): until when it is paid — none for a grant gone — the trial left of ten, the phone's
   month and what was read of a hundred. An earlier build reads the answer strictly, as with `receiptsByModel`.
-- **The person's**: the three counts on `actors` and a receipt's `sent_month`, `counted` and `retaken_at` go with the person and the
-  receipt, into the copy (version 36), and `/privacy` says them under «Чеки» (a revision); not a change of the row —
-  `updated_at` does not see them (0089). The 0.3 gate's cohort reads `shared_until` alone, as before.
+- **The person's**: the three counts on `actors` and a receipt's `sent_month`, `counted` and `retaken_at` go with the
+  person and the receipt, into the copy (version 36), and `/privacy` says them under «Чеки» (a revision); not a change
+  of the row — `updated_at` does not see them (0089). The 0.3 gate's cohort reads `shared_until` alone, as before.
 - **The prices, named:** «Переснять» at the turn of a month gives back a place of the new month, the month a receipt
-  counted in not kept; a reading «Переснять» threw away was paid for by the owner — it cannot be kept, the receipt
-  gone and «Вернуть» counting it again — bounded by forty receipts a day and the $2 share; a receipt «Удалить» removed,
-  shot again later than ten minutes after, counts again, its row gone; a reading in flight as the hundredth or the tenth
+  counted in not kept; a reading «Переснять» threw away was paid for by the owner — it cannot be kept, the receipt gone
+  and «Вернуть» counting it again — bounded by forty receipts a day and the $2 share; a receipt «Удалить» removed, shot
+  again later than ten minutes after, counts again, its row gone; a reading in flight as the hundredth or the tenth
   lands may make one over — the queue reads one receipt at a time; an account erased and signed in again starts with a
   new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt has no number (MOL-422), so a
-  shot of it again after «Удалить» counts; with payment open, the review says «Строки на фото не разобрать» of a receipt nobody read until MOL-276
-  stands the sheet «пробные чеки закончились» before the shot.
+  shot of it again after «Удалить» counts; with payment open, the review says «Строки на фото не разобрать» of a receipt
+  nobody read until MOL-276 stands the sheet «пробные чеки закончились» before the shot.
 
 ## The class code (MOL-226)
 
@@ -655,16 +656,16 @@ receipt proven whole, and its lines of one piece went empty.
   worst prices a person with a Georgian receipt waiting, not one for everybody.
 
 - **The camera in Georgia is for whom the model reads now** (В-2 «а», adversarial А3): `/actors/me` says
-  `receiptsByModel` — the grant to come or the trial, the month's hundred and edition 5 (`readsByModel`, one condition with the queue's, MOL-275), one more call
-  of the largest request fitting the person's share of the month and the month's cap (`readsReceiptsByModel`, the use
-  case, by `ModelSpendRepository.readsFor` and `reserve`'s own inequality, `fits` — `spent < share` offered the camera
-  with $0,002 left, which no call fits, Р2-А1), and a model on the server at all — only to a phone that
-  asks (`RECEIPTS_BY_MODEL_HEADER`; an earlier build reads the answer strictly), and the store keeps it over the
-  settings' answer, which does not say it; one read more a request that asks. Not said — an answer of a server before
-  it, a launch offline — is no camera. **The price, named:** a grant, a share or the cap that ends between the shot and
-  the reading fails the receipt as unreadable; the camera goes some $0,018 before the share's end, where a small photo
-  would still fit; a launch with no connection shows Georgia no camera
-  until `/actors/me` answers.
+  `receiptsByModel` — the grant to come or the trial, the month's hundred and edition 5 (`readsByModel`, one condition
+  with the queue's, MOL-275), one more call of the largest request fitting the person's share of the month and the
+  month's cap (`readsReceiptsByModel`, the use case, by `ModelSpendRepository.readsFor` and `reserve`'s own inequality,
+  `fits` — `spent < share` offered the camera with $0,002 left, which no call fits, Р2-А1), and a model on the server at
+  all — only to a phone that asks (`RECEIPTS_BY_MODEL_HEADER`; an earlier build reads the answer strictly), and the
+  store keeps it over the settings' answer, which does not say it; one read more a request that asks. Not said — an
+  answer of a server before it, a launch offline — is no camera. **The price, named:** a grant, a share or the cap that
+  ends between the shot and the reading fails the receipt as unreadable; the camera goes some $0,018 before the share's
+  end, where a small photo would still fit; a launch with no connection shows Georgia no camera until `/actors/me`
+  answers.
 - **Every item a Georgian line finds is «проверьте»** (В-5 «б», `findsAreGuesses` of the card): the catalogue names
   nothing in Georgian, so a line goes Serbia's way — the search of its name whole, by letters across scripts and by
   meaning — and a find is a guess. The steps of the tax office's lines — a package's code, a delivery or a tip — stay
