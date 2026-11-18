@@ -94,7 +94,7 @@ export interface ExplainedReading {
  * A line put right by the total alone (MOL-290): the one choice that meets a total two places print — never the shop's
  * memory's, whose price was chosen by nothing but itself (MOL-291).
  */
-const byTotal = (line: ReceiptTextLine): boolean =>
+const chosenByTotal = (line: ReceiptTextLine): boolean =>
   line.repaired === true && line.remembered === undefined
 
 /**
@@ -109,7 +109,7 @@ function sumsCopied(lines: readonly ReceiptTextLine[]): boolean {
       (line) =>
         line.sumHundredths !== null &&
         line.sumHundredths > 0 &&
-        (line.repaired !== true || byTotal(line)),
+        (line.repaired !== true || chosenByTotal(line)),
     )
   )
 }
@@ -301,7 +301,7 @@ function verifiedLine(
           line: {
             ...blank(line),
             sumHundredths: sum,
-            ...(byTotal(line) ? { repaired: true } : {}),
+            ...(chosenByTotal(line) ? { repaired: true } : {}),
           },
           reason,
         }
