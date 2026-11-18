@@ -374,6 +374,31 @@ for (const size of ['150%', '200%'])
       )
     })
 
+    test('the longest city, «Санкт-Петербург», stands whole in «Настройки» and «Что брать» (MOL-412)', async ({
+      page,
+    }) => {
+      await signedIn(page, '/settings')
+      const headers = await asBrowser(page)
+      const previous = settingsOf(
+        actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+      )
+      const moved = await page.request.put('/api/actors/me/settings', {
+        headers,
+        data: { previous, settings: { ...previous, country: 'RU', city: 'Санкт-Петербург' } },
+      })
+      expect(moved.ok(), await moved.text()).toBe(true)
+
+      await page.goto('/settings')
+      const city = page.locator('.chosen-words').filter({ hasText: 'Санкт-Петербург' })
+      expect(await pageSideways(page, city)).toBe(0)
+      // the select's chosen words wrap over it, never cut by its box
+      expect(
+        await city.evaluate((words) => words.scrollWidth - words.clientWidth),
+      ).toBeLessThanOrEqual(1)
+      await page.goto('/')
+      expect(await pageSideways(page, page.locator('.intro-title'))).toBe(0)
+    })
+
     test('every screen of «Деньги» stands within the phone', async ({ page }) => {
       test.setTimeout(90_000)
       await signedIn(page)
