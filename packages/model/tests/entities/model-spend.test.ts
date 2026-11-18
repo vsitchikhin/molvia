@@ -6,7 +6,9 @@ import {
   modelCallMicroUsd,
   modelInputTokensMax,
   modelSpendStep,
+  receiptsMonthOf,
   spendMonthOf,
+  trialCapMicroUsd,
   worstCallMicroUsd,
 } from '#model/entities/model-spend'
 
@@ -96,5 +98,17 @@ describe('the month a call is counted in', () => {
     expect(spendMonthOf(new Date('2026-11-01T00:00:00Z'))).toBe('2026-11-01')
     // midnight in Yerevan is still October in UTC
     expect(spendMonthOf(new Date('2026-11-01T01:00:00+04:00'))).toBe('2026-10-01')
+  })
+})
+
+describe('the trial’s part of the cap and the month a receipt counts in (MOL-275)', () => {
+  it('gives the trial half the cap, to the micro-dollar below', () => {
+    expect(trialCapMicroUsd(200_000_000)).toBe(100_000_000)
+    expect(trialCapMicroUsd(3)).toBe(1)
+  })
+
+  it('counts a receipt in the first day of the phone’s month, whatever its day', () => {
+    expect(receiptsMonthOf('2026-11-30')).toBe('2026-11-01')
+    expect(receiptsMonthOf('2026-12-01')).toBe('2026-12-01')
   })
 })

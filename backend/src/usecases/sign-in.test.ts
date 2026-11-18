@@ -38,6 +38,7 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
     acceptConsent: () => Promise.reject(new Error('acceptConsent was not expected')),
     markSeen: () => Promise.resolve(true),
     markLocale: () => Promise.reject(new Error('markLocale was not expected')),
+    modelAccess: () => Promise.reject(new Error('modelAccess was not expected')),
     ...overrides,
   }
 }

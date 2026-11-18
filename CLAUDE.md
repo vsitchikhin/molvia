@@ -115,6 +115,11 @@ same column and the paid layer needs no second migration. Nothing sets it but a 
 брать» below, and what it never opens is anyone's expenses.
 It is accepted that there is no revenue for the first two years.
 
+**Reading receipts by the model has its own access (MOL-275)**: `actors.receipts_model_until`, set by hand until payment
+(MOL-283 extends it), a trial of ten receipts a person, a hundred a month by the phone's month — one condition,
+`readsByModel`; the trial stops at half the month's cap first. Past them Tesseract reads while the фф `payments` is off,
+nobody once it is on. The 0.3 cohort still reads `shared_until` alone.
+
 ---
 
 # Engineering
@@ -711,8 +716,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 ### Receipts — `.claude/rules/receipts.md`
 
-- **Claude Haiku reads the receipts of those it is granted to, Tesseract the rest** (MOL-272): the model
-  only while `actors.receipts_model_until` is to come and edition 5 is accepted, under the month's cap
+- **Claude Haiku reads the receipts of those it is granted to and everyone's first ten, Tesseract the rest** (MOL-272,
+  MOL-275): the model only while `actors.receipts_model_until` is to come or the trial is not spent, the month's
+  hundred not read (`readsByModel`), and edition 5 is accepted, under the month's cap
   (`model_spend`: the worst price reserved before a call, its own after) and the person's share of it, $2 a
   month (`actors.model_spent_micro_usd`, MOL-367); refused, cut, malformed, over the cap or the share or
   away past its wait — Tesseract in `services/receipt-reader`, a container with no database
