@@ -64,8 +64,9 @@ export interface ReceiptTextLine {
    * the one reading of the line that holds its arithmetic and the card's rate, every line then meeting a
    * total two places vouch for. Or a bill's line that prints no price, its price worked out of the sum on a
    * receipt proven whole, the quantity vouched for by nothing (MOL-310, owner's В-6 «а»). Or a line of a sum
-   * alone moved a luma by one swap, the one choice that meets a total two places print — `settled` false: no
-   * arithmetic of its own, so no receipt proven whole by it (MOL-420). Shown with «проверьте», never as printed.
+   * alone moved by one swap within the till's rounding, the one choice that meets a total two places print —
+   * `settled` false: no arithmetic of its own, so no receipt proven whole by it (MOL-420). Shown with «проверьте»,
+   * never as printed.
    */
   readonly repaired?: boolean
   /**
