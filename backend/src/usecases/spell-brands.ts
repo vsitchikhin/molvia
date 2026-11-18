@@ -26,7 +26,7 @@ export type SpellReport =
     }
   | {
       readonly kind: 'brands_passed'
-      readonly reason: 'cap' | 'share' | 'size' | 'refused' | 'cut' | 'invalid'
+      readonly reason: 'cap' | 'share' | 'trial' | 'size' | 'refused' | 'cut' | 'invalid'
       readonly paid?: ModelPaid
     }
   | { readonly kind: 'brands_unavailable'; readonly reason: string }

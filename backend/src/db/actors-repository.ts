@@ -1,5 +1,11 @@
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
-import { MODEL_CONSENT_EDITION, actorSchema, telegramUserIdSchema } from '@molvia/model'
+import type { SQL } from 'drizzle-orm'
+import {
+  MODEL_CONSENT_EDITION,
+  RECEIPTS_MODEL_MONTH_MAX,
+  actorSchema,
+  telegramUserIdSchema,
+} from '@molvia/model'
 import type { Actor, ActorPatch, AppLocale, NewActor, TelegramUserId } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -64,12 +70,20 @@ export interface ActorRepository {
   markLocale(id: string, locale: AppLocale): Promise<boolean>
 }
 
+/** The model's reading is paid for the person now (MOL-275): `receipts_model_until` still to come. */
+export const PAID_BY_MODEL = sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp(), false)`
+
 /**
- * The model reads a person's receipts while `receipts_model_until` is to come and edition `MODEL_CONSENT_EDITION` is
- * accepted (MOL-272): one condition for the queue that reads and the phone that offers the camera (MOL-408).
+ * The model reads a person's receipts of `month` (MOL-272, MOL-275): edition `MODEL_CONSENT_EDITION` accepted, the
+ * reading paid (`receipts_model_until` to come) or the trial not spent, and the month's hundred not read — counted in
+ * the later of `month` and the person's own, as a reading lands (`receipts.counted`). One condition for the queue that
+ * reads and the phone that offers the camera (MOL-408); the money is `ModelSpendRepository`'s.
  */
-export const READS_BY_MODEL = sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp()
-  and ${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}, false)`
+export const readsByModel = (month: SQL): SQL<boolean> => sql<boolean>`coalesce(
+  ${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}
+  and (${PAID_BY_MODEL} or ${actors.trialReceiptsLeft} > 0)
+  and not (${actors.modelReceiptsMonth} >= ${month} and ${actors.modelReceiptsRead} >= ${RECEIPTS_MODEL_MONTH_MAX}),
+  false)`
 
 /**
  * A row becomes an entity only by passing the domain's own schema. The cost is that a row

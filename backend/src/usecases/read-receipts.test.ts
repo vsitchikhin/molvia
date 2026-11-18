@@ -2,22 +2,23 @@ import { describe, expect, it } from 'vitest'
 import { RECEIPT_MODEL, RECEIPT_MODEL_INPUT_MAX, worstCallMicroUsd } from '@molvia/model'
 import type { ModelCall, ModelSpendRepository } from '@/db/model-spend-repository'
 import type { ReceiptModel } from '@/receipts/model-reader'
-import { modelRest, readsReceiptsByModel } from './read-receipts'
+import { modelRest, readsReceiptsByModel, receiptsAccessOf } from './read-receipts'
 
 const refused = (what: string) => () => Promise.reject(new Error(`${what} is not asked`))
 
 function spendAnswering(reads: boolean): ModelSpendRepository & {
-  asked: { month: string; worst: number; call: ModelCall }[]
+  asked: { month: string; worst: number; call: ModelCall; receiptsMonth: string }[]
 } {
-  const asked: { month: string; worst: number; call: ModelCall }[] = []
+  const asked: { month: string; worst: number; call: ModelCall; receiptsMonth: string }[] = []
   return {
     asked,
     reserve: refused('reserve'),
     settle: refused('settle'),
     keepInMonth: refused('keepInMonth'),
     month: refused('month'),
-    readsFor: (month, worst, call) => {
-      asked.push({ month, worst, call })
+    access: refused('access'),
+    readsFor: (month, worst, call, receiptsMonth) => {
+      asked.push({ month, worst, call, receiptsMonth })
       return Promise.resolve(reads)
     },
   }
@@ -33,12 +34,14 @@ describe('readsReceiptsByModel (MOL-408, adversarial А3, Р2-А1)', () => {
       model: { reader: someModel, spend, capMicroUsd: 200_000_000, shareMicroUsd: 2_000_000 },
       now: () => new Date('2026-11-30T23:59:59.000Z'),
     }
-    expect(await readsReceiptsByModel(deps, 'a-person')).toBe(true)
+    // the phone's day already December in the east: the hundred is of its month, the money of UTC's (MOL-275)
+    expect(await readsReceiptsByModel(deps, 'a-person', '2026-12-01')).toBe(true)
     expect(spend.asked).toEqual([
       {
         month: '2026-11-01',
         worst: worstCallMicroUsd(RECEIPT_MODEL_INPUT_MAX, RECEIPT_MODEL),
         call: { actorId: 'a-person', capMicroUsd: 200_000_000, shareMicroUsd: 2_000_000 },
+        receiptsMonth: '2026-12-01',
       },
     ])
   })
@@ -48,11 +51,38 @@ describe('readsReceiptsByModel (MOL-408, adversarial А3, Р2-А1)', () => {
     const deps = {
       model: { reader: someModel, spend, capMicroUsd: 200_000_000, shareMicroUsd: 2_000_000 },
     }
-    expect(await readsReceiptsByModel(deps, 'a-person')).toBe(false)
+    expect(await readsReceiptsByModel(deps, 'a-person', '2026-11-20')).toBe(false)
   })
 
   it('must not ask anything with no model on the server: no camera', async () => {
-    expect(await readsReceiptsByModel({ model: null }, 'a-person')).toBe(false)
+    expect(await readsReceiptsByModel({ model: null }, 'a-person', '2026-11-20')).toBe(false)
+  })
+})
+
+describe('receiptsAccessOf (MOL-275)', () => {
+  it('names the phone’s month, the ten and the hundred beside the person’s figures', async () => {
+    const until = new Date('2026-12-20T08:00:00.000Z')
+    const asked: string[] = []
+    const spend = {
+      access: (_actorId: string, month: string) => {
+        asked.push(month)
+        return Promise.resolve({ until, trialLeft: 4, read: 6 })
+      },
+    }
+    expect(await receiptsAccessOf(spend, 'a-person', '2026-11-30')).toEqual({
+      until,
+      trialLeft: 4,
+      trialOf: 10,
+      month: '2026-11-01',
+      read: 6,
+      limit: 100,
+    })
+    expect(asked).toEqual(['2026-11-01'])
+  })
+
+  it('says nothing of nobody', async () => {
+    const spend = { access: () => Promise.resolve(null) }
+    expect(await receiptsAccessOf(spend, 'gone', '2026-11-30')).toBeNull()
   })
 })
 

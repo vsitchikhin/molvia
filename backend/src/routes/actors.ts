@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   DomainError,
   ERROR,
+  RECEIPTS_ACCESS_HEADER,
   RECEIPTS_BY_MODEL_HEADER,
   actorCodec,
   exportFileCodec,
@@ -32,7 +33,7 @@ import { refuseAnyBody } from './empty-body'
  */
 export function answerWithActor(
   reply: FastifyReply,
-  actor: Actor & Pick<ActorView, 'receiptsByModel'>,
+  actor: Actor & Pick<ActorView, 'receiptsByModel' | 'receiptsAccess'>,
 ): FastifyReply {
   return reply.header('cache-control', 'no-store').send(z.encode(actorCodec, actor))
 }
@@ -44,7 +45,11 @@ export function answerWithActor(
  */
 export function actorMeRoute(
   app: FastifyInstance,
-  readsReceiptsByModel: (actorId: string) => Promise<boolean>,
+  readsReceiptsByModel: (actorId: string, today: string) => Promise<boolean>,
+  receiptsAccess: (
+    actorId: string,
+    today: string,
+  ) => Promise<NonNullable<ActorView['receiptsAccess']> | null>,
 ): void {
   app.get('/actors/me', async (request, reply) => {
     // The row the hook already read: asking for it again would be a second trip to the
@@ -52,15 +57,20 @@ export function actorMeRoute(
     // — the hook guarantees it, and a reader should not have to know that to trust this.
     const actor = request.actor
     if (!actor) throw new DomainError(ERROR.NO_ACTOR)
-    // Whether the model reads the person's receipts, only to a phone that asks: an earlier build reads the answer
-    // strictly (MOL-408). It costs this request one read more — the grant, the person's share and the month's cap are
-    // no fields of the entity the hook holds.
-    if (request.headers[RECEIPTS_BY_MODEL_HEADER.toLowerCase()] !== '1') {
-      return answerWithActor(reply, actor)
-    }
+    // Whether the model reads the person's receipts, and where they stand with it, only to a phone that asks: an
+    // earlier build reads the answer strictly (MOL-408, MOL-275). Each costs this request one read more — the grant,
+    // the trial, the month's hundred, the person's share and the month's cap are no fields of the entity the hook holds.
+    const asks = (header: string) => request.headers[header.toLowerCase()] === '1'
+    const byModel = asks(RECEIPTS_BY_MODEL_HEADER)
+      ? { receiptsByModel: await readsReceiptsByModel(actor.id, request.today) }
+      : {}
+    const access = asks(RECEIPTS_ACCESS_HEADER)
+      ? await receiptsAccess(actor.id, request.today)
+      : null
     return answerWithActor(reply, {
       ...actor,
-      receiptsByModel: await readsReceiptsByModel(actor.id),
+      ...byModel,
+      ...(access === null ? {} : { receiptsAccess: access }),
     })
   })
 }

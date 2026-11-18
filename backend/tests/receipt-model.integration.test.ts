@@ -6,6 +6,8 @@ import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   MODEL_CONSENT_EDITION,
+  RECEIPTS_ACCESS_HEADER,
+  TODAY_HEADER,
   dayIn,
   ownerNoticeSchema,
   receiptDetailCodec,
@@ -23,6 +25,7 @@ import { createStoreMemoryRepository } from '@/db/store-memory-repository'
 import {
   actors,
   modelReceiptDays,
+  modelSpend,
   ownerNotices,
   receiptDays,
   receiptLineImages,
@@ -136,8 +139,15 @@ interface Person {
   readonly cookie: string
 }
 
-/** A person granted the model until `until` and having accepted `edition`. */
-async function person(until: Date | null, edition: number | null = MODEL_CONSENT_EDITION) {
+/**
+ * A person granted the model until `until`, having accepted `edition`, with `trial` receipts of the trial left — none
+ * unless named, so that «no grant» is «not read by the model», as before the trial (MOL-275).
+ */
+async function person(
+  until: Date | null,
+  edition: number | null = MODEL_CONSENT_EDITION,
+  trial = 0,
+) {
   const id = await insertActor(db)
   await db
     .update(actors)
@@ -145,6 +155,7 @@ async function person(until: Date | null, edition: number | null = MODEL_CONSENT
       receiptsModelUntil: until,
       consentVersion: edition,
       consentedAt: edition === null ? null : new Date(),
+      trialReceiptsLeft: trial,
     })
     .where(eq(actors.id, id))
   return { id, cookie: await signIn(db, id) } satisfies Person
@@ -242,6 +253,7 @@ async function readAll(
     receipts = repository,
     second = null,
     rest = modelRest(),
+    payments = false,
   }: {
     cap?: number
     share?: number
@@ -250,6 +262,7 @@ async function readAll(
     receipts?: ReadReceiptsDeps['receipts']
     second?: ReceiptModel | null
     rest?: ModelRest
+    payments?: boolean
   } = {},
 ): Promise<ReadReport[]> {
   const reports: ReadReport[] = []
@@ -276,6 +289,7 @@ async function readAll(
             shareMicroUsd: share,
           },
     storeMemory: memory,
+    payments,
     ...(now === undefined ? {} : { now }),
     ...(told === undefined ? {} : { told }),
   })
@@ -2344,4 +2358,228 @@ describe('a receipt not read whole, read again by Sonnet (MOL-405)', () => {
     expect(reports).toContainEqual({ kind: 'second_passed', reason: 'cap' })
     expect((await month())?.spentMicroUsd).toBe(2_180)
   }, 30_000)
+})
+
+describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
+  /** The person's counts and the receipt's mark, as the reading left them. */
+  const countsOf = async (me: Person) =>
+    onlyRow(
+      await db
+        .select({
+          trial: actors.trialReceiptsLeft,
+          month: actors.modelReceiptsMonth,
+          read: actors.modelReceiptsRead,
+        })
+        .from(actors)
+        .where(eq(actors.id, me.id)),
+    )
+  const sentMonthOf = async (id: string) => (await receiptOf(id))?.sentMonth
+
+  it('reads a newcomer’s receipt by the model, counts it once and spends one of the ten', async () => {
+    const me = await person(null, MODEL_CONSENT_EDITION, 10)
+    const id = await queued(me)
+    const model = fakeModel(() => read())
+    await readAll(benchReader(), model)
+    expect(model.asked).toBe(1)
+    expect(await receiptOf(id)).toMatchObject({
+      readerVersion: 'claude-haiku-5-5@v5',
+      counted: true,
+    })
+    expect(await countsOf(me)).toEqual({ trial: 9, month: await sentMonthOf(id), read: 1 })
+  }, 30_000)
+
+  it('leaves the eleventh to Tesseract while payment is shut, and to nobody once it is open (В-1 «в»)', async () => {
+    const me = await person(null, MODEL_CONSENT_EDITION, 1)
+    await queued(me)
+    const model = fakeModel(() => read())
+    await readAll(benchReader(), model)
+    expect((await countsOf(me))?.trial).toBe(0)
+
+    const free = await queued(me)
+    await readAll(benchReader(), model)
+    expect(model.asked).toBe(1)
+    expect(await receiptOf(free)).toMatchObject({
+      readerVersion: 'tesseract 5.5.0 · test',
+      counted: false,
+    })
+
+    const shut = await queued(me)
+    const reader = benchReader()
+    await readAll(reader, model, { payments: true })
+    expect(reader.asked).toBe(0)
+    expect(model.asked).toBe(1)
+    expect(await receiptOf(shut)).toMatchObject({ status: 'failed', failure: 'unreadable' })
+  }, 30_000)
+
+  it('must not take Tesseract from whom the model was to read and did not, payment open', async () => {
+    const me = await person(LATER)
+    const id = await queued(me)
+    const refused = fakeModel(() =>
+      Promise.resolve({ kind: 'refused', costMicroUsd: 1_000, tokens: TOKENS }),
+    )
+    await readAll(benchReader(), refused, { payments: true })
+    expect(await receiptOf(id)).toMatchObject({
+      readerVersion: 'tesseract 5.5.0 · test',
+      counted: false,
+    })
+  }, 30_000)
+
+  it('spends no trial while the reading is paid, and counts the month all the same', async () => {
+    const me = await person(LATER, MODEL_CONSENT_EDITION, 10)
+    const id = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    expect(await countsOf(me)).toEqual({ trial: 10, month: await sentMonthOf(id), read: 1 })
+  }, 30_000)
+
+  it('counts nothing of a «переснимите», an answer not taken, nor a repeat of a receipt counted', async () => {
+    const me = await person(null, MODEL_CONSENT_EDITION, 10)
+    const nothing = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({
+          kind: 'read',
+          answer: { ...ANSWER, lines: [], totals: [] },
+          costMicroUsd: 1_000,
+          tokens: TOKENS,
+        }),
+      ),
+    )
+    expect(await receiptOf(nothing)).toMatchObject({ failure: 'reshoot', counted: false })
+    const refusedOne = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => Promise.resolve({ kind: 'invalid', costMicroUsd: 1_000, tokens: TOKENS })),
+    )
+    expect((await receiptOf(refusedOne))?.counted).toBe(false)
+    expect((await countsOf(me))?.trial).toBe(10)
+
+    const first = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    expect(await receiptOf(first)).toMatchObject({ tin: '01234567', counted: true })
+    // the same paper again, its first shot removed by «Переснять» meanwhile: one paper, one count
+    await db.update(receipts).set({ deletedAt: new Date() }).where(eq(receipts.id, first))
+    const again = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    expect(await receiptOf(again)).toMatchObject({
+      readerVersion: 'claude-haiku-5-5@v5',
+      counted: false,
+    })
+    expect(await countsOf(me)).toMatchObject({ trial: 9, read: 1 })
+  }, 60_000)
+
+  it('reads the hundredth of the month, leaves the next to Tesseract, and reads again in a month after', async () => {
+    const me = await person(LATER)
+    const hundredth = await queued(me)
+    const month = await sentMonthOf(hundredth)
+    const counted = (at: string, read: number) =>
+      db
+        .update(actors)
+        .set({ modelReceiptsMonth: at, modelReceiptsRead: read })
+        .where(eq(actors.id, me.id))
+    await counted(month ?? '', 99)
+    // each a paper of its own: one fiscal number again would be a repeat, which counts nothing
+    let papers = 0
+    const model = fakeModel(() =>
+      Promise.resolve({
+        kind: 'read',
+        answer: {
+          ...ANSWER,
+          id_rows: ['ՀՎՀՀ: 01234567', `Ֆիսկալ համար ${String(27_410_811 + ++papers)}`],
+        },
+        costMicroUsd: 2_180,
+        tokens: TOKENS,
+      }),
+    )
+    await readAll(benchReader(), model)
+    expect((await receiptOf(hundredth))?.readerVersion).toBe('claude-haiku-5-5@v5')
+    expect((await countsOf(me))?.read).toBe(100)
+
+    const past = await queued(me)
+    await readAll(benchReader(), model)
+    expect(model.asked).toBe(1)
+    expect((await receiptOf(past))?.readerVersion).toBe('tesseract 5.5.0 · test')
+
+    // a hundred of a month gone counts nothing now, and the new month starts at one
+    await counted('2000-01-01', 100)
+    const next = await queued(me)
+    await readAll(benchReader(), model)
+    expect((await receiptOf(next))?.readerVersion).toBe('claude-haiku-5-5@v5')
+    expect(await countsOf(me)).toMatchObject({ month, read: 1 })
+  }, 60_000)
+
+  it('stops the trial at half the month’s cap and tells no stop, while the paid read on (В-3 «а»)', async () => {
+    // 10 000 tokens in and the whole output: the worst of the fake model's call
+    const worst = 9_000
+    const now = () => new Date('2026-11-10T12:00:00Z')
+    await db.insert(modelSpend).values({ month: '2026-11-01', spentMicroUsd: CAP / 2 - worst + 1 })
+    const trial = await person(null, MODEL_CONSENT_EDITION, 10)
+    const paid = await person(LATER, MODEL_CONSENT_EDITION, 10)
+    const onTrial = await queued(trial)
+    const reports = await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+      { now },
+    )
+    expect((await receiptOf(onTrial))?.readerVersion).toBe('tesseract 5.5.0 · test')
+    expect(reports).toContainEqual({ kind: 'model_passed', reason: 'trial' })
+    expect((await spend.month('2026-11-01'))?.noticed).toBe(0)
+    expect((await countsOf(trial))?.trial).toBe(10)
+
+    const onPay = await queued(paid)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+      { now },
+    )
+    expect((await receiptOf(onPay))?.readerVersion).toBe('claude-haiku-5-5@v5')
+  }, 30_000)
+
+  it('says where the person stands to a phone that asks, by the month of its day, and nothing to one that does not', async () => {
+    const day = dayIn(new Date(), 'Asia/Yerevan')
+    const status = async (me: Person, headers: Record<string, string>) =>
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/actors/me',
+          headers: { cookie: me.cookie, [TODAY_HEADER]: day, ...headers },
+        })
+      ).json<Record<string, unknown>>()
+    const newcomer = await person(null, MODEL_CONSENT_EDITION, 10)
+    expect((await status(newcomer, { [RECEIPTS_ACCESS_HEADER]: '1' })).receiptsAccess).toEqual({
+      until: null,
+      trialLeft: 10,
+      trialOf: 10,
+      month: `${day.slice(0, 7)}-01`,
+      read: 0,
+      limit: 100,
+    })
+    expect(Object.keys(await status(newcomer, {}))).not.toContain('receiptsAccess')
+
+    const until = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+    const paid = await person(until, MODEL_CONSENT_EDITION, 3)
+    await db
+      .update(actors)
+      .set({ modelReceiptsMonth: `${day.slice(0, 7)}-01`, modelReceiptsRead: 42 })
+      .where(eq(actors.id, paid.id))
+    expect((await status(paid, { [RECEIPTS_ACCESS_HEADER]: '1' })).receiptsAccess).toMatchObject({
+      until: until.toISOString(),
+      trialLeft: 3,
+      read: 42,
+    })
+    // a grant run out is none: nothing is paid
+    const gone = await person(new Date(Date.now() - 1_000))
+    expect((await status(gone, { [RECEIPTS_ACCESS_HEADER]: '1' })).receiptsAccess).toMatchObject({
+      until: null,
+    })
+  }, 10_000)
 })

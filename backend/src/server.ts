@@ -81,7 +81,12 @@ import { previousItems } from '@/usecases/previous-items'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { mergeTick } from '@/usecases/merge-twins'
-import { modelRest, readQueuedReceipts, readsReceiptsByModel } from '@/usecases/read-receipts'
+import {
+  modelRest,
+  readQueuedReceipts,
+  readsReceiptsByModel,
+  receiptsAccessOf,
+} from '@/usecases/read-receipts'
 import { spelledBrands } from '@/usecases/spell-brands'
 import type { SpellReport } from '@/usecases/spell-brands'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
@@ -1003,6 +1008,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                   ? null
                   : { notices: createOwnerNoticeRepository(db), budget: receiptNotices },
               model: modelDeps,
+              // once a person can pay, nobody reads free (MOL-275, В-1 «в»)
+              payments: ff.has('payments'),
               bind: (claimed, lines, read) =>
                 bindReceiptLines(
                   {
@@ -1256,7 +1263,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       // Before the session is looked up: a foreign page or a link moves nothing (MOL-368).
       guarded.addHook('onRequest', refuseOutsideTheApp)
       withActor(guarded, (token, locale) => authenticate(sessions, actors, token, locale))
-      actorMeRoute(guarded, (id) => readsReceiptsByModel({ model: modelDeps }, id))
+      actorMeRoute(
+        guarded,
+        (id, today) => readsReceiptsByModel({ model: modelDeps }, id, today),
+        (id, today) => receiptsAccessOf(modelSpend, id, today),
+      )
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),
       )

@@ -59,6 +59,7 @@ function harness(
         keepInMonth,
         month: () => Promise.resolve(null),
         readsFor: () => Promise.reject(new Error('readsFor is not asked of brands')),
+        access: () => Promise.reject(new Error('access is not asked of brands')),
       },
       capMicroUsd: CALL.capMicroUsd,
       shareMicroUsd: CALL.shareMicroUsd,

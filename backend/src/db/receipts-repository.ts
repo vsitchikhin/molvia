@@ -20,6 +20,7 @@ import {
   RECEIPTS_UNRECORDED_MAX,
   receiptCard,
   receiptClockOf,
+  receiptsMonthOf,
   serbianReceiptLink,
   withoutItems,
 } from '@molvia/model'
@@ -45,7 +46,7 @@ import type {
   TelegramUserId,
   TripReceiptSource,
 } from '@molvia/model'
-import { READS_BY_MODEL } from './actors-repository'
+import { PAID_BY_MODEL, readsByModel } from './actors-repository'
 import { countOfDay } from './day-count'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -83,9 +84,9 @@ export interface ClaimedReceipt {
   readonly language: ReceiptSummary['language']
   readonly parts: readonly { readonly position: number; readonly photo: Buffer }[]
   /**
-   * The model may read it (MOL-272): granted to its owner until a moment still to come
-   * (`receipts_model_until`, Р-12) and edition `MODEL_CONSENT_EDITION` accepted — by the database's clock,
-   * as the claim reads it.
+   * The model may read it (MOL-272, MOL-275): edition `MODEL_CONSENT_EDITION` accepted, its owner's reading paid
+   * (`receipts_model_until` to come, Р-12) or their trial not spent, and the hundred of the month it was sent in not
+   * read (`readsByModel`) — by the database's clock, as the claim reads it.
    */
   readonly byModel: boolean
   /**
@@ -910,6 +911,32 @@ export async function recordedTwinOf(
   return twin ?? null
 }
 
+/**
+ * A receipt the model read to the review counts among its person's (MOL-275): once, and never where a receipt of
+ * theirs of the same tax number and number counted before — a removed one still in the table too, so «Переснять» of
+ * a receipt read counts nothing; a receipt with neither is its own. Counted in the later of the month it was sent in
+ * and the person's (the month only moves on, as the share's), the trial spent only while nothing is paid.
+ */
+async function countModelReceipt(tx: Conn, id: string): Promise<void> {
+  const [counted] = await tx.execute<{ actorId: string; month: string }>(sql`
+    update ${receipts} r set counted = true
+    where r.id = ${id} and not r.counted
+      and not exists (
+        select 1 from ${receipts} twin
+        where twin.actor_id = r.actor_id and twin.id <> r.id and twin.counted
+          and twin.tin = r.tin and twin.receipt_no = r.receipt_no)
+    returning r.actor_id as "actorId", r.sent_month::text as month`)
+  if (counted === undefined) return
+  await tx.execute(sql`
+    update ${actors}
+    set model_receipts_read =
+          (case when ${actors.modelReceiptsMonth} >= ${counted.month}::date then ${actors.modelReceiptsRead} else 0 end) + 1,
+        model_receipts_month = greatest(${actors.modelReceiptsMonth}, ${counted.month}::date),
+        trial_receipts_left =
+          case when ${PAID_BY_MODEL} then ${actors.trialReceiptsLeft} else greatest(${actors.trialReceiptsLeft} - 1, 0) end
+    where ${actors.id} = ${counted.actorId}`)
+}
+
 export function createReceiptRepository(db: Conn): ReceiptRepository {
   /** Back to the queue from `reading`, its attempt not counted: `release`, `releaseLink` and `rest`, with what else. */
   async function released(id: string, also: { readonly nextAttemptAt?: SQL } = {}): Promise<void> {
@@ -967,6 +994,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               language: body.language,
               currency: receiptCard(body.country).currency,
               capturedAt: body.capturedAt,
+              // the phone's month, by the day the receipt counts in today (MOL-275, MOL-121)
+              sentMonth: receiptsMonthOf(day),
               ...('link' in body
                 ? linkReceipt(body).row
                 : { status: 'uploading', parts: body.parts }),
@@ -1569,7 +1598,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           })
         const [owner] = await tx
           .select({
-            byModel: READS_BY_MODEL,
+            byModel: readsByModel(sql`${receipts.sentMonth}`),
             reviewable: sql<boolean>`coalesce(${actors.consentVersion} >= ${REVIEW_CONSENT_EDITION}, false)`,
           })
           .from(actors)
@@ -1623,12 +1652,15 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async finish(id, outcome) {
+      // a reading of the model that reached the review counts among the person's (MOL-275): their row is written
+      const counts = outcome.kind === 'parsed' && byModel(outcome.readerVersion)
       return db.transaction(async (tx) => {
         // the account before the receipt's row, as erasure takes them (`privacy.md`, review 2 of MOL-360, Б1б):
         // the copy for the review is keyed to the person, and its share of the account was taken after the
-        // receipt, which erasure holding the account waited for
+        // receipt, which erasure holding the account waited for — at the strength of the count's own `UPDATE` where
+        // one follows, never raised after the receipt's row is held
         await tx.execute(
-          sql`select 1 from ${actors} where ${actors.id} = (select ${receipts.actorId} from ${receipts} where ${receipts.id} = ${id}) for key share`,
+          sql`select 1 from ${actors} where ${actors.id} = (select ${receipts.actorId} from ${receipts} where ${receipts.id} = ${id}) ${counts ? sql`for no key update` : sql`for key share`}`,
         )
         const head = outcome.head
         const [done] = await tx
@@ -1665,6 +1697,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
           .returning({ id: receipts.id, source: receipts.source, country: receipts.country })
         if (done === undefined) return null
+        if (counts) await countModelReceipt(tx, id)
         // read or failed, the link of a receipt by its QR code is no longer kept (MOL-232, Р-4)
         await tx.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
         // the measure of 0.2 is the reader's (MOL-222): a receipt from the tax office has nothing in it
