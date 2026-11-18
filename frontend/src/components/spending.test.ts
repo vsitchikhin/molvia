@@ -661,6 +661,14 @@ describe('a line of the journal as its row says it', () => {
     expect(row(trip, beauty).icon).not.toBe(tripIcon)
   })
 
+  it('a line of «Траты» whose trip category the list lacks is the cart with no colour (MOL-406, Р2-Б1)', () => {
+    const value = journalRowProps(
+      { ...trip, categoryId: BEAUTY },
+      { t, locale: 'ru-RU', category: undefined, categoryName: 'Прочее', spendCurrency: 'AMD' },
+    )
+    expect([value.icon, value.tint, value.meta]).toEqual([tripIcon, 'muted', 'Прочее · 9 позиций'])
+  })
+
   it('a trip whose category the phone does not know is the cart with no colour, never «Продукты» (MOL-406, А3)', () => {
     expect(tripLook(undefined)).toEqual({ icon: tripIcon, tint: 'muted' })
     expect(tripLook(null)).toEqual({ icon: categoryIcon(groceries), tint: 'var(--cat-groceries)' })

@@ -340,11 +340,15 @@ export default defineComponent({
     const groceries = computed(
       () => categories.value.find((category) => category.preset === 'groceries') ?? null,
     )
-    function categoryOf(row: JournalRow): SpendingCategoryView | null {
+    /**
+     * A trip's category, «Продукты» where it names none (MOL-400); one the list lacks is not known — `undefined`, the
+     * cart and the name of an unknown spending's (MOL-406, adversarial Р2-Б1).
+     */
+    function categoryOf(row: JournalRow): SpendingCategoryView | null | undefined {
       if (row.kind === 'trip')
-        return (
-          categories.value.find((category) => category.id === row.categoryId) ?? groceries.value
-        )
+        return row.categoryId === null
+          ? groceries.value
+          : categories.value.find((category) => category.id === row.categoryId)
       return categories.value.find((category) => category.id === row.spending.categoryId) ?? null
     }
     function categoryNameOf(row: JournalRow): string {

@@ -393,7 +393,7 @@ export default defineComponent({
      * the person's choice or the guess (`reviewCategory`); one failed keeps the sign of its state.
      */
     function reviewLook(row: ReceiptRow): { readonly icon: Component; readonly tint?: string } {
-      if (row.state === 'failed') return { icon: iconOf(row) }
+      if (row.state === 'failed') return { icon: IconFileAlert }
       const place = row.summary
         ? reviewPlace(row.summary, drafts.draftOf(row.id))
         : (drafts.draftOf(row.id)?.place ?? null)

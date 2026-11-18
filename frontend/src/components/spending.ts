@@ -726,7 +726,8 @@ export function journalRowProps(
   context: {
     readonly t: Translate
     readonly locale: string
-    readonly category: SpendingCategoryView | null
+    /** `undefined` — a trip's category the phone's list lacks: not known, the cart (`tripLook`, MOL-406). */
+    readonly category: SpendingCategoryView | null | undefined
     readonly categoryName: string
     readonly spendCurrency: Currency
     readonly when?: string
@@ -756,7 +757,7 @@ export function journalRowProps(
       : unbroken(t('spending.uncounted_row', {}))
 
   const mark = row.kind === 'manual' ? row.mark : null
-  const look = trip ? tripLook(category) : spendingLook(category)
+  const look = trip ? tripLook(category) : spendingLook(category ?? null)
   return {
     ...look,
     verb: t(trip ? 'spending.row_open_trip' : 'spending.row_open', {}),
