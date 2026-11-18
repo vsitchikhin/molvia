@@ -5,7 +5,7 @@ import { createMemoryHistory, createRouter } from 'vue-router'
 import type { SpendingCategoryView } from '@molvia/model'
 import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
 import NavRow from '@/components/NavRow.vue'
-import { categoryIcon, tripIcon } from '@/components/spending'
+import { categoryIcon, tripIcon, tripLook } from '@/components/spending'
 import TripCategoryRow from '@/components/TripCategoryRow.vue'
 import { createAppI18n } from '@/i18n'
 
@@ -22,7 +22,10 @@ const cafe = preset(2, 'cafe')
 const NAMES: Record<string, string> = { cafe: 'Кафе', groceries: 'Продукты' }
 const nameOf = (category: SpendingCategoryView) => NAMES[category.preset ?? ''] ?? ''
 
-function field(selected: string | null, categories: SpendingCategoryView[] = [groceries, cafe]) {
+function field(
+  selected: string | null | undefined,
+  categories: SpendingCategoryView[] = [groceries, cafe],
+) {
   const view = mount(TripCategoryRow, {
     props: { categories, nameOf, selected },
     global: {
@@ -67,6 +70,18 @@ describe('«Категория ›» of a trip (MOL-400, MOL-406)', () => {
   it('a category the list lacks is not known: the cart, the row’s word, nothing chosen — never «Продукты» (adversarial Р3-В1)', () => {
     const { view, value, icon, chosen } = field('c0000000-0000-4000-8000-0000000000aa')
     expect([value, icon, chosen]).toEqual(['Прочее', tripIcon, null])
+    view.unmount()
+  })
+
+  it('and so is one not said at all — `undefined` is no «Продукты» on its way in (adversarial Р4-Г1)', () => {
+    const { view, value, icon, chosen } = field(undefined)
+    expect([value, icon, chosen]).toEqual(['Прочее', tripIcon, null])
+    view.unmount()
+  })
+
+  it('«Продукты» with no list keeps its preset’s icon, as the row draws it (review №18)', () => {
+    const { view, value, icon } = field(null, [])
+    expect([value, icon]).toEqual(['Продукты', tripLook(null).icon])
     view.unmount()
   })
 })

@@ -3,7 +3,7 @@ import IconCashPlus from '~icons/mdi/cash-plus'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import IconTransferIn from '~icons/mdi/bank-transfer-in'
 import IconTransferOut from '~icons/mdi/bank-transfer-out'
-import { TRIP_CATEGORY, formatEstimate, formatMoney, parseMoney } from '@molvia/model'
+import { formatEstimate, formatMoney, parseMoney } from '@molvia/model'
 import type {
   AccountOperationView,
   Currency,
@@ -13,7 +13,7 @@ import type {
 } from '@molvia/model'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
-import { spendingLook, tripLook, unbroken } from '@/components/spending'
+import { spendingLook, tripCategoryName, tripLook, unbroken } from '@/components/spending'
 import type { OperationRowProps, Translate } from '@/components/spending'
 import { calendarDayOfAnyYear } from '@/days'
 
@@ -160,11 +160,12 @@ export function operationRowProps(
   // spending's, never a guess of «Продукты» (MOL-406, Р2-Б1).
   const tripCategory = operation.categoryId === null ? groceries : (named ?? undefined)
   const category = kind === 'trip' ? (tripCategory ?? null) : named
-  const categoryName = category
-    ? context.nameOf(category)
-    : kind === 'trip' && operation.categoryId === null
-      ? t(`spending.category.${TRIP_CATEGORY}`, {})
-      : t('spending.category.other', {})
+  const categoryName =
+    kind === 'trip'
+      ? tripCategoryName(tripCategory, context.nameOf, t)
+      : category
+        ? context.nameOf(category)
+        : t('spending.category.other', {})
   // «Прочее · сверка»: what «Записать разницу» wrote (handoff 05) — its note and «Прочее».
   const reconciled =
     operation.note !== null &&

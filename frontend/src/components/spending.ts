@@ -716,6 +716,21 @@ export function tripLook(category: SpendingCategoryView | null | undefined): {
 }
 
 /**
+ * A trip's category in words, by `tripLook`'s contract (MOL-406): its name; `null` — «Продукты» by the preset's own
+ * word, list or no list (Р3-В2); `undefined` — not known, the word of an unknown spending's, «Прочее».
+ */
+export function tripCategoryName(
+  category: SpendingCategoryView | null | undefined,
+  nameOf: (category: SpendingCategoryView) => string,
+  t: Translate,
+): string {
+  if (category) return nameOf(category)
+  return category === null
+    ? t(`spending.category.${TRIP_CATEGORY}`, {})
+    : t('spending.category.other', {})
+}
+
+/**
  * A line of the month's journal (MOL-82, handoff 01): a spending of one's own, or a finished trip's
  * purchases in one currency. The amount is as it was spent; under it, for another currency, what the
  * server counted it as — or that it could not. `when` is the day, where rows of different days stand

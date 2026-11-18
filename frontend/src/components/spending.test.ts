@@ -16,6 +16,7 @@ import {
   refusedRows,
   roundsToNought,
   spentApprox,
+  tripCategoryName,
   tripIcon,
   tripLook,
   unbroken,
@@ -659,6 +660,14 @@ describe('a line of the journal as its row says it', () => {
     expect(row(trip, groceries).icon).toBe(categoryIcon(groceries))
     expect(row(trip, null).icon).toBe(categoryIcon(groceries))
     expect(row(trip, beauty).icon).not.toBe(tripIcon)
+  })
+
+  it('a trip’s category in words is one rule for every place: its name, «Продукты», «Прочее» (MOL-406, №18)', () => {
+    const nameOf = (category: SpendingCategoryView) =>
+      category.preset === 'beauty' ? 'Красота' : '?'
+    expect(tripCategoryName(beauty, nameOf, t)).toBe('Красота')
+    expect(tripCategoryName(null, nameOf, t)).toBe('Продукты')
+    expect(tripCategoryName(undefined, nameOf, t)).toBe('Прочее')
   })
 
   it('a line of «Траты» whose trip category the list lacks is the cart with no colour (MOL-406, Р2-Б1)', () => {

@@ -29,7 +29,7 @@ import { TRIP_CATEGORY } from '@molvia/model'
 import type { SpendingCategoryView } from '@molvia/model'
 import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
 import NavRow from '@/components/NavRow.vue'
-import { categoryIcon, chipOrder, tripIcon } from '@/components/spending'
+import { chipOrder, tripCategoryName, tripLook } from '@/components/spending'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 
 /**
@@ -56,7 +56,12 @@ export default defineComponent({
       type: Function as PropType<(category: SpendingCategoryView) => string>,
       required: true,
     },
-    selected: { type: String as PropType<string | null>, default: null },
+    /**
+     * The trip's category: `null` — it names none, «Продукты»; absent or `undefined` — one the phone does not know.
+     * No default: Vue gave an `undefined` the default `null`, and the field said «Продукты» of a category not known
+     * (adversarial Р4-Г1).
+     */
+    selected: { type: String as PropType<string | null | undefined>, default: undefined },
     disabled: { type: Boolean, default: false },
   },
   emits: { pick: (id: string) => typeof id === 'string' },
@@ -89,16 +94,10 @@ export default defineComponent({
         props.frequent,
       ),
     )
-    const name = computed(() => {
-      if (shown.value) return props.nameOf(shown.value)
-      return shown.value === null
-        ? t(`spending.category.${TRIP_CATEGORY}`)
-        : t('spending.category.other')
-    })
-    const icon = computed(() => {
-      if (shown.value) return categoryIcon(shown.value)
-      return shown.value === null ? undefined : tripIcon
-    })
+    // the row's own rule, word and icon (`tripCategoryName`, `tripLook`): «Продукты» with no list takes its preset's
+    // icon here too (review №18)
+    const name = computed(() => tripCategoryName(shown.value, props.nameOf, t))
+    const icon = computed(() => tripLook(shown.value).icon)
     return { t, open, shown, choice, name, icon }
   },
 })
