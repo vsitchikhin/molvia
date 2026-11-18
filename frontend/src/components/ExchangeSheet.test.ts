@@ -258,7 +258,7 @@ describe('ExchangeSheet', () => {
 
     const second = await render()
     expect(second.text()).toContain('held before the exchange')
-    expect(second.text()).toContain('By the recorded spending')
+    expect(second.text()).toContain('By the recorded expenses')
     expect(second.text()).toContain('20,000')
   })
 

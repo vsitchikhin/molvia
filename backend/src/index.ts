@@ -1,4 +1,5 @@
 import process from 'node:process'
+import { RECEIPT_SECOND_MODEL } from '@molvia/model'
 import { env } from './env'
 import { getDb } from '@/db'
 import { describeMigrationFailure } from '@/db/failure'
@@ -29,6 +30,11 @@ import { buildServer } from './server'
 // Every answer is counted only where somebody scrapes the count (MOL-145): production names the port.
 const http = env.METRICS_PORT === undefined ? undefined : httpMetrics()
 
+const claude =
+  env.CLAUDE_API_KEY === undefined
+    ? null
+    : { apiKey: env.CLAUDE_API_KEY, workspaceId: env.CLAUDE_WORKSPACE_ID }
+
 // The model of the search by meaning loads in the background (MOL-105): the API answers by the
 // letters until it is ready, and without its files, for good. The receipt reader is asked only
 // where it is named (MOL-125).
@@ -42,11 +48,10 @@ const app = buildServer({
     : {}),
   receiptReader:
     env.RECEIPT_READER_URL === undefined ? null : receiptReader(env.RECEIPT_READER_URL),
-  // the model reads only the receipts it is granted to (MOL-272), and only where its key is set
-  receiptModel:
-    env.CLAUDE_API_KEY === undefined
-      ? null
-      : receiptModel({ apiKey: env.CLAUDE_API_KEY, workspaceId: env.CLAUDE_WORKSPACE_ID }),
+  // the model reads only the receipts it is granted to (MOL-272), and only where its key is set; a receipt the first
+  // did not read whole is read again by Sonnet, the same key (MOL-405)
+  receiptModel: claude && receiptModel(claude),
+  receiptSecondModel: claude && receiptModel({ ...claude, model: RECEIPT_SECOND_MODEL }),
 })
 
 // Migrations run at boot rather than as a separate deploy step: there is one instance,

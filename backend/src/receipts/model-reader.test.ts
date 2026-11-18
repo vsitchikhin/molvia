@@ -103,6 +103,20 @@ describe('the model that reads receipts (MOL-272)', () => {
     expect(content?.map((block) => block.type)).toEqual(['image', 'image', 'text'])
   })
 
+  it('reads by Sonnet where asked to, the same prompt and effort, its version and its price its own (MOL-405)', async () => {
+    const { fetch, sent } = api(() => message({ model: 'claude-sonnet-5-5' }))
+    const reader = receiptModel({ apiKey: 'k', fetch, model: 'claude-sonnet-5-5' })
+    expect([reader.model, reader.version]).toEqual(['claude-sonnet-5-5', 'claude-sonnet-5-5@v5'])
+    const got = await reader.read([jpeg(10, 10)])
+    expect(got).toMatchObject({ kind: 'read', costMicroUsd: 33_062 })
+    expect(sent[0]?.body).toMatchObject({
+      model: 'claude-sonnet-5-5',
+      output_config: { effort: 'medium' },
+    })
+    const haiku = receiptModel({ apiKey: 'k', fetch })
+    expect([haiku.model, haiku.version]).toEqual(['claude-haiku-5-5', 'claude-haiku-5-5@v5'])
+  })
+
   it('names no workspace for a key made inside one', async () => {
     const { fetch, sent } = api(() => message())
     await model(fetch).read([jpeg(10, 10)])

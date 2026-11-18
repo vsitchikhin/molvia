@@ -151,7 +151,7 @@ import IconLock from '~icons/mdi/lock-outline'
 import IconQrcode from '~icons/mdi/qrcode-scan'
 import IconQrcodeRemove from '~icons/mdi/qrcode-remove'
 import IconSun from '~icons/mdi/white-balance-sunny'
-import { LOCALES, serbianReceiptLink } from '@molvia/model'
+import { pickLocale, serbianReceiptLink } from '@molvia/model'
 import type { ReceiptLinkRefusal, ReceiptVia } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppField from '@/components/AppField.vue'
@@ -331,7 +331,8 @@ export default defineComponent({
 
     /** The link into the receipts' queue; the sheet stays at work for a double tap, then goes. */
     async function queued(link: string, via: ReceiptVia): Promise<boolean> {
-      const language = LOCALES.find((one) => one === locale.value) ?? 'ru'
+      // The language, not the tag the screen formats by: `en-GB` is English (MOL-398).
+      const language = pickLocale(locale.value)
       const kept = queue.sendLink({
         id: newId(),
         link,

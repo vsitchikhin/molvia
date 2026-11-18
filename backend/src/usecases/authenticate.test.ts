@@ -27,10 +27,15 @@ const actor = actorSchema.parse({
   updatedAt: new Date('2026-09-16T10:00:00.000Z'),
 })
 
-function live(lastSeenAt: Date, actorSeenAt: Date = new Date(Date.now() - 3_600_000)): LiveSession {
+function live(
+  lastSeenAt: Date,
+  actorSeenAt: Date = new Date(Date.now() - 3_600_000),
+  actorLocale: LiveSession['actorLocale'] = null,
+): LiveSession {
   return {
     actor,
     actorSeenAt,
+    actorLocale,
     session: sessionSchema.parse({
       id: SESSION_ID,
       actorId: ACTOR_ID,
@@ -56,11 +61,15 @@ function fakeSessions(overrides: Partial<SessionRepository> = {}): SessionReposi
   }
 }
 
-type Visits = Pick<ActorRepository, 'markSeen'>
+type Visits = Pick<ActorRepository, 'markSeen' | 'markLocale'>
 
-/** A visit is not expected unless a test says so: the fresh one must not go to the database. */
+/**
+ * A visit is not expected unless a test says so: the fresh one must not go to the database. Nor is a
+ * language: a request that names none, or the same, sends no statement (MOL-398).
+ */
 const noVisit: Visits = {
   markSeen: () => Promise.reject(new Error('markSeen was not expected')),
+  markLocale: () => Promise.reject(new Error('markLocale was not expected')),
 }
 
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000)
@@ -146,7 +155,7 @@ describe('последний визит (MOL-238)', () => {
       liveByToken: () => Promise.resolve(live(hoursAgo(1), hoursAgo(ACCOUNT_SEEN_AFTER_HOURS + 1))),
     })
 
-    const authenticated = await authenticate(sessions, { markSeen }, TOKEN)
+    const authenticated = await authenticate(sessions, { ...noVisit, markSeen }, TOKEN)
 
     expect(markSeen).toHaveBeenCalledExactlyOnceWith(ACTOR_ID, ACCOUNT_SEEN_AFTER_HOURS)
     expect(authenticated.refreshedUntil).toBeNull()
@@ -184,8 +193,41 @@ describe('последний визит (MOL-238)', () => {
       return Promise.resolve(false)
     })
 
-    await authenticate(sessions, { markSeen }, TOKEN)
+    await authenticate(sessions, { ...noVisit, markSeen }, TOKEN)
 
     expect(order).toEqual(['touch', 'seen'])
+  })
+})
+
+describe('язык приложения (MOL-398)', () => {
+  it('пишет язык, который назвал телефон, когда он другой', async () => {
+    const markLocale = vi.fn(() => Promise.resolve(true))
+    const sessions = fakeSessions({
+      liveByToken: () => Promise.resolve(live(hoursAgo(1), hoursAgo(1), 'ru')),
+    })
+
+    await authenticate(sessions, { ...noVisit, markLocale }, TOKEN, 'en')
+
+    expect(markLocale).toHaveBeenCalledExactlyOnceWith(ACTOR_ID, 'en')
+  })
+
+  it('пишет и первый: пустой — ещё никем не названный', async () => {
+    const markLocale = vi.fn(() => Promise.resolve(true))
+    const sessions = fakeSessions({
+      liveByToken: () => Promise.resolve(live(hoursAgo(1), hoursAgo(1), null)),
+    })
+
+    await authenticate(sessions, { ...noVisit, markLocale }, TOKEN, 'ru')
+
+    expect(markLocale).toHaveBeenCalledExactlyOnceWith(ACTOR_ID, 'ru')
+  })
+
+  it('тот же язык или никакой — в базу не ходит', async () => {
+    const sessions = fakeSessions({
+      liveByToken: () => Promise.resolve(live(hoursAgo(1), hoursAgo(1), 'en')),
+    })
+
+    await expect(authenticate(sessions, noVisit, TOKEN, 'en')).resolves.toMatchObject({ actor })
+    await expect(authenticate(sessions, noVisit, TOKEN)).resolves.toMatchObject({ actor })
   })
 })

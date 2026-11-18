@@ -6,11 +6,13 @@ import { defineComponent, h, nextTick } from 'vue'
 import { createMemoryHistory, createRouter, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import en from '@/i18n/en.json'
+import ru from '@/i18n/ru.json'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import {
   direction,
   installArrival,
+  screenNamer,
   installHeightHold,
   installViewTransitions,
   releaseHeightHold,
@@ -311,6 +313,25 @@ describe('installArrival', () => {
     )
     return { router, view }
   }
+
+  it('names the tab again in a language chosen, and leaves a title that is not its own (MOL-398, А1)', async () => {
+    const router = routerAt()
+    await router.push('/')
+    const i18n = createAppI18n('en')
+    installArrival(router, (key) => i18n.global.t(key))
+    expect(document.title).toBe(`${en.advice.title} · ${en.app.name}`)
+    i18n.global.locale.value = 'ru'
+    await nextTick()
+    expect(document.title).toBe(`${ru.advice.title} · ${ru.app.name}`)
+
+    document.title = 'Вход · Molvia'
+    i18n.global.locale.value = 'en'
+    await nextTick()
+    expect(document.title).toBe('Вход · Molvia')
+    // The door gives it back by the route, in the language spoken now.
+    screenNamer()?.()
+    expect(document.title).toBe(`${en.advice.title} · ${en.app.name}`)
+  })
 
   it('names the tab after the screen from the start', async () => {
     const { view } = await app()

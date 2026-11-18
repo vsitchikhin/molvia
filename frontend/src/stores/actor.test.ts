@@ -740,3 +740,24 @@ describe('when the server last said the settings (MOL-215)', () => {
     expect(kept.readAt).toBe(READ.toISOString())
   })
 })
+
+describe('whether the model reads the receipts (MOL-408)', () => {
+  it('is kept from `/actors/me` past the settings’ answer, which does not say it', async () => {
+    me.mockResolvedValue({ ...FIRST, receiptsByModel: true })
+    const { store } = await freshStore()
+    await store.start()
+    expect(store.actor?.receiptsByModel).toBe(true)
+
+    store.apply({ ...FIRST, city: 'Ереван', updatedAt: new Date('2026-12-01T00:00:00.000Z') })
+    expect([store.actor?.city, store.actor?.receiptsByModel]).toEqual(['Ереван', true])
+  })
+
+  it('is said again by the next `/actors/me`, a grant ended included', async () => {
+    me.mockResolvedValue({ ...FIRST, receiptsByModel: true })
+    const { store } = await freshStore()
+    await store.start()
+    me.mockResolvedValue({ ...FIRST, receiptsByModel: false })
+    await store.start()
+    expect(store.actor?.receiptsByModel).toBe(false)
+  })
+})

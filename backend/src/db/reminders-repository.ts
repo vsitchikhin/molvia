@@ -1,6 +1,7 @@
 import { sql } from 'drizzle-orm'
 import { PENDING_VERDICTS_LIMIT, localClock, switchReminders, timeZoneOf } from '@molvia/model'
 import type {
+  AppLocale,
   PendingVerdict,
   ReminderLadder,
   ReminderPlan,
@@ -17,6 +18,8 @@ export interface ReminderCandidate {
   readonly actorId: string
   readonly telegramUserId: number
   readonly country: string
+  /** The language their app last spoke (MOL-398): what the reminder is written in; none — Russian. */
+  readonly locale: AppLocale | null
   readonly ladder: ReminderLadder | null
   /** A live verdict of theirs written after their last reminder — the ladder starts over (Л-1). */
   readonly ratedSince: boolean
@@ -120,6 +123,7 @@ export function createReminderRepository(db: Conn): ReminderRepository {
         actor_id: string
         telegram_user_id: number
         country: string
+        locale: AppLocale | null
         step: ReminderStep | null
         reminded_on: string | null
         window_from: string | null
@@ -131,6 +135,7 @@ export function createReminderRepository(db: Conn): ReminderRepository {
           a.id as actor_id,
           a.telegram_user_id::float8 as telegram_user_id,
           a.country,
+          a.locale,
           r.step,
           to_char(r.reminded_on, 'YYYY-MM-DD') as reminded_on,
           to_char(r.window_from, 'YYYY-MM-DD') as window_from,
@@ -164,6 +169,7 @@ export function createReminderRepository(db: Conn): ReminderRepository {
         actorId: row.actor_id,
         telegramUserId: row.telegram_user_id,
         country: row.country.trim(),
+        locale: row.locale,
         ladder:
           row.step !== null && row.reminded_on !== null && row.window_from !== null
             ? { step: row.step, remindedOn: row.reminded_on, windowFrom: row.window_from }

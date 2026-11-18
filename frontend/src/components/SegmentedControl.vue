@@ -7,6 +7,7 @@
         :key="option.value"
         class="segment"
         :class="{ on: option.value === modelValue }"
+        :lang="option.lang"
       >
         <input
           class="radio"
@@ -37,6 +38,8 @@ export interface Segment {
   label: string
   /** Said instead of the label where the label is a sign: «Драмы», not «֏» (MOL-82). */
   spoken?: string
+  /** The label's own language where it is not the screen's: «English» on a Russian screen (MOL-398). */
+  lang?: string
 }
 
 /** More than this stops fitting a phone's width; the handoff sends it to a `<select>`. */

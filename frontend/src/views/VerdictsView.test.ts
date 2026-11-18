@@ -506,7 +506,7 @@ describe('VerdictsView', () => {
 
     expect(view.get('.question').text()).toContain('Хлеб')
     expect(view.get('.notice').text()).toContain('Молоко «Ашхар»')
-    expect(view.get('.notice').text()).toContain('comes back next')
+    expect(view.get('.notice').text()).toContain('it’s next in line again')
 
     // Done with the bread, the refused one is next — and the notice has nothing left to say.
     await button(view, en.verdict.skip).trigger('click')

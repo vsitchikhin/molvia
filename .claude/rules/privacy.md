@@ -211,6 +211,12 @@ The detail behind the privacy lines of `CLAUDE.md`.
   with the switch off and with no edition accepted, in the copy (version 24), gone with the row, a line
   of the record of processing; the page names it under «Ваши настройки», and says that after a long
   silence keeping the account takes a login, not only opening the app — both revisions.
+- **The language the app last spoke is kept on the account** (MOL-398, owner's В-1 «в»): `actors.locale`,
+  `ru` or `en`, written by the guard where a request names another (`LOCALE_HEADER`), for the bot's rating
+  reminder alone; not a change of the row (0087), in the copy (version 35), gone with the row. The page
+  names it under «Ваши настройки» — a revision, not an edition: a setting beside the settings, with no new
+  recipient or purpose. **The record of processing** (Confluence 12091393) gains it in the line of the
+  settings on the owner's word. The device's choice and the order of an English day stay on the device.
 - **Two years of silence erase the account** (MOL-239, owner's В-2 of MOL-97; decisions of 28.10.2026 in
   `.scratch/tasks/requirements/MOL-239.md`): `last_seen_at` plus two calendar years (`SILENCE_YEARS`, Postgres's
   `make_interval`) is the day, and the page is the specification — «за 30 и за 7 дней бот предупредит… если бот

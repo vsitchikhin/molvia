@@ -60,6 +60,8 @@ describe('actorCodec', () => {
       'createdAt',
       'id',
       'incomeCurrency',
+      // whether the model reads the person's receipts: optional, and sent only to a phone that asks (MOL-408)
+      'receiptsByModel',
       'spendCurrency',
       'updatedAt',
     ])

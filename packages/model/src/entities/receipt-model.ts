@@ -14,6 +14,7 @@ import {
   printedDayOf,
 } from '#model/entities/receipt-text'
 import type { ReceiptPaidBy } from '#model/entities/receipt'
+import { digitCounts } from '#model/entities/receipt-card'
 import type { PhotoReading } from '#model/entities/receipt-card'
 import type { ReceiptText, ReceiptTextLine, TextRow } from '#model/entities/receipt-text'
 import { z } from 'zod'
@@ -135,13 +136,19 @@ const clockOf = (time: string | null): string | null => {
 }
 
 /**
- * Every number of eight digits the rows the model copied print after a word of the card. The model copies the
- * rows with their labels and never says which number is which (review №10, adversarial А6): asked for the tax
- * number, it gave «Ереван Сити»'s till registration «ԳՀ» printed under it, and the shop's tax number as the
- * fiscal one — the key of every receipt of that till, and the next one «recorded before».
+ * Every number of the card's digits the rows the model copied print after a word of the card (MOL-408: Armenia's
+ * eight, Georgia's tax number nine or eleven). The model copies the rows with their labels and never says which
+ * number is which (review №10, adversarial А6): asked for the tax number, it gave «Ереван Сити»'s till registration
+ * «ԳՀ» printed under it, and the shop's tax number as the fiscal one — the key of every receipt of that till, and the
+ * next one «recorded before».
  */
-function labelled(answer: ModelReceipt, word: string, between: string): string[] {
-  const pattern = new RegExp(`(?:${word})${between}(?<!\\d)(\\d{8})(?!\\d)`, 'giu')
+function labelled(
+  answer: ModelReceipt,
+  word: string,
+  between: string,
+  digits: readonly number[],
+): string[] {
+  const pattern = new RegExp(`(?:${word})${between}(?<!\\d)(${digitCounts(digits)})(?!\\d)`, 'giu')
   return answer.id_rows.flatMap((row) => [...row.matchAll(pattern)].map((found) => found[1] ?? ''))
 }
 
@@ -159,8 +166,9 @@ const timesPrinted = (answer: ModelReceipt, number: string): number =>
 /**
  * The seller's tax number and the receipt's number, the key against a second record (Т-11), in Tesseract's
  * form and by its words — or one paper read by the two readers is two keys and recorded twice (adversarial
- * А5, А6): the eight digits after «ՀՎՀՀ», and the fiscal number, eight digits after «Ֆիսկալ», leading zeros
- * kept. **Never «ԿՀ»**: a till's own count, repeated by the shop's other tills. **Never a number the rows
+ * А5, А6): the card's digits after its word — Armenia's eight after «ՀՎՀՀ», Georgia's nine or eleven after «ს/კ»
+ * (MOL-408) — and the fiscal number, the card's digits after «Ֆիսկալ», leading zeros kept. **Never «ԿՀ»**: a
+ * till's own count, repeated by the shop's other tills. **Never a number the rows
  * print under another label too** — the shop's tax number, the till's registration: the same on every
  * receipt of the till, and every one after the first «recorded before» (adversarial А6, round 4). The tax
  * number keeps no such guard: it is the same on every receipt anyway, and the bench's one number under two
@@ -171,14 +179,19 @@ function keyOf(
   reading: PhotoReading,
   answer: ModelReceipt,
 ): { tin: string | null; number: string | null } {
-  const fiscals = labelled(answer, reading.words.fiscal, '\\S*(?:\\s+\\S*)?\\s*')
+  const fiscals = labelled(
+    answer,
+    reading.words.fiscal,
+    '\\S*(?:\\s+\\S*)?\\s*',
+    reading.fiscalDigits,
+  )
   const distinct = [...new Set(fiscals)].sort()
   // each under its own label alone: one printed under another too is a constant of the till (А6, round 4)
   const own = distinct.every(
     (fiscal) => timesPrinted(answer, fiscal) === fiscals.filter((one) => one === fiscal).length,
   )
   return {
-    tin: oneOf(labelled(answer, reading.words.tin, '\\S{0,2}\\s*')),
+    tin: oneOf(labelled(answer, reading.words.tin, '\\S{0,2}\\s*', reading.tinDigits)),
     // a prepayment slip printed over «Ереван Сити»'s receipt has a fiscal number of its own, and the model
     // copies the two in either order: the pair is the paper's key, as either alone would be (MOL-293, В-3 «а»)
     number: !own || distinct.length === 0 || distinct.length > 2 ? null : distinct.join('+'),

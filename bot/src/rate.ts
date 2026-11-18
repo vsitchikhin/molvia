@@ -5,7 +5,7 @@ import type { MolviaBotClient } from '@molvia/client'
 import { ERROR, ISSUE } from '@molvia/model'
 import { dropKeyboard, refuse, settleKeeping, shownText, stopSpinner } from './answer'
 import { t } from './i18n'
-import { SCALE_DATA, keyboardOf, readText, scale, writeText } from './remind'
+import { SCALE_DATA, keyboardOf, languageOfText, readText, scale, writeText } from './remind'
 import { handlerOf, reportDefect } from './failure'
 
 export interface RateDeps {
@@ -25,6 +25,8 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
 
   composer.chatType('private').callbackQuery(SCALE_DATA, async (ctx) => {
     const [, itemId = '', digit = ''] = ctx.match
+    // The message's language, read off it: the outcome, a refusal and the scale rebuilt (MOL-398).
+    const language = languageOfText(shownText(ctx.callbackQuery.message))
     const score = Number(digit)
 
     // The API call alone is inside the `try`, as in `login.ts`: a Telegram failure after the
@@ -39,9 +41,9 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
         // An erased account or an item gone: no press of the scale can succeed again. The switch
         // under the last message of the evening still can, and it is that evening's only one
         // (review №3).
-        await refuse(ctx, 'rate.gone')
+        await refuse(ctx, 'rate.gone', language)
         const { offer } = keyboardOf(ctx.callbackQuery.message?.reply_markup)
-        await dropKeyboard(ctx, offer ? scale(undefined, undefined, offer) : undefined)
+        await dropKeyboard(ctx, offer ? scale(undefined, undefined, offer, language) : undefined)
         return
       }
       console.error(
@@ -49,18 +51,18 @@ export function rateComposer({ api }: RateDeps): Composer<Context> {
       )
       reportDefect(api, error, handlerOf(ctx))
       // The scale stays: a repeat is harmless, and «press again» must leave something to press.
-      await refuse(ctx, 'rate.failed')
+      await refuse(ctx, 'rate.failed', language)
       return
     }
 
-    const outcome = t(ctx.from.language_code, 'rate.done', { score })
+    const outcome = t(language, 'rate.done', { score })
     const message = ctx.callbackQuery.message
     // The switch's row and its outcome stay as the message holds them (MOL-103, Р-7).
     const { offer } = keyboardOf(message?.reply_markup)
     const shown = shownText(message)
     try {
       const text = shown === null ? null : writeText({ ...readText(shown), rated: outcome })
-      await settleKeeping(ctx, text, scale(itemId, score, offer), outcome)
+      await settleKeeping(ctx, text, scale(itemId, score, offer, language), outcome)
     } finally {
       await stopSpinner(ctx)
     }

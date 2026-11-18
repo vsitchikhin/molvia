@@ -1845,6 +1845,17 @@ describe('a section with no items: a sole trader’s receipt (MOL-227)', () => {
     expect(bestReading(AM, [rows('')]).tin).toBeNull()
   })
 
+  it('reads the tax number by the card’s count of digits, never a literal eight (MOL-408)', () => {
+    const rows = (tin: string) =>
+      reading('ԽԱՆՈՒԹ ԱՁ', `ՀՎՀՀ: ${tin}`, 'Բաժին 1', 'Ընդամենը 1700.00', 'Առձեռն 1700.00')
+    const nine = { ...AM, tinDigits: [9] }
+    expect(bestReading(nine, [rows('123456789')]).tin).toBe('123456789')
+    // must not: a card of nine takes no eight, and Armenia's eight takes no nine
+    expect(bestReading(nine, [rows('12345678')]).tin).toBeNull()
+    expect(bestReading(AM, [rows('123456789')]).tin).toBeNull()
+    expect(bestReading(AM, [rows('12345678')]).tin).toBe('12345678')
+  })
+
   it('reads no total, time or number where the upper receipt’s head is out of the frame (adversarial А1)', () => {
     // one moment in view, but two totals and two fiscal numbers: two receipts all the same
     const got = bestReading(AM, [

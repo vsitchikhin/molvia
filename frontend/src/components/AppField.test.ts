@@ -285,7 +285,7 @@ describe('the count of what is left (MOL-147)', () => {
 
   it('says the bound once nothing more fits', () => {
     const view = counted('a'.repeat(2000))
-    expect(view.get('.counter').text()).toBe("That's the limit: 2000 characters")
+    expect(view.get('.counter').text()).toBe('That’s the limit: 2000 characters')
     view.unmount()
   })
 
@@ -319,7 +319,7 @@ describe('the count of what is left (MOL-147)', () => {
       '100 characters left',
       '20 characters left',
       '20 characters left',
-      "That's the limit: 2000 characters",
+      'That’s the limit: 2000 characters',
     ])
     view.unmount()
   })

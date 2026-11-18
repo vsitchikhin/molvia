@@ -1,5 +1,6 @@
 import { GrammyError } from 'grammy'
 import type { Context, InlineKeyboard } from 'grammy'
+import type { AppLocale } from '@molvia/model'
 import { t } from './i18n'
 import type { MessageKey } from './i18n'
 
@@ -96,12 +97,13 @@ export async function settleKeeping(
  * that can be answered; the way that press is made cheap is the client's timeout below, not a
  * second channel here. For a dead link the caller drops the buttons, and that is the signal.
  */
-export async function refuse(ctx: Context, key: MessageKey): Promise<void> {
+export async function refuse(ctx: Context, key: MessageKey, language?: AppLocale): Promise<void> {
   try {
     // Over the message rather than under the top edge of the screen: this is the one thing
-    // the person has to read, and a toast at a shelf is easy to miss.
+    // the person has to read, and a toast at a shelf is easy to miss. In the message's language where
+    // the caller knows it — a reminder's (MOL-398) — else in the presser's.
     await ctx.answerCallbackQuery({
-      text: t(ctx.from?.language_code, key),
+      text: t(language ?? ctx.from?.language_code, key),
       show_alert: true,
     })
   } catch {

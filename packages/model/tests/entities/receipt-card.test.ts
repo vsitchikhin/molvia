@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { PARSED_FRACTION_DIGITS, RECEIPT_CARDS, receiptCard } from '#model/entities/receipt-card'
+import {
+  PARSED_FRACTION_DIGITS,
+  RECEIPT_CARDS,
+  findsAreGuesses,
+  modelAlone,
+  receiptCard,
+} from '#model/entities/receipt-card'
 import type { ReceiptWords } from '#model/entities/receipt-card'
 import { receiptCountrySchema, receiptSourceOf } from '#model/entities/receipt'
 import { parseReceiptText, rowsOf } from '#model/entities/receipt-text'
@@ -39,6 +45,26 @@ describe('a country’s card (MOL-247)', () => {
     expect(receiptCard('AM')).toMatchObject({ currency: 'AMD', nameLanguage: 'hy' })
     expect(receiptCard('AM').photo?.languages).toBe('hye+rus+eng')
     expect(receiptCard('RS')).toEqual({ currency: 'RSD', nameLanguage: null, photo: null })
+  })
+
+  it('Georgia is read by the model alone, in lari, with no names of its own in the catalogue (MOL-408)', () => {
+    expect(receiptCard('GE')).toMatchObject({ currency: 'GEL', nameLanguage: null })
+    expect(receiptCard('GE').photo).toMatchObject({ languages: null, tinDigits: [9, 11] })
+    // must not: no swap of the model's until the bench measures one
+    expect(receiptCard('GE').photo?.modelSwaps).toEqual({})
+    expect(receiptCard('AM').photo?.tinDigits).toEqual([8])
+  })
+
+  it('says which country the model alone reads: Georgia, never Armenia nor a country read by its link', () => {
+    expect(countries.filter(modelAlone)).toEqual(['GE'])
+    // must not: Serbia has no photo to read, so no reader of one
+    expect(modelAlone('RS')).toBe(false)
+  })
+
+  it('takes every find of a line as a guess only off a photo in a language the catalogue names nothing in', () => {
+    expect(findsAreGuesses(receiptCard('GE'))).toBe(true)
+    expect(findsAreGuesses(receiptCard('RS'))).toBe(false)
+    expect(findsAreGuesses(receiptCard('AM'))).toBe(false)
   })
 
   it('names only formats of numbers the parse reads', () => {
