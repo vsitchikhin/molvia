@@ -36,6 +36,7 @@ import {
   LOCALES,
   LOGIN_CODE_MAX,
   MERGE_SUBJECTS,
+  RECEIPT_TRIAL,
   REMINDERS_OFF,
   baseUnitSchema,
   catalogueSubjectSchema,
@@ -346,6 +347,15 @@ export const actors = pgTable(
     modelSpentMicroUsd: bigint('model_spent_micro_usd', { mode: 'number' }).notNull().default(0),
     modelShareTold: date('model_share_told'),
     /**
+     * The model's receipts of this person (MOL-275, MOL-271): the trial's left of `RECEIPT_TRIAL` — every account starts
+     * with ten, those before it too (0089), spent only while nothing is paid — and of the phone's month the receipts it
+     * read, held to `RECEIPTS_MODEL_MONTH_MAX`. Counts, never the rows of `receipts`: a receipt removed would give its
+     * place back. The month only moves on, as the share's. Not a change of the row: `updated_at` does not see them.
+     */
+    trialReceiptsLeft: smallint('trial_receipts_left').notNull().default(RECEIPT_TRIAL),
+    modelReceiptsMonth: date('model_receipts_month'),
+    modelReceiptsRead: smallint('model_receipts_read').notNull().default(0),
+    /**
      * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own, from their
      * exchanges, when there is one for the pair, and the official one otherwise — or always
      * `official`. Beside the settings rather than among them: it is switched on the screen of
@@ -462,6 +472,11 @@ export const actors = pgTable(
     check('actors_items_proposed_not_negative', sql`${table.itemsProposed} >= 0`),
     check('actors_receipt_items_new_not_negative', sql`${table.receiptItemsNew} >= 0`),
     check('actors_model_spent_not_negative', sql`${table.modelSpentMicroUsd} >= 0`),
+    check(
+      'actors_trial_receipts_left_known',
+      sql`${table.trialReceiptsLeft} between 0 and ${sql.raw(String(RECEIPT_TRIAL))}`,
+    ),
+    check('actors_model_receipts_read_not_negative', sql`${table.modelReceiptsRead} >= 0`),
     // A version without its moment, or a moment of no version, is a consent nobody can show.
     check(
       'actors_consent_whole',
@@ -2911,6 +2926,15 @@ export const receipts = pgTable(
     // receipt does not say, or says both.
     paidBy: text('paid_by').$type<ReceiptPaidBy>(),
     balanced: boolean('balanced').notNull().default(false),
+    // The first day of the phone's month the receipt was sent in (MOL-275, MOL-121): the month whose hundred it counts
+    // in — the queue reads it later and has no phone. Those before it, and an image rolled back past it that writes
+    // none, Yerevan's month of their arrival (0089).
+    sentMonth: date('sent_month')
+      .notNull()
+      .default(sql`(date_trunc('month', now() at time zone 'Asia/Yerevan'))::date`),
+    // Counted among the model's receipts of its person (MOL-275): its reading by the model reached the review, and no
+    // receipt of theirs of the same tax number and number was counted before — a repeat costs nothing.
+    counted: boolean('counted').notNull().default(false),
     // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
     city: text('city').$type<ReceiptCity>(),
     recordedAt: timestamp('recorded_at', { withTimezone: true }),
