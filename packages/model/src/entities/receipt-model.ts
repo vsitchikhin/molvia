@@ -214,7 +214,7 @@ function lineOf(line: ModelReceipt['lines'][number]): ReceiptTextLine {
   // a bill that prints no price — «Блюдо, Кол-во, Сумма» (MOL-310) — has no arithmetic to hold: its quantity and
   // sum are as printed, and only a total they meet vouches for them (`verifiedReading`)
   const settled =
-    counted(line) ||
+    priceless(line) ||
     (quantityMilli !== null &&
       priceHundredths !== null &&
       sumHundredths !== null &&
@@ -710,7 +710,7 @@ interface Move {
 }
 
 /** A bill's line of a count and a sum, no price printed (MOL-310): settled as copied, by no arithmetic. */
-function counted(line: ModelReceipt['lines'][number]): boolean {
+function priceless(line: ModelReceipt['lines'][number]): boolean {
   return (
     line.unit_price === null &&
     figureOf(line.discount, 2) === null &&
@@ -803,8 +803,8 @@ function repaired(
   // a line of a sum alone moved by one swap (MOL-420): by how much, and which line to which sum — and a bill's line of a
   // count and a sum, a rival only (adversarial Б1)
   const moves = new Map<number, Move[]>()
-  // its sum moved by one swap within the till's rounding, as the total chooses a sum of any line and never between two
-  // sums (review round 3 of MOL-290, Г1 «а»): 5,86 → 6,86 is a sum of its own; false past the receipt's ceiling
+  // its sum moved by one swap within the till's rounding — the total chooses no sum of a line beyond it, nor between
+  // two (review round 3 of MOL-290, Г1 «а»): 5,86 → 6,86 is a sum of its own; false past the receipt's ceiling
   const moveOf = (i: number, own: number, sum: string | null, rival: boolean): boolean => {
     const swapped = readingsOf(swaps, sum, 2, 1)
     if (swapped.length > budget.left) return false
@@ -831,7 +831,7 @@ function repaired(
     }
     // a bill's line that prints no price (MOL-310) holds no arithmetic either: its sum moved alike is the other way
     // the lines miss the total, never one the total chooses — the receipt's lines put right by it are a doubt (Б1)
-    if (copied !== undefined && line.sumHundredths !== null && counted(copied)) {
+    if (copied !== undefined && line.sumHundredths !== null && priceless(copied)) {
       read += line.sumHundredths
       options.push(null)
       if (!moveOf(i, line.sumHundredths, copied.sum, true)) return null

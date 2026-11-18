@@ -608,11 +608,11 @@ nine sets, $0,37): **the model copies any script about as well as Armenian** —
 **our code is what loses it**: Georgia shows 12 fields right and none wrong, sums on 6 lines of 35 — a line lost leaves
 the total in one place (MOL-244), a till of sums alone had no arithmetic for MOL-290's repair to try (31 fields right
 since MOL-420 — «A line of a sum alone, put right by the total»), the pharmacies' three decimals. Russia with a card of
-the bench: totals 33 right and none wrong of 40, 28 proven whole,
-dates 37 of 37 (MOL-414). A tax on top, a total rounded to 5 sen and thousands with a point in a currency with no cents
-showed wrong totals or none (Malaysia, Indonesia, Iceland) — none of today's countries, MOL-426; two receipts on one
-photo, a total of the other one (MOL-425); and the model orders an ambiguous date's day and month itself, 2 of 16 on
-ReceiptBench, all of Georgia's, Russia's, Iceland's and Vietnam's right — MOL-305's price, measured now.
+the bench: totals 33 right and none wrong of 40, 28 proven whole, dates 37 of 37 (MOL-414). A tax on top, a total
+rounded to 5 sen and thousands with a point in a currency with no cents showed wrong totals or none (Malaysia,
+Indonesia, Iceland) — none of today's countries, MOL-426; two receipts on one photo, a total of the other one (MOL-425);
+and the model orders an ambiguous date's day and month itself, 2 of 16 on ReceiptBench, all of Georgia's, Russia's,
+Iceland's and Vietnam's right — MOL-305's price, measured now.
 
 ## What a line is (MOL-126)
 
@@ -1728,7 +1728,7 @@ right**: `choicesOf` found no reading of a quantity that was never printed, and 
   two moves. The walk checks each leaf against every size of a move, never against each line, so its steps do not
   grow with them; the readings of a sum alone are counted into the receipt's ceiling and `repairTries` as a line's are.
 - **A bill's line of a count and a sum, no price printed, is a rival, never a move** (adversarial Б1): MOL-310's
-  `counted` line holds no arithmetic either, and Georgia prints most of its lines so (ge-01, ge-02) — its sum copied
+  `priceless` line holds no arithmetic either, and Georgia prints most of its lines so (ge-01, ge-02) — its sum copied
   5↔6 beside a sum alone copied right made the total move the right one: the sandwich's 8,96 for 8,95 moved the bag's
   0,26 to 0,25, two sums wrong, «Прочитали не всё» quiet. Its one swap within the till's rounding is one more way the
   lines miss the total, so a move of the same size beside it is a doubt; it is never moved itself — no sum alone,
