@@ -1074,8 +1074,11 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         .from(receiptLines)
         .innerJoin(receipts, eq(receipts.id, receiptLines.receiptId))
         .where(and(eq(receipts.actorId, actorId), inArray(receiptLines.receiptId, [...ids])))
-      for (const row of rows)
-        classes.set(row.receiptId, [...(classes.get(row.receiptId) ?? []), row.hs])
+      for (const row of rows) {
+        const held = classes.get(row.receiptId)
+        if (held) held.push(row.hs)
+        else classes.set(row.receiptId, [row.hs])
+      }
       return classes
     },
 

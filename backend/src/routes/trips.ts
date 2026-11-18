@@ -32,7 +32,7 @@ import type {
   TripCategoryBody,
   TripView,
 } from '@molvia/model'
-import type { FastifyInstance, FastifyReply } from 'fastify'
+import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify'
 import type { Asking } from './actor'
 import { parseBody, parseQuery, resourceId } from '@/parse'
 
@@ -118,12 +118,7 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
     const cursor =
       query.before && query.beforeId ? { at: query.before, id: query.beforeId } : undefined
     const page = await api.history(request.actorId, cursor)
-    // the category only to a phone that asks (MOL-406): an earlier build reads a row strictly
-    const asked = request.headers[TRIP_HISTORY_CATEGORY_HEADER.toLowerCase()] === '1'
-    // undefined leaves the key out of the JSON
-    const sent = asked
-      ? page
-      : { ...page, trips: page.trips.map((row) => ({ ...row, categoryId: undefined })) }
+    const sent = historyCategoryOf(request) ? page : withoutCategory(page)
     return reply.header('cache-control', 'no-store').send(z.encode(tripHistoryCodec, sent))
   })
 
@@ -257,4 +252,14 @@ export function tripRoutes(app: FastifyInstance, api: TripsApi): void {
       await api.chooseRate(request.actorId, resourceId(request.params.tripId), body),
     )
   })
+}
+
+/** Whether the phone knows a history row's `categoryId` (MOL-406). */
+function historyCategoryOf(request: FastifyRequest): boolean {
+  return request.headers[TRIP_HISTORY_CATEGORY_HEADER.toLowerCase()] === '1'
+}
+
+/** The history as a phone of an earlier build reads it: rows with no category (`undefined` leaves the key out). */
+function withoutCategory(page: TripHistory): TripHistory {
+  return { ...page, trips: page.trips.map((row) => ({ ...row, categoryId: undefined })) }
 }

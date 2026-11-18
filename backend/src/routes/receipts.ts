@@ -133,6 +133,11 @@ function billOf(request: FastifyRequest): boolean {
   return request.headers[RECEIPT_BILL_HEADER.toLowerCase()] === '1'
 }
 
+/** Whether the phone knows a summary's `food` (MOL-406). */
+function foodOf(request: FastifyRequest): boolean {
+  return request.headers[RECEIPT_FOOD_HEADER.toLowerCase()] === '1'
+}
+
 function ownerOf(request: FastifyRequest): string {
   return actorOf(request).id
 }
@@ -225,11 +230,7 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
     scope.get('/receipts', { exposeHeadRoute: false }, async (request, reply) =>
       privately(reply).send(
         z.encode(receiptsResponseCodec, {
-          receipts: await api.list(
-            actorOf(request),
-            shownOf(request),
-            request.headers[RECEIPT_FOOD_HEADER.toLowerCase()] === '1',
-          ),
+          receipts: await api.list(actorOf(request), shownOf(request), foodOf(request)),
         }),
       ),
     )

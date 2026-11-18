@@ -157,7 +157,7 @@ export async function receiptsOf(
   repositories: ReceiptReviewRepositories,
   actor: Actor,
   shown: boolean,
-  food = false,
+  food: boolean,
 ): Promise<ReceiptSummary[]> {
   const stored = await repositories.receipts.list(actor.id)
   if (shown) await handedOver(repositories.receipts, actor.id, stored)

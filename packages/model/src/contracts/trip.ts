@@ -475,9 +475,11 @@ export type TripHistoryEntry = z.output<typeof tripHistoryEntryCodec>
 
 /**
  * A phone that knows a history row's `categoryId` says so by this header (MOL-406), as `RECEIPT_CODES_HEADER`: a
- * header, not the query — a server rolled back refuses a query it does not know, and leaves a header alone.
+ * header, not the query — a server rolled back refuses a query it does not know, and leaves a header alone. A name of
+ * its own, never the month's `MONEY_TRIP_CATEGORY_HEADER` (MOL-400): one name is one field it asks for.
  */
-export const TRIP_HISTORY_CATEGORY_HEADER = 'X-Molvia-Trip-Category'
+export const TRIP_HISTORY_CATEGORY_HEADER = 'X-Molvia-Trip-History-Category'
+
 export const tripHistoryCodec = z.strictObject({
   trips: z.array(tripHistoryEntryCodec).max(TRIP_HISTORY_PAGE_SIZE),
   nextCursor: tripHistoryCursorSchema.nullable(),
