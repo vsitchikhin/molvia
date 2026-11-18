@@ -256,7 +256,7 @@ import type { StyleValue } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconPlus from '~icons/mdi/plus'
 import IconWallet from '~icons/mdi/wallet-outline'
-import { formatEstimate, formatMoney, monthOf as monthOfDay } from '@molvia/model'
+import { TRIP_CATEGORY, formatEstimate, formatMoney, monthOf as monthOfDay } from '@molvia/model'
 import type { Currency, Money, MoneyMonthView, SpendingCategoryView } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
@@ -353,7 +353,11 @@ export default defineComponent({
     }
     function categoryNameOf(row: JournalRow): string {
       const category = categoryOf(row)
-      return category ? screen.nameOf(category) : t('spending.category.other')
+      if (category) return screen.nameOf(category)
+      // a trip naming none is «Продукты» by the preset's own name with no list (MOL-406, Р3-В2)
+      return row.kind === 'trip' && row.categoryId === null
+        ? t(`spending.category.${TRIP_CATEGORY}`)
+        : t('spending.category.other')
     }
     /** `when` — the day, where rows of different days stand together: «Не приняты». */
     function rowOf(row: JournalRow, spendCurrency: Currency, when = ''): OperationRowProps {

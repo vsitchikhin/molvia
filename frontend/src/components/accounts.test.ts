@@ -393,6 +393,18 @@ describe('an operation as its row says it', () => {
       })
       expect([bare.icon, bare.tint]).toEqual([tripIcon, 'muted'])
     })
+
+    it('naming none with no list is «Продукты» in its words as in its circle, never «Прочее» (MOL-406, Р3-В2)', () => {
+      const bare = operationRowProps(trip(), {
+        t,
+        locale: 'ru-RU',
+        categories: [],
+        nameOf: () => '',
+        accountName: () => null,
+        inAccount: true,
+      })
+      expect([bare.tint, bare.meta]).toEqual(['var(--cat-groceries)', 'Продукты · 5 позиций'])
+    })
   })
 
   it('every row is opened by one verb, read first', () => {
