@@ -185,14 +185,18 @@ an earlier build reads a row strictly, so the server leaves the key out for it, 
 the month's `MONEY_TRIP_CATEGORY_HEADER`: one name is one field asked for. **Not known is the cart with no colour**
 (`tripLook(undefined)`, `muted` as a spending of an unknown category): an answer of a server before it, a row the phone
 made, a cache of a build before, and an id the phone's list lacks — made on another phone, or no list kept at all —
-never a guess of «Продукты» (adversarial А3). A category taken out of the choice is still the trip's, and draws its own
-icon. **A write landing on a recorded trip keeps the row's category in every copy of the row** (`apply`, adversarial
+never a guess of «Продукты» (adversarial А3) — on «Записаны», «Траты» and an account's operations alike (`tripLook`
+of each, round 2, Р2-Б1), where the row's words name it as an unknown spending's, «Прочее». A category taken out of the
+choice is still the trip's, and draws its own icon. **A write landing on a recorded trip keeps the row's category in every copy of the row** (`apply`, adversarial
 А1): a trip view carries none, and the page, the deeper pages and the shelf are each given the category the row held —
 kept on screen alone, a restart or another window's shelf drew the cart. **And the category is no part of «row for row»**
 (MOL-307's `asShelvedPage`, adversarial А2): a window of a build before writes the shelf with no key of it, and compared,
-the page was «Сервер не ответил» over a server that answered. **The price, named:** a category changed in «Траты»
-reaches the row of «Записаны» with the next read of the history; and while a window of a build before keeps the shelf,
-its rows draw the cart until this window reads the history again.
+the page was «Сервер не ответил» over a server that answered. **So a category the last answer does not say is not
+known** (`categoryUnconfirmed`, round 2, Р2-Б2), as a count and a sum are (`unconfirmed`): while the list moves under
+every read, another window's older copy of it is drawn as the cart, never as the server's word. **The price, named:** a category changed in «Траты»
+reaches the row of «Записаны» with the next read of the history; while a window of a build before keeps the shelf,
+its rows draw the cart until this window reads the history again; and a trip of an unknown category reads «Прочее» in
+the words of «Траты» and an account — a word the phone has for «not known», as for a spending.
 
 ## «Брали здесь в прошлый раз» (MOL-209)
 
