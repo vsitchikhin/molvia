@@ -270,8 +270,9 @@ const SUL = `(?<![${GEORGIAN.small}])სულ(?![${GEORGIAN.small}])`
  * receipt it was seen on** — the five photos of MOL-229 (`.scratch/receipts/foreign/ge-01…05.jpg`) and its draft card
  * (`research/MOL-229/cards/GE.json`) — and a word no Georgian receipt has shown is `NEVER`, as is what Georgia prints
  * no counterpart of (the card's cashback, the sum since the year's start): a word without a paper behind it would
- * decide what a total is. The model's swap is 5↔6, measured on Carrefour's sums (MOL-420). The pharmacies' three decimals, «23.868 ლარი», are
- * not read: such a figure stays empty (MOL-421).
+ * decide what a total is. The model's 5↔6 was seen only where the total put a sum right (Carrefour, MOL-420): a swap of
+ * the repair alone, never the shop's memory's doubt, which nobody measured. The pharmacies' three decimals,
+ * «23.868 ლარი», are not read: such a figure stays empty (MOL-421).
  */
 export const GEORGIAN_RECEIPTS: PhotoReading = {
   languages: null,
@@ -282,9 +283,9 @@ export const GEORGIAN_RECEIPTS: PhotoReading = {
   fiscalDigits: [],
   numbers: [{ fractionDigits: 2 }],
   swaps: {},
+  modelSwaps: {},
   // Carrefour's «5,85» copied «5,86» (ge-03): the total printed twice puts it right (MOL-420)
-  modelSwaps: { 5: '6', 6: '5' },
-  modelRepairSwaps: {},
+  modelRepairSwaps: { 5: '6', 6: '5' },
   digitLike: {},
   // «25.05.2024», «19.07.2008» (ge-02, ge-01)
   dateOrder: 'day-first',

@@ -12,7 +12,7 @@ import {
   receiptTextOfModel,
   unparsedFigures,
 } from '#model/entities/receipt-model'
-import { explainedReading, verifiedReading } from '#model/entities/receipt-verify'
+import { betterReading, explainedReading, verifiedReading } from '#model/entities/receipt-verify'
 import type { ModelReceipt } from '#model/entities/receipt-model'
 
 // a made-up head: the repository is public, and a receipt's own carries a customer's name
@@ -1661,6 +1661,10 @@ describe('a line of a sum alone put right by the total (MOL-420)', () => {
     { label: 'TOT', amount },
     { label: 'GEL EFT Credit', amount },
   ]
+  const owedAm = (amount: string) => [
+    { label: 'Ընդամենը', amount },
+    { label: 'Վճարված է Առձեռն', amount },
+  ]
   const carrefour = (lines: Line[], totals: { label: string; amount: string }[]) =>
     answer({ shop: 'Carrefour', address: null, id_rows: [], lines, totals })
   const readGe = (
@@ -1740,7 +1744,7 @@ describe('a line of a sum alone put right by the total (MOL-420)', () => {
       [false, false, false],
       [745, 1_044, 586],
     ])
-    const none = { ...GEORGIAN_RECEIPTS, modelSwaps: {} }
+    const none = { ...GEORGIAN_RECEIPTS, modelRepairSwaps: {} }
     expect(marked(readGe([gherkins, chicken, choco], twice('23.74'), none).text)).toEqual([
       false,
       false,
@@ -1774,14 +1778,51 @@ describe('a line of a sum alone put right by the total (MOL-420)', () => {
       code: null,
       article: null,
       quantity: '2',
-      unit_price: '3.10',
-      sum: '6.20',
+      unit_price: '3.09',
+      sum: '6.18',
     })
-    const { text, shown } = readGe([milk, choco], twice('12.05'))
+    // a total with no 5 or 6 of its own in the luma: no slip of its copying explains the luma (А1)
+    const { text, shown } = readGe([milk, choco], twice('12.03'))
     expect([sums(text), marked(text)]).toEqual([
-      [620, 585],
+      [618, 585],
       [false, true],
     ])
     expect(marked(shown)).toEqual([false, true])
+  })
+
+  it('moves a sum by a luma at most, as the total chooses no sum of a line (review round 3 of MOL-290, Г1 «а»)', () => {
+    // 6,20 + 7,10 + 3,10 = 16,40 printed, the chicken copied 5,20: only 5 → 6 of its lari meets 16,40 — a sum of its own
+    const lines = [sumOnly('CHICKEN', '5.20'), sumOnly('RICE', '7.10'), sumOnly('OIL', '3.10')]
+    const { text, shown } = readGe(lines, twice('16.40'))
+    expect(marked(text)).toEqual([false, false, false])
+    expect(sums(shown)).toEqual([null, null, null])
+  })
+
+  it('moves none where the total copied alike in both places by the same swap explains it too (adversarial А1)', () => {
+    // printed 2,40 + 3,85 + 9,20 = 15,45, every line copied right, «TOT» and «EFT» both copied 15,46: 3,85 → 3,86
+    // would meet it, and so would 15,46 read back as 15,45 — the line copied right is never rewritten
+    const right = [sumOnly('BREAD', '2.40'), sumOnly('MILK 1L', '3.85'), sumOnly('CHEESE', '9.20')]
+    const { text, shown } = readGe(right, twice('15.46'))
+    expect(marked(text)).toEqual([false, false, false])
+    expect(sums(shown)).toEqual([null, null, null])
+    // Armenia beside lines of quantity × price: the lavash 250 copied right, both places 1 550 copied 1 560 — moved
+    // by 10,00 never (a luma at most), and its own 5 of the tens explains no luma
+    const qp = (printed: string, quantity: string, price: string, sum: string) =>
+      line({ printed, code: null, article: null, quantity, unit: 'pcs', unit_price: price, sum })
+    const armenian = answer({
+      lines: [qp('Կաթ', '2', '200', '400'), qp('Հաց', '3', '300', '900'), sumOnly('Լավաշ', '250')],
+      totals: owedAm('1560'),
+    })
+    expect(read(armenian).lines.some((l) => l.repaired === true)).toBe(false)
+  })
+
+  it('leaves the second reader its say where the total was copied wrong alike (adversarial А2, MOL-405)', () => {
+    // the first reading's total 15,46 twice, its lines right; the second's total 15,45 twice — met as copied
+    const right = [sumOnly('BREAD', '2.40'), sumOnly('MILK 1L', '3.85'), sumOnly('CHEESE', '9.20')]
+    const judged = (total: string) =>
+      explainedReading(receiptTextOfModel(GEORGIAN_RECEIPTS, carrefour(right, twice(total))), {
+        byModel: true,
+      })
+    expect(betterReading(judged('15.46'), judged('15.45'))).toBe('second')
   })
 })

@@ -50,9 +50,9 @@ describe('a country’s card (MOL-247)', () => {
   it('Georgia is read by the model alone, in lari, with no names of its own in the catalogue (MOL-408)', () => {
     expect(receiptCard('GE')).toMatchObject({ currency: 'GEL', nameLanguage: null })
     expect(receiptCard('GE').photo).toMatchObject({ languages: null, tinDigits: [9, 11] })
-    // the model's 5↔6 alone, measured on Carrefour's sums (MOL-420); no swap seen only where the total put it right
-    expect(receiptCard('GE').photo?.modelSwaps).toEqual({ 5: '6', 6: '5' })
-    expect(receiptCard('GE').photo?.modelRepairSwaps).toEqual({})
+    // the model's 5↔6 seen only where the total put a sum right (MOL-420): the repair's, never the memory's doubt
+    expect(receiptCard('GE').photo?.modelSwaps).toEqual({})
+    expect(receiptCard('GE').photo?.modelRepairSwaps).toEqual({ 5: '6', 6: '5' })
     expect(receiptCard('AM').photo?.tinDigits).toEqual([8])
   })
 
