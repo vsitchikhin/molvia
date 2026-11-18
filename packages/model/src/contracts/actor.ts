@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { actorSchema } from '#model/entities/actor'
+import { RECEIPTS_MODEL_MONTH_MAX, RECEIPT_TRIAL } from '#model/entities/model-spend'
 
 /**
  * The cookie a request proves itself with (MOL-53). It replaced `X-Molvia-Actor`, a header
@@ -60,6 +61,23 @@ export const actorViewSchema = actorSchema
      * «not said», never «no».
      */
     receiptsByModel: z.boolean().optional(),
+    /**
+     * Where the person stands with the model that reads receipts (MOL-275): until when it is paid, the trial's
+     * receipts left of ten, and of the phone's month the receipts it read of a hundred. Every figure the server's, for
+     * MOL-276's screen. Sent by `/actors/me` alone, only to a phone that asks (`RECEIPTS_ACCESS_HEADER`), as
+     * `receiptsByModel` is.
+     */
+    receiptsAccess: z
+      .strictObject({
+        until: z.date().nullable(),
+        trialLeft: z.int().min(0).max(RECEIPT_TRIAL),
+        trialOf: z.literal(RECEIPT_TRIAL),
+        /** The first day of the phone's month the count is of, `YYYY-MM-01`. */
+        month: z.iso.date(),
+        read: z.int().min(0),
+        limit: z.literal(RECEIPTS_MODEL_MONTH_MAX),
+      })
+      .optional(),
   })
 export type ActorView = z.infer<typeof actorViewSchema>
 
@@ -84,10 +102,16 @@ export type ActorView = z.infer<typeof actorViewSchema>
  * being shown — travels with the answer that carries them, as `scope`. It joins the wire with
  * the screen that grants or sells access, by being named in the view, not by being derived.
  */
+const receiptsAccessWireSchema = z.strictObject({
+  ...actorViewSchema.shape.receiptsAccess.unwrap().shape,
+  until: z.iso.datetime().nullable(),
+})
+
 export const actorWireSchema = z.strictObject({
   ...actorViewSchema.shape,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  receiptsAccess: receiptsAccessWireSchema.optional(),
 })
 export type ActorWire = z.infer<typeof actorWireSchema>
 
@@ -98,17 +122,36 @@ export type ActorWire = z.infer<typeof actorWireSchema>
  * into an Invalid Date, so by the time decode runs there is nothing left to report.
  */
 export const actorCodec = z.codec(actorWireSchema, actorViewSchema, {
-  decode: (wire) => ({
+  decode: ({ receiptsAccess, ...wire }) => ({
     ...wire,
     createdAt: new Date(wire.createdAt),
     updatedAt: new Date(wire.updatedAt),
+    ...(receiptsAccess === undefined
+      ? {}
+      : {
+          receiptsAccess: {
+            ...receiptsAccess,
+            until: receiptsAccess.until === null ? null : new Date(receiptsAccess.until),
+          },
+        }),
   }),
-  encode: (actor) => ({
+  encode: ({ receiptsAccess, ...actor }) => ({
     ...actor,
     createdAt: actor.createdAt.toISOString(),
     updatedAt: actor.updatedAt.toISOString(),
+    ...(receiptsAccess === undefined
+      ? {}
+      : {
+          receiptsAccess: {
+            ...receiptsAccess,
+            until: receiptsAccess.until === null ? null : receiptsAccess.until.toISOString(),
+          },
+        }),
   }),
 })
 
 /** The header a phone asks `/actors/me` for `receiptsByModel` by (MOL-408). */
 export const RECEIPTS_BY_MODEL_HEADER = 'X-Molvia-Receipts-By-Model'
+
+/** The header a phone asks `/actors/me` for `receiptsAccess` by (MOL-275). */
+export const RECEIPTS_ACCESS_HEADER = 'X-Molvia-Receipts-Access'
