@@ -410,6 +410,26 @@ describe('whether the server has answered an empty history (MOL-77)', () => {
     expect(store.categoryUnconfirmed()).toEqual(new Set())
   })
 
+  it('a category another window shelves after an answer taken is not known either (MOL-406, Р3-В3)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), categoryId: CAFE }],
+      nextCursor: null,
+    })
+    expect(await store.load()).toBe(true)
+    expect(store.categoryUnconfirmed()).toEqual(new Set())
+    // The other window read the history before the trip went to «Кафе», and shelves its page after a purchase.
+    const shelf = localStorage.getItem(SHELF) ?? ''
+    const theirs = shelf.replace(`"categoryId":"${CAFE}"`, '"categoryId":null')
+    expect(theirs).not.toBe(shelf)
+    localStorage.setItem(SHELF, theirs)
+    window.dispatchEvent(new StorageEvent('storage', { key: SHELF }))
+    expect(store.page.trips[0]?.categoryId).toBeNull()
+    expect(store.categoryUnconfirmed()).toEqual(new Set([A]))
+    // With no answer in the session the page is memory, and its categories stand as kept.
+    expect(restart().categoryUnconfirmed()).toEqual(new Set())
+  })
+
   it('a record with no purchases keeps «0» and no sum on the shelf, not «unknown» (MOL-307)', async () => {
     const store = useTripHistoryStore()
     tripHistory.mockResolvedValueOnce({

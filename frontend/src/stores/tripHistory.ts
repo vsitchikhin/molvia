@@ -476,22 +476,25 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
    * the answer or newer, and «unknown» is neither wrong nor the strip's «не ответил».
    */
   function unconfirmed(): Set<string> {
-    const said = new Map((lastAnswer.value?.trips ?? []).map((row) => [row.id, countOf(row)]))
+    return unconfirmedBy(countOf)
+  }
+
+  /** The rows of the first page where `said` of the row differs from the same of the last answer's. */
+  function unconfirmedBy(said: (row: TripHistoryEntry) => unknown): Set<string> {
+    const answered = new Map((lastAnswer.value?.trips ?? []).map((row) => [row.id, said(row)]))
     return new Set(
-      firstPage.trips.filter((row) => said.get(row.id) !== countOf(row)).map((row) => row.id),
+      firstPage.trips.filter((row) => answered.get(row.id) !== said(row)).map((row) => row.id),
     )
   }
 
   /**
    * The rows of the first page whose category the server's last answer does not say (MOL-406, adversarial Р2-Б2):
-   * the category is no part of «row for row», so another window's older copy of it may stand on a page taken as the
-   * answer — drawn then as not known, never as the server's word.
+   * the category is no part of «row for row», and another window's older copy of it may stand on the page — a read
+   * taken as the answer, or the shelf it wrote after one (Р3-В3) — drawn then as not known, never as the server's word.
    */
   function categoryUnconfirmed(): Set<string> {
-    const said = new Map((lastAnswer.value?.trips ?? []).map((row) => [row.id, row.categoryId]))
-    return new Set(
-      firstPage.trips.filter((row) => said.get(row.id) !== row.categoryId).map((row) => row.id),
-    )
+    // with no answer in this session the page is memory, said by its strip, and its categories stand as kept
+    return lastAnswer.value ? unconfirmedBy((row) => row.categoryId) : new Set()
   }
 
   /**

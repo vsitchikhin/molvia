@@ -1170,6 +1170,31 @@ describe('PurchasesView (MOL-128)', () => {
       }
     })
 
+    it('соседнее окно кладёт на полку старую категорию после принятого ответа — корзина без цвета, не «Продукты» (MOL-406, Р3-В3)', async () => {
+      const known = [
+        { id: 'c0000000-0000-4000-8000-000000000001', preset: 'groceries' as const },
+        { id: 'c0000000-0000-4000-8000-000000000002', preset: 'cafe' as const },
+      ].map((one) => ({ ...one, name: null, colour: null, icon: null, archived: false }))
+      const cafe = known[1]?.id ?? ''
+      localStorage.setItem(
+        `molvia.own-categories.${ME}`,
+        JSON.stringify({ askedAt: NOW.toISOString(), answer: { categories: known, frequent: [] } }),
+      )
+      const row = { ...trip(1), itemCount: 2, total: [parseMoney('1000', 'AMD')] }
+      tripHistory.mockResolvedValue({ trips: [{ ...row, categoryId: cafe }], nextCursor: null })
+      const { view } = await render()
+      expect(rows(view)[0]?.find('.circle').attributes('style')).toContain('--cat-cafe')
+
+      remember([{ ...row, itemCount: 3, total: [parseMoney('1500', 'AMD')], categoryId: null }])
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      await flushPromises()
+
+      const circle = rows(view)[0]?.find('.circle')
+      expect(circle?.classes()).toContain('muted')
+      expect(rows(view)[0]?.text()).toContain('3 позиции')
+      expect(view.findAll('.strip')).toHaveLength(0)
+    })
+
     describe('«Показать ещё» о первой странице ничего не говорит — под сомнением она прочитана заново, до следующей (MOL-307, Г1, Д1, Е1, Ж1, №4)', () => {
       const row = trip(1)
       const deeper = trip(7, 'SAS')
