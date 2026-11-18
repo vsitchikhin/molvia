@@ -1034,12 +1034,15 @@ describe('TripView', () => {
         createdAt: new Date('2026-09-01T00:00:00.000Z'),
         updatedAt: new Date(day),
       })
-      useActorStore().apply(whereAt('Москва', 'RU', '2026-09-22T00:00:00.000Z'))
+      // Алматы — город вне списка: Москва им была до MOL-412, и тогда тест ничего не держал (адверсариал А1)
+      useActorStore().apply(whereAt('Алматы', 'KZ', '2026-09-22T00:00:00.000Z'))
       await flushPromises()
       clock += 1000
       await button(view, ru.settings.legacy.action).trigger('click')
       await flushPromises()
-      expect(document.body.querySelector('dialog[open]')?.textContent).toContain('Москва')
+      expect(document.body.querySelector('dialog[open]')?.textContent).toContain(
+        ru.settings.city_current.replace('{city}', 'Алматы'),
+      )
 
       // Шторка закрыта, настройки переехали, шторка открыта снова.
       await view.findComponent({ name: 'TripContextSheet' }).vm.$emit('update:open', false)
@@ -1050,7 +1053,7 @@ describe('TripView', () => {
       await button(view, ru.settings.legacy.action).trigger('click')
       await flushPromises()
       const sheet = document.body.querySelector('dialog[open]')
-      expect(sheet?.textContent).not.toContain('Москва')
+      expect(sheet?.textContent).not.toContain('Алматы')
       expect(sheet?.textContent).toContain('Гюмри')
     })
 
