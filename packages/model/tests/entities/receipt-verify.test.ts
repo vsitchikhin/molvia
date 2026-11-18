@@ -605,3 +605,44 @@ describe('which of two readings goes to the review (MOL-405, owner’s В-1 «а
     expect(betterReading(read([line()], null), read([line()], null))).toBe('first')
   })
 })
+
+describe('a sum alone the total put right, among sums the total vouches for (MOL-420)', () => {
+  const alone = (sum: number, over: Partial<ReceiptTextLine> = {}) =>
+    line({
+      quantityMilli: null,
+      priceHundredths: null,
+      discountHundredths: null,
+      sumHundredths: sum,
+      settled: false,
+      asPrinted: false,
+      ...over,
+    })
+  const byModel = { byModel: true }
+
+  it('shows every sum, the one the total chose «проверьте», the receipt not proven whole', () => {
+    const lines = [alone(745), alone(585, { repaired: true })]
+    const got = explainedReading(reading(lines, 1_330), byModel)
+    expect(got.shown.lines.map((l) => [l.sumHundredths, l.repaired === true])).toEqual([
+      [745, false],
+      [585, true],
+    ])
+    expect([got.shown.balanced, got.receipt]).toEqual([false, 'line_not_as_printed'])
+  })
+
+  it('never proves a receipt whole by a sum alone the total chose, the other lines as printed', () => {
+    const got = explainedReading(reading([line(), alone(585, { repaired: true })], 74_585), byModel)
+    expect([got.receipt, got.shown.lines[1]?.sumHundredths, got.shown.lines[1]?.repaired]).toEqual([
+      'line_not_as_printed',
+      585,
+      true,
+    ])
+    // the line as printed keeps its figures
+    expect(figures(got.shown.lines[0]!)).toEqual([2_000, 37_000, 74_000, 0, true])
+  })
+
+  it('must not let a sum the shop’s memory chose vouch for the others (MOL-291)', () => {
+    const lines = [alone(745), alone(585, { repaired: true, remembered: 'repaired' })]
+    const got = verifiedReading(reading(lines, 1_330), byModel)
+    expect(got.lines.map((l) => l.sumHundredths)).toEqual([null, null])
+  })
+})
