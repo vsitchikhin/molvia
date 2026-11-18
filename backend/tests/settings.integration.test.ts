@@ -165,13 +165,11 @@ describe('settings and offline trip context', () => {
     expect(await db.select({ country: actors.country, city: actors.city }).from(actors)).toEqual([
       { country: 'RU', city: 'Казань' },
     ])
-    // The CBA's rouble of yesterday is in the cache, so a trip of two currencies takes it.
-    const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
-      new Date(Date.now() - 24 * 3_600_000),
-    )
+    // The CBA's rouble is in the cache — any past day, a trip takes the latest on or before its own —
+    // so a trip of two currencies takes it.
     await db
       .insert(officialRates)
-      .values({ provider: 'cba', currency: 'RUB', rateDate: yesterday, scaled: 4_241_700n })
+      .values({ provider: 'cba', currency: 'RUB', rateDate: '2026-09-25', scaled: 4_241_700n })
     const start = async (context: ActorSettings, name: string) => {
       const id = randomUUID()
       const response = await app.inject({
@@ -194,7 +192,7 @@ describe('settings and offline trip context', () => {
         headers: { cookie },
         payload: {},
       })
-      expect(finished.statusCode, finished.body).toBeLessThan(300)
+      expect(finished.statusCode, finished.body).toBe(204)
       return rate
     }
     // a trip's own geography (MOL-65): another city of Russia, with no case of its own; roubles to
