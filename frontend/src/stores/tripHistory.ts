@@ -483,6 +483,18 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   }
 
   /**
+   * The rows of the first page whose category the server's last answer does not say (MOL-406, adversarial Р2-Б2):
+   * the category is no part of «row for row», so another window's older copy of it may stand on a page taken as the
+   * answer — drawn then as not known, never as the server's word.
+   */
+  function categoryUnconfirmed(): Set<string> {
+    const said = new Map((lastAnswer.value?.trips ?? []).map((row) => [row.id, row.categoryId]))
+    return new Set(
+      firstPage.trips.filter((row) => said.get(row.id) !== row.categoryId).map((row) => row.id),
+    )
+  }
+
+  /**
    * Whether the answer was taken. A false one is not a failure: the list changed under the
    * request — another window wrote the cache, a finish was taken back — and the answer may no
    * longer be true. The caller asks again rather than wait for a reconnect that may never come:
@@ -593,6 +605,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     load,
     showsAnswer,
     unconfirmed,
+    categoryUnconfirmed,
     known,
     answered,
     open,

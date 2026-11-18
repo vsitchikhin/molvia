@@ -1122,6 +1122,54 @@ describe('PurchasesView (MOL-128)', () => {
       }
     })
 
+    it('соседнее окно держит на полке старую категорию строки — она неизвестна, корзина без цвета, не ответ сервера (MOL-406, Р2-Б2)', async () => {
+      const before = new Date(NOW.getTime() - 5000)
+      const groceries = { id: 'c0000000-0000-4000-8000-000000000001', preset: 'groceries' as const }
+      const cafe = { id: 'c0000000-0000-4000-8000-000000000002', preset: 'cafe' as const }
+      const known = [groceries, cafe].map((one) => ({
+        ...one,
+        name: null,
+        colour: null,
+        icon: null,
+        archived: false,
+      }))
+      const row = trip(1)
+      // The server says «Кафе»; the other window, writing purchases into the trip, shelves its page read before
+      // the trip was moved there — «Продукты» — and so moves the list under every read (MOL-307, Б2).
+      for (const [shelved, muted] of [
+        [null, true],
+        [cafe.id, false],
+      ] as const) {
+        while (mounted.length) mounted.pop()?.unmount()
+        localStorage.clear()
+        tripHistory.mockReset()
+        localStorage.setItem(
+          `molvia.own-categories.${ME}`,
+          JSON.stringify({
+            askedAt: NOW.toISOString(),
+            answer: { categories: known, frequent: [] },
+          }),
+        )
+        let sent = 2
+        tripHistory.mockImplementation(() => {
+          const answered = { ...row, itemCount: sent, categoryId: cafe.id }
+          sent += 1
+          localStorage.setItem(`molvia.trip-history-at.${ME}`, before.toISOString())
+          remember([{ ...row, itemCount: sent, categoryId: shelved }])
+          window.dispatchEvent(new StorageEvent('storage', { key }))
+          return Promise.resolve({ trips: [answered], nextCursor: null })
+        })
+        const { view } = await render()
+        await pausesPass()
+
+        expect(tripHistory).toHaveBeenCalledTimes(4)
+        expect(view.findAll('.strip').map((strip) => strip.text())).toEqual([])
+        const circle = rows(view)[0]?.find('.circle')
+        expect(circle?.classes().includes('muted')).toBe(muted)
+        if (!muted) expect(circle?.attributes('style')).toContain('--cat-cafe')
+      }
+    })
+
     describe('«Показать ещё» о первой странице ничего не говорит — под сомнением она прочитана заново, до следующей (MOL-307, Г1, Д1, Е1, Ж1, №4)', () => {
       const row = trip(1)
       const deeper = trip(7, 'SAS')

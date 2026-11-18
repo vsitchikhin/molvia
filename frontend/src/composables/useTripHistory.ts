@@ -78,6 +78,8 @@ export function useTripHistory(): TripHistoryScreen {
     // A list moved under every read is the answer by its rows; a count the answer does not say is
     // unknown, never memory said as the answer (MOL-307, owner's В-2 «а»).
     const unsure = moved.value ? history.unconfirmed() : new Set<string>()
+    // and so is a category it does not say: another window's older copy of it (MOL-406, adversarial Р2-Б2)
+    const unsureCategory = moved.value ? history.categoryUnconfirmed() : new Set<string>()
     const rows = new Map(
       history.page.trips.map((row) => [
         row.id,
@@ -90,7 +92,9 @@ export function useTripHistory(): TripHistoryScreen {
           total: unsure.has(row.id) ? null : row.total,
           fromReceipt: row.fromReceipt,
           onPhone: false,
-          ...(row.categoryId === undefined ? {} : { categoryId: row.categoryId }),
+          ...(row.categoryId === undefined || unsureCategory.has(row.id)
+            ? {}
+            : { categoryId: row.categoryId }),
         },
       ]),
     )

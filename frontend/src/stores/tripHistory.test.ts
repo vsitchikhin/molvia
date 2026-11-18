@@ -384,6 +384,32 @@ describe('whether the server has answered an empty history (MOL-77)', () => {
     expect(store.showsAnswer()).toBe(true)
   })
 
+  it('a category the answer does not say — another window’s older copy — is not known while the list moves (MOL-406, Р2-Б2)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), categoryId: null }],
+      nextCursor: null,
+    })
+    await store.load()
+    const theirs = useTripHistoryStore(createPinia())
+    // The trip was moved to «Кафе» elsewhere; the other window writes into it from its older page while this one reads.
+    tripHistory.mockImplementationOnce(() => {
+      theirs.apply(written(A, 3))
+      window.dispatchEvent(new StorageEvent('storage', { key: SHELF }))
+      return Promise.resolve({ trips: [{ ...entry(A), categoryId: CAFE }], nextCursor: null })
+    })
+    expect(await store.load()).toBe(false)
+    expect(store.showsAnswer()).toBe(true)
+    expect(store.categoryUnconfirmed()).toEqual(new Set([A]))
+    // An answer that says the shelf's category confirms it.
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), categoryId: null }],
+      nextCursor: null,
+    })
+    await store.load()
+    expect(store.categoryUnconfirmed()).toEqual(new Set())
+  })
+
   it('a record with no purchases keeps «0» and no sum on the shelf, not «unknown» (MOL-307)', async () => {
     const store = useTripHistoryStore()
     tripHistory.mockResolvedValueOnce({
