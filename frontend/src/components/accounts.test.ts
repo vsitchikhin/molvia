@@ -14,6 +14,7 @@ import {
   pickerGroups,
   removedOf,
 } from '@/components/accounts'
+import { tripIcon } from '@/components/spending'
 import { createAppI18n } from '@/i18n'
 
 let next = 0
@@ -373,6 +374,36 @@ describe('an operation as its row says it', () => {
     it('in a category of its own stands in it, its words too (MOL-400)', () => {
       const value = row(trip({ categoryId: CAFE }))
       expect([value.meta, value.tint]).toEqual(['Кафе · 5 позиций', 'var(--cat-cafe)'])
+    })
+
+    it('in a category the phone’s list lacks — or with no list — is the cart with no colour, named as an unknown spending’s (MOL-406, Р2-Б1)', () => {
+      const lacked = row(trip({ categoryId: 'eeeeeeee-0000-4000-8000-0000000000aa' }))
+      expect([lacked.icon, lacked.tint, lacked.meta]).toEqual([
+        tripIcon,
+        'muted',
+        'Прочее · 5 позиций',
+      ])
+      const bare = operationRowProps(trip({ categoryId: CAFE }), {
+        t,
+        locale: 'ru-RU',
+        categories: [],
+        nameOf: () => '',
+        accountName: () => null,
+        inAccount: true,
+      })
+      expect([bare.icon, bare.tint]).toEqual([tripIcon, 'muted'])
+    })
+
+    it('naming none with no list is «Продукты» in its words as in its circle, never «Прочее» (MOL-406, Р3-В2)', () => {
+      const bare = operationRowProps(trip(), {
+        t,
+        locale: 'ru-RU',
+        categories: [],
+        nameOf: () => '',
+        accountName: () => null,
+        inAccount: true,
+      })
+      expect([bare.tint, bare.meta]).toEqual(['var(--cat-groceries)', 'Продукты · 5 позиций'])
     })
   })
 

@@ -29,7 +29,7 @@ import { TRIP_CATEGORY } from '@molvia/model'
 import type { SpendingCategoryView } from '@molvia/model'
 import CategoryPickerSheet from '@/components/CategoryPickerSheet.vue'
 import NavRow from '@/components/NavRow.vue'
-import { categoryIcon, chipOrder } from '@/components/spending'
+import { chipOrder, tripCategoryName, tripLook } from '@/components/spending'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 
 /**
@@ -40,7 +40,10 @@ import { useSpendingQueueStore } from '@/stores/spendingQueue'
  * a category the server has not got yet, which the server takes as no word at all. One made in «Категории» is
  * offered here once it has landed.
  *
- * A trip with no category is «Продукты», as the server counts it (handoff 06).
+ * A trip with no category is «Продукты», as the server counts it (handoff 06). One whose category the list lacks is
+ * not known (MOL-406, adversarial Р3-В1): the cart and the word of the row it was opened from, nothing chosen in the
+ * list — «Продукты» chosen there was a word about the person's choice the phone does not have, and a tap on it to
+ * «leave it» wrote «Продукты» over the trip's own.
  */
 export default defineComponent({
   name: 'TripCategoryRow',
@@ -53,7 +56,12 @@ export default defineComponent({
       type: Function as PropType<(category: SpendingCategoryView) => string>,
       required: true,
     },
-    selected: { type: String as PropType<string | null>, default: null },
+    /**
+     * The trip's category: `null` — it names none, «Продукты»; absent or `undefined` — one the phone does not know.
+     * No default: Vue gave an `undefined` the default `null`, and the field said «Продукты» of a category not known
+     * (adversarial Р4-Г1).
+     */
+    selected: { type: String as PropType<string | null | undefined>, default: undefined },
     disabled: { type: Boolean, default: false },
   },
   emits: { pick: (id: string) => typeof id === 'string' },
@@ -61,11 +69,11 @@ export default defineComponent({
     const { t } = useI18n()
     const open = ref(false)
     const spendings = useSpendingQueueStore()
-    const shown = computed(
-      () =>
-        props.categories.find((category) => category.id === props.selected) ??
-        props.categories.find((category) => category.preset === TRIP_CATEGORY) ??
-        null,
+    /** `null` — «Продукты» not in the list; `undefined` — a category named the list lacks: not known. */
+    const shown = computed(() =>
+      props.selected === null
+        ? (props.categories.find((category) => category.preset === TRIP_CATEGORY) ?? null)
+        : props.categories.find((category) => category.id === props.selected),
     )
     // the live ones the server has, and the trip's own where it was taken out of the choice since
     const waiting = computed(
@@ -86,10 +94,10 @@ export default defineComponent({
         props.frequent,
       ),
     )
-    const name = computed(() =>
-      shown.value ? props.nameOf(shown.value) : t(`spending.category.${TRIP_CATEGORY}`),
-    )
-    const icon = computed(() => (shown.value ? categoryIcon(shown.value) : undefined))
+    // the row's own rule, word and icon (`tripCategoryName`, `tripLook`): «Продукты» with no list takes its preset's
+    // icon here too (review №18)
+    const name = computed(() => tripCategoryName(shown.value, props.nameOf, t))
+    const icon = computed(() => tripLook(shown.value).icon)
     return { t, open, shown, choice, name, icon }
   },
 })
