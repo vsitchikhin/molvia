@@ -12,7 +12,7 @@ import {
   receiptTextOfModel,
   unparsedFigures,
 } from '#model/entities/receipt-model'
-import { explainedReading, verifiedReading } from '#model/entities/receipt-verify'
+import { betterReading, explainedReading, verifiedReading } from '#model/entities/receipt-verify'
 import type { ModelReceipt } from '#model/entities/receipt-model'
 
 // a made-up head: the repository is public, and a receipt's own carries a customer's name
@@ -1636,5 +1636,216 @@ describe('a Georgian receipt the model read (MOL-408)', () => {
       { label: 'სულ:', amount: '10.99' },
     ]
     expect(modelPaidBy(GEORGIAN_RECEIPTS, georgian({ totals: cash }))).toBe('cash')
+  })
+})
+
+// MOL-420: Georgia's Carrefour prints a line's sum alone, and the model copied one «5,85» as «5,86» (ge-03) — made-up
+// names and sums in its shape, the total printed twice («TOT» and the card's «EFT»)
+describe('a line of a sum alone put right by the total (MOL-420)', () => {
+  const sumOnly = (printed: string, sum: string): Line =>
+    line({
+      printed,
+      code: null,
+      article: null,
+      quantity: null,
+      unit: null,
+      unit_price: null,
+      discount: null,
+      sum,
+    })
+  const gherkins = sumOnly('GHERKINS 720G', '7.45')
+  const chicken = sumOnly('CHICKEN BREAST', '10.44')
+  // printed 5,85
+  const choco = sumOnly('CHOCO 100GR', '5.86')
+  const twice = (amount: string) => [
+    { label: 'TOT', amount },
+    { label: 'GEL EFT Credit', amount },
+  ]
+  const owedAm = (amount: string) => [
+    { label: 'Ընդամենը', amount },
+    { label: 'Վճարված է Առձեռն', amount },
+  ]
+  const carrefour = (lines: Line[], totals: { label: string; amount: string }[]) =>
+    answer({ shop: 'Carrefour', address: null, id_rows: [], lines, totals })
+  const readGe = (
+    lines: Line[],
+    totals: { label: string; amount: string }[],
+    card = GEORGIAN_RECEIPTS,
+  ) => {
+    const text = receiptTextOfModel(card, carrefour(lines, totals))
+    return { text, shown: verifiedReading(text, { byModel: true }) }
+  }
+  const sums = (text: ReturnType<typeof read>) => text.lines.map((l) => l.sumHundredths)
+  const marked = (text: ReturnType<typeof read>) => text.lines.map((l) => l.repaired === true)
+
+  it('moves the one sum whose swap meets a total two places print, and shows every sum, that one «проверьте»', () => {
+    const { text, shown } = readGe([gherkins, chicken, choco], twice('23.74'))
+    expect([sums(text), marked(text)]).toEqual([
+      [745, 1_044, 585],
+      [false, false, true],
+    ])
+    expect([sums(shown), marked(shown)]).toEqual([
+      [745, 1_044, 585],
+      [false, false, true],
+    ])
+    // no quantity was printed, so no price is made and the receipt is not proven whole
+    expect(shown.lines.map((l) => [l.quantityMilli, l.priceHundredths])).toEqual([
+      [null, null],
+      [null, null],
+      [null, null],
+    ])
+    expect([text.totalHundredths, text.balanced, shown.balanced]).toEqual([2_374, false, false])
+  })
+
+  it('moves none where two sums a swap moves alike could each be the slip', () => {
+    // 2,56 read 2,55 lowers the lines by the same 0,01 as 5,86 read 5,85
+    const { text, shown } = readGe([gherkins, sumOnly('AYRAN', '2.56'), choco], twice('15.86'))
+    expect(marked(text)).toEqual([false, false, false])
+    expect(sums(shown)).toEqual([null, null, null])
+  })
+
+  it('moves at most one sum, by one swap', () => {
+    // two sums each a luma high: two moves, never one receipt put right
+    const { text } = readGe([gherkins, sumOnly('AYRAN', '2.56'), choco], twice('15.85'))
+    expect(marked(text)).toEqual([false, false, false])
+    // one sum two swaps off: 5,66 for 5,55
+    expect(marked(readGe([gherkins, sumOnly('CHOCO', '5.66')], twice('13.00')).text)).toEqual([
+      false,
+      false,
+    ])
+  })
+
+  it('moves none where one place alone prints the total', () => {
+    const { text, shown } = readGe([gherkins, chicken, choco], twice('23.74').slice(0, 1))
+    expect(marked(text)).toEqual([false, false, false])
+    expect(sums(shown)).toEqual([null, null, null])
+  })
+
+  it('moves none where a line read whole moves alike by its swaps (review round 2 of MOL-290, Б2)', () => {
+    // 1 × 1,06 holds as copied and as 1 × 1,05: the 0,01 may be its own
+    const water = line({
+      printed: 'WATER',
+      code: null,
+      article: null,
+      quantity: '1',
+      unit_price: '1.06',
+      sum: '1.06',
+    })
+    expect(marked(readGe([gherkins, water, choco], twice('14.36')).text)).toEqual([
+      false,
+      false,
+      false,
+    ])
+  })
+
+  it('must not move a sum where the lines meet the total as copied, nor on a card with no swap of the model', () => {
+    const met = readGe([gherkins, chicken, choco], twice('23.75'))
+    expect([marked(met.text), sums(met.shown)]).toEqual([
+      [false, false, false],
+      [745, 1_044, 586],
+    ])
+    const none = { ...GEORGIAN_RECEIPTS, modelRepairSwaps: {} }
+    expect(marked(readGe([gherkins, chicken, choco], twice('23.74'), none).text)).toEqual([
+      false,
+      false,
+      false,
+    ])
+  })
+
+  it('puts right a line of quantity × price beside a sum alone, which before held the whole receipt back (В-1 «а»)', () => {
+    // printed 3 × 1,85 = 5,55, the price copied 1,86: MOL-290's one swap
+    const butter = line({
+      printed: 'BUTTER',
+      code: null,
+      article: null,
+      quantity: '3',
+      unit_price: '1.86',
+      sum: '5.55',
+    })
+    const { text, shown } = readGe([gherkins, butter], twice('13.00'))
+    expect([sums(text), marked(text), text.lines[1]?.priceHundredths]).toEqual([
+      [745, 555],
+      [false, true],
+      185,
+    ])
+    // the sum alone keeps its quantity unknown, so the receipt shows sums: the butter's, «проверьте»
+    expect([sums(shown), marked(shown), shown.balanced]).toEqual([[745, 555], [false, true], false])
+  })
+
+  it('moves a sum alone beside lines of quantity × price that hold as copied', () => {
+    const milk = line({
+      printed: 'MILK',
+      code: null,
+      article: null,
+      quantity: '2',
+      unit_price: '3.09',
+      sum: '6.18',
+    })
+    // a total with no 5 or 6 of its own in the luma: no slip of its copying explains the luma (А1)
+    const { text, shown } = readGe([milk, choco], twice('12.03'))
+    expect([sums(text), marked(text)]).toEqual([
+      [618, 585],
+      [false, true],
+    ])
+    expect(marked(shown)).toEqual([false, true])
+  })
+
+  it('moves a sum by a luma at most, as the total chooses no sum of a line (review round 3 of MOL-290, Г1 «а»)', () => {
+    // 6,20 + 7,10 + 3,10 = 16,40 printed, the chicken copied 5,20: only 5 → 6 of its lari meets 16,40 — a sum of its own
+    const lines = [sumOnly('CHICKEN', '5.20'), sumOnly('RICE', '7.10'), sumOnly('OIL', '3.10')]
+    const { text, shown } = readGe(lines, twice('16.40'))
+    expect(marked(text)).toEqual([false, false, false])
+    expect(sums(shown)).toEqual([null, null, null])
+  })
+
+  it('moves none where the total copied alike in both places by the same swap explains it too (adversarial А1)', () => {
+    // printed 2,40 + 3,85 + 9,20 = 15,45, every line copied right, «TOT» and «EFT» both copied 15,46: 3,85 → 3,86
+    // would meet it, and so would 15,46 read back as 15,45 — the line copied right is never rewritten
+    const right = [sumOnly('BREAD', '2.40'), sumOnly('MILK 1L', '3.85'), sumOnly('CHEESE', '9.20')]
+    const { text, shown } = readGe(right, twice('15.46'))
+    expect(marked(text)).toEqual([false, false, false])
+    expect(sums(shown)).toEqual([null, null, null])
+    // Armenia beside lines of quantity × price: the lavash 250 copied right, both places 1 550 copied 1 560 — moved
+    // by 10,00 never (a luma at most), and its own 5 of the tens explains no luma
+    const qp = (printed: string, quantity: string, price: string, sum: string) =>
+      line({ printed, code: null, article: null, quantity, unit: 'pcs', unit_price: price, sum })
+    const armenian = answer({
+      lines: [qp('Կաթ', '2', '200', '400'), qp('Հաց', '3', '300', '900'), sumOnly('Լավաշ', '250')],
+      totals: owedAm('1560'),
+    })
+    expect(read(armenian).lines.some((l) => l.repaired === true)).toBe(false)
+  })
+
+  it('moves none where a line of a count and a sum, no price, moves alike — and never that line (adversarial Б1)', () => {
+    // ge-02's shape: a count and what was paid, no price — settled by no arithmetic (MOL-310)
+    const counted = (printed: string, sum: string) =>
+      line({
+        printed,
+        code: null,
+        article: null,
+        quantity: '1',
+        unit: 'pcs',
+        unit_price: null,
+        sum,
+      })
+    // printed 8,59 + 8,95 + 0,26 = 17,80, the sandwich copied 8,96: the bag's 0,26 → 0,25 meets the total, and so
+    // would the sandwich's own 8,96 → 8,95
+    const bag = sumOnly('ბიო პარკი', '0.26')
+    const misread = [counted('სენდვიჩი 1', '8.59'), counted('სენდვიჩი 2', '8.96'), bag]
+    const { text, shown } = readGe(misread, twice('17.80'))
+    expect(marked(text)).toEqual([false, false, false])
+    expect(shown.lines.some((l) => l.sumHundredths !== null)).toBe(false)
+    // a line of a count and a sum alone misread is never put right: it is no sum alone
+    expect(marked(readGe(misread.slice(0, 2), twice('17.54')).text)).toEqual([false, false])
+  })
+
+  it('leaves the second reader its say where the total was copied wrong alike (adversarial А2, MOL-405)', () => {
+    // the first reading's total 15,46 twice, its lines right; the second's total 15,45 twice — met as copied
+    const right = [sumOnly('BREAD', '2.40'), sumOnly('MILK 1L', '3.85'), sumOnly('CHEESE', '9.20')]
+    const judged = (total: string) =>
+      explainedReading(receiptTextOfModel(GEORGIAN_RECEIPTS, carrefour(right, twice(total))), {
+        byModel: true,
+      })
+    expect(betterReading(judged('15.46'), judged('15.45'))).toBe('second')
   })
 })
