@@ -91,6 +91,31 @@ const fits = (spent: SQL, worstMicroUsd: number, bound: number) =>
 const monthSpentOf = (month: string) =>
   sql`coalesce((select ${modelSpend.spentMicroUsd} from ${modelSpend} where ${modelSpend.month} = ${month}::date), 0)`
 
+/**
+ * A step of the month told once (В-2 «а»): marked in the month's row where it was not, and told in the same transaction
+ * — the stop at the first call the cap refuses, the half at the trial's first refusal (MOL-275, adversarial А1).
+ */
+async function noticeOnce(
+  tx: Conn,
+  owner: boolean,
+  month: string,
+  step: ModelSpendStep,
+  capMicroUsd: number,
+  at: Date,
+): Promise<void> {
+  const [row] = await tx.execute<{ spent: string }>(sql`
+    insert into ${modelSpend} (month, noticed) values (${month}::date, ${step}::smallint)
+    on conflict (month) do update set noticed = ${step}::smallint where ${modelSpend.noticed} < ${step}::smallint
+    returning spent_micro_usd as spent`)
+  if (row === undefined) return
+  await tell(
+    tx,
+    owner,
+    { kind: 'model_spend', month, step, spentMicroUsd: Number(row.spent), capMicroUsd },
+    at,
+  )
+}
+
 async function tell(
   tx: Conn,
   owner: boolean,
@@ -127,15 +152,15 @@ async function takeShare(
 
 export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRepository {
   return {
-    async readsFor({ spend: month, receipts: receiptsMonth }, worstMicroUsd, call) {
+    async readsFor({ spend: spendMonth, receipts: receiptsMonth }, worstMicroUsd, call) {
       const { actorId, capMicroUsd, shareMicroUsd } = call
       if (idOrNull(actorId) === null) return false
       const [row] = await db
         .select({
           reads: sql<boolean>`${readsByModel(sql`${receiptsMonth}::date`)}
-            and ${fits(spentOf(month), worstMicroUsd, shareMicroUsd)}
-            and ${fits(monthSpentOf(month), worstMicroUsd, capMicroUsd)}
-            and (${PAID_BY_MODEL} or ${fits(monthSpentOf(month), worstMicroUsd, trialCapMicroUsd(capMicroUsd))})`,
+            and ${fits(spentOf(spendMonth), worstMicroUsd, shareMicroUsd)}
+            and ${fits(monthSpentOf(spendMonth), worstMicroUsd, capMicroUsd)}
+            and (${PAID_BY_MODEL} or ${fits(monthSpentOf(spendMonth), worstMicroUsd, trialCapMicroUsd(capMicroUsd))})`,
         })
         .from(actors)
         .where(eq(actors.id, actorId))
@@ -183,46 +208,11 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
             sql`select ${fits(monthSpentOf(month), worstMicroUsd, capMicroUsd)} as fits`,
           )
           if (fitsCap?.fits === true) {
-            const [half] = await tx.execute<{ spent: string }>(sql`
-              insert into ${modelSpend} (month, noticed) values (${month}::date, 50)
-              on conflict (month) do update set noticed = 50 where ${modelSpend.noticed} < 50
-              returning spent_micro_usd as spent`)
-            if (half !== undefined) {
-              await tell(
-                tx,
-                owner,
-                {
-                  kind: 'model_spend',
-                  month,
-                  step: 50,
-                  spentMicroUsd: Number(half.spent),
-                  capMicroUsd,
-                },
-                at,
-              )
-            }
+            await noticeOnce(tx, owner, month, 50, capMicroUsd, at)
             return 'trial'
           }
         }
-        const stopped = await tx.execute<{ spent: string }>(sql`
-          insert into ${modelSpend} (month, noticed) values (${month}::date, 100)
-          on conflict (month) do update set noticed = 100 where ${modelSpend.noticed} < 100
-          returning spent_micro_usd as spent`)
-        const [row] = stopped
-        if (row !== undefined) {
-          await tell(
-            tx,
-            owner,
-            {
-              kind: 'model_spend',
-              month,
-              step: 100,
-              spentMicroUsd: Number(row.spent),
-              capMicroUsd,
-            },
-            at,
-          )
-        }
+        await noticeOnce(tx, owner, month, 100, capMicroUsd, at)
         return 'cap'
       })
     },

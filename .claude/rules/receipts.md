@@ -423,10 +423,16 @@ and MOL-283, the screen MOL-276.
 - **«Переснять» gives back what the count took** (owner's В-4 «а», adversarial А2): the key alone missed about half the
   retakes — two readings of one paper by the model give one key on 21 receipts of 46 (MOL-272's bench), the faded ones
   that make people retake least of all — so a counted receipt removed by «Переснять» (`remove(…, { retake: true })`,
-  the account's lock first) returns its trial receipt, if it took one, and its place in the hundred while the person's
-  month is the one it was sent in, marked `retaken_at`; the new shot counts as any. One paper, one count, whatever key
-  each shot copied. **«Вернуть» takes them again** (`restore`); a count given back stands for no repeat. «Удалить»
-  gives nothing back.
+  the account's lock first, `retaken_at` marked on any) returns its trial receipt, if it took one, and its place in the
+  hundred while the person's month is not past the one it counted in (`giveBack`, `>=` as every reader of the count);
+  the new shot counts as any. One paper, one count, whatever key each shot copied. **A live shot of the same paper the
+  model read takes the count over instead** (adversarial Б2): a repeat read and not counted, left on the review while
+  the counted one gave its count back, was a reading free. A count given back stands for no repeat; «Удалить» gives
+  nothing back.
+- **«Вернуть» takes it again, or is refused** (`takeAgain`, adversarial Б1): the place, and the trial receipt — a trial
+  given back and spent since on another paper is never one twice, so with none left «Вернуть» is a 409 and the receipt
+  stays removed; paid meanwhile, it takes the place alone and is counted `month`. The phone's «Переснять» offers no
+  «Вернуть»; the refusal holds the API, where any client may ask.
 - **Checked before the call, counted after it** (Р-5): the claim decides, `reserve` holds the money, `finish` counts.
 - **Near the cap the trial stops first** (owner's В-3 «а»): a person with nothing paid is held to half the month's cap
   (`RECEIPT_TRIAL_CAP_PERCENT`, `trialCapMicroUsd`) in `reserve`'s own statement — refused there, `trial`, the share given

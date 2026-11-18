@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { eq, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
+  ERROR,
   MODEL_CONSENT_EDITION,
   RECEIPTS_ACCESS_HEADER,
   TODAY_HEADER,
@@ -2566,11 +2567,69 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     await repository.remove(me.id, kept)
     expect(await countsOf(me)).toMatchObject({ trial: 10, read: 1 })
 
-    // a receipt «Переснять» removed before any reading counted it gives nothing back
+    // a receipt «Переснять» removed before any reading counted it gives nothing back, marked all the same
     const unread = await queued(me)
     await repository.remove(me.id, unread, { retake: true })
     expect(await countsOf(me)).toMatchObject({ trial: 10, read: 1 })
-    expect((await receiptOf(unread))?.retakenAt).toBeNull()
+    expect((await receiptOf(unread))?.retakenAt).not.toBeNull()
+  }, 60_000)
+
+  it('refuses «Вернуть» that cannot take its trial receipt again, and takes the place alone once paid (adversarial Б1)', async () => {
+    const me = await person(null, MODEL_CONSENT_EDITION, 1)
+    const first = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    await repository.remove(me.id, first, { retake: true })
+    expect((await countsOf(me))?.trial).toBe(1)
+    // the trial receipt given back is spent on another paper
+    const other = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() =>
+        Promise.resolve({
+          kind: 'read',
+          answer: { ...ANSWER, id_rows: ['ՀՎՀՀ: 01234567', 'Ֆիսկալ համար 39999999'] },
+          costMicroUsd: 2_180,
+          tokens: TOKENS,
+        }),
+      ),
+    )
+    expect((await receiptOf(other))?.counted).toBe('trial')
+    expect(await countsOf(me)).toMatchObject({ trial: 0, read: 1 })
+    await expect(repository.restore(me.id, first)).rejects.toMatchObject({ code: ERROR.CONFLICT })
+    expect((await receiptOf(first))?.deletedAt).not.toBeNull()
+    expect(await countsOf(me)).toMatchObject({ trial: 0, read: 1 })
+
+    // paid since: brought back, it takes its place alone and is counted so
+    await db.update(actors).set({ receiptsModelUntil: LATER }).where(eq(actors.id, me.id))
+    expect(await repository.restore(me.id, first)).toBe(true)
+    expect(await receiptOf(first)).toMatchObject({ counted: 'month', retakenAt: null })
+    expect(await countsOf(me)).toMatchObject({ trial: 0, read: 2 })
+  }, 60_000)
+
+  it('passes the count of a receipt «Переснять» removed to a live shot of the same paper the model read (adversarial Б2)', async () => {
+    const me = await person(null, MODEL_CONSENT_EDITION, 10)
+    const first = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    const again = await queued(me)
+    await readAll(
+      benchReader(),
+      fakeModel(() => read()),
+    )
+    expect((await receiptOf(again))?.counted).toBeNull()
+
+    await repository.remove(me.id, first, { retake: true })
+    expect(await receiptOf(again)).toMatchObject({ counted: 'trial' })
+    expect(await receiptOf(first)).toMatchObject({ counted: null })
+    expect(await countsOf(me)).toMatchObject({ trial: 9, read: 1 })
+    // brought back, the first shot is a repeat of the paper again and takes nothing
+    expect(await repository.restore(me.id, first)).toBe(true)
+    expect(await countsOf(me)).toMatchObject({ trial: 9, read: 1 })
   }, 60_000)
 
   it('reads the hundredth of the month, leaves the next to Tesseract, and reads again in a month after', async () => {

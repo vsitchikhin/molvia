@@ -329,7 +329,7 @@ async function readOne(
   // no free reader once a person can pay (MOL-275, В-1 «в»), nor in a country the model alone reads (MOL-408, В-2 «а»):
   // no layout of Tesseract's finds a Georgian receipt's lines, so a receipt the model did not read is said so — the
   // purchases typed by hand — never «переснимите»
-  if (!tesseractReads(photoReading) || (deps.payments === true && !claimed.tariff)) {
+  if (!tesseractReads(photoReading) || (deps.payments === true && !claimed.tariffOpen)) {
     const outcome: ReadOutcome = {
       kind: 'failed',
       failure: 'unreadable',

@@ -96,7 +96,7 @@ export interface ClaimedReceipt {
    * read — whatever the edition. With payment open, a receipt whose tariff is shut is read by nobody (adversarial А3:
    * who has paid and not accepted edition 5 is still read by Tesseract).
    */
-  readonly tariff: boolean
+  readonly tariffOpen: boolean
   /**
    * Its photo and reading may be kept for the developer's review if it is read not whole (MOL-309): its owner
    * accepted edition `REVIEW_CONSENT_EDITION`, which says so.
@@ -953,24 +953,46 @@ async function countModelReceipt(tx: Conn, id: string): Promise<void> {
 
 /**
  * What a counted receipt took, given back as «Переснять» removes it (MOL-275, owner's В-4 «а»): its place in the hundred
- * while the person's month is still the one it was sent in, and its trial receipt if it took one; `back` — «Вернуть»
- * brought it back, and it takes them again. One paper, one count, whatever key the model copied of each shot.
+ * while the person's month is not past the one it counted in — `>=`, as every reader of the count compares — and its
+ * trial receipt if it took one. One paper, one count, whatever key the model copied of each shot.
  */
-async function recountRetake(
+async function giveBack(
   tx: Conn,
   row: { readonly actorId: string; readonly sentMonth: string; readonly counted: ReceiptCount },
-  back: boolean,
 ): Promise<void> {
-  const step = back ? 1 : -1
-  // the place only while the person's month is the one it was sent in — a retake comes minutes after; a month moved
-  // on since keeps its count, and gives back nothing it no longer holds
   await tx.execute(sql`
     update ${actors}
-    set model_receipts_read = case when ${actors.modelReceiptsMonth} = ${row.sentMonth}::date
-          then greatest(${actors.modelReceiptsRead} + ${step}::int, 0) else ${actors.modelReceiptsRead} end,
+    set model_receipts_read = case when ${actors.modelReceiptsMonth} >= ${row.sentMonth}::date
+          then greatest(${actors.modelReceiptsRead} - 1, 0) else ${actors.modelReceiptsRead} end,
         trial_receipts_left = case when ${row.counted === 'trial'}::boolean
-          then least(greatest(${actors.trialReceiptsLeft} - ${step}::int, 0), ${RECEIPT_TRIAL}::int) else ${actors.trialReceiptsLeft} end
+          then least(${actors.trialReceiptsLeft} + 1, ${RECEIPT_TRIAL}::int) else ${actors.trialReceiptsLeft} end
     where ${actors.id} = ${row.actorId}`)
+}
+
+/**
+ * What «Вернуть» of a receipt «Переснять» gave back takes again (MOL-275, adversarial Б1): its place, and its trial
+ * receipt — a trial spent meanwhile, a paid reading takes the place alone and the receipt is counted so; neither, none:
+ * a trial receipt given back and spent on another paper is never one twice. Says how it is counted now, or none.
+ */
+async function takeAgain(
+  tx: Conn,
+  row: { readonly actorId: string; readonly sentMonth: string; readonly counted: ReceiptCount },
+): Promise<ReceiptCount | null> {
+  const [person] = await tx.execute<{ paid: boolean; trial: number }>(sql`
+    select ${PAID_BY_MODEL} as paid, ${actors.trialReceiptsLeft} as trial
+    from ${actors} where ${actors.id} = ${row.actorId}`)
+  if (person === undefined) return null
+  const by: ReceiptCount | null =
+    row.counted === 'month' || person.paid ? 'month' : person.trial > 0 ? 'trial' : null
+  if (by === null) return null
+  await tx.execute(sql`
+    update ${actors}
+    set model_receipts_read =
+          (case when ${actors.modelReceiptsMonth} >= ${row.sentMonth}::date then ${actors.modelReceiptsRead} else 0 end) + 1,
+        model_receipts_month = greatest(${actors.modelReceiptsMonth}, ${row.sentMonth}::date),
+        trial_receipts_left = ${actors.trialReceiptsLeft} - ${by === 'trial' ? 1 : 0}::smallint
+    where ${actors.id} = ${row.actorId}`)
+  return by
 }
 
 export function createReceiptRepository(db: Conn): ReceiptRepository {
@@ -1455,6 +1477,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             tripId: receipts.tripId,
             counted: receipts.counted,
             sentMonth: receipts.sentMonth,
+            tin: receipts.tin,
+            receiptNo: receipts.receiptNo,
           })
           .from(receipts)
           .where(
@@ -1467,20 +1491,40 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           .for('update')
         if (held === undefined) return
         if (held.tripId !== null) throw new DomainError(ERROR.CONFLICT)
-        const givesBack = retake && held.counted !== null
         await tx
           .update(receipts)
           .set({
             deletedAt: sql`clock_timestamp()`,
-            ...(givesBack ? { retakenAt: sql`clock_timestamp()` } : {}),
+            ...(retake ? { retakenAt: sql`clock_timestamp()` } : {}),
           })
           .where(eq(receipts.id, own))
-        if (givesBack && held.counted !== null) {
-          await recountRetake(
-            tx,
-            { actorId, sentMonth: held.sentMonth, counted: held.counted },
-            false,
-          )
+        const counted = retake ? held.counted : null
+        if (counted !== null) {
+          // a live shot of the same paper the model read takes the count over, never a reading of it left free
+          // (adversarial Б2): one paper, one count
+          const [heir] = await tx
+            .select({ id: receipts.id })
+            .from(receipts)
+            .where(
+              and(
+                eq(receipts.actorId, actorId),
+                sql`${receipts.id} <> ${own}`,
+                sql`${receipts.deletedAt} is null`,
+                sql`${receipts.counted} is null`,
+                eq(receipts.status, 'parsed'),
+                readByModelSql(sql`${receipts.readerVersion}`),
+                sql`${receipts.tin} = ${held.tin} and ${receipts.receiptNo} = ${held.receiptNo}`,
+              ),
+            )
+            .orderBy(asc(receipts.createdAt), asc(receipts.id))
+            .limit(1)
+            .for('update')
+          if (heir === undefined) {
+            await giveBack(tx, { actorId, sentMonth: held.sentMonth, counted })
+          } else {
+            await tx.update(receipts).set({ counted }).where(eq(receipts.id, heir.id))
+            await tx.update(receipts).set({ counted: null }).where(eq(receipts.id, own))
+          }
         }
         // «Переснять»: the review of the receipt it replaces stays (MOL-309, owner's В-6 «а»)
         await tx
@@ -1519,18 +1563,22 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           // minutes may run out while the account's lock was waited for (review 1, №3)
           const restored = await tx
             .update(receipts)
-            .set({ deletedAt: null })
+            .set({ deletedAt: null, retakenAt: null })
             .where(yours)
             .returning({ id: receipts.id })
           if (restored.length === 0) return false
-          // brought back from «Переснять», it takes again what its count gave back (MOL-275, В-4 «а»)
+          // brought back from «Переснять», it takes again what its count gave back (MOL-275, В-4 «а») — or is refused,
+          // the transaction with it, where a trial given back was spent since and nothing is paid (adversarial Б1)
           if (held.retakenAt !== null && held.counted !== null) {
-            await recountRetake(
-              tx,
-              { actorId, sentMonth: held.sentMonth, counted: held.counted },
-              true,
-            )
-            await tx.update(receipts).set({ retakenAt: null }).where(eq(receipts.id, own))
+            const by = await takeAgain(tx, {
+              actorId,
+              sentMonth: held.sentMonth,
+              counted: held.counted,
+            })
+            if (by === null) throw new DomainError(ERROR.CONFLICT)
+            if (by !== held.counted) {
+              await tx.update(receipts).set({ counted: by }).where(eq(receipts.id, own))
+            }
           }
           // brought back, it is no receipt replaced: its review goes with it again
           await tx
@@ -1666,7 +1714,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         const [owner] = await tx
           .select({
             byModel: readsByModel(sql`${receipts.sentMonth}`),
-            tariff: tariffOpens(sql`${receipts.sentMonth}`),
+            tariffOpen: tariffOpens(sql`${receipts.sentMonth}`),
             reviewable: sql<boolean>`coalesce(${actors.consentVersion} >= ${REVIEW_CONSENT_EDITION}, false)`,
           })
           .from(actors)
@@ -1682,7 +1730,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           ...row,
           parts,
           byModel: owner?.byModel ?? false,
-          tariff: owner?.tariff ?? false,
+          tariffOpen: owner?.tariffOpen ?? false,
           reviewable: owner?.reviewable ?? false,
         }
       })
