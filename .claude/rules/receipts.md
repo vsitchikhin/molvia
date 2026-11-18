@@ -523,8 +523,9 @@ receipt proven whole, and its lines of one piece went empty.
   GEL, the day first. **A word no Georgian receipt has shown is `NEVER`**, a fragment that matches nothing — never an
   empty one, which matches every row: a word without a paper behind it decides what a total is, and the bill words
   and «Service» the first draft took from Armenia's card would have. So is what Georgia prints no counterpart of —
-  the card's cashback, the sum since the year's start. **The model's swap is 5↔6 alone** (MOL-420): seen on
-  Carrefour's sums, where the total printed twice puts it right; no swap of the repair alone (`modelRepairSwaps`).
+  the card's cashback, the sum since the year's start. **The model's 5↔6 is the repair's alone** (`modelRepairSwaps`,
+  MOL-420): seen only where the total printed twice put Carrefour's sum right; `modelSwaps`, which the shop's memory
+  doubts by, stays empty — nobody measured it there.
 - **The digits of the tax number and the fiscal number are the card's** (`tinDigits`, `fiscalDigits`, `digitCounts`),
   for the model's rows and Tesseract's layouts alike (review 1, №4): Armenia's eight and eight, Georgia's nine of a
   company and eleven of a sole trader after «ს/კ», and no fiscal number. **No receipt number yet** (Р-5): with no
@@ -605,8 +606,8 @@ receipt proven whole, and its lines of one piece went empty.
 nine sets, $0,37): **the model copies any script about as well as Armenian** — Georgian 50 fields right of 51, Serbian
 126 of 132, Russian 374 of 391, Icelandic 1 175 of 1 195, the total copied right in 5 of 5, 38 of 39, 38 of 40 — and
 **our code is what loses it**: Georgia shows 12 fields right and none wrong, sums on 6 lines of 35 — a line lost leaves
-the total in one place (MOL-244), a till of sums alone had no arithmetic for MOL-290's repair to try (since MOL-420
-the total puts one sum right, 31 fields right, below), the pharmacies' three decimals. Russia with a card of the bench: totals 33 right and none wrong of 40, 28 proven whole,
+the total in one place (MOL-244), a till of sums alone had no arithmetic for MOL-290's repair to try (31 fields
+right since MOL-420 — «A line of a sum alone, put right by the total»), the pharmacies' three decimals. Russia with a card of the bench: totals 33 right and none wrong of 40, 28 proven whole,
 dates 37 of 37 (MOL-414). A tax on top, a total rounded to 5 sen and thousands with a point in a currency with no cents
 showed wrong totals or none (Malaysia, Indonesia, Iceland) — none of today's countries, MOL-426; two receipts on one
 photo, a total of the other one (MOL-425); and the model orders an ambiguous date's day and month itself, 2 of 16 on
@@ -1718,9 +1719,18 @@ right**: `choicesOf` found no reading of a quantity that was never printed, and 
 
 - **Read as copied, and at most one such line of the receipt moved by one swap of its sum** (`sumOnly`, the ticket's
   «одна замена 5↔6 в одной строке»): never MOL-290's two a figure, since only the total judges such a line, and two
-  swaps give too many ways to make up a few tetri. A move is one more of the total's choices — **two lines a swap moves
-  alike are a doubt**, so are a line read whole that its swaps move alike (Б2) and two moves; the walk counts a move's
-  lines at its leaf, by the size of the move, so the steps do not grow with them.
+  swaps give too many ways to make up a few tetri. **A luma at most** (`TOLERANCE_HUNDREDTHS`, review №2): the total
+  chooses a luma of a line and never between two sums (Г1 «а»), so «5,86» moves to 5,85, never to 6,86 — 5↔6 in the
+  last digit alone; Armenia's 3↔8 moves no sum alone. A move is one more of the total's choices — **two lines a swap
+  moves alike are a doubt**, so are a line read whole that its swaps move alike (Б2) and two moves. The walk checks
+  each leaf against every size of a move, one or two (±1 luma), never against each line, so its steps do not grow
+  with them; the readings of a sum alone are counted into the receipt's ceiling and `repairTries` as a line's are.
+- **And never where the total explains it as well** (adversarial А1): the model copies the till's «5» as «6» in the
+  total too, alike in both its places (MOL-244 saw it in a card's payment), and then the lines as copied miss it by
+  just the luma a sum alone would move — «15.46» twice over 2,40 + 3,85 + 9,20 moved the milk, copied right, to 3,86
+  and showed it «проверьте», where the base showed nothing. So where one swap of the printed total (`slipsOfTotal`,
+  before the card's cashback or the service) undoes the move, the receipt is a doubt; its «Прочитали не всё» stays
+  and the second reader of MOL-405 keeps its say (А1б, А2). ge-03's 103,73 has no 5 or 6 to swap.
 - **In any receipt** (owner's В-1 «а»): beside lines of quantity × price too, which MOL-290 puts right as before — one
   quantity the model left out no longer holds the whole receipt back. The Armenian bench came out the same (am-05c,
   am-06 carry such lines), so «б» — sums alone only — was not needed.
@@ -1731,8 +1741,12 @@ right**: `choicesOf` found no reading of a quantity that was never printed, and 
   memory chose still vouches for nothing (`remembered: 'repaired'`, MOL-291). **It keeps «проверьте» shown alone**
   (`emptied` keeps `repaired` for the total's), and the phone says «Цифры поправили — сверьте с бумагой» with no figures
   before its sum (`ReceiptLineRow`); an earlier build gets it empty, as any line put right.
-- **The price, named:** two lines the model misread by +d and −d beside a third that one swap moves by exactly the
-  difference meet the total — the edge of Г2 of MOL-290; a receipt with two sums misread stays empty, as before.
+- **The prices, named:** two lines the model misread by +d and −d beside a third that one swap moves by exactly the
+  difference meet the total — the edge of Г2 of MOL-290; a receipt with two sums misread stays empty, as before; **and
+  one sum copied a luma off by a slip no pair of the card names** (7,38 copied 7,37, adversarial А3) lets the total move
+  another line, copied right, by the luma back — two wrong figures where the base showed none. Not seen: the model's
+  slips in sums are the measured pairs (MOL-315), and a slip outside them is a hypothesis, the adversary's own word.
+  A receipt whose total has a 5 or 6 in its luma and a sum alone misread is a doubt too (А1), its lines empty as before.
 - **Measured** (`status/MOL-408/score.mts`, `status/MOL-310/score.mts`, 18.11.2026): Georgia 12 → 31 right, made up 0,
   sums on 6 → 25 lines of 35 — ge-03's 19; the Armenian bench, production's ten and every other set of MOL-408 the same
   to the field (their bench cards take Georgia's swaps too).
