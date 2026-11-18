@@ -176,6 +176,9 @@ export async function aLife(
       serviceMinor: 500n,
       paidBy: 'card',
       balanced: true,
+      // the month it counts in, and counted among the model's (MOL-275): fields of the copy, filled in some row
+      sentMonth: '2026-09-01',
+      counted: true,
       recordedAt: at,
       tripId,
     },

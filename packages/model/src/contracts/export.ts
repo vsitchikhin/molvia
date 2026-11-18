@@ -65,8 +65,11 @@ export const EXPORT_FORMAT = 'molvia-export'
 // account's `receiptItemsDay` and `receiptItemsNew`, the items put into the shared catalogue by «Записать» of the
 // person's receipts on their day, which its own quota counts (MOL-373). 34: a trip's `categoryId`, the category
 // «Деньги» count it in, chosen at «Записать», «Закончить» or in «Траты» (MOL-400). 35: the account's `locale`,
-// the language the person's app last spoke, which the bot's rating reminder is written in (MOL-398).
-export const EXPORT_VERSION = 35
+// the language the person's app last spoke, which the bot's rating reminder is written in (MOL-398). 36: the account's
+// `trialReceiptsLeft`, `modelReceiptsMonth` and `modelReceiptsRead`, the trial's receipts left and the receipts the
+// model read in the person's month, and a receipt's `sentMonth` and `counted`, the month it counts in and whether it
+// was counted (MOL-275).
+export const EXPORT_VERSION = 36
 
 const day = z.iso.date()
 
@@ -163,6 +166,9 @@ const accountSchema = z.strictObject({
   modelMonth: day.nullable(),
   modelSpentMicroUsd: z.int().nonnegative(),
   modelShareTold: day.nullable(),
+  trialReceiptsLeft: z.int().nonnegative(),
+  modelReceiptsMonth: day.nullable(),
+  modelReceiptsRead: z.int().nonnegative(),
   createdAt: isoDate,
   updatedAt: isoDate,
 })
@@ -407,6 +413,8 @@ const receiptSchema = z.strictObject({
   readPartly: z.boolean().nullable(),
   paidBy: z.string().nullable(),
   balanced: z.boolean(),
+  sentMonth: day,
+  counted: z.boolean(),
   city: z.string().nullable(),
   recordedAt: isoDate.nullable(),
   heard: receiptHeardSchema.nullable(),
