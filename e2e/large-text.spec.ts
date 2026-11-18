@@ -5,7 +5,7 @@ import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import type { Locator, Page } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import { facesIn, stillIn } from './scroll'
 import { asBrowser, signedIn } from './session'
 import { textAt } from './text-size'
@@ -372,6 +372,58 @@ for (const size of ['150%', '200%'])
       await expect(page.getByRole('group', { name: 'Тема' }).locator('.track')).toHaveClass(
         /stacked/,
       )
+    })
+
+    test('the longest city, «Санкт-Петербург», stands whole in «Настройки» and «Что брать» (MOL-412)', async ({
+      page,
+    }) => {
+      // «Что брать» first, so the phone remembers Gyumri's list: the city is printed there only by the strip of a
+      // list for another city (`advice.city_reloading`), never by a newcomer's words (adversarial А2).
+      await signedIn(page, '/')
+      await expect(page.locator('.intro-title')).toBeVisible()
+      const headers = await asBrowser(page)
+      const previous = settingsOf(
+        actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+      )
+      const moved = await page.request.put('/api/actors/me/settings', {
+        headers,
+        data: { previous, settings: { ...previous, country: 'RU', city: 'Санкт-Петербург' } },
+      })
+      expect(moved.ok(), await moved.text()).toBe(true)
+
+      await page.goto('/settings')
+      const city = page.locator('.chosen-words').filter({ hasText: 'Санкт-Петербург' })
+      expect(await pageSideways(page, city)).toBe(0)
+      // the select's chosen words wrap over it, never cut by its box
+      expect(
+        await city.evaluate((words) => words.scrollWidth - words.clientWidth),
+      ).toBeLessThanOrEqual(1)
+
+      // Petersburg's list held on its way: the remembered one is Gyumri's, and past a moment the strip names the
+      // city it waits for — «Обновляем · список для Санкт-Петербурга».
+      const held: Route[] = []
+      const hold = (route: Route) => {
+        held.push(route)
+      }
+      await page.route(/\/api\/advice(\?|$)/, hold)
+      await page.goto('/')
+      const strip = page.locator('.strip .words').filter({ hasText: 'Санкт-Петербурга' })
+      expect(await pageSideways(page, strip)).toBe(0)
+      expect(
+        await strip.evaluate((words) => {
+          const line = words.getBoundingClientRect()
+          const box = words.closest('.strip')!.getBoundingClientRect()
+          return Math.max(
+            line.right - box.right,
+            box.left - line.left,
+            words.scrollWidth - words.clientWidth,
+          )
+        }),
+      ).toBeLessThanOrEqual(1)
+      // nothing left in the air past the test: the held requests go on, and the list comes
+      for (const route of held.splice(0)) await route.continue()
+      await page.unroute(/\/api\/advice(\?|$)/, hold)
+      await expect(page.locator('.intro-title')).toBeVisible()
     })
 
     test('every screen of «Деньги» stands within the phone', async ({ page }) => {

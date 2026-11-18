@@ -252,6 +252,43 @@ describe('общий режим', () => {
     expect(await expenses.placePricesFor(ownPrices(me, [itemId]))).toHaveLength(1)
   })
 
+  it('в России: чужие цены только Москвы, свой казанский чек — после неё (MOL-412, Р-26)', async () => {
+    // Одноимённая «Пятёрочка» в Москве и в Санкт-Петербурге — два места одной страны; человек в Москве.
+    const me = await insertActor(db, { country: 'RU', city: 'Москва' })
+    const itemId = await insertItem(db)
+    const moscow = await insertPlace(db, { name: 'Пятёрочка', country: 'RU', city: 'Москва' })
+    const petersburg = await insertPlace(db, {
+      name: 'Пятёрочка',
+      country: 'RU',
+      city: 'Санкт-Петербург',
+    })
+    const kazan = await insertPlace(db, { name: 'Магнит', country: 'RU', city: 'Казань' })
+    const rub = (minor: number): Money => ({ minor: BigInt(minor), currency: 'RUB' })
+    for (const minor of [9_000, 9_100, 9_200]) {
+      await bought(
+        await insertActor(db, { country: 'RU', city: 'Москва' }),
+        itemId,
+        moscow,
+        rub(minor),
+      )
+      await bought(
+        await insertActor(db, { country: 'RU', city: 'Санкт-Петербург' }),
+        itemId,
+        petersburg,
+        rub(minor - 1_000),
+      )
+    }
+    // свой казанский чек дешевле — и всё равно после своего города
+    await bought(me, itemId, kazan, rub(5_000))
+    const inMoscow = { ...sharedPrices(me, [itemId]), country: 'RU', city: 'Москва' }
+
+    const rows = await expenses.placePricesFor(inMoscow)
+    expect(rows.map((row) => [row.placeName, row.placeCity])).toEqual([
+      ['Пятёрочка', 'Москва'],
+      ['Магнит', 'Казань'],
+    ])
+  })
+
   it('на двух странах: чужие цены только своего города, свои — отовсюду, свой город первым (MOL-109, Р-26)', async () => {
     // Одноимённый «Carrefour» в Тбилиси и в Гюмри — два места; человек живёт в Тбилиси.
     const me = await insertActor(db, { country: 'GE', city: 'Тбилиси' })

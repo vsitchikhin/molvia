@@ -10,12 +10,23 @@ export const citySchema = visibleLine(120)
  * reminder comes at seven in the evening of *their* day, and «yesterday» is their yesterday.
  * By country rather than by city, because every city the settings offer shares its country's
  * zone; a test refuses a country the settings accept without a line here. Belgrade keeps summer
- * time, which the zone's name carries — never an offset.
+ * time, which the zone's name carries — never an offset. Russia's seven cities all live by Moscow's
+ * clock the year round, Volgograd since 27.12.2020 (MOL-412); a city of another zone is MOL-419's.
  */
 export const COUNTRY_TIME_ZONES: Readonly<Record<string, string>> = {
   AM: 'Asia/Yerevan',
   GE: 'Asia/Tbilisi',
+  RU: 'Europe/Moscow',
   RS: 'Europe/Belgrade',
+}
+
+/**
+ * The zones a phone in a country may name beside the country's own (MOL-412): Volgograd keeps a name of
+ * its own in the IANA database while it runs on Moscow's clock. Read by a newcomer's first geography
+ * alone — never a person's day, which is `COUNTRY_TIME_ZONES`'.
+ */
+export const COUNTRY_PHONE_ZONES: Readonly<Record<string, readonly string[]>> = {
+  RU: ['Europe/Volgograd'],
 }
 
 /** The zone of a country, or `null` for one we have no day for — such a person is not reminded. */
