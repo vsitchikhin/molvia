@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import { actorCodec, ERROR, settingsOf, tripViewCodec } from '@molvia/model'
 import type { ActorSettings } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { actors, places } from '@/db/schema'
+import { actors, officialRates, places, trips } from '@/db/schema'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
@@ -165,16 +165,50 @@ describe('settings and offline trip context', () => {
     expect(await db.select({ country: actors.country, city: actors.city }).from(actors)).toEqual([
       { country: 'RU', city: 'Казань' },
     ])
-    // a trip's own geography (MOL-65): another city of Russia, with no case of its own
+    // The CBA's rouble of yesterday is in the cache, so a trip of two currencies takes it.
+    const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
+      new Date(Date.now() - 24 * 3_600_000),
+    )
+    await db
+      .insert(officialRates)
+      .values({ provider: 'cba', currency: 'RUB', rateDate: yesterday, scaled: 4_241_700n })
+    const start = async (context: ActorSettings, name: string) => {
+      const id = randomUUID()
+      const response = await app.inject({
+        method: 'POST',
+        url: '/trips',
+        headers: { cookie },
+        payload: { id, context, place: { kind: 'store', name } },
+      })
+      expect(response.statusCode, response.body).toBe(201)
+      const rate = onlyRow(
+        await db
+          .select({ currency: trips.currency, base: trips.rateBase, quote: trips.rateQuote })
+          .from(trips)
+          .where(eq(trips.id, id)),
+      )
+      // one open trip at a time: finished, so the next one may start
+      const finished = await app.inject({
+        method: 'POST',
+        url: `/trips/${id}/finish`,
+        headers: { cookie },
+        payload: {},
+      })
+      expect(finished.statusCode, finished.body).toBeLessThan(300)
+      return rate
+    }
+    // a trip's own geography (MOL-65): another city of Russia, with no case of its own; roubles to
+    // roubles take no rate at all — the pair is one currency, never a bank's (Т5)
     const sochi = { ...kazan, city: 'Сочи', spendCurrency: 'RUB', incomeCurrency: 'RUB' } as const
-    const trip = await app.inject({
-      method: 'POST',
-      url: '/trips',
-      headers: { cookie },
-      payload: { id: randomUUID(), context: sochi, place: { kind: 'store', name: 'Магнит' } },
-    })
-    expect(trip.statusCode).toBe(201)
-    expect(await db.select({ country: places.country, city: places.city }).from(places)).toEqual([
+    expect(await start(sochi, 'Магнит')).toEqual({ currency: 'RUB', base: null, quote: null })
+    // the control: drams in Gyumri, beside it, take the rouble's rate from the same cache
+    expect(await start(initial, 'SAS')).toEqual({ currency: 'AMD', base: 'RUB', quote: 'AMD' })
+    const where = await db
+      .select({ country: places.country, city: places.city })
+      .from(places)
+      .orderBy(places.city)
+    expect(where).toEqual([
+      { country: 'AM', city: 'Гюмри' },
       { country: 'RU', city: 'Сочи' },
     ])
   })
