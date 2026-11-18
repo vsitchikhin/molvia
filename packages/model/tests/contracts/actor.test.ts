@@ -60,6 +60,8 @@ describe('actorCodec', () => {
       'createdAt',
       'id',
       'incomeCurrency',
+      // where the person stands with the model: optional, and sent only to a phone that asks (MOL-275)
+      'receiptsAccess',
       // whether the model reads the person's receipts: optional, and sent only to a phone that asks (MOL-408)
       'receiptsByModel',
       'spendCurrency',
@@ -68,6 +70,37 @@ describe('actorCodec', () => {
     // And the entity really is the wider of the two — otherwise the list above would be
     // agreeing with nothing.
     expect(Object.keys(actorSchema.shape)).toContain('telegramUserId')
+  })
+
+  it('carries where the person stands with the model, its moment as ISO, only where it was said', () => {
+    // MOL-275: the status for MOL-276's screen; an older answer has none, and none is no field at all
+    const view = actorViewSchema.parse(actorSchema.parse(actor))
+    const status = {
+      until: new Date('2026-12-20T08:00:00.000Z'),
+      trialLeft: 3,
+      trialOf: 10 as const,
+      month: '2026-11-01',
+      read: 7,
+      limit: 100 as const,
+    }
+    const wire = z.encode(actorCodec, { ...view, receiptsAccess: status })
+
+    expect(wire.receiptsAccess).toEqual({ ...status, until: '2026-12-20T08:00:00.000Z' })
+    expect(actorCodec.parse(JSON.parse(JSON.stringify(wire))).receiptsAccess).toEqual(status)
+    const unpaid = z.encode(actorCodec, { ...view, receiptsAccess: { ...status, until: null } })
+    expect(actorCodec.parse(unpaid).receiptsAccess?.until).toBeNull()
+    expect(z.encode(actorCodec, view)).not.toHaveProperty('receiptsAccess')
+    // past the trial's ten, or a limit other than the hundred, is no answer of this server
+    expect(
+      actorWireSchema.safeParse({
+        ...wire,
+        receiptsAccess: { ...wire.receiptsAccess, trialLeft: 11 },
+      }).success,
+    ).toBe(false)
+    expect(
+      actorWireSchema.safeParse({ ...wire, receiptsAccess: { ...wire.receiptsAccess, limit: 99 } })
+        .success,
+    ).toBe(false)
   })
 
   it('keeps the two timestamps apart to the millisecond', () => {
