@@ -1816,6 +1816,29 @@ describe('a line of a sum alone put right by the total (MOL-420)', () => {
     expect(read(armenian).lines.some((l) => l.repaired === true)).toBe(false)
   })
 
+  it('moves none where a line of a count and a sum, no price, moves alike — and never that line (adversarial Б1)', () => {
+    // ge-02's shape: a count and what was paid, no price — settled by no arithmetic (MOL-310)
+    const counted = (printed: string, sum: string) =>
+      line({
+        printed,
+        code: null,
+        article: null,
+        quantity: '1',
+        unit: 'pcs',
+        unit_price: null,
+        sum,
+      })
+    // printed 8,59 + 8,95 + 0,26 = 17,80, the sandwich copied 8,96: the bag's 0,26 → 0,25 meets the total, and so
+    // would the sandwich's own 8,96 → 8,95
+    const bag = sumOnly('ბიო პარკი', '0.26')
+    const misread = [counted('სენდვიჩი 1', '8.59'), counted('სენდვიჩი 2', '8.96'), bag]
+    const { text, shown } = readGe(misread, twice('17.80'))
+    expect(marked(text)).toEqual([false, false, false])
+    expect(shown.lines.some((l) => l.sumHundredths !== null)).toBe(false)
+    // a line of a count and a sum alone misread is never put right: it is no sum alone
+    expect(marked(readGe(misread.slice(0, 2), twice('17.54')).text)).toEqual([false, false])
+  })
+
   it('leaves the second reader its say where the total was copied wrong alike (adversarial А2, MOL-405)', () => {
     // the first reading's total 15,46 twice, its lines right; the second's total 15,45 twice — met as copied
     const right = [sumOnly('BREAD', '2.40'), sumOnly('MILK 1L', '3.85'), sumOnly('CHEESE', '9.20')]

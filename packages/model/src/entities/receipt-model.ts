@@ -213,13 +213,8 @@ function lineOf(line: ModelReceipt['lines'][number]): ReceiptTextLine {
   const rounding = discountHundredths === null ? 0 : TOLERANCE_HUNDREDTHS
   // a bill that prints no price — «Блюдо, Кол-во, Сумма» (MOL-310) — has no arithmetic to hold: its quantity and
   // sum are as printed, and only a total they meet vouches for them (`verifiedReading`)
-  const priceless =
-    line.unit_price === null &&
-    discountHundredths === null &&
-    quantityMilli !== null &&
-    sumHundredths !== null
   const settled =
-    priceless ||
+    counted(line) ||
     (quantityMilli !== null &&
       priceHundredths !== null &&
       sumHundredths !== null &&
@@ -706,6 +701,24 @@ function slipsOfTotal(swaps: Readonly<Record<string, string>>, total: number): S
   return new Set(readingsOf(swaps, text, 2, 1).map((one) => (one.value ?? total) - total))
 }
 
+/** A line of no arithmetic of its own moved by one swap of its sum: a rival is never the one the total chooses. */
+interface Move {
+  readonly i: number
+  readonly sum: number
+  readonly delta: number
+  readonly rival: boolean
+}
+
+/** A bill's line of a count and a sum, no price printed (MOL-310): settled as copied, by no arithmetic. */
+function counted(line: ModelReceipt['lines'][number]): boolean {
+  return (
+    line.unit_price === null &&
+    figureOf(line.discount, 2) === null &&
+    figureOf(line.quantity, 3) !== null &&
+    figureOf(line.sum, 2) !== null
+  )
+}
+
 /**
  * A line the till printed with its sum alone — no quantity, no price, no discount (Georgia's Carrefour, MOL-420): no
  * arithmetic of its own to hold, so only the total judges it.
@@ -787,28 +800,41 @@ function repaired(
   let read = 0
   // how far the lines read whole as copied may be off, each read whole by the swaps as well: 0 where none is
   let shifts = new Set([0])
-  // a line of a sum alone moved by one swap (MOL-420): by how much, and which line to which sum
-  const moves = new Map<number, { i: number; sum: number }[]>()
+  // a line of a sum alone moved by one swap (MOL-420): by how much, and which line to which sum — and a bill's line of a
+  // count and a sum, a rival only (adversarial Б1)
+  const moves = new Map<number, Move[]>()
+  // its sum moved by one swap within the till's rounding, as the total chooses a sum of any line and never between two
+  // sums (review round 3 of MOL-290, Г1 «а»): 5,86 → 6,86 is a sum of its own; false past the receipt's ceiling
+  const moveOf = (i: number, own: number, sum: string | null, rival: boolean): boolean => {
+    const swapped = readingsOf(swaps, sum, 2, 1)
+    if (swapped.length > budget.left) return false
+    budget.left -= swapped.length
+    repairTries.count += swapped.length
+    for (const { value } of swapped) {
+      if (value === null) continue
+      const delta = value - own
+      if (delta === 0 || Math.abs(delta) > TOLERANCE_HUNDREDTHS) continue
+      const held = moves.get(delta)
+      const move = { i, sum: value, delta, rival }
+      if (held === undefined) moves.set(delta, [move])
+      else held.push(move)
+    }
+    return true
+  }
   for (const [i, line] of lines.entries()) {
     const copied = answer.lines[i]
     if (copied !== undefined && line.sumHundredths !== null && sumOnly(copied)) {
-      const own = line.sumHundredths
-      read += own
+      read += line.sumHundredths
       options.push(null)
-      const swapped = readingsOf(swaps, copied.sum, 2, 1)
-      if (swapped.length > budget.left) return null
-      budget.left -= swapped.length
-      repairTries.count += swapped.length
-      for (const { value } of swapped) {
-        if (value === null) continue
-        const delta = value - own
-        // a luma at most, as the total chooses a luma of any line and never between two sums (review round 3 of
-        // MOL-290, Г1 «а»): 5,86 → 6,86 is a sum of its own
-        if (delta === 0 || Math.abs(delta) > TOLERANCE_HUNDREDTHS) continue
-        const held = moves.get(delta)
-        if (held === undefined) moves.set(delta, [{ i, sum: value }])
-        else held.push({ i, sum: value })
-      }
+      if (!moveOf(i, line.sumHundredths, copied.sum, false)) return null
+      continue
+    }
+    // a bill's line that prints no price (MOL-310) holds no arithmetic either: its sum moved alike is the other way
+    // the lines miss the total, never one the total chooses — the receipt's lines put right by it are a doubt (Б1)
+    if (copied !== undefined && line.sumHundredths !== null && counted(copied)) {
+      read += line.sumHundredths
+      options.push(null)
+      if (!moveOf(i, line.sumHundredths, copied.sum, true)) return null
       continue
     }
     if (line.settled) {
@@ -839,7 +865,7 @@ function repaired(
   // pays for the juice read 105 for 106), and the one choice must make it with them as copied
   const broken = options.flatMap((found, i) => (found === null ? [] : [{ i, found }]))
   // no sum alone moved, or one of them: every line a move of that size would take is a way of its own
-  const sizes: [number, readonly ({ i: number; sum: number } | null)[]][] = [[0, [null]], ...moves]
+  const sizes: [number, readonly (Move | null)[]][] = [[0, [null]], ...moves]
   // a sum alone moved down lowers what the other lines may make
   const lowest = Math.min(...shifts) + Math.min(0, ...moves.keys())
   const picks: number[] = []
@@ -849,7 +875,7 @@ function repaired(
     steps: number
     picked: number[]
     shift: number
-    moved: { i: number; sum: number } | null
+    moved: Move | null
   } = { ways: 0, steps: 0, picked: [], shift: 0, moved: null }
   const walk = (k: number, sum: number): void => {
     if (choice.ways > 1 || choice.steps > REPAIR_ASSIGNMENTS_MAX) return
@@ -881,8 +907,7 @@ function repaired(
   if (broken.length === 0 && moved === null) return null
   // the total copied alike in both its places with the same swap explains the sum alone just as well — a doubt, never a
   // line copied right rewritten to meet a total copied wrong (adversarial А1): «15.46» read for 15,45 twice
-  const own = moved === null ? null : (lines[moved.i]?.sumHundredths ?? null)
-  if (moved !== null && own !== null && slipsOfTotal(swaps, total).has(own - moved.sum)) return null
+  if (moved !== null && (moved.rival || slipsOfTotal(swaps, total).has(-moved.delta))) return null
   return lines.map((line, i) => {
     // a sum alone stays a sum alone: no arithmetic of its own holds it, and only the total chose it
     if (moved?.i === i)
@@ -946,7 +971,7 @@ export function receiptTextOfModel(
   // right (adversarial А3, review №1); and the memory chooses none of a line's readings — between 0,6 × 550 and
   // 0,5 × 660 its old price is the one a changed shelf price makes wrong (review 2, №6, Б1)
   const byTotal =
-    owed === null || met ? null : repaired(reading, answer, copied, owed, total ?? owed)
+    owed === null || total === null || met ? null : repaired(reading, answer, copied, owed, total)
   // else the shop's memory, a line at a time, and the total again over what it decided
   const swaps = { price: reading.modelSwaps, others: reading.modelSwaps, doubt: reading.modelSwaps }
   const less = (amount: number | null): number | null =>
@@ -961,7 +986,9 @@ export function receiptTextOfModel(
   const moved = voiced.some((line, i) => line !== copied[i])
   const fixed =
     byTotal ??
-    (owed === null || met || !moved ? null : repaired(reading, answer, voiced, owed, total ?? owed))
+    (owed === null || total === null || met || !moved
+      ? null
+      : repaired(reading, answer, voiced, owed, total))
   const lines = fixed ?? voiced
   // a receipt with no line is a sum to record where it prints a section or two places vouch for its
   // total (MOL-227) — the model names a sole trader's «Բաժին 1» as a total no more often than not; with
