@@ -265,18 +265,18 @@ it('Б1: an unsupported city can be returned to, and keeps its own country', asy
   // Its option used to disappear on the first change, and the body the form built for it
   // named Armenia — which the server answers 400 to. A country the settings do not offer stays
   // in the list of countries too (MOL-109).
-  const legacy = { ...initial, country: 'RU', city: 'Москва' }
+  const legacy = { ...initial, country: 'KZ', city: 'Алматы' }
   me.mockResolvedValue(legacy)
   const view = await render(false)
-  expect(options(view, 'country')).toEqual(['RU', 'AM', 'GE', 'RS'])
+  expect(options(view, 'country')).toEqual(['KZ', 'AM', 'GE', 'RU', 'RS'])
   // a country the settings never offered is named by its code (`countryLabel`)
-  expect(field(view, 'country')?.findAll('option')[0]?.text()).toBe('RU')
-  expect(options(view, 'city')).toEqual(['Москва'])
+  expect(field(view, 'country')?.findAll('option')[0]?.text()).toBe('KZ')
+  expect(options(view, 'city')).toEqual(['Алматы'])
   await field(view, 'country')?.setValue('AM')
   expect(options(view, 'city')).toEqual(['Гюмри', 'Ереван'])
   expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Гюмри')
-  await field(view, 'country')?.setValue('RU')
-  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Москва')
+  await field(view, 'country')?.setValue('KZ')
+  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Алматы')
   expect(view.find('.kept').exists()).toBe(true)
   save.mockResolvedValue(legacy)
   expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
@@ -285,12 +285,17 @@ it('Б1: an unsupported city can be returned to, and keeps its own country', asy
 
 it('moves to Georgia: the cities follow the country, the first one chosen (MOL-109)', async () => {
   const view = await render()
-  expect(options(view, 'country')).toEqual(['AM', 'GE', 'RS'])
+  expect(options(view, 'country')).toEqual(['AM', 'GE', 'RU', 'RS'])
   expect(
     field(view, 'country')
       ?.findAll('option')
       .map((option) => option.text()),
-  ).toEqual([en.settings.countries.AM, en.settings.countries.GE, en.settings.countries.RS])
+  ).toEqual([
+    en.settings.countries.AM,
+    en.settings.countries.GE,
+    en.settings.countries.RU,
+    en.settings.countries.RS,
+  ])
   await field(view, 'country')?.setValue('GE')
   expect(options(view, 'city')).toEqual(['Тбилиси', 'Батуми'])
   expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Тбилиси')

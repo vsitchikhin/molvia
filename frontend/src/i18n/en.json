@@ -465,6 +465,13 @@
       "Ереван": "Yerevan",
       "Тбилиси": "Tbilisi",
       "Батуми": "Batumi",
+      "Москва": "Moscow",
+      "Санкт-Петербург": "Saint Petersburg",
+      "Волгоград": "Volgograd",
+      "Казань": "Kazan",
+      "Краснодар": "Krasnodar",
+      "Сочи": "Sochi",
+      "Домбай": "Dombay",
       "Белград": "Belgrade",
       "Нови-Сад": "Novi Sad"
     },
@@ -1544,6 +1551,7 @@
     "countries": {
       "AM": "Armenia",
       "GE": "Georgia",
+      "RU": "Russia",
       "RS": "Serbia"
     },
     "city": "City",
@@ -2359,6 +2367,13 @@
       "Ереван": "in Yerevan",
       "Тбилиси": "in Tbilisi",
       "Батуми": "in Batumi",
+      "Москва": "in Moscow",
+      "Санкт-Петербург": "in Saint Petersburg",
+      "Волгоград": "in Volgograd",
+      "Казань": "in Kazan",
+      "Краснодар": "in Krasnodar",
+      "Сочи": "in Sochi",
+      "Домбай": "in Dombay",
       "Белград": "in Belgrade",
       "Нови-Сад": "in Novi Sad"
     }
