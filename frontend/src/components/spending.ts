@@ -686,14 +686,6 @@ export function unbroken(text: string): string {
   return head + text.slice(head.length).replaceAll(' ', '\u00a0')
 }
 
-/**
- * Purchases are drawn in the colour of their category (Ф-4, MOL-400) — «Продукты» where they name none —
- * never the accent.
- */
-export function tripTint(category: SpendingCategoryView | null): string {
-  return category ? categoryColour(category) : `var(--cat-${TRIP_CATEGORY})`
-}
-
 /** A spending's circle: its category's colour and icon, or no colour for one the phone does not know. */
 export function spendingLook(category: SpendingCategoryView | null): {
   readonly icon: Component
@@ -704,20 +696,23 @@ export function spendingLook(category: SpendingCategoryView | null): {
     : { icon: markRaw(IconTag), tint: 'muted' }
 }
 
-/** A trip whose category is not known at all — an answer of a server before MOL-406 — draws the cart. */
+/** A trip whose category the phone does not know draws the cart (MOL-406). */
 export const tripIcon = markRaw(IconCart)
 
 /**
- * A trip's circle (MOL-406): its category's icon in its colour, as a spending's — «Продукты»'s where it names none
- * (MOL-400) — whether it was typed by hand or recorded from a receipt.
+ * A trip's circle (MOL-406): its category's icon in its colour, as a spending's, whether it was typed by hand or
+ * recorded from a receipt — never the accent (Ф-4). `null` is a trip that names none: «Продукты» (MOL-400).
+ * `undefined` is one whose category the phone does not know — a server before MOL-406, a row the phone made, an id
+ * its list lacks — the cart with no colour, as a spending of an unknown category: never a guess of «Продукты».
  */
-export function tripLook(category: SpendingCategoryView | null): {
+export function tripLook(category: SpendingCategoryView | null | undefined): {
   readonly icon: Component
   readonly tint: string
 } {
+  if (category === undefined) return { icon: tripIcon, tint: 'muted' }
   return category
     ? { icon: categoryIcon(category), tint: categoryColour(category) }
-    : { icon: PRESET_ICONS[TRIP_CATEGORY], tint: tripTint(null) }
+    : { icon: PRESET_ICONS[TRIP_CATEGORY], tint: `var(--cat-${TRIP_CATEGORY})` }
 }
 
 /**

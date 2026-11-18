@@ -701,25 +701,26 @@ describe('PurchasesView (MOL-128)', () => {
 
   // MOL-406: a purchase stands in its category's circle, typed by hand or recorded from a receipt
   describe('the category’s circle (MOL-406)', () => {
-    const preset = (n: number, key: SpendingCategoryView['preset']): SpendingCategoryView => ({
+    const preset = (
+      n: number,
+      key: SpendingCategoryView['preset'],
+      archived = false,
+    ): SpendingCategoryView => ({
       id: `c0000000-0000-4000-8000-00000000000${String(n)}`,
       preset: key,
       name: null,
       colour: null,
       icon: null,
-      archived: false,
+      archived,
     })
     const groceries = preset(1, 'groceries')
     const cafe = preset(2, 'cafe')
     const pets = preset(3, 'pets')
     /** The list the phone keeps, as the server last answered it (`molvia.own-categories`). */
-    const keepCategories = () => {
+    const keepCategories = (categories = [groceries, cafe, pets]) => {
       localStorage.setItem(
         `molvia.own-categories.${ME}`,
-        JSON.stringify({
-          askedAt: NOW.toISOString(),
-          answer: { categories: [groceries, cafe, pets], frequent: [] },
-        }),
+        JSON.stringify({ askedAt: NOW.toISOString(), answer: { categories, frequent: [] } }),
       )
     }
     /** The glyph a circle draws, by its path: what tells one icon from another in the page. */
@@ -737,18 +738,71 @@ describe('PurchasesView (MOL-128)', () => {
         ],
         nextCursor: null,
       })
-      const { view } = await render({ before: keepCategories })
+      const { view } = await render({
+        before: () => {
+          keepCategories()
+        },
+      })
       const [inCafe, inGroceries] = rows(view)
       expect(inCafe && glyph(inCafe)).toBe(glyphOf(categoryIcon(cafe)))
       expect(inCafe?.find('.circle').attributes('style')).toContain('--cat-cafe')
       expect(inGroceries && glyph(inGroceries)).toBe(glyphOf(categoryIcon(groceries)))
     })
 
-    it('must not fire: a row whose category is not known — a server before it — keeps the cart', async () => {
+    it('must not fire: a row whose category is not known — a server before it — keeps the cart, with no colour', async () => {
       tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
-      const { view } = await render({ before: keepCategories })
+      const { view } = await render({
+        before: () => {
+          keepCategories()
+        },
+      })
       const [row] = rows(view)
       expect(row && glyph(row)).toBe(glyphOf(tripIcon))
+      expect(row?.find('.circle').classes()).toContain('muted')
+    })
+
+    it('a category the phone’s list lacks — made on another phone — is the cart, never «Продукты» (adversarial А3)', async () => {
+      tripHistory.mockResolvedValue({
+        trips: [{ ...trip(1), categoryId: cafe.id }],
+        nextCursor: null,
+      })
+      const { view } = await render({
+        before: () => {
+          keepCategories([groceries, pets])
+        },
+      })
+      const [row] = rows(view)
+      expect(row && glyph(row)).toBe(glyphOf(tripIcon))
+      expect(row?.find('.circle').classes()).toContain('muted')
+    })
+
+    it('with no list on the phone, a row naming a category is the cart, one naming none «Продукты» (adversarial А3)', async () => {
+      tripHistory.mockResolvedValue({
+        trips: [
+          { ...trip(1), categoryId: cafe.id },
+          { ...trip(2), categoryId: null },
+        ],
+        nextCursor: null,
+      })
+      const { view } = await render()
+      expect(rows(view).map((row) => glyph(row))).toEqual([
+        glyphOf(tripIcon),
+        glyphOf(categoryIcon(groceries)),
+      ])
+    })
+
+    it('a category taken out of the choice is still the trip’s: its own icon (adversarial А3 «в»)', async () => {
+      tripHistory.mockResolvedValue({
+        trips: [{ ...trip(1), categoryId: cafe.id }],
+        nextCursor: null,
+      })
+      const { view } = await render({
+        before: () => {
+          keepCategories([groceries, preset(2, 'cafe', true), pets])
+        },
+      })
+      const [row] = rows(view)
+      expect(row && glyph(row)).toBe(glyphOf(categoryIcon(cafe)))
     })
 
     const READ = 'cccccccc-0000-4000-8000-0000000000f1'
@@ -775,7 +829,11 @@ describe('PurchasesView (MOL-128)', () => {
 
     it('a receipt waiting for «Записать» stands in the category the review guesses — a café by its food', async () => {
       receipts.mockResolvedValue({ receipts: [readReceipt(true)] })
-      const { view } = await render({ before: keepCategories })
+      const { view } = await render({
+        before: () => {
+          keepCategories()
+        },
+      })
       expect(glyph(reviewRow(view))).toBe(glyphOf(categoryIcon(cafe)))
     })
 
@@ -792,7 +850,11 @@ describe('PurchasesView (MOL-128)', () => {
 
     it('must not fire: a receipt not read keeps the sign of its state, no circle', async () => {
       receipts.mockResolvedValue({ receipts: [readReceipt(false, 'failed')] })
-      const { view } = await render({ before: keepCategories })
+      const { view } = await render({
+        before: () => {
+          keepCategories()
+        },
+      })
       const failed = reviewRow(view)
       expect([failed.exists(), failed.find('.circle').exists()]).toEqual([true, false])
     })

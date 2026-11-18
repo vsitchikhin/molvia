@@ -317,6 +317,73 @@ describe('whether the server has answered an empty history (MOL-77)', () => {
     expect(store.showsAnswer()).toBe(true)
   })
 
+  const CAFE = 'cccccccc-0000-4000-8000-000000000001'
+  const SHELF = `molvia.trip-history.${OWNER}`
+
+  it('a write into a recorded trip keeps its category on the shelf, so a restart draws it (MOL-406, adversarial А1)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), categoryId: CAFE }],
+      nextCursor: null,
+    })
+    await store.load()
+    // The queue's answer to a purchase written into it: a trip view carries no category.
+    store.apply(written(A, 3))
+    expect(store.page.trips[0]?.categoryId).toBe(CAFE)
+    // Another window writes the shelf — the page is built again from it.
+    window.dispatchEvent(new StorageEvent('storage', { key: SHELF }))
+    expect(store.page.trips[0]?.categoryId).toBe(CAFE)
+    expect(restart().page.trips[0]?.categoryId).toBe(CAFE)
+  })
+
+  it('and a row of a deeper page keeps it the same way (adversarial А1)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({ trips: [entry(A)], nextCursor: cursor(A) })
+    await store.load()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(B, '2026-08-01T10:30:00Z'), categoryId: CAFE }],
+      nextCursor: null,
+    })
+    await store.load(true)
+    store.apply(written(B, 1))
+    window.dispatchEvent(new StorageEvent('storage', { key: SHELF }))
+    expect(store.page.trips.find((row) => row.id === B)?.categoryId).toBe(CAFE)
+  })
+
+  it.each([
+    ['in a category of its own', CAFE],
+    ['naming none, «Продукты»', null],
+  ])(
+    'a write into a recorded trip %s leaves the page the server’s answer (adversarial А2)',
+    async (_name, categoryId) => {
+      const store = useTripHistoryStore()
+      tripHistory.mockResolvedValueOnce({ trips: [{ ...entry(A), categoryId }], nextCursor: null })
+      await store.load()
+      store.apply(written(A, 3))
+      expect(store.showsAnswer()).toBe(true)
+    },
+  )
+
+  it('a shelf a build before MOL-406 wrote — no key of the category — is still the answer, row for row (adversarial А2)', async () => {
+    const store = useTripHistoryStore()
+    tripHistory.mockResolvedValueOnce({
+      trips: [{ ...entry(A), categoryId: CAFE }],
+      nextCursor: null,
+    })
+    await store.load()
+    // A window of the build before writes the shelf while this one reads: it drops the key it does not know.
+    tripHistory.mockImplementationOnce(() => {
+      const shelf = localStorage.getItem(SHELF) ?? ''
+      const before = shelf.replace(`,"categoryId":"${CAFE}"`, '')
+      expect(before).not.toBe(shelf)
+      localStorage.setItem(SHELF, before)
+      window.dispatchEvent(new StorageEvent('storage', { key: SHELF }))
+      return Promise.resolve({ trips: [{ ...entry(A), categoryId: CAFE }], nextCursor: null })
+    })
+    expect(await store.load()).toBe(false)
+    expect(store.showsAnswer()).toBe(true)
+  })
+
   it('a record with no purchases keeps «0» and no sum on the shelf, not «unknown» (MOL-307)', async () => {
     const store = useTripHistoryStore()
     tripHistory.mockResolvedValueOnce({

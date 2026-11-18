@@ -242,6 +242,7 @@
 
 <script lang="ts">
 import { computed, defineComponent, onMounted, ref, watch } from 'vue'
+import type { Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import IconCart from '~icons/mdi/cart-outline'
@@ -249,10 +250,9 @@ import IconPencil from '~icons/mdi/pencil-outline'
 import IconStar from '~icons/mdi/star-outline'
 import IconCloudUpload from '~icons/mdi/cloud-upload-outline'
 import IconFileAlert from '~icons/mdi/file-alert-outline'
-import IconReceipt from '~icons/mdi/receipt-text-outline'
 import IconSync from '~icons/mdi/sync'
 import { formatMoney, withoutItems } from '@molvia/model'
-import { tripIcon, tripLook, tripTint } from '@/components/spending'
+import { tripLook } from '@/components/spending'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppReveal from '@/components/AppReveal.vue'
@@ -279,6 +279,7 @@ import { WORKING, rejectedReasonWords, useReceipts } from '@/composables/useRece
 import type { ReceiptRow } from '@/composables/useReceipts'
 import { useReconnect } from '@/composables/useReconnect'
 import { useOwnCategories } from '@/composables/useOwnCategories'
+import { usePlaceCategories } from '@/composables/usePlaceCategories'
 import { useTripHistory } from '@/composables/useTripHistory'
 import type { HistoryRow } from '@/composables/useTripHistory'
 import { useTripRows } from '@/composables/useTripRows'
@@ -292,9 +293,8 @@ import {
   timeOfDay,
 } from '@/days'
 import { useNavigation } from '@/navigation'
-import { reviewCategory } from '@/receipts/review'
+import { reviewCategory, reviewPlace } from '@/receipts/review'
 import { useActorStore } from '@/stores/actor'
-import { placeCategoriesOf, refreshPlaceCategories } from '@/stores/placeCategories'
 import { placeIdOf, useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import { useTripStore } from '@/stores/trip'
@@ -377,28 +377,26 @@ export default defineComponent({
     // A purchase stands in its category's circle, typed by hand or recorded from a receipt (MOL-406)
     const own = useOwnCategories()
     const drafts = useReceiptDraftsStore()
-    const placesAt = ref(placeCategoriesOf(actor.id))
-    void refreshPlaceCategories(actor.id).then(() => {
-      placesAt.value = placeCategoriesOf(actor.id)
-    })
+    const placesAt = usePlaceCategories(actor.id)
     const categoryOf = (id: string | null) =>
       own.categories.value.find((category) => category.id === id) ?? null
-    /** Its category's look; not known — a server before MOL-406, a row the phone made — the cart. */
+    /**
+     * Its category's look: «Продукты» where the trip names none; not known — a server before MOL-406, a row the
+     * phone made, an id the phone's list lacks — the cart (`tripLook`).
+     */
     function recordedLook(row: HistoryRow) {
-      return row.categoryId === undefined
-        ? { icon: tripIcon, tint: tripTint(null) }
-        : tripLook(categoryOf(row.categoryId))
+      if (row.categoryId === undefined || row.categoryId === null) return tripLook(row.categoryId)
+      return tripLook(categoryOf(row.categoryId) ?? undefined)
     }
     /**
      * A receipt read and waiting for «Записать» stands in the category it will be recorded in — the review's rule,
      * the person's choice or the guess (`reviewCategory`); one failed keeps the sign of its state.
      */
-    function reviewLook(row: ReceiptRow) {
+    function reviewLook(row: ReceiptRow): { readonly icon: Component; readonly tint?: string } {
       if (row.state === 'failed') return { icon: iconOf(row) }
-      const draft = drafts.draftOf(row.id)
-      const found = row.summary?.place
-      const place =
-        draft?.place ?? (found ? { id: found.id, name: found.name, city: found.city } : null)
+      const place = row.summary
+        ? reviewPlace(row.summary, drafts.draftOf(row.id))
+        : (drafts.draftOf(row.id)?.place ?? null)
       const id = reviewCategory(own.categories.value, {
         chosen: drafts.categoryOf(row.id),
         placeId: place ? placeIdOf(place) : null,
@@ -603,7 +601,7 @@ export default defineComponent({
         ? t('purchases.issues_check', { n: unsettled }, unsettled)
         : null
     }
-    function iconOf(row: ReceiptRow) {
+    function iconOf(row: ReceiptRow): Component {
       switch (row.state) {
         case 'waiting':
         case 'sending':
@@ -614,8 +612,10 @@ export default defineComponent({
         case 'rejected':
         case 'failed':
           return IconFileAlert
-        default:
-          return IconReceipt
+        // one to look at stands in its category's circle; whole, so a new state is the compiler's to name
+        case 'parsed':
+        case 'recording':
+          return reviewLook(row).icon
       }
     }
     function openReceipt(row: ReceiptRow): void {

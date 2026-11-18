@@ -17,6 +17,7 @@ import {
   roundsToNought,
   spentApprox,
   tripIcon,
+  tripLook,
   unbroken,
   unsentIn,
 } from '@/components/spending'
@@ -658,6 +659,11 @@ describe('a line of the journal as its row says it', () => {
     expect(row(trip, groceries).icon).toBe(categoryIcon(groceries))
     expect(row(trip, null).icon).toBe(categoryIcon(groceries))
     expect(row(trip, beauty).icon).not.toBe(tripIcon)
+  })
+
+  it('a trip whose category the phone does not know is the cart with no colour, never «Продукты» (MOL-406, А3)', () => {
+    expect(tripLook(undefined)).toEqual({ icon: tripIcon, tint: 'muted' })
+    expect(tripLook(null)).toEqual({ icon: categoryIcon(groceries), tint: 'var(--cat-groceries)' })
   })
 
   it('a trip with money and no purchase is the receipt’s sum, never «0 позиций» (MOL-227)', () => {

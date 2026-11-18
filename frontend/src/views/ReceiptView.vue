@@ -450,6 +450,7 @@ import { api } from '@/api'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useOnline } from '@/composables/useOnline'
 import { useOwnCategories } from '@/composables/useOwnCategories'
+import { usePlaceCategories } from '@/composables/usePlaceCategories'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { useLocalDay } from '@/composables/useLocalDay'
@@ -470,11 +471,7 @@ import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { receiptSlots, rememberPaymentAccount, rememberedAccount } from '@/stores/paymentAccounts'
-import {
-  placeCategoriesOf,
-  refreshPlaceCategories,
-  rememberPlaceCategory,
-} from '@/stores/placeCategories'
+import { rememberPlaceCategory } from '@/stores/placeCategories'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { placeIdOf } from '@/stores/receiptDrafts'
 import type { AddedLineDraft, LineDraft, PlaceDraft } from '@/stores/receiptDrafts'
@@ -583,7 +580,9 @@ export default defineComponent({
         ? reviewBalance(detail.value, lines.value, draft.value)
         : { lines: null, difference: null, suspect: null, recorded: 0, blank: 0 },
     )
-    const place = computed(() => (detail.value ? reviewPlace(detail.value, draft.value) : null))
+    const place = computed(() =>
+      detail.value ? reviewPlace(detail.value.receipt, draft.value) : null,
+    )
     const placeChosen = computed(() => !!draft.value?.place)
     const day = computed(() =>
       detail.value ? reviewDay(detail.value, draft.value, taken.value) : taken.value,
@@ -640,13 +639,10 @@ export default defineComponent({
      * category this phone no longer knows gives way to the guess: the row says what is sent.
      */
     const own = useOwnCategories()
-    const placesAt = ref(placeCategoriesOf(actor.id))
-    void refreshPlaceCategories(actor.id).then(() => {
-      placesAt.value = placeCategoriesOf(actor.id)
-    })
+    const placesAt = usePlaceCategories(actor.id)
     const reviewPlaceId = computed(() => {
       const one = detail.value
-      const place = one ? reviewPlace(one, draft.value) : null
+      const place = one ? reviewPlace(one.receipt, draft.value) : null
       return place ? placeIdOf(place) : null
     })
     const categoryId = computed(() => {
@@ -989,7 +985,7 @@ export default defineComponent({
       const one = detail.value
       if (!one || sending.value || recording.value) return
       // the place first, then the codes: either sheet brings «Записать» back once it is away
-      if (!reviewPlace(one, draft.value)) {
+      if (!reviewPlace(one.receipt, draft.value)) {
         askPlace(true)
         return
       }

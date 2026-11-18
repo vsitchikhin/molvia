@@ -98,6 +98,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## frontend · stores
 
 - `frontend/src/stores/placeCategories.ts` — The category of the last trip at each place (MOL-400, Р-6): the server's answer laid over what this phone recorded since, per owner; what the guess of a receipt and «Закончить» starts from.
+- `frontend/src/composables/usePlaceCategories.ts` — Composable: the places' last categories for a screen's guess — kept at once, the server's laid over them on its answer; one for a receipt's review and its row in «Покупки» (MOL-406).
 - `frontend/src/stores/spendingHandoff.ts` — Store: a record with no purchases handed over to «Деньги» as a spending (MOL-78, В-1), taken once by the sheet.
 - `frontend/src/stores/spendingQueue.ts` — Store: the on-device queue of every spending and category write, folded while waiting, sent one window at a time.
 

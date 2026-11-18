@@ -119,14 +119,15 @@ function toShelf(cache: z.output<typeof cacheCodec>): string {
  * A count on the shelf is moved by the list's answer and by a write's (`apply`), and which of them is
  * newer the phone cannot tell — compared whole, a shelf ahead of the answer read as memory and drew
  * «Сервер не ответил» over a server that answered every time (adversarial Б2 of MOL-307, owner's В-2
- * «а»). The counts the answer does not confirm are `unconfirmed` instead.
+ * «а»). The counts the answer does not confirm are `unconfirmed` instead. Nor its category (MOL-406,
+ * adversarial А2): a window of a build before it writes the shelf with no key of it, and the rows are the answer's.
  */
 function asShelvedPage(page: TripHistory): string {
   return JSON.stringify(
     everyView(
       { page: tripHistoryCodec.encode(page) },
       () => true,
-      (key) => key !== 'itemCount' && key !== 'total',
+      (key) => key !== 'itemCount' && key !== 'total' && key !== 'categoryId',
     ),
   )
 }
@@ -400,9 +401,12 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     }
     if (row) {
       selected.value ??= trip
-      // a trip view carries no category (MOL-406): the row keeps the one the answer gave it
-      const category = page.value.trips.find((held) => held.id === trip.id)?.categoryId
-      const placed = category === undefined ? row : { ...row, categoryId: category }
+      // A trip view carries no category (MOL-406): every copy of the row keeps the one the answer gave it — the
+      // shelf and the deeper pages too, which `restore()` and `spread()` rebuild the page from (adversarial А1, А2).
+      const keep = (held: TripHistoryEntry): TripHistoryEntry =>
+        held.categoryId === undefined ? row : { ...row, categoryId: held.categoryId }
+      const shown = page.value.trips.find((held) => held.id === trip.id)
+      const placed = shown ? keep(shown) : row
       page.value = {
         ...page.value,
         trips: [...page.value.trips.filter((held) => held.id !== trip.id), placed].sort(
@@ -412,14 +416,14 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
         ),
       }
       // Kept in place rather than dropped: a row of a page already loaded stays on that page.
-      deeper = deeper.map((held) => (held.id === row.id ? row : held))
+      deeper = deeper.map((held) => (held.id === row.id ? keep(held) : held))
       // And on the shelf, where the first page holds it (adversarial А1 of MOL-307): the shelf keeps the
       // row's count, and the first write of another window put the count before this purchase back on
       // screen, as the server's answer. Only in place — a row the page does not hold would move its
       // boundary, which only `load()` reads.
       firstPage = {
         ...firstPage,
-        trips: firstPage.trips.map((held) => (held.id === row.id ? row : held)),
+        trips: firstPage.trips.map((held) => (held.id === row.id ? keep(held) : held)),
       }
       moved = true
     }
