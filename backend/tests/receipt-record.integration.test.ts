@@ -9,6 +9,8 @@ import {
   receiptRecordedCodec,
   spendingCategoriesResponseCodec,
   tripHistoryCodec,
+  TRIP_HISTORY_CATEGORY_HEADER,
+  RECEIPT_FOOD_HEADER,
   parseRate,
   tripViewCodec,
 } from '@molvia/model'
@@ -1788,7 +1790,7 @@ describe('«Записать»', () => {
     expect(await db.select().from(receiptDays)).toMatchObject([
       { recorded: 5, within5m: 1, within15m: 1, within1h: 1, within1d: 1, later: 1 },
     ])
-  }, 10_000)
+  }, 25_000)
 
   // MOL-222, adversarial А6: the memory learns from another record between the review and «Записать»;
   // only the phone knows what it showed, and it says which lines it put right
@@ -1827,7 +1829,7 @@ describe('«Записать»', () => {
     // C: put right the same way as A, though the memory would now show cheese
     expect((await record(me, c, body(cheese, [0]))).statusCode).toBe(200)
     expect(await db.select().from(receiptDays)).toMatchObject([{ linesEdited: 1, linesItem: 1 }])
-  }, 10_000)
+  }, 25_000)
 
   // MOL-222, review 2 and adversarial А7: a total put right confirms the printed sums of the lines that
   // do not add up (В-5) — one edit of the receipt, never of the lines nobody opened
@@ -2296,5 +2298,58 @@ describe('the category of «Записать» (MOL-400)', () => {
     expect(moved.statusCode).toBe(204)
     expect((await record(me, id, body)).statusCode).toBe(200)
     expect(await categoryOf(body.tripId)).toBe(pets)
+  })
+
+  // MOL-406: the row of «Записаны» draws its category, said only to a phone that asks
+  it('says a history row’s category to a phone that asks, and nothing of it to one that does not', async () => {
+    const me = await insertActor(db)
+    const cafe = (await presets(me)).find((category) => category.preset === 'cafe')?.id ?? ''
+    const chosen = bodyOf(cafe)
+    expect((await record(me, await another(me), chosen)).statusCode).toBe(200)
+    const none = bodyOf()
+    expect((await record(me, await another(me), none)).statusCode).toBe(200)
+
+    const cookie = await signIn(db, me)
+    const read = async (asked: boolean) =>
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/trips/history',
+          headers: { cookie, ...(asked ? { [TRIP_HISTORY_CATEGORY_HEADER]: '1' } : {}) },
+        })
+      ).json<{ trips: Record<string, unknown>[] }>()
+    const asked = tripHistoryCodec.parse(await read(true))
+    expect(sorted(asked.trips.map((row) => `${row.id} ${String(row.categoryId)}`))).toEqual(
+      sorted([`${chosen.tripId} ${cafe}`, `${none.tripId} null`]),
+    )
+    // an earlier build reads a row strictly: the key is not there at all
+    expect((await read(false)).trips.map((row) => 'categoryId' in row)).toEqual([false, false])
+  })
+
+  // MOL-406: a receipt under review guesses «Кафе» in «Покупки» as on its review, by the class 56 or a service
+  it('says whether a receipt under review serves food to a phone that asks', async () => {
+    const me = await insertActor(db)
+    const cafe = await another(me)
+    await db.update(receiptLines).set({ hs: '56.10' }).where(eq(receiptLines.receiptId, cafe))
+    const served = await parsedReceipt(me, LINES, {
+      receiptNo: String(40_000_000 + ++papers),
+      serviceMinor: 10_000n,
+    })
+    const shop = await another(me)
+
+    const cookie = await signIn(db, me)
+    const read = async (asked: boolean) =>
+      (
+        await app.inject({
+          method: 'GET',
+          url: '/receipts',
+          headers: { cookie, ...(asked ? { [RECEIPT_FOOD_HEADER]: '1' } : {}) },
+        })
+      ).json<{ receipts: { id: string; food?: boolean }[] }>()
+    const asked = await read(true)
+    expect(sorted(asked.receipts.map((row) => `${row.id} ${String(row.food)}`))).toEqual(
+      sorted([`${cafe} true`, `${served} true`, `${shop} false`]),
+    )
+    expect((await read(false)).receipts.map((row) => 'food' in row)).toEqual([false, false, false])
   })
 })

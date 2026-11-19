@@ -686,14 +686,6 @@ export function unbroken(text: string): string {
   return head + text.slice(head.length).replaceAll(' ', '\u00a0')
 }
 
-/**
- * Purchases are drawn in the colour of their category (Ф-4, MOL-400) — «Продукты» where they name none —
- * never the accent.
- */
-export function tripTint(category: SpendingCategoryView | null): string {
-  return category ? categoryColour(category) : `var(--cat-${TRIP_CATEGORY})`
-}
-
 /** A spending's circle: its category's colour and icon, or no colour for one the phone does not know. */
 export function spendingLook(category: SpendingCategoryView | null): {
   readonly icon: Component
@@ -704,7 +696,39 @@ export function spendingLook(category: SpendingCategoryView | null): {
     : { icon: markRaw(IconTag), tint: 'muted' }
 }
 
+/** A trip whose category the phone does not know draws the cart (MOL-406). */
 export const tripIcon = markRaw(IconCart)
+
+/**
+ * A trip's circle (MOL-406): its category's icon in its colour, as a spending's, whether it was typed by hand or
+ * recorded from a receipt — never the accent (Ф-4). `null` is a trip that names none: «Продукты» (MOL-400).
+ * `undefined` is one whose category the phone does not know — a server before MOL-406, a row the phone made, an id
+ * its list lacks — the cart with no colour, as a spending of an unknown category: never a guess of «Продукты».
+ */
+export function tripLook(category: SpendingCategoryView | null | undefined): {
+  readonly icon: Component
+  readonly tint: string
+} {
+  if (category === undefined) return { icon: tripIcon, tint: 'muted' }
+  return category
+    ? { icon: categoryIcon(category), tint: categoryColour(category) }
+    : { icon: PRESET_ICONS[TRIP_CATEGORY], tint: `var(--cat-${TRIP_CATEGORY})` }
+}
+
+/**
+ * A trip's category in words, by `tripLook`'s contract (MOL-406): its name; `null` — «Продукты» by the preset's own
+ * word, list or no list (Р3-В2); `undefined` — not known, the word of an unknown spending's, «Прочее».
+ */
+export function tripCategoryName(
+  category: SpendingCategoryView | null | undefined,
+  nameOf: (category: SpendingCategoryView) => string,
+  t: Translate,
+): string {
+  if (category) return nameOf(category)
+  return category === null
+    ? t(`spending.category.${TRIP_CATEGORY}`, {})
+    : t('spending.category.other', {})
+}
 
 /**
  * A line of the month's journal (MOL-82, handoff 01): a spending of one's own, or a finished trip's
@@ -717,7 +741,8 @@ export function journalRowProps(
   context: {
     readonly t: Translate
     readonly locale: string
-    readonly category: SpendingCategoryView | null
+    /** `undefined` — a trip's category the phone's list lacks: not known, the cart (`tripLook`, MOL-406). */
+    readonly category: SpendingCategoryView | null | undefined
     readonly categoryName: string
     readonly spendCurrency: Currency
     readonly when?: string
@@ -747,7 +772,7 @@ export function journalRowProps(
       : unbroken(t('spending.uncounted_row', {}))
 
   const mark = row.kind === 'manual' ? row.mark : null
-  const look = trip ? { icon: tripIcon, tint: tripTint(category) } : spendingLook(category)
+  const look = trip ? tripLook(category) : spendingLook(category ?? null)
   return {
     ...look,
     verb: t(trip ? 'spending.row_open_trip' : 'spending.row_open', {}),
