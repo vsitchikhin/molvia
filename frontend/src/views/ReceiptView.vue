@@ -195,6 +195,7 @@
           :total="shownTotal"
           :cashback="detail.cashback ?? null"
           :service="detail.service ?? null"
+          :rounding="detail.rounding ?? null"
           :redeemed="detail.redeemed ?? null"
           :rate="detail.rate"
           :day="rateDay"
@@ -870,11 +871,13 @@ export default defineComponent({
     const partly = computed(() => {
       const one = detail.value
       if (!one || one.lines.length === 0) return null
-      // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
+      // the lines make the total less what a card sent to the card (MOL-289), less a café's service (MOL-310) and less
+      // a pharmacy's rounding (MOL-421)
       const total = linesTotalOf(
         one.receipt.total ?? one.readTotal ?? null,
         one.cashback ?? null,
         one.service ?? null,
+        one.rounding ?? null,
       )
       const blank = one.lines.some((line) => line.sum === null)
       // a receipt read before keeps no word, and no line the check emptied (А5 «а»)

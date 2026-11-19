@@ -283,6 +283,8 @@ export async function receiptOfOwner(
   paidBy = false,
   /** The phone knows the detail's `service` and `slip` (`RECEIPT_BILL_HEADER`, MOL-310). */
   bill = false,
+  /** The phone knows the detail's `rounding` (`RECEIPT_ROUNDING_HEADER`, MOL-421). */
+  rounding = false,
 ): Promise<ReceiptDetail> {
   const found = await repositories.receipts.one(actor.id, id)
   if (found === null) throw new DomainError(ERROR.NOT_FOUND)
@@ -306,8 +308,9 @@ export async function receiptOfOwner(
     actor.id,
     tin,
     lines,
-    // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
-    linesTotalOf(receipt.total, found.cashback, found.service),
+    // the lines make the total less what a card sent to the card (MOL-289), less a café's service (MOL-310) and less a
+    // pharmacy's rounding (MOL-421)
+    linesTotalOf(receipt.total, found.cashback, found.service, found.rounding),
     currency,
   )
 
@@ -367,13 +370,15 @@ export async function receiptOfOwner(
     )
   }
 
-  // an earlier build sets the lines against `total`, knowing no cashback or service: it is told what the lines come
-  // to, or it says «Разница» of every line read right (review round 1, А4); the trip's money is the server's. And it
-  // knows no slip: a total read in one place goes to it as none, for the person to type (MOL-310, В-3 «а»)
+  // an earlier build sets the lines against `total`, knowing no cashback, service or rounding: it is told what the
+  // lines come to, or it says «Разница» of every line read right (review round 1, А4); the trip's money is the
+  // server's. And it knows no slip: a total read in one place goes to it as none, for the person to type (MOL-310, В-3
+  // «а»)
   const told = linesTotalOf(
     found.slip && !bill ? null : receipt.total,
     cashback ? null : found.cashback,
     bill ? null : found.service,
+    rounding ? null : found.rounding,
   )
   return {
     receipt: told === receipt.total ? receipt : { ...receipt, total: told },
@@ -433,6 +438,7 @@ export async function receiptOfOwner(
     ...(cashback ? { cashback: found.cashback, redeemed: found.redeemed } : {}),
     ...(paidBy ? { paidBy: found.paidBy } : {}),
     ...(bill ? { service: found.service, ...(found.slip ? { slip: true } : {}) } : {}),
+    ...(rounding ? { rounding: found.rounding } : {}),
   }
 }
 

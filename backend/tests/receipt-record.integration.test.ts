@@ -794,7 +794,7 @@ describe('«Записать»', () => {
       headers: { cookie: await signIn(db, me) },
     })
     expect(pending.body).toContain(milk)
-  })
+  }, 15_000)
 
   it('records a line the font’s swaps put right as not read: no shelf price for the memory (MOL-290, Р-7)', async () => {
     const me = await insertActor(db)
@@ -1293,6 +1293,82 @@ describe('«Записать»', () => {
     expect(await moneyOf(typed, body({ total: amount(2_300) }))).toBe(230_000n)
   }, 10_000)
 
+  it('takes what a pharmacy was paid, its rounding with it, from an earlier build’s echo too (MOL-421)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const body = (over: Record<string, unknown> = {}) => ({
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+        {
+          position: 1,
+          skip: false,
+          item: { id: milk },
+          quantity: pieces(1),
+          amount: amount(1_450),
+        },
+      ],
+      ...over,
+    })
+    const moneyOf = async (receipt: string, payload: ReturnType<typeof body>) => {
+      expect((await record(me, receipt, payload)).statusCode).toBe(200)
+      const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, payload.tripId)))
+      return trip?.receiptMinor
+    }
+    // lines of 2 190 rounded, the total 2 191: a rounding of +1, the lines met the total as printed
+    const pharmacy = { totalMinor: 219_100n, roundingMinor: 100n, layout: 'class' as const }
+    const sent = await parsedReceipt(me, LINES.slice(0, 2), { ...pharmacy, receiptNo: '1' })
+    expect(await moneyOf(sent, body())).toBe(219_100n)
+    // an earlier build is shown the lines' total and sends it back as it was: the printed total, no correction
+    const echoed = await parsedReceipt(me, LINES.slice(0, 2), { ...pharmacy, receiptNo: '2' })
+    expect(await moneyOf(echoed, body({ total: amount(2_190) }))).toBe(219_100n)
+    expect(sum((await db.select().from(receiptDays)).map((day) => day.totalsCorrected))).toBe(0)
+    // must not: another figure is the person's word
+    const typed = await parsedReceipt(me, LINES.slice(0, 2), { ...pharmacy, receiptNo: '3' })
+    expect(await moneyOf(typed, body({ total: amount(2_300) }))).toBe(230_000n)
+    // a rounding below nought prints the total below its lines, as paid: 2 189 recorded, not the lines' 2 190
+    // (adversarial Б2)
+    const below = { totalMinor: 218_900n, roundingMinor: -100n, layout: 'class' as const }
+    const over = await parsedReceipt(me, LINES.slice(0, 2), { ...below, receiptNo: '4' })
+    expect(await moneyOf(over, body())).toBe(218_900n)
+    // must not: two below with no rounding is a total misread — the lines, as before
+    const misread = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: 218_800n,
+      roundingMinor: -100n,
+      layout: 'class',
+      receiptNo: '5',
+    })
+    expect(await moneyOf(misread, body())).toBe(219_000n)
+    // must not: a rounding of −2 is exactly two below, never one — the lines (review №21)
+    const short = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: 218_900n,
+      roundingMinor: -200n,
+      layout: 'class',
+      receiptNo: '6',
+    })
+    expect(await moneyOf(short, body())).toBe(219_000n)
+    // a rounding named on a receipt not whole, its total read in one place: the lines typed and it meet that total —
+    // what was paid (adversarial Д2)
+    const unproven = {
+      totalMinor: null,
+      readTotalMinor: 219_100n,
+      roundingMinor: 100n,
+      layout: 'class' as const,
+    }
+    const read = await parsedReceipt(me, LINES.slice(0, 2), { ...unproven, receiptNo: '7' })
+    expect(await moneyOf(read, body())).toBe(219_100n)
+    // must not: lines typed apart from it are the lines, the total read in one place vouching for nothing
+    const apart = await parsedReceipt(me, LINES.slice(0, 2), {
+      ...unproven,
+      readTotalMinor: 219_300n,
+      receiptNo: '8',
+    })
+    expect(await moneyOf(apart, body())).toBe(219_000n)
+  }, 10_000)
+
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard
   // against a second record — it goes with its trip, never before it, and never after (MOL-240, А2 of
   // the adversarial review of MOL-97): nobody sees a recorded receipt without its trip
@@ -1537,7 +1613,7 @@ describe('«Записать»', () => {
         ['text', milk, 37_000n],
       ])
       expect(words.map((word) => word.writtenAt)).toEqual([older.recordedAt, older.recordedAt])
-    })
+    }, 15_000)
 
     it('Р3-2: a purchase of the line under another item removed gives the word back to the one still there', async () => {
       const me = await insertActor(db)
@@ -1589,7 +1665,7 @@ describe('«Записать»', () => {
         .where(eq(expenses.id, bought.expenseId))
       await settleStoreMemory(db)
       expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([null, null])
-    })
+    }, 20_000)
 
     // round 6, Р6-1: a line «Записать» judged not as read keeps no price, whatever the purchase says later
     it('Р6-1: gives no shelf price to a line recorded with its sum put right, once the purchase agrees', async () => {

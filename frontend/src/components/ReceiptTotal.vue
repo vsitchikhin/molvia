@@ -16,6 +16,12 @@
         <span>{{ t('receipt.review.service') }}</span>
         <span class="figure">{{ serviceText }}</span>
       </div>
+      <!-- A pharmacy's rounding (MOL-421): the lines met the total as printed, in thousandths, and rounded to the
+           tetri they come to it less this, either sign. -->
+      <div v-if="roundingText" class="line">
+        <span>{{ t('receipt.review.rounding') }}</span>
+        <span class="figure">{{ roundingText }}</span>
+      </div>
       <hr class="rule" />
     </template>
     <!-- The total is a button (Р-8): OCR misses it on half the receipts, and the trip's money is the
@@ -51,6 +57,7 @@ import IconChevronRight from '~icons/mdi/chevron-right'
 import { convertMoney, formatEstimate, formatMoney, receiptPaidOf } from '@molvia/model'
 import type { ExchangeRate, Money, ReceiptBalance } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
+import { signedAmount } from '@/components/accounts'
 import { figureChars } from '@/components/figure'
 import { calendarDayOfAnyYear } from '@/days'
 
@@ -71,6 +78,8 @@ export default defineComponent({
     redeemed: { type: Object as PropType<Money | null>, default: null },
     /** A café's service (MOL-310). */
     service: { type: Object as PropType<Money | null>, default: null },
+    /** A pharmacy's rounding, either sign (MOL-421). */
+    rounding: { type: Object as PropType<Money | null>, default: null },
     rate: { type: Object as PropType<ExchangeRate | null>, default: null },
     /** The day the rate is of: the receipt's. */
     day: { type: String, required: true },
@@ -120,6 +129,12 @@ export default defineComponent({
       totalText: computed(() => money(props.total)),
       cashbackText: computed(() => (props.noItems ? null : money(props.cashback))),
       serviceText: computed(() => (props.noItems ? null : money(props.service))),
+      // signed: what the total adds to the lines, or takes off them
+      roundingText: computed(() =>
+        props.noItems || !props.rounding
+          ? null
+          : signedAmount(props.rounding, locale.value, { plus: true }),
+      ),
       redeemedText: computed(() => money(props.redeemed)),
       approx,
       difference,

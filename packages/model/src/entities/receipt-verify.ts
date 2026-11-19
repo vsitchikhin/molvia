@@ -1,4 +1,12 @@
-import { TOLERANCE_HUNDREDTHS, linesTotalHundredths } from '#model/entities/receipt-text'
+import {
+  THOUSANDTHS_PER_HUNDREDTH,
+  TOLERANCE_HUNDREDTHS,
+  linesTotalHundredths,
+  pharmacySum,
+  printedMeets,
+  printedThousandths,
+  printedTotal,
+} from '#model/entities/receipt-text'
 import type { ReceiptLayout, ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
 
 /**
@@ -268,15 +276,26 @@ function notWhole(text: ReceiptText): ReceiptReason | null {
   // a card that sends its discount to the card prints the total without it (MOL-289)
   const total = linesTotalHundredths(text, text.totalHundredths)
   const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
-  if (sum === total) return null
-  return sum < total ? 'lines_lost' : 'lines_over'
+  if (sum !== total) return sum < total ? 'lines_lost' : 'lines_over'
+  // a pharmacy's lines meet its total as printed, never by the tetri alone — a total two places vouch for in tetri,
+  // «ლარი 26.698» and «ბარათი 26.70», proves no thousandth misread (MOL-421, adversarial Б1)
+  const milli = pharmacySum(text)
+  if (milli === null || printedMeets(milli, text.totalHundredths, text.totalThousandths))
+    return null
+  // two printed apart: short or over by the tetri the total rounds to
+  const printed =
+    printedTotal(text.totalHundredths, text.totalThousandths) ??
+    text.totalHundredths * THOUSANDTHS_PER_HUNDREDTH
+  return milli < printed ? 'lines_lost' : 'lines_over'
 }
 
 function sumsMeet(text: ReceiptText): boolean {
   if (text.totalHundredths === null || !sumsCopied(text.lines)) return false
   if (text.lines.some((line) => line.remembered === 'doubted')) return false
   const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
-  return sum === linesTotalHundredths(text, text.totalHundredths)
+  if (sum !== linesTotalHundredths(text, text.totalHundredths)) return false
+  const milli = pharmacySum(text)
+  return milli === null || printedMeets(milli, text.totalHundredths, text.totalThousandths)
 }
 
 interface CheckedLine {
@@ -343,16 +362,29 @@ function verifiedLine(
       ? { line: { ...line, priceHundredths: null, discountHundredths: null }, reason: null }
       : emptied('one_alike_unproven')
   }
-  const rounding = layout === 'card' ? TOLERANCE_HUNDREDTHS : 0
-  // within the rounding a price and a sum hold either way round: OCR takes the columns from the paper,
+  // the till's tolerance by the layout — a card's till rounds what was paid off its shelf price — where the reading's
+  // own `holds` reads it off the line's discount
+  const tolerance = layout === 'card' ? TOLERANCE_HUNDREDTHS : 0
+  // within the tolerance a price and a sum hold either way round: OCR takes the columns from the paper,
   // a model names them itself — «389,99 390» answered as price 389,99 and sum 390 (MOL-272)
-  const apart = byModel ? rounding : 0
+  const apart = byModel ? tolerance : 0
   const oneAlike =
     qty === 1_000 && discount === 0 && price !== null && Math.abs(price - sum) <= apart
   // the memory's price is the second source of one number printed twice (MOL-291)
   if (oneAlike && !proven && !byMemory) return emptied('one_alike_unproven')
+  // quantity × price = sum + discount, the money in one scale: tetri, or a pharmacy's thousandths (`scale` 10)
+  const arithmetic = (p: number | null, s: number | null, d: number, scale: number): boolean =>
+    p !== null &&
+    s !== null &&
+    Math.abs(Math.round((qty * p) / 1_000) - (s + d)) <= tolerance * scale
+  // a pharmacy's line is judged as printed, in thousandths, as the reading judged it (MOL-421, Р-2, adversarial А2):
+  // 3 × 0.255 = 0.765 holds, 3 × 0,26 against 0,77 would not — and the record keeps its 0,77 as a line off by no more
+  // than its price's rounding (`lineAddsUp`, owner's В3 «а»), so its price is shown on any receipt
+  const printed = printedThousandths(line)
   const holds =
-    price !== null && Math.abs(Math.round((qty * price) / 1_000) - (sum + discount)) <= rounding
+    printed === null
+      ? arithmetic(price, sum, discount, 1)
+      : arithmetic(printed.price, printed.sum, printed.discount ?? 0, THOUSANDTHS_PER_HUNDREDTH)
   return holds
     ? { line, reason: null }
     : {
