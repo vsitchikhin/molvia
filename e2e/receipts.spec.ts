@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { asBrowser, signedIn } from './session'
+import { risen } from './sheet-risen'
 
 // Receipts on the phone (MOL-127): taken in the browser, kept by the queue, read by the fake reader
 // (`bin/fake-receipt-reader.mjs` answers every photo with the bench's reading of am-05 — thirteen
@@ -98,16 +99,6 @@ async function saveAll(page: Page, purchases = 13): Promise<void> {
     await sheet(page).getByLabel('Another place').fill('Ереван Сити')
     await sheet(page).getByRole('button', { name: save }).click()
   }
-}
-
-/** A sheet has come up: its rise, then the double-tap floor — until then it takes no tap (MOL-69). */
-async function risen(page: Page): Promise<void> {
-  await sheet(page)
-    .last()
-    .evaluate((dialog) =>
-      Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
-    )
-  await page.waitForTimeout(350)
 }
 
 test('a receipt from the photo to the purchases: read, reviewed, recorded under a place named', async ({

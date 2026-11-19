@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { ffOff, signedIn } from './session'
+import { risen } from './sheet-risen'
 
 // Where a person stands with the model that reads receipts, on the phone (MOL-276): the row of the settings and
 // the sheet «Trial receipts are used up» before the camera. The suite's API has no model, so no receipt spends the
@@ -10,14 +11,6 @@ import { ffOff, signedIn } from './session'
 // `sheet.spec` holds there.
 
 const sheet = (page: Page) => page.locator('dialog[open]')
-
-/** Until it has risen a sheet takes no tap at all (MOL-69): its rise, then the double-tap floor. */
-async function risen(page: Page): Promise<void> {
-  await sheet(page).evaluate((dialog) =>
-    Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
-  )
-  await page.waitForTimeout(350)
-}
 
 /**
  * The server's answer to «who am I» with the trial spent: ten read, none left, nothing paid. An answer that says no
