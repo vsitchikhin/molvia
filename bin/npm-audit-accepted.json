@@ -1,1 +1,7 @@
-[]
+[
+  {
+    "advisory": "GHSA-fc5q-39xc-vjpf",
+    "reason": "picomatch ReDoS (owner, 17.11.2026, MOL-405): 4.0.7 is the latest release, no fix published. It comes as a dependency of vue-router's file-routing plugins, vite, sass's watcher and unplugin — build tools; neither the PWA's bundle, the API nor the bot imports it, and its patterns are ours, never a person's.",
+    "until": "2026-12-17"
+  }
+]

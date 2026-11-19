@@ -4,8 +4,8 @@ import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
   DomainError,
   ERROR,
-  MODEL_CONSENT_EDITION,
   RECEIPT_MODEL,
+  RECEIPT_SECOND_MODEL,
   REVIEW_CONSENT_EDITION,
   placeSchema,
   RECEIPT_KEEP_DAYS,
@@ -18,8 +18,10 @@ import {
   RECEIPT_UNDO_MINUTES,
   RECEIPTS_DAY_MAX,
   RECEIPTS_UNRECORDED_MAX,
+  RECEIPT_TRIAL,
   receiptCard,
   receiptClockOf,
+  receiptsMonthOf,
   serbianReceiptLink,
   withoutItems,
 } from '@molvia/model'
@@ -27,6 +29,7 @@ import type {
   Currency,
   Money,
   Place,
+  ReceiptCount,
   ReceiptBody,
   ReceiptFailure,
   ReceiptLinkBody,
@@ -45,6 +48,7 @@ import type {
   TelegramUserId,
   TripReceiptSource,
 } from '@molvia/model'
+import { PAID_BY_MODEL, hundredRead, readsByModel, tariffOpens } from './actors-repository'
 import { countOfDay } from './day-count'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
@@ -82,11 +86,17 @@ export interface ClaimedReceipt {
   readonly language: ReceiptSummary['language']
   readonly parts: readonly { readonly position: number; readonly photo: Buffer }[]
   /**
-   * The model may read it (MOL-272): granted to its owner until a moment still to come
-   * (`receipts_model_until`, Р-12) and edition `MODEL_CONSENT_EDITION` accepted — by the database's clock,
-   * as the claim reads it.
+   * The model may read it (MOL-272, MOL-275): edition `MODEL_CONSENT_EDITION` accepted, its owner's reading paid
+   * (`receipts_model_until` to come, Р-12) or their trial not spent, and the hundred of the month it was sent in not
+   * read (`readsByModel`) — by the database's clock, as the claim reads it.
    */
   readonly byModel: boolean
+  /**
+   * Its owner's tariff opens the model for it (MOL-275, `tariffOpens`): paid or on the trial, the month's hundred not
+   * read — whatever the edition. With payment open, a receipt whose tariff is shut is read by nobody (adversarial А3:
+   * who has paid and not accepted edition 5 is still read by Tesseract).
+   */
+  readonly tariffOpen: boolean
   /**
    * Its photo and reading may be kept for the developer's review if it is read not whole (MOL-309): its owner
    * accepted edition `REVIEW_CONSENT_EDITION`, which says so.
@@ -421,9 +431,25 @@ const tally = (
   readerVersion: string | null = null,
 ) => addToDay(db, byModel(readerVersion) ? modelReceiptDays : receiptDays, counts, day, source)
 
-/** The model read the receipt (MOL-272), by its `reader_version`; Tesseract, a link, none. */
+/**
+ * How every `reader_version` a model wrote begins (`model-reader.ts`): the model's own name and «@» — Haiku's, or
+ * Sonnet's where its reading again was kept (MOL-405).
+ */
+const MODEL_READER_PREFIXES = [`${RECEIPT_MODEL}@`, `${RECEIPT_SECOND_MODEL}@`] as const
+
+/**
+ * The model read the receipt (MOL-272), by its `reader_version`; Tesseract, a link, none. One rule in two forms: this,
+ * and `readByModelSql` for a query (MOL-408).
+ */
 export const byModel = (readerVersion: string | null): boolean =>
-  readerVersion?.startsWith(`${RECEIPT_MODEL}@`) ?? false
+  MODEL_READER_PREFIXES.some((prefix) => readerVersion?.startsWith(prefix) ?? false)
+
+/** `byModel` in SQL, over a `reader_version` column of the query's. */
+const readByModelSql = (readerVersion: SQL) =>
+  sql`(${sql.join(
+    MODEL_READER_PREFIXES.map((prefix) => sql`starts_with(${readerVersion}, ${prefix})`),
+    sql` or `,
+  )})`
 
 /** Adds to `tax_receipt_days`: the receipts by their link (MOL-234). */
 const tallyTax = (db: Conn, counts: TaxReceiptDayCounts, day: SQL, source: SQL = sql``) =>
@@ -539,6 +565,10 @@ async function keepMiss(
   return kept?.keepUntil ?? null
 }
 
+/** The least and the most a person's receipts the model alone reads rest between two tries of the model away (MOL-408). */
+export const RECEIPT_MODEL_ALONE_RETRY_MIN_MS = 60 * 1000
+export const RECEIPT_MODEL_ALONE_RETRY_MAX_MS = 60 * 60 * 1000
+
 export interface ReceiptRepository {
   /**
    * «Отправить чек»: a new receipt, or the same one sent again; anything else under its id is a 409. A new
@@ -561,6 +591,8 @@ export interface ReceiptRepository {
     part: ReceiptPart,
   ): Promise<{ receipt: ReceiptSummary; queued: boolean }>
   list(actorId: string): Promise<StoredReceipt[]>
+  /** The class each line printed (MOL-226), by the person's receipt — for `servesFood` (MOL-406). */
+  classesOf(actorId: string, ids: readonly string[]): Promise<Map<string, (string | null)[]>>
   one(
     actorId: string,
     id: string,
@@ -635,11 +667,17 @@ export interface ReceiptRepository {
   /**
    * The next receipt for the reader, now `reading`; `null` for an empty queue. People in turn, the one
    * read least in the last hour first (review А10): fifty receipts of one person do not hold
-   * another's behind them.
+   * another's behind them. None that `rest`s, nor, through an outage, the person's others of its country (MOL-408).
    */
   claimNext(): Promise<ClaimedReceipt | null>
   /** Back to the queue, its attempt not counted: the reader was not there, the receipt not at fault. */
   release(id: string): Promise<void>
+  /**
+   * Back to the queue as `release`, not claimed again before `next_attempt_at` — as long again as it has waited, 1, 2,
+   * 4… minutes, an hour at most (MOL-408, owner's В-9 «а») — and, while the model reads nothing, the person's receipts
+   * of its country rest with it (Р3-А1, В-11 «а»). Whose country rests is the caller's to know.
+   */
+  rest(id: string): Promise<void>
   /**
    * The reader dropped this photo: its attempt counted, back to the end of the queue — or failed as
    * `unreadable` once it has had its attempts (`RECEIPT_READ_ATTEMPTS`).
@@ -883,7 +921,112 @@ export async function recordedTwinOf(
   return twin ?? null
 }
 
+/**
+ * Whether the person's reading is paid now, the trial left and whether the hundred of `sentMonth` is read (MOL-275): what
+ * a count is decided by.
+ */
+async function personOf(
+  tx: Conn,
+  actorId: string,
+  sentMonth: string,
+): Promise<{ readonly paid: boolean; readonly trial: number; readonly full: boolean } | null> {
+  const [person] = await tx.execute<{ paid: boolean; trial: number; full: boolean }>(sql`
+    select ${PAID_BY_MODEL} as paid, ${actors.trialReceiptsLeft} as trial,
+      ${hundredRead(sql`${sentMonth}::date`)} as full
+    from ${actors} where ${actors.id} = ${actorId}`)
+  return person ?? null
+}
+
+/**
+ * A count taken: a place in the hundred of the later of the month the receipt was sent in and the person's — the month
+ * only moves on, as the share's — and a trial receipt where `by` is the trial's.
+ */
+async function takeCount(
+  tx: Conn,
+  actorId: string,
+  sentMonth: string,
+  by: ReceiptCount,
+): Promise<void> {
+  await tx.execute(sql`
+    update ${actors}
+    set model_receipts_read =
+          (case when ${actors.modelReceiptsMonth} >= ${sentMonth}::date then ${actors.modelReceiptsRead} else 0 end) + 1,
+        model_receipts_month = greatest(${actors.modelReceiptsMonth}, ${sentMonth}::date),
+        trial_receipts_left = ${actors.trialReceiptsLeft} - ${by === 'trial' ? 1 : 0}::smallint
+    where ${actors.id} = ${actorId}`)
+}
+
+/**
+ * A receipt the model read to the review counts among its person's (MOL-275): once, and never where a receipt of
+ * theirs of the same tax number and number counted before and was not given back by «Переснять» — a removed one still
+ * in the table too; a receipt with neither is its own. A trial receipt while nothing is paid and one is left, else a
+ * place alone — a reading in flight past the trial too — and the receipt keeps which (`counted`), so «Переснять» gives
+ * back what it took (В-4 «а»).
+ */
+async function countModelReceipt(tx: Conn, id: string): Promise<void> {
+  const [receipt] = await tx.execute<{ actorId: string; month: string }>(sql`
+    select r.actor_id as "actorId", r.sent_month::text as month from ${receipts} r
+    where r.id = ${id} and r.counted is null
+      and not exists (
+        select 1 from ${receipts} twin
+        where twin.actor_id = r.actor_id and twin.id <> r.id
+          and twin.counted is not null and twin.retaken_at is null
+          and twin.tin = r.tin and twin.receipt_no = r.receipt_no)`)
+  if (receipt === undefined) return
+  const person = await personOf(tx, receipt.actorId, receipt.month)
+  if (person === null) return
+  const by: ReceiptCount = !person.paid && person.trial > 0 ? 'trial' : 'month'
+  await takeCount(tx, receipt.actorId, receipt.month, by)
+  await tx.update(receipts).set({ counted: by }).where(eq(receipts.id, id))
+}
+
+/**
+ * What a counted receipt took, given back as «Переснять» removes it (MOL-275, owner's В-4 «а»): its place in the
+ * person's month, wherever that is not before the one it was sent in — the month it counted in is not kept, so at the
+ * turn of a month it is the new month's place — and its trial receipt if it took one. One paper, one count, whatever key
+ * the model copied of each shot.
+ */
+async function giveBack(
+  tx: Conn,
+  row: { readonly actorId: string; readonly sentMonth: string; readonly counted: ReceiptCount },
+): Promise<void> {
+  await tx.execute(sql`
+    update ${actors}
+    set model_receipts_read = case when ${actors.modelReceiptsMonth} >= ${row.sentMonth}::date
+          then greatest(${actors.modelReceiptsRead} - 1, 0) else ${actors.modelReceiptsRead} end,
+        trial_receipts_left = case when ${row.counted === 'trial'}::boolean
+          then least(${actors.trialReceiptsLeft} + 1, ${RECEIPT_TRIAL}::int) else ${actors.trialReceiptsLeft} end
+    where ${actors.id} = ${row.actorId}`)
+}
+
+/**
+ * What «Вернуть» of a receipt «Переснять» gave back takes again (MOL-275, adversarial Б1, В2): its place, and its trial
+ * receipt — a trial spent meanwhile, a paid reading takes the place alone and the receipt is counted so. None where the
+ * month's hundred is read meanwhile, nor where neither is there: a trial receipt or a place given back and spent on
+ * another paper is never one twice. Says how it is counted now, or none.
+ */
+async function takeAgain(
+  tx: Conn,
+  row: { readonly actorId: string; readonly sentMonth: string; readonly counted: ReceiptCount },
+): Promise<ReceiptCount | null> {
+  const person = await personOf(tx, row.actorId, row.sentMonth)
+  if (person === null || person.full) return null
+  const by: ReceiptCount | null =
+    row.counted === 'month' || person.paid ? 'month' : person.trial > 0 ? 'trial' : null
+  if (by === null) return null
+  await takeCount(tx, row.actorId, row.sentMonth, by)
+  return by
+}
+
 export function createReceiptRepository(db: Conn): ReceiptRepository {
+  /** Back to the queue from `reading`, its attempt not counted: `release`, `releaseLink` and `rest`, with what else. */
+  async function released(id: string, also: { readonly nextAttemptAt?: SQL } = {}): Promise<void> {
+    await db
+      .update(receipts)
+      .set({ status: 'queued', attempts: sql`greatest(${receipts.attempts} - 1, 0)`, ...also })
+      .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+  }
+
   async function summaryOf(conn: Conn, id: string): Promise<ReceiptSummary> {
     const [found] = await conn
       .select(summaryColumns)
@@ -932,6 +1075,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               language: body.language,
               currency: receiptCard(body.country).currency,
               capturedAt: body.capturedAt,
+              // the phone's month, by the day the receipt counts in today (MOL-275, MOL-121)
+              sentMonth: receiptsMonthOf(day),
               ...('link' in body
                 ? linkReceipt(body).row
                 : { status: 'uploading', parts: body.parts }),
@@ -1027,6 +1172,22 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         .where(and(eq(receipts.actorId, actorId), sql`${receipts.deletedAt} is null`))
         .orderBy(desc(receipts.createdAt), desc(receipts.id))
       return rows.map(toStored)
+    },
+
+    async classesOf(actorId, ids) {
+      const classes = new Map<string, (string | null)[]>()
+      if (ids.length === 0) return classes
+      const rows = await db
+        .select({ receiptId: receiptLines.receiptId, hs: receiptLines.hs })
+        .from(receiptLines)
+        .innerJoin(receipts, eq(receipts.id, receiptLines.receiptId))
+        .where(and(eq(receipts.actorId, actorId), inArray(receiptLines.receiptId, [...ids])))
+      for (const row of rows) {
+        const held = classes.get(row.receiptId)
+        if (held) held.push(row.hs)
+        else classes.set(row.receiptId, [row.hs])
+      }
+      return classes
     },
 
     async one(actorId, id) {
@@ -1346,10 +1507,18 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
       const own = idOrNull(id)
       if (own === null) return
       await db.transaction(async (tx) => {
+        // «Переснять» gives back what the receipt's count took (MOL-275): the account first, as every lock is taken
+        if (retake) await lockedAccount(tx, actorId)
         // under the row's lock, as «Записать» takes it: a record committed while this waited is seen
         // (round 2, Р2-В1), and a receipt just recorded is not marked away from under its trip
         const [held] = await tx
-          .select({ tripId: receipts.tripId })
+          .select({
+            tripId: receipts.tripId,
+            counted: receipts.counted,
+            sentMonth: receipts.sentMonth,
+            tin: receipts.tin,
+            receiptNo: receipts.receiptNo,
+          })
           .from(receipts)
           .where(
             and(
@@ -1361,10 +1530,49 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           .for('update')
         if (held === undefined) return
         if (held.tripId !== null) throw new DomainError(ERROR.CONFLICT)
+        const counted = retake ? held.counted : null
+        // another shot of the same paper the model read takes the count over, never a reading of it left free
+        // (adversarial Б2, В1, Г1): any not counted — on the review, recorded, removed by «Удалить» or by «Переснять»
+        // and still to be brought back; one whose own count «Переснять» gave back keeps `counted`, and is none. One
+        // paper, one count
+        const [heir] =
+          counted === null
+            ? []
+            : await tx
+                .select({ id: receipts.id })
+                .from(receipts)
+                .where(
+                  and(
+                    eq(receipts.actorId, actorId),
+                    sql`${receipts.id} <> ${own}`,
+                    sql`${receipts.counted} is null`,
+                    sql`${receipts.status} in ('parsed', 'recorded')`,
+                    readByModelSql(sql`${receipts.readerVersion}`),
+                    sql`${receipts.tin} = ${held.tin} and ${receipts.receiptNo} = ${held.receiptNo}`,
+                  ),
+                )
+                .orderBy(asc(receipts.createdAt), asc(receipts.id))
+                .limit(1)
+                .for('update')
         await tx
           .update(receipts)
-          .set({ deletedAt: sql`clock_timestamp()` })
+          .set({
+            deletedAt: sql`clock_timestamp()`,
+            ...(retake ? { retakenAt: sql`clock_timestamp()` } : {}),
+            ...(heir === undefined ? {} : { counted: null }),
+          })
           .where(eq(receipts.id, own))
+        if (counted !== null) {
+          if (heir === undefined) {
+            await giveBack(tx, { actorId, sentMonth: held.sentMonth, counted })
+          } else {
+            // a count it holds, not one given back: «Вернуть» of it takes nothing again
+            await tx
+              .update(receipts)
+              .set({ counted, retakenAt: null })
+              .where(eq(receipts.id, heir.id))
+          }
+        }
         // «Переснять»: the review of the receipt it replaces stays (MOL-309, owner's В-6 «а»)
         await tx
           .update(receiptMisses)
@@ -1386,7 +1594,12 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             sql`(${receipts.deletedAt} is null or ${receipts.deletedAt} > ${undoFrom()})`,
           )
           const [held] = await tx
-            .select({ deletedAt: receipts.deletedAt })
+            .select({
+              deletedAt: receipts.deletedAt,
+              counted: receipts.counted,
+              retakenAt: receipts.retakenAt,
+              sentMonth: receipts.sentMonth,
+            })
             .from(receipts)
             .where(yours)
           if (held === undefined) return false
@@ -1397,10 +1610,23 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           // minutes may run out while the account's lock was waited for (review 1, №3)
           const restored = await tx
             .update(receipts)
-            .set({ deletedAt: null })
+            .set({ deletedAt: null, retakenAt: null })
             .where(yours)
             .returning({ id: receipts.id })
           if (restored.length === 0) return false
+          // brought back from «Переснять», it takes again what its count gave back (MOL-275, В-4 «а») — or is refused,
+          // the transaction with it, where a trial given back was spent since and nothing is paid (adversarial Б1)
+          if (held.retakenAt !== null && held.counted !== null) {
+            const by = await takeAgain(tx, {
+              actorId,
+              sentMonth: held.sentMonth,
+              counted: held.counted,
+            })
+            if (by === null) throw new DomainError(ERROR.CONFLICT)
+            if (by !== held.counted) {
+              await tx.update(receipts).set({ counted: by }).where(eq(receipts.id, own))
+            }
+          }
           // brought back, it is no receipt replaced: its review goes with it again
           await tx
             .update(receiptMisses)
@@ -1473,16 +1699,38 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
 
     async claimNext() {
       return db.transaction(async (tx) => {
-        // each person in turn: the one read least in the last hour first, then the oldest receipt —
-        // a person's next receipt waits behind everyone else's first (review А10)
+        // each person in turn: the one read least in the last hour first (review А10) — a person's next receipt waits
+        // behind everyone else's first; then a receipt that never rested, then the one rested longest ago (Р4-А1),
+        // then the oldest. The second key is across people too: at one count, any receipt with no rest behind it —
+        // never rested, or of a country that never rests — goes before one back from a rest, however older (№23)
         const [next] = await tx.execute<{ id: string }>(sql`
           select waiting.id from ${receipts} waiting
           where waiting.status = 'queued' and waiting.source = 'photo' and waiting.deleted_at is null
+            and (waiting.next_attempt_at is null or waiting.next_attempt_at <= clock_timestamp())
+            and not exists (
+              select 1 from ${receipts} sibling
+              where sibling.actor_id = waiting.actor_id and sibling.country = waiting.country
+                and sibling.status = 'queued' and sibling.source = 'photo' and sibling.deleted_at is null
+                and sibling.next_attempt_at > clock_timestamp()
+                -- a resting receipt holds the person's others only while the model has read none of the person's
+                -- receipts of the country since its try — an outage, or a slow API (owner's В-11 «а», В-12 «а»,
+                -- adversarial Р6-А1, Р7-А1); once it has, the failure was that receipt's own, and it rests alone
+                and sibling.reading_at >= coalesce((
+                  select max(answered.read_at) from ${receipts} answered
+                  where answered.actor_id = sibling.actor_id and answered.country = sibling.country
+                    and ${readByModelSql(sql`answered.reader_version`)}
+                ), '-infinity')
+                -- a receipt that never rested passes it, a try of the person's in the country a minute at most
+                -- (owner's В-10 «а», adversarial Р5-А1)
+                and (waiting.next_attempt_at is not null
+                  or sibling.reading_at > clock_timestamp()
+                    - make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MIN_MS / 1000}))
+            )
           order by (
             select count(*) from ${receipts} served
             where served.actor_id = waiting.actor_id
               and served.reading_at > clock_timestamp() - interval '1 hour'
-          ), waiting.queued_at, waiting.id
+          ), waiting.next_attempt_at nulls first, waiting.queued_at, waiting.id
           limit 1`)
         if (next !== undefined) {
           // one runner reads, so the row is ours; the lock keeps a second process from it all the same
@@ -1512,8 +1760,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           })
         const [owner] = await tx
           .select({
-            byModel: sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp()
-              and ${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}, false)`,
+            byModel: readsByModel(sql`${receipts.sentMonth}`),
+            tariffOpen: tariffOpens(sql`${receipts.sentMonth}`),
             reviewable: sql<boolean>`coalesce(${actors.consentVersion} >= ${REVIEW_CONSENT_EDITION}, false)`,
           })
           .from(actors)
@@ -1529,16 +1777,26 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           ...row,
           parts,
           byModel: owner?.byModel ?? false,
+          tariffOpen: owner?.tariffOpen ?? false,
           reviewable: owner?.reviewable ?? false,
         }
       })
     },
 
     async release(id) {
-      await db
-        .update(receipts)
-        .set({ status: 'queued', attempts: sql`greatest(${receipts.attempts} - 1, 0)` })
-        .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+      await released(id)
+    },
+
+    async rest(id) {
+      // each try of the model away may cost its worst in the person's share (MOL-367): through an outage the person's
+      // receipts rest with it (`claimNext`), or twenty receipts paid twenty worst prices a try (Р3-А1); as long as the
+      // receipt itself has waited, so one that failed once is not held by the age of another (В-11 «а», Р6-А1)
+      await released(id, {
+        nextAttemptAt: sql`clock_timestamp() + least(
+          make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MAX_MS / 1000}),
+          greatest(make_interval(secs => ${RECEIPT_MODEL_ALONE_RETRY_MIN_MS / 1000}),
+            clock_timestamp() - ${receipts.queuedAt}))`,
+      })
     },
 
     async retry(id) {
@@ -1558,12 +1816,16 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async finish(id, outcome) {
+      // a reading of the model that reached the review counts among the person's (MOL-275): their row is written
+      const counts = outcome.kind === 'parsed' && byModel(outcome.readerVersion)
       return db.transaction(async (tx) => {
         // the account before the receipt's row, as erasure takes them (`privacy.md`, review 2 of MOL-360, Б1б):
         // the copy for the review is keyed to the person, and its share of the account was taken after the
-        // receipt, which erasure holding the account waited for
+        // receipt, which erasure holding the account waited for — at the strength of the count's own `UPDATE` where
+        // one follows, never raised after the receipt's row is held
+        const strength = counts ? sql`for no key update` : sql`for key share`
         await tx.execute(
-          sql`select 1 from ${actors} where ${actors.id} = (select ${receipts.actorId} from ${receipts} where ${receipts.id} = ${id}) for key share`,
+          sql`select 1 from ${actors} where ${actors.id} = (select ${receipts.actorId} from ${receipts} where ${receipts.id} = ${id}) ${strength}`,
         )
         const head = outcome.head
         const [done] = await tx
@@ -1600,6 +1862,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
           .returning({ id: receipts.id, source: receipts.source, country: receipts.country })
         if (done === undefined) return null
+        if (counts) await countModelReceipt(tx, id)
         // read or failed, the link of a receipt by its QR code is no longer kept (MOL-232, Р-4)
         await tx.delete(receiptLinks).where(eq(receiptLinks.receiptId, id))
         // the measure of 0.2 is the reader's (MOL-222): a receipt from the tax office has nothing in it
@@ -1630,6 +1893,34 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
           return { keptUntil }
         }
         if (outcome.lines.length > 0) {
+          // The items the lines found, held while the lines are written (MOL-374, adversarial А6): one
+          // erasure took meanwhile — its author gone, nothing standing on it yet — makes its line a new one
+          // rather than refuse the whole reading on the foreign key. A key share waits for an erasure in
+          // flight and then finds the row gone; held first, it is a line erasure sees standing on the item.
+          const bound = [
+            ...new Set(
+              outcome.bindings.flatMap((binding) =>
+                binding.itemId === null ? [] : [binding.itemId],
+              ),
+            ),
+          ]
+          const live = new Set<string>()
+          if (bound.length > 0) {
+            const rows = await tx.execute<{ id: string }>(sql`
+              select id from items
+              where id in (${sql.join(
+                bound.map((item) => sql`${item}::uuid`),
+                sql`, `,
+              )})
+              order by id
+              for key share`)
+            for (const row of rows) live.add(row.id)
+          }
+          const bindings = outcome.bindings.map((binding) =>
+            binding.itemId === null || live.has(binding.itemId)
+              ? binding
+              : { ...binding, itemId: null, match: 'new' as const },
+          )
           await tx.insert(receiptLines).values(
             outcome.lines.map((line, position) => ({
               receiptId: id,
@@ -1645,10 +1936,10 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
               settled: line.settled,
               repaired: line.repaired === true,
               remembered: outcome.remembered?.[position] === true,
-              itemId: outcome.bindings[position]?.itemId ?? null,
-              match: outcome.bindings[position]?.match ?? null,
-              translation: outcome.bindings[position]?.translation ?? null,
-              spelled: outcome.bindings[position]?.spelled === true,
+              itemId: bindings[position]?.itemId ?? null,
+              match: bindings[position]?.match ?? null,
+              translation: bindings[position]?.translation ?? null,
+              spelled: bindings[position]?.spelled === true,
               gtin: outcome.codes?.[position] ?? null,
             })),
           )
@@ -1763,10 +2054,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
     },
 
     async releaseLink(id) {
-      await db
-        .update(receipts)
-        .set({ status: 'queued', attempts: sql`greatest(${receipts.attempts} - 1, 0)` })
-        .where(and(eq(receipts.id, id), eq(receipts.status, 'reading')))
+      await released(id)
     },
 
     async askLater(id, minutes) {

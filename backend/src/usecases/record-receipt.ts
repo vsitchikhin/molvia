@@ -34,6 +34,7 @@ import { findByBarcode } from './find-by-barcode'
 import { shownLines } from './receipts'
 import type { ShownLines } from './receipts'
 import { tripRateOn } from './start-trip'
+import { ownCategory } from './trip-category'
 import { todayOf } from './today'
 import type { Today } from './today'
 
@@ -377,6 +378,8 @@ export async function recordReceipt(
             ? receiptMomentOf(body.purchasedOn, held.printedTime, held.country)
             : null,
         ...payment,
+        // the category chosen on the review (MOL-400): one the person has not got is «Продукты»
+        categoryId: await ownCategory(repositories, actor, body.categoryId),
       },
       held.currency,
       snapshot,

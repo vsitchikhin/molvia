@@ -133,6 +133,7 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       receiptsModelUntil: at(6),
       silenceWarning: 30,
       silenceWarnedAt: at(7),
+      locale: 'en',
       receiptsDay: '2026-09-20',
       receiptsSent: 3,
       itemsDay: '2026-09-21',
@@ -142,6 +143,9 @@ async function aFullLife(actorId: string, telegramUserId: number) {
       modelMonth: '2026-09-01',
       modelSpentMicroUsd: 41_250,
       modelShareTold: '2026-09-01',
+      trialReceiptsLeft: 7,
+      modelReceiptsMonth: '2026-09-01',
+      modelReceiptsRead: 3,
     })
     .where(eq(actors.id, actorId))
   await insertSession(db, { actorId, deviceName: 'iPhone · Safari' })
@@ -371,6 +375,8 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     { id: own, actorId, name: 'Такси', colour: 3, icon: 'taxi', archivedAt: at(16) },
     { id: randomUUID(), actorId, preset: 'groceries' },
   ])
+  // The trip's own category (MOL-400), once the category is there.
+  await db.update(trips).set({ categoryId: own }).where(eq(trips.id, tripId))
   await db.insert(spendings).values({
     id: randomUUID(),
     actorId,

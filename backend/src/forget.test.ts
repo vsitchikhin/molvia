@@ -27,27 +27,53 @@ const REPORT: ErasureReport = {
     login_requests: 1,
     actors: 1,
   },
+  itemsLeaving: 3,
+  leavingItems: ['a', 'b', 'c'],
   itemsReleased: 1,
   barcodesReleased: 2,
   memoryReleased: 0,
   counted: true,
 }
 
-function run(argv: string[], report: ErasureReport | Error = REPORT) {
+function run(
+  argv: string[],
+  report: ErasureReport | Error = REPORT,
+  swept: number | Error = REPORT.itemsLeaving,
+) {
   const erase = vi.fn<ErasureRepository['erase']>(async () =>
     report instanceof Error ? Promise.reject(report) : report,
   )
+  const sweepReleased = vi.fn<ErasureRepository['sweepReleased']>(async () =>
+    swept instanceof Error ? Promise.reject(swept) : swept,
+  )
   const lines: string[] = []
-  const exit = forget(argv, { erase }, (line) => lines.push(line))
-  return { exit, erase, lines }
+  const exit = forget(argv, { erase, sweepReleased }, (line) => lines.push(line))
+  return { exit, erase, sweepReleased, lines }
 }
 
 describe('forget — стирание вручную', () => {
-  it('без --yes только считает: сухой прогон', async () => {
-    const { exit, erase, lines } = run(['184467331'])
+  it('без --yes только считает: сухой прогон, и ничего не убирает', async () => {
+    const { exit, erase, sweepReleased, lines } = run(['184467331'])
     expect(await exit).toBe(0)
     expect(erase).toHaveBeenCalledWith(184467331, { dryRun: true })
+    expect(sweepReleased).not.toHaveBeenCalled()
     expect(lines.at(-1)).toMatch(/dry run: nothing changed/)
+  })
+
+  // Review 4, №19: the items leaving go at once, as by either door.
+  it('с --yes убирает товары своего стирания и печатает сколько', async () => {
+    const { exit, sweepReleased, lines } = run(['184467331', '--yes'])
+    expect(await exit).toBe(0)
+    expect(sweepReleased).toHaveBeenCalledWith(REPORT.leavingItems)
+    expect(lines).toContain('  items swept         3')
+  })
+
+  it('сбой уборки после стирания называет код и не меняет исход', async () => {
+    const broken = Object.assign(new Error('boom'), { code: '40P01' })
+    const { exit, lines } = run(['184467331', '--yes'], REPORT, broken)
+    expect(await exit).toBe(0)
+    expect(lines).toContain("  sweep failed: 40P01 — the API's minute takes them")
+    expect(lines.at(-1)).toBe('erased.')
   })
 
   it('с --yes стирает, где бы флаг ни стоял', async () => {
@@ -92,6 +118,7 @@ describe('forget — стирание вручную', () => {
     const { exit, lines } = run(['184467331'])
     await exit
     expect(lines).toContain('  verdicts            3')
+    expect(lines).toContain('  items leaving       3 (nobody alive stands on them)')
     expect(lines).toContain('  items kept          1 (author removed)')
     expect(lines).toContain('  codes kept          2 (author removed)')
     expect(lines).toContain(

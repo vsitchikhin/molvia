@@ -98,3 +98,22 @@ describe('ReceiptLineRow — a line’s package (MOL-264, В-2 «а»)', () => {
     expect(own.find('.figures').text()).toBe('0,5 кг')
   })
 })
+
+describe('ReceiptLineRow — a sum alone the total put right (MOL-420)', () => {
+  // a line the till printed with its sum alone: no quantity, no price, no arithmetic of its own
+  const sumAlone = (over: Partial<ReviewLine>) => {
+    const one = row({ quantity: null, ...over }, 'new')
+    return { ...one, line: { ...one.line, quantity: null, price: null, settled: false } }
+  }
+
+  it('says why it is «проверьте» though no quantity or price stands before its sum', () => {
+    const text = render(sumAlone({ repaired: true })).text()
+    expect(text).toContain(ru.receipt.review.repaired_note)
+    expect(text).toContain(ru.receipt.review.tag_check)
+    expect(text).not.toContain(ru.receipt.review.unread)
+  })
+
+  it('must not say it of a sum alone the reading kept as copied', () => {
+    expect(render(sumAlone({})).text()).not.toContain(ru.receipt.review.repaired_note)
+  })
+})

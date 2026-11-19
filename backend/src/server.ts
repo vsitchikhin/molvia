@@ -14,13 +14,15 @@ import {
   LOGIN_WINDOW_LIMIT,
   RECEIPT_MODEL_SHARE_MICRO_USD,
   VERSION_HEADER,
+  FF_HEADER,
+  ffHeaderOf,
   errorResponseSchema,
   isWireCode,
   describeFailure,
 } from '@molvia/model'
-import type { ErrorCode, ErrorResponse, TelegramUserId } from '@molvia/model'
+import type { ErrorCode, ErrorResponse, FfName, TelegramUserId } from '@molvia/model'
 import { InvalidBody } from '@/parse'
-import { VERSION, env, loginConfig } from '@/env'
+import { FF_ON, VERSION, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
@@ -79,7 +81,12 @@ import { previousItems } from '@/usecases/previous-items'
 import { proposeItem } from '@/usecases/propose-item'
 import { embedMissing, startItemEmbedding } from '@/usecases/embed-items'
 import { mergeTick } from '@/usecases/merge-twins'
-import { readQueuedReceipts } from '@/usecases/read-receipts'
+import {
+  modelRest,
+  readQueuedReceipts,
+  readsReceiptsByModel,
+  receiptsAccessOf,
+} from '@/usecases/read-receipts'
 import { spelledBrands } from '@/usecases/spell-brands'
 import type { SpellReport } from '@/usecases/spell-brands'
 import { readTaxReceipts } from '@/usecases/read-tax-receipts'
@@ -153,6 +160,7 @@ import {
   spendingCategoriesOf,
 } from '@/usecases/spendings'
 import { chooseSalaryShift, moneyMonthOf, salaryShiftOf } from '@/usecases/money-month'
+import { categorizeTrip, placeCategoriesOf } from '@/usecases/trip-category'
 import { acceptConsent, consentOf } from '@/usecases/consent'
 import { moneyChartMonthOf } from '@/usecases/money-chart-month'
 import { moneyBudgetOf, setBudgetPlan } from '@/usecases/money-budget'
@@ -397,6 +405,11 @@ export interface ServerOptions {
    * a fake — no test asks the model.
    */
   readonly receiptModel?: ReceiptModel | null
+  /**
+   * The model that reads again a receipt the first did not read whole (MOL-405): Sonnet, built beside the first from
+   * the same key. Absent or `null`, the first reading is all there is.
+   */
+  readonly receiptSecondModel?: ReceiptModel | null
   /** The month's cap of the model in micro-dollars; absent, `RECEIPT_MODEL_MONTHLY_CAP_USD`'s. */
   readonly receiptModelCapMicroUsd?: number
   /** A person's share of it in micro-dollars (MOL-367); absent, `RECEIPT_MODEL_SHARE_MICRO_USD`. */
@@ -413,6 +426,12 @@ export interface ServerOptions {
    * metrics port serves, and a test the one it reads.
    */
   readonly metrics?: HttpMetrics
+  /**
+   * The «фф» that are on (MOL-382). Absent, the environment's (`FF_<NAME>`); a test names its own. A
+   * feature's routes and timers are registered only while its фф is on, so off it is an address the
+   * API does not have — the same 404, before any session.
+   */
+  readonly ff?: ReadonlySet<FfName>
 }
 
 /**
@@ -467,6 +486,8 @@ function openFoodFactsOf(log: FastifyBaseLogger): OpenFoodFacts | null {
 }
 
 export function buildServer(options: ServerOptions = {}): FastifyInstance {
+  const ff = options.ff ?? FF_ON
+  const namedFf = ffHeaderOf(ff)
   const app = Fastify({
     logger: {
       // Fastify's default serializers write no headers at all, so today this hides nothing; it
@@ -498,6 +519,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       if (isAuthRequest(request)) void reply.header('cache-control', 'no-store')
       // No hook runs for these, the one below included.
       void reply.header(VERSION_HEADER, NAMED_BUILD)
+      void reply.header(FF_HEADER, namedFf)
       // Both are the caller's: a path that does not decode, and one past a raised header limit.
       if (error.code === 'FST_ERR_BAD_URL' || error.code === 'FST_ERR_MAX_PARAM_LENGTH') {
         void reply
@@ -518,6 +540,10 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     app.log,
     options.failureRecorded,
   )
+  // A sweep that failed after an erasure committed (MOL-374): the minute timer takes the items left.
+  const sweepFailed = (error: unknown): void => {
+    failures.report(error, job('released-items'), 'released items sweep failed')
+  }
 
   // The auth scopes set `no-store` on what their routes answer, but a path no route matches
   // and a URL Fastify cannot decode are answered before any scope is entered (adversarial А4).
@@ -532,8 +558,11 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // page that meets another build than the one it first met knows the server was rolled out
   // under it, and looks for its own new version at once — on the very answer it may no longer
   // read (MOL-132). `onSend`, not `onRequest`: a reply the error handler builds anew keeps it.
+  // The фф that are on ride beside it (MOL-382, В-1 «а»): the phone hears them before the login, and
+  // learns of a change with its next answer.
   app.addHook('onSend', (_request, reply, payload, next) => {
     void reply.header(VERSION_HEADER, NAMED_BUILD)
+    void reply.header(FF_HEADER, namedFf)
     next(null, payload)
   })
 
@@ -628,6 +657,25 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const reader = options.receiptReader ?? null
     const model = options.receiptModel ?? null
     const modelSpend = createModelSpendRepository(db, owner !== null)
+    const capMicroUsd =
+      options.receiptModelCapMicroUsd ?? Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000)
+    // a share above the cap is the cap: lowering the cap stays one line (MOL-367, adversarial А3)
+    const shareMicroUsd = Math.min(
+      options.receiptModelShareMicroUsd ?? RECEIPT_MODEL_SHARE_MICRO_USD,
+      capMicroUsd,
+    )
+    const modelDeps =
+      model === null
+        ? null
+        : {
+            reader: model,
+            second: options.receiptSecondModel
+              ? { reader: options.receiptSecondModel, rest: modelRest() }
+              : null,
+            spend: modelSpend,
+            capMicroUsd,
+            shareMicroUsd,
+          }
     const taxOffice =
       options.purs === undefined
         ? pursOf(instance.log, (error) => {
@@ -643,6 +691,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopIncomeCleanup: (() => Promise<void>) | undefined
     let stopSpendingCleanup: (() => Promise<void>) | undefined
     let stopTripCleanup: (() => Promise<void>) | undefined
+    let stopReleasedSweep: (() => Promise<void>) | undefined
     let stopAccountCleanup: (() => Promise<void>) | undefined
     let stopTransferCleanup: (() => Promise<void>) | undefined
     let stopSessionCleanup: (() => Promise<void>) | undefined
@@ -696,6 +745,12 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           failures.report(error, job('trip-cleanup'), 'removed trip cleanup failed')
         },
       )
+      // And the items whose author erased themselves, once nothing stands on them (MOL-374, В-7 «а»):
+      // erasure only marks them, so it holds no lock on an item anybody else writes to.
+      const erasure = createErasureRepository(db)
+      stopReleasedSweep = startLoginCleanup(async () => {
+        await erasure.sweepReleased()
+      }, sweepFailed)
       // And for accounts without operations (MOL-115): deleted ten minutes on, whatever named one
       // meanwhile left without an account rather than lost (Р-17).
       stopAccountCleanup = startLoginCleanup(
@@ -852,9 +907,13 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 partly: event.partly,
                 ms: event.ms,
                 reader: event.reader,
+                readerVersion: event.readerVersion,
                 costMicroUsd: event.costMicroUsd,
                 inputTokens: event.tokens?.input,
                 outputTokens: event.tokens?.output,
+                secondCostMicroUsd: event.second?.costMicroUsd,
+                secondInputTokens: event.second?.tokens.input,
+                secondOutputTokens: event.second?.tokens.output,
                 unparsed: event.unparsed,
                 rememberedConfirmed: event.remembered.confirmed,
                 rememberedRepaired: event.remembered.repaired,
@@ -872,8 +931,23 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               },
               'receipt not read by the model',
             )
+          } else if (event.kind === 'second_passed') {
+            instance.log.info(
+              {
+                reason: event.reason,
+                costMicroUsd: event.paid?.costMicroUsd,
+                inputTokens: event.paid?.tokens.input,
+                outputTokens: event.paid?.tokens.output,
+              },
+              'receipt not read again by the second model',
+            )
+          } else if (event.kind === 'second_slow') {
+            instance.log.warn({ ms: event.ms }, 'receipt second model slow, resting')
           } else if (event.kind === 'model_unavailable') {
-            instance.log.warn({ reason: event.reason }, 'receipt model unavailable')
+            instance.log.warn(
+              { model: event.model, reason: event.reason },
+              'receipt model unavailable',
+            )
           } else if (event.kind === 'model_broken') {
             failures.report(event.error, job('receipt-model'), 'receipt model answer torn')
           } else if (event.kind === 'model_rejected') {
@@ -897,16 +971,6 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           PHONE_NOTICES_PER_SENDER,
           (count) => ({ kind: 'receipt_partial_muted', count }),
         )
-        const capMicroUsd =
-          options.receiptModelCapMicroUsd ??
-          Math.round(env.RECEIPT_MODEL_MONTHLY_CAP_USD * 1_000_000)
-        // a share above the cap is the cap: lowering the cap stays one line (MOL-367, adversarial А3)
-        const shareMicroUsd = Math.min(
-          options.receiptModelShareMicroUsd ?? RECEIPT_MODEL_SHARE_MICRO_USD,
-          capMicroUsd,
-        )
-        const modelDeps =
-          model === null ? null : { reader: model, spend: modelSpend, capMicroUsd, shareMicroUsd }
         const brandSpellings = createBrandSpellingRepository(db)
         // the brands of a receipt the model read, asked of it (MOL-326): counts and reasons only, never a brand
         const brandReport = (event: SpellReport): void => {
@@ -944,6 +1008,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                   ? null
                   : { notices: createOwnerNoticeRepository(db), budget: receiptNotices },
               model: modelDeps,
+              // once a person can pay, nobody reads free (MOL-275, В-1 «в»)
+              payments: ff.has('payments'),
               bind: (claimed, lines, read) =>
                 bindReceiptLines(
                   {
@@ -1032,6 +1098,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopIncomeCleanup?.()
       await stopSpendingCleanup?.()
       await stopTripCleanup?.()
+      await stopReleasedSweep?.()
       await stopTransferCleanup?.()
       await stopAccountCleanup?.()
       await stopSessionCleanup?.()
@@ -1079,7 +1146,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       preview: (code) => previewLogin(loginRequests, code),
       confirm: (code, telegramId) => confirmLogin(loginRequests, code, telegramId),
       decline: (code) => declineLogin(loginRequests, code),
-      erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId),
+      erase: (telegramUserId) => eraseMe(createErasureRepository(db), telegramUserId, sweepFailed),
       // One person's claim that fails is logged by its kind and the others of the minute go on.
       claimReminders: () =>
         remindRatings(
@@ -1195,13 +1262,17 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     void instance.register((guarded, _guardedOptions, guardedDone) => {
       // Before the session is looked up: a foreign page or a link moves nothing (MOL-368).
       guarded.addHook('onRequest', refuseOutsideTheApp)
-      withActor(guarded, (token) => authenticate(sessions, actors, token))
-      actorMeRoute(guarded)
+      withActor(guarded, (token, locale) => authenticate(sessions, actors, token, locale))
+      actorMeRoute(
+        guarded,
+        (id, today) => readsReceiptsByModel({ model: modelDeps }, id, today),
+        (id, today) => receiptsAccessOf(actors, id, today),
+      )
       actorExportRoute(guarded, (actorId, sessionId) =>
         exportMine(createExportRepository(db), actorId, sessionId),
       )
       actorEraseRoute(guarded, (telegramUserId) =>
-        eraseMe(createErasureRepository(db), telegramUserId),
+        eraseMe(createErasureRepository(db), telegramUserId, sweepFailed),
       )
       const heavyFeedback = heavyFeedbackLimit()
       feedbackRoutes(
@@ -1262,6 +1333,9 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           finishTrip(tripData.trips, actorId, tripId, deviceAt, deviceDay),
         chooseRate: (actorId, tripId, body) => chooseTripRate(transact, actorId, tripId, body),
         setReceipt: (actorId, tripId, receipt) => setReceipt(transact, actorId, tripId, receipt),
+        categorize: (actorId, tripId, body) =>
+          categorizeTrip(tripData, { id: actorId }, tripId, body),
+        placeCategories: (actorId) => placeCategoriesOf(tripData, { id: actorId }),
         removeTrip: (actorId, tripId) => removeTrip(tripData.trips, actorId, tripId),
         restoreTrip: (actorId, tripId, body) => restoreTrip(tripData, actorId, tripId, body),
       })
@@ -1292,7 +1366,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
           if (queued) receiptQueue?.nudge()
           return receipt
         },
-        list: (actor, shown) => receiptsOf(tripData, actor, shown),
+        list: (actor, shown, food) => receiptsOf(tripData, actor, shown, food),
         one: (
           actor,
           id,

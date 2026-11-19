@@ -407,7 +407,8 @@ The detail behind the frontend lines of `CLAUDE.md`.
   its sides are 8 and it stands 8 into the row's padding at the right, so beside a circle of 40 a word of
   a name fits at 320 under the widest word of the tail (adversarial А2: «Развлечения» broke in its middle
   at 16; Б1: under «Вернуть» with the sides alone). `NavRow` without `to` is a button that opens a sheet and says so
-  (`aria-haspopup="dialog"`). **Among the fields of a form it is drawn as one** (`field`, MOL-199):
+  (`aria-haspopup="dialog"`); `inactive` is the kit's not now — `aria-disabled`, no chevron, the tap going nowhere, no
+  pointer and no light under it, a list's row as a field (MOL-400, as `AccountRow`). **Among the fields of a form it is drawn as one** (`field`, MOL-199):
   the well of `AccountRow` — `--surface-2`, a `border-strong` edge, the tint under the pointer — since a
   list's row, with no fill and no edge, read in a form as plain text; `invalid` marks a field behind it
   that holds an error (a `--bad` edge, `aria-invalid`). **Their classes are the kit's own words**
@@ -612,8 +613,8 @@ min-content` — the day's head and the total of «Траты», a line of an ex
     `AppField size="entry"` and its sign shrink together to the field, by «figure + 0.8 × sign» (`entryWidth`,
     32 to 40) — beside a sign of its own size «125403,50» was 12.9 px at 200 %; an amount of the body's size
     (`kind="decimal"`) shrinks to its own box (`.control-box`, `display: contents` in every other field) beside the
-    currency of a plan or an account; the sum and its currency of an exchange and an income stand one under the
-    other below 15rem — side by side at 200 % the sum read «1254» and the currency had 0 px; and with large text a
+    currency of a plan, an account or an exchange (its currency in the sum's well since MOL-348); the sum and its
+    currency of an income stand one under the other below 15rem — side by side at 200 % the sum read «1254» and the currency had 0 px; and with large text a
     select's chosen option is drawn as words that wrap (`.chosen-words`), the select over them unseen and still
     the one tapped, focused and read out — «Армянский драм · AMD» had 92 px and showed «Армя». A tile's figure
     («Пришло», «Можно тратить», «Сбережения»), an operation's amount, the day's sum of «Траты» and the figure of
@@ -828,7 +829,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   **On `ListRow`, by two things the kit gained**: `tint`, the icon of 24 in a circle of 40
   (`--row-circle`) in a category's colour on `--cat-tint-share`, or `muted` (`surface-2`,
   `text-muted`) for an income, an exchange, a spending whose category the phone does not know —
-  never the accent, which is «press here» (Ф-4): purchases take the circle of «Продукты»; and `#below`,
+  never the accent, which is «press here» (Ф-4): purchases take the circle of their category — its icon too since MOL-406, `tripLook` — «Продукты» where they name none (MOL-400), and the cart, `muted`, where the phone does not know it — its «Категория ›» too (`TripCategoryRow`); and `#below`,
   the tag under the meta, since in the meta it would be cut with it. **The chevron is on every row** —
   every one opens a sheet to go on with — so the amounts end in one column; a sum over the rows stands
   in it by `--space-tail` (the card's hairline, the row's inset, the chevron and the gap: the day's sum
@@ -861,6 +862,26 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   came; always drawn, a journal in its own currency would come shorter than its bars — the page under the
   month's switcher, which MOL-138 holds. **The price, named** (adversarial round 4 of MOL-176): a row whose
   words wrap is taller than its bars — on a card of 256 by 17 to 34 px — since the bars know no text.
+- **The language is the device's, chosen on «Настройки» and at the door** (MOL-398, owner's В-1…В-3).
+  «Язык» under «Тема» — «Как на устройстве · Русский · English», each language named in itself and in
+  its own `lang` — and, while the screens speak English, «Date format»: British by default, American by
+  choice, each named by a sample `Intl` writes. Kept in `molvia.locale` and `molvia.date-style` on both
+  shelves as the scheme is, followed from other windows, left by «Выйти» and erasure (`useLocale.ts`);
+  «Как на устройстве» is `pickLocale` as before and follows `languagechange`. **One tag, not a language
+  and a format beside it**: `ru`, `en-GB` or `en-US` is vue-i18n's locale — English is one dictionary
+  under three names — so every `Intl.*(locale.value)` of a screen takes the order of the day by itself.
+  **What crosses the wire is the language, never the tag**: `pickLocale(locale.value)` for a receipt,
+  the hint of Open Food Facts, a message to the developer, and `LOCALE_HEADER` on every request — the
+  account keeps the last one for the bot's reminder (`bot.md`). Applied on the tap with no reload: no
+  screen is kept alive, so the next one mounts in the new language; a sheet's decimal separator is taken
+  at its opening, and none is open on «Настройки». **The tab's title follows too** (adversarial А1):
+  `installArrival` renames it while it is still the route's, the door names its own and gives the tab back
+  by the route (`screenNamer`), never a string kept from before the choice; a note the door shows once —
+  the erasure's — is words of the language spoken now (А2). **A category of one's own is refused a
+  ready-made name in either language** (А3): after a switch the two would stand as twins; the server does
+  not know the presets' names, so what was created before stays. The login screen offers the other language under its
+  way in, apart from it (the owner's note on the plan), on the first step only. The line of a browser
+  below the floor stays `pickLocale`'s: the app never started there, so nothing could have been chosen.
 - **The scheme is the device's, and it is drawn before the first paint** (MOL-111). «Тема» on the
   settings screen — «Системная · Светлая · Тёмная», under «Напоминания» (owner's В-2) — is kept in
   `molvia.scheme` (`light` / `dark` / `system`; anything else reads as the system), never sent: a

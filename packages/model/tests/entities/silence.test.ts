@@ -13,21 +13,23 @@ const countries = (now: Date) => [...silenceSendDay(now).countries].sort()
 
 describe('silenceSendDay — the person’s own day (MOL-239, Р-5)', () => {
   it('names every country at noon in Yerevan in summer', () => {
-    // 12:00 in Yerevan and Tbilisi, 10:00 in Belgrade (summer time)
-    expect(countries(new Date('2027-09-26T08:00:00Z'))).toEqual(['AM', 'GE', 'RS'])
+    // 12:00 in Yerevan and Tbilisi, 11:00 in Moscow, 10:00 in Belgrade (summer time)
+    expect(countries(new Date('2027-09-26T08:00:00Z'))).toEqual(['AM', 'GE', 'RS', 'RU'])
   })
 
   it('opens at ten and closes at twenty, by each country’s clock', () => {
-    // 09:59 in Belgrade is not yet, while Yerevan has been open for two hours
-    expect(countries(new Date('2027-07-01T07:59:00Z'))).toEqual(['AM', 'GE'])
-    expect(countries(new Date('2027-07-01T08:00:00Z'))).toEqual(['AM', 'GE', 'RS'])
-    // 20:00 in Yerevan is closed; 18:00 in Belgrade is still open
-    expect(countries(new Date('2027-07-01T16:00:00Z'))).toEqual(['RS'])
+    // 09:59 in Belgrade is not yet, while Yerevan has been open for two hours and Moscow for one
+    expect(countries(new Date('2027-07-01T07:59:00Z'))).toEqual(['AM', 'GE', 'RU'])
+    expect(countries(new Date('2027-07-01T08:00:00Z'))).toEqual(['AM', 'GE', 'RS', 'RU'])
+    // 20:00 in Yerevan is closed; 19:00 in Moscow and 18:00 in Belgrade are still open
+    expect(countries(new Date('2027-07-01T16:00:00Z'))).toEqual(['RS', 'RU'])
+    // 20:00 in Moscow is closed too (MOL-412)
+    expect(countries(new Date('2027-07-01T17:00:00Z'))).toEqual(['RS'])
     expect(SILENCE_SEND_FROM_HOUR).toBeLessThan(SILENCE_SEND_UNTIL_HOUR)
   })
 
   it('names nobody at night everywhere', () => {
-    // 01:00 in Yerevan and Tbilisi, 23:00 in Belgrade
+    // 01:00 in Yerevan and Tbilisi, 00:00 in Moscow, 23:00 in Belgrade
     expect(silenceSendDay(new Date('2027-09-25T21:00:00Z'))).toEqual({
       countries: [],
       elsewhere: false,

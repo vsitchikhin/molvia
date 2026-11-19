@@ -154,6 +154,17 @@ export function bestQuote(quotes: readonly MarketQuote[], side: MarketSide): Mar
 }
 
 /**
+ * What an exchange is set beside in the market (MOL-152, В-3): its own channel when the person named
+ * it, else the best of its day — one rule for its row, the sum «Обмены против рынка», its bar and its
+ * point on the line of the rate (MOL-348, review №6). Null — no market.
+ */
+export function cardMeasureOf<T>(
+  market: { readonly best: T; readonly own: T | null } | null | undefined,
+): T | null {
+  return market ? (market.own ?? market.best) : null
+}
+
+/**
  * Whether the exchange offices of `day` are still to come: they reach the central bank's file about
  * ten days late, a week at a time (В-3). Not once the file has passed that day — the day then simply
  * has no row — and, before the first week was ever read, only for a day recent enough to be in a

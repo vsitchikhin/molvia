@@ -55,7 +55,8 @@ press — the only channel people are given, because there Telegram already says
   checker**, and the test is left to cover what types cannot see — an empty value and a lost
   substitution. The language is `pickLocale` of `packages/model`, the very rule the PWA uses:
   Telegram's `language_code` is an IETF tag like any other, and a second copy of that decision
-  would be a second place to drift.
+  would be a second place to drift. **A reminder is the exception: it speaks the app's language the
+  API hands with it** (MOL-398), and the answer to a press of it speaks the language of its message.
 - **The bot keeps no state of its own.** The login code rides in the button's `callback_data`,
   which is Telegram's memory rather than ours, and everything else is asked of the API — the
   only write path there is. So nothing survives a restart, because nothing needs to.
@@ -232,7 +233,8 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   a step is due until sent, so it comes the next evening. Days in SQL are turned into instants by
   Postgres with the zone named — never the session's `timezone`. A country without a zone is not
   reminded; a test holds every country the settings accept to having one — Tbilisi's and
-  Belgrade's since MOL-109, Belgrade's with its summer time, so the evening is theirs all year.
+  Belgrade's since MOL-109, Belgrade's with its summer time, so the evening is theirs all year;
+  Moscow's since MOL-412, the clock of all seven cities of Russia the settings offer.
 - **A message an item, at most three a day, only the first one rings** (В-1). The freshest three;
   under the last, how many more wait in «Оценки» with the link — as text, since Telegram refuses an
   inline button to an `http://` address and a copy in development has one.
@@ -240,8 +242,19 @@ The lever of gate 0.2: the day after a purchase the bot asks «вчера · Е�
   «Оценки», products only, deleted trips out — plus the answer to MOL-29 (В-3): **not a purchase
   made before the person withdrew their verdict on the item**. One after the withdrawal is a new
   experience and is asked about. The screen is unchanged.
-- **The message is always Russian** (Р-7): it is sent without an update, and the person's language
-  is not something we keep (the privacy page). The answer to a press speaks the presser's.
+- **The message speaks the language the person's app last spoke** (MOL-398, owner's В-1 «в»; Р-7 before
+  it — always Russian): it is sent without an update, so Telegram's is not at hand, and the account keeps
+  the one every request of the phone names (`actors.locale`, `LOCALE_HEADER`), handed as `language` with
+  the reminder; none — Russian, as it was, and a bot of the new version reads the API of the old one.
+  **A press reads the language off the message itself** (`languageOfText`): the bot keeps nothing, and
+  Telegram's copy is its memory — English where the question carries the English scale's line, else
+  Russian, as every reminder before MOL-398 was and as one handed over with no text is taken; the outcome,
+  a refusal over it and the switch rebuilt speak it. **The buttons carry no language** (adversarial А6): a
+  button of a new form is one the bot of the release before does not know, and a rollback stripped every
+  reminder sent since of its scale with «ссылка больше не действует» — so their form is the one before.
+  «Ещё N ждут» picks its form by the language's plural rule (`remind.more.*`, adversarial А5). The silence
+  warning, the sign-in notice and a leak's message stay Russian then English: a notice not understood is
+  the harm it warns of, and a kept language may be one a stranger never read.
 - **A place is named with its city only where two items of one reminder share its name** (MOL-120)
   — «Вчера · Ереван Сити в Ереване» beside the Gyumri one, the name alone otherwise. The rule is
   the domain's `cityWhereNameRepeats`, the one «Оценки» reads, so the bot keeps none of its own —
@@ -541,8 +554,8 @@ plan in `.scratch/tasks/plans/MOL-237.md`.
   the other way, a script with the bot's token: the token lives in the bot's container alone, and it
   is exactly what step 2 of the procedure revokes through BotFather in the first hour of a leak; the
   script would need the new one typed in, and a second implementation of 429 and 403 in the API.
-- **One message, Russian then English, the owner's file as it is** (В-2): nobody's language is kept
-  (`actors` holds none, the bot keeps no Telegram language), and the first market is Russian-speaking
+- **One message, Russian then English, the owner's file as it is** (В-2): nobody's language was kept
+  then (`actors.locale`, MOL-398, is only the app's last one, and the bot keeps no Telegram language), and the first market is Russian-speaking
   in three countries. **It is the one message of the bot that is not an i18n key**: its words are the
   incident's, written on the day by the template of 12124161. Plain text with no `parse_mode` — an
   escape missed in the middle of an incident would refuse the message — and no link preview. What the
@@ -618,7 +631,8 @@ Owner's decisions of 28.10.2026 in `.scratch/tasks/requirements/MOL-239.md`.
 - **To everybody, a blocked bot too** (adversarial А4): a block heard once is never heard lifted from Telegram's list,
   so the claim tries, and a block still there answers 403 and is marked again. The reminders off, no edition accepted,
   the statistics off are no reason to stay silent — it is a duty, as the message about a leak is (Р-9).
-- **Russian, then English, in one message** (owner's В-2 «а»): nobody's language is kept, and a warning not understood
+- **Russian, then English, in one message** (owner's В-2 «а»): no language is trusted for it — `actors.locale`
+  (MOL-398) may be years old — and a warning not understood
   is data lost. Keys of the dictionary (`silence.warn`, `silence.days.*`), the date and the count by each language's own
   rules. **«откройте приложение и войдите»**: after 180 days the session is gone, the app opens on the door, and only a
   login marks the visit (MOL-238) — the bot is no visit, and has no button to keep the account (requirements, «Чего не делать»). The day and the
@@ -666,7 +680,8 @@ own User-Agent, and before this nothing told the person afterwards. Owner's В-9
 - **No switch, no filter** (Р-1): neither the reminders off, nor «чек разобран» off, nor the statistics, nor an
   edition accepted silence it — a duty, as the warning before an erasure is; a blocked bot is tried, and a 403 marks
   the block by MOL-103's path. **With sound at any hour** (Р-2): a sign-in at night is the one to hear of at once.
-- **Russian, then English, in one message** (В-2 «а»), the button named in both: nobody's language is kept, and a
+- **Russian, then English, in one message** (В-2 «а»), the button named in both: no language is trusted for it —
+  `actors.locale` (MOL-398) may be a stranger's — and a
   notice not understood is a hijack not ended. It names the device as the browser named itself and says so — a
   stranger forges it — and **the day and time in the account's zone** (`signedInClock`, Р-3): absolute, since the
   message stays in the chat; MOL-55's reason for «минуту назад», that the zone is not known, does not hold where the

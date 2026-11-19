@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { hostname } from 'node:os'
 import { Readable } from 'node:stream'
-import { eq, sql } from 'drizzle-orm'
+import { and, eq, sql } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import {
@@ -16,6 +16,7 @@ import {
 } from '@molvia/model'
 import am05 from '@molvia/model/testing/receipt-text.am-05.json'
 import type { FastifyInstance } from 'fastify'
+import { createErasureRepository } from '@/db/erasure-repository'
 import { createItemRepository } from '@/db/items-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
 import { NO_EMBEDDER } from '@/embeddings/embedder'
@@ -36,7 +37,15 @@ import { readQueuedReceipts } from '@/usecases/read-receipts'
 import type { ReadReport } from '@/usecases/read-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, insertItem, insertPlace, insertTrip, signIn } from './fixtures'
+import {
+  clearAll,
+  insertActor,
+  insertItem,
+  insertPlace,
+  insertTrip,
+  signIn,
+  telegramId,
+} from './fixtures'
 import { onlyRow, sorted } from './rows'
 
 // The tests here that come near half a second on CI carry a timeout of their own, at least twenty
@@ -247,10 +256,19 @@ describe('«Отправить чек»', () => {
     expect((await send(me, receipt)).statusCode).toBe(409)
   })
 
-  it('refuses an id in capitals and a country not read yet', async () => {
+  it('refuses an id in capitals, a country read by its link and one not read yet', async () => {
     const me = await owner()
     expect((await send(me, body({ id: randomUUID().toUpperCase() }))).statusCode).toBe(400)
-    expect((await send(me, body({ country: 'GE' }))).statusCode).toBe(400)
+    expect((await send(me, body({ country: 'RS' }))).statusCode).toBe(400)
+    expect((await send(me, body({ country: 'TR' }))).statusCode).toBe(400)
+  })
+
+  it('takes a Georgian photo (MOL-408): the database knows the country', async () => {
+    const me = await owner()
+    const receipt = body({ country: 'GE' })
+    expect((await send(me, receipt)).statusCode).toBe(201)
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, receipt.id)))
+    expect([row?.country, row?.currency]).toEqual(['GE', 'GEL'])
   })
 })
 
@@ -712,6 +730,20 @@ describe('the queue', () => {
     expect(list.find((r) => r.id === good)).toMatchObject({ status: 'parsed' })
   }, 15_000)
 
+  it('fails a Georgian receipt the model did not read as unreadable, and never asks Tesseract (MOL-408)', async () => {
+    const me = await owner()
+    const id = await queued(me, { country: 'GE' })
+    const reader = benchReader()
+    expect(await readAll(reader)).toMatchObject([
+      { kind: 'read', status: 'failed', failure: 'unreadable', reader: 'ocr' },
+    ])
+    // must not: no layout of Tesseract's reads Georgia — its «0 lines» would say «переснимите»
+    expect(reader.asked).toBe(0)
+    const row = onlyRow(await db.select().from(receipts).where(eq(receipts.id, id)))
+    expect([row?.status, row?.failure]).toEqual(['failed', 'unreadable'])
+    expect(await days()).toMatchObject([{ unreadable: 1, reshoot: 0, read: 0 }])
+  }, 15_000)
+
   it('leaves the receipt in the queue, its attempt uncounted, while the reader is away', async () => {
     const me = await owner()
     const id = await queued(me)
@@ -857,6 +889,52 @@ describe('the queue', () => {
     await put(me, receipt.id, 1, jpeg())
     expect(await repository.claimNext()).toBeNull()
   })
+})
+
+describe('the item a line found, erased before the reading is written (MOL-374, adversarial А6)', () => {
+  it('makes the line a new one, never refuses the receipt', async () => {
+    const me = await owner()
+    const id = await queued(me)
+    const annaTg = telegramId()
+    const anna = await insertActor(db, { telegramUserId: annaTg })
+    const annas = await insertItem(db, {
+      name: 'Молоко Анны',
+      searchKey: 'moloko anny',
+      createdBy: anna,
+    })
+
+    const reports: ReadReport[] = []
+    await readQueuedReceipts({
+      receipts: repository,
+      reader: benchReader(),
+      report: (event) => reports.push(event),
+      bind: async (claimed, lines) => {
+        const bindings = await bindReceiptLines(
+          { items: createItemRepository(db), embedder: NO_EMBEDDER },
+          claimed.actorId,
+          claimed.country,
+          claimed.language,
+          lines,
+        )
+        // the matcher found Anna's item for the first line, and Anna is erased and her item swept while
+        // the queue reads on: nothing stood on it yet
+        await createErasureRepository(db).erase(annaTg, { dryRun: false })
+        expect(await createErasureRepository(db).sweepReleased()).toBe(1)
+        return bindings.map((binding, position) =>
+          position === 0 ? { ...binding, itemId: annas, match: 'search' as const } : binding,
+        )
+      },
+    })
+
+    expect(reports).toEqual([expect.objectContaining({ kind: 'read', status: 'parsed' })])
+    const first = onlyRow(
+      await db
+        .select({ itemId: receiptLines.itemId, match: receiptLines.match })
+        .from(receiptLines)
+        .where(and(eq(receiptLines.receiptId, id), eq(receiptLines.position, 0))),
+    )
+    expect(first).toEqual({ itemId: null, match: 'new' })
+  }, 15_000)
 })
 
 describe('«Удалить чек · Вернуть» (П-8)', () => {

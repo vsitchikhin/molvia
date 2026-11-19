@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { actorCodec, settingsOf } from '@molvia/model'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page } from '@playwright/test'
+import { yerevanDay } from './days'
 import { facesIn, standAt, toTheEnd, topOf } from './scroll'
 import { asBrowser, signedIn } from './session'
 import { firstAttemptTrace } from './trace'
@@ -15,12 +16,6 @@ test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
  * «Месяц · Год» in the address without an entry in the history, and the last answer kept for a shelf
  * with no connection.
  */
-
-function yerevanDay(days = 0): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
-    new Date(Date.now() + days * 24 * 60 * 60 * 1000),
-  )
-}
 
 /** The 15th of the month `back` months before this one in Yerevan: a day any month has. */
 function monthsAgoDay(back: number): string {

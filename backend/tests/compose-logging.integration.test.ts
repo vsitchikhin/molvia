@@ -20,6 +20,7 @@ describe('docker-compose.prod.yml', () => {
       'postgres',
       'postgres-exporter',
       'receipt-reader',
+      'tunnel',
       'victoria',
       'victoria-volumes',
     ])

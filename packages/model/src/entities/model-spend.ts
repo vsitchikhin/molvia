@@ -9,16 +9,31 @@
 export const RECEIPT_MODEL = 'claude-haiku-5-5'
 
 /**
- * Its price in micro-dollars a million tokens, for a request up to `RECEIPT_MODEL_INPUT_MAX` tokens (the
- * Claude API's price list, 06.10.2026): $0,10 in, $0,50 out — thinking is output — a cache write 1.25×
- * the input, a read 0.1×.
+ * The model that reads again a receipt the first did not read whole (MOL-405): Sonnet 5.5, the same prompt and schema.
+ * On the bench it adds a fifth of the right figures and no wrong one, at ten times Haiku's price a call.
  */
-export const RECEIPT_MODEL_PRICE = {
-  input: 100_000,
-  output: 500_000,
-  cacheWrite: 125_000,
-  cacheRead: 10_000,
-} as const
+export const RECEIPT_SECOND_MODEL = 'claude-sonnet-5-5'
+
+/** A model that reads receipts. */
+export type ReceiptModelName = typeof RECEIPT_MODEL | typeof RECEIPT_SECOND_MODEL
+
+/**
+ * Each model's price in micro-dollars a million tokens, for a request up to `RECEIPT_MODEL_INPUT_MAX` tokens (the
+ * Claude API's price list): Haiku $0,10 in, $0,50 out (06.10.2026), Sonnet $2 and $10 (17.11.2026) — thinking is
+ * output — a cache write 1.25× the input, a read 0.1×.
+ */
+export const RECEIPT_MODEL_PRICES = {
+  [RECEIPT_MODEL]: { input: 100_000, output: 500_000, cacheWrite: 125_000, cacheRead: 10_000 },
+  [RECEIPT_SECOND_MODEL]: {
+    input: 2_000_000,
+    output: 10_000_000,
+    cacheWrite: 2_500_000,
+    cacheRead: 200_000,
+  },
+} as const satisfies Record<
+  ReceiptModelName,
+  { input: number; output: number; cacheWrite: number; cacheRead: number }
+>
 
 /** The tokens the price above holds for; a request past it is priced otherwise and never sent. */
 export const RECEIPT_MODEL_INPUT_MAX = 100_000
@@ -45,9 +60,9 @@ export interface ModelUsage {
 
 const MILLION = 1_000_000
 
-/** A call's price by what it used, rounded up to the micro-dollar. */
-export function modelCallMicroUsd(usage: ModelUsage): number {
-  const p = RECEIPT_MODEL_PRICE
+/** A call's price by what it used, at its model's price, rounded up to the micro-dollar. */
+export function modelCallMicroUsd(usage: ModelUsage, model: ReceiptModelName): number {
+  const p = RECEIPT_MODEL_PRICES[model]
   const millionths =
     usage.input_tokens * p.input +
     (usage.cache_creation_input_tokens ?? 0) * p.cacheWrite +
@@ -72,9 +87,12 @@ export function modelInputTokensMax(
   )
 }
 
-/** The most a call may cost: its input at most and the whole output it may take. */
-export function worstCallMicroUsd(inputTokens: number): number {
-  return modelCallMicroUsd({ input_tokens: inputTokens, output_tokens: RECEIPT_MODEL_OUTPUT_MAX })
+/** The most a call of the model may cost: its input at most and the whole output it may take. */
+export function worstCallMicroUsd(inputTokens: number, model: ReceiptModelName): number {
+  return modelCallMicroUsd(
+    { input_tokens: inputTokens, output_tokens: RECEIPT_MODEL_OUTPUT_MAX },
+    model,
+  )
 }
 
 /**
@@ -102,3 +120,37 @@ export function modelSpendStep(spentMicroUsd: number, capMicroUsd: number): Mode
 
 /** The month a call is counted in: the calendar month in UTC, as Anthropic bills. */
 export const spendMonthOf = (at: Date): string => `${at.toISOString().slice(0, 7)}-01`
+
+/**
+ * The receipts the model reads free for anyone who has never paid (MOL-275, MOL-271's «пробник»): the first ten of
+ * their life, a count on the person that only goes down, spent only while no paid access is open
+ * (`receipts_model_until`).
+ */
+export const RECEIPT_TRIAL = 10
+
+/**
+ * The receipts the model reads a person in their month at most, paid or on the trial (MOL-275, MOL-271: the tariff of
+ * receipts is «до 100 в месяц»). The month is the phone's when the receipt was sent (MOL-121); a receipt counts once
+ * its reading reached the review, a repeat of a counted one never. Beside the share's dollars, which hold the money.
+ */
+export const RECEIPTS_MODEL_MONTH_MAX = 100
+
+/**
+ * The share of the month's cap past which the model no longer reads on the trial (MOL-275, owner's В-3 «а»): the
+ * trial stops first, paid access last; half, the owner's first notice, so the day it stops is the day he hears.
+ */
+export const RECEIPT_TRIAL_CAP_PERCENT = 50
+
+/** What of the month's cap the trial may take: `RECEIPT_TRIAL_CAP_PERCENT` of it, to the micro-dollar below. */
+export const trialCapMicroUsd = (capMicroUsd: number): number =>
+  Math.floor((capMicroUsd * RECEIPT_TRIAL_CAP_PERCENT) / 100)
+
+/** The month a receipt sent on the phone's `day` counts in (MOL-275, MOL-121): its first day, `YYYY-MM-01`. */
+export const receiptsMonthOf = (day: string): string => `${day.slice(0, 7)}-01`
+
+/**
+ * How a receipt the model read was counted (MOL-275): `trial` — a trial receipt and a place in the hundred, `month` — a
+ * place alone, the reading paid. «Переснять» gives back what it took (owner's В-4 «а»), so it is kept.
+ */
+export const RECEIPT_COUNTS = ['trial', 'month'] as const
+export type ReceiptCount = (typeof RECEIPT_COUNTS)[number]

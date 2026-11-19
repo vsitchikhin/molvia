@@ -106,7 +106,8 @@ for byte. So it waits, up to twenty minutes, until `https://molvia.net/api/healt
 set right after a merge, that is CI, the build and the rollout. A commit production does not run — a
 rollout that rolled back, was held or stood aside for a newer one — is refused, and so is one whose
 three images are not all there; names go on all three or on none. Set it on the commit that runs.
-Only `vN.N.N` sets it off. `v0.2.0` marks the start of the 0.2 cohort.
+Only `vN.N.N` sets it off. `v0.2.0` marks the start of the 0.2 cohort: an annotated tag, set
+2026-11-11T01:22:39+04:00 on `4214c68e` (MOL-298) — a lightweight tag has no moment of its own.
 
 **Rolling back by hand:** Actions → Release → «Run workflow» on master, with a tag — `v0.1.2`,
 `sha-1a2b3c4`, or any image built before MOL-90 (`v0.1.1`). It only deploys; nothing is built.
@@ -139,8 +140,9 @@ only a successful CI of a push to master of this repository builds, and only a b
    ```
 
    `restrict` takes away the terminal, forwarding and the agent; whatever the client asks for
-   arrives in `$SSH_ORIGINAL_COMMAND`, and the script refuses anything but `status`, `sha-<7 hex>`
-   and `v<N>.<N>.<N>`.
+   arrives in `$SSH_ORIGINAL_COMMAND`, and the script refuses anything but `status`, `sha-<7 hex>`,
+   `v<N>.<N>.<N>` and, since MOL-381, a release's `v<N>.<N>.<N>-<name>` and a hotfix's
+   `v<N>.<N>.<N>-<name>-<k>`.
 
 3. The environment and its two secrets — the host key taken from the machine itself, not scanned:
 
@@ -157,6 +159,55 @@ only a successful CI of a push to master of this repository builds, and only a b
 
    Then delete `deploy_key`: GitHub holds the only copy it needs, and a new pair is cheaper than
    guarding an old one.
+
+## Releases (MOL-376, MOL-381)
+
+Master takes a release, a hotfix and Dependabot: CI's first step refuses a pull request into it from any
+other branch (`bin/release.mjs source`). The rules are `.claude/rules/deploy.md`, «One release a day»;
+the machinery is two workflows and an app.
+
+- **`release-night.yml`** at 03:00 Yerevan, and «Run workflow» on it — the owner's «выпускай»: the next
+  release branch by the last tag (`bin/release.mjs next`), released when it differs from master by its
+  files and, at night, when nothing went out by hand within 24 hours. It finds or opens the pull request
+  into master, waits up to an hour for both gates of CI and merges the commit CI passed — at night with
+  `(night)` after the subject GitHub writes, which is how the next night tells its own release from one
+  made by hand.
+- **`after-release.yml`** after CI on master, whoever merged: a release's or a hotfix's merge commit is
+  awaited on `/api/health` up to forty minutes and tagged — `v0.2.<n>-<name>`, a hotfix
+  `v0.2.<n>-<name>-<k>` — which `release.yml` then puts on the images. A release cuts the next
+  `release/<name>` from that commit and deletes those older than the one before it, each only once master
+  holds it; a hotfix merges master into the next release branch, and a conflict there is a `/fail` to
+  merge by hand. «Re-run» finishes what a failure left: a tag already on the commit is done.
+- **Both report to `molvia-release`** (Signals, below): a night with nothing to release pings too, so a
+  night that never ran is silence and an alarm.
+
+### Once: the app `molvia-release`
+
+A merge, a tag or a branch pushed with GitHub's own `GITHUB_TOKEN` starts no other workflow — no CI on
+master, so no rollout. The app is someone else, and its token lives an hour.
+
+1. GitHub → Settings → Developer settings → GitHub Apps → New: name `molvia-release`, no webhook,
+   «Only on this account». Repository permissions: **Contents — read and write, Pull requests — read and
+   write, Workflows — read and write** (a release that changed a workflow is merged and pushed only with
+   it), Metadata — read. Nothing else.
+2. Install it on `vsitchikhin/molvia` alone. Generate a private key; it downloads as a `.pem`.
+3. Its client id and key into the environment `production`, never the repository:
+
+   ```bash
+   gh secret set RELEASE_APP_CLIENT_ID --env production   # typed at the prompt
+   gh secret set RELEASE_APP_KEY --env production < molvia-release.*.private-key.pem
+   ```
+
+   Then delete the `.pem`: GitHub holds the only copy it needs.
+
+4. The check `molvia-release` at healthchecks.io — period 1 day, grace 3 hours, the Telegram
+   integration — and its URL: `gh secret set HC_RELEASE_URL --env production`.
+5. **`deploy.sh` on the machine** takes named tags since MOL-381, and the release checks the machine's
+   copy first: before the release that brings MOL-381 is merged,
+   `scp deploy/deploy.sh molvia:molvia/deploy.sh` from that commit. That release goes out by hand — the
+   night has no workflow on master until it does.
+6. See it work: «Run workflow» on «Release night». With nothing new in the release branch it says so and
+   `molvia-release` turns green.
 
 ## The receipt reader (MOL-125)
 
@@ -386,8 +437,8 @@ docker compose -f docker-compose.prod.yml --env-file .env.prod \
   exec backend node dist/gates.js --from 2026-10-05
 ```
 
-`--from` is where the cohort starts: for 0.2 the day of the tag `v0.2.0`, or its exact moment,
-`git log -1 --format=%cI v0.2.0` on the laptop. `--to` is optional and a day there is taken in
+`--from` is where the cohort starts: for 0.2 the moment of the tag `v0.2.0`, `2026-11-11T01:22:39+04:00` —
+`git tag -l v0.2.0 --format='%(taggerdate:iso-strict)'` on the laptop; `%cI` is the commit's time, not the tag's. `--to` is optional and a day there is taken in
 whole; without it, until now. A day is Yerevan's; a moment needs its offset.
 
 - **Every share stands beside its `n`.** The cohort is as many as we find, so «2 of 10» is two
@@ -401,6 +452,41 @@ whole; without it, until now. A day is Yerevan's; a moment needs its offset.
   window touches erased themselves. Only how many — not whether they had reached five.
 
 In a working copy the same thing is `make gates FROM=2026-10-05 [TO=2026-10-31]`.
+
+## Feature flags — «фф» (MOL-382)
+
+A finished feature reaches people with its release (MOL-376, В-1 «в»); an фф closes only a thing they
+should not see yet — venues until their chain is whole, payment until the bank is connected. The list is
+`packages/model/src/contracts/ff.ts`: a name, what it closes, the task that takes it off.
+
+- **Production's value is a line of `.env.prod`**, `FF_<NAME>=on` or `off`, and the compose file passes
+  each by name with `off` as its default. A value other than those — `ON`, `true` — stops the API's start
+  with the variable named in its log (`docker compose … logs backend`). **A typo in the name never reaches
+  the API** — compose passes only the names it knows, and `FF_PAYMNETS=on` leaves payment off, saying
+  nothing — so the line is written by `ff.sh`, never by hand: it asks compose what it reads from the file,
+  refuses a name the compose file does not pass, wherever it stands in the file, and writes nothing then.
+  Its copy on the machine is the owner's to bring, as `deploy.sh`'s: `scp deploy/ff.sh molvia:molvia/ff.sh`.
+- **Turning one on is the owner's word**, then the line and a restart of the API alone — no release, no
+  merge:
+
+  ```bash
+  # on the machine, in ~/molvia, after the owner's word; the file is the owner's to write
+  ./ff.sh venues on   # FF_VENUES=on in place of its line, or added: production's file has none
+  docker compose -f docker-compose.prod.yml --env-file .env.prod up -d backend
+  curl -sI https://molvia.net/api/health | grep -i x-molvia-ff   # → x-molvia-ff: venues
+  ```
+
+  `./ff.sh` alone only checks the file. `/health` answers `503` for the seconds the API restarts, as at
+  any rollout. An open page learns of it with its next answer — every answer names the фф that are on in
+  `X-Molvia-Ff` — and shows the feature without a reload; a phone offline keeps the last list it heard,
+  and a link into the feature opened before its first answer opens with that answer — unless the person
+  has touched the app meanwhile.
+
+- **Off again is `./ff.sh venues off` and the same restart**: the routes are gone at once, the phone's
+  entries with its next answer; a screen of the feature already open stays until it is left.
+- **Taken off by its task** (`removedBy`): once the feature has been on, a task removes the flag from
+  the code, the list, the compose file and `.env.prod.example`; the line in `.env.prod` goes after that
+  rollout — nothing reads it any more.
 
 ## The merge of twins (MOL-106)
 
@@ -441,17 +527,19 @@ In a working copy the same thing is `make merge FROM=<id> INTO=<id> [YES=1]`, `m
 
 ## Signals (MOL-142, MOL-221)
 
-Four checks at healthchecks.io tell the owner in Telegram that something in production is down.
+Six checks at healthchecks.io tell the owner in Telegram that something in production is down.
 They go through healthchecks.io's own Telegram integration, never through our bot: a machine that
 is down takes the bot with it. healthchecks.io, Cloudflare and GitHub see the server's address and nothing of
 anyone's data.
 
-| Check            | Who pings                                                                   | Period · grace  | Silence or `/fail` means                                                                               |
-| ---------------- | --------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------ |
-| `molvia-up`      | the Worker `molvia-watch` on Cloudflare (`watch/`), every five minutes      | 10 min · 10 min | the API with its database or the page — or the Worker, or Cloudflare itself                            |
-| `molvia-cert`    | `.github/workflows/watch.yml`, from GitHub, hourly                          | 1 day · 1 hour  | the certificate has fourteen days left or fewer — or a day of runs that could not read it              |
-| `molvia-bot`     | the bot, after a claim of reminders, while it hears Telegram, every 5–6 min | 6 min · 9 min   | the bot is down, does not hear Telegram or cannot reach the API — and then nobody can sign in (MOL-54) |
-| `molvia-backups` | `backup/backup.sh`, nightly                                                 | 1 day · 1 hour  | no copy of the database tonight (Backups, below)                                                       |
+| Check                 | Who pings                                                                   | Period · grace  | Silence or `/fail` means                                                                               |
+| --------------------- | --------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------------------ |
+| `molvia-up`           | the Worker `molvia-watch` on Cloudflare (`watch/`), every five minutes      | 10 min · 10 min | the API with its database or the page — or the Worker, or Cloudflare itself                            |
+| `molvia-grafana-lock` | the same Worker, in the same round (MOL-399)                                | 10 min · 10 min | `grafana.<DOMAIN>` answered a request with no pass itself, not Cloudflare Access — the lock is off     |
+| `molvia-cert`         | `.github/workflows/watch.yml`, from GitHub, hourly                          | 1 day · 1 hour  | the certificate has fourteen days left or fewer — or a day of runs that could not read it              |
+| `molvia-bot`          | the bot, after a claim of reminders, while it hears Telegram, every 5–6 min | 6 min · 9 min   | the bot is down, does not hear Telegram or cannot reach the API — and then nobody can sign in (MOL-54) |
+| `molvia-backups`      | `backup/backup.sh`, nightly                                                 | 1 day · 1 hour  | no copy of the database tonight (Backups, below)                                                       |
+| `molvia-release`      | `release-night.yml` nightly, `after-release.yml` after a release (MOL-381)  | 1 day · 3 hours | the night's release did not go — CI red or late, no merge, no rollout, no tag — or the night never ran |
 
 The periods are a little longer than the pings' rhythm — the bot beats every five to six minutes — so
 the panel is not yellow with «late» all the time; period and grace add up to the time a silent watch
@@ -476,6 +564,17 @@ on GitHub, hourly: its check waits a day and an hour.
   on the site's check it kept a fall of the API silent, since healthchecks.io speaks only when a
   check flips. A certificate that could not be read is the site's matter and sends nothing to
   `molvia-cert`.
+- **The lock of Grafana** (MOL-399, В-3). `GET https://grafana.<DOMAIN>/public-dashboards/watch` — a path
+  the tunnel passes — with no pass, the redirect not followed, must be Cloudflare Access's redirect to
+  `https://<team>.cloudflareaccess.com/…`, what Access does with every request carrying none.
+  `grafana open 200` is Grafana answering by itself: Access is off, and the dashboard's link is the one
+  secret left; anything else — `grafana 530`, or `403`, which may be a
+  challenge or the firewall of Cloudflare a browser passes to the Grafana behind it (adversarial А5) —
+  says nothing of the lock and is no lock seen either. By the same three of four, told to
+  `molvia-grafana-lock`, a check of its own — never `HC_UP_URL`'s, which the round refuses (adversarial
+  А4): a lock left off is a state that lasts, and on `molvia-up` it would keep a fall of the site silent,
+  as the certificate's term did. Bot Fight Mode or «I'm Under Attack» on the zone answers the Worker
+  `403` and keeps the check down — the challenge stands before the lock and hides it.
 - **A rollout does not wake anyone.** `/fail` raises the alarm at once, with no grace, and every
   merge leaves the API silent for seconds. So once a check fails, four are made half a minute
   apart, and three failing is a `/fail` saying what they saw: `health 503`, `pwa 000`. A rollout
@@ -516,6 +615,13 @@ on GitHub, hourly: its check waits a day and an hour.
   `HC_CERT_URL` likewise. `OK (rate limited)` — more than five pings a minute — is not that: the
   ping is tried again. Without the secret every round throws, `HC_UP_URL is not an https URL`, and
   the check goes down by its grace. Its plain variable `DOMAIN` is set again by every rollout.
+- `molvia-grafana-lock`'s ping URL is the Worker's secret `HC_LOCK_URL`, set and kept as `HC_UP_URL`,
+  under the same rules (MOL-399). Read by the lock's round alone: without it, or malformed, the site's
+  round goes as before and the Worker's round then fails, `HC_LOCK_URL is not …` — and the check, never
+  pinged, stays grey, so see it turn green once set. **Both secrets by the check's UUID**,
+  `https://hc-ping.com/<uuid>`, never by its ping key and slug (adversarial Б2): one check has both URLs,
+  and the round can tell two checks apart only by their UUIDs — so it refuses another form, and a
+  `HC_UP_URL` set by slug is changed to its UUID URL with `HC_LOCK_URL`.
 - **The Worker is rolled out by the release** after green CI on master (`watcher` in `release.yml`),
   with the environment `production`'s secret `CLOUDFLARE_API_TOKEN` — an account token, «Workers
   Scripts: Edit» and nothing else — and its variable `CLOUDFLARE_ACCOUNT_ID`. By hand, with the same
@@ -528,6 +634,9 @@ on GitHub, hourly: its check waits a day and an hour.
   alone. The job takes the environment with `deployment: false` — its secrets and its rule of
   branches, and no record of a deployment: an hourly check would write 24 a day into
   `production`'s history of rollouts. Without the secret every run is red.
+- `molvia-release`'s ping URL is the secret `HC_RELEASE_URL` of the environment `production`, as
+  `molvia-cert`'s (Releases, «Once: the app `molvia-release`»). GitHub's cron runs late here, hence the
+  grace of three hours.
 - `molvia-bot`'s ping URL is `BOT_PULSE_URL` in `~/molvia/.env.prod`, handed to the bot by
   `docker-compose.prod.yml`. **The line is required**: without it compose refuses to start, since
   a check that never got a ping stays «new» and never raises an alarm — a forgotten line would go
@@ -544,8 +653,10 @@ on GitHub, hourly: its check waits a day and an hour.
 On the Worker itself, so the alarm tried is the one that runs: Workers & Pages → `molvia-watch` →
 Settings → Variables and Secrets → `DOMAIN` = `molvia.invalid`, deploy. Within five minutes its round
 makes four tries — a minute and a half, since a name that does not resolve fails at once — then a
-`/fail` and a message in Telegram. `DOMAIN` back to
-`molvia.net` — or `make watcher`, which sets it — and the next round puts `molvia-up` back up.
+`/fail` and a message in Telegram — two: `grafana.molvia.invalid` does not resolve either, and
+`molvia-grafana-lock` says `grafana 530`. `DOMAIN` back to `molvia.net` — or `make watcher`, which sets
+it — and the next round puts both back up. The lock alone is tried by switching the application of
+Access off for a round (Metrics, «Where it is set»): `grafana open 200`.
 
 The certificate's way: `gh workflow run watch.yml -f domain=molvia.invalid` sends `molvia-cert`
 nothing — an unreadable certificate is the site's matter — so a `/fail` of it is tried only by a
@@ -567,6 +678,13 @@ certificate that really ends.
 - No ping for twenty minutes and no `/fail` — the Worker: its log names a round that failed by its
   kind (the secret, a ping that did not go), and no round at all is Cloudflare's matter:
   https://www.cloudflarestatus.com.
+
+**`molvia-grafana-lock`** (MOL-399). Grafana's address answered without Access — the application of
+Access deleted, its hostname changed or its policy made «Bypass». The tunnel still passes the shared
+dashboard alone, but its link is then the only lock: put the application back (Metrics, «Where it is
+set»), or `docker compose … stop tunnel` until then. `grafana 403` — a challenge or the firewall of
+Cloudflare answered before Access did: Security → Events of the zone names it. `grafana 530`, `grafana 502` on its own — the tunnel and
+Access both away: Zero Trust → Networks → Tunnels shows whether `molvia-grafana` is healthy.
 
 **`molvia-cert`.** The `/fail` says when it expires. Caddy's renewal failed:
 `docker compose … logs frontend | grep -i acme`, and check the domain's A record in Cloudflare. No
@@ -630,10 +748,24 @@ VictoriaMetrics keeps thirty days of figures, scraped every fifteen seconds from
 (9464, never through Caddy), node_exporter (the machine), cAdvisor (the containers) and
 postgres_exporter (the database, as `molvia_metrics`: `pg_monitor` and no table — MOL-366). All four
 are on a network with no way out. Grafana draws them and
-sends the alarms; it is the only one with a port, on the machine's loopback. Nothing leaves the machine
-but the alarms, through Telegram, and the alarms' pulse, to healthchecks.io.
+sends the alarms; it is the only one with a port, on the machine's loopback, and the only one reached from
+outside — through a Cloudflare Tunnel behind Cloudflare Access, for the owner alone (MOL-399). Nothing
+leaves the machine but the alarms, through Telegram, the alarms' pulse, to healthchecks.io, and Grafana's
+pages, to the owner through Cloudflare.
 
 ### Looking
+
+**From any device: the dashboard's shared link**, `https://grafana.molvia.net/public-dashboards/<token>`,
+bookmarked (MOL-399, В-6 «а»). Cloudflare Access asks for the e-mail and sends a code to it — only to the
+owner's e-mail; any other gets no code — and the dashboard opens, the device remembered for a month. The
+link signs in to nothing: it runs the dashboard's own panels over the time range chosen, and no other
+query. **The tunnel passes nothing else of Grafana** — `/public-dashboards/`, `/public/` and `/api/public/`
+by the routes of `docker-compose.prod.yml`, anything else its own 404 — so from outside there is no login,
+no API and no data source's proxy, whether Access stands in front or not. A stranger sees Cloudflare's
+page and nothing of Grafana.
+
+**Grafana whole — `admin`, Explore, the alarms, a contact point's Test — by the SSH tunnel**, and the
+dashboard too when Cloudflare is down:
 
 ```bash
 ssh -L 3000:127.0.0.1:3000 molvia     # then http://localhost:3000, admin and GRAFANA_ADMIN_PASSWORD
@@ -746,6 +878,47 @@ node-exporter`, and `✅ Прошло` follows.
 - **Grafana 13.0 and the chat id**: `deploy/grafana/start.sh` writes `OWNER_TELEGRAM_ID` into the
   contact point as text before Grafana starts, since Grafana turned it into a number and refused it
   (grafana/alerting #558). A Grafana that takes a numeric chat — after 13.0.2 — no longer needs it.
+  **An alarm names no address** (MOL-399, adversarial Б1): «Дашборд — закладка общей ссылки» — the root of
+  `grafana.molvia.net` is the tunnel's 404, and the shared link is a secret that would sit in Telegram.
+- **Grafana from outside** (MOL-399, В-6 «а»): what the tunnel passes is the compose file's
+  (`configs: tunnel`), held by a test; who gets past Access is Cloudflare's dashboard, held by the watch
+  (`molvia-grafana-lock`, «Signals»); the shared link is Grafana's volume. **The tunnel is managed
+  locally, so it is made with `cloudflared` on the owner's computer, never in Zero Trust → Tunnels**: a
+  tunnel made there takes its routes from Cloudflare's dashboard, and they would replace the compose
+  file's — the paths would no longer be held. **Before the release that brings `tunnel` rolls out**, in
+  this order — compose refuses to start without the token, so a release without it stops at the compare of
+  the compose file, as any change of it does:
+  1. Zero Trust (`one.dash.cloudflare.com`) → the plan Free (up to 50 users; Cloudflare may ask for a card)
+     and a team's name.
+  2. Access → Applications → Add → Self-hosted: domain `grafana.molvia.net`, session **one month**;
+     sign-in «One-time PIN» alone; a policy **Allow** — Emails: the owner's e-mail, nothing else.
+  3. On the owner's computer — the browser opens at `login`, choose `molvia.net`; the last prints the
+     token. `~/.cloudflared/cert.pem` makes tunnels on the account: delete it once done.
+
+     ```bash
+     brew install cloudflared
+     cloudflared tunnel login
+     cloudflared tunnel create molvia-grafana
+     cloudflared tunnel route dns molvia-grafana grafana.molvia.net
+     cloudflared tunnel token molvia-grafana
+     ```
+
+  4. Into `~/molvia/.env.prod` on the machine: the token typed at `read -rs T`, then
+     `printf 'CLOUDFLARE_TUNNEL_TOKEN=%s\n' "$T" >>.env.prod` — `printf` is the shell's own, so the token is
+     in no command's arguments («Rotating the secrets»).
+  5. The check `molvia-grafana-lock` in healthchecks.io (period 10 min, grace 10 min, the Telegram
+     integration), its UUID URL the Worker's secret `HC_LOCK_URL` — and `HC_UP_URL` by its UUID too
+     («Signals», «Where it is set»).
+  6. **Compose 2.23.1 or later on the machine** — `configs` with `content`, which the tunnel's routes are,
+     came then; an older one reads none of the file, and no release goes out, the application's included:
+     `docker compose version`, and `sudo apt-get install --only-upgrade docker-compose-plugin` if older.
+     Then the compose file and `deploy/deploy.sh` copied to the machine, and the release.
+  7. **The shared link**, once, by the SSH tunnel as `admin`: Dashboards → «Молвия» → Share → Share
+     externally → «Anyone with the link», the time range picker on → copy the link, bookmark it on the
+     phone. It lives in Grafana's volume: a volume made anew needs a new link, and «Revoke» there takes a
+     leaked one back. Then: the phone opens the link on Cloudflare's page; the code, then the dashboard;
+     `https://grafana.molvia.net/login` after the code is the tunnel's 404; `molvia-grafana-lock` green
+     after the Worker's next round.
 
 ## Backups (MOL-70)
 
@@ -875,11 +1048,15 @@ written as their documentation has them and not drilled.
 | `GRAFANA_ADMIN_PASSWORD`               | `.env.prod`                                        | Grafana's restart                            |
 | `TELEGRAM_BOT_TOKEN`                   | `.env.prod`, BotFather                             | the bot's restart; no login meanwhile        |
 | `ALERTS_BOT_TOKEN`                     | `.env.prod`, BotFather                             | Grafana's restart                            |
+| `CLOUDFLARE_TUNNEL_TOKEN`              | `.env.prod`, Cloudflare (`cloudflared tunnel`)     | Grafana from outside; never the site         |
+| the shared dashboard's link            | Grafana's volume, the owner's bookmark             | Grafana from outside                         |
 | `CLAUDE_API_KEY`                       | `.env.prod`, Anthropic console                     | none — Tesseract reads a refused key's reads |
 | `BOT_PULSE_URL`, `ALERTS_PULSE_URL`    | `.env.prod`, healthchecks.io                       | none                                         |
 | `HC_URL` (the copies' ping)            | `backup.env`, healthchecks.io                      | none                                         |
-| `HC_UP_URL`                            | the Worker's secret, healthchecks.io               | none                                         |
+| `HC_UP_URL`, `HC_LOCK_URL`             | the Worker's secrets, healthchecks.io              | none                                         |
 | `HC_CERT_URL`                          | GitHub secret of `production`, healthchecks.io     | none                                         |
+| `HC_RELEASE_URL`                       | GitHub secret of `production`, healthchecks.io     | none                                         |
+| `RELEASE_APP_KEY`                      | GitHub environment `production`, the app's page    | the night's release and the tags after one   |
 | `DEPLOY_SSH_KEY`, `DEPLOY_KNOWN_HOSTS` | GitHub environment `production`, `authorized_keys` | none                                         |
 | `CLOUDFLARE_API_TOKEN`                 | GitHub environment `production`, Cloudflare        | none                                         |
 | GHCR token                             | `~/.docker/config.json` of `deploy`, GitHub        | none — the images are public                 |
@@ -934,6 +1111,22 @@ written as their documentation has them and not drilled.
   new one into `.env.prod`, `$C up -d bot`. Until the bot is back nobody can sign in; the bot exits on a
   revoked token (`401`) rather than retrying, so a restart loop says the line was not changed.
   **`ALERTS_BOT_TOKEN`** the same for the alarms' bot, then `$C up -d grafana`.
+- **`CLOUDFLARE_TUNNEL_TOKEN`** (MOL-399): whoever holds it can run a connector of the tunnel — put their
+  own machine behind `grafana.<DOMAIN>`, Access still in front, and take a share of the requests. The
+  tunnel made anew on the owner's computer, after `cloudflared tunnel login` («Metrics», «Where it is
+  set»), then the new token into the line by `read -rs` as above, `$C up -d tunnel`. Not drilled.
+
+  ```bash
+  cloudflared tunnel cleanup molvia-grafana
+  cloudflared tunnel delete molvia-grafana
+  cloudflared tunnel create molvia-grafana
+  cloudflared tunnel route dns --overwrite-dns molvia-grafana grafana.molvia.net
+  cloudflared tunnel token molvia-grafana
+  ```
+
+- **The shared dashboard's link** (MOL-399): Access stands before it, but the link is the second lock.
+  By the SSH tunnel as `admin`: Dashboards → Shared dashboards → «Revoke», and a new one shared as in
+  «Metrics», «Where it is set», step 7.
 - **`CLAUDE_API_KEY`**: a new key in the console's workspace, the line, `$C up -d backend`, and only
   then the old key deleted. **A key the API refuses is no wait**: a `401` is `ModelRejected`, and that
   receipt goes to Tesseract at once, for good — never asked of the model again — each one a
@@ -943,9 +1136,13 @@ written as their documentation has them and not drilled.
   healthchecks.io with the Telegram integration, its URL where the old one was — `.env.prod` and
   `$C up -d bot` / `grafana`; `HC_URL` of `backup.env`, seen by
   `sudo systemctl start molvia-backup.service`; the Worker's secret (Signals, «Where it is set»);
-  `gh secret set HC_CERT_URL --env production` — and the old check deleted. See the new one turn
+  `gh secret set HC_CERT_URL --env production`, `HC_RELEASE_URL` likewise — and the old check deleted. See the new one turn
   green before deleting the old. Whoever holds a ping URL can say «alive» while it is not, so a
-  leaked server changes all five.
+  leaked server changes all seven.
+- **`RELEASE_APP_KEY`**: the app's page → Private keys → Generate, `gh secret set RELEASE_APP_KEY --env
+production < …pem`, then delete the old key there and the `.pem` here. The client id is no secret and
+  stays. Meanwhile neither the night nor the tags after a release run; a release by hand in GitHub still
+  merges and rolls out, and «Re-run» of «After release» tags it once the key is back.
 - **`DEPLOY_SSH_KEY`**: a new pair as in «Once: the deploy key», its line appended to
   `~/.ssh/authorized_keys` with the same `restrict,command=…` before the old one is removed, the
   environment's secret replaced, one rollout seen green, then the old line removed.

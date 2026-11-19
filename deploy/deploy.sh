@@ -6,7 +6,8 @@
 #
 #   status          what runs here now and the hashes of the files a deploy relies on
 #   sha-<7 hex>     an image built from a master commit
-#   v<N>.<N>.<N>    an image named by a release tag
+#   v<N>.<N>.<N>    an image named by a release tag — and since MOL-381 v<N>.<N>.<N>-<name> of a
+#                   release and v<N>.<N>.<N>-<name>-<k> of a hotfix
 #
 # While ~/molvia/deploy.hold exists every rollout is refused: restore.sh --into-prod sets it, and
 # so can anyone maintaining the machine by hand. The API migrates when it starts, and a rollback
@@ -37,8 +38,8 @@ if [[ "$request" == status ]]; then
   exit 0
 fi
 
-if [[ ! "$request" =~ ^(sha-[0-9a-f]{7}|v[0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-  echo "refused: expected status, sha-<7 hex> or v<N>.<N>.<N>" >&2
+if [[ ! "$request" =~ ^(sha-[0-9a-f]{7}|v[0-9]+\.[0-9]+\.[0-9]+(-[a-z]+(-[0-9]+)?)?)$ ]]; then
+  echo "refused: expected status, sha-<7 hex>, v<N>.<N>.<N>, v<N>.<N>.<N>-<name> or v<N>.<N>.<N>-<name>-<k>" >&2
   exit 2
 fi
 tag="$request"
@@ -143,8 +144,9 @@ IMAGE_TAG="$tag" "${compose[@]}" pull -q backend bot frontend receipt-reader
 
 # The metrics (MOL-145) are pulled before anything changes too, the upstream exporters included, but
 # they never judge a rollout (adversarial А4): a registry's refusal — Docker Hub's limit for an
-# anonymous pull — is a warning, and they are started only once the application is healthy.
-metrics=(victoria node-exporter cadvisor postgres-exporter grafana)
+# anonymous pull — is a warning, and they are started only once the application is healthy. The tunnel
+# to Grafana is theirs (MOL-399): Grafana from outside is a look at the figures, never the site.
+metrics=(victoria node-exporter cadvisor postgres-exporter grafana tunnel)
 IMAGE_TAG="$tag" "${compose[@]}" pull -q "${metrics[@]}" ||
   echo "warning: the metrics' images were not all pulled" >&2
 

@@ -2,7 +2,7 @@
 # repository says is what runs, and a change made in the interface is not kept (Р-10).
 # `grafana/grafana`, never `grafana/grafana-oss`: the second stopped at 13.0.2 in June 2026, and no
 # release of it would ever reach Dependabot (MOL-365) — the image under the first is the same open source.
-FROM grafana/grafana:13.0.12@sha256:28476aa8096cd8d0f658a05a443b605fffb450e57f444335216175d604cfd23d AS runtime
+FROM grafana/grafana:13.3.1@sha256:0615ec4fbd4072004b7d86b46ded63013a74b7d6eb1119273dd89e8fa25c13cf AS runtime
 
 # Alpine's packages up to date, in a layer the release builds afresh (MOL-365, `no-cache-filters`), and
 # back to Grafana's own user.

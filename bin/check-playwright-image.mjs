@@ -1,7 +1,7 @@
 // Refuses an image of Playwright in CI that is not the version the lockfile installs (MOL-295): the
 // end-to-end job runs in `mcr.microsoft.com/playwright:v<version>-noble`, whose browsers are built for
 // that one version, and Playwright of another refuses to start at the first test. Playwright names the
-// tag itself there, in the end-to-end job; this says it in the checks job too, in one sentence, so a
+// tag itself there, in the end-to-end job; this says it in `npm run lint` too, in one sentence, so a
 // pull request of Dependabot that raised @playwright/test with its weekly group — never the tag — reads
 // as the tag to move, not as a broken suite.
 //

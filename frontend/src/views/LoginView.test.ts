@@ -7,8 +7,10 @@ import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 
 import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
 import type { ActorView, LoginPoll, LoginStarted } from '@molvia/model'
-import { createAppI18n } from '@/i18n'
+import { LOCALE_KEY } from '@/composables/useLocale'
+import { createAppI18n, i18n } from '@/i18n'
 import en from '@/i18n/en.json'
+import ru from '@/i18n/ru.json'
 import { routes } from '@/router'
 import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
@@ -48,7 +50,7 @@ const views: VueWrapper[] = []
 let opened: ReturnType<typeof vi.spyOn>
 
 /** Экран в том состоянии, в котором его и видят: сессии нет. `attach` — в документе, где есть фокус. */
-async function render(update: UpdatePhase = 'none', attach = false) {
+async function render(update: UpdatePhase = 'none', attach = false, i18n = createAppI18n('en')) {
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -59,7 +61,7 @@ async function render(update: UpdatePhase = 'none', attach = false) {
   const view = mount(LoginView, {
     ...(attach ? { attachTo: document.body } : {}),
     global: {
-      plugins: [pinia, router, createAppI18n('en')],
+      plugins: [pinia, router, i18n],
       provide: {
         [pwaUpdateKey as symbol]: {
           phase: shallowRef(update),
@@ -233,6 +235,26 @@ describe('первый экран — имя и обещание (MOL-216)', () 
     expect(view.findAll('h1').map((one) => one.text())).toEqual([en.login.title])
     expect(view.find('img.mark').exists()).toBe(false)
     expect(view.text()).not.toContain(en.login.promise)
+  })
+})
+
+describe('другой язык на первом экране (MOL-398, В-2 «а»)', () => {
+  it('назван на себе самом, и нажатие — тот же выбор, что «Язык» в настройках', async () => {
+    const { view } = await render()
+    const other = button(view, 'Русский')
+    expect(other.attributes('lang')).toBe('ru')
+
+    await other.trigger('click')
+    expect(localStorage.getItem(LOCALE_KEY)).toBe('ru')
+    expect(i18n.global.locale.value).toBe('ru')
+  })
+
+  it('только до входа: следующий шаг его не держит', async () => {
+    const { view } = await render()
+    pollLogin.mockResolvedValue({ status: 'pending', expiresAt: REQUEST.expiresAt })
+    await button(view, 'Sign in with Telegram').trigger('click')
+    await flushPromises()
+    expect(view.findAll('button').some((one) => one.text() === 'Русский')).toBe(false)
   })
 })
 
@@ -415,7 +437,7 @@ describe('когда войти не вышло', () => {
     window.dispatchEvent(new Event('offline'))
     await flushPromises()
 
-    expect(view.text()).toContain('No internet, no sign-in')
+    expect(view.text()).toContain('Signing in needs the internet')
     expect(view.find('.warn').exists()).toBe(true)
     expect(view.findAll('button')).toHaveLength(0)
   })
@@ -469,6 +491,21 @@ describe('после «Удалить мои данные» (MOL-94, В-3)', () 
 
     const again = await render()
     expect(again.view.text()).not.toContain(en.login.erased)
+  })
+
+  it('записка и заголовок вкладки идут за языком, выбранным на двери (MOL-398, А1, А2)', async () => {
+    sessionStorage.setItem('molvia.erased', 'erased')
+    const i18n = createAppI18n('ru')
+    const { view } = await render('none', false, i18n)
+    expect(view.text()).toContain(ru.login.erased)
+    expect(document.title).toBe(`${ru.login.title} · ${ru.app.name}`)
+
+    i18n.global.locale.value = 'en-GB'
+    await flushPromises()
+    expect(view.text()).toContain(en.login.erased)
+    expect(view.text()).not.toContain(ru.login.erased)
+    expect(document.title).toBe(`${en.login.title} · ${en.app.name}`)
+    view.unmount()
   })
 
   it('исход неизвестен — так и говорит; удаления не было — тоже (adversarial А)', async () => {

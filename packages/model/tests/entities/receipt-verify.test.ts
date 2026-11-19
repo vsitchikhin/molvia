@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { explainedReading, verifiedReading } from '#model/entities/receipt-verify'
+import { betterReading, explainedReading, verifiedReading } from '#model/entities/receipt-verify'
 import type { ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
 
 const line = (over: Partial<ReceiptTextLine> = {}): ReceiptTextLine => ({
@@ -411,5 +411,238 @@ describe('why a line was not shown as read, and the receipt not whole (MOL-309)'
       const text = reading(lines, total)
       expect(explainedReading(text).shown).toEqual(verifiedReading(text))
     }
+  })
+})
+
+describe('the second reading as a witness (MOL-405, owner’s В-4 «а», В-5 «а»)', () => {
+  // am-11: «1 × 540 = 540» on a receipt not proven whole — emptied as one number twice, though both models read it
+  const alike = (hundredths: number) =>
+    line({ quantityMilli: 1_000, priceHundredths: hundredths, sumHundredths: hundredths })
+  const witnessed = (
+    lines: ReceiptTextLine[],
+    witness: ReceiptTextLine[],
+    total: number | null = null,
+  ) => explainedReading(reading(lines, total), { byModel: true, witness: reading(witness) })
+
+  it('shows again what both read alike, under «проверьте», the reason kept', () => {
+    const got = witnessed([alike(54_000)], [alike(54_000)])
+    expect(figures(got.shown.lines[0]!)).toEqual([1_000, 54_000, 54_000, 0, false])
+    expect(got.shown.lines[0]!.repaired).toBe(true)
+    expect(got.lines).toEqual(['one_alike_unproven'])
+    expect(got.receipt).toBe('no_total')
+  })
+
+  it('never vouches for a figure with a 6: both read the font’s 5 as one alike', () => {
+    // «1 × 540» read «1 × 640» by both; the quantity alone is shown again
+    const got = witnessed([alike(64_000)], [alike(64_000)]).shown.lines[0]!
+    expect(figures(got)).toEqual([1_000, null, null, 0, false])
+    expect(got.repaired).toBe(true)
+  })
+
+  it('shows nothing again where the other read the line otherwise — a figure, a weight, a discount', () => {
+    const otherwise = [
+      [alike(54_000), alike(55_000)],
+      // am-43: 3,134 kg against 3,130
+      [
+        line({ quantityMilli: 3_134, unit: 'kg', asPrinted: false, settled: false }),
+        line({ quantityMilli: 3_130, unit: 'kg', asPrinted: false, settled: false }),
+      ],
+      [
+        alike(54_000),
+        line({
+          quantityMilli: 1_000,
+          priceHundredths: 54_000,
+          sumHundredths: 54_000,
+          discountHundredths: 1_000,
+        }),
+      ],
+    ] as const
+    for (const [one, other] of otherwise) {
+      const got = witnessed([one], [other]).shown.lines[0]!
+      expect(figures(got)).toEqual(BLANK)
+      expect(got.repaired).toBeUndefined()
+    }
+  })
+
+  it('takes each line of the other reading as a witness once, in order', () => {
+    const got = witnessed([alike(54_000), alike(54_000)], [alike(54_000)]).shown.lines
+    expect(got.map(figures)).toEqual([[1_000, 54_000, 54_000, 0, false], BLANK])
+  })
+
+  it('takes the other reading’s lines in their order: none before the last one taken', () => {
+    const got = witnessed([alike(54_000), alike(55_000)], [alike(55_000), alike(54_000)]).shown
+    expect(got.lines.map(figures)).toEqual([[1_000, 54_000, 54_000, 0, false], BLANK])
+  })
+
+  it('gives no voice against the shop’s memory: a line it doubts stays empty, its witness left', () => {
+    // adversarial А3в: the doubted line took the one witness, and the line after it went empty
+    const doubted = line({ ...alike(54_000), remembered: 'doubted' })
+    const got = witnessed([doubted, alike(54_000)], [alike(54_000)]).shown.lines
+    expect(got.map(figures)).toEqual([BLANK, [1_000, 54_000, 54_000, 0, false]])
+  })
+
+  // adversarial А2: the check proved these wrong, and the same misreading twice does not make them true
+  it('never answers a line the check proved wrong — its arithmetic, a sum of nothing, a quantity of none', () => {
+    const wrong = [
+      // «2 × 335 = 770» by both: 385 on the paper, 8 read as 3
+      line({ priceHundredths: 33_500, sumHundredths: 77_000, asPrinted: false, settled: false }),
+      line({ quantityMilli: 1_000, priceHundredths: 54_000, sumHundredths: 0 }),
+      line({ quantityMilli: 0, priceHundredths: 54_000, sumHundredths: 54_000 }),
+      line({ ...alike(54_000), asPrinted: false, settled: true }),
+    ]
+    for (const one of wrong) {
+      const got = witnessed([one], [one])
+      expect(got.lines[0]).not.toBeNull()
+      expect(figures(got.shown.lines[0]!)).toEqual(BLANK)
+      expect(got.shown.lines[0]!.repaired).toBeUndefined()
+    }
+  })
+
+  // adversarial Б2: a gift's price and discount are one number twice, never shown even on a receipt proven whole
+  it('shows again of a gift by the card its quantity and sum alone, as proof would', () => {
+    const gift = line({
+      quantityMilli: 1_000,
+      priceHundredths: 54_000,
+      sumHundredths: 0,
+      discountHundredths: 54_000,
+    })
+    const got = witnessed([gift], [gift])
+    expect(got.lines).toEqual(['one_alike_unproven'])
+    expect(figures(got.shown.lines[0]!)).toEqual([1_000, null, 0, null, false])
+    expect(got.shown.lines[0]!.repaired).toBe(true)
+  })
+
+  // adversarial А3а, А3б
+  it('is no witness of another article, nor of a line read in part', () => {
+    const bread = alike(33_000)
+    const water = { ...alike(33_000), sku: '1100200' }
+    expect(figures(witnessed([bread], [water]).shown.lines[0]!)).toEqual(BLANK)
+    // a line no article was read of agrees by its figures
+    expect(figures(witnessed([{ ...bread, sku: null }], [water]).shown.lines[0]!)).toEqual([
+      1_000,
+      33_000,
+      33_000,
+      0,
+      false,
+    ])
+    // «1 ×» with no price and no sum takes nobody's witness: the bread after it keeps its own
+    const part = line({ quantityMilli: 1_000, priceHundredths: null, sumHundredths: null })
+    const got = witnessed([part, alike(54_000)], [alike(54_000)]).shown.lines
+    expect(got.map(figures)).toEqual([BLANK, [1_000, 54_000, 54_000, 0, false]])
+  })
+
+  // adversarial А4: an earlier build gets a line under «проверьте» empty, so the sum it saw would go
+  it('leaves a line whose sum the total vouched for as the check showed it', () => {
+    const lines = [
+      alike(54_000),
+      line({
+        quantityMilli: 1_000,
+        priceHundredths: 33_500,
+        sumHundredths: 33_000,
+        asPrinted: false,
+        settled: false,
+      }),
+    ]
+    const alone = explainedReading(reading(lines, 87_000), { byModel: true })
+    expect(alone.shown.lines.map((one) => one.sumHundredths)).toEqual([54_000, 33_000])
+    expect(witnessed(lines, lines, 87_000)).toEqual(alone)
+  })
+
+  it('changes nothing shown as read, nor a receipt proven whole', () => {
+    for (const total of [null, 74_000, 140_000]) {
+      const lines = [line(), alike(66_000)]
+      const alone = explainedReading(reading(lines, total), { byModel: true })
+      const got = witnessed(lines, [line({ asPrinted: false })], total)
+      expect(got).toEqual(alone)
+    }
+  })
+})
+
+describe('which of two readings goes to the review (MOL-405, owner’s В-1 «а»: R3)', () => {
+  const read = (lines: ReceiptTextLine[], total: number | null) =>
+    explainedReading(reading(lines, total), { byModel: true })
+  const whole = read([line()], 74_000)
+  const unsettled = line({ asPrinted: false, settled: false })
+
+  it('takes the one proven whole', () => {
+    expect(betterReading(read([unsettled], 74_000), whole)).toBe('second')
+    expect(betterReading(whole, read([line(), line()], null))).toBe('first')
+  })
+
+  // adversarial А1, Б1: a section of one sum, or lines found with no figure read, would take both lines the first
+  // read and showed
+  it('takes the one that shows a line as read over one that shows none, whatever its total', () => {
+    expect(betterReading(read([line(), line()], null), read([], 148_000))).toBe('first')
+    expect(betterReading(read([], 148_000), read([line()], null))).toBe('second')
+    const unread = line({ priceHundredths: null, sumHundredths: null, asPrinted: false })
+    expect(betterReading(read([line(), line()], null), read([unread, unread], 148_000))).toBe(
+      'first',
+    )
+    // neither shows a line as read, both found some: the total decides, as R3
+    expect(betterReading(read([unsettled], null), read([unread], 148_000))).toBe('second')
+  })
+
+  // adversarial Г1: a section of one sum would take the lines the other found, though none was shown as read
+  it('takes the one that found lines over one that found none, though it shows none as read', () => {
+    expect(betterReading(read([unsettled, unsettled], null), read([], 87_000))).toBe('first')
+    expect(betterReading(read([], 87_000), read([unsettled], null))).toBe('second')
+  })
+
+  it('takes the one with a total over one with more lines (am-34, am-07b)', () => {
+    expect(
+      betterReading(read([line(), unsettled], 200_000), read([line(), line(), line()], null)),
+    ).toBe('first')
+    expect(betterReading(read([line()], null), read([unsettled], 74_000))).toBe('second')
+  })
+
+  it('takes more lines shown as read where neither has a total, a tie the first', () => {
+    expect(betterReading(read([line(), unsettled], null), read([line(), line()], null))).toBe(
+      'second',
+    )
+    expect(betterReading(read([line(), line()], null), read([line(), unsettled], null))).toBe(
+      'first',
+    )
+    expect(betterReading(read([line()], null), read([line()], null))).toBe('first')
+  })
+})
+
+describe('a sum alone the total put right, among sums the total vouches for (MOL-420)', () => {
+  const alone = (sum: number, over: Partial<ReceiptTextLine> = {}) =>
+    line({
+      quantityMilli: null,
+      priceHundredths: null,
+      discountHundredths: null,
+      sumHundredths: sum,
+      settled: false,
+      asPrinted: false,
+      ...over,
+    })
+  const byModel = { byModel: true }
+
+  it('shows every sum, the one the total chose «проверьте», the receipt not proven whole', () => {
+    const lines = [alone(745), alone(585, { repaired: true })]
+    const got = explainedReading(reading(lines, 1_330), byModel)
+    expect(got.shown.lines.map((l) => [l.sumHundredths, l.repaired === true])).toEqual([
+      [745, false],
+      [585, true],
+    ])
+    expect([got.shown.balanced, got.receipt]).toEqual([false, 'line_not_as_printed'])
+  })
+
+  it('never proves a receipt whole by a sum alone the total chose, the other lines as printed', () => {
+    const got = explainedReading(reading([line(), alone(585, { repaired: true })], 74_585), byModel)
+    expect([got.receipt, got.shown.lines[1]?.sumHundredths, got.shown.lines[1]?.repaired]).toEqual([
+      'line_not_as_printed',
+      585,
+      true,
+    ])
+    // the line as printed keeps its figures
+    expect(figures(got.shown.lines[0]!)).toEqual([2_000, 37_000, 74_000, 0, true])
+  })
+
+  it('must not let a sum the shop’s memory chose vouch for the others (MOL-291)', () => {
+    const lines = [alone(745), alone(585, { repaired: true, remembered: 'repaired' })]
+    const got = verifiedReading(reading(lines, 1_330), byModel)
+    expect(got.lines.map((l) => l.sumHundredths)).toEqual([null, null])
   })
 })

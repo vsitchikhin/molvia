@@ -57,6 +57,7 @@ export interface MoneyRepository {
 interface TripLineRow extends Record<string, unknown> {
   trip_id: string
   place_name: string
+  category_id: string | null
   items: string | number
   finished_at: Date | string
   finished_on: string
@@ -117,7 +118,7 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
     async tripLines(actorId, from, to) {
       const rows = await db.execute<TripLineRow>(sql`
         with finished as (
-          select t.id, p.name as place_name,
+          select t.id, p.name as place_name, t.category_id,
                  coalesce(t.finished_on_device_at, t.finished_at) as finished_at,
                  -- The phone's day of the tap (MOL-121), beside the spendings the same phone dated;
                  -- a trip from an old queue has none, and the server's day of the moment stands.
@@ -135,7 +136,7 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
         money as (${tripMoneyRows(
           sql`t.id in (select id from finished where finished_day between ${from}::date and ${to}::date)`,
         )})
-        select f.id as trip_id, f.place_name, f.finished_at,
+        select f.id as trip_id, f.place_name, f.category_id, f.finished_at,
                to_char(f.finished_day, 'YYYY-MM-DD') as finished_on,
                m.currency, m.minor as amount_minor, m.items
           from finished f
@@ -149,6 +150,7 @@ export function createMoneyRepository(db: Conn): MoneyRepository {
         finishedOn: row.finished_on,
         finishedAt: new Date(row.finished_at),
         amount: { minor: BigInt(row.amount_minor), currency: row.currency },
+        categoryId: row.category_id,
       }))
     },
 

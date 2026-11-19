@@ -61,6 +61,8 @@ const figuresOf = (l: ReceiptTextLine | undefined) => [
   l?.sumHundredths,
 ]
 const BLANK = [null, null, null, null]
+/** A line's sum alone: two places vouch for the sums as copied, never its quantity or price (MOL-310, round 2). */
+const SUM = (sum: number) => [null, null, null, sum]
 
 describe('the shop’s memory as a voice in a model’s digits (MOL-291)', () => {
   it('puts right a line whose price it remembers one confused digit off, with the sum as copied', () => {
@@ -93,10 +95,11 @@ describe('the shop’s memory as a voice in a model’s digits (MOL-291)', () =>
   })
 
   it('puts nothing right against the total: a butter gone up to 650, remembered at 550 (adversarial А1)', () => {
-    // printed 1 × 650 = 650, the price copied «660», the total 650 in two places, or in one
+    // printed 1 × 650 = 650, the price copied «660», the total 650 in two places, or in one: two places vouch for the sum
+    // as copied alone (MOL-310, round 2), the price stays none
     const butter = line('1110004', { unit_price: '660', sum: '650' })
     expect(figuresOf(read([butter], { '1110004': 55_000 }, owed('650')).shown.lines[0])).toEqual(
-      BLANK,
+      SUM(65_000),
     )
     expect(
       figuresOf(read([butter], { '1110004': 55_000 }, owed('650').slice(0, 1)).shown.lines[0]),
@@ -104,7 +107,7 @@ describe('the shop’s memory as a voice in a model’s digits (MOL-291)', () =>
     // beside a line read right: the total less it is the paper's 650
     const loaves = line('1106618', { quantity: '2', unit_price: '145', sum: '290' })
     const { shown } = read([loaves, butter], { '1110004': 55_000 }, owed('940'))
-    expect(figuresOf(shown.lines[1])).toEqual(BLANK)
+    expect(figuresOf(shown.lines[1])).toEqual(SUM(65_000))
     // the bag «60 / 50» against a total it misses once put right: the total refutes it
     const bag = line('1122223', { unit_price: '60', sum: '50' })
     expect(
@@ -270,7 +273,8 @@ describe('the shop’s memory as a voice in a model’s digits (MOL-291)', () =>
     for (const totals of [owed('613.80'), []]) {
       const { text, shown } = read([bread, cheese], { '2000001': 55_000 }, totals)
       expect(text.lines[1]?.remembered).toBeUndefined()
-      expect(figuresOf(shown.lines[1])).toEqual(BLANK)
+      // the sum both readings share, where two places vouch for it (MOL-310, round 2)
+      expect(figuresOf(shown.lines[1])).toEqual(totals.length > 0 ? SUM(32_670) : BLANK)
     }
   })
 
@@ -289,7 +293,7 @@ describe('the shop’s memory as a voice in a model’s digits (MOL-291)', () =>
     for (const totals of [owed('613.80'), []]) {
       expect(
         figuresOf(read([bread, cheese], { '2000001': 55_000 }, totals).shown.lines[1]),
-      ).toEqual(BLANK)
+      ).toEqual(totals.length > 0 ? SUM(32_670) : BLANK)
     }
     // №9б: 0,25 kg × 2 600 = 650, the sum copied «550»; remembered 2 500 — 0,26 × 2 500 meets the total too
     const loaves = line('1106618', { quantity: '2', unit_price: '145', sum: '290' })

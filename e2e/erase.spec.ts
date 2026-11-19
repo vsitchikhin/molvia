@@ -41,14 +41,16 @@ test('«Удалить мои данные» стирает человека и 
   // The session that asked is gone on the server, not only put out here.
   expect((await page.request.get('/api/actors/me', { headers })).status()).toBe(401)
 
-  // Signing in again is a new, empty account; the catalogue kept the item, without its author.
+  // Signing in again is a new, empty account; the item nobody else stood on went with its author
+  // (MOL-374) — the name is Cyrillic, which no id or moment in the answer can spell.
   const again = await signedIn(page)
   expect(again).not.toBe(owner)
   await expect(page.locator('.erasure')).toHaveCount(0)
   const found = await page.request.get(`/api/catalogue/search?q=${encodeURIComponent(name)}`, {
     headers: await asBrowser(page),
   })
-  expect(JSON.stringify(await found.json())).toContain(name)
+  expect(found.status()).toBe(200)
+  expect(JSON.stringify(await found.json())).not.toContain(name)
 })
 
 // Adversarial А: the session ended from «Устройства» while the sheet was open. The server erases

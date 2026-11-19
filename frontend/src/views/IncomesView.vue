@@ -44,9 +44,9 @@
          month and a card — their plates by the account a new income lands on (`skeletonPlates`). -->
     <ScreenSkeleton v-if="phase === 'loading'">
       <SkeletonPart kind="caption" :width="22" />
-      <OperationSkeleton form="income" :plates="skeletonPlates[0]" />
+      <OperationSkeleton :plates="skeletonPlates[0]" />
       <SkeletonPart kind="caption" :width="18" />
-      <OperationSkeleton form="income" :plates="skeletonPlates[1]" />
+      <OperationSkeleton :plates="skeletonPlates[1]" />
     </ScreenSkeleton>
 
     <template v-else-if="phase !== 'idle'">

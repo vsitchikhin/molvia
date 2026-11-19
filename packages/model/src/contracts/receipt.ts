@@ -184,6 +184,12 @@ export const receiptSummaryCodec = z.strictObject({
    * the receipt with it (MOL-240).
    */
   tripId: z.uuid().nullable(),
+  /**
+   * A receipt of food service (`servesFood`, MOL-400), for the category «Покупки» guess beside it (MOL-406), as the
+   * review guesses. Only for a receipt still read and not recorded, and only to a phone that asks
+   * (`RECEIPT_FOOD_HEADER`): an installed app of an earlier build reads a summary strictly. Absent — not known.
+   */
+  food: z.boolean().optional(),
 })
 export type ReceiptSummary = z.output<typeof receiptSummaryCodec>
 
@@ -339,6 +345,11 @@ export const receiptRecordBodySchema = z.strictObject({
    * a phone of an earlier build, or «без счёта» — the trip is on no account.
    */
   account: tripPaymentBodySchema.optional(),
+  /**
+   * The category «Деньги» count the trip in (MOL-400), chosen on the review: one the person has not got
+   * is «Продукты», never a refusal. Absent — a phone of an earlier build — the trip is «Продукты», as before.
+   */
+  categoryId: z.uuid().optional(),
 })
 export type ReceiptRecordBody = z.output<typeof receiptRecordBodySchema>
 
@@ -411,6 +422,9 @@ export const RECEIPT_CASHBACK_HEADER = 'X-Molvia-Receipt-Cashback'
 
 /** A phone that knows the detail's `service` and `slip` says so by this header (MOL-310). */
 export const RECEIPT_BILL_HEADER = 'X-Molvia-Receipt-Bill'
+
+/** A phone that knows a summary's `food` says so by this header on `GET /receipts` (MOL-406). */
+export const RECEIPT_FOOD_HEADER = 'X-Molvia-Receipt-Food'
 
 /** A phone that knows a line's `spelled` says so by this header (MOL-293), as `RECEIPT_CODES_HEADER`. */
 export const RECEIPT_SPELLED_HEADER = 'X-Molvia-Receipt-Spelled'

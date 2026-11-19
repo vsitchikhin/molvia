@@ -6,7 +6,7 @@ import { ERROR } from '@molvia/model'
 import type { ReminderSwitch } from '@molvia/model'
 import { dropKeyboard, refuse, settleKeeping, shownText, stopSpinner } from './answer'
 import { t } from './i18n'
-import { SWITCH_DATA, keyboardOf, readText, scale, writeText } from './remind'
+import { SWITCH_DATA, keyboardOf, languageOfText, readText, scale, writeText } from './remind'
 import { handlerOf, reportDefect } from './failure'
 
 export interface MuteDeps {
@@ -40,22 +40,24 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
 
   composer.chatType('private').callbackQuery(SWITCH_DATA, async (ctx) => {
     const offer = ctx.match[1] === 'on' ? 'on' : 'off'
+    // The message's language, read off it: the outcome, a refusal, the switch rebuilt (MOL-398).
+    const language = languageOfText(shownText(ctx.callbackQuery.message))
     try {
       await api.switchReminders(ctx.from.id, offer)
     } catch (error) {
       if (error instanceof ApiError && error.code === ERROR.NOT_FOUND) {
-        await refuse(ctx, 'remind.gone')
+        await refuse(ctx, 'remind.gone', language)
         await dropKeyboard(ctx)
         return
       }
       logged('remind switch', error)
       reportDefect(api, error, handlerOf(ctx))
       // The buttons stay: «press again» must leave something to press.
-      await refuse(ctx, 'remind.switchFailed')
+      await refuse(ctx, 'remind.switchFailed', language)
       return
     }
 
-    const outcome = t(ctx.from.language_code, offer === 'off' ? 'remind.stopped' : 'remind.resumed')
+    const outcome = t(language, offer === 'off' ? 'remind.stopped' : 'remind.resumed')
     const message = ctx.callbackQuery.message
     const { itemId, pressed } = keyboardOf(message?.reply_markup)
     const shown = shownText(message)
@@ -64,7 +66,7 @@ export function muteComposer({ api }: MuteDeps): Composer<Context> {
       await settleKeeping(
         ctx,
         text,
-        scale(itemId, pressed, offer === 'off' ? 'on' : 'off'),
+        scale(itemId, pressed, offer === 'off' ? 'on' : 'off', language),
         outcome,
       )
     } finally {

@@ -12,9 +12,10 @@ import type { PropType } from 'vue'
 import IconChevronRight from '~icons/mdi/chevron-right'
 
 /**
- * «When» of an operation's card — the day, «исправлен …», the chevron — the same on an exchange and an
- * income (MOL-81, handoff 02, 03). Inside the card's button: the whole card opens the amendment, and the
- * removal lives in its sheet (MOL-189, Ф-34, С-20). A `span`, since a button holds phrasing content only.
+ * «When» of an income's card — the day, «исправлен …», the chevron (MOL-81, handoff 03); an exchange's
+ * card had it too until MOL-348 made it a row. Inside the card's button: the whole card opens the
+ * amendment, and the removal lives in its sheet (MOL-189, Ф-34, С-20). A `span`, since a button holds
+ * phrasing content only.
  */
 export default defineComponent({
   name: 'OperationCardHead',
@@ -34,9 +35,11 @@ export default defineComponent({
   min-height: var(--icon);
 }
 
+/* The day is the card's heading (MOL-345, handoff of «Доходы» 04): 15/700 in the text's ink, never quieter
+   than the sums under it. */
 .day {
-  color: var(--text-muted);
-  font-size: var(--text-footnote);
+  color: var(--text);
+  font-size: var(--text-callout);
   font-weight: var(--weight-bold);
 }
 

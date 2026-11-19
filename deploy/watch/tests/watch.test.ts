@@ -1,9 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PAUSE_MS, PING_TRIES, REQUEST_TIMEOUT_MS, settingsOf, watch } from '@/watch'
+import {
+  LOCK_PATH,
+  PAUSE_MS,
+  PING_TRIES,
+  REQUEST_TIMEOUT_MS,
+  settingsOf,
+  watch,
+  watchLock,
+} from '@/watch'
 import type { Io } from '@/watch'
 import worker from '@/worker'
 
 const PING = 'https://hc-ping.com/0f1e2d3c-secret'
+/** Two checks by their UUIDs, as the lock's round takes them (MOL-399). */
+const UP = 'https://hc-ping.com/0f1e2d3c-4b5a-4c6d-8e7f-a0b1c2d3e4f5'
+const LOCK = 'https://hc-ping.com/9a8b7c6d-5e4f-4a3b-8c2d-1e0f9a8b7c6d'
 const SETTINGS = { pingUrl: PING, domain: 'molvia.net' }
 const HEALTHY = '{"status":"ok","version":"v0.1.3-45-gfebb22c8","database":"up"}'
 
@@ -13,37 +24,30 @@ const urlOf = (input: Parameters<typeof globalThis.fetch>[0]): string =>
   input instanceof Request ? input.url : input.toString()
 
 /**
- * A site that answers each try as `tries` says — the last state holds — and a healthchecks.io that
- * answers `pings` in turn. Every request is recorded, the pauses too.
+ * A Worker's `io` whose requests `answer` serves, and a healthchecks.io behind `pingUrl` that answers
+ * `pings` in turn. Every request is recorded, the pauses and the log too.
  */
-function rig(tries: readonly Site[], pings: readonly (number | 'network')[] = [200]) {
-  let attempt = -1
+function fakeIo(
+  pingUrl: string,
+  answer: (url: string) => Response,
+  pings: readonly (number | 'network')[] = [200],
+) {
   let ping = -1
   const waits: number[] = []
   const logged: string[] = []
   const reports: { url: string; method: string; body: string }[] = []
-  const answer = (url: string, init: RequestInit | undefined): Response => {
-    if (url.startsWith(PING)) {
+  // A thrown answer is a rejected fetch, as the network's failure is.
+  const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
+    Promise.resolve().then(() => {
+      const url = urlOf(input)
+      if (!url.startsWith(pingUrl)) return answer(url)
       ping += 1
       const body = typeof init?.body === 'string' ? init.body : ''
       reports.push({ url, method: init?.method ?? 'GET', body })
       const status = pings[Math.min(ping, pings.length - 1)] ?? 200
       if (status === 'network') throw new TypeError('fetch failed')
       return new Response('OK', { status })
-    }
-    if (url.endsWith('/api/health')) attempt += 1
-    const site = tries[Math.min(attempt, tries.length - 1)]
-    if (site === 'unreachable') throw new TypeError('fetch failed')
-    if (url.endsWith('/api/health')) {
-      return site === 'well'
-        ? new Response(HEALTHY)
-        : new Response('{"status":"degraded","database":"down"}', { status: 503 })
-    }
-    return new Response('<!doctype html>')
-  }
-  // A thrown answer is a rejected fetch, as the network's failure is.
-  const fetch = vi.fn<typeof globalThis.fetch>((input, init) =>
-    Promise.resolve().then(() => answer(urlOf(input), init)),
+    }),
   )
   const io: Io = {
     fetch,
@@ -55,7 +59,28 @@ function rig(tries: readonly Site[], pings: readonly (number | 'network')[] = [2
       logged.push(`${warn ? 'warn' : 'log'}: ${line}`)
     },
   }
-  return { io, fetch, waits, reports, logged, tries: () => attempt + 1 }
+  return { io, fetch, waits, reports, logged }
+}
+
+/** A site that answers each try as `tries` says — the last state holds. */
+function rig(tries: readonly Site[], pings: readonly (number | 'network')[] = [200]) {
+  let attempt = -1
+  const fake = fakeIo(
+    PING,
+    (url) => {
+      if (url.endsWith('/api/health')) attempt += 1
+      const site = tries[Math.min(attempt, tries.length - 1)]
+      if (site === 'unreachable') throw new TypeError('fetch failed')
+      if (url.endsWith('/api/health')) {
+        return site === 'well'
+          ? new Response(HEALTHY)
+          : new Response('{"status":"degraded","database":"down"}', { status: 503 })
+      }
+      return new Response('<!doctype html>')
+    },
+    pings,
+  )
+  return { ...fake, tries: () => attempt + 1 }
 }
 
 describe('watch', () => {
@@ -370,11 +395,209 @@ describe('the ping URL', () => {
   })
 })
 
+describe('the lock of Grafana (MOL-399)', () => {
+  const LOCKED = { ...SETTINGS, pingUrl: UP, lockUrl: LOCK }
+  const SIGN_IN = 'https://molvia.cloudflareaccess.com/cdn-cgi/access/login/grafana.molvia.net'
+
+  type Door = 'access' | 'grafana' | 'challenge' | 'unreachable'
+
+  /** Grafana's address answering each try as `doors` says — the last state holds. */
+  function door(doors: readonly Door[]) {
+    let attempt = -1
+    return fakeIo(LOCK, () => {
+      attempt += 1
+      const state = doors[Math.min(attempt, doors.length - 1)]
+      if (state === 'unreachable') throw new TypeError('fetch failed')
+      if (state === 'challenge') return new Response(null, { status: 403 })
+      // Access switched off: Grafana serves a shared dashboard's page for any link, a known one or not.
+      if (state === 'grafana') return new Response('<!doctype html>')
+      return new Response(null, { status: 302, headers: { location: SIGN_IN } })
+    })
+  }
+
+  it('asks a path the tunnel passes, with no pass, never following the redirect, and pings its own check', async () => {
+    const { io, fetch, waits, reports, logged } = door(['access'])
+    const round = await watchLock(LOCKED, io)
+    expect(round.verdict).toEqual({ up: true })
+    expect(fetch.mock.calls.map(([input]) => urlOf(input))).toEqual([
+      'https://grafana.molvia.net/public-dashboards/watch',
+      LOCK,
+    ])
+    expect(LOCK_PATH).toMatch(/^\/public-dashboards\//)
+    expect(fetch.mock.calls[0]?.[1]?.redirect).toBe('manual')
+    expect(fetch.mock.calls[0]?.[1]?.headers).toBeUndefined()
+    expect(waits).toEqual([])
+    expect(reports).toEqual([{ url: LOCK, method: 'GET', body: '' }])
+    expect(logged).toEqual(['log: grafana.molvia.net is well'])
+  })
+
+  it('reports /fail «grafana open» at three answers of Grafana’s own in four — Access off', async () => {
+    const { io, reports } = door(['grafana', 'grafana', 'access', 'grafana'])
+    const round = await watchLock(LOCKED, io)
+    expect(round.attempts).toEqual([
+      ['grafana open 200'],
+      ['grafana open 200'],
+      [],
+      ['grafana open 200'],
+    ])
+    expect(reports).toEqual([{ url: `${LOCK}/fail`, method: 'POST', body: 'grafana open 200' }])
+  })
+
+  it('still pings at two of four — a rollout of the tunnel', async () => {
+    const { io, reports } = door(['grafana', 'unreachable', 'access'])
+    expect((await watchLock(LOCKED, io)).verdict).toEqual({ up: true })
+    expect(reports.map((report) => report.url)).toEqual([LOCK])
+  })
+
+  it('asks the domain it is given', async () => {
+    const { io, fetch } = door(['access'])
+    await watchLock({ ...LOCKED, domain: 'molvia.invalid' }, io)
+    expect(urlOf(fetch.mock.calls[0]?.[0] ?? '')).toBe(
+      'https://grafana.molvia.invalid/public-dashboards/watch',
+    )
+  })
+
+  it('refuses a missing or malformed secret by its name, never its value, and asks nothing', async () => {
+    for (const lockUrl of [
+      undefined,
+      '',
+      'http://hc-ping.com/abc',
+      `${LOCK}?x=1`,
+      `${LOCK}/fail`,
+    ]) {
+      const { io, fetch } = door(['access'])
+      const failure = await watchLock(
+        { ...SETTINGS, ...(lockUrl === undefined ? {} : { lockUrl }) },
+        io,
+      ).catch((error: unknown) => error)
+      expect((failure as Error).message, lockUrl).toMatch(/^HC_LOCK_URL is not/)
+      expect((failure as Error).message).not.toContain('hc-ping')
+      expect(fetch).not.toHaveBeenCalled()
+    }
+  })
+
+  it('never takes a 403 for the lock — a challenge a browser passes to the Grafana behind (adversarial А5)', async () => {
+    const { io, reports } = door(['challenge'])
+    const round = await watchLock(LOCKED, io)
+    expect(round.attempts).toEqual(Array(4).fill(['grafana 403']))
+    expect(reports).toEqual([{ url: `${LOCK}/fail`, method: 'POST', body: 'grafana 403' }])
+  })
+
+  it('refuses the site’s own check, and asks nothing (adversarial А4)', async () => {
+    const { io, fetch } = door(['access'])
+    await expect(watchLock({ ...LOCKED, lockUrl: UP }, io)).rejects.toThrow(
+      'HC_LOCK_URL is the same check as HC_UP_URL — the lock needs a check of its own',
+    )
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('tells the checks apart by UUIDs alone, naming the secret not by one (adversarial Б2, review №14)', async () => {
+    const SLUG_UP = 'https://hc-ping.com/pk/molvia-up'
+    for (const [pingUrl, lockUrl, said] of [
+      [UP, 'https://hc-ping.com/pk/molvia-up', 'HC_LOCK_URL is'],
+      [SLUG_UP, LOCK, 'HC_UP_URL is'],
+      [SLUG_UP, 'https://hc-ping.com/pk/molvia-grafana-lock', 'HC_UP_URL and HC_LOCK_URL are'],
+    ] as const) {
+      const { io, fetch } = door(['access'])
+      await expect(watchLock({ ...SETTINGS, pingUrl, lockUrl }, io), lockUrl).rejects.toThrow(
+        `${said} not a check’s UUID URL — the lock’s round tells checks by their UUIDs`,
+      )
+      expect(fetch).not.toHaveBeenCalled()
+    }
+  })
+
+  it('takes one UUID under another host for the same check (adversarial Б3, review №13)', async () => {
+    const uuid = UP.slice('https://hc-ping.com/'.length)
+    for (const lockUrl of [`https://hchk.io/${uuid}`, `https://hc-ping.com./${uuid}`]) {
+      const { io, fetch } = door(['access'])
+      await expect(watchLock({ ...SETTINGS, pingUrl: UP, lockUrl }, io), lockUrl).rejects.toThrow(
+        'HC_LOCK_URL is the same check as HC_UP_URL — the lock needs a check of its own',
+      )
+      expect(fetch).not.toHaveBeenCalled()
+    }
+  })
+
+  it('is read as set: the site’s settings never refuse over it', () => {
+    expect(settingsOf({ HC_UP_URL: PING, HC_LOCK_URL: 'not a url' })).toEqual({
+      ...SETTINGS,
+      lockUrl: 'not a url',
+    })
+    expect(settingsOf({ HC_UP_URL: PING })).toEqual(SETTINGS)
+  })
+})
+
 describe('the Worker', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('throws rather than stay silent without the secret, and asks nothing', async () => {
     const fetch = vi.spyOn(globalThis, 'fetch')
     await expect(worker.scheduled(undefined, {})).rejects.toThrow(/HC_UP_URL/)
     expect(fetch).not.toHaveBeenCalled()
-    fetch.mockRestore()
+  })
+
+  it('tells of the site, then fails the round for the lock’s secret missing (MOL-399)', async () => {
+    const fetch = vi
+      .spyOn(globalThis, 'fetch')
+      .mockImplementation((input) =>
+        Promise.resolve(
+          new Response(
+            urlOf(input).endsWith('/api/health') ? HEALTHY : urlOf(input) === PING ? 'OK' : '',
+          ),
+        ),
+      )
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    await expect(worker.scheduled(undefined, { HC_UP_URL: PING })).rejects.toThrow(
+      /^HC_LOCK_URL is not/,
+    )
+    expect(fetch.mock.calls.map(([input]) => urlOf(input))).toContain(PING)
+  })
+
+  it('names both rounds when both fail (review №1)', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation((input) =>
+      Promise.resolve(
+        new Response(
+          urlOf(input).endsWith('/api/health')
+            ? HEALTHY
+            : urlOf(input) === PING
+              ? 'OK (not found)'
+              : '',
+        ),
+      ),
+    )
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    await expect(worker.scheduled(undefined, { HC_UP_URL: PING })).rejects.toThrow(
+      /^the ping to healthchecks\.io reached no check: «OK \(not found\)»; HC_LOCK_URL is not an https URL/,
+    )
+  })
+
+  it('runs both rounds and fails for neither when both are told', async () => {
+    const fetch = vi.spyOn(globalThis, 'fetch').mockImplementation((input) => {
+      const url = urlOf(input)
+      if (url === 'https://grafana.molvia.net/public-dashboards/watch')
+        return Promise.resolve(
+          new Response(null, {
+            status: 302,
+            headers: { location: 'https://molvia.cloudflareaccess.com/cdn-cgi/access/login/x' },
+          }),
+        )
+      return Promise.resolve(
+        new Response(
+          url.endsWith('/api/health') ? HEALTHY : url.startsWith('https://hc-ping') ? 'OK' : '',
+        ),
+      )
+    })
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    await worker.scheduled(undefined, { HC_UP_URL: UP, HC_LOCK_URL: LOCK })
+    expect(
+      sorted(
+        fetch.mock.calls
+          .map(([input]) => urlOf(input))
+          .filter((url) => url.startsWith('https://hc-ping')),
+      ),
+    ).toEqual(sorted([LOCK, UP]))
   })
 })
+
+const sorted = (values: string[]): string[] => values.toSorted()

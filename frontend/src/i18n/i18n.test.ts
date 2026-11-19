@@ -235,7 +235,10 @@ describe('словарь: повторяющиеся тексты', () => {
       // Две подстраницы настроек, одно и то же «не загрузилось» (MOL-129).
       'Сервер не ответил. Попробуйте ещё раз.': ['bot.load_error.body', 'devices.load_error.body'],
       'Не получилось. Проверьте связь и попробуйте ещё раз': ['exchange.failed', 'income.failed'],
-      Валюта: ['accounts.sheet.currency', 'exchange.sheet.currency', 'income.sheet.currency'],
+      // «Продать евро» и «в евро» — одно слово в обоих падежах (MOL-348).
+      евро: ['exchange.market.plural.EUR', 'spending.charts.currency_in.EUR'],
+      // «Курсы по данным ЦБ РА» выбирают валюту тем же словом (MOL-348).
+      Валюта: ['accounts.sheet.currency', 'exchange.market.currency', 'income.sheet.currency'],
       'Прежние версии': ['exchange.sheet.history', 'income.sheet.history'],
       'Сохранить правку': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Сейчас записано: {details}': ['exchange.sheet.current', 'income.sheet.current'],
@@ -415,6 +418,9 @@ describe('словарь: повторяющиеся тексты', () => {
       Undo: ['spending.restore', 'trip.remove.restore'],
       'What to buy': ['advice.title', 'nav.advice'],
       Ratings: ['nav.verdicts', 'verdict.title'],
+      // The language a message is written in and the language of the app: both name it in English, and
+      // the setting names every language in itself (MOL-398).
+      English: ['feedback.languages.en', 'settings.locale.en'],
       Settings: ['nav.settings', 'settings.title'],
       Money: ['nav.money', 'settings.group_money', 'spending.title'],
       Save: [
@@ -451,11 +457,7 @@ describe('словарь: повторяющиеся тексты', () => {
         'trip.error.title',
       ],
       // MOL-189, as in Russian.
-      'Will bring back once online': [
-        'accounts.screen.restore_wait',
-        'exchange.restore_offline',
-        'income.restore_offline',
-      ],
+      'Will bring back once online': ['exchange.restore_offline', 'income.restore_offline'],
       'Will save once online': [
         'accounts.sheet.wait_online',
         'exchange.sheet.save_offline',
@@ -481,7 +483,11 @@ describe('словарь: повторяющиеся тексты', () => {
       ],
       'The server did not answer. Try again.': ['bot.load_error.body', 'devices.load_error.body'],
       'That did not work. Check the connection and try again': ['exchange.failed', 'income.failed'],
-      Currency: ['accounts.sheet.currency', 'exchange.sheet.currency', 'income.sheet.currency'],
+      // «Sell roubles» and «in roubles»: English keeps one word where Russian declines it (MOL-348).
+      roubles: ['exchange.market.plural.RUB', 'spending.charts.currency_in.RUB'],
+      dollars: ['exchange.market.plural.USD', 'spending.charts.currency_in.USD'],
+      euros: ['exchange.market.plural.EUR', 'spending.charts.currency_in.EUR'],
+      Currency: ['accounts.sheet.currency', 'exchange.market.currency', 'income.sheet.currency'],
       'Earlier versions': ['exchange.sheet.history', 'income.sheet.history'],
       'Save the amendment': ['exchange.sheet.save_amend', 'income.sheet.save_amend'],
       'Now recorded: {details}': ['exchange.sheet.current', 'income.sheet.current'],
@@ -519,6 +525,10 @@ describe('словарь: повторяющиеся тексты', () => {
       // the button of an account's screen are one word in English.
       From: ['income.sheet.source', 'transfer.from'],
       Note: ['income.sheet.note', 'transfer.note'],
+      // «Ничего не нашли по …» of the advice's search and of the catalogue's: one phrase in English (MOL-398).
+      'Nothing found for “{query}”': ['advice.search.empty.title', 'item.empty.title'],
+      // «Переснять» of a receipt's part and of the QR code: one verb in English (MOL-398).
+      Retake: ['receipt.capture.retake', 'receipt.qr.retake'],
       Transfer: ['accounts.account.transfer', 'transfer.row_meta', 'transfer.title'],
       'Try again': ['state.retry', 'transfer.failed_retry'],
     })
@@ -584,7 +594,6 @@ describe('словарь: плюральные формы', () => {
       'spending.list.count',
       'spending.list.unsent',
       'exchange.vs_market.uncounted',
-      'exchange.vs_market.count',
       'sign_out.unsent',
       'feedback.attached_pictures',
       'field.left',

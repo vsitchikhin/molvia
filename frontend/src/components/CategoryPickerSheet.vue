@@ -18,7 +18,7 @@
       </div>
       <!-- A card of its own, out of the group: a button among the radios was read as one of the
            choices (self-review №5); «Без счёта» of the account's choice stands so too. -->
-      <AppCard as="ul" list>
+      <AppCard v-if="addable" as="ul" list>
         <li>
           <ListRow aria-haspopup="dialog" @click="$emit('add')">
             <template #title>
@@ -65,6 +65,8 @@ export default defineComponent({
       required: true,
     },
     selected: { type: String as PropType<string | null>, default: null },
+    /** «+ Своя» under the list; a trip's choice has none (MOL-400, `TripCategoryRow`). */
+    addable: { type: Boolean, default: true },
   },
   emits: {
     'update:open': (open: boolean) => typeof open === 'boolean',

@@ -189,12 +189,17 @@ test('a segment scrolled under the pinned header stays under it, and the header 
   const x = box.x + box.width / 2
   const y = box.y + box.height / 2
   expect(y).toBeLessThan(bar.y + bar.height)
-  expect(
-    await page.evaluate(
-      (at) => document.elementFromPoint(at.x, at.y)?.closest('header.bar') !== null,
-      { x, y },
-    ),
-  ).toBe(true)
+  // Waited for, not read once (class 5 of `testing.md`): read once right after the scroll, the point
+  // missed the header on CI (MOL-374, the run on 7e32c583) with the word already under it; what was
+  // still moving was not caught. A word drawn over the header never lets it come true.
+  await expect
+    .poll(() =>
+      page.evaluate((at) => document.elementFromPoint(at.x, at.y)?.closest('header.bar') !== null, {
+        x,
+        y,
+      }),
+    )
+    .toBe(true)
   await page.mouse.click(x, y)
   await expect(scheme(page).getByRole('radio', { name: 'Системная', exact: true })).toBeChecked()
   await expect(page.locator('html')).not.toHaveAttribute('data-scheme')

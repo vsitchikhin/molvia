@@ -5,9 +5,10 @@ import { actorCodec, settingsOf } from '@molvia/model'
 import { randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
-import type { Locator, Page } from '@playwright/test'
+import type { Locator, Page, Route } from '@playwright/test'
 import { facesIn, stillIn } from './scroll'
 import { asBrowser, signedIn } from './session'
+import { textAt } from './text-size'
 
 /**
  * Android's text at 150 % and 200 % on a phone of 320 (MOL-321, owner's В-4 «б»): no screen and no sheet
@@ -335,13 +336,7 @@ for (const size of ['150%', '200%'])
   test.describe(`the text at ${size} on a phone of 320`, () => {
     test.beforeEach(async ({ page }) => {
       await page.setViewportSize({ width: 320, height: 720 })
-      await page.addInitScript((value) => {
-        document.addEventListener('DOMContentLoaded', () => {
-          const style = document.createElement('style')
-          style.textContent = `html { font-size: ${value} }`
-          document.head.append(style)
-        })
-      }, size)
+      await textAt(page, size)
     })
 
     test('a newcomer’s «Что брать» and «Настройки» stand within the phone', async ({ page }) => {
@@ -379,6 +374,58 @@ for (const size of ['150%', '200%'])
       )
     })
 
+    test('the longest city, «Санкт-Петербург», stands whole in «Настройки» and «Что брать» (MOL-412)', async ({
+      page,
+    }) => {
+      // «Что брать» first, so the phone remembers Gyumri's list: the city is printed there only by the strip of a
+      // list for another city (`advice.city_reloading`), never by a newcomer's words (adversarial А2).
+      await signedIn(page, '/')
+      await expect(page.locator('.intro-title')).toBeVisible()
+      const headers = await asBrowser(page)
+      const previous = settingsOf(
+        actorCodec.parse(await (await page.request.get('/api/actors/me', { headers })).json()),
+      )
+      const moved = await page.request.put('/api/actors/me/settings', {
+        headers,
+        data: { previous, settings: { ...previous, country: 'RU', city: 'Санкт-Петербург' } },
+      })
+      expect(moved.ok(), await moved.text()).toBe(true)
+
+      await page.goto('/settings')
+      const city = page.locator('.chosen-words').filter({ hasText: 'Санкт-Петербург' })
+      expect(await pageSideways(page, city)).toBe(0)
+      // the select's chosen words wrap over it, never cut by its box
+      expect(
+        await city.evaluate((words) => words.scrollWidth - words.clientWidth),
+      ).toBeLessThanOrEqual(1)
+
+      // Petersburg's list held on its way: the remembered one is Gyumri's, and past a moment the strip names the
+      // city it waits for — «Обновляем · список для Санкт-Петербурга».
+      const held: Route[] = []
+      const hold = (route: Route) => {
+        held.push(route)
+      }
+      await page.route(/\/api\/advice(\?|$)/, hold)
+      await page.goto('/')
+      const strip = page.locator('.strip .words').filter({ hasText: 'Санкт-Петербурга' })
+      expect(await pageSideways(page, strip)).toBe(0)
+      expect(
+        await strip.evaluate((words) => {
+          const line = words.getBoundingClientRect()
+          const box = words.closest('.strip')!.getBoundingClientRect()
+          return Math.max(
+            line.right - box.right,
+            box.left - line.left,
+            words.scrollWidth - words.clientWidth,
+          )
+        }),
+      ).toBeLessThanOrEqual(1)
+      // nothing left in the air past the test: the held requests go on, and the list comes
+      for (const route of held.splice(0)) await route.continue()
+      await page.unroute(/\/api\/advice(\?|$)/, hold)
+      await expect(page.locator('.intro-title')).toBeVisible()
+    })
+
     test('every screen of «Деньги» stands within the phone', async ({ page }) => {
       test.setTimeout(90_000)
       await signedIn(page)
@@ -387,7 +434,7 @@ for (const size of ['150%', '200%'])
         ['/money', page.locator('.donut .sector-name')],
         ['/money/spendings', page.locator('.day-head')],
         ['/money/budget', page.getByRole('button', { name: 'Задать план категории' })],
-        ['/money/exchange', page.locator('article button.body')],
+        ['/money/exchange', page.locator('.rows button.list-row')],
         ['/money/incomes', page.locator('.cards button.body')],
         ['/money/charts', page.locator('.center')],
         ['/money/charts?mode=year', page.locator('.columns')],
@@ -512,6 +559,37 @@ for (const size of ['150%', '200%'])
       ).toBeLessThanOrEqual(0.5)
     })
 
+    // «мой — ЦБ РА сегодня» under «Мой курс» (MOL-348): end to end has no rate of the central bank, so the
+    // server sends no line — the answer is given one, the dots at the ends, as `walletTrack` puts them apart.
+    // Centred on its dot, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 % (adversarial Б1).
+    test('the line «мой — ЦБ РА» under «Мой курс» stands within its card', async ({ page }) => {
+      await page.route('**/api/exchanges', async (route) => {
+        if (route.request().method() !== 'GET') return route.continue()
+        const response = await route.fetch()
+        const json = (await response.json()) as Record<string, unknown> & {
+          wallet?: { rate: Record<string, unknown> } | null
+        }
+        const own = json.wallet?.rate
+        if (own)
+          json.walletTrack = {
+            official: { ...own, rate: '4.902000', source: 'official' },
+            own: 150,
+            officialAt: 850,
+          }
+        await route.fulfill({ response, json })
+      })
+      await signedIn(page)
+      await post(page, '/api/exchanges', {
+        id: randomUUID(),
+        given: { amount: '20000', currency: 'RUB' },
+        received: { amount: '97420', currency: 'AMD' },
+        exchangedOn: day(1),
+      })
+      await page.goto('/money/exchange')
+      expect(await pageSideways(page, page.locator('.wallet-line .label'))).toBe(0)
+      expect(await pastCard(page, '.wallet-line .label')).toBeLessThanOrEqual(0.5)
+    })
+
     test('the sheets of «Деньги» stand within the phone', async ({ page }) => {
       test.setTimeout(90_000)
       await signedIn(page)
@@ -522,9 +600,9 @@ for (const size of ['150%', '200%'])
         0,
       )
       await page.goto('/money/exchange')
-      await expect(page.locator('article button.body').first()).toBeVisible()
+      await expect(page.locator('.rows button.list-row').first()).toBeVisible()
       // «Как меняли»: «Не указано · Банк, нал · Безнал · Обменник».
-      expect(await sheetSideways(page, page.locator('article button.body').first())).toBe(0)
+      expect(await sheetSideways(page, page.locator('.rows button.list-row').first())).toBe(0)
       await page.goto('/money/accounts')
       expect(await sheetSideways(page, page.getByRole('button', { name: 'Добавить счёт' }))).toBe(0)
       await page.goto('/money/budget')
@@ -779,21 +857,27 @@ for (const size of ['150%', '200%'])
             ).length,
         ),
       ).toBe(0)
-      // An exchange: its sum and currency one under the other, the sum typed whole.
+      // An exchange: its currency in the well of its sum (MOL-348), the sum typed whole and the currency
+      // within the well, never past it.
       await page.goto('/money/exchange')
       await page.getByRole('button', { name: 'Записать обмен' }).click()
       const sheet = page.locator('dialog[open]').last()
-      const pair = sheet.locator('.pair').first()
-      await expect(pair).toBeVisible()
-      const [amount, currency] = await pair.locator('.app-field').all()
-      expect((await currency!.boundingBox())!.y).toBeGreaterThan((await amount!.boundingBox())!.y)
-      const typed = amount!.locator('input')
+      const amount = sheet.locator('.pair').first().locator('.app-field').first()
+      await expect(amount).toBeVisible()
+      const typed = amount.locator('input')
       await typed.fill('125403,50')
       await typed.blur()
       await facesIn(page)
       expect(
         await typed.evaluate((input) => input.scrollWidth - input.clientWidth),
       ).toBeLessThanOrEqual(0)
+      const [well, currency] = await Promise.all([
+        amount.locator('.well').boundingBox(),
+        amount.locator('select').boundingBox(),
+      ])
+      expect((currency?.x ?? 0) + (currency?.width ?? 0)).toBeLessThanOrEqual(
+        (well?.x ?? 0) + (well?.width ?? 0) + 0.5,
+      )
     })
 
     // Beyond «Деньги» (MOL-334): before it at 200 % the record went 102 px sideways, «Оценки» 23, «Данные и
@@ -1035,13 +1119,7 @@ for (const size of ['110%', '115%'])
   test(`a price per unit in a record's row stands whole at ${size} on 320`, async ({ page }) => {
     test.setTimeout(60_000)
     await page.setViewportSize({ width: 320, height: 720 })
-    await page.addInitScript((value) => {
-      document.addEventListener('DOMContentLoaded', () => {
-        const style = document.createElement('style')
-        style.textContent = `html { font-size: ${value} }`
-        document.head.append(style)
-      })
-    }, size)
+    await textAt(page, size)
     await signedIn(page)
     const { finished } = await aLife(page)
     await page.goto(`/purchases/${finished}`)

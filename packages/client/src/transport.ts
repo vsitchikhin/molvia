@@ -1,13 +1,16 @@
 import type { ZodType } from 'zod'
 import {
   ERROR,
+  FF_HEADER,
   ISSUE,
   TODAY_HEADER,
   VERSION_HEADER,
   ZONE_HEADER,
+  LOCALE_HEADER,
   errorResponseSchema,
+  ffFromHeader,
 } from '@molvia/model'
-import type { WireCode } from '@molvia/model'
+import type { FfName, WireCode } from '@molvia/model'
 
 /**
  * What the API answered with. Not a DomainError: the wire carries shape errors too — a
@@ -109,6 +112,12 @@ export interface ClientOptions {
    */
   readonly onVersion?: (version: string) => void
   /**
+   * Told the «фф» that are on (`FF_HEADER`, MOL-382), from every answer that names them and as soon as
+   * its headers are in, as the build is. Empty is an answer — none is on; an answer without the header
+   * (a proxy, a portal) tells nothing, and a name this build does not know is passed over.
+   */
+  readonly onFf?: (on: ReadonlySet<FfName>) => void
+  /**
    * The phone's today, named on every request (`TODAY_HEADER`, MOL-121): what the server counts
    * «today» of money by. Asked at each request, so a page open across midnight names the new day.
    * The bot names none, and the server takes Yerevan's.
@@ -119,6 +128,11 @@ export interface ClientOptions {
    * begin and end, for a moment the server stamped itself. The bot names none.
    */
   readonly zone?: () => string
+  /**
+   * The language of the phone's screens, named on every request (`LOCALE_HEADER`, MOL-398): what the
+   * bot's rating reminder speaks. The bot names none.
+   */
+  readonly locale?: () => string
 }
 
 interface RequestOptions<A = never> {
@@ -159,8 +173,10 @@ export function createTransport({
   credentials = 'same-origin',
   timeoutMs = DEFAULT_TIMEOUT_MS,
   onVersion,
+  onFf,
   today,
   zone,
+  locale,
   botSecret,
 }: ClientOptions & { readonly botSecret?: string }): Transport {
   async function exchange<T, A = never>(
@@ -172,6 +188,7 @@ export function createTransport({
     if (botSecret) headers.set('authorization', `Bearer ${botSecret}`)
     if (today) headers.set(TODAY_HEADER, today())
     if (zone) headers.set(ZONE_HEADER, zone())
+    if (locale) headers.set(LOCALE_HEADER, locale())
     if (options.body !== undefined) headers.set('content-type', 'application/json')
     if (options.raw !== undefined) headers.set('content-type', options.raw.type)
 
@@ -227,6 +244,8 @@ export function createTransport({
 
       const version = response.headers.get(VERSION_HEADER)
       if (version !== null) onVersion?.(version)
+      const ff = response.headers.get(FF_HEADER)
+      if (ff !== null) onFf?.(ffFromHeader(ff))
 
       // A proxy page, an empty body, a reply cut off mid-flight: `.json()` throws, and every
       // line below — including the one that tells a dead identity from a broken server — used

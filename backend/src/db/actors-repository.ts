@@ -1,6 +1,12 @@
 import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
-import { actorSchema, telegramUserIdSchema } from '@molvia/model'
-import type { Actor, ActorPatch, NewActor, TelegramUserId } from '@molvia/model'
+import type { SQL } from 'drizzle-orm'
+import {
+  MODEL_CONSENT_EDITION,
+  RECEIPTS_MODEL_MONTH_MAX,
+  actorSchema,
+  telegramUserIdSchema,
+} from '@molvia/model'
+import type { Actor, ActorPatch, AppLocale, NewActor, TelegramUserId } from '@molvia/model'
 import { translateFailures } from './failure'
 import type { Conn } from './index'
 import { idOrNull, theRow } from './rows'
@@ -55,7 +61,60 @@ export interface ActorRepository {
    * arriving together write once. `now()`, the database's clock, as everywhere a moment is stamped.
    */
   markSeen(id: string, afterHours: number): Promise<boolean>
+
+  /**
+   * Keeps the language the person's app named (MOL-398, В-1 «в»): the one the bot's rating reminder
+   * speaks. Writes only where it differs — the condition in the `WHERE`, as `markSeen`'s is — and
+   * answers whether it wrote. Not a change of the row: `updated_at`'s trigger leaves it out (0087).
+   */
+  markLocale(id: string, locale: AppLocale): Promise<boolean>
+
+  /**
+   * Where the person stands with the model in the phone's month `receiptsMonth` (MOL-275): the figures of
+   * `receiptsAccess` on `/actors/me`, by the columns `readsByModel` reads. None for nobody.
+   */
+  modelAccess(id: string, receiptsMonth: string): Promise<ModelAccess | null>
 }
+
+/** Where a person stands with the model (MOL-275). */
+export interface ModelAccess {
+  /** Until when it is paid; none where nothing is, a moment gone included. */
+  readonly until: Date | null
+  readonly trialLeft: number
+  /**
+   * The person's count of the phone's month or a later one — the later of the two, as `readsByModel` counts; nought
+   * for an earlier one.
+   */
+  readonly read: number
+}
+
+/** The model's reading is paid for the person now (MOL-275): `receipts_model_until` still to come. */
+export const PAID_BY_MODEL = sql<boolean>`coalesce(${actors.receiptsModelUntil} > clock_timestamp(), false)`
+
+/**
+ * The month's hundred read (MOL-275): the person's count of `month` or a later one at `RECEIPTS_MODEL_MONTH_MAX` — the
+ * one rule the tariff and «Вернуть» close by.
+ */
+export const hundredRead = (month: SQL): SQL<boolean> =>
+  sql<boolean>`coalesce(${actors.modelReceiptsMonth} >= ${month}
+    and ${actors.modelReceiptsRead} >= ${RECEIPTS_MODEL_MONTH_MAX}, false)`
+
+/**
+ * The person's tariff opens the model for a receipt of `month` (MOL-275): the reading paid (`receipts_model_until` to
+ * come) or the trial not spent, and the month's hundred not read — counted in the later of `month` and the person's
+ * own, as a reading lands (`receipts.counted`). Whatever the edition: who has paid and not consented is read by
+ * Tesseract, never by nobody (adversarial А3).
+ */
+export const tariffOpens = (month: SQL): SQL<boolean> =>
+  sql<boolean>`coalesce((${PAID_BY_MODEL} or ${actors.trialReceiptsLeft} > 0) and not ${hundredRead(month)}, false)`
+
+/**
+ * The model reads a person's receipts of `month` (MOL-272, MOL-275): edition `MODEL_CONSENT_EDITION` accepted and the
+ * tariff open (`tariffOpens`). One condition for the queue that reads and the phone that offers the camera (MOL-408);
+ * the money is `ModelSpendRepository`'s.
+ */
+export const readsByModel = (month: SQL): SQL<boolean> =>
+  sql<boolean>`coalesce(${actors.consentVersion} >= ${MODEL_CONSENT_EDITION}, false) and ${tariffOpens(month)}`
 
 /**
  * A row becomes an entity only by passing the domain's own schema. The cost is that a row
@@ -194,6 +253,34 @@ export function createActorRepository(db: Conn): ActorRepository {
         )
         .returning({ id: actors.id })
       return written.length > 0
+    },
+
+    async markLocale(id, locale) {
+      if (idOrNull(id) === null) return false
+      const written = await db
+        .update(actors)
+        .set({ locale })
+        .where(and(eq(actors.id, id), sql`${actors.locale} is distinct from ${locale}`))
+        .returning({ id: actors.id })
+      return written.length > 0
+    },
+
+    async modelAccess(id, receiptsMonth) {
+      if (idOrNull(id) === null) return null
+      const [row] = await db
+        .select({
+          // empty and past are one answer, as `shared_until`'s: nothing paid
+          until:
+            sql<Date | null>`case when ${PAID_BY_MODEL} then ${actors.receiptsModelUntil} end`.mapWith(
+              actors.receiptsModelUntil,
+            ),
+          trialLeft: actors.trialReceiptsLeft,
+          read: sql<number>`(case when ${actors.modelReceiptsMonth} >= ${receiptsMonth}::date
+            then ${actors.modelReceiptsRead} else 0 end)::int`,
+        })
+        .from(actors)
+        .where(eq(actors.id, id))
+      return row ?? null
     },
 
     async update(id, patch) {

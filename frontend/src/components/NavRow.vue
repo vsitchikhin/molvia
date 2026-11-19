@@ -2,11 +2,12 @@
   <component
     :is="link ? 'a' : 'button'"
     class="nav-row"
-    :class="{ 'nav-field': field, 'nav-invalid': invalid }"
+    :class="{ 'nav-field': field, 'nav-invalid': invalid, 'nav-inactive': inactive }"
     :type="link ? undefined : 'button'"
     :href="link?.href.value"
     :aria-haspopup="link ? undefined : 'dialog'"
     :aria-invalid="invalid ? 'true' : undefined"
+    :aria-disabled="inactive ? 'true' : undefined"
     @click="click"
   >
     <component :is="icon" v-if="icon" class="icon" aria-hidden="true" />
@@ -14,7 +15,7 @@
       <span class="label">{{ label }}</span>
       <span v-if="value" class="value">{{ value }}</span>
     </span>
-    <IconChevronRight class="chevron" aria-hidden="true" />
+    <IconChevronRight v-if="!inactive" class="chevron" aria-hidden="true" />
   </component>
 </template>
 
@@ -50,6 +51,11 @@ export default defineComponent({
     icon: { type: [Object, Function] as PropType<Component>, default: undefined },
     field: { type: Boolean, default: false },
     invalid: { type: Boolean, default: false },
+    /**
+     * Not now (MOL-174, MOL-400): in the focus order, read as unavailable, the tap goes nowhere and there is no
+     * chevron — as `AccountRow` while «Записать» is on its way.
+     */
+    inactive: { type: Boolean, default: false },
   },
   emits: { click: (event: MouseEvent) => event instanceof MouseEvent },
   setup(props, { emit }) {
@@ -57,6 +63,10 @@ export default defineComponent({
     const target = props.to
     const link = target === undefined ? null : useLink({ to: computed(() => props.to ?? target) })
     function click(event: MouseEvent): void {
+      if (props.inactive) {
+        event.preventDefault()
+        return
+      }
       emit('click', event)
       if (link && !event.defaultPrevented) void link.navigate(event)
     }
@@ -104,6 +114,18 @@ export default defineComponent({
   }
 }
 
+/* Not now is the kit's whole (MOL-174, review №7 of MOL-400): no pointer and no light under it, a list's row as
+   a field; the field keeps its well. */
+.nav-inactive {
+  cursor: default;
+}
+
+@media (hover: hover) {
+  .nav-row.nav-inactive:not(.nav-field):hover {
+    background: none;
+  }
+}
+
 /* A field's well, as `AccountRow`: under the pointer the tint, where muted text is under 4.5:1 (MOL-172). */
 .nav-field {
   padding-inline: var(--space-3) var(--space-2);
@@ -123,6 +145,22 @@ export default defineComponent({
 
   &:focus-visible {
     @include focus-ring(2px);
+  }
+
+  &.nav-inactive {
+    .value {
+      font-weight: var(--weight-medium);
+    }
+
+    @media (hover: hover) {
+      &:hover {
+        background: var(--surface-2);
+
+        .value {
+          color: var(--text-muted);
+        }
+      }
+    }
   }
 
   &.nav-invalid {

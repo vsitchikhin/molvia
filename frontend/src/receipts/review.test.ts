@@ -369,7 +369,7 @@ describe('what «Записать» sends', () => {
 
   it('no place known — nothing to send: «Записать» asks for it first', () => {
     const detail = { ...receiptA(), receipt: { ...receiptA().receipt, place: null } }
-    expect(reviewPlace(detail, null)).toBeNull()
+    expect(reviewPlace(detail.receipt, null)).toBeNull()
     expect(recordBody(detail, null, reviewLines(detail, null), TRIP, '2026-09-27')).toBeNull()
   })
 

@@ -162,17 +162,18 @@ Postgres refuses, «2099» and «99:99».
 
 ## The model reads (MOL-272)
 
-**Claude Haiku 5.5 reads the receipts of those it is granted to** (owner, 18.10.2026; the cap 19.10;
-the decisions В-1…В-6 of 20.10 in `.scratch/tasks/requirements/MOL-272.md`). `backend/src/receipts/model-reader.ts`:
-every part in one message, the answer by a schema (structured output), `effort: medium`, the prompt
-`model-prompt.ts` — its version beside the model in `reader_version`, `claude-haiku-5-5@v5`.
+**Claude Haiku 5.5 reads the receipts of those it is granted to, and everyone's first ten** (owner, 18.10.2026; the cap
+19.10; the trial MOL-275, below; the decisions В-1…В-6 of 20.10 in `.scratch/tasks/requirements/MOL-272.md`).
+`backend/src/receipts/model-reader.ts`: every part in one message, the answer by a schema (structured output), `effort:
+medium`, the prompt `model-prompt.ts` — its version beside the model in `reader_version`, `claude-haiku-5-5@v5`.
 
-**Who it reads for is a column and an edition** (В-4, Р-12): `actors.receipts_model_until` still to come —
-a moment, as `shared_until` is, set by hand with `psql` until the paid layer (MOL-271) — and
-`MODEL_CONSENT_EDITION` (5) accepted, since the photo goes to Anthropic, stored in the USA and computed in any
-country it has capacity in, kept there up to 30 days (Т-9, MOL-319; edition 3 named the USA alone). Empty, past,
-ending now or an older edition: Tesseract. **Without `CLAUDE_API_KEY` nobody is read by it.** A person's
-key (`sk-ant-usr-…`) is refused by the API without its workspace, so `CLAUDE_WORKSPACE_ID` names it.
+**Who it reads for is a column, the trial and an edition** (В-4, Р-12, MOL-275): `actors.receipts_model_until` still to
+come — a moment, as `shared_until` is, set by hand with `psql` until the paid layer (MOL-271, MOL-283) — or the trial's
+receipts not spent, the month's hundred not read (`readsByModel`, below), and `MODEL_CONSENT_EDITION` (5) accepted,
+since the photo goes to Anthropic, stored in the USA and computed in any country it has capacity in, kept there up to 30
+days (Т-9, MOL-319; edition 3 named the USA alone). Empty, past or ending now with the trial spent, the hundred read, or
+an older edition: Tesseract — or nobody once payment is open (below). **Without `CLAUDE_API_KEY` nobody is read by it.**
+A person's key (`sk-ant-usr-…`) is refused by the API without its workspace, so `CLAUDE_WORKSPACE_ID` names it.
 
 **The model copies, our code decides** (MOL-268, «Дальше»): every number of a line in its place — the
 quantity and unit, the shelf price, the line's discount, what was paid — and every amount of the summary
@@ -264,9 +265,10 @@ MOL-255's rule — so it is `medium`.
 
 **What it costs is counted, and the cap cannot be passed** (Т-3, Т-4, В-2 «а»): `model_spend`, by the calendar
 month in UTC — Anthropic's bill's — in integer micro-dollars, at the price written in the code
-(`RECEIPT_MODEL_PRICE`), from each answer's `usage`, an answer we did not take too. **Before a call its worst
-is reserved in one statement**: the input at most — an image's pixels over 750, the prompt's bytes and the
-schema sent with it — and the whole output it may take; a month that would pass
+(`RECEIPT_MODEL_PRICES`, each model's — MOL-405, the model never a default), from each answer's `usage`, an answer
+we did not take too. **Before a call its worst is reserved in one statement**: the input at most — an image's
+pixels over 750, the prompt's bytes and the schema sent with it — and the whole output it may take; a month that
+would pass
 `RECEIPT_MODEL_MONTHLY_CAP_USD` ($200) refuses it, and Tesseract reads. After the answer its own price is put
 in place of the worst; **a process lost in between leaves the worst counted**, never less than was spent. **So
 the client never repeats a request** (`maxRetries: 0`, adversarial А2): a request repeated inside it is two
@@ -328,14 +330,16 @@ row. **The share is what is counted, never what was paid** (adversarial Е1): th
 own price go to Tesseract; a connection that breaks under the request in a poor network eats the share as a time out
 does, though nothing may have been billed; a fault of ours that Anthropic did bill is not in the share — once a
 receipt, some $0,009, held by the month;
-the share is reset at 04:00 of the 1st in Yerevan; one share for everybody — a tariff's own is MOL-275's, with the 100
-receipts a month.
+the share is reset at 04:00 of the 1st in Yerevan; one share for everybody — the tariff's hundred receipts a month is a
+count of its own (MOL-275, below), and a share of each tariff waits for the tariffs (MOL-283).
 
 **When the model is not the one to read, Tesseract reads, as before** (В-1 «а»): the cap, photos past the
 price, a refusal of the model, an answer cut by its length or of no schema — each paid — a request the API
 refuses for what it is (4xx, `ModelRejected`, paid nothing, a failure the owner hears of as
 `job:receipt-model`), and anything else the queue's call throws — a fault of ours, heard of as
-`receipt-reading`, the worst kept (review №4); never «не разобран» on a receipt Tesseract would read.
+`receipt-reading`, the worst kept (review №4); never «не разобран» on a receipt Tesseract would read. **Whom the model
+was to read and did not, that is** — the trial's half of the cap among the reasons (MOL-275): with payment open, someone
+the model does not read is read by nobody (below).
 
 **The model away is waited for ten minutes** (Р-9, `RECEIPT_MODEL_WAIT_MS`): a 429, a 5xx, an overload, no
 connection, a time out or an answer torn on its way (adversarial А3) leave the receipt queued with its attempt
@@ -388,6 +392,82 @@ recorded alike, by its `reader_version` — a table of its own for MOL-234's rea
 block under Tesseract's, with the same stop. A receipt that failed for its attempts has no reader and counts
 in `receipt_days`.
 
+## The trial and the month's hundred (MOL-275)
+
+**The tariff of receipts, the server's half** (MOL-271, owner's decisions of 20.10.2026; the task's В-1…В-3 and Р-1…Р-8
+of 18.11.2026 in `.scratch/tasks/requirements/MOL-275.md`): every receipt the model reads costs the owner money, so it
+reads for whoever pays — $2 a month, up to a hundred receipts — and for a newcomer's first ten. Payment itself is
+MOL-277 and MOL-283, the screen MOL-276.
+
+- **One condition, `readsByModel(month)`** (`actors-repository.ts`): edition 5 and the tariff open (`tariffOpens`) — the
+  reading paid (`receipts_model_until` to come, `PAID_BY_MODEL`) or the trial not spent (`actors.trial_receipts_left` >
+  0), and the hundred of `month` not read. The claim asks it of the receipt's month, `/actors/me` of the phone's today —
+  Georgia's camera with it (MOL-408). **No column `receipts_until`** (Р-1): `receipts_model_until` meant it already, and
+  a rename goes out in two releases (`deploy.md`); MOL-283 extends this one.
+- **The trial is ten receipts of a person's life** (`RECEIPT_TRIAL`): a count on the person that only goes down, every
+  account starting with ten — those before 0089 too — spent only while nothing is paid; paid, a reading leaves it as it
+  is (Р-2's twin: the trial waits for a month unpaid).
+- **The hundred is of the phone's month the receipt was sent in** (`RECEIPTS_MODEL_MONTH_MAX`, Р-3, MOL-121): the queue
+  reads later and has no phone, so `receipts.sent_month` is written as the receipt is taken — the day of its count of
+  the day (`countOfDay`), so it only moves on — and the person's `model_receipts_month` and `model_receipts_read` count
+  it, the month only moving on as the share's does (А4 of MOL-367): a receipt of a month before, read late, counts in
+  the later. **Access granted by hand is under it too** (Р-2), the owner's included. The share keeps its month in UTC —
+  the bill's — so the two months part for four hours at the turn of a month in Yerevan.
+- **A reading counts once it reaches the review** (`countModelReceipt` in `finish`, its transaction, the account's lock
+  first and at the count's strength): a model's reading `parsed`, read whole or in part. **Not counted:** «переснимите»,
+  a failure, an answer not taken and Tesseract's reading after it, the second reading of Sonnet and the brands — the
+  same receipt — its parts — one receipt — a Serbian receipt by its link, and **a repeat**: the tax number and the
+  number of another receipt of the person's counted before, still in the table, a removed one included (Р-4). A receipt
+  with no key counts as its own. The receipt keeps how it was counted (`counted`: `trial` — a trial receipt and a place,
+  `month` — a place alone).
+- **«Переснять» gives back what the count took** (owner's В-4 «а», adversarial А2): the key alone missed about half the
+  retakes — two readings of one paper by the model give one key on 21 receipts of 46 (MOL-272's bench), the faded ones
+  that make people retake least of all — so a counted receipt removed by «Переснять» (`remove(…, { retake: true })`,
+  the account's lock first, `retaken_at` marked on any) returns its trial receipt, if it took one, and its place in the
+  person's month wherever that is not before the one it was sent in (`giveBack`, `>=` as every reader of the count — the
+  month it counted in is not kept); the new shot counts as any. One paper, one count, whatever key each shot copied.
+  **Another shot of the same paper the model read takes the count over instead** (adversarial Б2, В1, Г1) — any not
+  counted: on the review, recorded, removed by «Удалить» or by «Переснять» and still to be brought back; one whose own
+  count «Переснять» gave back keeps `counted`, and is none. Its `retaken_at` goes with it, the count its own, so its
+  «Вернуть» takes nothing again. Three rounds closed a path each — the review, then removed and recorded, then retaken —
+  before the rule became the state itself: not counted is what a free reading is. A count given back stands
+  for no repeat; «Удалить» gives nothing back.
+- **«Вернуть» takes it again, or is refused** (`takeAgain`, adversarial Б1, В2): the place, and the trial receipt — a
+  trial or a place given back and spent since on another paper is never one twice, so with no trial left, or the month's
+  hundred read, «Вернуть» is a 409 and the receipt stays removed; paid meanwhile, it takes the place alone and is
+  counted `month`. The phone's «Переснять» offers no
+  «Вернуть»; the refusal holds the API, where any client may ask.
+- **Checked before the call, counted after it** (Р-5): the claim decides, `reserve` holds the money, `finish` counts.
+- **Near the cap the trial stops first** (owner's В-3 «а»): a person with nothing paid is held to half the month's cap
+  (`RECEIPT_TRIAL_CAP_PERCENT`, `trialCapMicroUsd`) in `reserve`'s own statement — refused there, `trial`, the share
+  given back and **no stop told**, the whole cap still the paid's; refused by the whole cap, `cap` and the stop as
+  before. Half is the owner's first notice, so he hears on the day the trial stops — **told there, at the first refusal,
+  once a month** (adversarial А1): a month the trial alone reads settles below half for good, each call's worst reserved
+  above its own price, and `settle`'s half never came. `readsFor` holds the camera to the same.
+- **Who reads past them, by the фф `payments`** (owner's В-1 «в»): off, as today, Tesseract reads whom the model does
+  not; on — payment open, MOL-277 — nobody does: such a receipt fails `unreadable`, as Georgia's (MOL-408), and the
+  purchases are typed by hand; Tesseract stays the reader of whom the model was to read and did not (the cap, the share,
+  the trial's half, an answer not taken, the model away) — and of whom the tariff opens and edition 5 does not: the
+  claim carries the tariff apart (`tariffOpens`, adversarial А3), and who has paid is never read by nobody. MOL-440
+  takes the branch «off» away with the фф.
+- **The trial reaches everyone with the release** (owner's В-2 «а»): it is whole by itself — no фф. Edition 5 named
+  Anthropic as the recipient «если вам включено» already; the trial is a reading that is on, so the privacy page took a
+  revision, not an edition.
+- **Where a person stands is the server's, to a phone that asks** (`RECEIPTS_ACCESS_HEADER`, `receiptsAccess` of
+  `/actors/me`, `receiptsAccessOf`): until when it is paid — none for a grant gone — the trial left of ten, the phone's
+  month and what was read of a hundred. An earlier build reads the answer strictly, as with `receiptsByModel`.
+- **The person's**: the three counts on `actors` and a receipt's `sent_month`, `counted` and `retaken_at` go with the
+  person and the receipt, into the copy (version 36), and `/privacy` says them under «Чеки» (a revision); not a change
+  of the row — `updated_at` does not see them (0089). The 0.3 gate's cohort reads `shared_until` alone, as before.
+- **The prices, named:** «Переснять» at the turn of a month gives back a place of the new month, the month a receipt
+  counted in not kept; a reading «Переснять» threw away was paid for by the owner — it cannot be kept, the receipt gone
+  and «Вернуть» counting it again — bounded by forty receipts a day and the $2 share; a receipt «Удалить» removed, shot
+  again later than ten minutes after, counts again, its row gone; a reading in flight as the hundredth or the tenth
+  lands may make one over — the queue reads one receipt at a time; an account erased and signed in again starts with a
+  new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt has no number (MOL-422), so a
+  shot of it again after «Удалить» counts; with payment open, the review says «Строки на фото не разобрать» of a receipt
+  nobody read until MOL-276 stands the sheet «пробные чеки закончились» before the shot.
+
 ## The class code (MOL-226)
 
 **An Armenian fiscal till marks every item with its class code**, after «Դաս.»: a customs heading of four
@@ -427,9 +507,9 @@ there is by the line's text only.
 currency; `moneyOfHundredths` turns them into the currency's minor units by its exponent. Quantities
 are thousandths. A float is a ratio that ranks candidates, never money.
 
-**The languages are the country's** — its card's (below). Armenia `hye+rus+eng`; Georgia has its language
-files in the reader, and joins with its card (MOL-248); Serbia is read by its link, not by the reader (MOL-232).
-Every alphabet at once is slower and mixes the scripts.
+**The languages are the country's** — its card's (below). Armenia `hye+rus+eng`; Georgia has none — the model alone
+reads it (MOL-408, below); Serbia is read by its link, not by the reader (MOL-232). Every alphabet at once is slower
+and mixes the scripts.
 
 ## A country's card (MOL-247)
 
@@ -507,6 +587,111 @@ narrows. **The prices, named:** a price the person typed on the sheet is doubted
 Tesseract's, which master let go; and a phone of a build before the А2 fix doubts by one
 digit alone, so the model's «660» against other people's 550 shows no hint there, as on master, until the app updates
 (`pwaUpdate.ts`).
+
+## Georgia: read by the model alone (MOL-408)
+
+**The scanner opens in Georgia, by photo, for whom the model reads** (owner, 15–16.11.2026, В-1…В-5 of
+`.scratch/tasks/requirements/MOL-408.md`). «Haiku reads any language» held for the copy — the model copied Georgian
+receipts as well as Armenian ones (the bench, below) — but the copy is only half: the total, the payment, the tax
+number and the layout are our code's, by the card's words (MOL-247), and without Georgia's no total was found, no
+receipt proven whole, and its lines of one piece went empty.
+
+- **Its card is `GEORGIAN_RECEIPTS`, and every word names the receipt it was seen on** (review 1, №5): MOL-229's five
+  photos and its draft card — the total «სულ» (never inside a word: «სულგუნი» is a cheese) and Carrefour's «TOT»; the
+  payment «გადახდა», «BOG_Cards», «EFT», «ნაღდი», «ბარათი»; the change «ხურდა» is no payment and prints below nought;
+  GEL, the day first. **A word no Georgian receipt has shown is `NEVER`**, a fragment that matches nothing — never an
+  empty one, which matches every row: a word without a paper behind it decides what a total is, and the bill words
+  and «Service» the first draft took from Armenia's card would have. So is what Georgia prints no counterpart of —
+  the card's cashback, the sum since the year's start. **The model's 5↔6 is the repair's alone** (`modelRepairSwaps`,
+  MOL-420): seen only where the total printed twice put Carrefour's sum right; `modelSwaps`, which the shop's memory
+  doubts by, stays empty — nobody measured it there.
+- **The digits of the tax number and the fiscal number are the card's** (`tinDigits`, `fiscalDigits`, `digitCounts`),
+  for the model's rows and Tesseract's layouts alike (review 1, №4): Armenia's eight and eight, Georgia's nine of a
+  company and eleven of a sole trader after «ს/კ», and no fiscal number. **No receipt number yet** (Р-5): with no
+  key a Georgian receipt is held by its id alone, and the same paper recorded twice is not caught — Nikora prints
+  «ქვითარი 1687592»; its word joins with a measure (MOL-422).
+- **The shop's memory learns only from a receipt that prints its tax number** (adversarial А1, owner's В-6 «а»): none of
+  the five photos prints «ს/კ» — the law's abbreviation is kept for the receipt that does — so a Georgian receipt has no
+  key, «Записать» writes no word, and the next receipt of the shop starts from nothing: every line «проверьте» every
+  time, the person's corrections repeated. A key by the shop's name the model copies is MOL-438; Tesseract for those the
+  model does not read (MOL-423) waits for it (owner's word, 17.11.2026).
+- **`tesseractReads`, `modelAlone` — no Tesseract** (`languages: null`, В-2 «а»): no layout of its reads a Georgian till, so a
+  Georgian receipt the model did not read — no grant, the cap, the share, an answer not taken — fails `unreadable`
+  («Строки на фото не разобрать. Покупки можно записать вручную»), never «переснимите»: a retake changes nothing. Its
+  photo is never sent to the reader. One predicate for the server's queue and the phone's camera (review 1, №3).
+- **The model away is waited for a day, and the round goes on past the receipt** (adversarial А2, owner's В-8 «а»):
+  `RECEIPT_MODEL_ALONE_WAIT_MS` — ten minutes are there to hand a receipt to Tesseract, and failed after them a Georgian
+  receipt of an outage was lost for good. A waiting receipt of a country no Tesseract reads (`modelAlone`) rests
+  (`ReceiptRepository.rest`), so an Armenian receipt behind it reaches Tesseract past its own ten minutes; one of
+  Armenia is released and stops the round as before. **And it is asked less and less often** (adversarial Р2-А1, owner's
+  В-9 «а»): no sooner than `next_attempt_at` — the column the queue of links asks again by — as long again as it has
+  waited, 1, 2, 4… minutes, an hour at most (`RECEIPT_MODEL_ALONE_RETRY_MIN_MS`, `…_MAX_MS`). A time out is paid in
+  doubt, its worst kept in the person's share (MOL-367), and asked every minute a day one receipt took the month's share
+  in under four hours; now some thirty tries a day, ≈ $0,27 at worst. Which country rests is the use case's to know
+  (`modelAlone`), the repository's only which receipts rest. The rest was refined over four rounds of the adversarial
+  review, each closing a delay the one before left:
+  - **Through an outage the person's receipts of the country rest together** (Р3-А1): `claimNext` takes none of them
+    while one rests, so the twenty the quota lets wait (`RECEIPTS_UNRECORDED_MAX`) pay one try a time, not twenty — per
+    receipt they took the share in six hours.
+  - **Only through an outage or a slow API** (owner's В-11 «а», В-12 «а», Р6-А1, Р7-А1): the model has read none of
+    the person's receipts of the country since that try (`readByModelSql`, the SQL form of `byModel`, by `read_at`).
+    Once it has, the failure was the receipt's own — an answer longer than the time out — and the receipt rests alone,
+    by its own age: by the oldest's, a new receipt failing once rested an hour behind a slow one. **Never anyone's
+    receipt**: a slow API answers short receipts in time and times out long ones, and with other people's reads
+    lifting the rest the person's twenty long receipts paid a try each at every read — the whole share in nine hours
+    with a read a minute.
+  - **A rest over goes to the person's receipt that rested longest ago, one that never rested first**
+    (`next_attempt_at nulls first`, Р4-А1): to the oldest, a receipt the model fails on by itself took every try of the
+    day.
+  - **A receipt that never rested passes the person's rest**, a try of theirs in the country a minute at most (owner's
+    В-10 «а», Р5-А1): the rest cannot tell an outage from the model failing on one receipt before it answers anything.
+
+  **The prices, named:** in an outage each receipt pays one try of its own, a minute apart — a batch of twenty some
+  $0,18 more of the share over a day, one receipt nothing; while a receipt the model fails on by itself rests, a new
+  one of the person that also fails once waits for that rest, up to an hour, unless another receipt of theirs is read
+  meanwhile (В-12 «а»); at one count of the last hour, the order
+  puts any receipt with no rest behind it — never rested, or of a country that never rests — before one back from a
+  rest, of anyone, however older (review №23); a receipt of an outage arrives within an hour of the model's return,
+  hours later; past the day, `unreadable`; each person granted pays their own tries, so an outage costs some thirty
+  worst prices a person with a Georgian receipt waiting, not one for everybody.
+
+- **The camera in Georgia is for whom the model reads now** (В-2 «а», adversarial А3): `/actors/me` says
+  `receiptsByModel` — the grant to come or the trial, the month's hundred and edition 5 (`readsByModel`, one condition
+  with the queue's, MOL-275), one more call of the largest request fitting the person's share of the month and the
+  month's cap (`readsReceiptsByModel`, the use case, by `ModelSpendRepository.readsFor` and `reserve`'s own inequality,
+  `fits` — `spent < share` offered the camera with $0,002 left, which no call fits, Р2-А1), and a model on the server at
+  all — only to a phone that asks (`RECEIPTS_BY_MODEL_HEADER`; an earlier build reads the answer strictly), and the
+  store keeps it over the settings' answer, which does not say it; one read more a request that asks. Not said — an
+  answer of a server before it, a launch offline — is no camera. **The price, named:** a grant, a share or the cap that
+  ends between the shot and the reading fails the receipt as unreadable; the camera goes some $0,018 before the share's
+  end, where a small photo would still fit; a launch with no connection shows Georgia no camera until `/actors/me`
+  answers.
+- **Every item a Georgian line finds is «проверьте»** (В-5 «б», `findsAreGuesses` of the card): the catalogue names
+  nothing in Georgian, so a line goes Serbia's way — the search of its name whole, by letters across scripts and by
+  meaning — and a find is a guess. The steps of the tax office's lines — a package's code, a delivery or a tip — stay
+  Serbia's (`receiptSourceOf`). **The price, named:** every line is flagged, «Кока-кола» too, and with no memory
+  (above) on every receipt.
+- **The newcomer is not promised a translation** where the card names no language of the catalogue — Georgia, Serbia:
+  «прочитает чек», not «прочитает и переведёт».
+- **0.2r counts Georgia with Armenia** (В-3 «в», confirmed as В-7 «б» after adversarial А1): `receipt_days` and
+  `model_receipt_days` have no country; `receipt_reason_days` tells the countries apart. **The price, named:** with no
+  memory in Georgia the same corrections count on every receipt of a shop, so the share of lines put right leans toward
+  the stop by Georgia's memory, not the reading — «Haiku has to cope with it» (owner, 17.11.2026).
+- **The prices, named:** a pharmacy's three decimals («23.868 ლარი») are no figure the parse reads, and such a line's
+  figures stay empty (Р-2, MOL-421); a rollback to a build before this task cannot list a person's receipts once one of
+  them is Georgian (Р-4); Serbia stays its link — a photo where the QR does not read is MOL-424 (В-1 «а»).
+
+**The bench** (`.scratch/tasks/research/MOL-408.md`, `tasks/status/MOL-408/`: the product's reader on 273 receipts of
+nine sets, $0,37): **the model copies any script about as well as Armenian** — Georgian 50 fields right of 51, Serbian
+126 of 132, Russian 374 of 391, Icelandic 1 175 of 1 195, the total copied right in 5 of 5, 38 of 39, 38 of 40 — and
+**our code is what loses it**: Georgia shows 12 fields right and none wrong, sums on 6 lines of 35 — a line lost leaves
+the total in one place (MOL-244), a till of sums alone had no arithmetic for MOL-290's repair to try (31 fields right
+since MOL-420 — «A line of a sum alone, put right by the total»), the pharmacies' three decimals. Russia with a card of
+the bench: totals 33 right and none wrong of 40, 28 proven whole, dates 37 of 37 (MOL-414). A tax on top, a total
+rounded to 5 sen and thousands with a point in a currency with no cents showed wrong totals or none (Malaysia,
+Indonesia, Iceland) — none of today's countries, MOL-426; two receipts on one photo, a total of the other one (MOL-425);
+and the model orders an ambiguous date's day and month itself, 2 of 16 on ReceiptBench, all of Georgia's, Russia's,
+Iceland's and Vietnam's right — MOL-305's price, measured now.
 
 ## What a line is (MOL-126)
 
@@ -1024,6 +1209,19 @@ minutes of «Вернуть» run out in the very transaction is a 404, as `payT
 — the first launch, after «Выйти» — «Записать» pressed before they answer records the receipt on no account, the row not
 drawn yet (self-review Р1-3: held for the answer, a record at the shelf with no connection would wait for it). A choice
 is kept as chosen even where it was the default, which moves with the next receipt recorded (adversarial А5).
+
+**The trip of «Записать» is in the category the review chose** (MOL-400, `money-spendings.md`): `categoryId` of the
+body, one the person has not got «Продукты», never a refusal; absent — an earlier build — «Продукты». The row is
+not now while «Записать» is on its way, as the account under it (`NavRow`'s `inactive`). The review's
+row «Категория ›» starts on the guess of the place and the receipt (a line of the class 56, a café's service); the
+choice is a draft beside the review's (`molvia.receipt-category`), as the account's is. A repeat moves no category
+chosen since in «Траты». **A receipt waiting for «Записать» stands in that category in «Покупки» too** (MOL-406):
+one rule, `reviewCategory` — the choice while the phone knows it, else `guessedTripCategory` — for the review and its
+row. The row has no lines, so **whether it serves food is the server's word on the summary** (`food`, by
+`servesFood` over its lines' classes and its service, `receipts.classesOf`), said only of a receipt read and not
+recorded, and only to a phone that asks (`RECEIPT_FOOD_HEADER`). A receipt in work or failed keeps the sign of its
+state. **The price, named:** without the word — a server rolled back past it — the row guesses as if no food, and a
+café's receipt stands in «Продукты» there while its review says «Кафе».
 
 **The same trip sent again is the same answer, another trip a 409** — the phone names the trip, as every
 write offline (MOL-24). **The same receipt recorded before is refused** (Т-11,
@@ -1597,6 +1795,54 @@ On the bench: right fields 646 → 652 and 656 → 686, am-44 99 → 117, made u
 and 17 → 19, am-44 whole. **The price, named:** a receipt with one line no swap of the pair explains — a 3 for an 8, a
 digit lost — stays as copied, its five other lines too; and am-35/36, whose sum taxed with VAT the model misread with
 the same 5→6, have no second place and are not put right.
+
+## A line of a sum alone, put right by the total (MOL-420)
+
+**Georgia's Carrefour prints a line's sum alone** — no quantity, no price — and the model copied 19 of 19 right but one,
+«5,85» as «5,86» (ge-03): the lines made 103,74 against «TOT» and «EFT» both 103,73, and all 19 went empty. **A line of
+a sum alone has no arithmetic for the repair to try, and before this task one such line put no line of its receipt
+right**: `choicesOf` found no reading of a quantity that was never printed, and `repaired` gave the receipt up.
+
+- **Read as copied, and at most one such line of the receipt moved by one swap of its sum** (`sumOnly`, the ticket's
+  «одна замена 5↔6 в одной строке»): never MOL-290's two a figure, since only the total judges such a line, and two
+  swaps give too many ways to make up a few tetri. **Within the till's rounding** (`TOLERANCE_HUNDREDTHS`, as `near`
+  of Г1 «а», review №2, round 2 Р2-1): the total chooses a sum of a line only that close and never between two sums,
+  so «5,86» moves to 5,85, never to 6,86 — today ±1 luma, 5↔6 in the last digit; Armenia's 3↔8 (±5) moves no sum
+  alone, and a pair added to a card later moves sums within the same three luma. A move is one more of the total's
+  choices — **two lines a swap moves alike are a doubt**, so are a line read whole that its swaps move alike (Б2) and
+  two moves. The walk checks each leaf against every size of a move, never against each line, so its steps do not
+  grow with them; the readings of a sum alone are counted into the receipt's ceiling and `repairTries` as a line's are.
+- **A bill's line of a count and a sum, no price printed, is a rival, never a move** (adversarial Б1): MOL-310's
+  `priceless` line holds no arithmetic either, and Georgia prints most of its lines so (ge-01, ge-02) — its sum copied
+  5↔6 beside a sum alone copied right made the total move the right one: the sandwich's 8,96 for 8,95 moved the bag's
+  0,26 to 0,25, two sums wrong, «Прочитали не всё» quiet. Its one swap within the till's rounding is one more way the
+  lines miss the total, so a move of the same size beside it is a doubt; it is never moved itself — no sum alone,
+  and repairing it is no part of this task.
+- **And never where the total explains it as well** (adversarial А1): the model copies the till's «5» as «6» in the
+  total too, alike in both its places (MOL-244 saw it in a card's payment), and then the lines as copied miss it by
+  just the luma a sum alone would move — «15.46» twice over 2,40 + 3,85 + 9,20 moved the milk, copied right, to 3,86
+  and showed it «проверьте», where the base showed nothing. So where one swap of the printed total (`slipsOfTotal`,
+  before the card's cashback or the service) undoes the move, the receipt is a doubt; its «Прочитали не всё» stays
+  and the second reader of MOL-405 keeps its say (А1б, А2). ge-03's 103,73 has no 5 or 6 to swap.
+- **In any receipt** (owner's В-1 «а»): beside lines of quantity × price too, which MOL-290 puts right as before — one
+  quantity the model left out no longer holds the whole receipt back. The Armenian bench came out the same (am-05c,
+  am-06 carry such lines), so «б» — sums alone only — was not needed.
+- **The line put right stays a sum alone** — `repaired`, no quantity, no price, `settled` false — and **proves no
+  receipt whole** (`notWhole` asks `settled` too, `balanced` of the reading likewise): its quantity was never printed.
+  The receipt then shows its sums as MOL-310's round 2 does, **and a sum the total chose vouches with them**
+  (`sumsCopied`): the one choice that meets a total two places print is the total's own second source. A sum the shop's
+  memory chose still vouches for nothing (`remembered: 'repaired'`, MOL-291). **It keeps «проверьте» shown alone**
+  (`emptied` keeps `repaired` for the total's), and the phone says «Цифры поправили — сверьте с бумагой» with no figures
+  before its sum (`ReceiptLineRow`); an earlier build gets it empty, as any line put right.
+- **The prices, named:** two lines the model misread by +d and −d beside a third that one swap moves by exactly the
+  difference meet the total — the edge of Г2 of MOL-290; a receipt with two sums misread stays empty, as before; **and
+  one sum copied a luma off by a slip no pair of the card names** (7,38 copied 7,37, adversarial А3) lets the total move
+  another line, copied right, by the luma back — two wrong figures where the base showed none. Not seen: the model's
+  slips in sums are the measured pairs (MOL-315), and a slip outside them is a hypothesis, the adversary's own word.
+  A receipt whose total has a 5 or 6 in its luma and a sum alone misread is a doubt too (А1), its lines empty as before.
+- **Measured** (`status/MOL-408/score.mts`, `status/MOL-310/score.mts`, 18.11.2026): Georgia 12 → 31 right, made up 0,
+  sums on 6 → 25 lines of 35 — ge-03's 19; the Armenian bench, production's ten and every other set of MOL-408 the same
+  to the field (their bench cards take Georgia's swaps too).
 
 ## The shop's memory as a voice in the digits (MOL-291)
 
@@ -2311,6 +2557,106 @@ service)` for every comparison of the lines with the total, the trip's money the
   (`prod-310`, outside the repository) 111 → 183 right, 0 made up, totals 3 right and 1 wrong → 9 and 0, whole 0 → 5.
   **Not reached**: 62260baa — its «ԱԱՀ-ով հարկվող» copied 5↔6 too, so no place vouches for its total; two lines whose
   quantity the model did not copy (Dog City's «,019», «Ереван Сити»'s cosmetics) — the next iteration's.
+
+## A summary in capitals, sums the total vouches for (MOL-310, iteration 2)
+
+**The owner's 13.11.2026: half of the last ten receipts with no total, many lines with no sum** — and «неверно прочитанное
+хуже непрочитанного» meant reading better, never emptying what was read. Of the seven kept for the review the model had
+misread none: every total and every sum it copied was the paper's (`misses/2026-11-13.md`). Sonnet re-reading them would
+have paid to read the same; it waits (MOL-405), and Haiku at `high` measured within the runs' spread, so it stays `medium`.
+
+- **A summary's words are read in any case** (`totalOf`): «ԸՆԴԱՄԵՆԸ», «ԸՆԴԱՄԵՆԸ ՎՃԱՐՄԱՆ», «ԸՆԴԱՄԵՆԸ ՎՃԱՐՎԱԾ» of a food court and
+  a shop's till lost four receipts their total — the total, discount, cashback, VAT, bonus and since-start words with `iu`.
+  **Never the payment's** (`paid`): its «Վճար» in small letters is inside «կանխավճարին» and «Կանխավճար», the prepayment
+  slip — read so, the slip paid, and four totals of the bench came out wrong. **«Ենթակա է վճարման»**, subject to payment,
+  is a total (`billTotal`).
+- **«ԱԱՀ-ով հարկվող» is the total's second place without the card's cashback too**: the sum taxed with VAT, the lines'
+  sum printed again (MOL-289). «Ереван Сити» without the card prints the total twice and the model copies it once.
+- **A model's sums as copied that meet a total two places vouch for vouch for every sum** (`explainedReading`,
+  `sumsMeet`): a line whose quantity or price does not hold keeps **its sum alone**, quantity and price empty, its reason
+  as before — Dog City's weight under the table's rule «?,001», «Ереван Сити»'s own rounding «989,96 / 990», «1 × цена»
+  of a receipt not whole. Only sums as copied (`sumsCopied`): one the font's swaps chose was chosen to meet the total. The
+  model's reading only — Tesseract's sum may be the total's choice. **A total read in one place stays none** (MOL-244,
+  owner's В-1 «а»), the sums meeting it or not: a food court's «1 բաժին 1,550» — the portion copied as a row of the summary
+  — keeps its bill with no total. The receipt is no more proven whole than before: its lines' quantities are not.
+- **Measured** (`status/MOL-310/score.mts`): the model's bench, three runs (two of `medium`, one of `high`), right fields
+  661 → 674, 704 → 721, 695 → 710, made up 2, 1, 1 as before; totals right 37, 36, 39 → 44 each, wrong 0; production's ten
+  of iteration 1 183 → 188, made up 0; the seven of this one: four whole, two with every sum and the total, one — the
+  portion — none.
+
+## A receipt not read whole, read again by Sonnet (MOL-405)
+
+**The owner's 17.11.2026: Sonnet second, but first the check must stop emptying what was read right.** Measured on the
+bench's answers of Haiku `medium` (two runs, 1 137 fields of truth; `.scratch/tasks/research/MOL-405.md`): of what Haiku
+wrote, 980 · 1 003 figures right and 116 · 101 wrong — two thirds of them the font's 5↔6; the check showed 674 · 721
+right and 2 · 1 wrong, so it emptied 306 · 282 right figures to stop 114 · 100. **The check alone cannot tell them
+apart**: am-11's «1 × 540 = 540» copied «1 × 640 = 640» holds its arithmetic as the next line's «1 × 560 = 560» read
+right does. A second source can — the total, the shop's memory, or a second reader.
+
+- **A receipt the model read not whole, with lines, is read again by Sonnet 5.5** (`RECEIPT_SECOND_MODEL`), the same
+  prompt, schema and `medium` effort, the same key (`receiptSecondModel` of the server). A slip or a section has no
+  lines by design and is whole as it is; a receipt read whole is never sent. Every country the model reads (owner's В-2
+  «а»).
+- **Its call is paid as the first's, by the one step** (`askModel`, review №1): its own worst — Sonnet's price,
+  `RECEIPT_MODEL_PRICES` — reserved in the month's cap and the person's share before it, its own price after, an answer
+  not taken paid too, a time out's worst kept. **Anything short of an answer keeps the first reading** (Р-3) — the worst
+  past the cap or the share, the photos past its price, the model away, refusing, cut, invalid, the request rejected
+  (the owner hears of that one): never Tesseract, never a wait, since the first is paid and checked. `second_passed` in
+  the log says why, `model_unavailable` names the model away, and the `read` line names the reading kept
+  (`readerVersion`) and the second call's price and tokens apart from the first's (review №3).
+- **Away once, or slower than a minute, Sonnet rests ten minutes** (`RECEIPT_SECOND_REST_MS`, `RECEIPT_SECOND_SLOW_MS`,
+  `modelRest`, adversarial А5, Б4): asked on every receipt read not whole, an outage held the one reader of the queue
+  its whole wait (120 s) on each and left its worst, $0,18, in every owner's share — ten time outs were 91 % of a
+  person's month; an overloaded model answers near its time out rather than refusing, and held it as long (the bench's
+  slowest answer 22 s, p90 17 s). A slow answer is still taken, and told (`second_slow`, with its time). Resting, the
+  receipt keeps its first reading (`second_passed: resting`). The rest is the API's memory: a restart asks once more.
+  **The price:** in an outage one receipt in ten minutes still waits its 120 s, and one person a while pays the worst of
+  a call that may never have been paid (MOL-367, В-6).
+- **Of the two the better goes to the review** (`betterReading`): the bench's rule R3 (owner's В-1 «а») — the one proven
+  whole; else the one with a total shown; else more lines shown as read; a tie, the first — **with two steps before the
+  total, adversarial А1's, Б1's and Г1's, not the bench's**: the one that found lines, where the other found none — a
+  section of one sum only where no reading found a line (MOL-227), or Sonnet's section took the lines Haiku found, shown
+  or to type; then the one that shows a line as read, where the other shows none — its lines found with no figure read
+  took both lines Haiku read and showed. On the bench it changes nothing. The code knows no truth: counting lines first
+  took a second reading with more lines and no total, four wrong figures with it (am-34), and lost a total on a tie
+  (am-07b). **The price, named** (adversarial А1, its variant): a reading with the total and fewer lines shown wins, and
+  a line only the other read is typed by hand — the bench had no such receipt, and counting lines before the total is
+  what lost am-34. `reader_version` is the reading kept — `claude-sonnet-5-5@v5` counts as the model's in 0.2r
+  (`MODEL_READER_PREFIXES`), its own row of `model_receipt_days`.
+- **The head is the kept reading's, what it did not read the other's** (`filledHead`, adversarial Б3): the tax number,
+  the day with its time, the receipt's number, the city — fields whose none means «not found» — the same paper read
+  twice; a day out of the window is none for either (MOL-305). Never a sum: the total goes with the lines it judged.
+  **Never how it was paid** (adversarial В1): none there is the word of every payment row the reading found — a mixed
+  payment says nothing (MOL-312) — and a reading that lost the card's row would suggest the cash account.
+- **Both readings are judged by the shop's memory under one tax number** (adversarial В2, review №17): the one that read
+  none is read again by the other's before the choice — or the choice weighs a reading the memory checked against one it
+  never saw, and «10 × 65 = 650» the person's own 55 empties stands as read. **The price:** a second query of the memory
+  and a second parse where the first read no tax number.
+- **The other is its witness** (`explainedReading({ witness })`, owner's В-4 «а»): a figure the check emptied is shown
+  again where the other reading has a line of the very same figures — quantity, price, sum and discount, none on one
+  side alone, the same article where both print one; each line a witness once, in order — **and the figure has no 6**:
+  both models read the font's 5 as a 6 alike, so with a 6 agreement proved nothing (25 right, 35 wrong), without one it
+  did (205 right, 4 wrong — 3,134 kg for 3,130, 0,534 for 0,530, 342 for 842, one sum of am-29). **Shown under
+  «проверьте»** (`repaired`, owner's В-5 «а»), as MOL-290's and MOL-291's: the check's own arithmetic proved none of it
+  — so an earlier build gets it empty and the memory takes no shelf price from it. The reasons of MOL-309 stay the
+  check's.
+- **A witness answers only a want of proof, never a proof of wrong** (`WITNESS_ANSWERS`, adversarial А2–А4, Б2): a line
+  emptied whole as one number twice (`one_alike_unproven`) or as a bill with no price (`no_price_unproven`). Never one
+  whose arithmetic does not hold, a sum of nothing, a quantity of none, a figure missing, a swap, the memory's doubt —
+  «2 × 335 = 770» copied alike by both is still wrong — nor a line whose sum the total vouched for (MOL-310): an earlier
+  build would get it empty, its sum gone. **Only a figure the check would show on a receipt proven whole**: a gift's
+  price and discount are one number twice and never shown (MOL-255, round 4, А11 «а»), so a gift gets its quantity and
+  sum. **The price:** 64 · 64 right figures the witness showed before stay empty, to keep 3 · 3 wrong ones off the
+  review; two lines of the very same figures, one of them lost by the reader kept, may still vouch one for the other
+  where no article is read.
+- **Measured, the cascade through the domain** (run 1 · run 2): right 674 · 721 → 891 · 911, wrong shown 2 · 1 → 2 · 2
+  (R3 alone: 836 · 860, 1 · 1), totals 44 · 44 → 44 · 45, whole 21 · 23 → 24 · 26; Sonnet kept on 7 · 8 receipts of the
+  23 · 21 read again.
+- **The prices, named:** a receipt with lines costs $0,0028 → ~$0,011 on the bench (×4 — a bench of hard photos, 52 %
+  read again); a person's $2 buys ~170 such receipts a month instead of ~700; Sonnet's worst, ~$0,19 on a usual receipt,
+  is held in the share while it reads, so a person near the end of the share gets Haiku's alone; a receipt read again
+  takes +10 s at p50 and +17 s at p90, more of them past «Чек разобран»'s 30 s (MOL-129). One wrong figure in 68 · 100
+  witnessed stands under «проверьте» — and a figure with a 6 the check emptied stays empty.
 
 ## What lives how long
 

@@ -1,4 +1,4 @@
-import { nextTick } from 'vue'
+import { nextTick, watch } from 'vue'
 import type { RouteLocation, RouteLocationNormalized, Router } from 'vue-router'
 
 /**
@@ -231,6 +231,17 @@ function holdWhileFocused(title: HTMLElement): void {
   )
 }
 
+let renameScreen: (() => void) | undefined
+
+/**
+ * The tab named by the route's screen again, in the language spoken now — for the door, which named it
+ * itself and gives it back (MOL-398, adversarial А1). Undefined before `installArrival`: then there is
+ * no name to give.
+ */
+export function screenNamer(): (() => void) | undefined {
+  return renameScreen
+}
+
 /**
  * What a person who cannot see the screen needs after a move: the tab's title names the screen
  * (and the Android task switcher shows it), and focus lands on the new heading instead of
@@ -251,10 +262,27 @@ export function installArrival(router: Router, t: (key: string) => string): void
     return key === undefined ? t('app.name') : `${t(key)} · ${t('app.name')}`
   }
 
-  document.title = name(router.currentRoute.value)
+  // What this wrote last: a language chosen renames the tab only while it is still the route's — the
+  // door names its own (MOL-398, adversarial А1). The name is watched itself: `t` reads the language
+  // as it changes, so nothing else has to be passed for it (review №8).
+  let written = name(router.currentRoute.value)
+  const write = (to: RouteLocationNormalized): void => {
+    written = name(to)
+    document.title = written
+  }
+  document.title = written
+  renameScreen = () => {
+    write(router.currentRoute.value)
+  }
+  watch(
+    () => name(router.currentRoute.value),
+    () => {
+      if (document.title === written) write(router.currentRoute.value)
+    },
+  )
   router.afterEach(async (to, from, failure) => {
     if (failure || to.fullPath === from.fullPath || sameScreen(from, to)) return
-    document.title = name(to)
+    write(to)
     if (from.matched.length === 0) return
     await nextTick()
     focusScreenTitle()

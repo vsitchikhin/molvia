@@ -16,6 +16,7 @@ import en from '@/i18n/en.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingHandoffStore } from '@/stores/spendingHandoff'
+import { useTripQueueStore } from '@/stores/tripQueue'
 import type { SpendingPrefill } from '@/stores/spendingHandoff'
 import MoneySpendingsView from '@/views/MoneySpendingsView.vue'
 import MoneyView from '@/views/MoneyView.vue'
@@ -25,9 +26,11 @@ const moneyMonth = vi.fn<(month: string, cursor?: JournalKey) => Promise<MoneyMo
 const recordSpending = vi.fn<(body: SpendingBody) => Promise<unknown>>()
 const amendSpending = vi.fn<(id: string, body: unknown) => Promise<unknown>>()
 const trip = vi.fn<(id: string) => Promise<unknown>>()
+const categorizeTrip = vi.fn<(id: string, body: unknown) => Promise<void>>()
 vi.mock('@/api', () => ({
   api: {
     trip: (id: string) => trip(id),
+    categorizeTrip: (id: string, body: unknown) => categorizeTrip(id, body),
     moneyMonth: (month: string, cursor?: JournalKey) => moneyMonth(month, cursor),
     recordSpending: (body: SpendingBody) => recordSpending(body),
     amendSpending: (id: string, body: unknown) => amendSpending(id, body),
@@ -941,6 +944,7 @@ describe('SpendingSheet: the items of a trip’s summary (MOL-199, Ф-13, Ф-15)
             key: TRIP,
             tripId: TRIP,
             placeName: 'SAS',
+            categoryId: null,
             items: 2,
             amount: amd('850'),
             counted: null,
@@ -1022,5 +1026,181 @@ describe('SpendingSheet: the items of a trip’s summary (MOL-199, Ф-13, Ф-15)
     const view = await summary()
     expect(view.text()).toContain(en.spending.sheet.trip_items_offline)
     expect(view.find('.state').exists()).toBe(false)
+  })
+})
+
+describe('SpendingSheet: the category of a trip in its summary (MOL-400)', () => {
+  const TRIP = 'bbbbbbbb-0000-4000-8000-000000000002'
+  const GROCERIES = 'c0000000-0000-4000-8000-000000000011'
+  const PETS = 'c0000000-0000-4000-8000-000000000012'
+  const CAFE = 'c0000000-0000-4000-8000-000000000013'
+  const preset = (id: string, key: 'groceries' | 'pets' | 'cafe') =>
+    ({ id, preset: key, name: null, colour: null, icon: null, archived: false }) as const
+
+  async function summary(categoryId: string | null): Promise<VueWrapper> {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const actor = useActorStore()
+    actor.id = ACTOR
+    actor.state = 'ready'
+    const router = createRouter({ history: createMemoryHistory(), routes })
+    await router.push('/money/spendings')
+    trip.mockReturnValue(new Promise(() => undefined))
+    const view = mount(SpendingSheet, {
+      attachTo: document.body,
+      props: {
+        open: true,
+        target: {
+          kind: 'trip',
+          day: '2026-09-25',
+          row: {
+            kind: 'trip',
+            key: TRIP,
+            tripId: TRIP,
+            placeName: 'Зоомагазин',
+            categoryId,
+            items: 1,
+            amount: amd('4500'),
+            counted: null,
+          },
+        },
+        categories: [preset(GROCERIES, 'groceries'), preset(PETS, 'pets'), preset(CAFE, 'cafe')],
+        nameOf: (one: { preset: string | null }) => one.preset ?? '',
+        spendCurrency: 'AMD',
+      },
+      global: { plugins: [pinia, router, createAppI18n('en')] },
+    })
+    views.push(view)
+    await risen()
+    return view
+  }
+
+  const row = (view: VueWrapper) => view.get('.summary .nav-row')
+
+  /** Opens «Категория ›» of the summary and chooses the category named. */
+  async function choose(view: VueWrapper, name: string): Promise<void> {
+    await row(view).trigger('click')
+    await risen()
+    const option = [...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]')].find(
+      (one) => one.textContent.includes(name),
+    )
+    if (!option) throw new Error(`no «${name}» in the list`)
+    option.click()
+    await flushPromises()
+  }
+
+  it('says «Продукты» for a trip with none, and its own for one that has it', async () => {
+    expect(row(await summary(null)).text()).toContain('groceries')
+    expect(row(await summary(PETS)).text()).toContain('pets')
+  })
+
+  it('a choice goes into the trip’s queue at once and the row says it', async () => {
+    categorizeTrip.mockReturnValue(new Promise(() => undefined))
+    const view = await summary(null)
+    await row(view).trigger('click')
+    await risen()
+    const pets = [...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]')].find(
+      (one) => one.textContent.includes('pets'),
+    )
+    if (!pets) throw new Error('no «pets» in the list')
+    pets.click()
+    await flushPromises()
+    expect(useTripQueueStore().pending).toContainEqual({
+      kind: 'category',
+      tripId: TRIP,
+      body: { categoryId: PETS },
+    })
+    expect(row(view).text()).toContain('pets')
+  })
+
+  // Дошедший выбор не уступает строке месяца, с которой шторка открылась (ревью №1, адверсариальная А2)
+  it('a choice that landed stays in the row, and the old one chosen again is sent', async () => {
+    categorizeTrip.mockReset()
+    categorizeTrip.mockResolvedValue(undefined)
+    const view = await summary(CAFE)
+    await choose(view, 'pets')
+    expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
+    expect(useTripQueueStore().pending).toEqual([])
+    expect(row(view).text()).toContain('pets')
+    await choose(view, 'cafe')
+    expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: CAFE })
+    expect(row(view).text()).toContain('cafe')
+  })
+
+  // Новое открытие той же шторки — строка месяца как есть, а не выбор прошлого (адверсариальная Б2): категорию
+  // вернули в другом окне, месяц перечитан
+  it('opened again, the row is the month’s as it is now, and the choice of the last opening is sent anew', async () => {
+    categorizeTrip.mockReset()
+    categorizeTrip.mockResolvedValue(undefined)
+    const view = await summary(CAFE)
+    await choose(view, 'pets')
+    expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
+    await view.setProps({ open: false })
+    await flushPromises()
+    await view.setProps({ open: true })
+    await risen()
+    expect(row(view).text()).toContain('cafe')
+    await choose(view, 'pets')
+    expect(categorizeTrip).toHaveBeenCalledTimes(2)
+    expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: PETS })
+  })
+
+  // Открыта снова раньше, чем месяц перечитан: строка — прежняя «Кафе», а сервер держит «Животные» (адверсариальная
+  // В1) — выбор «Кафе» уходит; внутри открытия своё слово по-прежнему не шлётся дважды
+  it('opened again over a month not read yet, the category shown is sent when chosen', async () => {
+    categorizeTrip.mockReset()
+    categorizeTrip.mockResolvedValue(undefined)
+    const view = await summary(CAFE)
+    await choose(view, 'pets')
+    await choose(view, 'pets')
+    expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
+    await view.setProps({ open: false })
+    await flushPromises()
+    await view.setProps({ open: true })
+    await risen()
+    expect(row(view).text()).toContain('cafe')
+    await choose(view, 'cafe')
+    expect(categorizeTrip).toHaveBeenCalledTimes(2)
+    expect(categorizeTrip).toHaveBeenLastCalledWith(TRIP, { categoryId: CAFE })
+  })
+
+  // Ревью №9: слово шторки глушит повтор — та же категория, пока первая запись в пути, не ставит вторую: её
+  // очередь заменила бы на месте под новым ключом, и после ответа ушёл бы второй запрос
+  it('must not fire: the same category again while the first choice is on its way sends nothing more', async () => {
+    let land: () => void = () => undefined
+    categorizeTrip.mockReset()
+    categorizeTrip.mockReturnValueOnce(
+      new Promise<void>((resolve) => {
+        land = resolve
+      }),
+    )
+    categorizeTrip.mockResolvedValue(undefined)
+    const view = await summary(CAFE)
+    await choose(view, 'pets')
+    await choose(view, 'pets')
+    land()
+    await flushPromises()
+    expect(categorizeTrip).toHaveBeenCalledExactlyOnceWith(TRIP, { categoryId: PETS })
+    expect(useTripQueueStore().pending).toEqual([])
+  })
+
+  // Строка месяца может отставать от сервера — выбор ушёл из шторки другого экрана, журнал не перечитан
+  // (адверсариальная В2): выбор, равный строке, уходит; повтор целиком ничего не двигает
+  it('the category the month’s row shows goes when chosen: the row may be older than the server', async () => {
+    categorizeTrip.mockReset()
+    categorizeTrip.mockReturnValue(new Promise(() => undefined))
+    const view = await summary(PETS)
+    await row(view).trigger('click')
+    await risen()
+    const pets = [...document.querySelectorAll<HTMLElement>('dialog[open] [role="radio"]')].find(
+      (one) => one.textContent.includes('pets'),
+    )
+    pets?.click()
+    await flushPromises()
+    expect(useTripQueueStore().pending).toContainEqual({
+      kind: 'category',
+      tripId: TRIP,
+      body: { categoryId: PETS },
+    })
   })
 })

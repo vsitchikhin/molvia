@@ -145,10 +145,11 @@ of the measure and with every test merged. So CI checks every run instead (owner
   A limit of ten times the worst, rounded up, stands 1.0–2 times above it, so a run on a busy runner sets a
   new worst somewhere now and then: red everywhere, that was somebody else's pull request red for a test it
   never touched — the flake MOL-243 closed, back by another door. The files are the merge CI checks out,
-  `HEAD^1..HEAD` (`fetch-depth: 2` in `ci.yml`); a push to master changes no file of a pull request and only
-  warns; a merge that cannot be read makes every breach red and says why, since a guard gone quiet would go
-  unseen. **The price, named:** a test made slow by a change of the code, not of its file, only warns; and
-  whoever touches a file answers for every test in it, which is how the 277 came to be given 10 s at once.
+  `HEAD^1..HEAD` (`fetch-depth: 2` of the job `tests` in `ci.yml`, MOL-375); a push to master changes no
+  file of a pull request and only warns; a merge that cannot be read makes every breach red and says why,
+  since a guard gone quiet would go unseen. **The price, named:** a test made slow by a change of the code,
+  not of its file, only warns; and whoever touches a file answers for every test in it, which is how the 277
+  came to be given 10 s at once.
 - **A test is held by its whole time**, `beforeEach`, `afterEach`, `aroundEach` and a wait it sets included:
   the reporter cannot tell a wait from work, so `navigation` and `metrics`, whose time is their own wait,
   carry a limit too — it costs nothing. **The price, named:** vitest gives those hooks no time of their

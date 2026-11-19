@@ -5,7 +5,7 @@ import postgres from 'postgres'
 import type { Sql } from 'postgres'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { testDatabaseUrl } from './db'
-import { insertItem, insertPlace, insertTrip, telegramId } from './fixtures'
+import { insertPlace, telegramId } from './fixtures'
 import { MIGRATIONS } from '@/db/migrate'
 import * as schema from '@/db/schema'
 import { expenses } from '@/db/schema'
@@ -107,6 +107,25 @@ async function seenOf(id: string): Promise<{ seen: string; updated: string }> {
   return { seen: new Date(row.seen).toISOString(), updated: new Date(row.updated).toISOString() }
 }
 
+/**
+ * A trip by SQL of its own: `trips` has a column since (0086, MOL-400) the schema would name, and the
+ * database here stands before it.
+ */
+async function insertOldTrip(fields: {
+  actorId: string
+  placeId: string
+  startedAt?: Date
+  accountId?: string | undefined
+  accountSetAt?: Date
+}): Promise<string> {
+  const id = randomUUID()
+  await sql`
+    insert into trips (id, actor_id, place_id, currency, started_at, account_id, account_set_at)
+    values (${id}, ${fields.actorId}, ${fields.placeId}, 'AMD', ${(fields.startedAt ?? new Date()).toISOString()},
+      ${fields.accountId ?? null}, ${fields.accountSetAt?.toISOString() ?? null})`
+  return id
+}
+
 describe('0073: the last visit of everyone already there', () => {
   it('takes the latest the server knows of each, and moves no `updated_at`', async () => {
     const before = journal.entries.filter((entry) => entry.idx < 73)
@@ -116,12 +135,16 @@ describe('0073: the last visit of everyone already there', () => {
     for (const entry of before) await apply(entry)
     const db = drizzle(sql, { schema })
     const place = await insertPlace(db)
-    const milk = await insertItem(db)
+    // items by SQL: `items` has a column since (0085, MOL-374) the schema would name
+    const milk = randomUUID()
+    await sql`
+      insert into items (id, kind, name, search_key, default_unit)
+      values (${milk}, 'product', 'Молоко «Ашхар»', 'moloko ashar', 'l')`
 
     // a session used on the 20th, a trip started before it: the session
     const withSession = await owner()
     await session(withSession, '2026-10-20T08:00:00.000Z')
-    await insertTrip(db, {
+    await insertOldTrip({
       actorId: withSession,
       placeId: place,
       startedAt: new Date('2026-10-01T08:00:00.000Z'),
@@ -134,7 +157,7 @@ describe('0073: the last visit of everyone already there', () => {
     // use once a day, and a record is a visit as well
     const recordLater = await owner()
     await session(recordLater, '2026-10-03T08:00:00.000Z')
-    const trip = await insertTrip(db, {
+    const trip = await insertOldTrip({
       actorId: recordLater,
       placeId: place,
       startedAt: new Date('2026-10-03T08:00:00.000Z'),
@@ -147,7 +170,7 @@ describe('0073: the last visit of everyone already there', () => {
     })
     // signed out everywhere — no session — but a trip of the 15th
     const noSession = await owner()
-    await insertTrip(db, {
+    await insertOldTrip({
       actorId: noSession,
       placeId: place,
       startedAt: new Date('2026-10-15T08:00:00.000Z'),
@@ -166,12 +189,10 @@ describe('0073: the last visit of everyone already there', () => {
         '2026-10-16T08:00:00.000Z')`
     // signed out everywhere, then proposed an item on the 17th, or bound a code to one on the 18th
     const proposed = await owner()
-    await insertItem(db, {
-      name: 'Сыр «Лори»',
-      searchKey: 'syr lori',
-      createdBy: proposed,
-      createdAt: new Date('2026-10-17T08:00:00.000Z'),
-    })
+    await sql`
+      insert into items (id, kind, name, search_key, default_unit, created_by, created_at)
+      values (${randomUUID()}, 'product', 'Сыр «Лори»', 'syr lori', 'l', ${proposed},
+        '2026-10-17T08:00:00.000Z')`
     const bound = await owner()
     await sql`
       insert into item_barcodes (code, item_id, added_by, added_at)
@@ -182,7 +203,7 @@ describe('0073: the last visit of everyone already there', () => {
       insert into money_accounts (id, actor_id, name, currency, start_minor, start_on, created_on, created_at)
       values (${randomUUID()}, ${debited}, 'Карта', 'AMD', 0, '2026-06-01', '2026-06-01', '2026-06-01T08:00:00.000Z')
       returning id`
-    await insertTrip(db, {
+    await insertOldTrip({
       actorId: debited,
       placeId: place,
       startedAt: new Date('2026-06-01T08:00:00.000Z'),
@@ -203,7 +224,7 @@ describe('0073: the last visit of everyone already there', () => {
         '2026-06-01T08:00:00.000Z', '2026-10-22T08:00:00.000Z')`
     // a trip whose phone's clock ran a year ahead: never later than the migration itself
     const ahead = await owner()
-    await insertTrip(db, {
+    await insertOldTrip({
       actorId: ahead,
       placeId: place,
       startedAt: new Date(Date.now() + 365 * 86_400_000),

@@ -8,7 +8,7 @@ import {
 import type { BrandSpellingRepository } from '@/db/brand-spellings-repository'
 import { BRANDS_OUTPUT_MAX, ModelRejected, ModelUnavailable } from '@/receipts/model-reader'
 import type { BrandAsked } from '@/receipts/model-reader'
-import type { ModelPaid, ReceiptModelDeps } from '@/usecases/read-receipts'
+import type { ModelPassReason, ModelPaid, ReceiptModelDeps } from '@/usecases/read-receipts'
 
 /**
  * The brands one call asks at most: a receipt prints a few dozen lines, and a brand past them waits for the next
@@ -26,7 +26,7 @@ export type SpellReport =
     }
   | {
       readonly kind: 'brands_passed'
-      readonly reason: 'cap' | 'share' | 'size' | 'refused' | 'cut' | 'invalid'
+      readonly reason: Exclude<ModelPassReason, 'away'>
       readonly paid?: ModelPaid
     }
   | { readonly kind: 'brands_unavailable'; readonly reason: string }
@@ -77,7 +77,10 @@ export async function spelledBrands(
     report({ kind: 'brands_passed', reason: 'size' })
     return taken
   }
-  const worst = modelCallMicroUsd({ input_tokens: input, output_tokens: BRANDS_OUTPUT_MAX })
+  const worst = modelCallMicroUsd(
+    { input_tokens: input, output_tokens: BRANDS_OUTPUT_MAX },
+    reader.model,
+  )
   const month = spendMonthOf(now())
   const call = { actorId, capMicroUsd, shareMicroUsd }
   const reserved = await spend.reserve(month, worst, call, now())

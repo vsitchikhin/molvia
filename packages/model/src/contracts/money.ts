@@ -73,8 +73,16 @@ const entryCodec = z.discriminatedUnion('kind', [
     finishedOn: exchangeDaySchema,
     amount: moneyCodec,
     counted: moneyCodec.nullable(),
+    /**
+     * The trip's own category (MOL-400), `null` — «Продукты». Sent only to a phone that asked by
+     * `MONEY_TRIP_CATEGORY_HEADER`: an installed app of an earlier build reads the month strictly.
+     */
+    categoryId: z.uuid().nullable().optional(),
   }),
 ])
+
+/** The phone knows a trip's `categoryId` in the month (MOL-400). */
+export const MONEY_TRIP_CATEGORY_HEADER = 'X-Molvia-Trip-Category'
 
 /**
  * `GET /money/months/:month` (MOL-73, handoff 06): the month of «Деньги» counted by the server — the
@@ -219,6 +227,7 @@ function entryViewOf(entry: MonthEntry) {
         finishedOn: entry.trip.finishedOn,
         amount: entry.trip.amount,
         counted: entry.counted,
+        categoryId: entry.trip.categoryId,
       }
 }
 

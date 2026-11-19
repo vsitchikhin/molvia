@@ -42,6 +42,14 @@ export const TODAY_HEADER = 'X-Molvia-Today'
  */
 export const ZONE_HEADER = 'X-Molvia-Zone'
 
+/**
+ * The header every request of the phone names the language of its screens in, `ru` or `en` (MOL-398,
+ * owner's В-1 «в»): the language, never the order of an English day. The account keeps the last one
+ * named (`actors.locale`), and the bot's rating reminder speaks it. Another value, or none — the bot, a
+ * page older than it — changes nothing.
+ */
+export const LOCALE_HEADER = 'X-Molvia-Locale'
+
 /** The build a copy that was not built by the release runs as: nothing to compare. */
 export const UNNAMED_BUILD = 'dev'
 

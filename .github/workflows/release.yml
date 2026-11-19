@@ -1,21 +1,25 @@
 name: Release
 
 # Every commit that reaches master and passes CI is built and rolled out to production (MOL-90).
-# A tag `vX.Y.Z` builds nothing: it puts its name on the images already built from its commit —
-# byte for byte what ran on production — as a mark and a point to roll back to (owner's decision
-# В-4). «Run workflow» with a tag rolls that tag out without building, which is how a rollback is
-# done by hand.
+# A tag `vX.Y.Z` — since MOL-381 also a release's `v0.2.<n>-<name>` and a hotfix's
+# `v0.2.<n>-<name>-<k>`, which `after-release.yml` sets — builds nothing: it puts its name on the
+# images already built from its commit — byte for byte what ran on production — as a mark and a point
+# to roll back to (owner's decision В-4). «Run workflow» with a tag rolls that tag out without
+# building, which is how a rollback is done by hand.
 on:
   workflow_run:
     workflows: [CI]
     types: [completed]
     branches: [master]
   push:
-    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-[a-z]+'
+      - 'v[0-9]+.[0-9]+.[0-9]+-[a-z]+-[0-9]+'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Image tag to roll out: sha-<7 hex> or v<N>.<N>.<N>'
+        description: 'Image tag to roll out: sha-<7 hex>, v<N>.<N>.<N>, v<N>.<N>.<N>-<name> or v<N>.<N>.<N>-<name>-<k>'
         required: true
 
 permissions:

@@ -4,11 +4,14 @@ import {
   ERROR,
   EXPORT_FORMAT,
   LOGIN_HEADER,
+  TRIP_HISTORY_CATEGORY_HEADER,
   RECEIPT_CASHBACK_HEADER,
   RECEIPT_BILL_HEADER,
   RECEIPT_CODES_HEADER,
+  RECEIPT_FOOD_HEADER,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
+  RECEIPTS_BY_MODEL_HEADER,
   RECEIPT_REPAIRED_HEADER,
   RECEIPT_RETAKE_HEADER,
   RECEIPT_SPELLED_HEADER,
@@ -57,6 +60,10 @@ import {
   transferViewCodec,
   tripPaymentBodySchema,
   tripReceiptBodySchema,
+  tripCategoryBodySchema,
+  placeCategoriesCodec,
+  MONEY_TRIP_CATEGORY_HEADER,
+  EXCHANGE_SCREEN_HEADER,
   unassignedOperationsCodec,
   budgetPlanBodySchema,
   moneyBudgetCodec,
@@ -106,6 +113,8 @@ import {
   verdictPathSchema,
 } from '@molvia/model'
 import type {
+  TripCategoryBody,
+  PlaceCategories,
   LoginStarted,
   SessionsResponse,
   LoginPoll,
@@ -207,6 +216,11 @@ export type CatalogueWrite =
 
 /** «Занят» comes with a 409 and is read only there; a 2xx is read only as the entry (review И). */
 const TAKEN = { 409: barcodeTakenSchema } as const
+
+/** «Обмен денег» of MOL-348: this phone reads `bars`, `walletTrack` and a currency's `track`. */
+function screenHeaders(): Headers {
+  return new Headers({ [EXCHANGE_SCREEN_HEADER]: '1' })
+}
 
 function writeOf(
   status: number,
@@ -345,6 +359,13 @@ export interface MolviaClient {
    * to send twice. `error.not_found` for a trip the server does not hold.
    */
   setTripReceipt(tripId: string, body: TripReceiptBody): Promise<TripView>
+  /**
+   * The category «Деньги» count the trip in (MOL-400), whole each time — safe for the queue to send
+   * twice. `error.not_found` for a trip the server does not hold, which the queue reads as done.
+   */
+  categorizeTrip(tripId: string, body: TripCategoryBody): Promise<void>
+  /** The category of the person's last trip at each place (MOL-400, Р-6): what a trip there starts on. */
+  placeCategories(): Promise<PlaceCategories>
   /**
    * «Удалить поход» (MOL-76): marked on the server, safe to send again. `error.not_found` for a
    * trip the server does not hold — never sent, someone else's, or final — which the queue reads
@@ -682,7 +703,10 @@ export function createClient(options: ClientOptions): MolviaClient {
       // 0.2 gate. A cold VPS answering slowly is the ordinary case, not the failure.
       request('/dev/login', actorCodec, { method: 'POST', timeout: null }),
 
-    me: () => request('/actors/me', actorCodec),
+    me: () =>
+      request('/actors/me', actorCodec, {
+        headers: new Headers({ [RECEIPTS_BY_MODEL_HEADER]: '1' }),
+      }),
     sessions: async () => request('/sessions', sessionsResponseCodec),
     exportMine: async (options = {}) => {
       const file = await request('/actors/me/export', exportEnvelopeSchema, {
@@ -821,6 +845,7 @@ export function createClient(options: ClientOptions): MolviaClient {
           ? `/trips/history?${new URLSearchParams({ before: cursor.at, beforeId: cursor.id })}`
           : '/trips/history',
         tripHistoryCodec,
+        { headers: new Headers({ [TRIP_HISTORY_CATEGORY_HEADER]: '1' }) },
       ),
 
     addExpense: async (tripId, body) => {
@@ -854,6 +879,17 @@ export function createClient(options: ClientOptions): MolviaClient {
         body: encode(tripReceiptBodySchema, body),
       }),
 
+    categorizeTrip: async (tripId, body) => {
+      noContent(
+        await exchange(`/trips/${segment(tripId)}/category`, z.undefined(), {
+          method: 'PUT',
+          body: encode(tripCategoryBodySchema, body),
+        }),
+      )
+    },
+
+    placeCategories: () => request('/trips/place-categories', placeCategoriesCodec),
+
     // A portal's page answering a redirected DELETE with 200 is not the removal (MOL-57, round 4).
     removeTrip: async (tripId) => {
       noContent(await exchange(`/trips/${segment(tripId)}`, z.undefined(), { method: 'DELETE' }))
@@ -865,11 +901,13 @@ export function createClient(options: ClientOptions): MolviaClient {
         ...(finish ? { body: encode(restoreTripBodySchema, { finish }) } : {}),
       }),
 
-    exchanges: () => request('/exchanges', exchangesResponseCodec),
+    // the figures of «Обмен денег» of MOL-348: only a phone that asks is told them
+    exchanges: () => request('/exchanges', exchangesResponseCodec, { headers: screenHeaders() }),
 
     recordExchange: async (body) => {
       const { status, data } = await exchange('/exchanges', exchangesResponseCodec, {
         method: 'POST',
+        headers: screenHeaders(),
         body: encode(exchangeBodySchema, body),
       })
       return { exchanges: data, created: status === 201 }
@@ -878,18 +916,26 @@ export function createClient(options: ClientOptions): MolviaClient {
     amendExchange: async (id, body) =>
       request(`/exchanges/${segment(id)}`, exchangesResponseCodec, {
         method: 'PUT',
+        headers: screenHeaders(),
         body: encode(exchangeAmendBodySchema, body),
       }),
 
     removeExchange: async (id) =>
-      request(`/exchanges/${segment(id)}`, exchangesResponseCodec, { method: 'DELETE' }),
+      request(`/exchanges/${segment(id)}`, exchangesResponseCodec, {
+        method: 'DELETE',
+        headers: screenHeaders(),
+      }),
 
     restoreExchange: async (id) =>
-      request(`/exchanges/${segment(id)}/restore`, exchangesResponseCodec, { method: 'POST' }),
+      request(`/exchanges/${segment(id)}/restore`, exchangesResponseCodec, {
+        method: 'POST',
+        headers: screenHeaders(),
+      }),
 
     chooseRatePreference: async (preference) =>
       request('/actors/me/rate-preference', exchangesResponseCodec, {
         method: 'PUT',
+        headers: screenHeaders(),
         body: encode(ratePreferenceBodySchema, { preference }),
       }),
 
@@ -922,7 +968,10 @@ export function createClient(options: ClientOptions): MolviaClient {
       const query = cursor
         ? `?${new URLSearchParams({ cursor: journalCursorCodec.encode(cursor) }).toString()}`
         : ''
-      return request(`/money/months/${month}${query}`, moneyMonthCodec)
+      // a trip's own category in the journal (MOL-400): only a phone that asks is told it
+      return request(`/money/months/${month}${query}`, moneyMonthCodec, {
+        headers: new Headers({ [MONEY_TRIP_CATEGORY_HEADER]: '1' }),
+      })
     },
 
     moneyChartMonth: async (month) => {
@@ -1027,7 +1076,9 @@ export function createClient(options: ClientOptions): MolviaClient {
       }),
 
     receipts: (options) =>
-      request(`/receipts${options?.shown ? '?shown=1' : ''}`, receiptsResponseCodec),
+      request(`/receipts${options?.shown ? '?shown=1' : ''}`, receiptsResponseCodec, {
+        headers: new Headers({ [RECEIPT_FOOD_HEADER]: '1' }),
+      }),
 
     receipt: (id, options) =>
       request(`/receipts/${segment(id)}${options?.shown ? '?shown=1' : ''}`, receiptDetailCodec, {

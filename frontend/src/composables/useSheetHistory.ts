@@ -301,6 +301,11 @@ export function useSheetHistory(onLeft: () => void): {
   return { lay, leave, leaveWith, laid: () => holder !== undefined }
 }
 
+/** Whether a sheet stands open over the screen — someone at work there, whom no answer moves (MOL-382). */
+export function sheetOpen(router: Router): boolean {
+  return stackOf(router).length > 0
+}
+
 /**
  * Steps off a sheet's entry that no sheet holds — left by a reload on it, by «forward» onto it, by
  * a move away from an open sheet. Such an entry is the screen's address twice: «back» from it

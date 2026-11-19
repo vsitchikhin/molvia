@@ -12,6 +12,7 @@ import StatusStrip, { STRIP_LATE_MS } from '@/components/StatusStrip.vue'
 import { answeredAt, localDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import en from '@/i18n/en.json'
+import ru from '@/i18n/ru.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
@@ -39,7 +40,7 @@ const initial = actorCodec.parse({
   updatedAt: '2026-09-01T00:00:00Z',
 })
 const views: VueWrapper[] = []
-async function render(cached = true, online?: boolean) {
+async function render(cached = true, online?: boolean, locale: 'en' | 'ru' = 'en') {
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -48,7 +49,7 @@ async function render(cached = true, online?: boolean) {
   const router = createRouter({ history: createMemoryHistory(), routes })
   await router.push('/settings')
   if (online !== undefined) vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(online)
-  const view = mount(SettingsView, { global: { plugins: [pinia, router, createAppI18n('en')] } })
+  const view = mount(SettingsView, { global: { plugins: [pinia, router, createAppI18n(locale)] } })
   views.push(view)
   await flushPromises()
   return Object.assign(view, { router, pinia })
@@ -264,18 +265,18 @@ it('Б1: an unsupported city can be returned to, and keeps its own country', asy
   // Its option used to disappear on the first change, and the body the form built for it
   // named Armenia — which the server answers 400 to. A country the settings do not offer stays
   // in the list of countries too (MOL-109).
-  const legacy = { ...initial, country: 'RU', city: 'Москва' }
+  const legacy = { ...initial, country: 'KZ', city: 'Алматы' }
   me.mockResolvedValue(legacy)
   const view = await render(false)
-  expect(options(view, 'country')).toEqual(['RU', 'AM', 'GE', 'RS'])
+  expect(options(view, 'country')).toEqual(['KZ', 'AM', 'GE', 'RU', 'RS'])
   // a country the settings never offered is named by its code (`countryLabel`)
-  expect(field(view, 'country')?.findAll('option')[0]?.text()).toBe('RU')
-  expect(options(view, 'city')).toEqual(['Москва'])
+  expect(field(view, 'country')?.findAll('option')[0]?.text()).toBe('KZ')
+  expect(options(view, 'city')).toEqual(['Алматы'])
   await field(view, 'country')?.setValue('AM')
   expect(options(view, 'city')).toEqual(['Гюмри', 'Ереван'])
   expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Гюмри')
-  await field(view, 'country')?.setValue('RU')
-  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Москва')
+  await field(view, 'country')?.setValue('KZ')
+  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Алматы')
   expect(view.find('.kept').exists()).toBe(true)
   save.mockResolvedValue(legacy)
   expect(view.get('.dock > button').attributes('aria-disabled')).toBe('true')
@@ -284,12 +285,17 @@ it('Б1: an unsupported city can be returned to, and keeps its own country', asy
 
 it('moves to Georgia: the cities follow the country, the first one chosen (MOL-109)', async () => {
   const view = await render()
-  expect(options(view, 'country')).toEqual(['AM', 'GE', 'RS'])
+  expect(options(view, 'country')).toEqual(['AM', 'GE', 'RU', 'RS'])
   expect(
     field(view, 'country')
       ?.findAll('option')
       .map((option) => option.text()),
-  ).toEqual([en.settings.countries.AM, en.settings.countries.GE, en.settings.countries.RS])
+  ).toEqual([
+    en.settings.countries.AM,
+    en.settings.countries.GE,
+    en.settings.countries.RU,
+    en.settings.countries.RS,
+  ])
   await field(view, 'country')?.setValue('GE')
   expect(options(view, 'city')).toEqual(['Тбилиси', 'Батуми'])
   expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Тбилиси')
@@ -305,6 +311,33 @@ it('moves to Georgia: the cities follow the country, the first one chosen (MOL-1
     settings: expect.objectContaining({ country: 'GE', city: 'Батуми' }),
   })
   expect(view.text()).toContain(en.settings.saved)
+})
+
+it('moves to Russia: seven cities, Moscow chosen, the spending currency untouched (MOL-412)', async () => {
+  const view = await render()
+  await field(view, 'country')?.setValue('RU')
+  expect(options(view, 'city')).toEqual([
+    'Москва',
+    'Санкт-Петербург',
+    'Волгоград',
+    'Казань',
+    'Краснодар',
+    'Сочи',
+    'Домбай',
+  ])
+  expect((field(view, 'city')?.element as HTMLSelectElement).value).toBe('Москва')
+  await field(view, 'city')?.setValue('Санкт-Петербург')
+  save.mockResolvedValue({ ...initial, country: 'RU', city: 'Санкт-Петербург' })
+  await view.get('.dock > button').trigger('click')
+  await flushPromises()
+  expect(save).toHaveBeenCalledWith({
+    previous: expect.objectContaining({ country: 'AM', city: 'Гюмри' }),
+    settings: expect.objectContaining({
+      country: 'RU',
+      city: 'Санкт-Петербург',
+      spendCurrency: initial.spendCurrency,
+    }),
+  })
 })
 
 it('the country is described by its change alone, never by an empty list (MOL-109)', async () => {
@@ -398,7 +431,7 @@ it.each([
   expect(entry?.attributes('href')).toBe('/settings/devices')
   expect(view.text()).toContain(en.settings.group_account)
 })
-it('«Тема» stands in every state, under «Бот» and over «Аккаунт» (MOL-111)', async () => {
+it('«Тема» and «Язык» stand in every state, under «Бот» and over «Аккаунт» (MOL-111, MOL-398)', async () => {
   const captions = (view: VueWrapper) => view.findAll('h2').map((caption) => caption.text())
   const loading = await (async () => {
     me.mockReturnValue(new Promise(() => undefined))
@@ -418,7 +451,24 @@ it('«Тема» stands in every state, under «Бот» and over «Аккаун
   const loaded = captions(await render())
   const at = loaded.indexOf(en.settings.group_scheme)
   expect(loaded[at - 1]).toBe(en.settings.group_bot)
-  expect(loaded[at + 1]).toBe(en.settings.group_account)
+  // In English the order of its days stands under the language.
+  expect(loaded.slice(at + 1, at + 4)).toEqual([
+    en.settings.group_locale,
+    en.settings.group_date_style,
+    en.settings.group_account,
+  ])
+  for (const view of [loading, offline, failed]) {
+    expect(captions(view)).toContain(en.settings.group_locale)
+  }
+})
+
+it('asks no order of a day in Russian: it has one (MOL-398, owner’s В-3)', async () => {
+  me.mockResolvedValue(initial)
+  const captions = (await render(true, undefined, 'ru'))
+    .findAll('h2')
+    .map((caption) => caption.text())
+  expect(captions).toContain(ru.settings.group_locale)
+  expect(captions).not.toContain(ru.settings.group_date_style)
 })
 
 describe('«Write to the developer» (MOL-147)', () => {

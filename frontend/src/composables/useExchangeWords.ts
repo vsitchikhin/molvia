@@ -1,7 +1,8 @@
 import { useI18n } from 'vue-i18n'
 import { formatMoney, formatRate, formatRateBeside, yerevanDate } from '@molvia/model'
-import type { ExchangeRate, ExchangeView } from '@molvia/model'
+import type { ExchangeRate, ExchangeView, Money } from '@molvia/model'
 import { signedAmount } from '@/components/accounts'
+import { aroundFigure } from '@/components/figure'
 import { bankWords } from '@/components/spending'
 import { calendarDay, calendarDayOfAnyYear } from '@/days'
 
@@ -42,12 +43,46 @@ export interface ExchangeWords {
   readonly dayOf: (exchange: ExchangeView) => string
   readonly moneyOf: (value: ExchangeView['given']) => string
   readonly amountsOf: (exchange: ExchangeView) => string
+  readonly amountPartsOf: (exchange: ExchangeView) => readonly AmountPart[]
   readonly rateLineOf: (exchange: ExchangeView, today: string) => string
   readonly officialOf: (exchange: ExchangeView) => OfficialWords | null
   readonly noOfficialOf: (exchange: ExchangeView) => string
   /** The bank an exchange's pair is measured by, named — «ЦБ РА», «НБ Грузии» (MOL-110). */
   readonly bankOf: (exchange: ExchangeView) => string
   readonly marketOf: (exchange: ExchangeView) => MarketWords | null
+}
+
+/** A piece of «отдал → получил»: a sum, which stands whole, or the words around it (MOL-404). */
+export interface AmountPart {
+  readonly text: string
+  readonly sum: boolean
+}
+
+/** A difference with the market by the sign of its money (MOL-190): its tone, its mark, its word. */
+export type VerdictKind = 'good' | 'bad' | 'even' | 'none'
+
+/** The kind of a sign of money — the card's, a bar's, a place's; null — no comparison. */
+export function verdictKind(sign: number | null): VerdictKind {
+  if (sign === null) return 'none'
+  return sign < 0 ? 'bad' : sign > 0 ? 'good' : 'even'
+}
+
+/** The kind of an amount by its sign. */
+export function verdictOfMoney(money: Money): VerdictKind {
+  return verdictKind(money.minor < 0n ? -1 : money.minor > 0n ? 1 : 0)
+}
+
+/** The tone a kind is drawn in: «ровно» and «без сравнения» have none (Ф-30). */
+export function toneOfVerdict(kind: VerdictKind): 'good' | 'bad' | null {
+  return kind === 'good' || kind === 'bad' ? kind : null
+}
+
+/** «лучше рынка», «хуже рынка», «ровно как рынок», or what no comparison says — one set of words. */
+export const VERDICT_WORD: Readonly<Record<VerdictKind, string>> = {
+  good: 'exchange.vs_market.better',
+  bad: 'exchange.vs_market.worse',
+  even: 'exchange.vs_market.even',
+  none: 'exchange.rate_chart.no_change',
 }
 
 /**
@@ -69,12 +104,29 @@ export function useExchangeWords(): ExchangeWords {
   /** Amounts as they were typed, as everywhere in «Деньги» (owner's decision В-1). */
   const moneyOf = (value: ExchangeView['given']): string => formatMoney(value, locale.value)
 
-  function amountsOf(exchange: ExchangeView): string {
-    return t('exchange.row_amounts', {
-      given: moneyOf(exchange.given),
-      received: moneyOf(exchange.received),
-    })
+  /**
+   * «Отдал → получил», cut around its two sums (`aroundFigure`), so a line breaks between them, never inside one. The
+   * arrow is a piece of its own: glued to either sum it took its width from that sum, shrunk under the caption though
+   * the sum alone fitted (rounds 2–3, Б3, В1); on its own it stands beside whichever sum it fits beside.
+   */
+  function amountPartsOf(exchange: ExchangeView): AmountPart[] {
+    const given = moneyOf(exchange.given)
+    const received = moneyOf(exchange.received)
+    const first = aroundFigure(t('exchange.row_amounts', { given, received }), given)
+    const second = aroundFigure(first.after, received)
+    return [
+      { text: first.before, sum: false },
+      { text: first.figure, sum: true },
+      { text: second.before, sum: false },
+      { text: second.figure, sum: true },
+      { text: second.after, sum: false },
+    ].filter((part) => part.text !== '')
   }
+
+  const amountsOf = (exchange: ExchangeView): string =>
+    amountPartsOf(exchange)
+      .map(({ text }) => text)
+      .join('')
 
   /**
    * The day and the rate it was made at — the day alone for amounts no rate in the band says. «Удалить обмен?» has
@@ -163,6 +215,7 @@ export function useExchangeWords(): ExchangeWords {
     dayOf,
     moneyOf,
     amountsOf,
+    amountPartsOf,
     rateLineOf,
     officialOf,
     noOfficialOf,

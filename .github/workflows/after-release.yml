@@ -1,0 +1,130 @@
+name: After release
+
+# What a release or a hotfix leaves once it runs on production (MOL-376; MOL-381): the tag on the build
+# that runs (owner's В-4 of `v0.1.N`), and for a release the next branch cut from master and the branches
+# older than the one before it deleted; for a hotfix master merged into the next release branch, so the
+# fix does not vanish with the next release. Whoever merged — the night, the owner's button or the owner's
+# hand in GitHub — this follows. `bin/release.mjs after` reads which it was off the merge commit.
+# `.claude/rules/deploy.md`, «One release a day».
+on:
+  # CI's run on master names the merge commit exactly; a run of Release names whatever master pointed at
+  # when it started. The rollout itself is awaited below, by what production says it runs.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [master]
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  after:
+    name: tag and branches of a release
+    if: >-
+      github.repository == 'vsitchikhin/molvia' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    environment:
+      name: production
+      deployment: false
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # A tag and a branch pushed with GitHub's own token start no workflow: the tag's job of
+      # `release.yml` would never name the images, and a release branch's pull request would not run
+      # CI. The app `molvia-release` (owner's В-2 «а»).
+      - id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ secrets.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_KEY }}
+          permission-contents: write
+          permission-workflows: write
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
+
+      - name: tag, cut, merge
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          CONCLUSION: ${{ github.event.workflow_run.conclusion }}
+          HC_RELEASE_URL: ${{ secrets.HC_RELEASE_URL }}
+        shell: bash
+        run: |
+          fail() { echo "$1" >"$RUNNER_TEMP/failure"; echo "::error::$1"; exit 1; }
+
+          plan="$(node bin/release.mjs after "$(git log -1 --format=%s "$SHA")" 2>"$RUNNER_TEMP/refused")" ||
+            fail "${SHA:0:7}: $(sed 's/^::error:://' "$RUNNER_TEMP/refused")"
+          kind="$(jq -r .kind <<<"$plan")"
+          if [[ "$kind" == none ]]; then
+            echo "${SHA:0:7} is no release and no hotfix: nothing to do"
+            exit 0
+          fi
+          tag="$(jq -r .tag <<<"$plan")"
+          next="$(jq -r .next <<<"$plan")"
+          [[ "$CONCLUSION" == success ]] || fail "$tag is not out: CI of ${SHA:0:7} on master ended $CONCLUSION"
+
+          # A tag names the build production runs (В-4): CI is done, the build and the rollout take
+          # minutes — forty at most, then it is a rollout that failed, was held or stood aside.
+          short="${SHA:0:7}"
+          version=""
+          for _ in $(seq 160); do
+            version="$(curl -fsS -m 10 https://molvia.net/api/health | sed -n 's/.*"version":"\([^"]*\)".*/\1/p')" || version=""
+            [[ "$version" == *"-g$short"* ]] && break
+            sleep 15
+          done
+          [[ "$version" == *"-g$short"* ]] ||
+            fail "$tag is not out: production runs ${version:-nothing}, not $short — roll it out, then re-run «After release»"
+
+          git config user.name 'molvia-release[bot]'
+          git config user.email 'molvia-release[bot]@users.noreply.github.com'
+
+          # Again after a failure is the same run: a tag already on this commit is done, on another a refusal.
+          if tagged="$(git rev-parse -q --verify "refs/tags/$tag^{commit}")"; then
+            [[ "$tagged" == "$SHA" ]] || fail "$tag already stands on ${tagged:0:7}, not on $short"
+          else
+            git tag -a "$tag" -m "$tag" "$SHA"
+            git push origin "refs/tags/$tag"
+          fi
+
+          if [[ "$kind" == release ]]; then
+            if git ls-remote --exit-code --heads origin "$next" >/dev/null; then
+              echo "$next is there already"
+            else
+              git push origin "$SHA:refs/heads/$next"
+            fi
+            # Three stay — the next, the one out and the one before it — so a rollback has its source;
+            # an older one goes only once master holds it all.
+            for stale in $(jq -r '.stale[]' <<<"$plan"); do
+              git ls-remote --exit-code --heads origin "$stale" >/dev/null || continue
+              git fetch --quiet origin "+refs/heads/$stale:refs/remotes/origin/$stale"
+              if git merge-base --is-ancestor "origin/$stale" "$SHA"; then
+                git push origin --delete "$stale"
+              else
+                echo "::warning::$stale holds commits master does not, kept: delete it by hand once it is settled"
+              fi
+            done
+            node bin/release.mjs ping ok "$tag out, $next cut"
+          else
+            git fetch --quiet origin "+refs/heads/$next:refs/remotes/origin/$next" ||
+              fail "$tag out, but there is no $next to bring the hotfix into"
+            git checkout --quiet -B "$next" "origin/$next"
+            git merge --no-ff --quiet -m "Merge branch 'master' into $next ($tag)" "$SHA" ||
+              fail "$tag out, but master does not merge into $next by itself: merge it by hand"
+            git push origin "$next"
+            node bin/release.mjs ping ok "$tag out, master merged into $next"
+          fi
+
+      - name: tell the owner
+        if: failure()
+        env:
+          HC_RELEASE_URL: ${{ secrets.HC_RELEASE_URL }}
+        shell: bash
+        run: |
+          reason="$(cat "$RUNNER_TEMP/failure" 2>/dev/null || echo "after-release failed: run $GITHUB_RUN_ID")"
+          node bin/release.mjs ping fail "$reason"

@@ -1,6 +1,6 @@
 # Build context is the repository root: the app needs the workspace packages, which
 # export TypeScript source rather than a built artifact.
-FROM node:22.23.4-alpine@sha256:0e1754758c2df4cfa3e68d59e2e1b7374bb7fd9ea6328eaaacf15cc934af8202 AS build
+FROM node:22.23.5-alpine@sha256:1314fb30ec37592d5845e5a160d522c0e680972aa534549940b8d73bde88481a AS build
 WORKDIR /repo
 
 COPY package.json package-lock.json ./
@@ -30,7 +30,7 @@ COPY . .
 RUN node bin/bundle.mjs backend
 
 # Debian, not alpine (MOL-105): onnxruntime's native build is for glibc.
-FROM node:22.23.4-bookworm-slim@sha256:5ec23b7c622b00547753bc6ffd78085dd868a68aeb41c8e0a1418f033e13d96d AS runtime
+FROM node:22.23.5-bookworm-slim@sha256:e9f565d32859f0cbfb52125eafe8be39390f24dac302dc3cdf566e8ba3ab21ee AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 

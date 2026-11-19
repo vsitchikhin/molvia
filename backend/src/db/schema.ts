@@ -36,6 +36,8 @@ import {
   LOCALES,
   LOGIN_CODE_MAX,
   MERGE_SUBJECTS,
+  RECEIPT_COUNTS,
+  RECEIPT_TRIAL,
   REMINDERS_OFF,
   baseUnitSchema,
   catalogueSubjectSchema,
@@ -81,6 +83,7 @@ import {
   spendingPresetSchema,
 } from '@molvia/model'
 import type {
+  ReceiptCount,
   ReceiptLayout,
   BaseUnit,
   Currency,
@@ -346,6 +349,15 @@ export const actors = pgTable(
     modelSpentMicroUsd: bigint('model_spent_micro_usd', { mode: 'number' }).notNull().default(0),
     modelShareTold: date('model_share_told'),
     /**
+     * The model's receipts of this person (MOL-275, MOL-271): the trial's left of `RECEIPT_TRIAL` — every account starts
+     * with ten, those before it too (0089), spent only while nothing is paid — and of the phone's month the receipts it
+     * read, held to `RECEIPTS_MODEL_MONTH_MAX`. Counts, never the rows of `receipts`: a receipt removed would give its
+     * place back. The month only moves on, as the share's. Not a change of the row: `updated_at` does not see them.
+     */
+    trialReceiptsLeft: smallint('trial_receipts_left').notNull().default(RECEIPT_TRIAL),
+    modelReceiptsMonth: date('model_receipts_month'),
+    modelReceiptsRead: smallint('model_receipts_read').notNull().default(0),
+    /**
      * Which rate a new trip takes (MOL-40, В-3): `personal` — the person's own, from their
      * exchanges, when there is one for the pair, and the official one otherwise — or always
      * `official`. Beside the settings rather than among them: it is switched on the screen of
@@ -424,6 +436,14 @@ export const actors = pgTable(
      */
     silenceWarning: smallint('silence_warning').$type<SilenceStep>(),
     silenceWarnedAt: timestamp('silence_warned_at', { withTimezone: true }),
+    /**
+     * The language the person's app last spoke (MOL-398, owner's В-1 «в»): every request of the phone
+     * names it (`LOCALE_HEADER`), and the guard writes it only where it differs. The bot's rating
+     * reminder speaks it; empty — no request named one yet — is Russian, as it was. The language,
+     * never the order of an English day: that is the device's alone. Not a change of the row, as the
+     * visit is not (0087).
+     */
+    locale: text('locale').$type<AppLocale>(),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     // Moved by a trigger, not by drizzle: `$onUpdate` lives in the query builder, so raw
     // SQL — the main instrument in this directory — would leave the column behind.
@@ -449,10 +469,16 @@ export const actors = pgTable(
       sql`${table.salaryShiftDay} between 1 and ${sql.raw(String(SALARY_SHIFT_DAY_MAX))}`,
     ),
     check('actors_reminders_off_known', oneOf(table.remindersOff, REMINDERS_OFF)),
+    check('actors_locale_known', oneOf(table.locale, LOCALES)),
     check('actors_receipts_sent_not_negative', sql`${table.receiptsSent} >= 0`),
     check('actors_items_proposed_not_negative', sql`${table.itemsProposed} >= 0`),
     check('actors_receipt_items_new_not_negative', sql`${table.receiptItemsNew} >= 0`),
     check('actors_model_spent_not_negative', sql`${table.modelSpentMicroUsd} >= 0`),
+    check(
+      'actors_trial_receipts_left_known',
+      sql`${table.trialReceiptsLeft} between 0 and ${sql.raw(String(RECEIPT_TRIAL))}`,
+    ),
+    check('actors_model_receipts_read_not_negative', sql`${table.modelReceiptsRead} >= 0`),
     // A version without its moment, or a moment of no version, is a consent nobody can show.
     check(
       'actors_consent_whole',
@@ -510,9 +536,18 @@ export const items = pgTable(
      * item that is itself merged is refused, and the traces of an item merged on follow it.
      */
     mergedInto: uuid('merged_into').references((): AnyPgColumn => items.id),
+    /**
+     * When its author erased themselves (MOL-374, owner's В-7 «а»): erasure marks the item and the
+     * sweep of the minute timer deletes it once no living person stands on it. Null for an item of a
+     * living author, of the seed, and of an author erased before the mark (В-6 «а»: those are left).
+     */
+    releasedAt: timestamp('released_at', { withTimezone: true }),
   },
   (table) => [
     index('items_search_key_trgm_idx').using('gin', table.searchKey.op('gin_trgm_ops')),
+    index('items_released_idx')
+      .on(table.releasedAt)
+      .where(sql`${table.releasedAt} is not null`),
     index('items_merged_into_idx')
       .on(table.mergedInto)
       .where(sql`${table.mergedInto} is not null`),
@@ -897,6 +932,9 @@ export const trips = pgTable(
     // hint of «сколько было до обмена» dates the receipt by, as a purchase by the moment it was
     // written, so a typo fixed after an exchange does not move the whole receipt past it (review 2).
     receiptFirstAt: timestamp('receipt_first_at', { withTimezone: true }),
+    // The category «Деньги» count the trip's money in (MOL-400): chosen at «Записать» and «Закончить»,
+    // changed in «Траты». Empty — «Продукты», as every trip was before (MOL-73, handoff 06).
+    categoryId: uuid('category_id'),
     // «Удалить поход» (MOL-76): marked, not deleted, by the money rule — «Вернуть» for ten
     // minutes, then the minute timer, and every reader but erasure and that timer filters it
     // out. A mark also keeps a start sent again from the queue from writing the trip anew.
@@ -1005,6 +1043,12 @@ export const trips = pgTable(
       'trips_receipt_first_with_sum',
       sql`(${table.receiptMinor} is null) = (${table.receiptFirstAt} is null)`,
     ),
+    // The category is the owner's own: the pair, not the id alone — as a spending's.
+    foreignKey({
+      name: 'trips_category_is_owners',
+      columns: [table.categoryId, table.actorId],
+      foreignColumns: [spendingCategories.id, spendingCategories.actorId],
+    }),
     ...paidFrom('trips', table),
   ],
 )
@@ -2829,7 +2873,8 @@ export const receipts = pgTable(
     source: text('source').$type<ReceiptSource>().notNull().default('photo'),
     parts: smallint('parts').notNull(),
     country: char('country', { length: 2 }).$type<ReceiptCountry>().notNull(),
-    // When the tax office is asked next about a receipt it did not show yet (MOL-232, Р-2).
+    // When the tax office is asked next about a receipt it did not show yet (MOL-232, Р-2); on a photo of a country
+    // the model alone reads, until when the person's receipts of that country rest from it, away (MOL-408, `rest`).
     nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }),
     // How a receipt's link reached the phone, and whether the camera missed before it (MOL-234): the
     // measure of the risk of MOL-233. Empty on a photo, and on a link a phone of an earlier build sent.
@@ -2883,6 +2928,20 @@ export const receipts = pgTable(
     // receipt does not say, or says both.
     paidBy: text('paid_by').$type<ReceiptPaidBy>(),
     balanced: boolean('balanced').notNull().default(false),
+    // The first day of the phone's month the receipt was sent in (MOL-275, MOL-121): the month whose hundred it counts
+    // in — the queue reads it later and has no phone. Those before it, and an image rolled back past it that writes
+    // none, Yerevan's month of their arrival (0089).
+    sentMonth: date('sent_month')
+      .notNull()
+      .default(sql`(date_trunc('month', now() at time zone 'Asia/Yerevan'))::date`),
+    // Counted among the model's receipts of its person, and how (MOL-275, `RECEIPT_COUNTS`): its reading by the model
+    // reached the review, and no receipt of theirs of the same tax number and number was counted before — a repeat
+    // costs nothing. None — not counted.
+    counted: text('counted').$type<ReceiptCount>(),
+    // Set by «Переснять» (MOL-275, owner's В-4 «а»): what its count took was given back, and «Вернуть» takes it again.
+    // Cleared where the receipt inherits the count of another shot of the paper (adversarial Г1) — a count it holds, not
+    // one given back. A count given back stands for no repeat.
+    retakenAt: timestamp('retaken_at', { withTimezone: true }),
     // The city of the settings its address prints (MOL-126, Р-6), where its place is looked for.
     city: text('city').$type<ReceiptCity>(),
     recordedAt: timestamp('recorded_at', { withTimezone: true }),
@@ -2957,6 +3016,7 @@ export const receipts = pgTable(
     check('receipts_country_known', oneOf(table.country, receiptCountrySchema.options)),
     check('receipts_language_known', oneOf(table.language, LOCALES)),
     check('receipts_currency_known', oneOf(table.currency, currencySchema.options)),
+    check('receipts_counted_known', oneOf(table.counted, RECEIPT_COUNTS)),
     check(
       'receipts_whole_when_queued',
       sql`${table.status} = 'uploading' or ${table.queuedAt} is not null`,

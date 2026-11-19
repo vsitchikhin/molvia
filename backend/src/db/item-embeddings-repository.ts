@@ -55,6 +55,9 @@ export function createItemEmbeddingRepository(db: Conn): ItemEmbeddingRepository
             from unnest(string_to_array(${ids}, ' ')::uuid[],
                         string_to_array(${vectors}, ';')) as v(id, embedding)
             join ${items} on ${items.id} = v.id
+            -- An item erasure deletes meanwhile (MOL-374, adversarial А5) is waited for and left out, not
+            -- a foreign key refusing the whole batch.
+            for key share of ${items}
             on conflict (item_id) do update
               set model = excluded.model, embedding = excluded.embedding, created_at = now()`,
       )

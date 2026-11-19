@@ -1,7 +1,12 @@
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { z } from 'zod'
-import { UNNAMED_BUILD, catalogueMergeModeSchema, telegramUserIdSchema } from '@molvia/model'
+import {
+  UNNAMED_BUILD,
+  catalogueMergeModeSchema,
+  ffEnvironmentSchema,
+  telegramUserIdSchema,
+} from '@molvia/model'
 import model from '@/embeddings/model.json'
 import { loginConfiguration } from './login-config'
 
@@ -182,5 +187,11 @@ const envSchema = z.object({
 
 export const env = envSchema.parse(process.env)
 export const VERSION = env.APP_VERSION
+
+/**
+ * The «фф» that are on (MOL-382): `FF_<NAME>` of every one the list declares, `off` unless set, and
+ * anything but `on` or `off` stops the boot. Changed by `.env.prod` and a restart of the API, no release.
+ */
+export const FF_ON = ffEnvironmentSchema.parse(process.env)
 
 export const loginConfig = loginConfiguration(process.env)

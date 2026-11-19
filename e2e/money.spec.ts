@@ -5,6 +5,7 @@ import { fakeKeyboard } from './keyboard'
 import { facesIn, standAt, stillIn, topOf } from './scroll'
 import { asBrowser, launchOffline, signedIn } from './session'
 import { chooseCategory } from './category'
+import { yerevanDay } from './days'
 import { fillDetails, openDetails } from './spending-details'
 
 test.use({ locale: 'ru-RU', reducedMotion: 'reduce' })
@@ -1034,13 +1035,6 @@ test.describe('in English', () => {
   })
 })
 
-/** A day of Yerevan's calendar, `days` from today. */
-function yerevanDay(days = 0): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
-    new Date(Date.now() + days * 24 * 60 * 60 * 1000),
-  )
-}
-
 // «На счетах сейчас» (MOL-183, Ф-27): the money on the accounts now, in the income currency, over the
 // switcher — the same balances «Счета» add up, and «now», not the month's.
 test('«На счетах сейчас» is the money on the accounts: a spending from one moves it (MOL-134, MOL-183)', async ({
@@ -1125,7 +1119,7 @@ test('a month with nothing spent keeps «Куда ушли» as tall as with a s
   expect(Math.round(spent?.height ?? 0)).toBe(Math.round(empty?.height ?? 0))
 })
 
-test('«зарплата — в следующий месяц»: the salary counts next month, and «Пришло» says so (MOL-134)', async ({
+test('«зарплата — в следующий месяц»: the salary counts towards next month, and «Пришло» says so (MOL-134)', async ({
   page,
 }) => {
   await signedIn(page)

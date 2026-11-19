@@ -345,6 +345,23 @@ export const tripReceiptBodySchema = z.strictObject({
 export type TripReceiptBody = z.output<typeof tripReceiptBodySchema>
 
 /**
+ * `PUT /trips/:id/category` (MOL-400): the category «Деньги» count the trip's money in — chosen at
+ * «Закончить» and changed in «Траты». Whole each time, so the queue may send it twice. One the person
+ * has not got is «Продукты», never a refusal: the write came from a queue.
+ */
+export const tripCategoryBodySchema = z.strictObject({ categoryId: z.uuid() })
+export type TripCategoryBody = z.output<typeof tripCategoryBodySchema>
+
+/**
+ * `GET /trips/place-categories` (MOL-400, Р-6): the category of the person's last finished trip at
+ * each place that has one — what the phone starts a receipt and a record by hand on at that place.
+ */
+export const placeCategoriesCodec = z.strictObject({
+  places: z.array(z.strictObject({ placeId: z.uuid(), categoryId: z.uuid() })),
+})
+export type PlaceCategories = z.output<typeof placeCategoriesCodec>
+
+/**
  * «Считать по новому курсу / по прежнему / по своему» (MOL-39, Р-19, Р-21). Repeatable: the same
  * choice twice is one. The own rate travels as the decimal a person types — `parseRate` reads it.
  */
@@ -447,8 +464,22 @@ export const tripHistoryEntryCodec = z.strictObject({
   total: z.array(moneyCodec).nullable().default(null),
   /** Recorded from a receipt (MOL-126): «· из чека» beside the row. */
   fromReceipt: z.boolean().default(false),
+  /**
+   * The category «Деньги» count it in (MOL-400), `null` — «Продукты»: the row's icon and colour (MOL-406). Only to
+   * a phone that asks (`TRIP_HISTORY_CATEGORY_HEADER`): an installed app of an earlier build reads a row strictly.
+   * Absent — not asked, or a server before it — is not known, and the row draws the cart.
+   */
+  categoryId: z.uuid().nullable().optional(),
 })
 export type TripHistoryEntry = z.output<typeof tripHistoryEntryCodec>
+
+/**
+ * A phone that knows a history row's `categoryId` says so by this header (MOL-406), as `RECEIPT_CODES_HEADER`: a
+ * header, not the query — a server rolled back refuses a query it does not know, and leaves a header alone. A name of
+ * its own, never the month's `MONEY_TRIP_CATEGORY_HEADER` (MOL-400): one name is one field it asks for.
+ */
+export const TRIP_HISTORY_CATEGORY_HEADER = 'X-Molvia-Trip-History-Category'
+
 export const tripHistoryCodec = z.strictObject({
   trips: z.array(tripHistoryEntryCodec).max(TRIP_HISTORY_PAGE_SIZE),
   nextCursor: tripHistoryCursorSchema.nullable(),

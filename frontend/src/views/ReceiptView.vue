@@ -203,6 +203,18 @@
           :no-items="noItems"
           @total="!locked && (totalOpen = true)"
         />
+        <!-- The category «Деньги» count it in (MOL-400): the place's last, a café's by its receipt, else
+             «Продукты» — a draft of the review, recorded with «Записать». -->
+        <AppCard class="block">
+          <TripCategoryRow
+            :categories="ownCategories"
+            :frequent="ownFrequent"
+            :name-of="categoryName"
+            :selected="categoryId"
+            :disabled="locked"
+            @pick="pickCategory"
+          />
+        </AppCard>
         <!-- The account it was paid from (MOL-312): a draft of the review, recorded with «Записать». Grown in
              where «Счета» answer after the review, as it pushes what stands under it (review Р1-3). -->
         <AppReveal>
@@ -405,6 +417,7 @@ import {
   receiptCard,
   receiptDigits,
   receiptSourceOf,
+  servesFood,
   withoutItems,
   yerevanDate,
 } from '@molvia/model'
@@ -432,9 +445,12 @@ import ScreenSkeleton from '@/components/ScreenSkeleton.vue'
 import ScreenState from '@/components/ScreenState.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
+import TripCategoryRow from '@/components/TripCategoryRow.vue'
 import { api } from '@/api'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
 import { useOnline } from '@/composables/useOnline'
+import { useOwnCategories } from '@/composables/useOwnCategories'
+import { usePlaceCategories } from '@/composables/usePlaceCategories'
 import { useReceipt } from '@/composables/useReceipt'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
 import { useLocalDay } from '@/composables/useLocalDay'
@@ -443,11 +459,19 @@ import { reportFailure } from '@/failures'
 import { newId } from '@/ids'
 import { afterStep, useNavigation } from '@/navigation'
 import { photoShelf } from '@/receipts/photoShelf'
-import { recordBody, reviewBalance, reviewDay, reviewLines, reviewPlace } from '@/receipts/review'
+import {
+  recordBody,
+  reviewBalance,
+  reviewCategory,
+  reviewDay,
+  reviewLines,
+  reviewPlace,
+} from '@/receipts/review'
 import { useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { receiptSlots, rememberPaymentAccount, rememberedAccount } from '@/stores/paymentAccounts'
+import { rememberPlaceCategory } from '@/stores/placeCategories'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { placeIdOf } from '@/stores/receiptDrafts'
 import type { AddedLineDraft, LineDraft, PlaceDraft } from '@/stores/receiptDrafts'
@@ -455,7 +479,7 @@ import { useReceiptQueueStore } from '@/stores/receiptQueue'
 
 /** The language a receipt of a country is printed in, for the system's face to pick its glyphs. */
 // the language a till prints its lines in, for the browser's choice of glyphs and hyphens
-const PRINTED_LANG: Readonly<Record<ReceiptCountry, string>> = { AM: 'hy', RS: 'sr' }
+const PRINTED_LANG: Readonly<Record<ReceiptCountry, string>> = { AM: 'hy', GE: 'ka', RS: 'sr' }
 
 /**
  * A receipt before it is recorded (MOL-127, handoff 05, 06): its place and day, its lines as read
@@ -494,6 +518,7 @@ export default defineComponent({
     ScreenSkeleton,
     ScreenState,
     SectionCaption,
+    TripCategoryRow,
     StatusStrip,
   },
   setup() {
@@ -555,7 +580,9 @@ export default defineComponent({
         ? reviewBalance(detail.value, lines.value, draft.value)
         : { lines: null, difference: null, suspect: null, recorded: 0, blank: 0 },
     )
-    const place = computed(() => (detail.value ? reviewPlace(detail.value, draft.value) : null))
+    const place = computed(() =>
+      detail.value ? reviewPlace(detail.value.receipt, draft.value) : null,
+    )
     const placeChosen = computed(() => !!draft.value?.place)
     const day = computed(() =>
       detail.value ? reviewDay(detail.value, draft.value, taken.value) : taken.value,
@@ -605,6 +632,37 @@ export default defineComponent({
      */
     const accounts = useAccountsStore()
     void accounts.refresh()
+
+    /**
+     * The category (MOL-400, Р-6): the person's choice on this review, else the guess — the category of their
+     * last trip at this place, a café where the receipt says food service, else «Продукты». A choice of a
+     * category this phone no longer knows gives way to the guess: the row says what is sent.
+     */
+    const own = useOwnCategories()
+    const placesAt = usePlaceCategories(actor.id)
+    const reviewPlaceId = computed(() => {
+      const one = detail.value
+      const place = one ? reviewPlace(one.receipt, draft.value) : null
+      return place ? placeIdOf(place) : null
+    })
+    const categoryId = computed(() => {
+      const one = detail.value
+      return reviewCategory(own.categories.value, {
+        chosen: drafts.categoryOf(id.value),
+        placeId: reviewPlaceId.value,
+        lastAt: placesAt.value,
+        food: one
+          ? servesFood(
+              one.lines.map((line) => line.hs),
+              (one.service ?? null) !== null,
+            )
+          : false,
+      })
+    })
+    function pickCategory(picked: string): void {
+      drafts.setCategory(id.value, picked)
+    }
+
     const slots = computed(() => receiptSlots(detail.value?.paidBy))
     const payment = computed(() => drafts.paymentOf(id.value))
     const accountId = computed(() => {
@@ -927,7 +985,7 @@ export default defineComponent({
       const one = detail.value
       if (!one || sending.value || recording.value) return
       // the place first, then the codes: either sheet brings «Записать» back once it is away
-      if (!reviewPlace(one, draft.value)) {
+      if (!reviewPlace(one.receipt, draft.value)) {
         askPlace(true)
         return
       }
@@ -945,16 +1003,20 @@ export default defineComponent({
         return
       }
       const barcodes = bind === true ? lineCodes.value.map((code) => code.position) : undefined
-      const body = recordBody(one, draft.value, lines.value, newId(), taken.value, barcodes, paid)
-      if (!body) {
+      const made = recordBody(one, draft.value, lines.value, newId(), taken.value, barcodes, paid)
+      if (!made) {
         askPlace(true)
         return
       }
+      const chosen = categoryId.value
+      const body = chosen === null ? made : { ...made, categoryId: chosen }
       sending.value = true
       try {
         queue.record(one.receipt.id, body)
         // the next receipt paid the same way starts on this account (MOL-312, В-1 «б»)
         rememberPaymentAccount(actor.id, currency.value, slots.value, paid?.accountId ?? null)
+        // and the next trip at this place on this category (MOL-400, Р-6)
+        rememberPlaceCategory(actor.id, reviewPlaceId.value, chosen)
         if (!navigator.onLine) {
           await goUp()
           return
@@ -992,6 +1054,11 @@ export default defineComponent({
       t,
       IconReceiptCheck,
       detail,
+      ownCategories: own.categories,
+      ownFrequent: own.frequent,
+      categoryName: own.nameOf,
+      categoryId,
+      pickCategory,
       accounts,
       accountId,
       account,

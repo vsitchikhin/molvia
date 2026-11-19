@@ -10,6 +10,7 @@ import { spendingPresetSchema } from '#model/entities/spending-category'
 import { rateChoiceSchema } from '#model/entities/trip'
 import { decimalFromScaled, scaledFromDecimal } from '#model/support/decimal'
 import { ERROR } from '#model/support/errors'
+import { LOCALES } from '#model/support/locale'
 import { currencySchema, signedMoneyCodec } from '#model/values/money'
 import { RATE_DIGITS, rateProviderSchema, rateSourceSchema } from '#model/values/rates'
 import { baseUnitSchema } from '#model/values/units'
@@ -62,8 +63,13 @@ export const EXPORT_FORMAT = 'molvia-export'
 // model is counted this month — a call whose price is not known at its highest — and whether the owner heard they
 // reached it (MOL-367). 32: a receipt's `service`, a café's service the lines make the total less (MOL-310). 33: the
 // account's `receiptItemsDay` and `receiptItemsNew`, the items put into the shared catalogue by «Записать» of the
-// person's receipts on their day, which its own quota counts (MOL-373).
-export const EXPORT_VERSION = 33
+// person's receipts on their day, which its own quota counts (MOL-373). 34: a trip's `categoryId`, the category
+// «Деньги» count it in, chosen at «Записать», «Закончить» or in «Траты» (MOL-400). 35: the account's `locale`,
+// the language the person's app last spoke, which the bot's rating reminder is written in (MOL-398). 36: the account's
+// `trialReceiptsLeft`, `modelReceiptsMonth` and `modelReceiptsRead`, the trial's receipts left and the receipts the
+// model read in the person's month, and a receipt's `sentMonth`, `counted` and `retakenAt`, the month it counts in, how
+// it was counted and when «Переснять» gave that back (MOL-275).
+export const EXPORT_VERSION = 36
 
 const day = z.iso.date()
 
@@ -150,6 +156,7 @@ const accountSchema = z.strictObject({
   lastSeenAt: isoDate,
   silenceWarning: z.int().nullable(),
   silenceWarnedAt: isoDate.nullable(),
+  locale: z.enum(LOCALES).nullable(),
   receiptsDay: day.nullable(),
   receiptsSent: z.int(),
   itemsDay: day.nullable(),
@@ -159,6 +166,9 @@ const accountSchema = z.strictObject({
   modelMonth: day.nullable(),
   modelSpentMicroUsd: z.int().nonnegative(),
   modelShareTold: day.nullable(),
+  trialReceiptsLeft: z.int().nonnegative(),
+  modelReceiptsMonth: day.nullable(),
+  modelReceiptsRead: z.int().nonnegative(),
   createdAt: isoDate,
   updatedAt: isoDate,
 })
@@ -210,6 +220,8 @@ const tripSchema = z.strictObject({
   receipt: signedMoneyCodec.nullable(),
   receiptSetAt: isoDate.nullable(),
   receiptFirstAt: isoDate.nullable(),
+  // The category «Деньги» count it in (MOL-400); none — «Продукты».
+  categoryId: z.uuid().nullable(),
   removedAt: isoDate.nullable(),
 })
 
@@ -401,6 +413,9 @@ const receiptSchema = z.strictObject({
   readPartly: z.boolean().nullable(),
   paidBy: z.string().nullable(),
   balanced: z.boolean(),
+  sentMonth: day,
+  counted: z.string().nullable(),
+  retakenAt: isoDate.nullable(),
   city: z.string().nullable(),
   recordedAt: isoDate.nullable(),
   heard: receiptHeardSchema.nullable(),

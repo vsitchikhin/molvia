@@ -10,6 +10,8 @@ paths:
   - 'backend/src/routes/health.ts'
   - 'bot/src/pulse.ts'
   - '.env.prod.example'
+  - 'packages/model/src/contracts/ff.ts'
+  - 'frontend/src/stores/ff.ts'
   - 'deploy/grafana/**'
   - 'deploy/victoria/**'
 ---
@@ -48,11 +50,17 @@ The shape worth knowing here:
   with the others; **a rollback starts `backend bot frontend` only** — a tag from before MOL-125 has no
   reader image, and `up -d` of everything would stop on the missing pull with the API left broken. The
   reader holds nothing and answers any API alike, so whatever runs of it stays.
-- **The metrics are five more services and two more images** (MOL-145): VictoriaMetrics,
+- **The metrics are six more services and two more images of ours** (MOL-145, MOL-399): VictoriaMetrics,
   node_exporter, cAdvisor and postgres_exporter on `metrics`, an `internal` network with no way out,
   Grafana in `metrics` and in `alerts`, a network of its own with a way out, its one port on
-  `127.0.0.1:3000` for an SSH tunnel. `molvia-grafana` and `molvia-victoria` carry what they read baked
-  in and are built by the release beside the four — Grafana from `grafana/grafana`, never
+  `127.0.0.1:3000` for an SSH tunnel. **The sixth is `tunnel`** (MOL-399): `cloudflare/cloudflared` of an
+  exact tag, in `alerts` beside Grafana, no port, its routes the compose file's — the dashboard shared by
+  link from any device, through Cloudflare Access (`observability.md`). One of the metrics, so it never
+  judges a rollout either; its line of `.env.prod`, `CLOUDFLARE_TUNNEL_TOKEN`, is required — set before
+  the release that brought it, as `deploy/README.md`, «Metrics», says. **Its routes are `configs` with
+  `content`, so the file wants Compose 2.23.1 or later** (review №8): an older one reads none of it, and no
+  release goes out, the application's included. `molvia-grafana` and `molvia-victoria` carry what they read
+  baked in and are built by the release beside the four — Grafana from `grafana/grafana`, never
   `grafana/grafana-oss`, which stopped at 13.0.2 in June 2026 and so would never have reached Dependabot
   (MOL-365); the exporters are upstream images of exact tags.
   **They never judge a rollout** (adversarial А4): their images are pulled before anything changes, the
@@ -198,6 +206,136 @@ The shape worth knowing here:
   and the commit, `v0.1.5-81-g0f371828` (MOL-371): a release is a commit of master's first line, each a pull
   request merged, by a merge or a squash, and rolled out; `git describe --long` counted every commit of the
   branches merged too — 1282 for those 81. The form is `describe`'s, `-g<sha>` what the tag's job looks for.
+- **One release a day, through `release/<name>` (MOL-376, owner's decisions of 11.11.2026).** A merge into
+  master is still the rollout; what changed is what may merge there. **Why:** each rollout puts «Обновить»
+  in front of every installed app (MOL-132), and a day of agents closes up to ten tasks — ten updates a day
+  for a person at the shelf. The day's tasks now gather in one branch and reach people once.
+  - **Master takes `release/<name>` and `hotfix/<name>-<number>` only.** A task branches from the current
+    release branch and its pull request goes back into it; CI runs on it as on any pull request, and the
+    owner's word merges it, as before.
+  - **The release is the pull request `release/<name>` → master**, merged by a merge commit. The tag
+    `v0.2.<n>-<name>` goes on that commit once production's `/health` names it (the rule of `v0.1.N`,
+    owner's В-4: a tag is the build that runs). The `v` stays: every earlier tag has it, and
+    `describe --match 'v[0-9]*'` and the rollback find tags by it.
+  - **When:** on the owner's word «выпускай», or by itself at 03:00 Yerevan time when no release went out in
+    the 24 hours before and the branch differs from master (owner's В-10: the word and the schedule
+    together). A red CI on the release branch stops the night release and tells the owner. **Since MOL-381
+    the word is «Run workflow» on `release-night.yml`, and the night is its cron** (`bin/release.mjs`):
+    - **The branch differs by its files, not by a commit** — after a hotfix master is merged into the next
+      release branch, and that merge alone is nothing to release.
+    - **Only a release by hand holds the night back** (MOL-381, owner's В-4 «а»): GitHub's cron runs late
+      here (MOL-221), and a night on time after a late one would find less than 24 hours and skip a day.
+      The night's merge carries `(night)` after the subject GitHub writes; a release by hand — the button
+      or GitHub's interface — has none. **The price, named:** a subject edited by hand in GitHub's
+      interface is read as GitHub's; edited into `(night)`, it holds no night back.
+    - **What CI passed is what merges**: up to an hour for both gates on the branch's head, the merge
+      bound to that commit (`--match-head-commit`); a task merged meanwhile goes with the next release.
+    - **By the app `molvia-release`, never `GITHUB_TOKEN`** (owner's В-2 «а»): what GitHub's own token
+      does starts no workflow — no CI on master, no rollout, no tag's job.
+    - **Its word is the check `molvia-release`** (owner's В-5 «а»): a night with nothing to release pings
+      too, so a night that never ran is an alarm as well.
+  - **Right after a release the next branch is cut from master.** Three `release/*` stay — the next, the
+    one just out and the one before it, so a rollback has its source; older ones are deleted. **Since
+    MOL-381 `after-release.yml` does it, and tags**, after CI on master for whoever merged: the merge
+    commit's branch says what it was, `/api/health` naming the commit says it is out (forty minutes at
+    most), then the tag, the next branch and the deletions — an old branch only once master holds it. A
+    release out of turn — not the next name after the last tag — is refused: the tags are the record.
+  - **A hotfix mends the release that is out**, never the next one: `hotfix/<that release's name>-<k>`, `k`
+    from 1, cut from master, merged into master, tagged `v0.2.<n>-<name>-<k>` with the release's own `n`;
+    then master is merged into the next release branch, so the fix does not vanish with the next release —
+    `after-release.yml` both, a conflict a `/fail` to merge by hand.
+    The next full release takes its own name and `n + 1`. A hotfix is not «the day's release» for the 03:00
+    rule: one fix would otherwise hold the day's features back a day.
+  - **Names rotate through three themes — a stone, a wind, a river — each in alphabetical order** (owner's В-9,
+    11.11.2026): `v0.2.1-agate`, `v0.2.2-alize`, `v0.2.3-amazon`, `v0.2.4-amethyst`… One word in Latin, lower
+    case, from the lists below; a list at its end starts over, and the number `n` keeps the tags apart. A
+    hotfix takes its release's name, never the next one. **The lists that count are `bin/release.mjs`'s**
+    (`NAMES`, MOL-381): name `n` is the stone, the wind or the river of `n − 1` in turn; the lists below
+    are their copy, held equal by `bin/release.test.ts`.
+    - stones: agate, amethyst, azurite, beryl, calcite, cinnabar, citrine, diopside, dolomite, emerald,
+      epidote, feldspar, fluorite, galena, garnet, gypsum, hematite, howlite, iolite, jade, jasper, kunzite,
+      kyanite, labradorite, lazurite, magnetite, malachite, nephrite, obsidian, onyx, opal, peridot, pyrite,
+      quartz, rhodonite, ruby, sapphire, sodalite, spinel, topaz, tourmaline, turquoise, unakite, variscite,
+      wulfenite, xenotime, zircon, zoisite;
+    - winds: alize, berg, bora, brickfielder, buran, chergui, chinook, elephanta, etesian, foehn, gregale,
+      haboob, harmattan, karaburan, khamsin, kona, levante, leveche, libeccio, marin, meltemi, mistral, ostro,
+      pampero, papagayo, simoom, sirocco, solano, sukhovey, tramontane, vendaval, williwaw, zonda;
+    - rivers: amazon, amur, araks, brahmaputra, congo, danube, debed, dnieper, don, drina, ebro, elbe,
+      euphrates, fraser, ganges, hrazdan, hudson, indus, irtysh, jordan, kura, lena, loire, mekong,
+      mississippi, morava, niger, nile, ob, oder, orinoco, po, rhine, rhone, sava, seine, shannon, tagus,
+      thames, tigris, ural, vistula, volga, yangtze, yenisei, yukon, zambezi.
+  - **Master takes `release/*`, `hotfix/*` and `dependabot/*`** (MOL-381; owner's В-7 «б» for Dependabot,
+    whose base cannot follow a name that changes daily): CI's first step, `bin/release.mjs source`, since a
+    ruleset cannot say where a pull request comes from and already requires that job's gate. **The price,
+    named:** a Dependabot merge is a rollout of its own and not the day's release. A tag of either form
+    names the images (`release.yml`) and rolls back (`deploy.sh`, whose copy on the machine is the
+    owner's to bring).
+- **A feature people should not see yet is closed by an «фф», and only such a one** (MOL-382; owner's В-1 «в» of
+  MOL-376, В-1…В-4 «а» of MOL-382): 0.3 ships openly, a finished feature reaching people with its release, and since
+  `v0.2.0` nothing half-done ships (MOL-298) — so an фф stands where a chain is not whole yet or a channel not live
+  (venues before «Что заказать», payment before the bank). Out of scope, by Jira: a flag per person or per share of
+  people (no hypothesis), and a switch without a restart.
+  - **One list, in the domain** (`packages/model/src/contracts/ff.ts`): a name in Latin `snake_case`, what it
+    closes, and **the task that takes it off, filed with the entry** (`removedBy`, В-3 «а») — a test refuses an
+    entry without one and two entries with one task. From it come the variable `FF_<NAME>`, the header's words,
+    the type of a name and the environment of end-to-end; a new фф is an entry, a line of `docker-compose.prod.yml`
+    (`${FF_<NAME>:-off}`) and of `.env.prod.example`. Today `venues` (MOL-439) and `payments` (MOL-440), both
+    off (В-4 «а»).
+  - **The value is the API's environment, strictly `on` or `off`, `off` unset**: `ON`, `true`, `1` or a typo stop
+    the start (`ffEnvironmentSchema`), naming the variable — a payment silently off is worse than an API that
+    does not start and says why. Turned on by the owner's word, a line of `.env.prod` and `up -d backend`: no release
+    (`deploy/README.md`, «Feature flags»). **A typo in the name never reaches the API** (adversarial А5): compose
+    passes each фф by name, and `FF_PAYMNETS=on` is dropped with payment left off. So **the line is written by
+    `deploy/ff.sh`**, which asks compose what it reads (`config --environment`, never a parse) and refuses any
+    name of an фф the compose file does not pass, writing nothing; it replaces the line or adds it — production's
+    file was made before MOL-382 and has none, where a `sed` of the line changed nothing, silently (А6). Its copy
+    on the machine is the owner's, as `deploy.sh`'s. **The price, named:** a line typed by hand past it is still
+    silent until `./ff.sh` reads the file, or the header after the restart says what is on.
+  - **Off, a feature's routes and timers are not registered at all** — `if (ff.has(name))` at the composition
+    point of `server.ts`, never a check inside a route — so what answers is the API's «no such address», word for
+    word: before the session and the fetch metadata, no `401` that puts the cookie out, `unmatched` in the
+    metrics; nothing says the feature exists. A feature that is a branch inside a route that stays (a café's
+    receipt, a dish's rating) takes `ff` among its use case's dependencies, and off it answers and behaves exactly
+    as before it — its own task says how. `options.ff` of `buildServer` is the environment's unless a test names
+    its own (`ff-header.integration.test.ts`). **A feature's path must be no route's that stays** (adversarial
+    А1): `/trips/venues` unregistered is `/trips/:tripId`'s — its `401`, the fetch guard's 404 with a body of its
+    own. The test holds every route the server has with every фф on and has not with none: asked of the server
+    with none, each answers as `/nowhere` does — so a feature's route is held the day it is registered.
+  - **The phone hears them from every answer, never from a body** (В-1 «а»): `X-Molvia-Ff` beside
+    `X-Molvia-Version`, in `onSend` and `frameworkErrors`, the names on in the list's order, empty for none — an
+    answer too. Not a field of `/actors/me`: its schema is strict, and every open page of the build before would
+    have failed «who am I» until «Обновить»; and it is read behind the door only. The client reads the header
+    before the body (`onFf`); an answer without it — a proxy, a portal — changes nothing, a name this build does not
+    know is passed over.
+  - **The phone keeps the last list on the device** (`molvia.ff`, `stores/ff.ts`): the server's, not the
+    person's, so «Выйти» and erasure leave it, as the scheme; nothing heard and nothing kept is all off. Written
+    whenever the device holds another list, never by the window's memory alone — another window may have written an
+    older one since (adversarial А3). A feature's entries are `v-if` by `useFf(name)` and come and go with the
+    next answer, no reload; its screens carry `meta.ff`, and while it is off a move there goes home as an unknown
+    address does (`closedByFf`). **The next answer decides a move closed** (adversarial А2): a link opened cold is
+    judged by what the device kept, before any answer, so an answer that names the фф on takes the person where
+    the link went, if they are still where the move landed — behind the door too, which stands over the route —
+    have not touched the page since (a tap, a key, typing, the wheel) and no sheet is open there: the answer may
+    come minutes later, with the connection, and what was typed in a sheet or the search, a list scrolled, would
+    go with home (adversarial Б1, В1). A touch is the line: reading the screen without one — a screen reader moves
+    only the focus — does not hold the link back. One move of the mounted app (В2): over a home that stands alone —
+    a cold start — the screen is pushed, so Android's «back» steps home and never out of the app (Б2); over an entry
+    of the app it takes home's place. Its parents are not laid under it: a screen whose chain goes through home
+    has home underneath, so the chevron and «back» step home past its parent (`backTarget` steps to the first
+    ancestor underneath); one whose chain ends at another tab's root has none of it underneath, and the chevron
+    puts the parent in its place (`step: false`). An answer naming it off ends it.
+  - **The bot reads none**: it is a client of the API, and a feature of the bot is closed by the API's route.
+  - **A feature's tests run in both positions** (В-2 «а»): end-to-end's API has every фф on, so a spec meets the
+    feature as people will; its «off» on the phone is `ffOff(page, names)` of `e2e/session.ts`, which rewrites the
+    header in the page's own `fetch`, an init script laid before `open()` — never a route: a route a spec lays
+    after it and lets go on with `route.continue()` skips every route before it, and the phone heard the
+    feature on (adversarial А4); the server's «off» is the integration tests', a route off answering as an
+    unknown address.
+  - **The prices, named:** the code of a feature that is off ships in the bundle and the image — the repository
+    is public anyway; turning one on is a restart, seconds of `503` on `/health`; a page open meanwhile learns of
+    it with its next answer, and a screen of a feature turned off stays until it is left; the names of the фф
+    that are on are in every answer — they are about to be visible anyway; and a feature that is a branch inside
+    a route that stays is held by its own task, since no route of its own is there for the test to find.
 - **Production is watched from outside, never from the machine (MOL-142; MOL-149, В-4).** A watch on
   the same machine does not notice the machine is down. **The Worker `molvia-watch` on Cloudflare**
   (`deploy/watch`, MOL-221) asks every five minutes for `/api/health` and the page and pings the

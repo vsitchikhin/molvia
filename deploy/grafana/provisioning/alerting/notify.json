@@ -4,7 +4,7 @@
     {
       "orgId": 1,
       "name": "molvia",
-      "template": "{{ define \"molvia\" }}{{ range .Alerts.Firing }}🔥 {{ .Labels.alertname }}\n{{ .Annotations.summary }}\n{{ with .Annotations.Error }}Запрос не выполнился: {{ . }}\n{{ end }}{{ end }}{{ range .Alerts.Resolved }}✅ Прошло: {{ .Labels.alertname }}\n{{ end }}Дашборд — через туннель, deploy/README.md «Metrics».{{ end }}"
+      "template": "{{ define \"molvia\" }}{{ range .Alerts.Firing }}🔥 {{ .Labels.alertname }}\n{{ .Annotations.summary }}\n{{ with .Annotations.Error }}Запрос не выполнился: {{ . }}\n{{ end }}{{ end }}{{ range .Alerts.Resolved }}✅ Прошло: {{ .Labels.alertname }}\n{{ end }}Дашборд — закладка общей ссылки, deploy/README.md «Looking».{{ end }}"
     }
   ],
   "contactPoints": [

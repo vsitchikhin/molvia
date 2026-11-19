@@ -402,10 +402,39 @@ task are В-1…В-5 in `.scratch/tasks/requirements/MOL-145.md`.
   node_exporter is not on the host's network, which would be a port outside, so the machine's network
   counters are not there. **Grafana is in `metrics` and in `alerts` of its own**, for Telegram and the
   pulse — not in `default` (review №4), beside Caddy, the API, the bot and the receipt reader, which
-  asks nobody who calls — and its one port is on the loopback for the tunnel. cAdvisor has
+  asks nobody who calls — and its one port is on the loopback for the SSH tunnel. cAdvisor has
   `CAP_SYSLOG` and nothing more (review №1): the OOM-killer is read from the kernel's log, which
   `kernel.dmesg_restrict=1` of Debian and Ubuntu keeps from anything without it — every OOM counted 0
   in silence, «Could not configure a source for OOM detection» in its log alone.
+- **Grafana from outside is its dashboard shared by link, through a Cloudflare Tunnel that passes nothing
+  else, behind Cloudflare Access** (MOL-399, owner's В-1 «а», В-6 «а»; MOL-149's В-3 «SSH tunnel» changed
+  by the owner's word of MOL-376: «с любого устройства… но скрыть от ненужных глаз»). **Nobody from outside
+  is a user of Grafana** (В-6 «а», adversarial А1–А3): a signed-in user, a Viewer too, wrote into
+  VictoriaMetrics through the data source's proxy by `GET` with a body, read the alarms' pulse URL from the
+  contact points, and `admin` signed in by the form and basic auth — none of which Grafana's free edition
+  can narrow. The shared link signs in to nothing and runs the dashboard's own panels alone (no other
+  query, no API, no proxy: 401 without a session, tried on a copy). **What the tunnel passes is the compose
+  file's** (`configs: tunnel`): `^/(public-dashboards|public|api/public)/` to `http://grafana:3000`, anything
+  else the tunnel's own 404 — so no login and no API from outside, whether Access stands or not; a test
+  holds the routes, and a path with `..` behind an allowed prefix reaches no other route of Grafana (tried:
+  404, no session). So **the tunnel is managed locally** — made by `cloudflared tunnel create`, never in Zero
+  Trust's dashboard, whose routes would replace the file's — and run by its token from the environment
+  (`TUNNEL_TOKEN`), never an argument. `cloudflared` holds a connection out, so the machine opens no port,
+  and **stands in `alerts` alone, never `metrics`**: all it reaches is Grafana — not VictoriaMetrics, which
+  has no password, nor the API. Access sends a code to the owner's e-mail alone, a month a device (В-2 «а»).
+  `admin`, Explore and the alarms stay behind the SSH tunnel, the way in when Cloudflare is down (Р-3).
+  **The lock is watched from outside** (В-3 «а»): the Worker asks a shared dashboard's path with no pass,
+  and anything but Access's redirect to its sign-in is `/fail` of `molvia-grafana-lock` — Grafana's own
+  `200` is Access off, a `403` may be Cloudflare's challenge a browser passes (adversarial А5) — a check of
+  its own, never the site's (А4), both told by their UUIDs alone — a check's slug is the same check (Б2). An
+  alarm names no address: the root is the tunnel's 404, the link a secret (Б1). **The prices, named:**
+  Cloudflare sees the dashboard — figures of the machine and routes' templates, nothing of a person, so no
+  recipient of anyone's data; the share is made once by `admin` and lives in Grafana's volume, not the
+  repository — a volume made anew needs a new link, and the link is the lock behind Access; from the phone
+  only the dashboard, never the alarms' list; a tunnel made in Zero Trust's dashboard by mistake would pass
+  what its routes say, and nothing here would tell; Cloudflare down, Grafana is the SSH tunnel's; the image
+  is another's and trivy does not read it. No logs in Grafana (В-4 «а»): Caddy's errors may carry a
+  visitor's address, and Cloudflare would see them.
 - **Grafana calls nobody home** (Р-6): usage reports, update checks, the news, gravatar, plugin keys
   and the five plugins it would install at every start, snapshots and feedback links are switched off —
   a test holds each setting. No sign-up, no anonymous view. **The admin's password is

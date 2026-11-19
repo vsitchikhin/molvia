@@ -115,6 +115,11 @@ same column and the paid layer needs no second migration. Nothing sets it but a 
 брать» below, and what it never opens is anyone's expenses.
 It is accepted that there is no revenue for the first two years.
 
+**Reading receipts by the model has its own access (MOL-275)**: `actors.receipts_model_until`, set by hand until payment
+(MOL-283 extends it), a trial of ten receipts a person, a hundred a month by the phone's month — one condition,
+`readsByModel`; the trial stops at half the month's cap first. Past them Tesseract reads while the фф `payments` is off,
+nobody once it is on. The 0.3 cohort still reads `shared_until` alone.
+
 ---
 
 # Engineering
@@ -297,12 +302,18 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and the year come in one answer** (MOL-168): each from the day after the same day N months back,
   whole months on a month's last day — the year is the window of «Обмены против рынка» — the month
   by days, a weekend at Friday's figure; the pairs are the year's, and the period is the screen's
-  address.
+  address. **«Обмен денег» is drawn, not tabled** (MOL-348): a bar an exchange, a track of a currency's
+  rates, the line «мой — ЦБ РА» — every height, place and order the server's (`exchange-screen.ts`), sent
+  only to a phone that asks (`EXCHANGE_SCREEN_HEADER`).
 
 ### Money: spendings and «Деньги» — `.claude/rules/money-spendings.md`
 
 - **A spending makes no item, feeds no price and no verdict** (MOL-73); a purchase at a shop is
   still entered in «Покупки».
+- **A trip is counted in its own category** (MOL-400): one for the whole trip, chosen at «Записать» and
+  «Закончить», changed in «Траты»; empty is «Продукты»; one the person has not got is never a refusal and moves
+  nothing — so a trip's list offers no category still in the spendings' queue; the month reads it by
+  `categoryOfEntry` alone, and the default is a guess — the place's last, a café's by its receipt, else «Продукты».
 - **A category is removed by archiving**, never erased; a spending in another currency keeps the
   rate of its own day, written with it and never recomputed.
 - **The month is counted by the server**; a closed month is frozen at the rate of its last day,
@@ -476,8 +487,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### Privacy: erasure, trackers, logs — `.claude/rules/privacy.md`
 
 - **Erasure is one function**, `ErasureRepository.erase`, behind two doors — `/delete` in the bot
-  and «Удалить мои данные» in the settings (`DELETE /actors/me`, MOL-94) — in one transaction; catalogue items stay
-  with `created_by` nulled, every place stays, and one is added to `erasures` — a count by week of
+  and «Удалить мои данные» in the settings (`DELETE /actors/me`, MOL-94) — in one transaction; the person's catalogue
+  items lose their author and are marked, and a sweep deletes a marked item — its merged group whole — once no
+  living person or seed stands on it — the authorless one kept for somebody goes when that somebody does (MOL-374, `ITEM_REFERENCES`); every
+  place stays, and one is added to `erasures` — a count by week of
   arrival, no id (MOL-91). **A new table that points at `actors` must join
   erasure** — a test holds `ACTOR_REFERENCES` to every foreign key — **and the record of processing**
   (Confluence 12091393, MOL-97) in the same PR, as must a new recipient; nothing holds that one —
@@ -570,7 +583,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The rating reminder: the API decides and marks the step as it hands it out, the bot only
   sends** (MOL-101) — at most once; 19:00 of the person's day, then 3 and 7 days, then six months
   of silence, and any own verdict starts over; a press is the verdict of `ctx.from.id` and keeps
-  the scale.
+  the scale. **It speaks the language the app last spoke** (`actors.locale`, MOL-398), Russian where
+  none is known; a press answers in the language read off the message, the buttons as before — a
+  rollback's bot reads them all; the other notices stay in both.
 - **The reminders' switch is `actors.reminders_off`, and it says why** (MOL-103): `chosen` or
   `blocked`; a block never overwrites «chosen», an unblock turns on only what blocking turned off,
   **the settings never lift a block** (В-5), and «on» starts the ladder over unless it reminded
@@ -646,6 +661,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The scheme is the device's** (MOL-111): `molvia.scheme`, set before the first paint by the script
   in `index.html` — the one reader of storage outside `storage.ts`; the person's choice wins both ways
   by selectors, and the status bar follows by `media`, the manifest never.
+- **The language is the device's too** (MOL-398): `molvia.locale` and, for English, the order of its day
+  (`molvia.date-style`) make one tag — `ru`, `en-GB`, `en-US` — that is vue-i18n's locale and every
+  `Intl`'s; what crosses the wire is the language, `pickLocale` of it, never the tag; every request
+  names it (`LOCALE_HEADER`) for the bot's reminder; the login screen offers the other one.
 - **The floor of the browsers is `build.target`, written out in `vite.config.ts`** (MOL-231): the
   script after `#app` in `index.html` checks markers of exactly that floor (`browserFloor.test.ts`),
   and below it draws the locales' line, and the app neither starts nor reports. An API above the floor
@@ -697,12 +716,18 @@ that are easiest to break; the file holds every rule of the area and the reason 
 
 ### Receipts — `.claude/rules/receipts.md`
 
-- **Claude Haiku reads the receipts of those it is granted to, Tesseract the rest** (MOL-272): the model
-  only while `actors.receipts_model_until` is to come and edition 5 is accepted, under the month's cap
+- **Claude Haiku reads the receipts of those it is granted to and everyone's first ten, Tesseract the rest** (MOL-272,
+  MOL-275): the model only while `actors.receipts_model_until` is to come or the trial is not spent, the month's
+  hundred not read (`readsByModel`), and edition 5 is accepted, under the month's cap
   (`model_spend`: the worst price reserved before a call, its own after) and the person's share of it, $2 a
   month (`actors.model_spent_micro_usd`, MOL-367); refused, cut, malformed, over the cap or the share or
   away past its wait — Tesseract in `services/receipt-reader`, a container with no database
   and no disk. The API holds the queue, the photos and the parse, one receipt at a time.
+- **Georgia is read by the model alone** (MOL-408): its card has no Tesseract (`tesseractReads`) — a receipt the model
+  did not read fails `unreadable`, the model away waited for a day, asked hourly at most, a person's receipts of the
+  country resting together through an outage, the round going on past them — the camera there only for whom
+  `/actors/me` says `receiptsByModel` (a header: grant, share, cap), the digits of the tax and fiscal numbers the
+  card's, every item a Georgian line finds «проверьте»; no tax number printed, no shop memory (MOL-438).
 - **A model's answer goes through the parse's own gate** (MOL-272): `receiptTextOfModel` into
   `ReceiptText`, then `verifiedReading(text, { byModel: true })` — every number as printed, the layout and
   the total our code's by the card's words, never the model's; a figure in any spelling it writes it, a
@@ -730,7 +755,15 @@ that are easiest to break; the file holds every rule of the area and the reason 
   rest is no line's, the foot says what the empty lines lack; «Прочитали не всё» is any shortfall of the lines
   as read against the total, before the check — with none, of the lines shown — the server's word
   (`read_partly`), the strip and the 0.2 measure alike, since the phone cannot tell an emptied line from a lost
-  one.
+  one. **A model's sums as copied that meet a total two places vouch for keep their sums** (MOL-310, round 2:
+  reading better, never emptying what was read), a quantity or price that does not hold empty; a summary's words
+  in any case but the payment's.
+- **A receipt the model read not whole, with lines, is read again by Sonnet** (MOL-405): its own worst reserved in the
+  month and the share, anything short of an answer keeps the first, never a wait, away or slow it rests ten minutes; the
+  better of the two kept — whole, then lines found, then a line shown as read, then a total, then more lines, a tie the
+  first (`betterReading`), its head filled from the other — and the other its witness: a figure of a line the check
+  emptied whole for want of proof, never one it proved wrong, that the other copied alike in a line, with no 6 in it —
+  the font's 5 both read as one — shown «проверьте».
 - **A total is shown only where two sources vouch for it** (MOL-244, В-1 «а»): the lines that met it every
   one as read unless two places print another sum, else two places printed — the total, the payment, a
   section's sum — by one `votedTotal` for both kinds of receipt, else the lines with one of them as read; a row
@@ -838,8 +871,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### End-to-end — `.claude/rules/e2e.md`
 
 - **End-to-end has a database and ports of its own**, and the database is dropped before every run.
-- **End-to-end runs in CI, not on the push** (MOL-164): a pull request merges only on both jobs
-  green, and a test green only on a retry is red there.
+- **End-to-end runs in CI, not on the push** (MOL-164): a pull request merges only on both required checks
+  green, and a test green only on a retry is red there. **It runs as four shards** (MOL-375), each with its
+  own database and build; `pwa`, which others depend on, is never split.
 - **Every spec comes in through `open()` in `e2e/session.ts`.**
 - **The sheet, the kit's «not now», its rows and the error's strip also run on WebKit** (`iphone`, MOL-80,
   MOL-174, MOL-175, MOL-180); a test it cannot run says why.
@@ -856,8 +890,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Migrations run when the API starts. A merged migration is never rewritten**; before the merge
   a task's migrations may be folded, and every database that ran the old file is brought into
   line by hand.
-- **A merge is a deploy** (MOL-90); a failed deploy puts the previous image back, not the schema,
-  **so a migration that drops or renames goes out in two merges**.
+- **A merge into master is a deploy** (MOL-90), and only a release or a hotfix merges there (MOL-376):
+  a failed deploy puts the previous image back, not the schema, **so a migration that drops or renames goes
+  out in two releases**.
 - **The Postgres image is an exact tag and part of the contract** (MOL-105): ICU, `vector` and
   glibc; a tag that moves glibc or ICU comes with a migration that rebuilds the text indexes, as
   `0038`. **A migration skipped by its stamp stops the boot** (`assertEveryMigrationApplied`).
@@ -869,7 +904,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   is required.
 - **The metrics never judge a rollout** (MOL-145, adversarial А4): pulled before anything changes,
   started only once the application is healthy, a failure of theirs a warning; a rollback leaves them as
-  they run. The one port they publish is Grafana's, on the loopback.
+  they run. The one port they publish is Grafana's, on the loopback; **from outside it is the dashboard
+  shared by link, through a Cloudflare Tunnel behind Access** (MOL-399): the tunnel's routes are the compose
+  file's — the shared dashboard's paths alone — `tunnel` in `alerts` alone, never `metrics`, and nobody from
+  outside is a user of Grafana.
 
 ## Tracker and documentation
 
@@ -914,7 +952,7 @@ make down        # stop the stack, keeping the data
 make psql        # psql inside this copy's database
 make db-reset    # drop this copy's volume and start clean (DESTRUCTIVE)
 make seed        # the common names into the catalogue; YES=1 writes, without it a dry run
-make gates FROM=2026-10-05  # read gates 0.2 and 0.3; TO= optional, a day taken in whole
+make gates FROM=2026-11-11T01:22:39+04:00  # gates 0.2 and 0.3 from the tag v0.2.0; TO= optional, a day taken in whole
 make dev         # run api, pwa and bot
 make e2e         # end-to-end tests in a phone-sized browser
 make reader      # this copy's receipt reader (Tesseract), on the API's band +3
@@ -932,7 +970,7 @@ differently in every working copy by design.
 
 - **Every check is CI's** (MOL-164, MOL-165): lint, types, every test and end-to-end run there on
   every push, in parallel and with no queue between the copies, and **`master` takes a pull
-  request only when both CI jobs are green** — a ruleset, not a habit. A flake green only on a
+  request only when both required checks are green** — a ruleset, not a habit. A flake green only on a
   retry fails CI (`failOnFlakyTests`). There is no `pre-push`.
 - **The one local hook that checks is `pre-commit`, and only the formatting of the files
   committed** (`.githooks`, wired by `make setup`, no husky) — seconds, since CI checks formatting
@@ -945,8 +983,13 @@ differently in every working copy by design.
   lock gives the command no terminal, so vitest does not watch by default, and refuses a vitest told
   to watch and Playwright's `--ui` and `--debug`, which never give it back. Why, in
   `.claude/rules/workspace.md`.
-- **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, in two
-  jobs: checks and e2e. CI **checks** formatting rather than fixing it — `make format`
+- **CI** (`.github/workflows/ci.yml`) repeats all of it on push and pull request, side by
+  side (MOL-375): «format, lint, types», the tests, and end-to-end in four shards; two gate jobs
+  carry the names the ruleset requires, «format, lint, types, tests» and «end-to-end», each red
+  unless all it waits for succeeded — `if: always()`, since a required job skipped counts as
+  passed. **The ruleset requires the six jobs themselves too** (MOL-402): a red job holds the merge by itself,
+  and a job's name or the count of shards changed is the ruleset changed the same day. CI **checks**
+  formatting rather than fixing it — `make format`
   mutates files, and a diff must fail rather than be silently repaired. It generates its
   `.env` with the same `bin/init-env.sh` every working copy uses, so CI cannot drift from
   local setup.
@@ -1240,7 +1283,7 @@ on an iPhone profile as well (MOL-80): Safari does not focus a tapped button.
 
 ### After a task
 
-**Definition of Done: both CI jobs green on the pull request** (`gh pr checks --watch`, MOL-165).
+**Definition of Done: both required checks green on the pull request** (`gh pr checks --watch`, MOL-165).
 Every check runs there, so «pushed» is not «done», and a red CI is the task's to fix exactly as a
 refused push once was. Locally the work runs what it needs to be written — the test file being
 changed, `make check` or `make e2e` when the agent wants an answer before the push — never as a
@@ -1248,6 +1291,11 @@ duty: the machine carries several copies, and CI repeats all of it on every push
 
 If a decision changed along the way — **update the product plan in Confluence immediately.**
 A plan that diverges from the code is worthless, and here the plan matters more than the code.
+
+**Since `v0.2.0` strangers are on production, so nothing half-done ships** (MOL-298, owner's В-2 «а»): until the tag
+only the owner was there, and a merge could leave an intermediate state for a neighbour task to finish. The tag is
+2026-11-11T01:22:39+04:00, the start of the 0.2 cohort (`make gates FROM=2026-11-11T01:22:39+04:00`). Prices named
+in the rules «before 0.2 only the owner is on production» were paid then and stay as written.
 
 ### Commits
 
@@ -1262,12 +1310,64 @@ A plan that diverges from the code is worthless, and here the plan matters more 
 the catalogue`. The tracker is a separate system, and the key in the subject is the only
   thing linking a commit to the task it belongs to. After the subject, a blank line, then
   an optional bullet list of what was done — points, not prose.
-- **Branches:** `MOL-<n>-<short-description>`, e.g. `MOL-6-schema`.
+- **Branches:** `MOL-<n>-<short-description>`, e.g. `MOL-6-schema`, cut from the current
+  `release/<name>` and merged back into it — never into master (see «Releases» below).
 - **Never a force push — no exceptions, under no circumstances** (owner's absolute rule, MOL-220):
   no `--force`, no `--force-with-lease`, no `+refspec`, no amend or rebase of anything already
   pushed. A pushed commit is corrected by a new one, a branch is brought up to date by a merge, and
   the push is a plain `git push`. `.claude/hooks/no-force-push.py` refuses the command before it
   runs; it is never worked around. GitHub refuses it too (ruleset «no force push» on every branch).
+
+### Releases: one a day, through `release/<name>` (MOL-376)
+
+Owner's decisions of 11.11.2026, after `v0.2.0`. Every merge into master is a rollout, and every rollout is
+a «Обновить» on every installed phone (MOL-132): ten tasks a day were ten updates. Now a day's tasks reach
+people as one release. The mechanics and their reasons are in `.claude/rules/deploy.md`.
+
+- **Master takes only two kinds of branch: `release/<name>` and `hotfix/<name>-<number>`** — and Dependabot's
+  (MOL-381, В-7 «б»), refused otherwise by CI's first step (`bin/release.mjs source`). A task's branch
+  starts from the current `release/<name>` and its pull request goes there, merged on the owner's word as
+  before; CI runs on that pull request as on any other.
+- **A release is the pull request `release/<name>` → master**, and its merge is the rollout. Its tag is
+  `v0.2.<n>-<name>` on the merge commit, `n` one above the last release's.
+- **It goes out on the owner's word «выпускай», or by itself at 03:00 Yerevan time** if no release went out
+  in the 24 hours before and the branch holds something new. At most one release a day.
+- **Right after a release the next `release/<name>` is cut from master.** Three release branches live: the
+  next, the one just released and the one before it, to roll back to; older ones are deleted.
+- **A hotfix mends the release that is out:** `hotfix/<name of that release>-<number>`, numbered from 1,
+  cut from master, merged into master, tagged `v0.2.<n>-<name>-<number>` with the same `n`; master is then
+  merged into the next release branch so the fix is not lost. The next full release takes its own name and
+  `n + 1`, with no number. A hotfix does not count as the day's release for the 03:00 rule.
+- **Names rotate a stone, a wind, a river, each theme in alphabetical order** (`v0.2.1-agate`,
+  `v0.2.2-alize`, `v0.2.3-amazon`…), one word in Latin, from the lists in `.claude/rules/deploy.md`.
+- **The release is automated since MOL-381**: `release-night.yml` at 03:00 and by «Run workflow» (the word
+  «выпускай»), only a release by hand holding the night back; `after-release.yml` tags what runs, cuts the next
+  branch, deletes the old and brings a hotfix into the next branch — by the app `molvia-release`, its word the
+  check `molvia-release`. The rules and their prices: `.claude/rules/deploy.md`.
+
+### Feature flags — «фф» (MOL-376)
+
+0.3 ships openly (owner's В-1 «в»): a finished feature reaches people with its release. **An фф closes only
+a thing people should not see yet** — a chain not whole (venues before «Что заказать»), a channel not live
+(payment before the bank) — and is taken off by a task once it is on. The mechanism is MOL-382, its rules
+`.claude/rules/deploy.md`:
+
+- **One list in the domain, each entry naming its removal task** (`contracts/ff.ts`, `removedBy`); the value is
+  `FF_<NAME>` of the API's environment, strictly `on` or `off` — anything else stops the start; turned on by
+  `deploy/ff.sh`, which refuses a name compose would drop, and a restart, no release.
+- **Off, a feature's routes are not registered**, so it is an address the API has not got, before any session —
+  a feature's path no route's that stays, held by a test over every route an фф adds.
+- **The phone hears them in `X-Molvia-Ff` of every answer**, never a body, keeps the last list on the device
+  past «Выйти», `useFf` for an entry and `meta.ff` for a screen, a link closed reopened by the next answer
+  unless the page was touched since, in one move;
+  end-to-end runs all on, `ffOff` for «off», in the page's `fetch`, never a route.
+
+### Talking to the owner
+
+**Since `v0.2.0` all communication with the owner is in English** (owner, MOL-376, 11.11.2026, В-11): the
+chat, lavish artifacts, questions, reports and pull request descriptions. Jira, Confluence, `.scratch`,
+commit messages and `docs/` stay Russian, and so does the app's own text. Code, its comments and this file
+were English already.
 
 ### Estimating (story points)
 

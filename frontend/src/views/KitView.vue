@@ -1238,6 +1238,7 @@ export default defineComponent({
             placeName: 'SAS',
             items: 5,
             amount: money(348000n, 'AMD'),
+            categoryId: null,
             counted: null,
           },
           groceries,

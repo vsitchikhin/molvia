@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { actorSchema } from '#model/entities/actor'
+import { RECEIPTS_MODEL_MONTH_MAX, RECEIPT_TRIAL } from '#model/entities/model-spend'
 
 /**
  * The cookie a request proves itself with (MOL-53). It replaced `X-Molvia-Actor`, a header
@@ -30,6 +31,27 @@ import { actorSchema } from '#model/entities/actor'
 export const SESSION_COOKIE = '__Host-molvia_session'
 
 /**
+ * Where a person stands with the model that reads receipts (MOL-275): until when it is paid — none where nothing is —
+ * the trial's receipts left of ten, and of the phone's month the receipts it read of a hundred. Every figure the
+ * server's, for MOL-276's screen.
+ */
+export const receiptsAccessSchema = z.strictObject({
+  until: z.date().nullable(),
+  trialLeft: z.int().min(0).max(RECEIPT_TRIAL),
+  trialOf: z.literal(RECEIPT_TRIAL),
+  /** The first day of the phone's month the count is of, `YYYY-MM-01`. */
+  month: z.iso.date(),
+  read: z.int().min(0),
+  limit: z.literal(RECEIPTS_MODEL_MONTH_MAX),
+})
+export type ReceiptsAccess = z.infer<typeof receiptsAccessSchema>
+
+/** The same on the wire, its moment as ISO. */
+const receiptsAccessWireSchema = receiptsAccessSchema.extend({
+  until: z.iso.datetime().nullable(),
+})
+
+/**
  * The owner as anyone outside the server sees them: the settings, without the identity behind
  * them (MOL-52).
  *
@@ -42,15 +64,30 @@ export const SESSION_COOKIE = '__Host-molvia_session'
  * The rule it enforces is the epic's: only Telegram's numeric id is *stored*, not shown, and
  * «who am I» is a question about settings.
  */
-export const actorViewSchema = actorSchema.pick({
-  id: true,
-  country: true,
-  city: true,
-  spendCurrency: true,
-  incomeCurrency: true,
-  createdAt: true,
-  updatedAt: true,
-})
+export const actorViewSchema = actorSchema
+  .pick({
+    id: true,
+    country: true,
+    city: true,
+    spendCurrency: true,
+    incomeCurrency: true,
+    createdAt: true,
+    updatedAt: true,
+  })
+  .extend({
+    /**
+     * Whether the model reads this person's receipts now (MOL-408, owner's В-2 «а»): Georgia's receipts are read by
+     * it alone, so its camera is there only for them. Sent by `/actors/me` alone, and only to a phone that asks
+     * (`RECEIPTS_BY_MODEL_HEADER`): an installed app of an earlier build reads the answer strictly. Absent is
+     * «not said», never «no».
+     */
+    receiptsByModel: z.boolean().optional(),
+    /**
+     * Where the person stands with the model that reads receipts (MOL-275, `receiptsAccessSchema`). Sent by
+     * `/actors/me` alone, only to a phone that asks (`RECEIPTS_ACCESS_HEADER`), as `receiptsByModel` is.
+     */
+    receiptsAccess: receiptsAccessSchema.optional(),
+  })
 export type ActorView = z.infer<typeof actorViewSchema>
 
 /**
@@ -78,6 +115,7 @@ export const actorWireSchema = z.strictObject({
   ...actorViewSchema.shape,
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
+  receiptsAccess: receiptsAccessWireSchema.optional(),
 })
 export type ActorWire = z.infer<typeof actorWireSchema>
 
@@ -88,14 +126,36 @@ export type ActorWire = z.infer<typeof actorWireSchema>
  * into an Invalid Date, so by the time decode runs there is nothing left to report.
  */
 export const actorCodec = z.codec(actorWireSchema, actorViewSchema, {
-  decode: (wire) => ({
+  decode: ({ receiptsAccess, ...wire }) => ({
     ...wire,
     createdAt: new Date(wire.createdAt),
     updatedAt: new Date(wire.updatedAt),
+    ...(receiptsAccess === undefined
+      ? {}
+      : {
+          receiptsAccess: {
+            ...receiptsAccess,
+            until: receiptsAccess.until === null ? null : new Date(receiptsAccess.until),
+          },
+        }),
   }),
-  encode: (actor) => ({
+  encode: ({ receiptsAccess, ...actor }) => ({
     ...actor,
     createdAt: actor.createdAt.toISOString(),
     updatedAt: actor.updatedAt.toISOString(),
+    ...(receiptsAccess === undefined
+      ? {}
+      : {
+          receiptsAccess: {
+            ...receiptsAccess,
+            until: receiptsAccess.until === null ? null : receiptsAccess.until.toISOString(),
+          },
+        }),
   }),
 })
+
+/** The header a phone asks `/actors/me` for `receiptsByModel` by (MOL-408). */
+export const RECEIPTS_BY_MODEL_HEADER = 'X-Molvia-Receipts-By-Model'
+
+/** The header a phone asks `/actors/me` for `receiptsAccess` by (MOL-275). */
+export const RECEIPTS_ACCESS_HEADER = 'X-Molvia-Receipts-Access'

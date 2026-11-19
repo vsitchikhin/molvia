@@ -39,6 +39,8 @@ const receiptSettled = vi.fn<(id: string) => Promise<{ tripId: string | null }>>
 const keepOnly = vi.fn<(named: ReadonlySet<string>) => Promise<void>>()
 const shelfParts = vi.fn<(id: string) => Promise<Blob[]>>()
 const moneyAccounts = vi.fn<() => Promise<MoneyAccountsResponse>>()
+const spendingCategories = vi.fn<() => Promise<unknown>>()
+const placeCategories = vi.fn<() => Promise<unknown>>()
 // Every other call of the API hangs: the screens behind this one load and never answer.
 vi.mock('@/api', () => ({
   api: new Proxy(
@@ -52,6 +54,8 @@ vi.mock('@/api', () => ({
         if (name === 'receipts') return () => receipts()
         if (name === 'recentPlaces') return () => Promise.resolve([])
         if (name === 'moneyAccounts') return () => moneyAccounts()
+        if (name === 'spendingCategories') return () => spendingCategories()
+        if (name === 'placeCategories') return () => placeCategories()
         return () => new Promise(() => undefined)
       },
     },
@@ -1346,6 +1350,8 @@ describe('ReceiptView — the account it was paid from (MOL-312)', () => {
     shelfParts.mockResolvedValue([])
     moneyAccounts.mockReset()
     moneyAccounts.mockResolvedValue(page([cash, card, roubles]))
+    spendingCategories.mockReturnValue(new Promise(() => undefined))
+    placeCategories.mockReturnValue(new Promise(() => undefined))
     vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
   })
 
@@ -1477,5 +1483,109 @@ describe('ReceiptView — the account it was paid from (MOL-312)', () => {
     // and heard (MOL-333): the focus goes from «Записать» to «Списано», already marked
     expect(document.activeElement).toBe(charged)
     expect(marked).toBe('true')
+  })
+})
+
+// MOL-400: the category «Деньги» count the receipt in, guessed and chosen on the review
+describe('ReceiptView — the category of the purchases (MOL-400)', () => {
+  const GROCERIES = 'aaaaaaaa-0000-4000-8000-000000000001'
+  const CAFE = 'aaaaaaaa-0000-4000-8000-000000000002'
+  const PETS = 'aaaaaaaa-0000-4000-8000-000000000003'
+  const preset = (id: string, key: 'groceries' | 'cafe' | 'pets') =>
+    ({ id, preset: key, name: null, colour: null, icon: null, archived: false }) as const
+
+  beforeEach(() => {
+    localStorage.clear()
+    sessionStorage.clear()
+    clock = 0
+    vi.spyOn(performance, 'now').mockImplementation(() => clock)
+    receipt.mockReset()
+    receipt.mockResolvedValue(detail())
+    recordReceipt.mockReset()
+    recordReceipt.mockResolvedValue({ tripId: TRIP })
+    receipts.mockReset()
+    receipts.mockResolvedValue({ receipts: [] })
+    shelfParts.mockReset()
+    shelfParts.mockResolvedValue([])
+    moneyAccounts.mockReset()
+    moneyAccounts.mockReturnValue(new Promise(() => undefined))
+    spendingCategories.mockReset()
+    spendingCategories.mockResolvedValue({
+      categories: [preset(GROCERIES, 'groceries'), preset(CAFE, 'cafe'), preset(PETS, 'pets')],
+      frequent: [],
+    })
+    placeCategories.mockReset()
+    placeCategories.mockResolvedValue({ places: [] })
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+  })
+
+  afterEach(() => {
+    while (mounted.length) mounted.pop()?.unmount()
+    vi.restoreAllMocks()
+    document.body.innerHTML = ''
+  })
+
+  const row = (view: VueWrapper) => view.get('.nav-row')
+  const recorded = async (view: VueWrapper) => {
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    return recordReceipt.mock.calls[0]?.[1]
+  }
+  const name = (key: string) => ru.spending.category[key as 'cafe']
+
+  it('starts on «Продукты» and records it, and the place starts on it next time', async () => {
+    const { view } = await render()
+    expect(row(view).text()).toContain(name('groceries'))
+    expect((await recorded(view))?.categoryId).toBe(GROCERIES)
+    expect(JSON.parse(localStorage.getItem(`molvia.place-categories.${ME}`) ?? '{}')).toEqual({
+      [PLACE]: GROCERIES,
+    })
+  })
+
+  it('starts a receipt of food service — a line of the class 56.10 — on «Кафе»', async () => {
+    const base = detail()
+    receipt.mockResolvedValue({
+      ...base,
+      lines: base.lines.map((one) => ({ ...one, hs: '56.10' })),
+    })
+    const { view } = await render()
+    expect(row(view).text()).toContain(name('cafe'))
+    expect((await recorded(view))?.categoryId).toBe(CAFE)
+  })
+
+  it('starts on the category of the last trip at this place, before the receipt’s food', async () => {
+    placeCategories.mockResolvedValue({ places: [{ placeId: PLACE, categoryId: PETS }] })
+    const { view } = await render()
+    expect(row(view).text()).toContain(name('pets'))
+  })
+
+  // Пока «Записать» в пути, строка — «не сейчас», как счёт под ней (ревью №3)
+  it('while «Записать» is on its way, the row is not now and opens nothing', async () => {
+    recordReceipt.mockReturnValue(new Promise(() => undefined))
+    const { view } = await render()
+    await button(view, 'Записать 2 покупки').trigger('click')
+    await flushPromises()
+    expect(row(view).attributes('aria-disabled')).toBe('true')
+    expect(row(view).find('.chevron').exists()).toBe(false)
+    await row(view).trigger('click')
+    await flushPromises()
+    expect(sheet()).toBeNull()
+  })
+
+  it('records the category chosen, kept through a reload of the review', async () => {
+    const { view } = await render()
+    await row(view).trigger('click')
+    await flushPromises()
+    clock += 1000
+    const option = [...(sheet()?.querySelectorAll('[role="radio"]') ?? [])].find((one) =>
+      one.textContent.includes(name('pets')),
+    )
+    if (!(option instanceof HTMLElement)) throw new Error('нет «Животных»')
+    option.click()
+    await flushPromises()
+    while (mounted.length) mounted.pop()?.unmount()
+    const again = await render()
+    expect(row(again.view).text()).toContain(name('pets'))
+    expect((await recorded(again.view))?.categoryId).toBe(PETS)
   })
 })

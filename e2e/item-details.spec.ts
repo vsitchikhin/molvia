@@ -96,7 +96,7 @@ test.describe('the sheet', () => {
     await pick(setting)
 
     await sheet(page).getByLabel('How much').fill('0.9')
-    await sheet(page).getByLabel('Price as on the tag').fill('520')
+    await sheet(page).getByLabel('Price on the tag').fill('520')
     await expect(sheet(page).locator('.per-unit-value')).toContainText('577.78')
     await expect(sheet(page).locator('.per-unit-value')).toContainText('/l')
 
@@ -141,7 +141,7 @@ test.describe('the sheet', () => {
     const setting = await onTrip(page)
     await pick(setting)
     await sheet(page).getByLabel('How much').fill('1')
-    await sheet(page).getByLabel('Price as on the tag').fill('540')
+    await sheet(page).getByLabel('Price on the tag').fill('540')
     await addButton(page).click()
     await expect.poll(setting.rows).toHaveLength(1)
 
@@ -178,7 +178,7 @@ test.describe('the sheet', () => {
   test('writes nothing when closed with ×', async ({ page }) => {
     const setting = await onTrip(page)
     await pick(setting)
-    await sheet(page).getByLabel('Price as on the tag').fill('520')
+    await sheet(page).getByLabel('Price on the tag').fill('520')
 
     await sheet(page).getByRole('button', { name: 'Close' }).click()
 
@@ -190,7 +190,7 @@ test.describe('the sheet', () => {
   test('adds one purchase for a double tap', async ({ page }) => {
     const setting = await onTrip(page)
     await pick(setting)
-    await sheet(page).getByLabel('Price as on the tag').fill('520')
+    await sheet(page).getByLabel('Price on the tag').fill('520')
 
     await addButton(page).dblclick()
 
@@ -203,12 +203,12 @@ test.describe('the sheet', () => {
   test('does not send what was typed as a price and is not one', async ({ page }) => {
     const setting = await onTrip(page)
     await pick(setting)
-    await sheet(page).getByLabel('Price as on the tag').fill('57o')
+    await sheet(page).getByLabel('Price on the tag').fill('57o')
 
     await addButton(page).click()
 
     await expect(sheet(page)).toContainText('That does not look like an amount')
-    await expect(sheet(page).getByLabel('Price as on the tag')).toBeFocused()
+    await expect(sheet(page).getByLabel('Price on the tag')).toBeFocused()
     expect(await setting.rows()).toEqual([])
   })
 
@@ -218,7 +218,7 @@ test.describe('the sheet', () => {
 
     await sheet(page).getByLabel('Price currency').selectOption('RUB')
     await sheet(page).getByLabel('How much').fill('0.9')
-    await sheet(page).getByLabel('Price as on the tag').fill('90')
+    await sheet(page).getByLabel('Price on the tag').fill('90')
     await expect(sheet(page).locator('.per-unit-value')).toContainText('₽')
     await addButton(page).click()
 
@@ -236,7 +236,7 @@ test.describe('with no connection', () => {
     const setting = await onTrip(page)
     await pick(setting)
     await sheet(page).getByLabel('How much').fill('0.9')
-    await sheet(page).getByLabel('Price as on the tag').fill('520')
+    await sheet(page).getByLabel('Price on the tag').fill('520')
 
     await context.setOffline(true)
     await expect(sheet(page)).toContainText('Saved on the phone, sent once you are back online')
@@ -343,10 +343,10 @@ test.describe('«Тут дешевле»', () => {
     // Before a price: the cheapest one, said plainly.
     await expect(hint(page)).toContainText('Cheapest you paid: Зовуни')
     await sheet(page).getByLabel('How much').fill('1')
-    await sheet(page).getByLabel('Price as on the tag').fill('620')
+    await sheet(page).getByLabel('Price on the tag').fill('620')
     await expect(hint(page)).toContainText('You paid ֏540/l at Зовуни')
     // The fields stay where they were: the hint is below them.
-    const price = await sheet(page).getByLabel('Price as on the tag').boundingBox()
+    const price = await sheet(page).getByLabel('Price on the tag').boundingBox()
     const line = await hint(page).boundingBox()
     expect(line && price && line.y > price.y).toBe(true)
 
@@ -357,7 +357,7 @@ test.describe('«Тут дешевле»', () => {
     ).toBe(201)
     await pick({ page, word })
     await sheet(page).getByLabel('How much').fill('1')
-    await sheet(page).getByLabel('Price as on the tag').fill('620')
+    await sheet(page).getByLabel('Price on the tag').fill('620')
     await expect(sheet(page).locator('.per-unit-value')).toContainText('620')
     await expect(sheet(page).locator('[data-hint]')).toHaveCount(0)
   })
@@ -383,7 +383,7 @@ test.describe('«Тут дешевле»', () => {
     const { word, other } = await boughtAtZovuni(page, { price: '480', score: 5 })
     await pick({ page, word })
     await sheet(page).getByLabel('How much').fill('1')
-    await sheet(page).getByLabel('Price as on the tag').fill('620')
+    await sheet(page).getByLabel('Price on the tag').fill('620')
 
     const line = sheet(page).locator('[data-hint="alternative"]')
     await expect(line).toContainText(`${other ?? ''} — ֏480/l at Зовуни`)
@@ -515,12 +515,12 @@ test.describe('«Тут дешевле»', () => {
     const { word } = await boughtAtZovuni(page, undefined, 'Зовуни Плюс Север')
     await pick({ page, word })
     await sheet(page).getByLabel('How much').fill('1')
-    await sheet(page).getByLabel('Price as on the tag').fill('540')
+    await sheet(page).getByLabel('Price on the tag').fill('540')
     await expect(hint(page)).toContainText('Same as at Зовуни Плюс Север')
     await still(page)
 
     const motion = await priceFieldMoves(page, async () => {
-      await sheet(page).getByLabel('Price as on the tag').fill('500')
+      await sheet(page).getByLabel('Price on the tag').fill('500')
       await expect(hint(page)).toContainText('Cheaper here')
       await still(page)
     })

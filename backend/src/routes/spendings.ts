@@ -2,6 +2,7 @@ import { z } from 'zod'
 import {
   DomainError,
   ERROR,
+  MONEY_TRIP_CATEGORY_HEADER,
   budgetPlanBodySchema,
   moneyBudgetCodec,
   moneyChartMonthCodec,
@@ -184,7 +185,9 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
       if (!month.success) throw new DomainError(ERROR.NOT_FOUND)
       const { cursor } = parseQuery(moneyMonthQuerySchema, request.query)
       const view = await api.month(ownerOf(request), month.data, cursor)
-      return privately(reply).send(z.encode(moneyMonthCodec, view))
+      return privately(reply).send(
+        z.encode(moneyMonthCodec, tripCategoryOf(request) ? view : withoutTripCategory(view)),
+      )
     },
   )
 
@@ -244,4 +247,25 @@ export function spendingRoutes(app: FastifyInstance, api: SpendingsApi): void {
       await api.setSalaryShift(ownerOf(request), parseBody(salaryShiftSchema, request.body)),
     ),
   )
+}
+
+/** Whether the phone knows a trip's `categoryId` in the month (MOL-400). */
+function tripCategoryOf(request: FastifyRequest): boolean {
+  return request.headers[MONEY_TRIP_CATEGORY_HEADER.toLowerCase()] === '1'
+}
+
+/** The month as a phone of an earlier build reads it: a trip's line with no category. */
+function withoutTripCategory(view: MoneyMonthView): MoneyMonthView {
+  return {
+    ...view,
+    days: view.days.map((day) => ({
+      ...day,
+      entries: day.entries.map((entry) => {
+        if (entry.kind !== 'trip') return entry
+        const earlier = { ...entry }
+        delete earlier.categoryId
+        return earlier
+      }),
+    })),
+  }
 }

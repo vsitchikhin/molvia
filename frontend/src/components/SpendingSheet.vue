@@ -14,11 +14,16 @@
         <span class="figure" :style="figureChars(money(target.row.amount))">{{
           money(target.row.amount)
         }}</span>
-        <span class="badge">
-          <span class="dot" :style="{ background: tripColour }" aria-hidden="true"></span>
-          {{ tripCategory }}
-        </span>
       </p>
+      <!-- The category «Деньги» count it in (MOL-400): chosen here and saved at once, through the trip's
+           queue, as the account under it. -->
+      <TripCategoryRow
+        :categories="categories"
+        :frequent="frequent"
+        :name-of="nameOf"
+        :selected="tripCategoryId"
+        @pick="categorizeTrip"
+      />
       <!-- The account of the trip: chosen here and saved at once, through the trip's queue (handoff
            06, 6h). Drawn once the trip is read — what it is on now is the server's. -->
       <AppReveal>
@@ -264,16 +269,10 @@ import ScreenState from '@/components/ScreenState.vue'
 import SegmentedControl from '@/components/SegmentedControl.vue'
 import StatusStrip from '@/components/StatusStrip.vue'
 import SpendingDetailsSheet from '@/components/SpendingDetailsSheet.vue'
+import TripCategoryRow from '@/components/TripCategoryRow.vue'
 import { defaultAccount, pageOrder } from '@/components/accounts'
 import { figureChars } from '@/components/figure'
-import {
-  bankWords,
-  categoryColour,
-  chipOrder,
-  detailsLine,
-  groceriesOf,
-  rateWords,
-} from '@/components/spending'
+import { bankWords, chipOrder, detailsLine, groceriesOf, rateWords } from '@/components/spending'
 import type {
   JournalRow,
   Removed,
@@ -329,6 +328,7 @@ export default defineComponent({
     ScreenState,
     SegmentedControl,
     SpendingDetailsSheet,
+    TripCategoryRow,
     StatusStrip,
   },
   props: {
@@ -655,15 +655,49 @@ export default defineComponent({
       return spending ? t('spending.sheet.meta_edit', { date: dayOf(spending.spentOn) }) : null
     })
 
-    const groceries = computed(
-      () => props.categories.find((category) => category.preset === 'groceries') ?? null,
+    /**
+     * The trip's category (MOL-400): a choice still in the queue is the newest word of it, then the one made in
+     * this opening of the sheet — the row is the month as it was when the sheet opened, and a choice that landed
+     * must not give way to it (review №1, adversarial А2) — else the month's row, `null` being «Продукты».
+     */
+    const pickedCategory = ref<{ tripId: string; categoryId: string } | null>(null)
+    // One sheet serves every opening of «Траты»: a new one starts on the month's row as it is now (adversarial
+    // Б2), or a choice made here hid a change made in another window since.
+    watch(
+      () => props.open,
+      (open) => {
+        if (open) pickedCategory.value = null
+      },
     )
-    const tripCategory = computed(() =>
-      groceries.value ? props.nameOf(groceries.value) : t('spending.category.groceries'),
-    )
-    const tripColour = computed(() =>
-      groceries.value ? categoryColour(groceries.value) : 'var(--cat-groceries)',
-    )
+    /** The sheet's own word of the trip's category — the queue's, else this opening's — or none. */
+    function ownCategoryWord(tripId: string): string | null {
+      const queued = trips.pending.findLast(
+        (write) => write.kind === 'category' && write.tripId === tripId,
+      )
+      if (queued?.kind === 'category') return queued.body.categoryId
+      const picked = pickedCategory.value
+      return picked?.tripId === tripId ? picked.categoryId : null
+    }
+    const tripCategoryId = computed(() => {
+      if (props.target.kind !== 'trip') return null
+      return ownCategoryWord(props.target.row.tripId) ?? props.target.row.categoryId
+    })
+    /**
+     * Chosen in the summary: at once, through the trip's queue, as its account (6h). Only the sheet's own word —
+     * the queue's, this opening's — keeps a choice from going: the month's row may be older than what the server
+     * holds, a choice landed while the month was not read again, on this screen or another (adversarial В1, В2),
+     * so a choice equal to it goes anyway — a write of the category is whole, and a repeat moves nothing.
+     */
+    function categorizeTrip(categoryId: string): void {
+      if (props.target.kind !== 'trip') return
+      const tripId = props.target.row.tripId
+      if (categoryId === ownCategoryWord(tripId)) return
+      pickedCategory.value = { tripId, categoryId }
+      trips.enqueue({ kind: 'category', tripId, body: { categoryId } })
+      const chosen = props.categories.find((category) => category.id === categoryId)
+      if (chosen)
+        announce?.(t('spending.sheet.trip_category_saved', { name: props.nameOf(chosen) }))
+    }
 
     const currencyOptions = computed(() =>
       currencySchema.options.map((value) => ({
@@ -1022,8 +1056,8 @@ export default defineComponent({
       sign,
       title,
       meta,
-      tripCategory,
-      tripColour,
+      tripCategoryId,
+      categorizeTrip,
       choice,
       currencyOptions,
       dayWords,
@@ -1171,8 +1205,7 @@ export default defineComponent({
   padding: var(--space-4);
 }
 
-/* The category goes under the sum only where the two cannot stand side by side (MOL-321, adversarial Б4):
-   the sum fits its card by `figure-fit`, and beside it the badge took the sheet 18 px sideways at 150 %. */
+/* The sum fits its card by `figure-fit` (MOL-321); the category stands under it, a row of its own (MOL-400). */
 .total {
   display: flex;
   flex-wrap: wrap;
@@ -1191,26 +1224,6 @@ export default defineComponent({
   @include figure-fit;
 
   font-variant-numeric: tabular-nums;
-}
-
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  max-width: 100%;
-  min-width: 0;
-  min-height: var(--badge-height);
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-pill);
-  background: var(--surface-2);
-  font-size: var(--text-footnote);
-  font-weight: var(--weight-medium);
-}
-
-.dot {
-  width: 0.625rem;
-  height: 0.625rem;
-  border-radius: var(--radius-pill);
 }
 
 .items {

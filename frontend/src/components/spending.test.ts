@@ -16,6 +16,9 @@ import {
   refusedRows,
   roundsToNought,
   spentApprox,
+  tripCategoryName,
+  tripIcon,
+  tripLook,
   unbroken,
   unsentIn,
 } from '@/components/spending'
@@ -572,6 +575,7 @@ describe('a line of the journal as its row says it', () => {
     key: TRIP,
     tripId: TRIP,
     placeName: 'Ереван Сити',
+    categoryId: null,
     items: 9,
     amount: amd('11280'),
     counted: null,
@@ -644,6 +648,39 @@ describe('a line of the journal as its row says it', () => {
       'Открыть покупки:',
     ])
     expect(row(trip, null).tint).toBe('var(--cat-groceries)')
+  })
+
+  it('a trip in a category of its own stands in that category’s circle and words (MOL-400)', () => {
+    const value = row({ ...trip, categoryId: beauty.id }, beauty)
+    expect([value.meta, value.tint]).toEqual(['Красота · 9 позиций', 'var(--cat-beauty)'])
+  })
+
+  it('a trip draws its category’s icon, never the cart; naming none, «Продукты»’s (MOL-406)', () => {
+    expect(row({ ...trip, categoryId: beauty.id }, beauty).icon).toBe(categoryIcon(beauty))
+    expect(row(trip, groceries).icon).toBe(categoryIcon(groceries))
+    expect(row(trip, null).icon).toBe(categoryIcon(groceries))
+    expect(row(trip, beauty).icon).not.toBe(tripIcon)
+  })
+
+  it('a trip’s category in words is one rule for every place: its name, «Продукты», «Прочее» (MOL-406, №18)', () => {
+    const nameOf = (category: SpendingCategoryView) =>
+      category.preset === 'beauty' ? 'Красота' : '?'
+    expect(tripCategoryName(beauty, nameOf, t)).toBe('Красота')
+    expect(tripCategoryName(null, nameOf, t)).toBe('Продукты')
+    expect(tripCategoryName(undefined, nameOf, t)).toBe('Прочее')
+  })
+
+  it('a line of «Траты» whose trip category the list lacks is the cart with no colour (MOL-406, Р2-Б1)', () => {
+    const value = journalRowProps(
+      { ...trip, categoryId: BEAUTY },
+      { t, locale: 'ru-RU', category: undefined, categoryName: 'Прочее', spendCurrency: 'AMD' },
+    )
+    expect([value.icon, value.tint, value.meta]).toEqual([tripIcon, 'muted', 'Прочее · 9 позиций'])
+  })
+
+  it('a trip whose category the phone does not know is the cart with no colour, never «Продукты» (MOL-406, А3)', () => {
+    expect(tripLook(undefined)).toEqual({ icon: tripIcon, tint: 'muted' })
+    expect(tripLook(null)).toEqual({ icon: categoryIcon(groceries), tint: 'var(--cat-groceries)' })
   })
 
   it('a trip with money and no purchase is the receipt’s sum, never «0 позиций» (MOL-227)', () => {

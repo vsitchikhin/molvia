@@ -355,7 +355,7 @@ describe('«Скачать мои данные» (MOL-93)', () => {
   })
 })
 
-describe('«Count me in the statistics» (MOL-96)', () => {
+describe('“Count me in the statistics” (MOL-96)', () => {
   const counted = (view: VueWrapper) => view.get<HTMLInputElement>('input[role="switch"]')
 
   function describedBy(view: VueWrapper): string[] {

@@ -104,13 +104,32 @@ function newestKept(owner: string): Remembered | undefined {
 }
 
 /** The categories of the newest month kept for the owner — any month names all of them. */
-export function recallCategories(owner: string): MoneyMonthView['categories'] {
+function recallCategories(owner: string): MoneyMonthView['categories'] {
   return newestKept(owner)?.answer.categories ?? []
 }
 
 /** The chips' frequent ones of the newest month kept for the owner (MOL-198), as its categories. */
-export function recallFrequent(owner: string): MoneyMonthView['frequent'] {
+function recallFrequent(owner: string): MoneyMonthView['frequent'] {
   return newestKept(owner)?.answer.frequent ?? []
+}
+
+/**
+ * The categories of the newest month kept, its chips' order and when that read set out (MOL-400, adversarial Б1):
+ * the list another screen kept is laid beside it, and the later of the two is the list.
+ */
+export function recallKeptList(owner: string): {
+  readonly categories: MoneyMonthView['categories']
+  readonly frequent: MoneyMonthView['frequent']
+  readonly askedAt: Date
+} | null {
+  const kept = newestKept(owner)
+  return kept
+    ? {
+        categories: kept.answer.categories,
+        frequent: kept.answer.frequent,
+        askedAt: kept.askedAt ?? kept.fetchedAt,
+      }
+    : null
 }
 
 /** The rate of the running month as last answered — only a month read while it was running. */
