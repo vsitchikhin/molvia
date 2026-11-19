@@ -17,9 +17,10 @@ import {
   matchStatement,
   spendingCandidate,
   STATEMENT_KEY_WEIGHT,
-  STATEMENT_SELLER_WEIGHT,
+  STATEMENT_NAMES_IN_A_PAIR,
   STATEMENT_STEPS_MAX,
   STATEMENT_WEIGHED_MAX,
+  statementNamesWeight,
   transferCandidate,
   tripCandidate,
 } from '#model/entities/statement-match'
@@ -28,6 +29,7 @@ import type {
   StatementDoubt,
   StatementLineDecision,
 } from '#model/entities/statement-match'
+import { bankSellerWords, sellerWords } from '#model/support/payee-name'
 import type { Currency, Money } from '#model/values/money'
 
 // The bench's rounds of MOL-409 (`research/MOL-409/bench/match.test.mjs`, А1…Н1), each as the
@@ -1339,7 +1341,12 @@ describe('matchStatement — review, round 1', () => {
     })
     const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
     expect(decide([fromShot], [booked], o)).toEqual([recorded(fromShot)])
-    expect(match([fromShot], [booked], o).pairs).toBe(1)
+    // One pair, and its names beyond those a pair was measured with (А24).
+    const names = statementNamesWeight(
+      bankSellerWords('AM\\DILIJAN\\TUFENKIAN HOTEL'),
+      sellerWords('Tufenkian Hotel'),
+    )
+    expect(match([fromShot], [booked], o).pairs).toBe(1 + names - STATEMENT_NAMES_IN_A_PAIR)
   })
 
   it('А13: a statement holds STATEMENT_LINES_MAX lines and no more', () => {
@@ -1528,11 +1535,9 @@ describe('matchStatement — adversarial, round 7', () => {
         spending(days(i % 55), amount, 'AMD', { place: 'Zovq Bar', account: ARDSHIN }),
       )
     // Every «+» line went through every record and weighed none: 24 s at pairs 0.
-    expect(matchStatement(PERSON, statementOf(refunds, o), records('6400.00'))).toEqual({
-      outcome: 'too_heavy',
-      pairs: 3000 * 3000 * STATEMENT_SELLER_WEIGHT,
-      steps: 0,
-    })
+    const plus = matchStatement(PERSON, statementOf(refunds, o), records('6400.00'))
+    expect(plus).toMatchObject({ outcome: 'too_heavy', steps: 0 })
+    expect(plus.pairs).toBeGreaterThan(STATEMENT_WEIGHED_MAX)
     expect(match(records('6500.00'), refunds, o).pairs).toBe(0)
     // В3: 1 500 purchases and 1 500 refunds of one sum, 6.7 s at pairs 0.
     const both = [
@@ -1543,10 +1548,9 @@ describe('matchStatement — adversarial, round 7', () => {
         back('2026-11-20', '6400.00', 'Ք: ZOVQ BAR YEREVAN AM'),
       ),
     ]
-    expect(matchStatement(PERSON, statementOf(both, o), [])).toMatchObject({
-      outcome: 'too_heavy',
-      pairs: 1500 * 1500 * STATEMENT_SELLER_WEIGHT,
-    })
+    const one = matchStatement(PERSON, statementOf(both, o), [])
+    expect(one.outcome).toBe('too_heavy')
+    expect(one.pairs).toBeGreaterThan(STATEMENT_WEIGHED_MAX)
   }, 60_000)
 
   it('А23: a refund still finds its purchase and its record by the sum, the debited one too', () => {
@@ -1570,6 +1574,40 @@ describe('matchStatement — adversarial, round 7', () => {
       { group: 'not_spending', reason: 'refund', record: { id: dollars.id, what: 'spending' } },
     ])
   })
+})
+
+describe('matchStatement — adversarial, round 8', () => {
+  /** Words of three letters no fold touches, the two names' letters apart: none is near another. */
+  const words = (letters: string, n: number) => {
+    const out: string[] = []
+    for (const a of letters)
+      for (const b of letters)
+        for (const c of letters) if (a !== b && b !== c && out.length < n) out.push(a + b + c)
+    return out.join(' ')
+  }
+  const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+  const crowd = (payee: string, note: string, records: number) =>
+    matchStatement(
+      PERSON,
+      statementOf(
+        Array.from({ length: 3000 }, () => line('2026-11-12', '1200.00', 'AMD', payee)),
+        o,
+      ),
+      Array.from({ length: records }, () =>
+        spending('2026-11-12', '1200.00', 'AMD', { place: note, account: ARDSHIN }),
+      ),
+    )
+
+  it('А24: two names weigh their words against each other — fifty against twenty is too heavy at 30 000 pairs', () => {
+    // Every word of one against every word of the other, the pair weighed as one: 15 s at 1.5 % of the ceiling.
+    const long = crowd(words('bdfgh', 50).slice(0, 200), words('klmnpr', 20).slice(0, 80), 10)
+    expect(long.outcome).toBe('too_heavy')
+    expect(long.pairs).toBeGreaterThan(STATEMENT_WEIGHED_MAX)
+    const short = crowd('Ք: YANDEX.GO YEREVAN AM', 'Такси', 10)
+    expect(short.outcome).toBe('matched')
+    // Short names weigh no more than the pair a pair was measured with.
+    expect(short.pairs).toBe(30_000)
+  }, 60_000)
 })
 
 describe('tripCandidate', () => {

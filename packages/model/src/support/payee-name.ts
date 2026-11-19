@@ -162,9 +162,14 @@ export function payeeWords(text: string): string[] {
     .filter((word) => word.length >= 3)
 }
 
-/** Two folded words are one: one edit apart, two from six letters. */
+/**
+ * Two folded words are one: one edit apart, two from six letters. Words further apart in length than that
+ * never are, and are not measured (adversarial А24).
+ */
 export function payeeWordsNear(a: string, b: string): boolean {
-  return levenshtein(a, b) <= (Math.min(a.length, b.length) >= 6 ? 2 : 1)
+  if (a === b) return true
+  const edits = Math.min(a.length, b.length) >= 6 ? 2 : 1
+  return Math.abs(a.length - b.length) <= edits && levenshtein(a, b) <= edits
 }
 
 /** The words of a city of the settings, folded: «Москва» is «MOSCOW», «Ереван» is «YEREVAN» (Р-4). */
@@ -214,9 +219,21 @@ export function bankSellerWords(payee: string): string[] {
   return sellerOf(payeeWords(payee).filter((word) => !BANK_WORDS.has(word)))
 }
 
+/**
+ * The words of a seller's name a rule reads at most (adversarial А24): a name is a few words, and each is
+ * weighed against each of the other name's. **The price, named:** a note listing a whole basket is read by
+ * its first eight, each by its first twenty letters.
+ */
+export const SELLER_WORDS_MAX = 8
+
+/** The letters of a seller's word a rule reads at most (А24): a longer one is cut — no seller's word is. */
+export const SELLER_WORD_LETTERS = 20
+
 function sellerOf(words: string[]): string[] {
   const seller = words.filter((word) => !isPlaceWord(word))
-  return seller.length > 0 ? seller : words
+  return (seller.length > 0 ? seller : words)
+    .slice(0, SELLER_WORDS_MAX)
+    .map((word) => word.slice(0, SELLER_WORD_LETTERS))
 }
 
 /**

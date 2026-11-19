@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   bankSellerWords,
   payeeWords,
+  SELLER_WORD_LETTERS,
+  SELLER_WORDS_MAX,
   payeeWordsNear,
   sameSeller,
   sellerWords,
@@ -84,6 +86,24 @@ describe('sellerWords and sameSeller', () => {
     const lines = (a: string, b: string) => sameSeller(bankSellerWords(a), bankSellerWords(b))
     expect(lines('AM\\YEREVAN\\ZOVQ BAR', 'ZOVQ BAR GYUMRI')).toBe(true)
     expect(lines('SAS SUPERMARKET', 'YEREVAN CITY SUPERMARKET')).toBe(false)
+  })
+
+  it('read a name by its first eight words, each by its first twenty letters (adversarial А24)', () => {
+    const basket =
+      'хлеб сыр яйца масло мука соль рис чай кофе сок мёд лук мясо рыба суп торт кекс лаваш'
+    expect(sellerWords(basket)).toEqual(payeeWords(basket).slice(0, SELLER_WORDS_MAX))
+    const [glued] = payeeWords('TUFENKIANHOTELRESTAURANTDILIJAN')
+    expect(glued?.length).toBeGreaterThan(SELLER_WORD_LETTERS)
+    expect(bankSellerWords('TUFENKIANHOTELRESTAURANTDILIJAN')).toEqual([
+      glued?.slice(0, SELLER_WORD_LETTERS),
+    ])
+  })
+
+  it('never measure words further apart in length than their edits, and take one word for itself', () => {
+    expect(payeeWordsNear('supermarket', 'sas')).toBe(false)
+    expect(payeeWordsNear('yandeks', 'yandeksgo')).toBe(true)
+    expect(payeeWordsNear('yandeks', 'yandeksgoo')).toBe(false)
+    expect(payeeWordsNear('bar', 'bar')).toBe(true)
   })
 
   it('read the bank’s own words as no seller in a bank’s line only (review №25)', () => {

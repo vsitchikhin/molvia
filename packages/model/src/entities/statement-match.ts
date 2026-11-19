@@ -555,10 +555,27 @@ export const STATEMENT_WEIGHED_MAX = 2_000_000
 export const STATEMENT_KEY_WEIGHT = 20
 
 /**
- * A refund's seller weighed against a purchase's or a record's (В3, Г4), in pairs (adversarial А23): words
- * one edit apart, some 2.7 µs here, as long as eight pairs at their worst.
+ * Two names weighed against each other, in pairs (adversarial А23, А24): every word of one against every
+ * word of the other — a pair a word against a word, and one more for every `STATEMENT_LETTERS_PER_PAIR`
+ * of their letters multiplied. Measured here, a unit of it took 0.04–0.27 µs, under a pair's 0.33: two
+ * words against one 0.15 µs, eight against eight 22 µs. Names are bounded (`SELLER_WORDS_MAX`,
+ * `SELLER_WORD_LETTERS`); before, fifty words against twenty took 0.4 ms a pair, and 30 000 such pairs —
+ * 1.5 % of the ceiling — 15 s.
  */
-export const STATEMENT_SELLER_WEIGHT = 8
+export const STATEMENT_LETTERS_PER_PAIR = 32
+
+const lettersOf = (words: readonly string[]) => words.reduce((n, word) => n + word.length, 0)
+
+/**
+ * The names a pair's 0.33 µs was measured with (А16) — «SAS SUPERMARKET» against «SAS», 4: a pair's names
+ * weigh only what they weigh beyond.
+ */
+export const STATEMENT_NAMES_IN_A_PAIR = 4
+
+/** What weighing two names costs, in pairs (`STATEMENT_LETTERS_PER_PAIR`). */
+export function statementNamesWeight(a: readonly string[], b: readonly string[]): number {
+  return a.length * b.length + Math.ceil((lettersOf(a) * lettersOf(b)) / STATEMENT_LETTERS_PER_PAIR)
+}
 
 /**
  * The steps of the matching at most (adversarial А22): the candidates its searches look at. A crowd of
@@ -754,18 +771,37 @@ export function matchStatement(
     for (const { under } of records) if (under !== null && under !== ours) uploads.add(under)
   }
   weight += uploads.size * rows.length * STATEMENT_KEY_WEIGHT
-  let sellers = 0
-  for (const row of spend) sellers += refundsBySum.get(sumKey(row.line.amount))?.length ?? 0
-  for (const row of refunds)
-    for (const sum of row.amounts) sellers += refundable.get(sumKey(sum))?.length ?? 0
-  weight += sellers * STATEMENT_SELLER_WEIGHT
-  if (weight > STATEMENT_WEIGHED_MAX) return { outcome: 'too_heavy', pairs: weight, steps: 0 }
+  // A seller is weighed both ways (`sameSeller`); summed with an early way out, a crowd of one sum is
+  // counted no further than the ceiling.
+  const tooHeavy = () => ({ outcome: 'too_heavy', pairs: weight, steps: 0 }) as const
+  for (const row of spend) {
+    for (const back of refundsBySum.get(sumKey(row.line.amount)) ?? [])
+      weight += 2 * statementNamesWeight(row.words, back.words)
+    if (weight > STATEMENT_WEIGHED_MAX) return tooHeavy()
+  }
+  for (const row of refunds) {
+    for (const sum of row.amounts)
+      for (const { seller } of refundable.get(sumKey(sum)) ?? [])
+        weight += 2 * statementNamesWeight(row.words, seller)
+    if (weight > STATEMENT_WEIGHED_MAX) return tooHeavy()
+  }
+  if (weight > STATEMENT_WEIGHED_MAX) return tooHeavy()
 
   // Every pair whose sum fits, then one to one: met before doubts, the line a record was made from
-  // first, then by the share of the name (А4), the nearer day, the order of the lines.
-  const pairs: Pair[] = []
+  // first, then by the share of the name (А4), the nearer day, the order of the lines. The names of the
+  // pairs that fit are weighed too, before any of them is (А24).
+  const fitting: {
+    readonly row: Row
+    readonly k: Known
+    readonly fit: Fit
+    readonly moves: boolean
+    readonly own: boolean
+    readonly reached: boolean
+    readonly distance: number
+  }[] = []
   for (const row of spend) {
-    for (const { c, days, link, amounts, seller } of reaching(byDay, row)) {
+    for (const k of reaching(byDay, row)) {
+      const { c, days, link, amounts } = k
       const moves = c.what === 'transfer' || c.what === 'exchange'
       if (moves && !onAccount(c, account)) continue
       const inside = days.some((d) => inWindow(form, row.day, d))
@@ -789,25 +825,41 @@ export function matchStatement(
           exact && relinks(c, link, days, distance) ? 'relink' : lateFit(link, row, form, amount)
       else fit = amount
       if (fit === null) continue
-      const named = wordsShare(row.words, seller)
-      // A late posting and a hold are known by the name; a hold only on the statement's account: a hold
-      // is a card's, and a record with no account is cash or before the accounts — a purchase under it
-      // in the same chain is new (Г3).
-      if (fit === 'late' && named === 0) continue
-      if (fit === 'hold' && (named === 0 || account === null || c.account !== account)) continue
-      if (fit === 'exact' && !moves && !onAccount(c, account)) fit = 'elsewhere' // В-1 «а»
-      pairs.push({
-        row: row.index,
-        c,
+      weight += Math.max(0, statementNamesWeight(row.words, k.seller) - STATEMENT_NAMES_IN_A_PAIR)
+      fitting.push({
+        row,
+        k,
         fit,
+        moves,
         own: says === 'own' || says === 'other_upload',
-        named,
-        // A line that names no seller is no other name only for a record its link reaches: by the window
-        // alone a dinner typed by hand would take a purchase silently (А15, А17).
-        nameless: seller.length === 0 || (row.words.length === 0 && link !== null && says !== 'no'),
+        reached: link !== null && says !== 'no',
         distance,
       })
     }
+    if (weight > STATEMENT_WEIGHED_MAX) return tooHeavy()
+  }
+  const pairs: Pair[] = []
+  for (const { row, k, moves, own, reached, distance, ...f } of fitting) {
+    const { c, seller } = k
+    let { fit } = f
+    const named = wordsShare(row.words, seller)
+    // A late posting and a hold are known by the name; a hold only on the statement's account: a hold is
+    // a card's, and a record with no account is cash or before the accounts — a purchase under it in the
+    // same chain is new (Г3).
+    if (fit === 'late' && named === 0) continue
+    if (fit === 'hold' && (named === 0 || account === null || c.account !== account)) continue
+    if (fit === 'exact' && !moves && !onAccount(c, account)) fit = 'elsewhere' // В-1 «а»
+    pairs.push({
+      row: row.index,
+      c,
+      fit,
+      own,
+      named,
+      // A line that names no seller is no other name only for a record its link reaches: by the window
+      // alone a dinner typed by hand would take a purchase silently (А15, А17).
+      nameless: seller.length === 0 || (row.words.length === 0 && reached),
+      distance,
+    })
   }
   pairs.sort(
     (p, q) =>
@@ -817,7 +869,7 @@ export function matchStatement(
       p.row - q.row,
   )
   const { choice, steps } = matchPairs(pairs)
-  if (choice === null) return { outcome: 'too_heavy', pairs: weight, steps }
+  if (choice === null) return { ...tooHeavy(), steps }
   for (const [index, p] of choice) {
     const row = rows[index]
     if (row === undefined) continue
