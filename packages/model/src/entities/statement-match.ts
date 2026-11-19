@@ -343,8 +343,20 @@ function amountFit(
   return near
 }
 
-const sameAmount = (ofLine: readonly Money[], ofRecord: readonly Money[]) =>
-  ofLine.some((a) => ofRecord.some((r) => r.currency === a.currency && r.minor === a.minor))
+/** A sum as a key: refunds are looked up among the lines and the records of their own sum (А23). */
+const sumKey = ({ minor, currency }: Money) => `${minor.toString()} ${currency}`
+
+/** Each item under every sum it has, once. */
+function bySum<T>(items: readonly T[], sums: (item: T) => readonly Money[]): Map<string, T[]> {
+  const out = new Map<string, T[]>()
+  for (const item of items)
+    for (const key of new Set(sums(item).map(sumKey))) {
+      const there = out.get(key)
+      if (there) there.push(item)
+      else out.set(key, [item])
+    }
+  return out
+}
 
 function inWindow(form: StatementForm, lineDay: number, recordDay: number): boolean {
   const after = lineDay - recordDay
@@ -543,10 +555,18 @@ export const STATEMENT_WEIGHED_MAX = 2_000_000
 export const STATEMENT_KEY_WEIGHT = 20
 
 /**
+ * A refund's seller weighed against a purchase's or a record's (В3, Г4), in pairs (adversarial А23): words
+ * one edit apart, some 2.7 µs here, as long as eight pairs at their worst.
+ */
+export const STATEMENT_SELLER_WEIGHT = 8
+
+/**
  * The steps of the matching at most (adversarial А22): the candidates its searches look at. A crowd of
  * one sum on two days — a line's best taken, its free record a rank worse — sends every line left over
  * through the whole crowd: 856 642 712 steps, 25 s here under the ceiling of pairs, some 0.03 µs a step.
- * Twenty million are some 0.6 s, the pairs' own; past them the rule stops and answers `too_heavy`.
+ * Twenty million are some 0.6 s; past them the rule stops and answers `too_heavy`. **The price, named**
+ * (review №29): the two ceilings add up — one call weighs up to `STATEMENT_WEIGHED_MAX`, some 0.66 s, and
+ * then matches up to these steps, some 0.6 s more: 1.3 s of the API's loop at worst.
  */
 export const STATEMENT_STEPS_MAX = 20_000_000
 
@@ -709,9 +729,23 @@ export function matchStatement(
     if (weighed(row.line)) spend.push(row)
   }
 
-  // The work, before any of it: past the ceiling nothing is weighed (А16) — the pairs, and the keys of
-  // every line under each other upload a link reaching them was keyed under (А21); counted, not kept
-  // (review №26).
+  // A refund (В3, Г4) is looked for among the lines and records of its own sum alone (А23).
+  const refunds = rows.filter((row) => !decisions.has(row.index) && row.line.sign === '+')
+  const refundsBySum = bySum(refunds, (row) => [row.line.amount])
+  const refundable = bySum(
+    known.filter(
+      ({ c }) =>
+        (c.what === 'spending' || c.what === 'trip') && !c.removed && onAccount(c, account),
+    ),
+    (k) => k.amounts,
+  )
+  const refundedRecords = (row: Row) => [
+    ...new Set(row.amounts.flatMap((a) => refundable.get(sumKey(a)) ?? [])),
+  ]
+
+  // The work, before any of it: past the ceiling nothing is weighed (А16) — the pairs, the keys of every
+  // line under each other upload a link reaching them was keyed under (А21), and the sellers a refund
+  // weighs against a purchase's of its sum and a record's (А23); counted, not kept (review №26).
   let weight = 0
   const uploads = new Set<string>()
   for (const row of spend) {
@@ -720,6 +754,11 @@ export function matchStatement(
     for (const { under } of records) if (under !== null && under !== ours) uploads.add(under)
   }
   weight += uploads.size * rows.length * STATEMENT_KEY_WEIGHT
+  let sellers = 0
+  for (const row of spend) sellers += refundsBySum.get(sumKey(row.line.amount))?.length ?? 0
+  for (const row of refunds)
+    for (const sum of row.amounts) sellers += refundable.get(sumKey(sum))?.length ?? 0
+  weight += sellers * STATEMENT_SELLER_WEIGHT
   if (weight > STATEMENT_WEIGHED_MAX) return { outcome: 'too_heavy', pairs: weight, steps: 0 }
 
   // Every pair whose sum fits, then one to one: met before doubts, the line a record was made from
@@ -791,18 +830,15 @@ export function matchStatement(
   }
 
   // A purchase and its refund in the same file (В3): the purchase new and not ticked; one refund a purchase.
-  const refunds = rows.filter((row) => !decisions.has(row.index) && row.line.sign === '+')
   const refunded = new Set<number>()
   for (const { index, line, words } of spend) {
     if (decisions.has(index)) continue
-    const back = refunds.find(
-      ({ index: r, line: refund, words: theirs }) =>
-        !refunded.has(r) &&
-        refund.amount.currency === line.amount.currency &&
-        refund.amount.minor === line.amount.minor &&
-        refund.day >= line.day &&
-        sameSeller(theirs, words),
-    )
+    const back = refundsBySum
+      .get(sumKey(line.amount))
+      ?.find(
+        ({ index: r, line: refund, words: theirs }) =>
+          !refunded.has(r) && refund.day >= line.day && sameSeller(theirs, words),
+      )
     if (back === undefined) continue
     refunded.add(back.index)
     decisions.set(index, { group: 'new', ticked: false, note: 'refunded', categoryHint: null })
@@ -817,9 +853,8 @@ export function matchStatement(
     const { index, day, words } = row
     if (refunded.has(index)) continue
     let best: { readonly c: StatementCandidate; readonly after: number } | undefined
-    for (const { c, days, amounts, seller } of known) {
-      if ((c.what !== 'spending' && c.what !== 'trip') || c.removed || hinted.has(c.id)) continue
-      if (!onAccount(c, account) || !sameAmount(row.amounts, amounts)) continue
+    for (const { c, days, seller } of refundedRecords(row)) {
+      if (hinted.has(c.id)) continue
       const afters = days.map((d) => day - d).filter((a) => a >= 0 && a <= STATEMENT_REFUND_DAYS)
       if (afters.length === 0 || !sameSeller(words, seller)) continue
       const after = Math.min(...afters)

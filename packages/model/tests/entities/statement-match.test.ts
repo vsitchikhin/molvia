@@ -17,6 +17,7 @@ import {
   matchStatement,
   spendingCandidate,
   STATEMENT_KEY_WEIGHT,
+  STATEMENT_SELLER_WEIGHT,
   STATEMENT_STEPS_MAX,
   STATEMENT_WEIGHED_MAX,
   transferCandidate,
@@ -1509,6 +1510,66 @@ describe('matchStatement — adversarial, round 6', () => {
     const one = match(byHand('2026-11-12', 1414), rides, o)
     expect(one.steps).toBeLessThanOrEqual(3 * one.pairs)
   }, 120_000)
+})
+
+describe('matchStatement — adversarial, round 7', () => {
+  const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+  const days = (n: number) =>
+    new Date(Date.UTC(2026, 9, 1) + n * 86_400_000).toISOString().slice(0, 10)
+  const back = (day: string, amount: string, payee: string) =>
+    line(day, amount, 'AMD', payee, { sign: '+' })
+
+  it('А23: a refund weighs the sellers of its own sum — a statement of «+» lines alone is weighed too', () => {
+    const refunds = Array.from({ length: 3000 }, () =>
+      back('2026-11-30', '6400.00', 'Ք: SAS SUPERMARKET YEREVAN AM'),
+    )
+    const records = (amount: string) =>
+      Array.from({ length: 3000 }, (_, i) =>
+        spending(days(i % 55), amount, 'AMD', { place: 'Zovq Bar', account: ARDSHIN }),
+      )
+    // Every «+» line went through every record and weighed none: 24 s at pairs 0.
+    expect(matchStatement(PERSON, statementOf(refunds, o), records('6400.00'))).toEqual({
+      outcome: 'too_heavy',
+      pairs: 3000 * 3000 * STATEMENT_SELLER_WEIGHT,
+      steps: 0,
+    })
+    expect(match(records('6500.00'), refunds, o).pairs).toBe(0)
+    // В3: 1 500 purchases and 1 500 refunds of one sum, 6.7 s at pairs 0.
+    const both = [
+      ...Array.from({ length: 1500 }, () =>
+        line('2026-11-10', '6400.00', 'AMD', 'Ք: SAS SUPERMARKET YEREVAN AM'),
+      ),
+      ...Array.from({ length: 1500 }, () =>
+        back('2026-11-20', '6400.00', 'Ք: ZOVQ BAR YEREVAN AM'),
+      ),
+    ]
+    expect(matchStatement(PERSON, statementOf(both, o), [])).toMatchObject({
+      outcome: 'too_heavy',
+      pairs: 1500 * 1500 * STATEMENT_SELLER_WEIGHT,
+    })
+  }, 60_000)
+
+  it('А23: a refund still finds its purchase and its record by the sum, the debited one too', () => {
+    const sas = spending('2026-11-12', '6400.00', 'AMD', { place: 'SAS', account: ARDSHIN })
+    const dollars = spending('2026-11-12', '20.00', 'USD', {
+      place: 'Ozon',
+      account: ARDSHIN,
+      debited: ['7800.00', 'AMD'],
+    })
+    expect(
+      decide(
+        [sas, dollars],
+        [
+          back('2026-11-20', '6400.00', 'Ք: SAS SUPERMARKET YEREVAN AM'),
+          back('2026-11-20', '7800.00', 'OZON'),
+        ],
+        o,
+      ),
+    ).toEqual([
+      { group: 'not_spending', reason: 'refund', record: { id: sas.id, what: 'spending' } },
+      { group: 'not_spending', reason: 'refund', record: { id: dollars.id, what: 'spending' } },
+    ])
+  })
 })
 
 describe('tripCandidate', () => {
