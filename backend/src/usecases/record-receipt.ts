@@ -157,13 +157,18 @@ function editsOf(
  * shown the lines' total for the receipt's — the total less what went to the card, and less a café's service
  * (MOL-310) — and sends exactly that back when «Итог» is opened and saved as it was. That echo is the printed total,
  * neither the trip's money nor a correction; anything else it sends is the person's own word. A build that knows the
- * cashback and not the service echoes the total less the service alone.
+ * cashback and not the service echoes the total less the service alone; one that knows both and not a pharmacy's
+ * rounding (MOL-421), the total less the rounding alone.
  */
 function echoed(held: ReceiptToRecord, body: ReceiptRecordBody): ReceiptRecordBody {
-  const { total, cashback, service } = held
+  const { total, cashback, service, rounding } = held
   const sent = body.total
   if (sent === undefined || total === null) return body
-  const told = [linesTotalOf(total, cashback, service), linesTotalOf(total, null, service)]
+  const told = [
+    linesTotalOf(total, cashback, service, rounding),
+    linesTotalOf(total, null, service, rounding),
+    linesTotalOf(total, null, null, rounding),
+  ]
   return told.some((one) => sameMoney(sent, one)) ? { ...body, total } : body
 }
 
@@ -179,7 +184,10 @@ function receiptMoney(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
  * The receipt's total for its trip (MOL-126 Т-10, В-3; В-5 of the review): the total the phone sent — the
  * printed one, or the person's correction of what OCR misread; without it the printed total where it is
  * not below the lines — what was paid, the lines left out and those OCR lost included, while a lost line
- * only ever raises a total, so one below the lines was misread — else the sum of every line: a recorded
+ * only ever raises a total, so one below the lines was misread; a pharmacy's rounding below nought prints it exactly
+ * that far below them, as paid (MOL-421, adversarial Б2); on a receipt with no total vouched for, the total as read in
+ * one place where the lines the person typed and a pharmacy's rounding meet it exactly (adversarial Д2) — else the sum
+ * of every line: a recorded
  * one at what the person settled on, one left out at what it would have been recorded at (В-5), and what a card
  * sent to the card (MOL-289). `null`
  * when nothing is known: the trip then counts its prices (MOL-78).
@@ -195,8 +203,13 @@ function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
     printed,
     ...stored.flatMap((line) => [line.price, line.sum, line.discount]),
   ])
-  // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
-  const left = recordedSums(stored, linesTotalOf(printed, held.cashback, held.service), digits)
+  // the lines make the total less what a card sent to the card (MOL-289), less a café's service (MOL-310) and less a
+  // pharmacy's rounding (MOL-421)
+  const left = recordedSums(
+    stored,
+    linesTotalOf(printed, held.cashback, held.service, held.rounding),
+    digits,
+  )
   let sum: Money | null = { minor: 0n, currency }
   const amounts = [
     ...body.lines.map((line) => (line.skip ? (left[line.position] ?? null) : line.amount)),
@@ -209,8 +222,26 @@ function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
     sum = sum === null || amount?.currency !== currency ? null : addMoney(sum, amount)
   }
   const lines = sum !== null && sum.minor > 0n ? sum : null
-  if (printed !== null && printed.minor > 0n && (lines === null || printed.minor >= lines.minor)) {
+  // exactly as far below as its rounding below nought: a tetri more is a total misread, as without one
+  const below = held.rounding !== null && held.rounding.minor < 0n ? -held.rounding.minor : 0n
+  if (
+    printed !== null &&
+    printed.minor > 0n &&
+    (lines === null || printed.minor >= lines.minor || printed.minor + below === lines.minor)
+  ) {
     return printed
+  }
+  // a pharmacy's rounding named on a receipt not whole, its total read in one place (MOL-421, adversarial Д2): the lines
+  // the person typed and it meeting that total, it is what was paid — the lines alone are a tetri off it
+  const { rounding, readTotal } = held
+  if (
+    printed === null &&
+    lines !== null &&
+    rounding?.currency === lines.currency &&
+    readTotal?.currency === lines.currency &&
+    lines.minor + rounding.minor === readTotal.minor
+  ) {
+    return readTotal
   }
   // what a card sent to the card left it too: the lines and it, where no total was vouched for (review round 1,
   // А3; owner's В-5 «а» of MOL-289 — «записывать, сколько списалось»). A total vouched for below the lines — a
@@ -324,7 +355,7 @@ export async function recordReceipt(
       actor.id,
       held.tin,
       held.lines,
-      linesTotalOf(body.total ?? held.total, held.cashback, held.service),
+      linesTotalOf(body.total ?? held.total, held.cashback, held.service, held.rounding),
       held.currency,
     )
 

@@ -9,6 +9,7 @@ import {
   modelHeadRows,
   modelPaidBy,
   moneyOfHundredths,
+  signedMoneyOfHundredths,
   needsReshoot,
   readPartly,
   receiptPaidBy,
@@ -289,6 +290,8 @@ function headOf(
     readTotalMinor: moneyOfHundredths(text.readTotalHundredths, currency)?.minor ?? null,
     cashbackMinor: moneyOfHundredths(text.cashbackHundredths ?? null, currency)?.minor ?? null,
     serviceMinor: moneyOfHundredths(text.serviceHundredths ?? null, currency)?.minor ?? null,
+    roundingMinor:
+      signedMoneyOfHundredths(text.roundingHundredths ?? null, currency)?.minor ?? null,
     redeemedMinor: moneyOfHundredths(text.redeemedHundredths ?? null, currency)?.minor ?? null,
     paidBy,
     balanced: text.balanced,
@@ -900,11 +903,14 @@ async function parsed(
   const measured = head.totalMinor ?? head.readTotalMinor
   const cashback = head.cashbackMinor ?? null
   const service = head.serviceMinor ?? null
-  // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
+  const rounding = head.roundingMinor ?? null
+  // the lines make the total less what a card sent to the card (MOL-289), less a café's service (MOL-310) and less a
+  // pharmacy's rounding (MOL-421)
   const total = linesTotalOf(
     measured === null ? null : { minor: measured, currency },
     cashback === null ? null : { minor: cashback, currency },
     service === null ? null : { minor: service, currency },
+    rounding === null ? null : { minor: rounding, currency },
   )
   return {
     kind: 'parsed',

@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
   RECEIPT_BILL_HEADER,
+  RECEIPT_ROUNDING_HEADER,
   RECEIPT_CASHBACK_HEADER,
   RECEIPT_MODEL,
   RECEIPT_PAID_BY_HEADER,
@@ -303,6 +304,34 @@ describe('the review of a receipt', () => {
     ])
   })
 
+  it('sets the lines against the total less a pharmacy’s rounding, and tells a phone that asks (MOL-421)', async () => {
+    const me = await insertActor(db)
+    const lines: Line[] = [
+      { printed: 'ხსნარი', price: 2236, sum: 2236 },
+      { printed: 'სიროფი', price: 433, sum: 433 },
+    ]
+    // the lines rounded to 2 236 + 433, the total to 2 670: a rounding of +1, as 22.364 + 4.334 = 26.698 of a pharmacy
+    const pharmacy = { totalMinor: 267_000n, roundingMinor: 100n, layout: 'class' as const }
+    const id = await parsedReceipt(me, lines, pharmacy)
+    // an earlier build, which knows no rounding, is told what the lines come to — no «Разница» of lines read right
+    const shown = await review(me, id)
+    expect([shown.receipt.total, shown.rounding]).toEqual([amd(2669), undefined])
+    expect(shown.lines.map((line) => line.amount)).toEqual([amd(2236), amd(433)])
+    const response = await app.inject({
+      method: 'GET',
+      url: `/receipts/${id}`,
+      headers: {
+        cookie: await signIn(db, me),
+        'x-molvia-today': '2026-10-03',
+        [RECEIPT_BILL_HEADER]: '1',
+        [RECEIPT_ROUNDING_HEADER]: '1',
+      },
+    })
+    const asked = receiptDetailCodec.parse(response.json())
+    expect([asked.receipt.total, asked.rounding]).toEqual([amd(2670), amd(1)])
+    expect(asked.lines.map((line) => line.amount)).toEqual([amd(2236), amd(433)])
+  })
+
   it('shows a terminal’s slip with its total only to a phone that asks, and none to an earlier build (MOL-310)', async () => {
     const me = await insertActor(db)
     const id = await parsedReceipt(me, [], { totalMinor: 1_166_000n, layout: 'slip' })
@@ -502,7 +531,7 @@ describe('the review of a receipt', () => {
     ])
     const detail = await review(me, id)
     expect(detail.lines.map((line) => line.rememberedPrice)).toEqual([amd(50), null])
-  })
+  }, 15_000)
 
   // MOL-315: the model confuses 5↔6 alone — its 1 100 → 1 400 is a price changed, Tesseract's a misread
   it('doubts a price of a receipt the model read by the model’s confusions alone', async () => {

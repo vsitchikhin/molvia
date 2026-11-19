@@ -34,6 +34,7 @@ function untold(patch: Partial<ReceiptSummary> = {}, telegramUserId = 4242): Unt
     cashback: null,
     redeemed: null,
     service: null,
+    rounding: null,
     readPartly: null,
     paidBy: null,
     byModel: false,

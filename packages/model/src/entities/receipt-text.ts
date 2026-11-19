@@ -13,7 +13,7 @@
 // with a word in it is built from the card, once a card. The tills' layouts stay the parse's own.
 
 import type { ReceiptPaidBy } from '#model/entities/receipt'
-import { PARSED_FRACTION_DIGITS, digitCounts } from '#model/entities/receipt-card'
+import { THOUSANDTHS, digitCounts, fractionDigitsReadBy } from '#model/entities/receipt-card'
 import type { DateOrder, PhotoReading } from '#model/entities/receipt-card'
 
 /** A line's four figures: thousandths of its unit, hundredths of money. */
@@ -22,6 +22,88 @@ export interface LineFigures {
   readonly priceHundredths: number | null
   readonly discountHundredths: number | null
   readonly sumHundredths: number | null
+}
+
+/** A line's money as a pharmacy prints it (MOL-421), in thousandths: «22.368» is 22 368. */
+export interface LineThousandths {
+  readonly price: number | null
+  readonly sum: number | null
+  readonly discount: number | null
+}
+
+/** A pharmacy's thousandths in a tetri (MOL-421): ten. */
+export const THOUSANDTHS_PER_HUNDREDTH = 10 ** (THOUSANDTHS - 2)
+
+/** Thousandths as hundredths, half up (MOL-421, owner's В-1 «а»): 22 368 is 2 237, 1 005 is 101. */
+export const halfUpHundredths = (thousandths: number): number =>
+  Math.floor((thousandths + THOUSANDTHS_PER_HUNDREDTH / 2) / THOUSANDTHS_PER_HUNDREDTH)
+
+/**
+ * A line's money as printed in thousandths, where it still is the line's (MOL-421): every figure rounds half up to the
+ * line's own. A line whose figures were put right since — by the font's swaps, the memory — is judged on its own.
+ */
+export function printedThousandths(line: ReceiptTextLine): LineThousandths | null {
+  const printed = line.thousandths
+  if (printed === undefined) return null
+  const same = (milli: number | null, hundredths: number | null): boolean =>
+    milli === null ? hundredths === null : halfUpHundredths(milli) === hundredths
+  return same(printed.price, line.priceHundredths) &&
+    same(printed.sum, line.sumHundredths) &&
+    same(printed.discount, line.discountHundredths)
+    ? printed
+    : null
+}
+
+/** The lines' sums as printed in thousandths (MOL-421), or none where a line has no such sum. */
+export function printedSum(lines: readonly ReceiptTextLine[]): number | null {
+  let milli = 0
+  for (const line of lines) {
+    const sum = printedThousandths(line)?.sum ?? null
+    if (sum === null) return null
+    milli += sum
+  }
+  return milli
+}
+
+/**
+ * A pharmacy's lines' sums as printed (MOL-421), what they meet its total by: none where a line has none, or a card's
+ * cashback or a café's service stands between the lines and the total — one rule for the reading and the check.
+ */
+export function pharmacySum(
+  text: Pick<ReceiptText, 'cashbackHundredths' | 'serviceHundredths' | 'lines'>,
+): number | null {
+  return (text.cashbackHundredths ?? null) === null && (text.serviceHundredths ?? null) === null
+    ? printedSum(text.lines)
+    : null
+}
+
+/**
+ * Whether a pharmacy's lines, their sums as printed in thousandths, meet a total as printed (MOL-421): to the
+ * thousandth, a total printed in tetri (`undefined`) as its tetri; one printed twice apart (`null`), never. **Never by
+ * the tetri alone**: 1.004 + 1.005 against 2.010 is a figure misread, though 1,00 + 1,01 is 2,01 (adversarial Б1) — nor
+ * against a total printed «2.01», which cannot tell 2.009 from 2.010 (adversarial В2, round 3): lines that come to
+ * 26.698 meet no «26.70».
+ */
+export function printedMeets(
+  milli: number,
+  totalHundredths: number,
+  totalThousandths: number | null | undefined,
+): boolean {
+  const printed = printedTotal(totalHundredths, totalThousandths)
+  return printed !== null && milli === printed
+}
+
+/**
+ * A pharmacy's total as printed, in thousandths (MOL-421): its own thousandths, one printed in tetri (`undefined`) as
+ * that tetri; `null` — two printed apart round to it.
+ */
+export function printedTotal(
+  totalHundredths: number,
+  totalThousandths: number | null | undefined,
+): number | null {
+  return totalThousandths === undefined
+    ? totalHundredths * THOUSANDTHS_PER_HUNDREDTH
+    : totalThousandths
 }
 
 /** One row of a reading: its text and where it stands on the photo of its part. */
@@ -74,6 +156,12 @@ export interface ReceiptTextLine {
    * the shop's memory sets its shelf price against. None on a line no article keys — a table's, a journal's.
    */
   readonly read?: LineFigures
+  /**
+   * A model's line of a receipt that prints thousandths (MOL-421): its price, sum and discount as printed — its
+   * arithmetic is judged on them, by the reading and by the check alike, never on the tetri they round to (Р-2): 3 ×
+   * 0.255 = 0.765 holds, where 3 × 0,26 = 0,78 against 0,77 would not. Read through `printedThousandths`.
+   */
+  readonly thousandths?: LineThousandths
   /**
    * What the shop's memory said of the line (MOL-291): its price `confirmed` a line as printed, `repaired`
    * one that did not hold, or `doubted` one as printed one confused digit off it — emptied by the check.
@@ -133,19 +221,38 @@ export interface ReceiptText {
    * is what was paid. Only a model's reading names it.
    */
   readonly serviceHundredths?: number | null
+  /**
+   * A pharmacy's rounding (MOL-421, owner's А1 «а»): its lines meet its total as printed, in thousandths, and each
+   * rounded half up to the tetri they come to the total less this — 22.364 + 4.334 = 26.698 is 22,36 + 4,33 against
+   * 26,70, a rounding of +0,01; either sign, never nought. The lines make the total less it, and the total is what was
+   * paid. On a receipt not whole it is the rounding against the total as read (`readTotalHundredths`), which «Прочитали
+   * не всё» measures the lines by (adversarial Г1). Only a model's reading of three decimals names it.
+   */
+  readonly roundingHundredths?: number | null
+  /**
+   * A pharmacy's total as printed with three decimals, in thousandths (MOL-421): what its lines are judged against as
+   * printed, by the reading and by the check alike (`printedMeets`); `null` — two printed apart round to the total;
+   * none — printed in tetri, or no pharmacy.
+   */
+  readonly totalThousandths?: number | null
   readonly lines: readonly ReceiptTextLine[]
 }
 
 /**
- * What the lines of a reading come to by a total of it, in hundredths (MOL-289, MOL-310): the total less what a card
- * sent to the card and less a café's service — the one rule of the check, the shop's memory and the model's reading,
- * as `linesTotalOf` is of the money.
+ * What the lines of a reading come to by a total of it, in hundredths (MOL-289, MOL-310, MOL-421): the total less what
+ * a card sent to the card, less a café's service and less a pharmacy's rounding — the one rule of the check, the shop's
+ * memory and the model's reading, as `linesTotalOf` is of the money.
  */
 export function linesTotalHundredths(
-  text: Pick<ReceiptText, 'cashbackHundredths' | 'serviceHundredths'>,
+  text: Pick<ReceiptText, 'cashbackHundredths' | 'serviceHundredths' | 'roundingHundredths'>,
   total: number,
 ): number {
-  return total - (text.cashbackHundredths ?? 0) - (text.serviceHundredths ?? 0)
+  return (
+    total -
+    (text.cashbackHundredths ?? 0) -
+    (text.serviceHundredths ?? 0) -
+    (text.roundingHundredths ?? 0)
+  )
 }
 
 // «1 260,5» — what OCR printed — as a number; NaN for what is not one, as the prototype had it.
@@ -211,9 +318,11 @@ const lexicons = new WeakMap<PhotoReading, Lexicon>()
 function lexiconOf(reading: PhotoReading): Lexicon {
   const known = lexicons.get(reading)
   if (known !== undefined) return known
-  // a card names only formats of numbers the parse reads: amounts are hundredths throughout, and three
-  // decimals read as two would be every sum wrong (MOL-248 adds the third with the reading of it)
-  const unread = reading.numbers.find((f) => !PARSED_FRACTION_DIGITS.includes(f.fractionDigits))
+  // a card names only formats of numbers its reader reads: Tesseract's amounts are hundredths throughout, and three
+  // decimals read as two would be every sum wrong; a card the model alone reads takes the model's (MOL-421) — the
+  // model's path asks this lexicon too (`paidByOf`), and the parse of a card read so reads no row of Tesseract's
+  const formats = fractionDigitsReadBy(reading)
+  const unread = reading.numbers.find((f) => !formats.includes(f.fractionDigits))
   if (reading.numbers.length === 0 || unread !== undefined) {
     throw new RangeError(
       `a card's formats of numbers are not the parse's: ${JSON.stringify(reading.numbers)}`,

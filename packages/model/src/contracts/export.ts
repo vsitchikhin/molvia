@@ -68,8 +68,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // the language the person's app last spoke, which the bot's rating reminder is written in (MOL-398). 36: the account's
 // `trialReceiptsLeft`, `modelReceiptsMonth` and `modelReceiptsRead`, the trial's receipts left and the receipts the
 // model read in the person's month, and a receipt's `sentMonth`, `counted` and `retakenAt`, the month it counts in, how
-// it was counted and when «Переснять» gave that back (MOL-275).
-export const EXPORT_VERSION = 36
+// it was counted and when «Переснять» gave that back (MOL-275). 37: a receipt's `rounding`, a pharmacy's rounding the
+// lines make the total less, either sign (MOL-421).
+export const EXPORT_VERSION = 37
 
 const day = z.iso.date()
 
@@ -410,6 +411,7 @@ const receiptSchema = z.strictObject({
   cashback: signedMoneyCodec.nullable(),
   redeemed: signedMoneyCodec.nullable(),
   service: signedMoneyCodec.nullable(),
+  rounding: signedMoneyCodec.nullable(),
   readPartly: z.boolean().nullable(),
   paidBy: z.string().nullable(),
   balanced: z.boolean(),
