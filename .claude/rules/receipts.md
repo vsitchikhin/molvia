@@ -556,10 +556,13 @@ read by photo.
 **A card names only what the parse reads** (owner, В-1 «а»): MOL-229's template also has the words of change,
 subtotal and not-an-item, the codes and the QR, which no rule of Armenia reads; they come with their first
 reader (MOL-248). A field nobody reads is a word nobody checks. **The formats of numbers are a list** — Georgia's
-pharmacies print three decimals beside its shops' two — **and a card may name only a format the parse reads**
-(`PARSED_FRACTION_DIGITS`): the parse counts in hundredths throughout, so it **refuses** a card with no format
-or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals read as
-two would be every sum wrong, and only a refusal makes the field more than a declaration.
+pharmacies print three decimals beside its shops' two — **and a card may name only a format its reader reads**:
+Tesseract's parse counts in hundredths throughout (`PARSED_FRACTION_DIGITS`), so it **refuses** a card it reads with
+no format or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals read as
+two would be every sum wrong, and only a refusal makes the field more than a declaration. A card the model alone reads
+(`tesseractReads` false) may name its three decimals too (`MODEL_FRACTION_DIGITS`, MOL-421): `lexiconOf` is asked on
+the model's path as well (`paidByOf`), and refusing there would have failed every Georgian receipt. Tesseract for
+Georgia (MOL-423) inherits the refusal until its parse reads them.
 
 **A card read off no photo doubts no digit** (MOL-270, owner's В-1 «а», 28.10.2026): `priceInDoubt` asks the
 receipt's card (`receiptCard`), and one with no `photo` — Serbia's, from the tax office — is `false`, the server's
@@ -677,8 +680,27 @@ receipt proven whole, and its lines of one piece went empty.
   `model_receipt_days` have no country; `receipt_reason_days` tells the countries apart. **The price, named:** with no
   memory in Georgia the same corrections count on every receipt of a shop, so the share of lines put right leans toward
   the stop by Georgia's memory, not the reading — «Haiku has to cope with it» (owner, 17.11.2026).
-- **The prices, named:** a pharmacy's three decimals («23.868 ლარი») are no figure the parse reads, and such a line's
-  figures stay empty (Р-2, MOL-421); a rollback to a build before this task cannot list a person's receipts once one of
+- **A pharmacy's three decimals are read, half up to the tetri** (MOL-421, owner's В-1 «а», 19.11.2026): the till of
+  ge-04 and ge-05 prints «22.368», «23.868 ლარი», and the model copies them as printed. `canonicalAnswer` reads them only
+  where the card names three decimals and **every** amount the model copied — a price, a sum, a discount, a total — has
+  three (Р-1, one receipt, one format): a weight «0.452» copied into the sum of a receipt of two decimals stays no figure.
+  **A line's arithmetic is judged as printed, in thousandths** (Р-2, `held`), and then every amount is hundredths, half
+  up, as the rest of the reading counts: rounded first, 3 × 0.255 = 0.765 is 3 × 0,26 against 0,77. **Whole is judged
+  in tetri** (Р-3): lines that drift a tetri off the total by their rounding — 1.005 + 1.005 against 2.010, 1,01 + 1,01
+  against 2,01 — leave the receipt not whole, its lines of one piece empty (MOL-255). Neither the prompt nor the phone
+  changed (Р-4, Р-5): the review shows 22,37 ₾ against 22.368 on the paper.
+- **A total under the currency alone is the total's place** (MOL-421, owner's В-2 «а»): the pharmacy prints «23.868
+  ლარი» with no word, and the model labels it «ლარი» — an amount nothing named, so no total, no receipt proven whole and
+  its lines of one piece empty. The card's `bareTotal` («ლარი», «₾», «GEL», marks around it at most; Armenia's `NEVER`)
+  makes such an amount a place of the total **only where no amount carries the total's word and only one such amount
+  stands** — two are a doubt — and it is shown by MOL-244's rule as any total: the lines that meet it every one as read,
+  or two places; one place the lines do not meet is read (`readTotalHundredths`) and never shown. On the bench ge-04 and
+  ge-05 come whole, 23,87 and 3,50, nothing made up (`.scratch/tasks/research/MOL-421.md`).
+- **The prices, named:** a cash payment in Georgia is rounded to 5 tetri (the National Bank, since 2019), so a cash
+  line of a pharmacy never meets its total — nor did it vote before; a receipt whose every amount is thousands grouped
+  by a point with no tetri — «31.000» for 31 000 — reads as three decimals, 31,00: no Georgian till was seen printing so
+  (ge-01…05 print tetri always), and the bench's Indonesian set read through Georgia's card shows it (5 fields, 3
+  totals; MOL-426 is such a country's card); a rollback to a build before this task cannot list a person's receipts once one of
   them is Georgian (Р-4); Serbia stays its link — a photo where the QR does not read is MOL-424 (В-1 «а»).
 
 **The bench** (`.scratch/tasks/research/MOL-408.md`, `tasks/status/MOL-408/`: the product's reader on 273 receipts of
@@ -686,7 +708,8 @@ nine sets, $0,37): **the model copies any script about as well as Armenian** —
 126 of 132, Russian 374 of 391, Icelandic 1 175 of 1 195, the total copied right in 5 of 5, 38 of 39, 38 of 40 — and
 **our code is what loses it**: Georgia shows 12 fields right and none wrong, sums on 6 lines of 35 — a line lost leaves
 the total in one place (MOL-244), a till of sums alone had no arithmetic for MOL-290's repair to try (31 fields right
-since MOL-420 — «A line of a sum alone, put right by the total»), the pharmacies' three decimals. Russia with a card of
+since MOL-420 — «A line of a sum alone, put right by the total»; 40 and the pharmacies whole since MOL-421), the
+pharmacies' three decimals. Russia with a card of
 the bench: totals 33 right and none wrong of 40, 28 proven whole, dates 37 of 37 (MOL-414). A tax on top, a total
 rounded to 5 sen and thousands with a point in a currency with no cents showed wrong totals or none (Malaysia,
 Indonesia, Iceland) — none of today's countries, MOL-426; two receipts on one photo, a total of the other one (MOL-425);
