@@ -42,7 +42,13 @@ describe('statementLineSchema', () => {
   })
 
   it('refuses a form no reader has', () => {
-    const statement = { form: 'tbank-pdf', accountId: null, period: null, lines: [line()] }
+    const statement = {
+      form: 'tbank-pdf',
+      accountId: null,
+      accountNumber: null,
+      period: null,
+      lines: [line()],
+    }
     expect(statementSchema.safeParse(statement).success).toBe(false)
   })
 })
@@ -68,6 +74,14 @@ describe('statementLineKeys', () => {
     const both = keys([line(), line({ payee: 'VEGA' }), line()])
     expect(new Set(both).size).toBe(3)
     expect(keys([line(), line()])).toEqual([both[0], both[2]])
+  })
+
+  it('keys by the number the bank’s head prints, before the account chosen in Molvia (adversarial А14)', () => {
+    const numbered = (accountNumber: string, accountId: string | null = null) =>
+      statementLineKeys(PERSON, { accountId, accountNumber, lines: [line()] })
+    expect(numbered('4400 **** 1111')).not.toEqual(numbered('4400 **** 2222'))
+    expect(numbered('4400 **** 1111', ARDSHIN)).toEqual(numbered('4400****1111'))
+    expect(numbered('4400 **** 1111')).not.toEqual(keys([line()], PERSON, null))
   })
 
   it('keeps two people apart on a statement with no account', () => {

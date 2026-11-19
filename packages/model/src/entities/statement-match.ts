@@ -283,7 +283,7 @@ interface Row {
 interface Known {
   readonly c: StatementCandidate
   readonly days: readonly number[]
-  readonly link: LinkDays | null
+  readonly link: Linked | null
   readonly amounts: readonly Money[]
   readonly seller: readonly string[]
 }
@@ -295,6 +295,7 @@ interface Pair {
   /** The record's link names this very line by its key: the line it was made from goes first (№15). */
   readonly own: boolean
   readonly named: number
+  /** The record or the line names no seller — «Безналичная оплата» of Ardshin's screen (А15). */
   readonly nameless: boolean
   readonly distance: number
 }
@@ -350,12 +351,20 @@ const daySlack = (a: StatementForm, b: StatementForm) =>
  */
 type LinkSays = 'own' | 'other_upload' | 'same' | 'posting' | 'unsure' | 'no'
 
-/** A record's link as the rule reads it: its days as numbers once, and how far from them it reaches. */
-interface LinkDays {
-  readonly link: StatementLink
-  readonly day: number
-  readonly posted: number | null
+/** A record's link with its days as numbers, read once (review №21). */
+interface Linked extends StatementLink {
+  readonly onDay: number
+  readonly postedDay: number | null
 }
+
+const linkedOf = (link: StatementLink | null): Linked | null =>
+  link === null
+    ? null
+    : {
+        ...link,
+        onDay: dayNumber(link.day),
+        postedDay: link.postedOn === null ? null : dayNumber(link.postedOn),
+      }
 
 /**
  * A line of a file against a screenshot of the same operation (MOL-428): a file dates a line by its
@@ -364,15 +373,15 @@ interface LinkDays {
  * the screenshot one to four days later is a doubt (А12). Two files meet by the operation's day; ± 1 for
  * a form whose day moves.
  */
-function operationSays(link: LinkDays, row: Row, form: StatementForm): 'same' | 'posting' | 'no' {
-  const slack = daySlack(link.link.form, form)
+function operationSays(link: Linked, row: Row, form: StatementForm): 'same' | 'posting' | 'no' {
+  const slack = daySlack(link.form, form)
   const meet = (a: number, b: number) => Math.abs(a - b) <= slack
-  const shotOfFile = link.link.form === 'screenshot' && isBankFile(form)
-  const fileOfShot = form === 'screenshot' && isBankFile(link.link.form)
-  if (!shotOfFile && !fileOfShot) return meet(link.day, row.day) ? 'same' : 'no'
-  const shot = shotOfFile ? link.day : row.day
-  const file = shotOfFile ? row.day : link.day
-  const posted = shotOfFile ? row.posted : link.posted
+  const shotOfFile = link.form === 'screenshot' && isBankFile(form)
+  const fileOfShot = form === 'screenshot' && isBankFile(link.form)
+  if (!shotOfFile && !fileOfShot) return meet(link.onDay, row.day) ? 'same' : 'no'
+  const shot = shotOfFile ? link.onDay : row.day
+  const file = shotOfFile ? row.day : link.onDay
+  const posted = shotOfFile ? row.posted : link.postedDay
   if (posted !== null) return meet(shot, posted) ? 'same' : 'no'
   if (meet(shot, file)) return 'same'
   const later = shot - file
@@ -385,29 +394,29 @@ function operationSays(link: LinkDays, row: Row, form: StatementForm): 'same' | 
  * screenshot shows the posting day: within `STATEMENT_HOLD_POST_DAYS` after the hold, past the window
  * too, which is the measure of a record typed by hand, not of a bank's posting.
  */
-function holdPosting(link: LinkDays, row: Row, form: StatementForm): boolean {
-  if (!link.link.pending || row.line.status === 'pending') return false
-  const after = row.day - link.day
+function holdPosting(link: Linked, row: Row, form: StatementForm): boolean {
+  if (!link.pending || row.line.status === 'pending') return false
+  const after = row.day - link.onDay
   return isBankFile(form)
-    ? Math.abs(after) <= daySlack(link.link.form, form)
+    ? Math.abs(after) <= daySlack(link.form, form)
     : after >= 0 && after <= STATEMENT_HOLD_POST_DAYS
 }
 
 function linkSays(
-  link: LinkDays,
+  link: Linked,
   row: Row,
   form: StatementForm,
   account: string | null,
   keyUnder: (account: string | null, index: number) => string | undefined,
 ): LinkSays {
-  const { key, accountId } = link.link
+  const { key, accountId } = link
   if (key === row.key) return 'own'
   if (accountId !== account && key === keyUnder(accountId, row.index)) return 'other_upload'
-  if (link.link.form === 'screenshot' && form === 'screenshot' && link.day === row.day) {
-    const said = printedTimesSay(link.link.time, row.line.time)
+  if (link.form === 'screenshot' && form === 'screenshot' && link.onDay === row.day) {
+    const said = printedTimesSay(link.time, row.line.time)
     return said === 'same' ? 'same' : said === 'apart' ? 'no' : 'unsure'
   }
-  const sameFile = formKeyIsStable(form) && link.link.form === form
+  const sameFile = formKeyIsStable(form) && link.form === form
   const operation = sameFile ? 'no' : operationSays(link, row, form)
   if (operation !== 'no') return operation
   return holdPosting(link, row, form) ? 'same' : 'no'
@@ -420,12 +429,12 @@ function linkSays(
  */
 function relinks(
   c: StatementCandidate,
-  link: LinkDays,
+  link: Linked,
   days: readonly number[],
   distance: number,
 ): boolean {
-  if (link.link.pending || c.what === 'transfer' || c.what === 'exchange') return false
-  return distance < Math.min(...days.map((d) => Math.abs(link.day - d)))
+  if (link.pending || c.what === 'transfer' || c.what === 'exchange') return false
+  return distance < Math.min(...days.map((d) => Math.abs(link.onDay - d)))
 }
 
 /**
@@ -434,29 +443,25 @@ function relinks(
  * asked by the caller.
  */
 function lateFit(
-  link: LinkDays,
+  link: Linked,
   row: Row,
   form: StatementForm,
   amount: 'exact' | 'tip' | 'hold',
 ): 'late' | null {
-  if (!link.link.pending || row.line.status === 'pending' || isBankFile(form)) return null
+  if (!link.pending || row.line.status === 'pending' || isBankFile(form)) return null
   if (amount === 'tip') return null
-  const after = row.day - link.day
+  const after = row.day - link.onDay
   return after > STATEMENT_HOLD_POST_DAYS && after <= STATEMENT_LATE_POST_DAYS ? 'late' : null
 }
 
 /**
- * The records the rule weighed against a line, in this process — read by tests alone (А13). «A line
- * weighs only the records that reach its day» is held by this count: a clock on CI does not tell a
- * second from four.
- */
-export const statementRecordsWeighed = { count: 0 }
-
-/**
  * The days of lines a record can meet: its window around each of its days, and around its link's days
- * as far as a link reaches — a late posting's thirty days either way bound them all (review №1, А13).
+ * as far as a link reaches — a late posting's thirty days either way bound them all (review №1, А13). A
+ * line is looked up by its day and its posting day both (`reaching`): a screenshot meets a file's line by
+ * the posting day it prints, however long after the operation (review №20). So the index decides
+ * nothing; it only spares the pairs no path could join.
  */
-function reachOf(form: StatementForm, days: readonly number[], link: LinkDays | null) {
+function reachOf(form: StatementForm, days: readonly number[], link: Linked | null) {
   const before =
     form === 'screenshot' ? STATEMENT_SCREENSHOT_DAYS_BEFORE : STATEMENT_FILE_WINDOW_DAYS
   const after = form === 'screenshot' ? STATEMENT_SCREENSHOT_DAYS_AFTER : STATEMENT_FILE_WINDOW_DAYS
@@ -464,11 +469,73 @@ function reachOf(form: StatementForm, days: readonly number[], link: LinkDays | 
   let to = Math.max(...days) + after
   if (link !== null) {
     const far = STATEMENT_LATE_POST_DAYS + 1
-    from = Math.min(from, link.day - far, (link.posted ?? link.day) - far)
-    to = Math.max(to, link.day + far, (link.posted ?? link.day) + far)
+    from = Math.min(from, link.onDay - far, (link.postedDay ?? link.onDay) - far)
+    to = Math.max(to, link.onDay + far, (link.postedDay ?? link.onDay) + far)
   }
   return { from, to }
 }
+
+/** Each record under every day of a line it can meet (`reachOf`). */
+function dayIndex<T extends { readonly days: readonly number[]; readonly link: Linked | null }>(
+  form: StatementForm,
+  records: readonly T[],
+): Map<number, T[]> {
+  const byDay = new Map<number, T[]>()
+  for (const r of records) {
+    const { from, to } = reachOf(form, r.days, r.link)
+    for (let day = from; day <= to; day++) {
+      const there = byDay.get(day)
+      if (there) there.push(r)
+      else byDay.set(day, [r])
+    }
+  }
+  return byDay
+}
+
+/** The records a line weighs: those under its day, and under its posting day, each once. */
+function reaching<T>(
+  byDay: ReadonlyMap<number, readonly T[]>,
+  row: Pick<Row, 'day' | 'posted'>,
+): readonly T[] {
+  const on = byDay.get(row.day) ?? []
+  const posted = row.posted === null || row.posted === row.day ? undefined : byDay.get(row.posted)
+  if (posted === undefined) return on
+  const seen = new Set(on)
+  return [...on, ...posted.filter((r) => !seen.has(r))]
+}
+
+/** A line the rule weighs against records: money out the reader did not name as no spending. */
+const weighed = (line: StatementLine) => notSpendingByLine(line) === null && line.sign === '-'
+
+/**
+ * The pairs of line and record the rule will weigh (А13, А16) — the work of `matchStatement`, counted
+ * before it. A line weighs only the records whose window or link reaches its day, so lines spread over a
+ * year weigh a fraction of the pairs, and lines and records crowded in one month weigh them all.
+ */
+export function statementWeighing(
+  statement: Pick<Statement, 'form' | 'lines'>,
+  candidates: readonly StatementCandidate[],
+): number {
+  const byDay = dayIndex(
+    statement.form,
+    candidates.map((c) => ({ days: c.days.map(dayNumber), link: linkedOf(c.link) })),
+  )
+  let pairs = 0
+  for (const line of statement.lines)
+    if (weighed(line)) {
+      const posted = line.postedOn === null ? null : dayNumber(line.postedOn)
+      pairs += reaching(byDay, { day: dayNumber(line.day), posted }).length
+    }
+  return pairs
+}
+
+/**
+ * The pairs the rule weighs at most (А16): it runs in the API's process. A year of 3 000 lines against
+ * 3 000 records linked to screenshots weighs some 1 500 000, in about half a second here; 3 000 lines and
+ * 3 000 records in one month weigh all 9 000 000, seconds. **MOL-433 asks `statementWeighing` before the
+ * rule and refuses past it**, with its own word for the screen — the rule itself does not count.
+ */
+export const STATEMENT_WEIGHED_MAX = 2_000_000
 
 /**
  * A record on the statement's account, or either of them with none. For a transfer or an exchange the
@@ -556,15 +623,15 @@ function matchPairs(pairs: readonly Pair[]): Map<number, Pair> {
  * posting of. The candidates are the person's spendings (removed ones still within «Вернуть»), finished
  * trips, transfers and exchanges, built by the functions above. A line is weighed only against the
  * records whose window or link reaches its day, the sum first; a name is folded once a line and once a
- * record — it runs in the API's process (review №1, А13): `STATEMENT_LINES_MAX` lines against a year of
- * 3 000 records linked to screenshots stays well within the bound its test holds.
+ * record — it runs in the API's process (review №1, А13), and its caller holds its work under
+ * `STATEMENT_WEIGHED_MAX` by `statementWeighing` (А16).
  */
 export function matchStatement(
   actorId: string,
   statement: Statement,
   candidates: readonly StatementCandidate[],
 ): StatementMatch {
-  const { form, lines } = statement
+  const { form } = statement
   const account = statement.accountId
   const rows: Row[] = statementKeyedLines(actorId, statement).map(({ line, key }, index) => ({
     index,
@@ -578,33 +645,18 @@ export function matchStatement(
   const known: Known[] = candidates.map((c) => ({
     c,
     days: c.days.map(dayNumber),
-    link:
-      c.link === null
-        ? null
-        : {
-            link: c.link,
-            day: dayNumber(c.link.day),
-            posted: c.link.postedOn === null ? null : dayNumber(c.link.postedOn),
-          },
+    link: linkedOf(c.link),
     amounts: amountsOfRecord(c),
     seller: sellerWords(c.name),
   }))
-  // Each record under every day of a line it can meet: a line weighs those alone (А13).
-  const byDay = new Map<number, Known[]>()
-  for (const k of known) {
-    const { from, to } = reachOf(form, k.days, k.link)
-    for (let day = from; day <= to; day++) {
-      const there = byDay.get(day)
-      if (there) there.push(k)
-      else byDay.set(day, [k])
-    }
-  }
-  // The keys the lines had under another account, asked only by a link keyed under one (А4).
+  const byDay = dayIndex(form, known) // a line weighs the records that reach its days alone (А13)
+  // The keys the lines had under another account, asked only by a link keyed under one (А4); where the
+  // head prints the bank's number they are the same keys, and the link says `own` (А14).
   const keysUnder = new Map<string | null, string[]>([[account, rows.map((r) => r.key)]])
   const keyUnder = (other: string | null, index: number) => {
     let keys = keysUnder.get(other)
     if (keys === undefined) {
-      keys = statementLineKeys(actorId, { accountId: other, lines })
+      keys = statementLineKeys(actorId, { ...statement, accountId: other })
       keysUnder.set(other, keys)
     }
     return keys[index]
@@ -615,15 +667,14 @@ export function matchStatement(
   for (const row of rows) {
     const reason = notSpendingByLine(row.line)
     if (reason !== null) decisions.set(row.index, { group: 'not_spending', reason, record: null })
-    else if (row.line.sign === '-') spend.push(row)
+    if (weighed(row.line)) spend.push(row)
   }
 
   // Every pair whose sum fits, then one to one: met before doubts, the line a record was made from
   // first, then by the share of the name (А4), the nearer day, the order of the lines.
   const pairs: Pair[] = []
   for (const row of spend) {
-    for (const { c, days, link, amounts, seller } of byDay.get(row.day) ?? []) {
-      statementRecordsWeighed.count += 1
+    for (const { c, days, link, amounts, seller } of reaching(byDay, row)) {
       const moves = c.what === 'transfer' || c.what === 'exchange'
       if (moves && !onAccount(c, account)) continue
       const inside = days.some((d) => inWindow(form, row.day, d))
@@ -660,7 +711,7 @@ export function matchStatement(
         fit,
         own: says === 'own' || says === 'other_upload',
         named,
-        nameless: seller.length === 0,
+        nameless: seller.length === 0 || row.words.length === 0,
         distance,
       })
     }

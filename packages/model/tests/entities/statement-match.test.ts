@@ -16,7 +16,8 @@ import {
   exchangeCandidate,
   matchStatement,
   spendingCandidate,
-  statementRecordsWeighed,
+  STATEMENT_WEIGHED_MAX,
+  statementWeighing,
   transferCandidate,
   tripCandidate,
 } from '#model/entities/statement-match'
@@ -127,6 +128,7 @@ const line = (
 
 interface StatementOptions {
   account?: string | null
+  number?: string
   form?: StatementForm
   period?: Statement['period']
 }
@@ -134,6 +136,7 @@ interface StatementOptions {
 const statementOf = (lines: StatementLine[], o: StatementOptions = {}): Statement => ({
   form: o.form ?? 'ameria-csv',
   accountId: o.account ?? null,
+  accountNumber: o.number ?? null,
   period: o.period ?? null,
   lines,
 })
@@ -1112,6 +1115,45 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
     }
   })
 
+  it('А14: two cards of one bank uploaded «без счёта» are two keys by the number the head prints', () => {
+    const coffee = 'Ք: COFFEESHOP COMPANY YEREVAN AM'
+    const morning = line('2026-11-12', '1800.00', 'AMD', coffee)
+    const keyed = (number: string, account: string | null = null) =>
+      statementLineKeys(PERSON, {
+        accountId: account,
+        accountNumber: number,
+        lines: [morning],
+      })[0] ?? ''
+    const fromCard1 = spending('2026-11-12', '1800.00', 'AMD', {
+      link: statementLinkOf(morning, keyed('2470 **** 1111'), {
+        form: 'ameria-csv',
+        accountId: null,
+      }),
+    })
+    const card2 = { form: 'ameria-csv', number: '2470 **** 2222' } as const
+    expect(decide([fromCard1], [morning], card2)).toEqual([NEW])
+    // The same card again, with an account chosen since: the same key, recorded silently (А4).
+    expect(keyed('2470 **** 1111', AMERIA)).toBe(keyed('2470****1111'))
+    expect(
+      decide([fromCard1], [morning], {
+        form: 'ameria-csv',
+        account: AMERIA,
+        number: '2470 **** 1111',
+      }),
+    ).toEqual([recorded(fromCard1)])
+  })
+
+  it('А15: a line that names no seller — the bank’s «Безналичная оплата», or nothing — is no other name', () => {
+    const sas = spending('2026-11-12', '6400.00', 'AMD', { place: 'SAS', account: ARDSHIN })
+    for (const payee of ['Безналичная оплата', ''])
+      expect(
+        decide([sas], [line('2026-11-12', '6400.00', 'AMD', payee)], {
+          account: ARDSHIN,
+          form: 'screenshot',
+        }),
+      ).toEqual([recorded(sas)])
+  })
+
   it('gives a record the line it was made from before a like one of the same file', () => {
     const both = [
       line('2026-11-12', '1200.00', 'AMD', 'YANDEX.GO'),
@@ -1161,26 +1203,52 @@ describe('matchStatement — review, round 1', () => {
     expect(out.lines).toHaveLength(300)
   }, 60_000)
 
-  it('А13: a line weighs only the records whose window or link reaches its day — a year linked to screenshots', () => {
+  it('А13, А16: a line weighs only the records that reach its days — a year passes the ceiling, a crowded month not', () => {
     const shops = ['SAS SUPERMARKET', 'YEREVAN CITY AVAN', 'YANDEX.GO', 'GAZPROM ARMENIA']
-    const dayOf = (n: number) =>
-      new Date(Date.UTC(2026, 0, 1) + n * 86_400_000).toISOString().slice(0, 10)
-    const lines = Array.from({ length: STATEMENT_LINES_MAX }, (_, i) =>
-      line(dayOf(i % 360), String(1000 + (i % 40) * 5), 'AMD', `Ք: ${shops[i % 4] ?? ''} AM`),
-    )
-    const records = lines.map((l, i) =>
-      spending(l.day, l.amount.minor.toString().slice(0, -2), 'AMD', {
-        place: shops[i % 4] ?? '',
-        account: AMERIA,
-        link: statementLinkOf(l, nextId(), { form: 'screenshot', accountId: AMERIA }),
-      }),
-    )
-    statementRecordsWeighed.count = 0
-    const out = match(records, lines, { account: ARDSHIN, form: 'ardshin-xlsx' })
-    expect(out.lines).toHaveLength(STATEMENT_LINES_MAX)
-    // Every line against every record is 9 000 000; a link reaches some two months of the year.
-    expect(statementRecordsWeighed.count).toBeLessThan((lines.length * records.length) / 4)
+    const crowd = (days: number) => {
+      const lines = Array.from({ length: STATEMENT_LINES_MAX }, (_, i) =>
+        line(
+          new Date(Date.UTC(2026, 0, 1) + (i % days) * 86_400_000).toISOString().slice(0, 10),
+          String(1000 + (i % 40) * 5),
+          'AMD',
+          `Ք: ${shops[i % 4] ?? ''} AM`,
+        ),
+      )
+      const records = lines.map((l, i) =>
+        spending(l.day, l.amount.minor.toString().slice(0, -2), 'AMD', {
+          place: shops[i % 4] ?? '',
+          account: AMERIA,
+          link: statementLinkOf(l, nextId(), { form: 'screenshot', accountId: AMERIA }),
+        }),
+      )
+      return { s: statementOf(lines, { account: ARDSHIN, form: 'ardshin-xlsx' }), records }
+    }
+    const every = STATEMENT_LINES_MAX * STATEMENT_LINES_MAX
+    // A year: a link reaches some two months of it, under a quarter of every pair and the ceiling.
+    const year = crowd(360)
+    expect(statementWeighing(year.s, year.records)).toBeLessThan(every / 4)
+    expect(statementWeighing(year.s, year.records)).toBeLessThanOrEqual(STATEMENT_WEIGHED_MAX)
+    expect(matchStatement(PERSON, year.s, year.records).lines).toHaveLength(STATEMENT_LINES_MAX)
+    // A month of 3 000 lines and 3 000 records weighs every pair: MOL-433 refuses it before the rule.
+    const month = crowd(30)
+    expect(statementWeighing(month.s, month.records)).toBe(every)
+    expect(statementWeighing(month.s, month.records)).toBeGreaterThan(STATEMENT_WEIGHED_MAX)
   }, 60_000)
+
+  it('№20: a screenshot meets a file’s line posted long after its operation — the index decides nothing', () => {
+    const hotel = line('2026-11-30', '40000.00', 'AMD', 'Tufenkian Hotel', { time: '10:00' })
+    const fromShot = spending('2026-11-30', '40000.00', 'AMD', {
+      place: 'Tufenkian Hotel',
+      account: ARDSHIN,
+      link: statementLinkOf(hotel, nextId(), { form: 'screenshot', accountId: ARDSHIN }),
+    })
+    const booked = line('2026-10-20', '40000.00', 'AMD', 'AM\\DILIJAN\\TUFENKIAN HOTEL', {
+      postedOn: '2026-11-30',
+    })
+    const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+    expect(decide([fromShot], [booked], o)).toEqual([recorded(fromShot)])
+    expect(statementWeighing(statementOf([booked], o), [fromShot])).toBe(1)
+  })
 
   it('А13: a statement holds STATEMENT_LINES_MAX lines and no more', () => {
     const one = line('2026-11-12', '100.00', 'AMD', 'YEREVAN METRO')
