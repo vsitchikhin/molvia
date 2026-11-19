@@ -386,7 +386,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
   screenshot fill `StatementLine`, the kind is the reader's; `matchStatement` answers new, recorded or no spending, and
   the API and the screen repeat no rule.
 - **A line's key is its spending's id**: a uuid v3 of the person, the account, the day, the sign, the amount, the payee
-  and the turn among equal lines — the person always in it, the form never.
+  and the turn among equal lines — the person always in it, the form never, a screenshot's time too (А19).
 - **An exchange is a candidate, a record on another account a doubt, never filtered** (MOL-428, owner's В-1 «а»); a
   transfer or an exchange settles a line only exactly, on its day, from its own account, on a line naming itself so.
 - **The payee is folded by its own tables, never `toSearchKey`**, a city aside on both sides; the windows are
@@ -396,7 +396,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   printing none a day to four before a screenshot is a doubt; a line known only by its key under another account is a
   doubt unless the account in Molvia is one; the key reads the last four digits of the number the bank's head prints
   before the account chosen in Molvia. **A line weighs only the records that reach its days**, at most
-  `STATEMENT_LINES_MAX` lines, and past `STATEMENT_WEIGHED_MAX` pairs the rule answers `too_heavy` and weighs none.
+  `STATEMENT_LINES_MAX` lines, and past `STATEMENT_WEIGHED_MAX` pairs — a key under another upload twenty — the rule
+  answers `too_heavy` and weighs none; the matching skips what a failed search went through (А20).
 
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 

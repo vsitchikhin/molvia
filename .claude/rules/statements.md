@@ -33,19 +33,23 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
 ## The key
 
 - **A line's key is its spending's id** (Р-2, `statementLineKeys`): a uuid v3 (`nameUuid` over `md5Hex` — the domain
-  imports no `node:crypto`; MD5 here is a name, not a secret) of the person, the statement's account — **the number
-  the bank's head prints, by its last four digits** (`accountNumber` as printed, `accountNumberKey` reads it: one
-  card's number comes whole, masked or cut by the format, review №22), else the account chosen in Molvia: two cards
-  of one bank uploaded «без счёта» were one key, and a line of the second card was the first's own, silently
-  (adversarial А14); with the number, a file uploaded again with an account chosen since is the same key too (А4).
-  **The price, named:** two cards or accounts of one bank ending in the same four digits are one number — the day, the
-  sign, the amount and the payee as printed, spaces squeezed, and the turn among equal lines **of its status** — a
-  later export may leave out a refusal or a hold the bank dropped, and the payment made again beside it would take
-  its key (adversarial А5, А9). So a hold and its posting are two keys: the link lets the posting in. The same line
-  uploaded again is the same id, written once. **The person is in it**: two people's like lines of statements with no
-  account would be one id, and the spendings' id is one primary key for everyone — the second would vanish silently
-  on a conflict. **The form is not**: the same text in a bank's CSV and its PDF is the same line. The reader's
-  other additions — kind, time, posting day — move nothing.
+  imports no `node:crypto`; MD5 here is a name, not a secret) of the person; the statement's account
+  (`statementKeyAccount`) — **the number the bank's head prints, by its last four digits** (`accountNumber` as printed,
+  `accountNumberKey` reads it: one card's number comes whole, masked or cut by the format, review №22), else the account
+  chosen in Molvia: two cards of one bank uploaded «без счёта» were one key, and a line of the second card was the
+  first's own, silently (adversarial А14); with the number, a file uploaded again with an account chosen since is the
+  same key too (А4); the day, the sign, the amount and the payee as printed, spaces squeezed; **a screenshot's time as
+  printed** — the payee of Ardshin's screen is «Безналичная оплата» for every card line, and two coffees of one price
+  on one day on two screenshots were one key, the second «recorded» by the first silently and never writable
+  (adversarial А19), while a file's is not, a parser may come to read one; and the turn among equal lines **of its
+  status** — a later export may leave out a refusal or a hold the bank dropped, and the payment made again beside it
+  would take its key (adversarial А5, А9). So a hold and its posting are two keys: the link lets the posting in. The
+  same line uploaded again is the same id, written once. **The person is in it**: two people's like lines of statements
+  with no account would be one id, and the spendings' id is one primary key for everyone — the second would vanish
+  silently on a conflict. **The form is not**: the same text in a bank's CSV and its PDF is the same line. The reader's
+  other additions — kind, a file's time, the posting day — move nothing. **The prices, named:** two cards or accounts
+  of one bank ending in the same four digits are one number; two like lines of a screenshot that prints no time are
+  one key.
 - **The link** (`statementLinkSchema`, stored by MOL-433 on a spending, a trip and a transfer) keeps the key and the
   upload it was keyed under — the account in Molvia and the bank's number — the day and the posting day, «pending»,
   the form, the amount, the payee and the time: enough to know its own line again by the key it had under that upload.
@@ -95,9 +99,16 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   are no seller's in a bank's line** (А15): Ardshin's screen shows «Безналичная оплата» for every card line, and a
   line that names no seller — so, or empty — **is no other name for a record its link reaches**, and is for any other
   (А17: by the window alone it took a dinner typed by hand silently). A record's own note «Покупка» is the person's
-  word and names it.
+  word and names it. **One seller of a refund** (В3, Г4) is read on the same words — `bankSellerWords` of a bank's
+  line, `sellerWords` of a record (review №25): two lines «Безналичная оплата» are no purchase and its refund, nor such
+  a line a refund of a record noted «Оплата», and «PURCHASE» and «PAYMENT» never part one seller.
 - **One to one by the greatest matching** (А3, Б2, Kuhn's path): what met exactly first, the doubts only for records
-  left free.
+  left free. A line takes a free record as good as its first before it takes one over, and what a failed search went
+  through leads nowhere until a line is matched, so the next line's search skips it (А20: a crowd of one sum, more
+  lines than records, searched every record again for every line left over — 10⁹ steps, 20–27 s under the ceiling of
+  pairs; now 0.7 s, the steps of the order of the pairs, and the answer the same). The answer counts them (`steps`), a
+  test holds them. **The price, named:** a chain of records each a rank apart — the share of the name, the day — is
+  still Kuhn's, its steps unbounded by the ceiling.
 - **The link decides another line** (Г2, Д1, Д2, Е1, Е2), past the window too where it names it: its own line, by its
   key; another form on the link's day, ± 1 for a form whose day moves — **and a screenshot against a file's line by
   the posting day the file prints, and by it alone** (adversarial А1, А11: the bench took a screenshot's day for the
@@ -120,10 +131,15 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   either way, so the index spares pairs and decides nothing (review №20) — the sum first, a name folded once a line
   and once a record; a statement holds `STATEMENT_LINES_MAX` lines (3 000, five years of the samples' 30–50 a month).
   **The rule counts its work on its own index before weighing any of it, and past `STATEMENT_WEIGHED_MAX` (2 000 000)
-  answers `too_heavy`** (А16, review №23): no caller weighs past it, and MOL-433 only says so on the screen. A year of
+  answers `too_heavy`** (А16, review №23): no caller weighs past it, and MOL-433 only says so on the screen. It counts,
+  keeping nothing (review №26), and its work is the pairs and **the keys of every line under each other upload** a
+  reaching link was keyed under, `STATEMENT_KEY_WEIGHT` (20) pairs a key — an md5 is some 7 µs, a pair at its worst
+  0.33 µs (А21: a thousand links under a thousand numbers asked 3 000 000 md5 at a quarter of the pairs, 21 s). The
+  keys under an upload are kept by the account the key reads (`statementKeyAccount`): masks of one number are one, and
+  the statement's own are its lines'. A year of
   3 000 lines against 3 000 records linked to screenshots weighs some 1 500 000, half a second here; the same in one
-  month weighs all 9 000 000, seconds. The answer carries `pairs`, for the log; a counter kept in the domain was state
-  a pure rule had no business keeping (review №19). A month against a year with no links, folded a pair at a time,
+  month weighs all 9 000 000, seconds. The answer carries `pairs` and `steps`, for the log; a counter kept in the domain
+  was state a pure rule had no business keeping (review №19). A month against a year with no links, folded a pair at a time,
   was 8.1 s: a test bounds it at 4 s.
 - **The answer is a discriminated union** (Р-9, `StatementMatch`, `StatementLineDecision`): `matched` or `too_heavy`;
   a line's `new` (ticked, a note, a hint),
