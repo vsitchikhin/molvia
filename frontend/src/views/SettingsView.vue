@@ -262,6 +262,7 @@ export default defineComponent({
     IconRefresh,
     ListRow,
     NavRow,
+    ReceiptsAccessGroup,
     SalaryShiftGroup,
     SchemeGroup,
     LocaleGroup,

@@ -7,6 +7,9 @@ import { useActorStore } from '@/stores/actor'
 import { useFf } from '@/stores/ff'
 import { read, write } from '@/stores/storage'
 
+/** What the person chose in «Пробные чеки закончились»: the camera all the same, the record by hand, a word to the developer. */
+export type ReceiptsClosedWay = 'photo' | 'manual' | 'developer'
+
 /** What the sheet «Пробные чеки закончились» was shown for on this phone, per owner (MOL-276, В-1 «а»). */
 const TOLD_KEY = 'molvia.receipts-told'
 
@@ -54,7 +57,7 @@ export function useReceiptsAccess(): {
    * Whether a tap on «Сфотографировать чек» meets the sheet first (В-1 «а»): at every tap where nobody would read
    * the receipt, else once — the trial once ever, the month's hundred once a month — and marked so as it is asked.
    */
-  sheetFirst(): boolean
+  readonly sheetFirst: () => boolean
 } {
   const actor = useActorStore()
   const payments = useFf('payments')
@@ -62,7 +65,7 @@ export function useReceiptsAccess(): {
     const parsed = photoReceiptCountrySchema.safeParse(actor.settings?.country)
     return parsed.success ? parsed.data : null
   })
-  const access = computed(() => (country.value && actor.actor?.receiptsAccess) || null)
+  const access = computed(() => (country.value ? (actor.actor?.receiptsAccess ?? null) : null))
   const closed = computed(() => (access.value ? receiptsClosedBy(access.value) : null))
   const othersRead = computed(
     () => !payments.value && country.value !== null && !modelAlone(country.value),
