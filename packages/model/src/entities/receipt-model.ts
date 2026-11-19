@@ -194,20 +194,6 @@ function canonicalAnswer(
   // either way
   const three = ofLines.filter((count) => count === THOUSANDTHS).length
   const two = ofLines.filter((count) => count === 2).length
-  // where the vote does not choose three, the paper's own arithmetic does: the lines' sums as thousandths meeting a total
-  // printed with three to the thousandth — 22.368 + «5.00» is «27.368»; «1.299» + «499» meets no «1.798» (adversarial
-  // Д1, round 5)
-  const lineSums = spelt.map((line) => figureOf(line.sum, THOUSANDTHS))
-  const sumMilli =
-    lineSums.length > 0 && lineSums.every((one) => one !== null)
-      ? lineSums.reduce((all, one) => all + one, 0)
-      : null
-  // the totals printed with three decimals, in thousandths: what the lines' sums meet, and what `printedTotals` folds
-  const totalsMilli = amounts.flatMap(({ amount }) => {
-    const milli = decimalsOf(amount) === THOUSANDTHS ? figureOf(amount, THOUSANDTHS) : null
-    return milli === null ? [] : [milli]
-  })
-  const meetsPrinted = sumMilli !== null && totalsMilli.includes(sumMilli)
   // where the lines did not choose three — no vote, every amount «5», «2.5» (adversarial Ж1, round 7), or a discount in
   // tetri their only vote (И1, round 9) — a total printed with three decides, beside a payment in tetri, «ბარათი
   // 8.73», or cash rounded to five tetri, «ნაღდი 8.75» (З1, round 8): fewer decimals read the same either way, and a
@@ -216,7 +202,7 @@ function canonicalAnswer(
   const totalsDecide = ofTotals.includes(THOUSANDTHS)
   const thousandths =
     reading.numbers.some((format) => format.fractionDigits === THOUSANDTHS) &&
-    (meetsPrinted || three > two || totalsDecide)
+    (three > two || totalsDecide)
   const printed = new Map<ModelLine, LineThousandths>()
   const lines = thousandths
     ? spelt.map((line) => {
@@ -237,6 +223,11 @@ function canonicalAnswer(
   const totals = thousandths
     ? amounts.map(({ label, amount }) => ({ label, amount: inHundredths(amount) ?? amount }))
     : amounts
+  // the totals printed with three decimals, in thousandths: what `printedTotals` folds
+  const totalsMilli = amounts.flatMap(({ amount }) => {
+    const milli = decimalsOf(amount) === THOUSANDTHS ? figureOf(amount, THOUSANDTHS) : null
+    return milli === null ? [] : [milli]
+  })
   // each total in tetri with what it printed in thousandths; two that round alike, a doubt — but a whole tetri printed
   // with three, a card's payment as the till prints the rest, «ბარათი 23.870» beside «ლარი 23.868», is that tetri and no
   // doubt of the thousandths (adversarial В1, round 3)

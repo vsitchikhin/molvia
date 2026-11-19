@@ -1790,8 +1790,8 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
     expect(weight.lines.map((l) => l.sumHundredths)).toEqual([150, null])
   })
 
-  it('reads three where the vote does not, by the lines’ sums meeting a total printed with three (adversarial Д1)', () => {
-    // «5.00» beside «22.368»: the vote ties, the paper's own sum decides — 22.368 + 5.00 = 27.368
+  it('lets a total printed with three decide a tie of the lines’ votes (adversarial Д1, И1)', () => {
+    // «5.00» beside «22.368»: the vote ties, the total printed with three decides
     const tie = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5.00')], '27.368', 'ლარი'))
     expect([tie.totalHundredths, tie.balanced]).toEqual([2_737, true])
     expect(tie.lines.map((l) => l.sumHundredths)).toEqual([2_237, 500])
