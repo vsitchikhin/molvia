@@ -177,6 +177,36 @@ before the finish, and from the summary in «Траты»; whole each time, 404 
 takes the earlier one's place while it waits. Mirrored under `molvia.trip-categories(-rejected)`: every build
 before it drops the kind.
 
+**A trip stands in its category's circle wherever it is a row** (MOL-406, owner, 13.11.2026: «иконки должны быть из
+категории, даже если покупка записана сканом»): its icon in its colour (`tripLook`), «Продукты»'s where it names none
+— on «Траты», an account's operations and «Записаны» of «Покупки» alike, typed by hand or from a receipt; with no list
+on the phone «Продукты» is named by the preset's own word, never «Прочее» (round 3, Р3-В2). The row of «Записаны»
+learns it from the history, **only by asking** (`TRIP_HISTORY_CATEGORY_HEADER`): an installed app of an earlier build
+reads a row strictly, so the server leaves the key out for it, under a header of its own — never the month's
+`MONEY_TRIP_CATEGORY_HEADER`: one name is one field asked for. **Not known is the cart with no colour**
+(`tripLook(undefined)`, `muted` as a spending of an unknown category): an answer of a server before it, a row the
+phone made, a cache of a build before, and an id the phone's list lacks — made on another phone, or no list kept at
+all — never a guess of «Продукты» (adversarial А3), on the three screens alike (round 2, Р2-Б1), where the row's words
+name it as an unknown spending's, «Прочее» — one rule of words beside the one of the circle (`tripCategoryName` beside
+`tripLook`, review №18). **So is the trip's «Категория ›» behind the row** (`TripCategoryRow`, round 3, Р3-В1): the
+cart and the row's word, nothing chosen in the list, an `undefined` too (no default of the prop turns it into
+«Продукты», Р4-Г1) — «Продукты» chosen there was a word about a choice the phone has not got, and a tap on it «to
+leave it» wrote «Продукты» over the trip's own. A category taken out of the choice is still the trip's, and draws its
+own icon. **A write landing on a recorded trip keeps the row's category in every copy of the row** (`apply`,
+adversarial А1): a trip view carries none, and the page, the deeper pages and the shelf are each given the category
+the row held — kept on screen alone, a restart or another window's shelf drew the cart. **And the category is no part
+of «row for row»** (MOL-307's `asShelvedPage`, adversarial А2): a window of a build before writes the shelf with no
+key of it, and compared, the page was «Сервер не ответил» over a server that answered. **So a category the last answer
+of the session does not say is not known** (`categoryUnconfirmed`, Р2-Б2, Р3-В3), as a count and a sum are while the
+list moves (`unconfirmed`) — and always, not only then: another window's older copy of it reaches the page by the
+shelf it writes after an answer taken too, and is drawn as the cart, never as the server's word; with no answer in the
+session the page is memory, said by its strip, and its categories stand as kept — and the session's answer is the
+person's here: another person signed in in the window starts with none (Р4-Г2). **The price, named:** a category
+changed in «Траты» reaches the row of «Записаны» with the next read of the history; while another window keeps the
+shelf — of a build before, or with a category the last answer does not say — its rows draw the cart until this window
+reads the history again; and a trip of an unknown category reads «Прочее» in the words of «Траты», an account and the
+trip's sheet — a word the phone has for «not known», as for a spending.
+
 ## «Брали здесь в прошлый раз» (MOL-209)
 
 **`GET /trips/:tripId/previous-items` and `TripRepository.previousPurchases` are read by «Что взяли?»**, and
@@ -273,14 +303,17 @@ that trip was. A 400 there would have been the end of that trip: the queue sets 
 send aside, and the purchases behind it go too. **What a trip may name is the rule the settings
 refuse by** — `geographyAllowed`: one's own current geography, or a city of its own country in
 `COUNTRY_CITIES` — Armenia (Гюмри, Ереван), Georgia (Тбилиси, Батуми), Serbia (Белград, Нови-Сад),
-MOL-109. «Батуми» under `AM` is refused: `places` is a table everyone shares, and which cities a
+MOL-109; Russia (Москва, Санкт-Петербург, Волгоград, Казань, Краснодар, Сочи, Домбай — the cities of
+Moscow's clock, a city of another zone MOL-419's), MOL-412. «Батуми» under `AM` is refused: `places` is a table everyone shares, and which cities a
 country has must not be held by the form alone. **The form chooses the country first** and the
 city among its country's; a change of country lands on that country's first city, or on the kept
 one when the country is its own (Б1), so the form never holds a city of another country. A city
 or a country the settings do not offer stays in its list, under its own country. **A newcomer
 starts where the phone's zone is** (`firstGeography`, В-3): the zone the login is collected with
 picks the country and its first city, every other zone Gyumri; the currencies stay the dram and
-the ruble until MOL-110, and an account that exists is never moved by it. The city is read by the fold
+the ruble until MOL-110, and an account that exists is never moved by it. A zone a phone of the
+country names beside the country's own leads there too — `Europe/Volgograd` to Moscow
+(`COUNTRY_PHONE_ZONES`, MOL-412), read by the first visit alone and never a person's day. The city is read by the fold
 `places.ensure` stores it under, never by the exact spelling, or a shop written «гюмри» once
 falls out of its own owner's prices. **The form's draft belongs to the account and not to the
 window**: it is kept under the owner's key on the device, as verdict drafts are, because the

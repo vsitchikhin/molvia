@@ -624,6 +624,13 @@
       "when": 1794900643803,
       "tag": "0088_receipts_georgia",
       "breakpoints": true
+    },
+    {
+      "idx": 89,
+      "version": "7",
+      "when": 1795007383129,
+      "tag": "0089_receipts_access",
+      "breakpoints": true
     }
   ]
 }

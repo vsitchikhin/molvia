@@ -30,10 +30,9 @@
         }}</span>
       </span>
       <!-- Figures put right by the font's 5↔6, the receipt whole by them (MOL-290), or a bill's price worked out of
-           its sum with a quantity nothing vouches for (MOL-310, В-6 «а»): «проверьте». -->
-      <span v-if="line.repaired && figures" class="figures">{{
-        t('receipt.review.repaired_note')
-      }}</span>
+           its sum with a quantity nothing vouches for (MOL-310, В-6 «а»): «проверьте». A sum alone the total chose
+           has no figures before it, and says so all the same (MOL-420). -->
+      <span v-if="line.repaired" class="figures">{{ t('receipt.review.repaired_note') }}</span>
       <!-- Figures that were not verified are left empty, never guessed (MOL-255, В-3 «а»). -->
       <span v-else-if="unread" class="figures">{{ t('receipt.review.unread') }}</span>
       <span v-if="tags.length > 0" class="tags">

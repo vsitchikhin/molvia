@@ -18,13 +18,16 @@ import type {
   TripHistory,
   TripHistoryEntry,
   TripView as TripViewModel,
+  SpendingCategoryView,
 } from '@molvia/model'
 import { ApiError } from '@molvia/client'
 import ru from '@/i18n/ru.json'
 import { answeredAt, localDay } from '@/days'
 import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
+import { categoryIcon, tripIcon } from '@/components/spending'
 import { useActorStore } from '@/stores/actor'
+import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
@@ -696,6 +699,167 @@ describe('PurchasesView (MOL-128)', () => {
     })
   })
 
+  // MOL-406: a purchase stands in its category's circle, typed by hand or recorded from a receipt
+  describe('the category’s circle (MOL-406)', () => {
+    const preset = (
+      n: number,
+      key: SpendingCategoryView['preset'],
+      archived = false,
+    ): SpendingCategoryView => ({
+      id: `c0000000-0000-4000-8000-00000000000${String(n)}`,
+      preset: key,
+      name: null,
+      colour: null,
+      icon: null,
+      archived,
+    })
+    const groceries = preset(1, 'groceries')
+    const cafe = preset(2, 'cafe')
+    const pets = preset(3, 'pets')
+    /** The list the phone keeps, as the server last answered it (`molvia.own-categories`). */
+    const keepCategories = (categories = [groceries, cafe, pets]) => {
+      localStorage.setItem(
+        `molvia.own-categories.${ME}`,
+        JSON.stringify({ askedAt: NOW.toISOString(), answer: { categories, frequent: [] } }),
+      )
+    }
+    /** The glyph a circle draws, by its path: what tells one icon from another in the page. */
+    const glyph = (row: {
+      find: (selector: string) => { attributes: (name: string) => string | undefined }
+    }) => row.find('.circle path').attributes('d')
+    const glyphOf = (icon: ReturnType<typeof categoryIcon>) =>
+      mount(icon).find('path').attributes('d')
+
+    it('a recorded row draws its category’s icon in its colour; «Продукты» where it names none', async () => {
+      tripHistory.mockResolvedValue({
+        trips: [
+          { ...trip(1), categoryId: cafe.id },
+          { ...trip(2), categoryId: null },
+        ],
+        nextCursor: null,
+      })
+      const { view } = await render({
+        before: () => {
+          keepCategories()
+        },
+      })
+      const [inCafe, inGroceries] = rows(view)
+      expect(inCafe && glyph(inCafe)).toBe(glyphOf(categoryIcon(cafe)))
+      expect(inCafe?.find('.circle').attributes('style')).toContain('--cat-cafe')
+      expect(inGroceries && glyph(inGroceries)).toBe(glyphOf(categoryIcon(groceries)))
+    })
+
+    it('must not fire: a row whose category is not known — a server before it — keeps the cart, with no colour', async () => {
+      tripHistory.mockResolvedValue({ trips: [trip(1)], nextCursor: null })
+      const { view } = await render({
+        before: () => {
+          keepCategories()
+        },
+      })
+      const [row] = rows(view)
+      expect(row && glyph(row)).toBe(glyphOf(tripIcon))
+      expect(row?.find('.circle').classes()).toContain('muted')
+    })
+
+    it('a category the phone’s list lacks — made on another phone — is the cart, never «Продукты» (adversarial А3)', async () => {
+      tripHistory.mockResolvedValue({
+        trips: [{ ...trip(1), categoryId: cafe.id }],
+        nextCursor: null,
+      })
+      const { view } = await render({
+        before: () => {
+          keepCategories([groceries, pets])
+        },
+      })
+      const [row] = rows(view)
+      expect(row && glyph(row)).toBe(glyphOf(tripIcon))
+      expect(row?.find('.circle').classes()).toContain('muted')
+    })
+
+    it('with no list on the phone, a row naming a category is the cart, one naming none «Продукты» (adversarial А3)', async () => {
+      tripHistory.mockResolvedValue({
+        trips: [
+          { ...trip(1), categoryId: cafe.id },
+          { ...trip(2), categoryId: null },
+        ],
+        nextCursor: null,
+      })
+      const { view } = await render()
+      expect(rows(view).map((row) => glyph(row))).toEqual([
+        glyphOf(tripIcon),
+        glyphOf(categoryIcon(groceries)),
+      ])
+    })
+
+    it('a category taken out of the choice is still the trip’s: its own icon (adversarial А3 «в»)', async () => {
+      tripHistory.mockResolvedValue({
+        trips: [{ ...trip(1), categoryId: cafe.id }],
+        nextCursor: null,
+      })
+      const { view } = await render({
+        before: () => {
+          keepCategories([groceries, preset(2, 'cafe', true), pets])
+        },
+      })
+      const [row] = rows(view)
+      expect(row && glyph(row)).toBe(glyphOf(categoryIcon(cafe)))
+    })
+
+    const READ = 'cccccccc-0000-4000-8000-0000000000f1'
+    const readReceipt = (food: boolean, status: 'parsed' | 'failed' = 'parsed') => ({
+      id: READ,
+      status,
+      failure: status === 'failed' ? ('reshoot' as const) : null,
+      parts: 1,
+      received: 1,
+      capturedAt: new Date('2026-09-26T16:00:00.000Z'),
+      country: 'AM' as const,
+      language: 'ru' as const,
+      header: null,
+      total: { minor: 155_000n, currency: 'AMD' as const },
+      balanced: true,
+      lineCount: 1,
+      unsettled: 0,
+      place: null,
+      tripId: null,
+      food,
+    })
+    /** The one receipt row on a screen with no history and none in work: the card «Посмотреть и записать». */
+    const reviewRow = (view: VueWrapper) => view.find('.block .list-row')
+
+    it('a receipt waiting for «Записать» stands in the category the review guesses — a café by its food', async () => {
+      receipts.mockResolvedValue({ receipts: [readReceipt(true)] })
+      const { view } = await render({
+        before: () => {
+          keepCategories()
+        },
+      })
+      expect(glyph(reviewRow(view))).toBe(glyphOf(categoryIcon(cafe)))
+    })
+
+    it('and in the category the person chose on its review, over the guess', async () => {
+      receipts.mockResolvedValue({ receipts: [readReceipt(true)] })
+      const { view } = await render({
+        before: () => {
+          keepCategories()
+          useReceiptDraftsStore().setCategory(READ, pets.id)
+        },
+      })
+      expect(glyph(reviewRow(view))).toBe(glyphOf(categoryIcon(pets)))
+    })
+
+    it('must not fire: a receipt not read keeps the sign of its state, no circle', async () => {
+      receipts.mockResolvedValue({ receipts: [readReceipt(false, 'failed')] })
+      const { view } = await render({
+        before: () => {
+          keepCategories()
+        },
+      })
+      const failed = reviewRow(view)
+      expect([failed.exists(), failed.find('.circle').exists()]).toEqual([true, false])
+    })
+  })
+
   describe('«Записаны»', () => {
     it('запись с суммой и без покупок — «сумма по чеку», откуда бы ни была (MOL-227, Р-6, А7)', async () => {
       const sum = [parseMoney('1700', 'AMD')]
@@ -956,6 +1120,79 @@ describe('PurchasesView (MOL-128)', () => {
         expect(rows(view)[0]?.text()).not.toContain('позиц')
         expect(rows(view)[0]?.text()).not.toContain('֏')
       }
+    })
+
+    it('соседнее окно держит на полке старую категорию строки — она неизвестна, корзина без цвета, не ответ сервера (MOL-406, Р2-Б2)', async () => {
+      const before = new Date(NOW.getTime() - 5000)
+      const groceries = { id: 'c0000000-0000-4000-8000-000000000001', preset: 'groceries' as const }
+      const cafe = { id: 'c0000000-0000-4000-8000-000000000002', preset: 'cafe' as const }
+      const known = [groceries, cafe].map((one) => ({
+        ...one,
+        name: null,
+        colour: null,
+        icon: null,
+        archived: false,
+      }))
+      const row = trip(1)
+      // The server says «Кафе»; the other window, writing purchases into the trip, shelves its page read before
+      // the trip was moved there — «Продукты» — and so moves the list under every read (MOL-307, Б2).
+      for (const [shelved, muted] of [
+        [null, true],
+        [cafe.id, false],
+      ] as const) {
+        while (mounted.length) mounted.pop()?.unmount()
+        localStorage.clear()
+        tripHistory.mockReset()
+        localStorage.setItem(
+          `molvia.own-categories.${ME}`,
+          JSON.stringify({
+            askedAt: NOW.toISOString(),
+            answer: { categories: known, frequent: [] },
+          }),
+        )
+        let sent = 2
+        tripHistory.mockImplementation(() => {
+          const answered = { ...row, itemCount: sent, categoryId: cafe.id }
+          sent += 1
+          localStorage.setItem(`molvia.trip-history-at.${ME}`, before.toISOString())
+          remember([{ ...row, itemCount: sent, categoryId: shelved }])
+          window.dispatchEvent(new StorageEvent('storage', { key }))
+          return Promise.resolve({ trips: [answered], nextCursor: null })
+        })
+        const { view } = await render()
+        await pausesPass()
+
+        expect(tripHistory).toHaveBeenCalledTimes(4)
+        expect(view.findAll('.strip').map((strip) => strip.text())).toEqual([])
+        const circle = rows(view)[0]?.find('.circle')
+        expect(circle?.classes().includes('muted')).toBe(muted)
+        if (!muted) expect(circle?.attributes('style')).toContain('--cat-cafe')
+      }
+    })
+
+    it('соседнее окно кладёт на полку старую категорию после принятого ответа — корзина без цвета, не «Продукты» (MOL-406, Р3-В3)', async () => {
+      const known = [
+        { id: 'c0000000-0000-4000-8000-000000000001', preset: 'groceries' as const },
+        { id: 'c0000000-0000-4000-8000-000000000002', preset: 'cafe' as const },
+      ].map((one) => ({ ...one, name: null, colour: null, icon: null, archived: false }))
+      const cafe = known[1]?.id ?? ''
+      localStorage.setItem(
+        `molvia.own-categories.${ME}`,
+        JSON.stringify({ askedAt: NOW.toISOString(), answer: { categories: known, frequent: [] } }),
+      )
+      const row = { ...trip(1), itemCount: 2, total: [parseMoney('1000', 'AMD')] }
+      tripHistory.mockResolvedValue({ trips: [{ ...row, categoryId: cafe }], nextCursor: null })
+      const { view } = await render()
+      expect(rows(view)[0]?.find('.circle').attributes('style')).toContain('--cat-cafe')
+
+      remember([{ ...row, itemCount: 3, total: [parseMoney('1500', 'AMD')], categoryId: null }])
+      window.dispatchEvent(new StorageEvent('storage', { key }))
+      await flushPromises()
+
+      const circle = rows(view)[0]?.find('.circle')
+      expect(circle?.classes()).toContain('muted')
+      expect(rows(view)[0]?.text()).toContain('3 позиции')
+      expect(view.findAll('.strip')).toHaveLength(0)
     })
 
     describe('«Показать ещё» о первой странице ничего не говорит — под сомнением она прочитана заново, до следующей (MOL-307, Г1, Д1, Е1, Ж1, №4)', () => {

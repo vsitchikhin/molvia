@@ -476,7 +476,7 @@ describe('whether the model reads for the person now (MOL-408, adversarial А3, 
     expect(await said(await granted())).toBe(true)
   }, 10_000)
 
-  it('says no of a grant run out or none, and of an older edition', async () => {
+  it('says no of a grant run out or none with the trial spent, and of an older edition', async () => {
     for (const [until, edition] of [
       [new Date(Date.now() - 24 * 60 * 60 * 1000), MODEL_CONSENT_EDITION],
       [null, MODEL_CONSENT_EDITION],
@@ -485,10 +485,31 @@ describe('whether the model reads for the person now (MOL-408, adversarial А3, 
       const me = await granted()
       await db
         .update(actors)
-        .set({ receiptsModelUntil: until, consentVersion: edition })
+        .set({ receiptsModelUntil: until, consentVersion: edition, trialReceiptsLeft: 0 })
         .where(eq(actors.id, me.id))
       expect(await said(me), String(until)).toBe(false)
     }
+  }, 10_000)
+
+  it('says yes to the trial with no grant, and no once it is spent, the month’s hundred read or the trial’s part of the cap gone (MOL-275)', async () => {
+    const me = await granted()
+    const set = (patch: Partial<typeof actors.$inferInsert>) =>
+      db.update(actors).set(patch).where(eq(actors.id, me.id))
+    await set({ receiptsModelUntil: null })
+    expect(await said(me)).toBe(true)
+    await set({ trialReceiptsLeft: 0 })
+    expect(await said(me)).toBe(false)
+    // the next month is «at least this one» for either clock, as the share's
+    await set({ trialReceiptsLeft: 10, modelReceiptsMonth: nextMonth, modelReceiptsRead: 100 })
+    expect(await said(me)).toBe(false)
+    await set({ modelReceiptsRead: 99 })
+    expect(await said(me)).toBe(true)
+    await db.insert(modelSpend).values([
+      { month: thisMonth, spentMicroUsd: CAP / 2 - worst + 1 },
+      { month: nextMonth, spentMicroUsd: CAP / 2 - worst + 1 },
+    ])
+    expect(await said(me)).toBe(false)
+    expect(await said(await granted())).toBe(true)
   }, 10_000)
 
   it('must not say it to a phone that does not ask: an earlier build reads the answer strictly', async () => {

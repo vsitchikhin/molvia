@@ -142,6 +142,8 @@ describe('Telegram login over HTTP', () => {
     }
     expect(await collect('Asia/Tbilisi')).toEqual(['GE', 'Тбилиси'])
     expect(await collect('Europe/Belgrade')).toEqual(['RS', 'Белград'])
+    // Volgograd's phone names a zone of its own, on Moscow's clock (MOL-412)
+    expect(await collect('Europe/Volgograd')).toEqual(['RU', 'Москва'])
     // a zone the runtime does not know is no zone: Gyumri, as before
     expect(await collect('Mars/Olympus')).toEqual(['AM', 'Гюмри'])
   })

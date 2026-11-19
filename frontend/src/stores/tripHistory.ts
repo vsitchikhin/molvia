@@ -119,14 +119,15 @@ function toShelf(cache: z.output<typeof cacheCodec>): string {
  * A count on the shelf is moved by the list's answer and by a write's (`apply`), and which of them is
  * newer the phone cannot tell — compared whole, a shelf ahead of the answer read as memory and drew
  * «Сервер не ответил» over a server that answered every time (adversarial Б2 of MOL-307, owner's В-2
- * «а»). The counts the answer does not confirm are `unconfirmed` instead.
+ * «а»). The counts the answer does not confirm are `unconfirmed` instead. Nor its category (MOL-406,
+ * adversarial А2): a window of a build before it writes the shelf with no key of it, and the rows are the answer's.
  */
 function asShelvedPage(page: TripHistory): string {
   return JSON.stringify(
     everyView(
       { page: tripHistoryCodec.encode(page) },
       () => true,
-      (key) => key !== 'itemCount' && key !== 'total',
+      (key) => key !== 'itemCount' && key !== 'total' && key !== 'categoryId',
     ),
   )
 }
@@ -284,6 +285,8 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
   watch(
     () => actor.id,
     () => {
+      // another person's last answer says nothing of this one's page (MOL-406, adversarial Р4-Г2)
+      lastAnswer.value = null
       restore()
     },
   )
@@ -400,23 +403,29 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     }
     if (row) {
       selected.value ??= trip
+      // A trip view carries no category (MOL-406): every copy of the row keeps the one the answer gave it — the
+      // shelf and the deeper pages too, which `restore()` and `spread()` rebuild the page from (adversarial А1, А2).
+      const keep = (held: TripHistoryEntry): TripHistoryEntry =>
+        held.categoryId === undefined ? row : { ...row, categoryId: held.categoryId }
+      const shown = page.value.trips.find((held) => held.id === trip.id)
+      const placed = shown ? keep(shown) : row
       page.value = {
         ...page.value,
-        trips: [...page.value.trips.filter((held) => held.id !== trip.id), row].sort(
+        trips: [...page.value.trips.filter((held) => held.id !== trip.id), placed].sort(
           (a, b) =>
             (b.finishedOnDeviceAt ?? b.finishedAt).getTime() -
               (a.finishedOnDeviceAt ?? a.finishedAt).getTime() || b.id.localeCompare(a.id),
         ),
       }
       // Kept in place rather than dropped: a row of a page already loaded stays on that page.
-      deeper = deeper.map((held) => (held.id === row.id ? row : held))
+      deeper = deeper.map((held) => (held.id === row.id ? keep(held) : held))
       // And on the shelf, where the first page holds it (adversarial А1 of MOL-307): the shelf keeps the
       // row's count, and the first write of another window put the count before this purchase back on
       // screen, as the server's answer. Only in place — a row the page does not hold would move its
       // boundary, which only `load()` reads.
       firstPage = {
         ...firstPage,
-        trips: firstPage.trips.map((held) => (held.id === row.id ? row : held)),
+        trips: firstPage.trips.map((held) => (held.id === row.id ? keep(held) : held)),
       }
       moved = true
     }
@@ -469,10 +478,25 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
    * the answer or newer, and «unknown» is neither wrong nor the strip's «не ответил».
    */
   function unconfirmed(): Set<string> {
-    const said = new Map((lastAnswer.value?.trips ?? []).map((row) => [row.id, countOf(row)]))
+    return unconfirmedBy(countOf)
+  }
+
+  /** The rows of the first page where `said` of the row differs from the same of the last answer's. */
+  function unconfirmedBy(said: (row: TripHistoryEntry) => unknown): Set<string> {
+    const answered = new Map((lastAnswer.value?.trips ?? []).map((row) => [row.id, said(row)]))
     return new Set(
-      firstPage.trips.filter((row) => said.get(row.id) !== countOf(row)).map((row) => row.id),
+      firstPage.trips.filter((row) => answered.get(row.id) !== said(row)).map((row) => row.id),
     )
+  }
+
+  /**
+   * The rows of the first page whose category the server's last answer does not say (MOL-406, adversarial Р2-Б2):
+   * the category is no part of «row for row», and another window's older copy of it may stand on the page — a read
+   * taken as the answer, or the shelf it wrote after one (Р3-В3) — drawn then as not known, never as the server's word.
+   */
+  function categoryUnconfirmed(): Set<string> {
+    // with no answer in this session the page is memory, said by its strip, and its categories stand as kept
+    return lastAnswer.value ? unconfirmedBy((row) => row.categoryId) : new Set()
   }
 
   /**
@@ -586,6 +610,7 @@ export const useTripHistoryStore = defineStore('tripHistory', () => {
     load,
     showsAnswer,
     unconfirmed,
+    categoryUnconfirmed,
     known,
     answered,
     open,

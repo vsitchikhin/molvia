@@ -143,6 +143,13 @@ export const ru = {
   'remind.in.Ереван': 'в Ереване',
   'remind.in.Тбилиси': 'в Тбилиси',
   'remind.in.Батуми': 'в Батуми',
+  'remind.in.Москва': 'в Москве',
+  'remind.in.Санкт-Петербург': 'в Санкт-Петербурге',
+  'remind.in.Волгоград': 'в Волгограде',
+  'remind.in.Казань': 'в Казани',
+  'remind.in.Краснодар': 'в Краснодаре',
+  'remind.in.Сочи': 'в Сочи',
+  'remind.in.Домбай': 'в Домбае',
   'remind.in.Белград': 'в Белграде',
   'remind.in.Нови-Сад': 'в Нови-Саде',
   /** Under the last message of the day, when more items wait than the three asked about. */
