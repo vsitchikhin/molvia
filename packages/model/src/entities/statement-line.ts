@@ -82,12 +82,18 @@ export const statementLineSchema = z.object({
 })
 export type StatementLine = z.infer<typeof statementLineSchema>
 
+/**
+ * The lines of one upload at most (А13): the rule runs in the API's process. The owner's samples hold 30–50
+ * lines a month an account, some 600 a year; five such years is the ceiling, and its time is held by a test.
+ */
+export const STATEMENT_LINES_MAX = 3000
+
 /** One upload: its form, the person's account it is of (or none), the period its head prints (or none). */
 export const statementSchema = z.object({
   form: statementFormSchema,
   accountId: z.uuid().nullable(),
   period: z.object({ from: exchangeDaySchema, to: exchangeDaySchema }).nullable(),
-  lines: z.array(statementLineSchema),
+  lines: z.array(statementLineSchema).max(STATEMENT_LINES_MAX),
 })
 export type Statement = z.infer<typeof statementSchema>
 
@@ -142,9 +148,9 @@ const keyMoney = ({ minor, currency }: Money) => `${minor.toString()} ${currency
  * statements with no account would be one id, and ids are one primary key for everyone; so are the
  * account, the day, the sign, the amount, the payee as printed with its spaces squeezed, and the turn
  * among equal lines — two rides of one price on one day are two. The form is not: the same text in a
- * bank's CSV and its PDF is the same line. A declined line takes no turn of the others — a payment
- * refused and paid again keeps its key whether the next export prints the refusal or not (adversarial
- * А5) — and is keyed apart, a spending never.
+ * bank's CSV and its PDF is the same line. A line is keyed and turned among the lines of its status: a
+ * later export may leave out a refusal or a hold the bank dropped, and a payment made again beside
+ * either keeps its key (adversarial А5, А9). So a hold's posting is another key — the link lets it in.
  */
 export function statementKeyedLines(
   actorId: string,
@@ -160,7 +166,7 @@ export function statementKeyedLines(
       keyMoney(line.amount),
       line.payee.replace(/\s+/g, ' ').trim(),
     ])
-    const name = line.status === 'declined' ? `${parts}#declined` : parts
+    const name = line.status === 'posted' ? parts : `${parts}#${line.status}`
     const turn = seen.get(name) ?? 0
     seen.set(name, turn + 1)
     return { line, key: nameUuid(STATEMENT_LINE_NAMESPACE, `${name}#${String(turn)}`) }

@@ -95,11 +95,18 @@ describe('statementLineKeys', () => {
     expect(keys([declined])).not.toEqual([paid])
   })
 
-  it('does not move with what the reader adds: status, kind, time, the posting day', () => {
+  it('keeps a paid line’s turn whether a dropped hold beside it is printed or not (adversarial А9)', () => {
+    const hold = line({ status: 'pending' })
+    const [, paid] = keys([hold, line()])
+    expect(keys([line()])).toEqual([paid])
+    expect(keys([hold])).not.toEqual([paid])
+  })
+
+  it('does not move with what the reader adds: kind, time, the posting day', () => {
     const [base] = keys([line()])
-    expect(
-      keys([line({ status: 'pending', kind: 'transfer', time: '14:35', postedOn: '2026-11-15' })]),
-    ).toEqual([base])
+    expect(keys([line({ kind: 'transfer', time: '14:35', postedOn: '2026-11-15' })])).toEqual([
+      base,
+    ])
   })
 })
 

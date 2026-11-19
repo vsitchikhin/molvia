@@ -1,6 +1,11 @@
 import { expectWithin } from '@molvia/model/testing/clock'
 import { describe, expect, it } from 'vitest'
-import { statementLineKeys, statementLinkOf } from '#model/entities/statement-line'
+import {
+  STATEMENT_LINES_MAX,
+  statementLineKeys,
+  statementLinkOf,
+  statementSchema,
+} from '#model/entities/statement-line'
 import type {
   Statement,
   StatementForm,
@@ -11,6 +16,7 @@ import {
   exchangeCandidate,
   matchStatement,
   spendingCandidate,
+  statementRecordsWeighed,
   transferCandidate,
   tripCandidate,
 } from '#model/entities/statement-match'
@@ -491,13 +497,16 @@ describe('matchStatement — rounds 5–6 (Д, Е)', () => {
       account: ARDSHIN,
       link: linkTo({ day: '2026-11-02', form: 'screenshot' }),
     })
-    const one = (day: string) =>
-      decide([taxi], [line(day, '1200.00', 'AMD', 'AM\\YEREVAN\\YANDEX.GO')], {
+    // The file prints each line's posting day: none is the screenshot's of 02.11.
+    const one = (day: string, postedOn: string | null = day) =>
+      decide([taxi], [line(day, '1200.00', 'AMD', 'AM\\YEREVAN\\YANDEX.GO', { postedOn })], {
         account: ARDSHIN,
         form: 'ardshin-xlsx',
       })[0]
     expect(one('2026-10-31')).toEqual(recorded(taxi, 'relink'))
     expect(one('2026-10-29')).toEqual(NEW)
+    // A file that prints none: the screenshot's line may be this one posted later (А12).
+    expect(one('2026-10-31', null)).toEqual(recorded(taxi, 'posting_day'))
   })
 
   it('Д2: a line of another form is the operation on the link’s day ± 1; of the same form, only by its key', () => {
@@ -555,16 +564,19 @@ describe('matchStatement — rounds 5–6 (Д, Е)', () => {
   })
 
   it('Е2: another form on the next day is the operation only for a form whose day moves', () => {
-    const taxi = (form: StatementForm) =>
+    const taxi = (form: StatementForm, postedOn: string | null = '2026-10-31') =>
       spending('2026-10-31', '1200.00', 'AMD', {
         place: 'Yandex Go',
         account: ARDSHIN,
-        link: linkTo({ day: '2026-10-31', form }),
+        link: linkTo({ day: '2026-10-31', postedOn, form }),
       })
     const today = [line('2026-11-01', '1200.00', 'AMD', 'Yandex Go')]
     const o = { account: ARDSHIN, form: 'screenshot' } as const
     expect(decide([taxi('ardshin-xlsx')], today, o)).toEqual([NEW])
     expect(group(decide([taxi('tbank-csv')], today, o)[0])).toBe('recorded')
+    // A file that printed no posting day: the screenshot may show this operation posted (А12).
+    const unposted = taxi('ardshin-xlsx', null)
+    expect(decide([unposted], today, o)).toEqual([recorded(unposted, 'posting_day')])
   })
 
   it('Е3: a hold posted later than a week by its name is a doubt «проводка холда?» on a screenshot; a file says it outright', () => {
@@ -938,9 +950,26 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
     expect(decide([fromFile], [onShot], { account: AMERIA, form: 'screenshot' })).toEqual([
       recorded(fromFile),
     ])
-    // A file that prints no posting day meets a screenshot on one day only (Д1, Е2): a named price.
+    // A file that prints no posting day (Ameria's CSV) meets a screenshot one to four days after it as a
+    // doubt, never ticked new nor recorded silently (А12).
     const unposted = line('2026-11-12', '6400.00', 'AMD', sas)
-    expect(decide([fromShot], [unposted], { account: AMERIA })).toEqual([NEW])
+    expect(decide([fromShot], [unposted], { account: AMERIA })).toEqual([
+      recorded(fromShot, 'posting_day'),
+    ])
+    const fromCsv = spending('2026-11-12', '6400.00', 'AMD', {
+      place: 'SAS',
+      account: AMERIA,
+      link: statementLinkOf(unposted, keyOf(unposted, AMERIA), {
+        form: 'ameria-csv',
+        accountId: AMERIA,
+      }),
+    })
+    expect(decide([fromCsv], [onShot], { account: AMERIA, form: 'screenshot' })).toEqual([
+      recorded(fromCsv, 'posting_day'),
+    ])
+    // A file that prints its posting day meets a screenshot by it alone, never by the operation's (А11).
+    const another = line('2026-11-14', '6400.00', 'AMD', sas, { postedOn: '2026-11-15' })
+    expect(decide([fromShot], [another], { account: AMERIA })).toEqual([NEW])
   })
 
   it('А2: a hold’s posting in a file of its bank is on the hold’s day — another sum a doubt «hold», another text the record', () => {
@@ -987,14 +1016,21 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
     expect(decide([ride], [posted], o)).toEqual([recorded(ride)])
   })
 
-  it('А4: the same file uploaded again with an account chosen since is the same line; another account — a doubt', () => {
+  it('А4, А8: a line known by its key under another account is a doubt — the same file again, or another card’s', () => {
     const sas = 'Ք: SAS SUPERMARKET YEREVAN AM'
     const l = line('2026-11-12', '6400.00', 'AMD', sas)
     const none = spending('2026-11-12', '6400.00', 'AMD', {
       place: 'SAS',
       link: statementLinkOf(l, keyOf(l), { form: 'ameria-csv', accountId: null }),
     })
-    expect(decide([none], [l], { account: AMERIA })).toEqual([recorded(none)])
+    expect(decide([none], [l], { account: AMERIA })).toEqual([recorded(none, 'other_account')])
+    // Two cards of one bank: «без счёта» and a card's own upload are told by nothing but the account.
+    const card = spending('2026-11-12', '6400.00', 'AMD', {
+      place: 'SAS',
+      account: AMERIA,
+      link: statementLinkOf(l, keyOf(l, AMERIA), { form: 'ameria-csv', accountId: AMERIA }),
+    })
+    expect(decide([card], [l], { account: null })).toEqual([recorded(card, 'other_account')])
     const wrong = spending('2026-11-12', '6400.00', 'AMD', {
       place: 'SAS',
       account: ARDSHIN,
@@ -1027,6 +1063,55 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
     expect(match([], lines, { account: AMERIA }).lines).toHaveLength(200_000)
   }, 120_000)
 
+  it('А9: a hold dropped from the next export leaves the payment its own record and asks «убрать трату?»', () => {
+    const shop = 'PYATEROCHKA 14 MOSCOW RUS'
+    const hold = line('2026-11-15', '389.90', 'RUB', shop, { status: 'pending' })
+    const paid = line('2026-11-15', '389.90', 'RUB', shop)
+    const o = { account: TBANK, form: 'tbank-csv' } as const
+    for (const first of [
+      [hold, paid],
+      [paid, hold],
+    ]) {
+      const keys = statementLineKeys(PERSON, { accountId: TBANK, lines: first })
+      const written = first.map((l, i) =>
+        spendingCandidate(
+          {
+            id: keys[i] ?? '',
+            spentOn: l.day,
+            amount: l.amount,
+            debited: null,
+            accountId: TBANK,
+            place: 'Пятёрочка',
+            note: null,
+          },
+          {
+            removed: false,
+            link: statementLinkOf(l, keys[i] ?? '', { form: 'tbank-csv', accountId: TBANK }),
+          },
+        ),
+      )
+      const fromHold = written[first.indexOf(hold)]
+      const fromPaid = written[first.indexOf(paid)]
+      if (fromHold === undefined || fromPaid === undefined) throw new Error('two records')
+      const out = match(written, [paid], {
+        ...o,
+        period: { from: '2026-11-01', to: '2026-11-30' },
+      })
+      expect(out.lines.map((l) => l.decision)).toEqual([recorded(fromPaid)])
+      expect(out.unposted).toEqual([
+        { record: { id: fromHold.id, what: 'spending' }, settled: true, ticked: true },
+      ])
+    }
+  })
+
+  it('А10: a record named by a city’s word alone keeps its name — «Казан» against a purchase at SAS is a doubt', () => {
+    const sas = [line('2026-11-12', '8500.00', 'AMD', 'Ք: SAS SUPERMARKET YEREVAN AM')]
+    for (const place of ['Казан', 'Москва', 'Ереван']) {
+      const dinner = spending('2026-11-12', '8500.00', 'AMD', { place, account: AMERIA })
+      expect(decide([dinner], sas, { account: AMERIA })).toEqual([recorded(dinner, 'other_name')])
+    }
+  })
+
   it('gives a record the line it was made from before a like one of the same file', () => {
     const both = [
       line('2026-11-12', '1200.00', 'AMD', 'YANDEX.GO'),
@@ -1052,7 +1137,7 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
 })
 
 describe('matchStatement — review, round 1', () => {
-  it('№1: weighs a month of 300 lines against a year of 3 000 records well within a second', () => {
+  it('№1: weighs a month of 300 lines against a year of 3 000 records within four seconds', () => {
     const shops = ['SAS SUPERMARKET', 'YEREVAN CITY AVAN', 'YANDEX.GO', 'GAZPROM ARMENIA']
     const dayOf = (n: number) =>
       new Date(Date.UTC(2026, 0, 1) + n * 86_400_000).toISOString().slice(0, 10)
@@ -1075,6 +1160,34 @@ describe('matchStatement — review, round 1', () => {
     expectWithin(performance.now() - started, 4_000)
     expect(out.lines).toHaveLength(300)
   }, 60_000)
+
+  it('А13: a line weighs only the records whose window or link reaches its day — a year linked to screenshots', () => {
+    const shops = ['SAS SUPERMARKET', 'YEREVAN CITY AVAN', 'YANDEX.GO', 'GAZPROM ARMENIA']
+    const dayOf = (n: number) =>
+      new Date(Date.UTC(2026, 0, 1) + n * 86_400_000).toISOString().slice(0, 10)
+    const lines = Array.from({ length: STATEMENT_LINES_MAX }, (_, i) =>
+      line(dayOf(i % 360), String(1000 + (i % 40) * 5), 'AMD', `Ք: ${shops[i % 4] ?? ''} AM`),
+    )
+    const records = lines.map((l, i) =>
+      spending(l.day, l.amount.minor.toString().slice(0, -2), 'AMD', {
+        place: shops[i % 4] ?? '',
+        account: AMERIA,
+        link: statementLinkOf(l, nextId(), { form: 'screenshot', accountId: AMERIA }),
+      }),
+    )
+    statementRecordsWeighed.count = 0
+    const out = match(records, lines, { account: ARDSHIN, form: 'ardshin-xlsx' })
+    expect(out.lines).toHaveLength(STATEMENT_LINES_MAX)
+    // Every line against every record is 9 000 000; a link reaches some two months of the year.
+    expect(statementRecordsWeighed.count).toBeLessThan((lines.length * records.length) / 4)
+  }, 60_000)
+
+  it('А13: a statement holds STATEMENT_LINES_MAX lines and no more', () => {
+    const one = line('2026-11-12', '100.00', 'AMD', 'YEREVAN METRO')
+    const of = (n: number) => statementOf(Array.from({ length: n }, () => one))
+    expect(statementSchema.safeParse(of(STATEMENT_LINES_MAX)).success).toBe(true)
+    expect(statementSchema.safeParse(of(STATEMENT_LINES_MAX + 1)).success).toBe(false)
+  })
 
   it('№2: asks nothing of a transfer onto the statement’s account: no money of it left there', () => {
     const o = {

@@ -16,7 +16,7 @@ import type {
 } from '#model/entities/statement-line'
 import type { Transfer } from '#model/entities/transfer'
 import { tripMoney } from '#model/entities/trip'
-import { payeeWords, sameSeller, sellerWords, wordsShare } from '#model/support/payee-name'
+import { sameSeller, sellerWords, wordsShare } from '#model/support/payee-name'
 import { printedTimesSay } from '#model/support/printed-time'
 import type { Money } from '#model/values/money'
 import { yerevanDate } from '#model/values/rates'
@@ -188,9 +188,11 @@ export interface StatementRecordRef {
 
 /**
  * Why a line that looks recorded is not taken for it without the person: `tip` (А2), `hold` (В4),
- * `late_post` (Е3), `relink` (Д1), `same_screenshot` (Е1, З1), `removed` (А5), `other_name` (Б4),
- * `other_account` (В-1 «а»), `transfer` and `exchange` — another day, no account, a line that does
- * not call itself so (Б1б, Г1, Р-6).
+ * `late_post` (Е3), `relink` (Д1), `same_screenshot` (Е1, З1), `posting_day` — a file's line with no
+ * posting day and a screenshot days after it (А12), `removed` (А5), `other_name` (Б4), `other_account` (В-1
+ * «а»; a line known only by its key under another account — the same file again or another card's, А8),
+ * `transfer` and `exchange` — another day, no account, a line that does not call itself so (Б1б, Г1,
+ * Р-6).
  */
 export type StatementDoubt =
   | 'tip'
@@ -198,6 +200,7 @@ export type StatementDoubt =
   | 'late_post'
   | 'relink'
   | 'same_screenshot'
+  | 'posting_day'
   | 'removed'
   | 'other_name'
   | 'other_account'
@@ -251,17 +254,27 @@ export interface StatementMatch {
   readonly unposted: readonly StatementUnposted[]
 }
 
-type Fit = 'exact' | 'unsure' | 'elsewhere' | 'tip' | 'hold' | 'late' | 'relink'
+type Fit = 'exact' | 'unsure' | 'posting' | 'elsewhere' | 'tip' | 'hold' | 'late' | 'relink'
 
 /** The fits in the order the matching takes them: what met first, the doubts only for what is left. */
-const FIT_ORDER: readonly Fit[] = ['exact', 'unsure', 'elsewhere', 'tip', 'hold', 'late', 'relink']
+const FIT_ORDER: readonly Fit[] = [
+  'exact',
+  'unsure',
+  'posting',
+  'elsewhere',
+  'tip',
+  'hold',
+  'late',
+  'relink',
+]
 
-/** A line as the rule reads it, each once: its key, its day as a number, its amounts, its payee folded. */
+/** A line as the rule reads it, each once: its key, its days as numbers, its amounts, its payee's seller words. */
 interface Row {
   readonly index: number
   readonly line: StatementLine
   readonly key: string
   readonly day: number
+  readonly posted: number | null
   readonly amounts: readonly Money[]
   readonly words: readonly string[]
 }
@@ -270,6 +283,7 @@ interface Row {
 interface Known {
   readonly c: StatementCandidate
   readonly days: readonly number[]
+  readonly link: LinkDays | null
   readonly amounts: readonly Money[]
   readonly seller: readonly string[]
 }
@@ -278,7 +292,7 @@ interface Pair {
   readonly row: number
   readonly c: StatementCandidate
   readonly fit: Fit
-  /** The record's link names this very line by its key: the line it was made from goes first. */
+  /** The record's link names this very line by its key: the line it was made from goes first (№15). */
   readonly own: boolean
   readonly named: number
   readonly nameless: boolean
@@ -326,60 +340,77 @@ const daySlack = (a: StatementForm, b: StatementForm) =>
   SHIFTED_FORMS.has(a) || SHIFTED_FORMS.has(b) ? 1 : 0
 
 /**
- * Whether a line of another form is the link's operation by its days (Д2, Е2): one day, ± 1 for a form
- * whose day moves. A file dates a line by its operation and prints its posting day beside it where its
- * format has one; a screenshot shows the posting day (MOL-428). So a screenshot meets a file's line on
- * its posting day too (adversarial А1) — with none printed, on one day only; two files, by the
- * operation's alone.
+ * What a record's link says of a line (Г2, Д1, Д2, Е1, Е2, Ж2): `own` — its own line, by its key;
+ * `other_upload` — the key the line had under the account the link was keyed under, which is the same
+ * file uploaded again with an account chosen since (А4) or a like line of another card (А8): a doubt;
+ * `same` — the link's operation in another form, or its hold's posting; `posting` — a file that prints
+ * no posting day against a screenshot one to four days after it, which may be the operation posted
+ * (А12): a doubt; `unsure` — a screenshot against a screenshot on one day the times do not tell apart;
+ * `no` — never another key of the same file, which would have given the same key.
  */
-function sameOperationDay(link: StatementLink, line: StatementLine, form: StatementForm): boolean {
-  const slack = daySlack(link.form, form)
-  const meet = (a: string, b: string) => Math.abs(dayNumber(a) - dayNumber(b)) <= slack
-  if (meet(link.day, line.day)) return true
-  if (link.form === 'screenshot' && isBankFile(form))
-    return line.postedOn !== null && meet(link.day, line.postedOn)
-  if (form === 'screenshot' && isBankFile(link.form))
-    return link.postedOn !== null && meet(link.postedOn, line.day)
-  return false
+type LinkSays = 'own' | 'other_upload' | 'same' | 'posting' | 'unsure' | 'no'
+
+/** A record's link as the rule reads it: its days as numbers once, and how far from them it reaches. */
+interface LinkDays {
+  readonly link: StatementLink
+  readonly day: number
+  readonly posted: number | null
+}
+
+/**
+ * A line of a file against a screenshot of the same operation (MOL-428): a file dates a line by its
+ * operation and prints its posting day beside it where its format has one; a screenshot shows the
+ * posting day. With a posting day printed, they meet by it alone (А1, А11); with none, on one day, and
+ * the screenshot one to four days later is a doubt (А12). Two files meet by the operation's day; ± 1 for
+ * a form whose day moves.
+ */
+function operationSays(link: LinkDays, row: Row, form: StatementForm): 'same' | 'posting' | 'no' {
+  const slack = daySlack(link.link.form, form)
+  const meet = (a: number, b: number) => Math.abs(a - b) <= slack
+  const shotOfFile = link.link.form === 'screenshot' && isBankFile(form)
+  const fileOfShot = form === 'screenshot' && isBankFile(link.link.form)
+  if (!shotOfFile && !fileOfShot) return meet(link.day, row.day) ? 'same' : 'no'
+  const shot = shotOfFile ? link.day : row.day
+  const file = shotOfFile ? row.day : link.day
+  const posted = shotOfFile ? row.posted : link.posted
+  if (posted !== null) return meet(shot, posted) ? 'same' : 'no'
+  if (meet(shot, file)) return 'same'
+  const later = shot - file
+  return later >= 1 && later <= STATEMENT_SCREENSHOT_DAYS_AFTER ? 'posting' : 'no'
 }
 
 /**
  * The posting of a hold the record was made from (Г2б). A file dates it by its operation — the hold's
- * own day (Д2), so on that day only: a line of a file days after it is another operation (adversarial
- * А2, А3). A screenshot shows the posting day: within `STATEMENT_HOLD_POST_DAYS` after the hold, past the
- * window too, which is the measure of a record typed by hand, not of a bank's posting.
+ * own day (Д2), so on that day only: a line of a file days after it is another operation (А2, А3). A
+ * screenshot shows the posting day: within `STATEMENT_HOLD_POST_DAYS` after the hold, past the window
+ * too, which is the measure of a record typed by hand, not of a bank's posting.
  */
-function holdPosting(link: StatementLink, line: StatementLine, form: StatementForm): boolean {
-  if (!link.pending || line.status === 'pending') return false
-  const after = dayNumber(line.day) - dayNumber(link.day)
+function holdPosting(link: LinkDays, row: Row, form: StatementForm): boolean {
+  if (!link.link.pending || row.line.status === 'pending') return false
+  const after = row.day - link.day
   return isBankFile(form)
-    ? Math.abs(after) <= daySlack(link.form, form)
+    ? Math.abs(after) <= daySlack(link.link.form, form)
     : after >= 0 && after <= STATEMENT_HOLD_POST_DAYS
 }
 
-/**
- * Whether a record's link lets this line in (Г2, Д2, Е1, Е2): its own line — by its key, or by the key
- * it had under the account the link was keyed under, the same file uploaded again with an account chosen
- * since (adversarial А4); a line of another form — or a screenshot against a screenshot — of the link's
- * operation by its days; never another key of the same file, which would have given the same key; a
- * hold's posting. A screenshot against a screenshot on one day is told by the time, else is a doubt (Ж2,
- * З1, И1, И2).
- */
-function linkLets(
-  link: StatementLink,
+function linkSays(
+  link: LinkDays,
   row: Row,
   form: StatementForm,
+  account: string | null,
   keyUnder: (account: string | null, index: number) => string | undefined,
-): boolean | 'unsure' {
-  if (link.key === row.key || link.key === keyUnder(link.accountId, row.index)) return true
-  const { line } = row
-  if (link.form === 'screenshot' && form === 'screenshot' && link.day === line.day) {
-    const said = printedTimesSay(link.time, line.time)
-    return said === 'same' ? true : said === 'apart' ? false : 'unsure'
+): LinkSays {
+  const { key, accountId } = link.link
+  if (key === row.key) return 'own'
+  if (accountId !== account && key === keyUnder(accountId, row.index)) return 'other_upload'
+  if (link.link.form === 'screenshot' && form === 'screenshot' && link.day === row.day) {
+    const said = printedTimesSay(link.link.time, row.line.time)
+    return said === 'same' ? 'same' : said === 'apart' ? 'no' : 'unsure'
   }
-  const sameFile = formKeyIsStable(form) && link.form === form
-  if (!sameFile && sameOperationDay(link, line, form)) return true
-  return holdPosting(link, line, form)
+  const sameFile = formKeyIsStable(form) && link.link.form === form
+  const operation = sameFile ? 'no' : operationSays(link, row, form)
+  if (operation !== 'no') return operation
+  return holdPosting(link, row, form) ? 'same' : 'no'
 }
 
 /**
@@ -387,11 +418,14 @@ function linkLets(
  * recorded, it moves the link to itself and writes the link's line as a spending of its own. Neither a
  * hold nor a transfer or an exchange: they have paths of their own.
  */
-function relinks(c: StatementCandidate, days: readonly number[], distance: number): boolean {
-  const link = c.link
-  if (link === null || link.pending || c.what === 'transfer' || c.what === 'exchange') return false
-  const linkDay = dayNumber(link.day)
-  return distance < Math.min(...days.map((d) => Math.abs(linkDay - d)))
+function relinks(
+  c: StatementCandidate,
+  link: LinkDays,
+  days: readonly number[],
+  distance: number,
+): boolean {
+  if (link.link.pending || c.what === 'transfer' || c.what === 'exchange') return false
+  return distance < Math.min(...days.map((d) => Math.abs(link.day - d)))
 }
 
 /**
@@ -400,16 +434,40 @@ function relinks(c: StatementCandidate, days: readonly number[], distance: numbe
  * asked by the caller.
  */
 function lateFit(
-  c: StatementCandidate,
-  line: StatementLine,
+  link: LinkDays,
+  row: Row,
   form: StatementForm,
   amount: 'exact' | 'tip' | 'hold',
 ): 'late' | null {
-  const link = c.link
-  if (link === null || !link.pending || line.status === 'pending' || isBankFile(form)) return null
+  if (!link.link.pending || row.line.status === 'pending' || isBankFile(form)) return null
   if (amount === 'tip') return null
-  const after = dayNumber(line.day) - dayNumber(link.day)
+  const after = row.day - link.day
   return after > STATEMENT_HOLD_POST_DAYS && after <= STATEMENT_LATE_POST_DAYS ? 'late' : null
+}
+
+/**
+ * The records the rule weighed against a line, in this process — read by tests alone (А13). «A line
+ * weighs only the records that reach its day» is held by this count: a clock on CI does not tell a
+ * second from four.
+ */
+export const statementRecordsWeighed = { count: 0 }
+
+/**
+ * The days of lines a record can meet: its window around each of its days, and around its link's days
+ * as far as a link reaches — a late posting's thirty days either way bound them all (review №1, А13).
+ */
+function reachOf(form: StatementForm, days: readonly number[], link: LinkDays | null) {
+  const before =
+    form === 'screenshot' ? STATEMENT_SCREENSHOT_DAYS_BEFORE : STATEMENT_FILE_WINDOW_DAYS
+  const after = form === 'screenshot' ? STATEMENT_SCREENSHOT_DAYS_AFTER : STATEMENT_FILE_WINDOW_DAYS
+  let from = Math.min(...days) - before
+  let to = Math.max(...days) + after
+  if (link !== null) {
+    const far = STATEMENT_LATE_POST_DAYS + 1
+    from = Math.min(from, link.day - far, (link.posted ?? link.day) - far)
+    to = Math.max(to, link.day + far, (link.posted ?? link.day) + far)
+  }
+  return { from, to }
 }
 
 /**
@@ -433,6 +491,7 @@ function doubtOf(
   if (p.fit === 'elsewhere') return 'other_account'
   if (p.fit === 'relink') return 'relink'
   if (p.fit === 'unsure') return 'same_screenshot'
+  if (p.fit === 'posting') return 'posting_day'
   if (p.fit === 'late') return 'late_post'
   if (p.fit === 'hold') return 'hold'
   if (p.fit === 'tip') return 'tip'
@@ -495,9 +554,10 @@ function matchPairs(pairs: readonly Pair[]): Map<number, Pair> {
 /**
  * The rule over one statement: a decision for every line, with its key, and the holds it shows no
  * posting of. The candidates are the person's spendings (removed ones still within «Вернуть»), finished
- * trips, transfers and exchanges, built by the functions above. Every line is weighed against every
- * record, the sum first; a name is folded once a line and once a record — a month of 300 lines against
- * a year of 3 000 records is some 0.1 s (review №1), in the API's process.
+ * trips, transfers and exchanges, built by the functions above. A line is weighed only against the
+ * records whose window or link reaches its day, the sum first; a name is folded once a line and once a
+ * record — it runs in the API's process (review №1, А13): `STATEMENT_LINES_MAX` lines against a year of
+ * 3 000 records linked to screenshots stays well within the bound its test holds.
  */
 export function matchStatement(
   actorId: string,
@@ -511,15 +571,34 @@ export function matchStatement(
     line,
     key,
     day: dayNumber(line.day),
+    posted: line.postedOn === null ? null : dayNumber(line.postedOn),
     amounts: amountsOfLine(line),
-    words: payeeWords(line.payee),
+    words: sellerWords(line.payee),
   }))
   const known: Known[] = candidates.map((c) => ({
     c,
     days: c.days.map(dayNumber),
+    link:
+      c.link === null
+        ? null
+        : {
+            link: c.link,
+            day: dayNumber(c.link.day),
+            posted: c.link.postedOn === null ? null : dayNumber(c.link.postedOn),
+          },
     amounts: amountsOfRecord(c),
     seller: sellerWords(c.name),
   }))
+  // Each record under every day of a line it can meet: a line weighs those alone (А13).
+  const byDay = new Map<number, Known[]>()
+  for (const k of known) {
+    const { from, to } = reachOf(form, k.days, k.link)
+    for (let day = from; day <= to; day++) {
+      const there = byDay.get(day)
+      if (there) there.push(k)
+      else byDay.set(day, [k])
+    }
+  }
   // The keys the lines had under another account, asked only by a link keyed under one (А4).
   const keysUnder = new Map<string | null, string[]>([[account, rows.map((r) => r.key)]])
   const keyUnder = (other: string | null, index: number) => {
@@ -543,27 +622,29 @@ export function matchStatement(
   // first, then by the share of the name (А4), the nearer day, the order of the lines.
   const pairs: Pair[] = []
   for (const row of spend) {
-    const { line } = row
-    for (const { c, days, amounts, seller } of known) {
-      const own = c.what === 'transfer' || c.what === 'exchange'
-      if (own && !onAccount(c, account)) continue
+    for (const { c, days, link, amounts, seller } of byDay.get(row.day) ?? []) {
+      statementRecordsWeighed.count += 1
+      const moves = c.what === 'transfer' || c.what === 'exchange'
+      if (moves && !onAccount(c, account)) continue
       const inside = days.some((d) => inWindow(form, row.day, d))
-      if (!inside && c.link === null) continue // only a link reaches past the window
+      if (!inside && link === null) continue // only a link reaches past the window
       const amount = amountFit(row.amounts, amounts)
       if (amount === null) continue
       const distance = Math.min(...days.map((d) => Math.abs(row.day - d)))
-      const lets = c.link === null ? true : linkLets(c.link, row, form, keyUnder)
+      const says = link === null ? 'same' : linkSays(link, row, form, account, keyUnder)
       // A link that names the line lets it in past the window: its key, its operation, its hold's posting.
-      const near = inside || (c.link !== null && lets === true)
+      const near = inside || (says !== 'no' && says !== 'unsure')
+      const exact = amount === 'exact'
       let fit: Fit | null
-      if (!near)
-        fit = lateFit(c, line, form, amount) // a hold's late posting, past the window too (Е3)
-      else if (lets === 'unsure') fit = amount === 'exact' ? 'unsure' : null
-      else if (!lets)
+      if (link !== null && !near)
+        fit = lateFit(link, row, form, amount) // a hold's late posting, past the window too (Е3)
+      else if (says === 'unsure') fit = exact ? 'unsure' : null
+      else if (says === 'posting') fit = exact ? 'posting' : null
+      else if (says === 'other_upload')
+        fit = exact ? 'elsewhere' : null // А8
+      else if (link !== null && says === 'no')
         fit =
-          amount === 'exact' && relinks(c, days, distance)
-            ? 'relink'
-            : lateFit(c, line, form, amount)
+          exact && relinks(c, link, days, distance) ? 'relink' : lateFit(link, row, form, amount)
       else fit = amount
       if (fit === null) continue
       const named = wordsShare(row.words, seller)
@@ -572,12 +653,12 @@ export function matchStatement(
       // in the same chain is new (Г3).
       if (fit === 'late' && named === 0) continue
       if (fit === 'hold' && (named === 0 || account === null || c.account !== account)) continue
-      if (fit === 'exact' && !own && !onAccount(c, account)) fit = 'elsewhere' // В-1 «а»
+      if (fit === 'exact' && !moves && !onAccount(c, account)) fit = 'elsewhere' // В-1 «а»
       pairs.push({
         row: row.index,
         c,
         fit,
-        own: c.link?.key === row.key,
+        own: says === 'own' || says === 'other_upload',
         named,
         nameless: seller.length === 0,
         distance,
