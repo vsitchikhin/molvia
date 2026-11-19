@@ -54,13 +54,21 @@ async function screen(actor: ActorView, readByScreen = false): Promise<VueWrappe
   return view
 }
 
+/**
+ * The clock the timers here run on (review №16): `clearTimeout` faked with `setTimeout`, or a timer the composable
+ * takes back still fires on the fake clock, and a clearing broken would never be seen.
+ */
+function clockAt(now: Date): void {
+  vi.useFakeTimers({ now, toFake: ['Date', 'setTimeout', 'clearTimeout'] })
+}
+
 function cameBack(): void {
   document.dispatchEvent(new Event('visibilitychange'))
 }
 
 beforeEach(() => {
   me.mockReset()
-  vi.useFakeTimers({ now: new Date('2026-11-19T12:00:00Z'), toFake: ['Date', 'setTimeout'] })
+  clockAt(new Date('2026-11-19T12:00:00Z'))
 })
 
 afterEach(() => {
@@ -79,7 +87,7 @@ describe('where the person stands, kept fresh by the screen that holds the camer
   })
 
   it('asks again at midnight with the screen in view (adversarial А3)', async () => {
-    vi.useFakeTimers({ now: new Date(2026, 10, 30, 23, 58), toFake: ['Date', 'setTimeout'] })
+    clockAt(new Date(2026, 10, 30, 23, 58))
     me.mockResolvedValue({ ...GEORGIA, receiptsAccess: { ...OPEN, month: '2026-12-01' } })
     await screen({ ...GEORGIA, receiptsAccess: OPEN })
     await vi.advanceTimersByTimeAsync(5 * 60_000)
@@ -87,7 +95,7 @@ describe('where the person stands, kept fresh by the screen that holds the camer
   })
 
   it('asks as the screen comes where the figures are of a month before the phone’s (Б2), and not of its own', async () => {
-    vi.useFakeTimers({ now: new Date('2026-12-01T08:00:00Z'), toFake: ['Date', 'setTimeout'] })
+    clockAt(new Date('2026-12-01T08:00:00Z'))
     me.mockResolvedValue({ ...GEORGIA, receiptsAccess: { ...OPEN, month: '2026-12-01' } })
     await screen({ ...GEORGIA, receiptsAccess: OPEN })
     expect(me).toHaveBeenCalledTimes(1)
@@ -98,7 +106,7 @@ describe('where the person stands, kept fresh by the screen that holds the camer
   })
 
   it('asks once a paid reading runs out with the screen in view (Б3)', async () => {
-    vi.useFakeTimers({ now: new Date('2026-12-19T09:58:00Z'), toFake: ['Date', 'setTimeout'] })
+    clockAt(new Date('2026-12-19T09:58:00Z'))
     const until = new Date('2026-12-19T10:00:00Z')
     const paid = { ...OPEN, month: '2026-12-01', until }
     me.mockResolvedValue({ ...GEORGIA, receiptsAccess: { ...paid, until: null, ended: until } })
@@ -109,18 +117,19 @@ describe('where the person stands, kept fresh by the screen that holds the camer
     expect(me).toHaveBeenCalledTimes(1)
   })
 
-  it('asks once, never every two seconds, where the phone’s clock runs ahead of the server’s (adversarial В1)', async () => {
-    // the phone says 10:00, the server 09:00: for it the grant goes on, and every answer brings its `until` anew
-    vi.useFakeTimers({ now: new Date('2026-12-19T10:00:00Z'), toFake: ['Date', 'setTimeout'] })
+  it('asks twice at most, never every two seconds, where the phone’s clock runs ahead of the server’s (adversarial В1)', async () => {
+    // the phone says 10:00, the server 09:00: for it the grant goes on, and every answer brings its `until` anew —
+    // the first answer after the moment asks once more (Д1), the second is believed
+    clockAt(new Date('2026-12-19T10:00:00Z'))
     const paid = () => ({ ...OPEN, month: '2026-12-01', until: new Date('2026-12-19T10:00:00Z') })
     me.mockImplementation(() => Promise.resolve({ ...GEORGIA, receiptsAccess: paid() }))
     await screen({ ...GEORGIA, receiptsAccess: paid() })
     await vi.advanceTimersByTimeAsync(60_000)
-    expect(me).toHaveBeenCalledTimes(1)
+    expect(me).toHaveBeenCalledTimes(2)
   })
 
   it('arms the grant’s end by the answer at midnight, the screen open more than a day before it (adversarial Г1)', async () => {
-    vi.useFakeTimers({ now: new Date('2026-12-18T08:00:00Z'), toFake: ['Date', 'setTimeout'] })
+    clockAt(new Date('2026-12-18T08:00:00Z'))
     const until = new Date('2026-12-19T10:00:00Z')
     const asked: number[] = []
     // the server's word by its clock, the same as the phone's: the grant goes on until 10:00
@@ -140,8 +149,8 @@ describe('where the person stands, kept fresh by the screen that holds the camer
     expect(useActorStore().actor?.receiptsAccess?.ended).toEqual(until)
   })
 
-  it('asks once about a grant the phone’s clock finds over, every answer after it saying it goes on (В1, Г1)', async () => {
-    vi.useFakeTimers({ now: new Date('2026-12-19T10:00:00Z'), toFake: ['Date', 'setTimeout'] })
+  it('stops asking about a grant the phone’s clock finds over once an answer after it says it goes on (В1, Г1)', async () => {
+    clockAt(new Date('2026-12-19T10:00:00Z'))
     const paid = () => ({ ...OPEN, month: '2026-12-01', until: new Date('2026-12-19T10:00:00Z') })
     me.mockImplementation(() => Promise.resolve({ ...GEORGIA, receiptsAccess: paid() }))
     await screen({ ...GEORGIA, receiptsAccess: paid() })
@@ -149,8 +158,52 @@ describe('where the person stands, kept fresh by the screen that holds the camer
     cameBack()
     await flushPromises()
     await vi.advanceTimersByTimeAsync(60_000)
-    // one for the grant's end, one for the return — and no timer armed again by either answer
-    expect(me).toHaveBeenCalledTimes(2)
+    // two for the grant's end, one for the return — and no timer armed again by the answers after
+    expect(me).toHaveBeenCalledTimes(3)
+  })
+
+  it('asks again about a grant’s end whose one ask the network lost (adversarial Д1)', async () => {
+    clockAt(new Date('2026-12-19T09:58:00Z'))
+    const until = new Date('2026-12-19T10:00:00Z')
+    const asked: number[] = []
+    me.mockImplementation(() => {
+      asked.push(Date.now())
+      // the ask at the grant's end is lost at the shelf, the connection said to be there
+      if (asked.length === 1) return Promise.reject(new TypeError('Failed to fetch'))
+      return Promise.resolve({
+        ...GEORGIA,
+        receiptsAccess: { ...OPEN, month: '2026-12-01', trialLeft: 0, ended: new Date(until) },
+      })
+    })
+    await screen({ ...GEORGIA, receiptsAccess: { ...OPEN, month: '2026-12-01', until } })
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(asked).toEqual([until.getTime() + 2_000, until.getTime() + 7_000])
+    expect(useActorStore().actor?.receiptsAccess?.ended).toEqual(until)
+  })
+
+  it('asks again where the answer after the grant’s end was to a question asked before it (adversarial Д1)', async () => {
+    clockAt(new Date('2026-12-19T09:59:50Z'))
+    const until = new Date('2026-12-19T10:00:00Z')
+    const asked: number[] = []
+    // the server answers by its clock, the phone's, as the question reaches it; the answer takes five seconds back
+    me.mockImplementation(() => {
+      asked.push(Date.now())
+      const access =
+        Date.now() < until.getTime()
+          ? { ...OPEN, month: '2026-12-01', until: new Date(until) }
+          : { ...OPEN, month: '2026-12-01', trialLeft: 0, ended: new Date(until) }
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve({ ...GEORGIA, receiptsAccess: access })
+        }, 5_000)
+      })
+    })
+    await screen({ ...GEORGIA, receiptsAccess: { ...OPEN, month: '2026-12-01', until } })
+    await vi.advanceTimersByTimeAsync(8_000) // 09:59:58: the return asks, and the grant's end finds it in the air
+    cameBack()
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(asked.filter((at) => at >= until.getTime())).toHaveLength(1)
+    expect(useActorStore().actor?.receiptsAccess?.ended).toEqual(until)
   })
 
   it('must not ask where receipts are not read off the photo: Serbia’s are their link', async () => {
@@ -169,7 +222,7 @@ describe('where the person stands, kept fresh by the screen that holds the camer
 
 describe('the settings, whose form reads `/actors/me` itself (review №12)', () => {
   it('leave the return and the coming to the form, and keep the midnight', async () => {
-    vi.useFakeTimers({ now: new Date(2026, 11, 1, 23, 58), toFake: ['Date', 'setTimeout'] })
+    clockAt(new Date(2026, 11, 1, 23, 58))
     me.mockResolvedValue({ ...GEORGIA, receiptsAccess: { ...OPEN, month: '2026-12-01' } })
     await screen({ ...GEORGIA, receiptsAccess: OPEN }, true)
     cameBack()

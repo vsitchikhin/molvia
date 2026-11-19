@@ -11,8 +11,9 @@ import type { PhotoReceiptCountry, ReceiptsAccess, ReceiptsClosed } from '@molvi
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useReconnect } from '@/composables/useReconnect'
 import { calendarDay, dateOfAnyYear } from '@/days'
-import { useActorStore } from '@/stores/actor'
+import { IDENTITY_RETRY_FIRST_MS, IDENTITY_RETRY_LAST_MS, useActorStore } from '@/stores/actor'
 import { useFf } from '@/stores/ff'
+import { doublingRetry } from '@/stores/queueing'
 import { read, write } from '@/stores/storage'
 
 /** What the person chose in «Пробные чеки закончились»: the camera all the same, the record by hand, a word to the developer. */
@@ -197,24 +198,43 @@ export function useAccessKeptFresh({
     })
   }
 
-  // Armed again by every answer — the one at midnight sets the timer for a grant a day off (adversarial Г1) — but
-  // never at once again for a moment already asked about: a phone whose clock runs ahead of the server's finds its
-  // grant over while the server's goes on, and re-armed by each answer it asked every two seconds (В1). One ask a
-  // moment; an answer still saying it, the next midnight or return asks again.
+  // Armed again by every answer — the one at midnight sets the timer for a grant a day off (adversarial Г1). A moment
+  // the phone's clock finds over is asked about once more only until an answer that came after it still names it: a
+  // phone whose clock runs ahead of the server's finds its grant over while the server's goes on, and re-armed by each
+  // such answer it asked every two seconds (В1). Marked by an answer, never by the ask (Д1): an ask lost by the network
+  // or swallowed by `verify` while another question was out learnt nothing — that one is asked again with a doubling
+  // pause, the identity's rhythm, until any answer comes; and the figures the screen came with are no answer after it.
   let grantEnds: ReturnType<typeof setTimeout> | undefined
-  let askedAbout: number | undefined
+  let heardPast: number | undefined
+  let answered = false
+  const unheard = doublingRetry(
+    () => {
+      askAgain()
+      unheard.later()
+    },
+    IDENTITY_RETRY_FIRST_MS,
+    IDENTITY_RETRY_LAST_MS,
+  )
   watch(
     access,
     (figures) => {
       clearTimeout(grantEnds)
+      unheard.cancel()
+      unheard.reset()
+      const answer = answered
+      answered = true
       const until = figures?.until?.getTime()
       if (until === undefined) return
       const left = until - Date.now()
-      if (left > GRANT_WAIT_MAX_MS || (left <= 0 && askedAbout === until)) return
+      if (left > GRANT_WAIT_MAX_MS) return
+      if (left <= 0 && answer) {
+        if (heardPast === until) return
+        heardPast = until
+      }
       grantEnds = setTimeout(
         () => {
-          askedAbout = until
           askAgain()
+          unheard.later()
         },
         Math.max(0, left) + GRANT_END_SLACK_MS,
       )
@@ -223,5 +243,6 @@ export function useAccessKeptFresh({
   )
   onUnmounted(() => {
     clearTimeout(grantEnds)
+    unheard.cancel()
   })
 }
