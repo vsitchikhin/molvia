@@ -93,22 +93,38 @@ export const STATEMENT_LINES_MAX = 3000
 
 /**
  * One upload: its form; the person's account in Molvia it is of (or none); the number of the account or
- * card the bank's head prints, as printed (or none — a screenshot, a format that prints none); the period
- * its head prints (or none).
+ * card the bank's head prints, as printed — `accountNumberKey` reads it — or none (a screenshot, a format
+ * that prints none); the period its head prints (or none).
  */
 export const statementSchema = z.object({
   form: statementFormSchema,
   accountId: z.uuid().nullable(),
-  accountNumber: z.string().trim().min(1).max(STATEMENT_ACCOUNT_NUMBER_MAX).nullable(),
+  accountNumber: z.string().max(STATEMENT_ACCOUNT_NUMBER_MAX).nullable(),
   period: z.object({ from: exchangeDaySchema, to: exchangeDaySchema }).nullable(),
   lines: z.array(statementLineSchema).max(STATEMENT_LINES_MAX),
 })
 export type Statement = z.infer<typeof statementSchema>
 
+/** The digits of a printed account's or card's number a key reads: never fewer. */
+const ACCOUNT_NUMBER_DIGITS = 4
+
+/**
+ * What a key reads of the number the bank's head prints (review №22): its last four digits. One card's
+ * number comes whole, masked or cut by the format and by the format's next version — «8888 8888 8888
+ * 8888», «888888******8888», «*8888» — and is one number to the key, as the same line in a bank's CSV and
+ * its PDF is one line. A number with fewer digits is none. **The price, named:** two cards or accounts
+ * of one person in one bank that end in the same four digits are one number.
+ */
+export function accountNumberKey(printed: string | null): string | null {
+  const digits = (printed ?? '').replace(/\D/g, '')
+  return digits.length < ACCOUNT_NUMBER_DIGITS ? null : digits.slice(-ACCOUNT_NUMBER_DIGITS)
+}
+
 /**
  * What a spending, a trip or a transfer keeps of the line it was made from or matched (stored by
- * MOL-433): the key, and the account of the upload it was keyed under — the same file uploaded again
- * with an account chosen since is the same line (adversarial А4); the day and the posting day, so the
+ * MOL-433): the key, and the account in Molvia and the bank's number of the upload it was keyed under —
+ * its own line is known again under another account's statement of the same account in Molvia, its
+ * card's or its account's, a card reissued (adversarial А4, А18); the day and the posting day, so the
  * same operation in another form is told (Г2, Д2: a file's day is the operation's, a screenshot's the
  * posting's — adversarial А1); `pending`, so its posting is let in (Г2б); the form, so another form is
  * the same operation and the same file is not (Е1, Е2); and the amount, payee and time, so a relinked
@@ -117,6 +133,7 @@ export type Statement = z.infer<typeof statementSchema>
 export const statementLinkSchema = z.object({
   key: z.uuid(),
   accountId: z.uuid().nullable(),
+  accountNumber: z.string().max(STATEMENT_ACCOUNT_NUMBER_MAX).nullable(),
   day: exchangeDaySchema,
   postedOn: exchangeDaySchema.nullable(),
   pending: z.boolean(),
@@ -130,11 +147,12 @@ export type StatementLink = z.infer<typeof statementLinkSchema>
 export function statementLinkOf(
   line: StatementLine,
   key: string,
-  { form, accountId }: Pick<Statement, 'form' | 'accountId'>,
+  { form, accountId, accountNumber }: Pick<Statement, 'form' | 'accountId' | 'accountNumber'>,
 ): StatementLink {
   return {
     key,
     accountId,
+    accountNumber,
     day: line.day,
     postedOn: line.postedOn,
     pending: line.status === 'pending',
@@ -150,30 +168,29 @@ const STATEMENT_LINE_NAMESPACE = '4f2c8e1a-7b3d-4a69-9e05-c1d8b2f6a374'
 
 const keyMoney = ({ minor, currency }: Money) => `${minor.toString()} ${currency}`
 
-/** What a line's key reads of its statement; a number the head does not print may be left out. */
-type KeyedStatement = Pick<Statement, 'accountId' | 'lines'> &
-  Partial<Pick<Statement, 'accountNumber'>>
+/** What a line's key reads of its statement. */
+type KeyedStatement = Pick<Statement, 'accountId' | 'accountNumber' | 'lines'>
 
 /**
  * Each line with its key, a spending's id when one is written from it (Р-2): the same line uploaded
  * again is the same id, so it is not written twice. The person is in it — two people's like lines of
  * statements with no account would be one id, and ids are one primary key for everyone; so are the
- * account — the bank's number where its head prints one, else the person's account in Molvia: two cards
- * of one bank uploaded «без счёта» are two keys, and a file uploaded again with an account chosen since
- * is the same (adversarial А4, А8, А14) — the day, the sign, the amount, the payee as printed with its
- * spaces squeezed, and the turn among equal lines — two rides of one price on one day are two. The form is not: the same text in a
- * bank's CSV and its PDF is the same line. A line is keyed and turned among the lines of its status: a
- * later export may leave out a refusal or a hold the bank dropped, and a payment made again beside
- * either keeps its key (adversarial А5, А9). So a hold's posting is another key — the link lets it in.
+ * account — the bank's number where its head prints one (`accountNumberKey`), else the person's account
+ * in Molvia: two cards of one bank uploaded «без счёта» are two keys, and a file uploaded again with an
+ * account chosen since is the same (adversarial А4, А8, А14) — the day, the sign, the amount, the payee
+ * as printed with its spaces squeezed, and the turn among equal lines: two rides of one price on one day
+ * are two. The form is not: the same text in a bank's CSV and its PDF is the same line. A line is keyed
+ * and turned among the lines of its status: a later export may leave out a refusal or a hold the bank
+ * dropped, and a payment made again beside either keeps its key (adversarial А5, А9). So a hold's
+ * posting is another key — the link lets it in.
  */
 export function statementKeyedLines(
   actorId: string,
   statement: KeyedStatement,
 ): { readonly line: StatementLine; readonly key: string }[] {
   const seen = new Map<string, number>()
-  const { accountNumber = null, accountId } = statement
-  const account =
-    accountNumber === null ? (accountId ?? '') : `#${accountNumber.replace(/\s+/g, '')}`
+  const number = accountNumberKey(statement.accountNumber)
+  const account = number === null ? (statement.accountId ?? '') : `#${number}`
   return statement.lines.map((line) => {
     const parts = JSON.stringify([
       actorId,

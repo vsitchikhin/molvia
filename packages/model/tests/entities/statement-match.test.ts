@@ -17,7 +17,6 @@ import {
   matchStatement,
   spendingCandidate,
   STATEMENT_WEIGHED_MAX,
-  statementWeighing,
   transferCandidate,
   tripCandidate,
 } from '#model/entities/statement-match'
@@ -145,7 +144,11 @@ const match = (
   candidates: StatementCandidate[],
   lines: StatementLine[],
   o: StatementOptions = {},
-) => matchStatement(PERSON, statementOf(lines, o), candidates)
+) => {
+  const out = matchStatement(PERSON, statementOf(lines, o), candidates)
+  if (out.outcome !== 'matched') throw new Error(`too heavy: ${String(out.pairs)} pairs`)
+  return out
+}
 
 const decide = (
   candidates: StatementCandidate[],
@@ -155,13 +158,14 @@ const decide = (
 
 /** The key a line of this statement gets, for a record linked to it. */
 const keyOf = (l: StatementLine, account: string | null = null) =>
-  statementLineKeys(PERSON, { accountId: account, lines: [l] })[0] ?? ''
+  statementLineKeys(PERSON, { accountId: account, accountNumber: null, lines: [l] })[0] ?? ''
 
 const linkTo = (
   o: Partial<StatementLink> & Pick<StatementLink, 'day' | 'form'>,
 ): StatementLink => ({
   key: nextId(),
   accountId: null,
+  accountNumber: null,
   postedOn: null,
   pending: false,
   amount: cash('1.00', 'AMD'),
@@ -939,7 +943,11 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
     const fromShot = spending('2026-11-14', '6400.00', 'AMD', {
       place: 'SAS',
       account: AMERIA,
-      link: statementLinkOf(onShot, nextId(), { form: 'screenshot', accountId: AMERIA }),
+      link: statementLinkOf(onShot, nextId(), {
+        form: 'screenshot',
+        accountId: AMERIA,
+        accountNumber: null,
+      }),
     })
     expect(decide([fromShot], [inFile], { account: AMERIA })).toEqual([recorded(fromShot)])
     const fromFile = spending('2026-11-12', '6400.00', 'AMD', {
@@ -948,6 +956,7 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
       link: statementLinkOf(inFile, keyOf(inFile, AMERIA), {
         form: 'ameria-csv',
         accountId: AMERIA,
+        accountNumber: null,
       }),
     })
     expect(decide([fromFile], [onShot], { account: AMERIA, form: 'screenshot' })).toEqual([
@@ -965,6 +974,7 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
       link: statementLinkOf(unposted, keyOf(unposted, AMERIA), {
         form: 'ameria-csv',
         accountId: AMERIA,
+        accountNumber: null,
       }),
     })
     expect(decide([fromCsv], [onShot], { account: AMERIA, form: 'screenshot' })).toEqual([
@@ -984,6 +994,7 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
       link: statementLinkOf(hold, keyOf(hold, ARDSHIN), {
         form: 'ardshin-xlsx',
         accountId: ARDSHIN,
+        accountNumber: null,
       }),
     })
     const o = {
@@ -1011,6 +1022,7 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
       link: statementLinkOf(hold, keyOf(hold, ARDSHIN), {
         form: 'ardshin-xlsx',
         accountId: ARDSHIN,
+        accountNumber: null,
       }),
     })
     const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
@@ -1024,20 +1036,32 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
     const l = line('2026-11-12', '6400.00', 'AMD', sas)
     const none = spending('2026-11-12', '6400.00', 'AMD', {
       place: 'SAS',
-      link: statementLinkOf(l, keyOf(l), { form: 'ameria-csv', accountId: null }),
+      link: statementLinkOf(l, keyOf(l), {
+        form: 'ameria-csv',
+        accountId: null,
+        accountNumber: null,
+      }),
     })
     expect(decide([none], [l], { account: AMERIA })).toEqual([recorded(none, 'other_account')])
     // Two cards of one bank: «без счёта» and a card's own upload are told by nothing but the account.
     const card = spending('2026-11-12', '6400.00', 'AMD', {
       place: 'SAS',
       account: AMERIA,
-      link: statementLinkOf(l, keyOf(l, AMERIA), { form: 'ameria-csv', accountId: AMERIA }),
+      link: statementLinkOf(l, keyOf(l, AMERIA), {
+        form: 'ameria-csv',
+        accountId: AMERIA,
+        accountNumber: null,
+      }),
     })
     expect(decide([card], [l], { account: null })).toEqual([recorded(card, 'other_account')])
     const wrong = spending('2026-11-12', '6400.00', 'AMD', {
       place: 'SAS',
       account: ARDSHIN,
-      link: statementLinkOf(l, keyOf(l, ARDSHIN), { form: 'ameria-csv', accountId: ARDSHIN }),
+      link: statementLinkOf(l, keyOf(l, ARDSHIN), {
+        form: 'ameria-csv',
+        accountId: ARDSHIN,
+        accountNumber: null,
+      }),
     })
     expect(decide([wrong], [l], { account: AMERIA })).toEqual([recorded(wrong, 'other_account')])
     // Another line of that file is still another key under either account.
@@ -1075,7 +1099,11 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
       [hold, paid],
       [paid, hold],
     ]) {
-      const keys = statementLineKeys(PERSON, { accountId: TBANK, lines: first })
+      const keys = statementLineKeys(PERSON, {
+        accountId: TBANK,
+        accountNumber: null,
+        lines: first,
+      })
       const written = first.map((l, i) =>
         spendingCandidate(
           {
@@ -1089,7 +1117,11 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
           },
           {
             removed: false,
-            link: statementLinkOf(l, keys[i] ?? '', { form: 'tbank-csv', accountId: TBANK }),
+            link: statementLinkOf(l, keys[i] ?? '', {
+              form: 'tbank-csv',
+              accountId: TBANK,
+              accountNumber: null,
+            }),
           },
         ),
       )
@@ -1115,43 +1147,77 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
     }
   })
 
-  it('А14: two cards of one bank uploaded «без счёта» are two keys by the number the head prints', () => {
+  it('А14, А18: the bank’s number keys the line — two cards are a doubt, one account’s card and account statements one line', () => {
     const coffee = 'Ք: COFFEESHOP COMPANY YEREVAN AM'
-    const morning = line('2026-11-12', '1800.00', 'AMD', coffee)
-    const keyed = (number: string, account: string | null = null) =>
-      statementLineKeys(PERSON, {
-        accountId: account,
-        accountNumber: number,
-        lines: [morning],
-      })[0] ?? ''
-    const fromCard1 = spending('2026-11-12', '1800.00', 'AMD', {
-      link: statementLinkOf(morning, keyed('2470 **** 1111'), {
-        form: 'ameria-csv',
-        accountId: null,
-      }),
-    })
-    const card2 = { form: 'ameria-csv', number: '2470 **** 2222' } as const
-    expect(decide([fromCard1], [morning], card2)).toEqual([NEW])
-    // The same card again, with an account chosen since: the same key, recorded silently (А4).
-    expect(keyed('2470 **** 1111', AMERIA)).toBe(keyed('2470****1111'))
-    expect(
-      decide([fromCard1], [morning], {
-        form: 'ameria-csv',
-        account: AMERIA,
-        number: '2470 **** 1111',
-      }),
-    ).toEqual([recorded(fromCard1)])
+    const sas = line('2026-11-12', '1800.00', 'AMD', coffee)
+    const upload = (number: string, account: string | null = null) =>
+      ({ form: 'ameria-csv', account, number }) as const
+    const writtenFrom = (number: string, account: string | null = null) => {
+      const s = { form: 'ameria-csv', accountId: account, accountNumber: number } as const
+      const key = statementLineKeys(PERSON, { ...s, lines: [sas] })[0] ?? ''
+      const link = statementLinkOf(sas, key, s)
+      return spending(
+        '2026-11-12',
+        '1800.00',
+        'AMD',
+        account === null ? { link } : { account, link },
+      )
+    }
+    // Two cards uploaded «без счёта»: a like line of the second is never the first's silently (А14).
+    const card1 = writtenFrom('2470 **** 1111')
+    expect(decide([card1], [sas], upload('2470 **** 2222'))).toEqual([
+      recorded(card1, 'other_account'),
+    ])
+    // The same card again, masked, with an account chosen since: the same key (А4, review №22).
+    expect(decide([card1], [sas], upload('247000******1111', AMERIA))).toEqual([recorded(card1)])
+    // One account in Molvia: its card's statement and its account's, or a card reissued (А18).
+    const byCard = writtenFrom('8888 8888 8888 8888', AMERIA)
+    expect(decide([byCard], [sas], upload('9999 9999 9999 9999', AMERIA))).toEqual([
+      recorded(byCard),
+    ])
+    expect(decide([byCard], [sas], upload('9999 9999 9999 9999', ARDSHIN))).toEqual([
+      recorded(byCard, 'other_account'),
+    ])
   })
 
-  it('А15: a line that names no seller — the bank’s «Безналичная оплата», or nothing — is no other name', () => {
-    const sas = spending('2026-11-12', '6400.00', 'AMD', { place: 'SAS', account: ARDSHIN })
-    for (const payee of ['Безналичная оплата', ''])
-      expect(
-        decide([sas], [line('2026-11-12', '6400.00', 'AMD', payee)], {
-          account: ARDSHIN,
-          form: 'screenshot',
-        }),
-      ).toEqual([recorded(sas)])
+  it('А15, А17: a line that names no seller is no other name for a record its link reaches — and any other is', () => {
+    const onShot = (payee: string) => [
+      line('2026-11-12', '6400.00', 'AMD', payee, { time: '13:05' }),
+    ]
+    const o = { account: ARDSHIN, form: 'screenshot' } as const
+    const inFile = line('2026-11-12', '6400.00', 'AMD', 'Ք: SAS SUPERMARKET YEREVAN AM', {
+      postedOn: '2026-11-12',
+    })
+    const fromFile = spending('2026-11-12', '6400.00', 'AMD', {
+      place: 'SAS',
+      account: ARDSHIN,
+      link: statementLinkOf(inFile, keyOf(inFile, ARDSHIN), {
+        form: 'ardshin-xlsx',
+        accountId: ARDSHIN,
+        accountNumber: null,
+      }),
+    })
+    const tanuki = spending('2026-11-12', '6400.00', 'AMD', { place: 'Тануки', account: ARDSHIN })
+    for (const payee of ['Безналичная оплата', '']) {
+      expect(decide([fromFile], onShot(payee), o)).toEqual([recorded(fromFile)])
+      expect(decide([tanuki], onShot(payee), o)).toEqual([recorded(tanuki, 'other_name')])
+    }
+    // The bank's words are aside in a bank's line alone: a note «Покупка» is the person's word.
+    const noted = spendingCandidate(
+      {
+        id: nextId(),
+        spentOn: '2026-11-12',
+        amount: cash('6400.00', 'AMD'),
+        debited: null,
+        accountId: ARDSHIN,
+        place: null,
+        note: 'Покупка',
+      },
+      { removed: false, link: null },
+    )
+    expect(decide([noted], [inFile], { account: ARDSHIN, form: 'ardshin-xlsx' })).toEqual([
+      recorded(noted, 'other_name'),
+    ])
   })
 
   it('gives a record the line it was made from before a like one of the same file', () => {
@@ -1159,7 +1225,11 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
       line('2026-11-12', '1200.00', 'AMD', 'YANDEX.GO'),
       line('2026-11-12', '1200.00', 'AMD', 'YANDEX.GO'),
     ]
-    const [, second] = statementLineKeys(PERSON, { accountId: ARDSHIN, lines: both })
+    const [, second] = statementLineKeys(PERSON, {
+      accountId: ARDSHIN,
+      accountNumber: null,
+      lines: both,
+    })
     const ride = spending('2026-11-12', '1200.00', 'AMD', {
       place: 'Yandex Go',
       account: ARDSHIN,
@@ -1218,7 +1288,11 @@ describe('matchStatement — review, round 1', () => {
         spending(l.day, l.amount.minor.toString().slice(0, -2), 'AMD', {
           place: shops[i % 4] ?? '',
           account: AMERIA,
-          link: statementLinkOf(l, nextId(), { form: 'screenshot', accountId: AMERIA }),
+          link: statementLinkOf(l, nextId(), {
+            form: 'screenshot',
+            accountId: AMERIA,
+            accountNumber: null,
+          }),
         }),
       )
       return { s: statementOf(lines, { account: ARDSHIN, form: 'ardshin-xlsx' }), records }
@@ -1226,13 +1300,16 @@ describe('matchStatement — review, round 1', () => {
     const every = STATEMENT_LINES_MAX * STATEMENT_LINES_MAX
     // A year: a link reaches some two months of it, under a quarter of every pair and the ceiling.
     const year = crowd(360)
-    expect(statementWeighing(year.s, year.records)).toBeLessThan(every / 4)
-    expect(statementWeighing(year.s, year.records)).toBeLessThanOrEqual(STATEMENT_WEIGHED_MAX)
-    expect(matchStatement(PERSON, year.s, year.records).lines).toHaveLength(STATEMENT_LINES_MAX)
-    // A month of 3 000 lines and 3 000 records weighs every pair: MOL-433 refuses it before the rule.
+    const weighed = matchStatement(PERSON, year.s, year.records)
+    expect(weighed.outcome).toBe('matched')
+    expect(weighed.pairs).toBeLessThan(every / 4)
+    // A month of 3 000 lines and 3 000 records weighs every pair: refused before any is weighed.
     const month = crowd(30)
-    expect(statementWeighing(month.s, month.records)).toBe(every)
-    expect(statementWeighing(month.s, month.records)).toBeGreaterThan(STATEMENT_WEIGHED_MAX)
+    expect(matchStatement(PERSON, month.s, month.records)).toEqual({
+      outcome: 'too_heavy',
+      pairs: every,
+    })
+    expect(every).toBeGreaterThan(STATEMENT_WEIGHED_MAX)
   }, 60_000)
 
   it('№20: a screenshot meets a file’s line posted long after its operation — the index decides nothing', () => {
@@ -1240,14 +1317,18 @@ describe('matchStatement — review, round 1', () => {
     const fromShot = spending('2026-11-30', '40000.00', 'AMD', {
       place: 'Tufenkian Hotel',
       account: ARDSHIN,
-      link: statementLinkOf(hotel, nextId(), { form: 'screenshot', accountId: ARDSHIN }),
+      link: statementLinkOf(hotel, nextId(), {
+        form: 'screenshot',
+        accountId: ARDSHIN,
+        accountNumber: null,
+      }),
     })
     const booked = line('2026-10-20', '40000.00', 'AMD', 'AM\\DILIJAN\\TUFENKIAN HOTEL', {
       postedOn: '2026-11-30',
     })
     const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
     expect(decide([fromShot], [booked], o)).toEqual([recorded(fromShot)])
-    expect(statementWeighing(statementOf([booked], o), [fromShot])).toBe(1)
+    expect(match([fromShot], [booked], o).pairs).toBe(1)
   })
 
   it('А13: a statement holds STATEMENT_LINES_MAX lines and no more', () => {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  accountNumberKey,
   formKeyIsStable,
   statementLineKeys,
   statementLineSchema,
@@ -62,7 +63,7 @@ describe('formKeyIsStable', () => {
 
 describe('statementLineKeys', () => {
   const keys = (lines: StatementLine[], actorId = PERSON, accountId: string | null = ARDSHIN) =>
-    statementLineKeys(actorId, { accountId, lines })
+    statementLineKeys(actorId, { accountId, accountNumber: null, lines })
 
   it('gives the same line uploaded again the same uuid', () => {
     const [first] = keys([line()])
@@ -76,11 +77,19 @@ describe('statementLineKeys', () => {
     expect(keys([line(), line()])).toEqual([both[0], both[2]])
   })
 
+  it('reads a printed number by its last four digits: whole, masked or cut, one number (review №22)', () => {
+    expect(accountNumberKey('8888 8888 8888 8888')).toBe('8888')
+    expect(accountNumberKey('888888******8888')).toBe('8888')
+    expect(accountNumberKey('*8888')).toBe('8888')
+    expect(accountNumberKey('AM 123')).toBeNull()
+    expect(accountNumberKey(null)).toBeNull()
+  })
+
   it('keys by the number the bank’s head prints, before the account chosen in Molvia (adversarial А14)', () => {
     const numbered = (accountNumber: string, accountId: string | null = null) =>
       statementLineKeys(PERSON, { accountId, accountNumber, lines: [line()] })
     expect(numbered('4400 **** 1111')).not.toEqual(numbered('4400 **** 2222'))
-    expect(numbered('4400 **** 1111', ARDSHIN)).toEqual(numbered('4400****1111'))
+    expect(numbered('4400 **** 1111', ARDSHIN)).toEqual(numbered('440000******1111'))
     expect(numbered('4400 **** 1111')).not.toEqual(keys([line()], PERSON, null))
   })
 
@@ -129,15 +138,22 @@ describe('statementLinkOf', () => {
     const held = line({ status: 'pending', time: '14:35' })
     const posted = line({ postedOn: '2026-11-16' })
     expect(
-      statementLinkOf(posted, 'k', { form: 'ardshin-xlsx', accountId: ARDSHIN }),
+      statementLinkOf(posted, 'k', {
+        form: 'ardshin-xlsx',
+        accountId: ARDSHIN,
+        accountNumber: null,
+      }),
     ).toMatchObject({
       accountId: ARDSHIN,
       postedOn: '2026-11-16',
       pending: false,
     })
-    expect(statementLinkOf(held, 'k', { form: 'screenshot', accountId: null })).toEqual({
+    expect(
+      statementLinkOf(held, 'k', { form: 'screenshot', accountId: null, accountNumber: null }),
+    ).toEqual({
       key: 'k',
       accountId: null,
+      accountNumber: null,
       day: '2026-11-14',
       postedOn: null,
       pending: true,

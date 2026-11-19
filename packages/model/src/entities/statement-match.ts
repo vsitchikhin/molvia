@@ -249,10 +249,19 @@ export interface StatementUnposted {
   readonly ticked: boolean
 }
 
-export interface StatementMatch {
-  readonly lines: readonly { readonly key: string; readonly decision: StatementLineDecision }[]
-  readonly unposted: readonly StatementUnposted[]
-}
+/**
+ * The answer over one statement: `matched` — a decision for every line and the holds with no posting;
+ * `too_heavy` — the statement weighs more pairs of line and record than `STATEMENT_WEIGHED_MAX`, and the
+ * rule weighed none (А16, review №23). `pairs` — what it weighs, for the log.
+ */
+export type StatementMatch =
+  | {
+      readonly outcome: 'matched'
+      readonly pairs: number
+      readonly lines: readonly { readonly key: string; readonly decision: StatementLineDecision }[]
+      readonly unposted: readonly StatementUnposted[]
+    }
+  | { readonly outcome: 'too_heavy'; readonly pairs: number }
 
 type Fit = 'exact' | 'unsure' | 'posting' | 'elsewhere' | 'tip' | 'hold' | 'late' | 'relink'
 
@@ -407,11 +416,14 @@ function linkSays(
   row: Row,
   form: StatementForm,
   account: string | null,
-  keyUnder: (account: string | null, index: number) => string | undefined,
+  keyUnder: (link: Linked, index: number) => string | undefined,
 ): LinkSays {
-  const { key, accountId } = link
-  if (key === row.key) return 'own'
-  if (accountId !== account && key === keyUnder(accountId, row.index)) return 'other_upload'
+  if (link.key === row.key) return 'own'
+  // The key the line had under the link's upload: its account's other statement — the card's and the
+  // account's, a card reissued — where the account in Molvia is one; else the same file under another
+  // choice of account, or a like line of another card: a doubt (А4, А8, А14, А18).
+  if (link.key === keyUnder(link, row.index))
+    return link.accountId !== null && link.accountId === account ? 'own' : 'other_upload'
   if (link.form === 'screenshot' && form === 'screenshot' && link.onDay === row.day) {
     const said = printedTimesSay(link.time, row.line.time)
     return said === 'same' ? 'same' : said === 'apart' ? 'no' : 'unsure'
@@ -508,32 +520,11 @@ function reaching<T>(
 const weighed = (line: StatementLine) => notSpendingByLine(line) === null && line.sign === '-'
 
 /**
- * The pairs of line and record the rule will weigh (А13, А16) — the work of `matchStatement`, counted
- * before it. A line weighs only the records whose window or link reaches its day, so lines spread over a
- * year weigh a fraction of the pairs, and lines and records crowded in one month weigh them all.
- */
-export function statementWeighing(
-  statement: Pick<Statement, 'form' | 'lines'>,
-  candidates: readonly StatementCandidate[],
-): number {
-  const byDay = dayIndex(
-    statement.form,
-    candidates.map((c) => ({ days: c.days.map(dayNumber), link: linkedOf(c.link) })),
-  )
-  let pairs = 0
-  for (const line of statement.lines)
-    if (weighed(line)) {
-      const posted = line.postedOn === null ? null : dayNumber(line.postedOn)
-      pairs += reaching(byDay, { day: dayNumber(line.day), posted }).length
-    }
-  return pairs
-}
-
-/**
- * The pairs the rule weighs at most (А16): it runs in the API's process. A year of 3 000 lines against
- * 3 000 records linked to screenshots weighs some 1 500 000, in about half a second here; 3 000 lines and
- * 3 000 records in one month weigh all 9 000 000, seconds. **MOL-433 asks `statementWeighing` before the
- * rule and refuses past it**, with its own word for the screen — the rule itself does not count.
+ * The pairs of line and record the rule weighs at most (А16): it runs in the API's process. A line weighs
+ * only the records whose window or link reaches its days, so a year of 3 000 lines against 3 000 records
+ * linked to screenshots weighs some 1 500 000, in about half a second here, and the same crowded in one
+ * month weighs all 9 000 000, seconds. Past it the rule answers `too_heavy` and weighs nothing — counted
+ * on its own index, so no caller weighs past it (review №23); the screen's word is MOL-433's.
  */
 export const STATEMENT_WEIGHED_MAX = 2_000_000
 
@@ -623,8 +614,7 @@ function matchPairs(pairs: readonly Pair[]): Map<number, Pair> {
  * posting of. The candidates are the person's spendings (removed ones still within «Вернуть»), finished
  * trips, transfers and exchanges, built by the functions above. A line is weighed only against the
  * records whose window or link reaches its day, the sum first; a name is folded once a line and once a
- * record — it runs in the API's process (review №1, А13), and its caller holds its work under
- * `STATEMENT_WEIGHED_MAX` by `statementWeighing` (А16).
+ * record — it runs in the API's process (review №1, А13), and refuses past `STATEMENT_WEIGHED_MAX` (А16).
  */
 export function matchStatement(
   actorId: string,
@@ -640,7 +630,7 @@ export function matchStatement(
     day: dayNumber(line.day),
     posted: line.postedOn === null ? null : dayNumber(line.postedOn),
     amounts: amountsOfLine(line),
-    words: sellerWords(line.payee),
+    words: sellerWords(line.payee, true),
   }))
   const known: Known[] = candidates.map((c) => ({
     c,
@@ -650,14 +640,15 @@ export function matchStatement(
     seller: sellerWords(c.name),
   }))
   const byDay = dayIndex(form, known) // a line weighs the records that reach its days alone (А13)
-  // The keys the lines had under another account, asked only by a link keyed under one (А4); where the
-  // head prints the bank's number they are the same keys, and the link says `own` (А14).
-  const keysUnder = new Map<string | null, string[]>([[account, rows.map((r) => r.key)]])
-  const keyUnder = (other: string | null, index: number) => {
-    let keys = keysUnder.get(other)
+  // The keys the lines had under a link's upload — its account in Molvia and the bank's number — asked
+  // once an upload, only by a link keyed under another (А4, А18).
+  const keysUnder = new Map<string, string[]>()
+  const keyUnder = ({ accountId, accountNumber }: Linked, index: number) => {
+    const under = JSON.stringify([accountId, accountNumber])
+    let keys = keysUnder.get(under)
     if (keys === undefined) {
-      keys = statementLineKeys(actorId, { ...statement, accountId: other })
-      keysUnder.set(other, keys)
+      keys = statementLineKeys(actorId, { ...statement, accountId, accountNumber })
+      keysUnder.set(under, keys)
     }
     return keys[index]
   }
@@ -670,11 +661,16 @@ export function matchStatement(
     if (weighed(row.line)) spend.push(row)
   }
 
+  // The work, before any of it: past the ceiling nothing is weighed (А16).
+  const reached = spend.map((row) => ({ row, records: reaching(byDay, row) }))
+  const weight = reached.reduce((sum, { records }) => sum + records.length, 0)
+  if (weight > STATEMENT_WEIGHED_MAX) return { outcome: 'too_heavy', pairs: weight }
+
   // Every pair whose sum fits, then one to one: met before doubts, the line a record was made from
   // first, then by the share of the name (А4), the nearer day, the order of the lines.
   const pairs: Pair[] = []
-  for (const row of spend) {
-    for (const { c, days, link, amounts, seller } of reaching(byDay, row)) {
+  for (const { row, records } of reached) {
+    for (const { c, days, link, amounts, seller } of records) {
       const moves = c.what === 'transfer' || c.what === 'exchange'
       if (moves && !onAccount(c, account)) continue
       const inside = days.some((d) => inWindow(form, row.day, d))
@@ -711,7 +707,9 @@ export function matchStatement(
         fit,
         own: says === 'own' || says === 'other_upload',
         named,
-        nameless: seller.length === 0 || row.words.length === 0,
+        // A line that names no seller is no other name only for a record its link reaches: by the window
+        // alone a dinner typed by hand would take a purchase silently (А15, А17).
+        nameless: seller.length === 0 || (row.words.length === 0 && link !== null && says !== 'no'),
         distance,
       })
     }
@@ -781,6 +779,8 @@ export function matchStatement(
   }
 
   return {
+    outcome: 'matched',
+    pairs: weight,
     lines: rows.map(({ index, line, key }) => ({
       key,
       decision: decisions.get(index) ?? newLine(line),
