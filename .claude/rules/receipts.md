@@ -553,16 +553,16 @@ receipt comes from is not on the card** (`receiptSourceOf` reads the schemas, `p
 `source` beside them would say it twice, and the card's test holds that `photo` is there exactly for a country
 read by photo.
 
-**A card names only what the parse reads** (owner, В-1 «а»): MOL-229's template also has the words of change,
-subtotal and not-an-item, the codes and the QR, which no rule of Armenia reads; they come with their first
-reader (MOL-248). A field nobody reads is a word nobody checks. **The formats of numbers are a list** — Georgia's
-pharmacies print three decimals beside its shops' two — **and a card may name only a format its reader reads**:
-Tesseract's parse counts in hundredths throughout (`fractionDigitsReadBy`, one rule for the parse and its test), so it **refuses** a card it reads with
-no format or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals read as
-two would be every sum wrong, and only a refusal makes the field more than a declaration. A card the model alone reads
-(`tesseractReads` false) may name its three decimals too (`THOUSANDTHS`, MOL-421): `lexiconOf` is asked on
-the model's path as well (`paidByOf`), and refusing there would have failed every Georgian receipt. Tesseract for
-Georgia (MOL-423) inherits the refusal until its parse reads them.
+**A card names only what the parse reads** (owner, В-1 «а»): MOL-229's template also has the words of change, subtotal
+and not-an-item, the codes and the QR, which no rule of Armenia reads; they come with their first reader (MOL-248). A
+field nobody reads is a word nobody checks. **The formats of numbers are a list** — Georgia's pharmacies print three
+decimals beside its shops' two — **and a card may name only a format its reader reads**: Tesseract's parse counts in
+hundredths throughout (`fractionDigitsReadBy`, one rule for the parse and its test), so it **refuses** a card it reads
+with no format or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals
+read as two would be every sum wrong, and only a refusal makes the field more than a declaration. A card the model alone
+reads (`tesseractReads` false) may name its three decimals too (`THOUSANDTHS`, MOL-421): `lexiconOf` is asked on the
+model's path as well (`paidByOf`), and refusing there would have failed every Georgian receipt. Tesseract for Georgia
+(MOL-423) inherits the refusal until its parse reads them.
 
 **A card read off no photo doubts no digit** (MOL-270, owner's В-1 «а», 28.10.2026): `priceInDoubt` asks the
 receipt's card (`receiptCard`), and one with no `photo` — Serbia's, from the tax office — is `false`, the server's
@@ -701,7 +701,15 @@ receipt proven whole, and its lines of one piece went empty.
   in every comparison (`linesTotalHundredths`, `linesTotalOf` — the check, «Прочитали не всё», the review, «Записать»),
   the trip is the total; the review says it in a row of its own, «Округление +0,01 ₾», to a phone that asks
   (`RECEIPT_ROUNDING_HEADER`) — an earlier build is told the lines' total as the receipt's, and its echo of it at
-  «Записать» is the printed total. The prompt did not change (Р-4), and the review shows 22,37 ₾ against 22.368 on the
+  «Записать» is the printed total. **The check judges it as printed too** (round 2): the reading hands it the total's
+  thousandths (`totalThousandths`), and `notWhole` and the sums that vouch for themselves (`sumsMeet`) meet it by
+  `printedMeets` — a card's payment in tetri, «ბარათი 26.70», voting for 26,70 beside «ლარი 26.698» proves no misread
+  thousandth whole, where 22,35 + 4,35 meet it in tetri (adversarial Б1: a quarter of such misreads were shown as read).
+  **A price that holds only in thousandths stays only on a receipt proven whole** (Б3): the record takes quantity ×
+  price unless the total confirms the lines (`recordedSums`), and 3 × 0,26 is 0,78, not the 0,77 shown — elsewhere the
+  price goes and the sum stays. **A total below its lines by a rounding below nought is what was paid** (Б2): the
+  record's «a total below the lines was misread» (`receiptTotal`) allows that far, or 22,37 + 4,34 against 26,70 went
+  down as 26,71. The prompt did not change (Р-4), and the review shows 22,37 ₾ against 22.368 on the
   paper (Р-5).
 - **A total under the currency alone is the total's place** (MOL-421, owner's В-2 «а»): the pharmacy prints «23.868
   ლარი» with no word, and the model labels it «ლარი» — an amount nothing named, so no total, no receipt proven whole and
