@@ -13,6 +13,7 @@ import {
   linesTotalHundredths,
   paidByOf,
   printedDayOf,
+  printedThousandths,
 } from '#model/entities/receipt-text'
 import type { ReceiptPaidBy } from '#model/entities/receipt'
 import { THOUSANDTHS, digitCounts } from '#model/entities/receipt-card'
@@ -95,6 +96,12 @@ function canonicalFigure(value: string | null, signed: boolean): string | null {
 type ModelLine = ModelReceipt['lines'][number]
 
 /**
+ * A receipt of three decimals' totals printed with three (MOL-421): each in tetri, with its thousandths — `null` where
+ * two printed apart round to it. A total printed in tetri is not here: it is its own.
+ */
+type PrintedTotals = ReadonlyMap<number, number | null>
+
+/**
  * Whether a line's arithmetic holds: quantity × price = sum + discount — the quantity in thousandths of its unit; the
  * price, the sum and the discount in one scale of money, `digits` decimals. To the last digit, or where the line prints
  * a discount — a till that prints a shelf price apart from what was paid — to that till's rounding, in the same scale.
@@ -150,7 +157,12 @@ function inHundredths(figure: string | null): string | null {
 function canonicalAnswer(
   reading: PhotoReading,
   answer: ModelReceipt,
-): { answer: ModelReceipt; unparsed: number; printed: ReadonlyMap<ModelLine, LineThousandths> } {
+): {
+  answer: ModelReceipt
+  unparsed: number
+  printed: ReadonlyMap<ModelLine, LineThousandths>
+  totals: PrintedTotals
+} {
   const discount = new RegExp(`(?:${reading.words.discountKept})`, 'u')
   const spelt = answer.lines.map((line) => ({
     ...line,
@@ -195,6 +207,15 @@ function canonicalAnswer(
   const totals = thousandths
     ? amounts.map(({ label, amount }) => ({ label, amount: inHundredths(amount) ?? amount }))
     : amounts
+  // each total in tetri with what it printed in thousandths; two that round alike, a doubt
+  const printedTotals = new Map<number, number | null>()
+  for (const { amount } of thousandths ? amounts : []) {
+    const milli = figureOf(amount, THOUSANDTHS)
+    if (milli === null || decimalsOf(amount) !== THOUSANDTHS) continue
+    const tetri = halfUpHundredths(milli)
+    const known = printedTotals.get(tetri)
+    printedTotals.set(tetri, known === undefined || known === milli ? milli : null)
+  }
   let unparsed = 0
   const count = (figure: string | null, digits: number): void => {
     if (figure !== null && figureOf(figure, digits) === null) unparsed += 1
@@ -204,7 +225,7 @@ function canonicalAnswer(
     for (const figure of [line.unit_price, line.discount, line.sum]) count(figure, 2)
   }
   for (const { amount } of totals) count(amount, 2)
-  return { answer: { ...answer, lines, totals }, unparsed, printed }
+  return { answer: { ...answer, lines, totals }, unparsed, printed, totals: printedTotals }
 }
 
 /** How many of the model's figures no rule reads (MOL-294): the count the log of a reading carries. */
@@ -451,6 +472,8 @@ function totalOf(
    * stays a line, so none is taken, by a label or a vote (review №9, adversarial В2, review №14).
    */
   served: readonly Served[] | null = [],
+  /** A pharmacy's totals as printed (MOL-421): the lines that meet one in thousandths meet it, rounding apart. */
+  printedTotals: PrintedTotals = new Map(),
 ): {
   total: number | null
   read: number | null
@@ -459,6 +482,7 @@ function totalOf(
   cashback: number | null
   redeemed: number | null
   service: number | null
+  rounding: number | null
 } {
   const w = reading.words
   // a summary's words are printed in capitals as often as not — «ՎՃԱՐՄԱՆ» (MOL-310), «ԸՆԴԱՄԵՆԸ» of a café's or a
@@ -562,10 +586,34 @@ function totalOf(
         cashback,
         redeemed: null,
         service: surcharge,
+        rounding: null,
       }
     }
-    const met = asPrinted && totals.includes(sum)
-    if (met) return { total: sum, read, met, owed: sum, cashback, redeemed: null, service: null }
+    // a pharmacy's lines meet its total as printed, in thousandths — one printed in tetri by their sum half up — and
+    // each rounded half up to the tetri they come to it less a rounding of a tetri or so, either way (MOL-421, owner's
+    // А1 «а»): 22.364 + 4.334 = 26.698 is 22,36 + 4,33 against 26,70. Never by the tetri alone: 1.004 + 1.005 against
+    // 2.010 is a figure misread, though 1,00 + 1,01 is 2,01
+    const milli = asPrinted ? printedSum(lines) : null
+    const meets = (one: number): boolean =>
+      milli === null
+        ? one === sum
+        : printedTotals.has(one)
+          ? printedTotals.get(one) === milli
+          : halfUpHundredths(milli) === one
+    const shown = asPrinted ? totals.find(meets) : undefined
+    const met = shown !== undefined
+    if (met) {
+      return {
+        total: shown,
+        read,
+        met,
+        owed: sum,
+        cashback,
+        redeemed: null,
+        service: null,
+        rounding: shown === sum ? null : shown - sum,
+      }
+    }
     // a total voted by its places took the service: every bill seen prints it so — ZERO, Bakery, Аракс (owner's В-7
     // «а», adversarial Б1) — so the lines make it less the service, the font's swaps putting them right to that
     // the sum taxed with VAT, «ԱԱՀ-ով հարկվող», is the lines' sum printed again (MOL-289): a place of the total where no
@@ -584,7 +632,7 @@ function totalOf(
       voted === null
         ? null
         : linesTotalHundredths({ cashbackHundredths: null, serviceHundredths: service }, voted)
-    return { total: voted, read, met, owed, cashback, redeemed: null, service }
+    return { total: voted, read, met, owed, cashback, redeemed: null, service, rounding: null }
   }
   // what the lines make: a total less what went to the card
   const owed = new Set(totals.map((one) => one - cashback).filter((one) => one > 0))
@@ -609,7 +657,18 @@ function totalOf(
       ? bonus
       : null
   // a card's discount and a café's service on one paper are no receipt seen: the cashback's rule alone
-  return { total: shown, read, met, owed: lined, cashback, redeemed, service: null }
+  return { total: shown, read, met, owed: lined, cashback, redeemed, service: null, rounding: null }
+}
+
+/** The lines' sums as printed in thousandths (MOL-421), or none where a line has no such sum. */
+function printedSum(lines: readonly ReceiptTextLine[]): number | null {
+  let milli = 0
+  for (const line of lines) {
+    const sum = printedThousandths(line)?.sum ?? null
+    if (sum === null) return null
+    milli += sum
+  }
+  return milli
 }
 
 /** The most swaps in one figure: «550» copied as «660» is two (owner, В-2 of MOL-290). */
@@ -1043,10 +1102,10 @@ export function receiptTextOfModel(
   written: ModelReceipt,
   prices: RememberedPrices = new Map(),
 ): ReceiptText {
-  const { answer: whole, printed } = canonicalAnswer(reading, written)
+  const { answer: whole, printed, totals: printedTotals } = canonicalAnswer(reading, written)
   const apart = serviceApart(reading, whole)
   const apartLines = apart.answer.lines.map((line) => lineOf(line, printed))
-  const tried = totalOf(reading, apart.answer, apartLines, apart.served)
+  const tried = totalOf(reading, apart.answer, apartLines, apart.served, printedTotals)
   // the service line goes out of the lines only where the surcharge is taken: else it stays the model's line, for the
   // foot's shortfall to show (review №5). Never where the lines met the total without it (adversarial Г1, Д1): that is
   // a bill «not included» as often as a subtotal whose total with the service the model lost, and a wrong total is worse
@@ -1064,9 +1123,9 @@ export function receiptTextOfModel(
       )
   // the service decided against stays decided: its line a line, no service taken by a label or a vote — taken, it was
   // counted twice, as a line and as the surcharge (review №9, adversarial В2)
-  const { total, read, met, owed, cashback, redeemed, service } = keptApart
+  const { total, read, met, owed, cashback, redeemed, service, rounding } = keptApart
     ? tried
-    : totalOf(reading, whole, copied, null)
+    : totalOf(reading, whole, copied, null, printedTotals)
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
   // a total two places vouch for that the lines do not meet: put right by the font's swaps, or not. The total first,
   // and on its own (MOL-291): a line it vouches for as copied is no doubt of the memory's, nor are the lines it put
@@ -1128,6 +1187,7 @@ export function receiptTextOfModel(
     cashbackHundredths: cashback,
     redeemedHundredths: redeemed,
     serviceHundredths: service,
+    roundingHundredths: rounding,
     lines,
   }
 }

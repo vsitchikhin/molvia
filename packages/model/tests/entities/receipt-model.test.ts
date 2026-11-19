@@ -1759,15 +1759,40 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
     expect([shop.totalHundredths, shop.readTotalHundredths]).toEqual([null, null])
   })
 
-  it('leaves a receipt whose rounded lines miss its total by a tetri not whole (Р-3)', () => {
-    // 1.005 + 1.005 = 2.010 printed, 1,01 + 1,01 against 2,01 counted
-    const text = readGe(pharmacy([piece('ა', '1.005'), piece('ბ', '1.005')], '2.010'))
-    expect(text.balanced).toBe(false)
-    // its lines of one piece are one number printed twice, shown only on a receipt proven whole (MOL-255)
+  it('proves whole the lines that meet the total as printed, the tetri they round apart its rounding (А1 «а»)', () => {
+    // 22.364 + 4.334 = 26.698: 22,36 + 4,33 against 26,70, every figure copied right (adversarial А1)
+    const up = readGe(pharmacy([piece('ა', '22.364'), piece('ბ', '4.334')], '26.698', 'ლარი'))
+    expect([up.totalHundredths, up.roundingHundredths, up.balanced]).toEqual([2_670, 1, true])
+    const explained = explainedReading(up, { byModel: true })
+    expect(explained.receipt).toBeNull()
+    expect(explained.shown.lines.map((l) => l.sumHundredths)).toEqual([2_236, 433])
+    // and the other way: 1.005 + 1.005 = 2.010 is 1,01 + 1,01 against 2,01
+    const down = readGe(pharmacy([piece('ა', '1.005'), piece('ბ', '1.005')], '2.010'))
+    expect([down.totalHundredths, down.roundingHundredths, down.balanced]).toEqual([201, -1, true])
+    expect(explainedReading(down, { byModel: true }).receipt).toBeNull()
+    // a total printed in tetri is met by the lines' sum as printed, half up
+    const tetri = readGe(pharmacy([piece('ა', '22.364'), piece('ბ', '4.334')], '26.70', 'ლარი'))
+    expect([tetri.totalHundredths, tetri.roundingHundredths, tetri.balanced]).toEqual([
+      2_670,
+      1,
+      true,
+    ])
+    // none where they meet in tetri too
+    const even = readGe(pharmacy([piece('ა', '1.500'), piece('ბ', '22.368')], '23.868', 'ლარი'))
+    expect(even.roundingHundredths).toBeNull()
+  })
+
+  it('never proves whole by the tetri a misread lands on: the lines are judged as printed', () => {
+    // must not: 1.004 + 1.005 = 2.009 is no 2.010, though 1,00 + 1,01 is 2,01
+    const text = readGe(pharmacy([piece('ა', '1.004'), piece('ბ', '1.005')], '2.010'))
+    expect([text.totalHundredths, text.balanced]).toEqual([null, false])
     expect(verifiedReading(text, { byModel: true }).lines.map((l) => l.sumHundredths)).toEqual([
       null,
       null,
     ])
+    // must not: a receipt of two decimals has no rounding — its lines meet the total to the tetri, or not
+    const shop = readGe(pharmacy([piece('ა', '22.36'), piece('ბ', '4.33')], '26.70', 'ლარი'))
+    expect([shop.totalHundredths, shop.roundingHundredths]).toEqual([null, null])
   })
 
   it('reads three decimals only where every amount has three: one receipt, one format (Р-1)', () => {
