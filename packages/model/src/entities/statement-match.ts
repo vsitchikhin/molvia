@@ -5,6 +5,7 @@ import type { SpendingPreset } from '#model/entities/spending-category'
 import {
   formKeyIsStable,
   isBankFile,
+  statementKeyAccount,
   statementKeyedLines,
   statementLineKeys,
 } from '#model/entities/statement-line'
@@ -16,7 +17,7 @@ import type {
 } from '#model/entities/statement-line'
 import type { Transfer } from '#model/entities/transfer'
 import { tripMoney } from '#model/entities/trip'
-import { sameSeller, sellerWords, wordsShare } from '#model/support/payee-name'
+import { bankSellerWords, sameSeller, sellerWords, wordsShare } from '#model/support/payee-name'
 import { printedTimesSay } from '#model/support/printed-time'
 import type { Money } from '#model/values/money'
 import { yerevanDate } from '#model/values/rates'
@@ -251,13 +252,15 @@ export interface StatementUnposted {
 
 /**
  * The answer over one statement: `matched` — a decision for every line and the holds with no posting;
- * `too_heavy` — the statement weighs more pairs of line and record than `STATEMENT_WEIGHED_MAX`, and the
- * rule weighed none (А16, review №23). `pairs` — what it weighs, for the log.
+ * `too_heavy` — the statement weighs more than `STATEMENT_WEIGHED_MAX`, and the rule weighed none (А16,
+ * review №23). `pairs` — what it weighs, the pairs of line and record and the keys under other uploads
+ * (`STATEMENT_KEY_WEIGHT`); `steps` — the candidates the matching looked at (А20): both for the log.
  */
 export type StatementMatch =
   | {
       readonly outcome: 'matched'
       readonly pairs: number
+      readonly steps: number
       readonly lines: readonly { readonly key: string; readonly decision: StatementLineDecision }[]
       readonly unposted: readonly StatementUnposted[]
     }
@@ -295,6 +298,8 @@ interface Known {
   readonly link: Linked | null
   readonly amounts: readonly Money[]
   readonly seller: readonly string[]
+  /** The account its link's key reads (`statementKeyAccount`), or none. */
+  readonly under: string | null
 }
 
 interface Pair {
@@ -529,6 +534,13 @@ const weighed = (line: StatementLine) => notSpendingByLine(line) === null && lin
 export const STATEMENT_WEIGHED_MAX = 2_000_000
 
 /**
+ * A line's key under another upload, in pairs (adversarial А21): a link keyed under another account's
+ * number asks every line's key under it once — an md5 each, some 7 µs here, as long as twenty pairs weighed at their worst — a
+ * pair whose sum fits and whose name is weighed, some 0.33 µs (А16).
+ */
+export const STATEMENT_KEY_WEIGHT = 20
+
+/**
  * A record on the statement's account, or either of them with none. For a transfer or an exchange the
  * account is the one its money left (Б1а).
  */
@@ -575,14 +587,21 @@ function notSpendingByLine(line: StatementLine): StatementNotSpending | null {
   return null
 }
 
+const sameRank = (p: Pair, q: Pair) =>
+  p.own === q.own && p.named === q.named && p.distance === q.distance
+
 /**
  * One to one by the greatest matching (А3, Б2): lines in the order of their best pair, each with its
- * candidates by preference; a taken record is taken over only when its line finds another (Kuhn's path).
- * The fits go in `FIT_ORDER`: a doubt takes only a record left free.
+ * candidates by preference; a taken record is taken over only when its line finds another (Kuhn's path),
+ * and only when no record as good as it is free. The fits go in `FIT_ORDER`: a doubt takes only a record
+ * left free. The records a failed search went through lead nowhere until a line is matched, so the next
+ * line's search skips them: a crowd of one sum, more lines than records, searched again every record for
+ * every line left over — some 10⁹ steps under the ceiling of pairs (adversarial А20).
  */
-function matchPairs(pairs: readonly Pair[]): Map<number, Pair> {
+function matchPairs(pairs: readonly Pair[]): { choice: Map<number, Pair>; steps: number } {
   const owner = new Map<string, number>()
   const choice = new Map<number, Pair>()
+  let steps = 0
   for (const fit of FIT_ORDER) {
     const options = new Map<number, Pair[]>()
     for (const p of pairs) {
@@ -591,22 +610,33 @@ function matchPairs(pairs: readonly Pair[]): Map<number, Pair> {
       if (held) held.push(p)
       else options.set(p.row, [p])
     }
+    const take = (row: number, p: Pair) => {
+      owner.set(p.c.id, row)
+      choice.set(row, p)
+      return true
+    }
     const claim = (row: number, seen: Set<string>): boolean => {
-      for (const p of options.get(row) ?? []) {
+      const mine = options.get(row) ?? []
+      const best = mine[0]
+      for (const p of mine) {
+        steps++
+        if (best === undefined || !sameRank(p, best)) break
+        if (!owner.has(p.c.id)) return take(row, p)
+      }
+      for (const p of mine) {
+        steps++
         if (seen.has(p.c.id)) continue
         seen.add(p.c.id)
         const holder = owner.get(p.c.id)
-        if (holder === undefined || (choice.get(holder)?.fit === fit && claim(holder, seen))) {
-          owner.set(p.c.id, row)
-          choice.set(row, p)
-          return true
-        }
+        if (holder === undefined || (choice.get(holder)?.fit === fit && claim(holder, seen)))
+          return take(row, p)
       }
       return false
     }
-    for (const row of options.keys()) if (!choice.has(row)) claim(row, new Set())
+    let seen = new Set<string>()
+    for (const row of options.keys()) if (!choice.has(row) && claim(row, seen)) seen = new Set()
   }
-  return choice
+  return { choice, steps }
 }
 
 /**
@@ -630,7 +660,7 @@ export function matchStatement(
     day: dayNumber(line.day),
     posted: line.postedOn === null ? null : dayNumber(line.postedOn),
     amounts: amountsOfLine(line),
-    words: sellerWords(line.payee, true),
+    words: bankSellerWords(line.payee),
   }))
   const known: Known[] = candidates.map((c) => ({
     c,
@@ -638,13 +668,15 @@ export function matchStatement(
     link: linkedOf(c.link),
     amounts: amountsOfRecord(c),
     seller: sellerWords(c.name),
+    under: c.link === null ? null : statementKeyAccount(c.link),
   }))
   const byDay = dayIndex(form, known) // a line weighs the records that reach its days alone (А13)
-  // The keys the lines had under a link's upload — its account in Molvia and the bank's number — asked
-  // once an upload, only by a link keyed under another (А4, А18).
-  const keysUnder = new Map<string, string[]>()
+  // The keys the lines had under a link's upload, by the account its key reads — masks of one number are
+  // one (review №27) — asked once an upload; this upload's are the lines' own (А4, А18).
+  const ours = statementKeyAccount(statement)
+  const keysUnder = new Map([[ours, rows.map((row) => row.key)]])
   const keyUnder = ({ accountId, accountNumber }: Linked, index: number) => {
-    const under = JSON.stringify([accountId, accountNumber])
+    const under = statementKeyAccount({ accountId, accountNumber })
     let keys = keysUnder.get(under)
     if (keys === undefined) {
       keys = statementLineKeys(actorId, { ...statement, accountId, accountNumber })
@@ -661,16 +693,24 @@ export function matchStatement(
     if (weighed(row.line)) spend.push(row)
   }
 
-  // The work, before any of it: past the ceiling nothing is weighed (А16).
-  const reached = spend.map((row) => ({ row, records: reaching(byDay, row) }))
-  const weight = reached.reduce((sum, { records }) => sum + records.length, 0)
+  // The work, before any of it: past the ceiling nothing is weighed (А16) — the pairs, and the keys of
+  // every line under each other upload a link reaching them was keyed under (А21); counted, not kept
+  // (review №26).
+  let weight = 0
+  const uploads = new Set<string>()
+  for (const row of spend) {
+    const records = reaching(byDay, row)
+    weight += records.length
+    for (const { under } of records) if (under !== null && under !== ours) uploads.add(under)
+  }
+  weight += uploads.size * rows.length * STATEMENT_KEY_WEIGHT
   if (weight > STATEMENT_WEIGHED_MAX) return { outcome: 'too_heavy', pairs: weight }
 
   // Every pair whose sum fits, then one to one: met before doubts, the line a record was made from
   // first, then by the share of the name (А4), the nearer day, the order of the lines.
   const pairs: Pair[] = []
-  for (const { row, records } of reached) {
-    for (const { c, days, link, amounts, seller } of records) {
+  for (const row of spend) {
+    for (const { c, days, link, amounts, seller } of reaching(byDay, row)) {
       const moves = c.what === 'transfer' || c.what === 'exchange'
       if (moves && !onAccount(c, account)) continue
       const inside = days.some((d) => inWindow(form, row.day, d))
@@ -721,7 +761,7 @@ export function matchStatement(
       p.distance - q.distance ||
       p.row - q.row,
   )
-  const choice = matchPairs(pairs)
+  const { choice, steps } = matchPairs(pairs)
   for (const [index, p] of choice) {
     const row = rows[index]
     if (row === undefined) continue
@@ -736,15 +776,15 @@ export function matchStatement(
   // A purchase and its refund in the same file (В3): the purchase new and not ticked; one refund a purchase.
   const refunds = rows.filter((row) => !decisions.has(row.index) && row.line.sign === '+')
   const refunded = new Set<number>()
-  for (const { index, line } of spend) {
+  for (const { index, line, words } of spend) {
     if (decisions.has(index)) continue
     const back = refunds.find(
-      ({ index: r, line: refund }) =>
+      ({ index: r, line: refund, words: theirs }) =>
         !refunded.has(r) &&
         refund.amount.currency === line.amount.currency &&
         refund.amount.minor === line.amount.minor &&
         refund.day >= line.day &&
-        sameSeller(refund.payee, line.payee),
+        sameSeller(theirs, words),
     )
     if (back === undefined) continue
     refunded.add(back.index)
@@ -757,14 +797,14 @@ export function matchStatement(
   // before it, then by id — never the order the records came in (review №7).
   const hinted = new Set<string>()
   for (const row of refunds) {
-    const { index, line, day } = row
+    const { index, day, words } = row
     if (refunded.has(index)) continue
     let best: { readonly c: StatementCandidate; readonly after: number } | undefined
-    for (const { c, days, amounts } of known) {
+    for (const { c, days, amounts, seller } of known) {
       if ((c.what !== 'spending' && c.what !== 'trip') || c.removed || hinted.has(c.id)) continue
       if (!onAccount(c, account) || !sameAmount(row.amounts, amounts)) continue
       const afters = days.map((d) => day - d).filter((a) => a >= 0 && a <= STATEMENT_REFUND_DAYS)
-      if (afters.length === 0 || !sameSeller(line.payee, c.name)) continue
+      if (afters.length === 0 || !sameSeller(words, seller)) continue
       const after = Math.min(...afters)
       if (best === undefined || after < best.after || (after === best.after && c.id < best.c.id))
         best = { c, after }
@@ -781,6 +821,7 @@ export function matchStatement(
   return {
     outcome: 'matched',
     pairs: weight,
+    steps,
     lines: rows.map(({ index, line, key }) => ({
       key,
       decision: decisions.get(index) ?? newLine(line),

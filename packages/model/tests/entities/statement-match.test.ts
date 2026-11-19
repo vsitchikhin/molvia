@@ -16,6 +16,7 @@ import {
   exchangeCandidate,
   matchStatement,
   spendingCandidate,
+  STATEMENT_KEY_WEIGHT,
   STATEMENT_WEIGHED_MAX,
   transferCandidate,
   tripCandidate,
@@ -157,8 +158,12 @@ const decide = (
 ) => match(candidates, lines, o).lines.map((l) => l.decision)
 
 /** The key a line of this statement gets, for a record linked to it. */
-const keyOf = (l: StatementLine, account: string | null = null) =>
-  statementLineKeys(PERSON, { accountId: account, accountNumber: null, lines: [l] })[0] ?? ''
+const keyOf = (
+  l: StatementLine,
+  account: string | null = null,
+  form: StatementForm = 'ameria-csv',
+) =>
+  statementLineKeys(PERSON, { form, accountId: account, accountNumber: null, lines: [l] })[0] ?? ''
 
 const linkTo = (
   o: Partial<StatementLink> & Pick<StatementLink, 'day' | 'form'>,
@@ -1100,6 +1105,7 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
       [paid, hold],
     ]) {
       const keys = statementLineKeys(PERSON, {
+        form: 'tbank-csv',
         accountId: TBANK,
         accountNumber: null,
         lines: first,
@@ -1226,6 +1232,7 @@ describe('matchStatement — the link across forms and uploads (adversarial, rou
       line('2026-11-12', '1200.00', 'AMD', 'YANDEX.GO'),
     ]
     const [, second] = statementLineKeys(PERSON, {
+      form: 'ardshin-xlsx',
       accountId: ARDSHIN,
       accountNumber: null,
       lines: both,
@@ -1303,11 +1310,12 @@ describe('matchStatement — review, round 1', () => {
     const weighed = matchStatement(PERSON, year.s, year.records)
     expect(weighed.outcome).toBe('matched')
     expect(weighed.pairs).toBeLessThan(every / 4)
-    // A month of 3 000 lines and 3 000 records weighs every pair: refused before any is weighed.
+    // A month of 3 000 lines and 3 000 records weighs every pair, and the keys under the links' upload
+    // (Ameria's, the statement Ardshin's): refused before any is weighed.
     const month = crowd(30)
     expect(matchStatement(PERSON, month.s, month.records)).toEqual({
       outcome: 'too_heavy',
-      pairs: every,
+      pairs: every + STATEMENT_LINES_MAX * STATEMENT_KEY_WEIGHT,
     })
     expect(every).toBeGreaterThan(STATEMENT_WEIGHED_MAX)
   }, 60_000)
@@ -1365,6 +1373,115 @@ describe('matchStatement — review, round 1', () => {
         reason: 'refund',
         record: { id: nearer.id },
       })
+  })
+})
+
+describe('matchStatement — review and adversarial, round 5', () => {
+  it('А19: two coffees of one price on one day on two screenshots are two keys, told by the time', () => {
+    const o = { account: ARDSHIN, form: 'screenshot' } as const
+    const coffee = (time: string) =>
+      line('2026-11-12', '1800.00', 'AMD', 'Безналичная оплата', { time })
+    const morning = coffee('09:12')
+    const key = keyOf(morning, ARDSHIN, 'screenshot')
+    const written = spendingCandidate(
+      {
+        id: key,
+        spentOn: '2026-11-12',
+        amount: morning.amount,
+        debited: null,
+        accountId: ARDSHIN,
+        place: null,
+        note: null,
+      },
+      {
+        removed: false,
+        link: statementLinkOf(morning, key, {
+          form: 'screenshot',
+          accountId: ARDSHIN,
+          accountNumber: null,
+        }),
+      },
+    )
+    expect(keyOf(coffee('19:40'), ARDSHIN, 'screenshot')).not.toBe(key)
+    expect(decide([written], [coffee('19:40')], o)).toEqual([NEW])
+    expect(decide([written], [coffee('19:40'), morning], o)).toEqual([NEW, recorded(written)])
+    expect(decide([written], [morning], o)).toEqual([recorded(written)])
+  })
+
+  it('А20: a crowd of one sum is matched in steps of the order of its pairs, more lines than records or as many', () => {
+    for (const [lines, records] of [
+      [3000, 666],
+      [1414, 1414],
+    ] as const) {
+      const ls = Array.from({ length: lines }, () =>
+        line('2026-11-12', '1200.00', 'AMD', 'Ք: YANDEX.GO YEREVAN AM'),
+      )
+      const rs = Array.from({ length: records }, () =>
+        spending('2026-11-12', '1200.00', 'AMD', { account: ARDSHIN }),
+      )
+      const out = match(rs, ls, { account: ARDSHIN, form: 'ardshin-xlsx' })
+      expect(out.pairs).toBeLessThanOrEqual(STATEMENT_WEIGHED_MAX)
+      // Kuhn's search again for every line left over took some 10⁹ steps, 20–27 s.
+      expect(out.steps).toBeLessThanOrEqual(3 * out.pairs)
+      expect(out.lines.filter((l) => l.decision.group === 'recorded')).toHaveLength(records)
+    }
+  }, 60_000)
+
+  it('А21, №27: the keys under another upload are weighed — masks of one number once, a thousand numbers too heavy', () => {
+    const number = '2470012345678901'
+    const o = { account: ARDSHIN, form: 'ardshin-xlsx', number } as const
+    const days = (n: number) =>
+      new Date(Date.UTC(2026, 0, 1) + n * 86_400_000).toISOString().slice(0, 10)
+    const lines = Array.from({ length: STATEMENT_LINES_MAX }, (_, i) =>
+      line(days(i % 365), '1200.00', 'AMD', 'Ք: YANDEX.GO YEREVAN AM'),
+    )
+    const linked = (count: number, under: (i: number) => string) =>
+      Array.from({ length: count }, (_, i) =>
+        spending(days(i), '1200.00', 'AMD', {
+          account: ARDSHIN,
+          link: linkTo({
+            day: days(i),
+            form: 'ardshin-xlsx',
+            accountId: ARDSHIN,
+            accountNumber: under(i),
+            amount: cash('1200.00', 'AMD'),
+            payee: 'Ք: YANDEX.GO YEREVAN AM',
+          }),
+        }),
+      )
+    const masks = ['8888 8888 8888 8888', '888888******8888', '*8888']
+    const own = match(
+      linked(3, () => number),
+      lines,
+      o,
+    ).pairs
+    const masked = match(
+      linked(3, (i) => masks[i] ?? ''),
+      lines,
+      o,
+    ).pairs
+    expect(masked).toBe(own + STATEMENT_LINES_MAX * STATEMENT_KEY_WEIGHT)
+    // A thousand uploads' numbers asked a thousand times every line's md5: 21 s at a quarter of the pairs.
+    const many = linked(1000, (i) => `24700123456${String(i).padStart(5, '0')}`)
+    expect(matchStatement(PERSON, statementOf(lines, o), many).outcome).toBe('too_heavy')
+  })
+
+  it('№25: a line naming no seller refunds no purchase and no record; the bank’s words never part one seller', () => {
+    const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+    const income = { group: 'not_spending', reason: 'income', record: null }
+    const paid = line('2026-11-12', '6400.00', 'AMD', 'Безналичная оплата')
+    const back = line('2026-11-20', '6400.00', 'AMD', 'Безналичная оплата', { sign: '+' })
+    expect(decide([], [paid, back], o)).toEqual([NEW, income])
+    const noted = spending('2026-11-01', '6400.00', 'AMD', { place: 'Оплата', account: ARDSHIN })
+    expect(decide([noted], [back], o)).toEqual([income])
+    const bar = [
+      line('2026-11-12', '5000.00', 'AMD', 'PURCHASE ZOVQ BAR'),
+      line('2026-11-20', '5000.00', 'AMD', 'PAYMENT ZOVQ BAR', { sign: '+' }),
+    ]
+    expect(decide([], bar, o)).toEqual([
+      { group: 'new', ticked: false, note: 'refunded', categoryHint: null },
+      { group: 'not_spending', reason: 'refund', record: null },
+    ])
   })
 })
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  bankSellerWords,
   payeeWords,
   payeeWordsNear,
   sameSeller,
@@ -8,7 +9,7 @@ import {
 } from '#model/support/payee-name'
 
 /** The share as the rule reads it: a record's seller words a line's have. */
-const share = (payee: string, name: string) => wordsShare(sellerWords(payee), sellerWords(name))
+const share = (payee: string, name: string) => wordsShare(bankSellerWords(payee), sellerWords(name))
 
 describe('payeeWords', () => {
   it('folds Cyrillic, Armenian and Georgian to the bank’s Latin', () => {
@@ -80,7 +81,17 @@ describe('sellerWords and sameSeller', () => {
   })
 
   it('take one seller for every word of one name in the other, never one common word', () => {
-    expect(sameSeller('AM\\YEREVAN\\ZOVQ BAR', 'ZOVQ BAR GYUMRI')).toBe(true)
-    expect(sameSeller('SAS SUPERMARKET', 'YEREVAN CITY SUPERMARKET')).toBe(false)
+    const lines = (a: string, b: string) => sameSeller(bankSellerWords(a), bankSellerWords(b))
+    expect(lines('AM\\YEREVAN\\ZOVQ BAR', 'ZOVQ BAR GYUMRI')).toBe(true)
+    expect(lines('SAS SUPERMARKET', 'YEREVAN CITY SUPERMARKET')).toBe(false)
+  })
+
+  it('read the bank’s own words as no seller in a bank’s line only (review №25)', () => {
+    const lines = (a: string, b: string) => sameSeller(bankSellerWords(a), bankSellerWords(b))
+    expect(lines('Безналичная оплата', 'Безналичная оплата')).toBe(false)
+    expect(lines('PURCHASE ZOVQ BAR', 'PAYMENT ZOVQ BAR')).toBe(true)
+    expect(sameSeller(bankSellerWords('Безналичная оплата'), sellerWords('Оплата'))).toBe(false)
+    expect(sellerWords('Покупка')).toEqual(payeeWords('Покупка'))
+    expect(bankSellerWords('Покупка')).toEqual([])
   })
 })

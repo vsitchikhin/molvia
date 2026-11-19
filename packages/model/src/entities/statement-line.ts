@@ -169,28 +169,43 @@ const STATEMENT_LINE_NAMESPACE = '4f2c8e1a-7b3d-4a69-9e05-c1d8b2f6a374'
 const keyMoney = ({ minor, currency }: Money) => `${minor.toString()} ${currency}`
 
 /** What a line's key reads of its statement. */
-type KeyedStatement = Pick<Statement, 'accountId' | 'accountNumber' | 'lines'>
+type KeyedStatement = Pick<Statement, 'form' | 'accountId' | 'accountNumber' | 'lines'>
+
+/**
+ * The account a line's key reads: the bank's number where its head prints one (`accountNumberKey`), else
+ * the person's account in Molvia — one string for every upload it keys alike.
+ */
+export function statementKeyAccount({
+  accountId,
+  accountNumber,
+}: Pick<Statement, 'accountId' | 'accountNumber'>): string {
+  const number = accountNumberKey(accountNumber)
+  return number === null ? (accountId ?? '') : `#${number}`
+}
 
 /**
  * Each line with its key, a spending's id when one is written from it (Р-2): the same line uploaded
  * again is the same id, so it is not written twice. The person is in it — two people's like lines of
  * statements with no account would be one id, and ids are one primary key for everyone; so are the
- * account — the bank's number where its head prints one (`accountNumberKey`), else the person's account
- * in Molvia: two cards of one bank uploaded «без счёта» are two keys, and a file uploaded again with an
- * account chosen since is the same (adversarial А4, А8, А14) — the day, the sign, the amount, the payee
- * as printed with its spaces squeezed, and the turn among equal lines: two rides of one price on one day
- * are two. The form is not: the same text in a bank's CSV and its PDF is the same line. A line is keyed
- * and turned among the lines of its status: a later export may leave out a refusal or a hold the bank
- * dropped, and a payment made again beside either keeps its key (adversarial А5, А9). So a hold's
- * posting is another key — the link lets it in.
+ * account (`statementKeyAccount`): two cards of one bank uploaded «без счёта» are two keys, and a file
+ * uploaded again with an account chosen since is the same (adversarial А4, А8, А14) — the day, the sign,
+ * the amount, the payee as printed with its spaces squeezed, a screenshot's time as printed, and the turn
+ * among equal lines: two rides of one price on one day are two. A screenshot's time is in it because its
+ * payee may name nothing — Ardshin's screen prints «Безналичная оплата» for every card line, and two
+ * coffees of one price on one day on two screenshots were one key, the second taken for the first
+ * silently (adversarial А19); a file's is not, a parser may come to read one. **The price, named:** two
+ * like lines of a screenshot that prints no time are one key. The form is not in it: the same text in a
+ * bank's CSV and its PDF is the same line. A line is keyed and turned among the lines of its status: a
+ * later export may leave out a refusal or a hold the bank dropped, and a payment made again beside either
+ * keeps its key (adversarial А5, А9). So a hold's posting is another key — the link lets it in.
  */
 export function statementKeyedLines(
   actorId: string,
   statement: KeyedStatement,
 ): { readonly line: StatementLine; readonly key: string }[] {
   const seen = new Map<string, number>()
-  const number = accountNumberKey(statement.accountNumber)
-  const account = number === null ? (statement.accountId ?? '') : `#${number}`
+  const account = statementKeyAccount(statement)
+  const timed = statement.form === 'screenshot'
   return statement.lines.map((line) => {
     const parts = JSON.stringify([
       actorId,
@@ -199,6 +214,7 @@ export function statementKeyedLines(
       line.sign ?? '',
       keyMoney(line.amount),
       line.payee.replace(/\s+/g, ' ').trim(),
+      ...(timed ? [line.time?.replace(/\s+/g, ' ').trim() ?? ''] : []),
     ])
     const name = line.status === 'posted' ? parts : `${parts}#${line.status}`
     const turn = seen.get(name) ?? 0

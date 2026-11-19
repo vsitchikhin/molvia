@@ -63,7 +63,7 @@ describe('formKeyIsStable', () => {
 
 describe('statementLineKeys', () => {
   const keys = (lines: StatementLine[], actorId = PERSON, accountId: string | null = ARDSHIN) =>
-    statementLineKeys(actorId, { accountId, accountNumber: null, lines })
+    statementLineKeys(actorId, { form: 'ardshin-xlsx', accountId, accountNumber: null, lines })
 
   it('gives the same line uploaded again the same uuid', () => {
     const [first] = keys([line()])
@@ -87,10 +87,23 @@ describe('statementLineKeys', () => {
 
   it('keys by the number the bank’s head prints, before the account chosen in Molvia (adversarial А14)', () => {
     const numbered = (accountNumber: string, accountId: string | null = null) =>
-      statementLineKeys(PERSON, { accountId, accountNumber, lines: [line()] })
+      statementLineKeys(PERSON, { form: 'ameria-csv', accountId, accountNumber, lines: [line()] })
     expect(numbered('4400 **** 1111')).not.toEqual(numbered('4400 **** 2222'))
     expect(numbered('4400 **** 1111', ARDSHIN)).toEqual(numbered('440000******1111'))
     expect(numbered('4400 **** 1111')).not.toEqual(keys([line()], PERSON, null))
+  })
+
+  it('keys a screenshot’s line by its time too, a file’s not: two coffees of one day are two (adversarial А19)', () => {
+    const shot = (time: string | null) =>
+      statementLineKeys(PERSON, {
+        form: 'screenshot',
+        accountId: ARDSHIN,
+        accountNumber: null,
+        lines: [line({ time })],
+      })
+    expect(shot('09:12')).not.toEqual(shot('19:40'))
+    expect(shot('09:12')).toEqual(shot(' 09:12 '))
+    expect(keys([line({ time: '09:12' })])).toEqual(keys([line({ time: '19:40' })]))
   })
 
   it('keeps two people apart on a statement with no account', () => {

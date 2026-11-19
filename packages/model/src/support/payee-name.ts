@@ -197,22 +197,31 @@ const BANK_WORDS: ReadonlySet<string> = new Set(
 )
 
 /**
- * The words of a seller's name, folded, the place's aside — in a bank's line and a record's name alike —
- * and the bank's own words aside in a bank's line (`ofBank`) alone: a note «Покупка» is the person's word,
- * and names the record (adversarial А17):
- * «Ереван Сити» is «siti», since every card line of Yerevan prints «YEREVAN» and the city would meet them
- * all (adversarial А6). A name that is nothing but a city's word — the restaurant «Казан», the cinema
- * «Москва» — keeps it: with none it would be no name, and met by any line (А10).
+ * The words of a seller's name in a record, folded, the place's aside: «Ереван Сити» is «siti», since every
+ * card line of Yerevan prints «YEREVAN» and the city would meet them all (adversarial А6). A name that is
+ * nothing but a city's word — the restaurant «Казан», the cinema «Москва» — keeps it: with none it would be
+ * no name, and met by any line (А10). A note «Покупка» is the person's word, and names the record (А17).
  */
-export function sellerWords(text: string, ofBank = false): string[] {
-  const words = payeeWords(text).filter((word) => !ofBank || !BANK_WORDS.has(word))
+export function sellerWords(text: string): string[] {
+  return sellerOf(payeeWords(text))
+}
+
+/**
+ * The words of a seller's name in a bank's line: as a record's (`sellerWords`), and the bank's own words
+ * aside — «Безналичная оплата» names no seller (adversarial А15, review №25).
+ */
+export function bankSellerWords(payee: string): string[] {
+  return sellerOf(payeeWords(payee).filter((word) => !BANK_WORDS.has(word)))
+}
+
+function sellerOf(words: string[]): string[] {
   const seller = words.filter((word) => !isPlaceWord(word))
   return seller.length > 0 ? seller : words
 }
 
 /**
- * The share of a record's seller words a line's seller words have (`sellerWords` of both): «YANDEX.GO
- * YEREVAN» against «Yandex Taxi» is a half. A record with no words is 0.
+ * The share of a record's seller words a line's seller words have (`bankSellerWords`, `sellerWords`):
+ * «YANDEX.GO YEREVAN» against «Yandex Taxi» is a half. A record with no words is 0.
  */
 export function wordsShare(payee: readonly string[], seller: readonly string[]): number {
   if (seller.length === 0) return 0
@@ -220,13 +229,12 @@ export function wordsShare(payee: readonly string[], seller: readonly string[]):
 }
 
 /**
- * One seller in two bank lines, or a line and a record (В3, Г4): every word of one name, places aside,
- * is the other's (Н1: one shared word — «SUPERMARKET», «PIZZA» — is no seller).
+ * One seller in two bank lines, or a line and a record (В3, Г4), by their seller words — a bank's line's
+ * by `bankSellerWords` (review №25): every word of one name is the other's (Н1: one shared word —
+ * «SUPERMARKET», «PIZZA» — is no seller), and a name of none meets nothing.
  */
-export function sameSeller(a: string, b: string): boolean {
-  const ours = sellerWords(a)
-  const theirs = sellerWords(b)
-  const within = (xs: string[], ys: string[]) =>
+export function sameSeller(a: readonly string[], b: readonly string[]): boolean {
+  const within = (xs: readonly string[], ys: readonly string[]) =>
     xs.length > 0 && xs.every((x) => ys.some((y) => payeeWordsNear(x, y)))
-  return within(ours, theirs) || within(theirs, ours)
+  return within(a, b) || within(b, a)
 }
