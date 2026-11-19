@@ -1342,6 +1342,14 @@ describe('«Записать»', () => {
       receiptNo: '5',
     })
     expect(await moneyOf(misread, body())).toBe(219_000n)
+    // must not: a rounding of −2 is exactly two below, never one — the lines (review №21)
+    const short = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: 218_900n,
+      roundingMinor: -200n,
+      layout: 'class',
+      receiptNo: '6',
+    })
+    expect(await moneyOf(short, body())).toBe(219_000n)
   }, 10_000)
 
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard

@@ -1,9 +1,9 @@
-import { THOUSANDTHS } from '#model/entities/receipt-card'
 import {
+  THOUSANDTHS_PER_HUNDREDTH,
   TOLERANCE_HUNDREDTHS,
   linesTotalHundredths,
+  pharmacySum,
   printedMeets,
-  printedSum,
   printedThousandths,
 } from '#model/entities/receipt-text'
 import type { ReceiptLayout, ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
@@ -276,21 +276,13 @@ function notWhole(text: ReceiptText): ReceiptReason | null {
   const total = linesTotalHundredths(text, text.totalHundredths)
   const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
   if (sum !== total) return sum < total ? 'lines_lost' : 'lines_over'
+  // a pharmacy's lines meet its total as printed, never by the tetri alone — a total two places vouch for in tetri,
+  // «ლარი 26.698» and «ბარათი 26.70», proves no thousandth misread (MOL-421, adversarial Б1)
   const milli = pharmacySum(text)
   if (milli === null || printedMeets(milli, text.totalHundredths, text.totalThousandths))
     return null
-  return milli < (text.totalThousandths ?? text.totalHundredths * 10) ? 'lines_lost' : 'lines_over'
-}
-
-/**
- * A pharmacy's lines' sums as printed, in thousandths (MOL-421): what they meet its total by, never the tetri alone — a
- * total two places vouch for in tetri, «ლარი 26.698» and «ბარათი 26.70», proves no thousandth misread (adversarial
- * Б1). None where a line has none, or a card's cashback or a café's service stands between the lines and the total.
- */
-function pharmacySum(text: ReceiptText): number | null {
-  return (text.cashbackHundredths ?? null) === null && (text.serviceHundredths ?? null) === null
-    ? printedSum(text.lines)
-    : null
+  const printed = text.totalThousandths ?? text.totalHundredths * THOUSANDTHS_PER_HUNDREDTH
+  return milli < printed ? 'lines_lost' : 'lines_over'
 }
 
 function sumsMeet(text: ReceiptText): boolean {
@@ -390,7 +382,7 @@ function verifiedLine(
   const holds =
     printed === null
       ? inTetri
-      : arithmetic(printed.price, printed.sum, printed.discount ?? 0, 10 ** (THOUSANDTHS - 2)) &&
+      : arithmetic(printed.price, printed.sum, printed.discount ?? 0, THOUSANDTHS_PER_HUNDREDTH) &&
         (inTetri || proven)
   return holds
     ? { line, reason: null }

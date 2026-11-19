@@ -13,7 +13,7 @@
 // with a word in it is built from the card, once a card. The tills' layouts stay the parse's own.
 
 import type { ReceiptPaidBy } from '#model/entities/receipt'
-import { digitCounts, fractionDigitsReadBy } from '#model/entities/receipt-card'
+import { THOUSANDTHS, digitCounts, fractionDigitsReadBy } from '#model/entities/receipt-card'
 import type { DateOrder, PhotoReading } from '#model/entities/receipt-card'
 
 /** A line's four figures: thousandths of its unit, hundredths of money. */
@@ -31,8 +31,12 @@ export interface LineThousandths {
   readonly discount: number | null
 }
 
+/** A pharmacy's thousandths in a tetri (MOL-421): ten. */
+export const THOUSANDTHS_PER_HUNDREDTH = 10 ** (THOUSANDTHS - 2)
+
 /** Thousandths as hundredths, half up (MOL-421, owner's В-1 «а»): 22 368 is 2 237, 1 005 is 101. */
-export const halfUpHundredths = (thousandths: number): number => Math.floor((thousandths + 5) / 10)
+export const halfUpHundredths = (thousandths: number): number =>
+  Math.floor((thousandths + THOUSANDTHS_PER_HUNDREDTH / 2) / THOUSANDTHS_PER_HUNDREDTH)
 
 /**
  * A line's money as printed in thousandths, where it still is the line's (MOL-421): every figure rounds half up to the
@@ -62,19 +66,32 @@ export function printedSum(lines: readonly ReceiptTextLine[]): number | null {
 }
 
 /**
- * Whether a pharmacy's lines, their sums as printed in thousandths, meet a total as printed (MOL-421): one printed with
- * three decimals to the thousandth, one printed in tetri (`undefined`) by their sum half up; one printed twice apart
- * (`null`), never. Never by the tetri alone: 1.004 + 1.005 against 2.010 is a figure misread, though 1,00 + 1,01 is
- * 2,01 (adversarial Б1).
+ * A pharmacy's lines' sums as printed (MOL-421), what they meet its total by: none where a line has none, or a card's
+ * cashback or a café's service stands between the lines and the total — one rule for the reading and the check.
+ */
+export function pharmacySum(
+  text: Pick<ReceiptText, 'cashbackHundredths' | 'serviceHundredths' | 'lines'>,
+): number | null {
+  return (text.cashbackHundredths ?? null) === null && (text.serviceHundredths ?? null) === null
+    ? printedSum(text.lines)
+    : null
+}
+
+/**
+ * Whether a pharmacy's lines, their sums as printed in thousandths, meet a total as printed (MOL-421): to the
+ * thousandth, a total printed in tetri (`undefined`) as its tetri; one printed twice apart (`null`), never. **Never by
+ * the tetri alone**: 1.004 + 1.005 against 2.010 is a figure misread, though 1,00 + 1,01 is 2,01 (adversarial Б1) — nor
+ * against a total printed «2.01», which cannot tell 2.009 from 2.010 (adversarial В2, round 3): lines that come to
+ * 26.698 meet no «26.70».
  */
 export function printedMeets(
   milli: number,
   totalHundredths: number,
   totalThousandths: number | null | undefined,
 ): boolean {
-  return totalThousandths === undefined
-    ? halfUpHundredths(milli) === totalHundredths
-    : milli === totalThousandths
+  const printed =
+    totalThousandths === undefined ? totalHundredths * THOUSANDTHS_PER_HUNDREDTH : totalThousandths
+  return printed !== null && milli === printed
 }
 
 /** One row of a reading: its text and where it stands on the photo of its part. */

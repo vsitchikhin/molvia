@@ -1771,16 +1771,56 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
     const down = readGe(pharmacy([piece('ა', '1.005'), piece('ბ', '1.005')], '2.010'))
     expect([down.totalHundredths, down.roundingHundredths, down.balanced]).toEqual([201, -1, true])
     expect(explainedReading(down, { byModel: true }).receipt).toBeNull()
-    // a total printed in tetri is met by the lines' sum as printed, half up
-    const tetri = readGe(pharmacy([piece('ა', '22.364'), piece('ბ', '4.334')], '26.70', 'ლარი'))
+    // a total printed in tetri is met only by lines that come to it to the thousandth: 22.365 + 4.335 = 26.700, 22,37 +
+    // 4,34 against 26,70
+    const tetri = readGe(pharmacy([piece('ა', '22.365'), piece('ბ', '4.335')], '26.70', 'ლარი'))
     expect([tetri.totalHundredths, tetri.roundingHundredths, tetri.balanced]).toEqual([
       2_670,
-      1,
+      -1,
       true,
     ])
     // none where they meet in tetri too
     const even = readGe(pharmacy([piece('ა', '1.500'), piece('ბ', '22.368')], '23.868', 'ლარი'))
     expect(even.roundingHundredths).toBeNull()
+  })
+
+  it('meets no total printed in tetri by the lines half up: it cannot tell a misread thousandth (adversarial В2)', () => {
+    // 22.354 + 4.344 on paper, «ლარი 26.70»; 4.344 copied 4.349 — 22,35 + 4,35 is 26,70 in tetri, 26.703 as printed
+    const misread = readGe(pharmacy([piece('ა', '22.354'), piece('ბ', '4.349')], '26.70', 'ლარი'))
+    expect([misread.totalHundredths, misread.balanced]).toEqual([null, false])
+    const shown = explainedReading(misread, { byModel: true }).shown.lines
+    expect(shown.map((l) => l.sumHundredths)).toEqual([null, null])
+    // the price, named: read right, 26.698 against «26.70» is no receipt proven whole either
+    const right = readGe(pharmacy([piece('ა', '22.354'), piece('ბ', '4.344')], '26.70', 'ლარი'))
+    expect(right.balanced).toBe(false)
+  })
+
+  it('takes a payment printed with three decimals for the tetri it is: no doubt of the total (adversarial В1)', () => {
+    const ge04 = [piece('ხსნარი 100მლ', '1.500'), piece('სიროფი 100მლ', '22.368')]
+    for (const label of ['ბარათი', 'ნაღდი']) {
+      const text = readGe({
+        ...pharmacy(ge04, '23.868', 'ლარი'),
+        totals: [
+          { label: 'ლარი', amount: '23.868' },
+          { label, amount: '23.870' },
+        ],
+      })
+      const explained = explainedReading(text, { byModel: true })
+      expect([text.totalHundredths, explained.receipt], label).toEqual([2_387, null])
+      expect(
+        explained.shown.lines.map((l) => l.sumHundredths),
+        label,
+      ).toEqual([150, 2_237])
+    }
+    // must not: two printed apart with thousandths of their own are a doubt — no receipt proven whole
+    const apart = readGe({
+      ...pharmacy(ge04, '23.868', 'ლარი'),
+      totals: [
+        { label: 'ლარი', amount: '23.868' },
+        { label: 'ბარათი', amount: '23.866' },
+      ],
+    })
+    expect(apart.balanced).toBe(false)
   })
 
   it('never proves whole by the tetri a misread lands on: the lines are judged as printed', () => {

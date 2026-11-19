@@ -13,6 +13,8 @@ import {
   linesTotalHundredths,
   paidByOf,
   printedDayOf,
+  THOUSANDTHS_PER_HUNDREDTH,
+  pharmacySum,
   printedMeets,
   printedSum,
 } from '#model/entities/receipt-text'
@@ -101,10 +103,6 @@ type ModelLine = ModelReceipt['lines'][number]
  * two printed apart round to it. A total printed in tetri is not here: it is its own.
  */
 type PrintedTotals = ReadonlyMap<number, number | null>
-
-/** A total's thousandths as printed — `undefined` where it was printed in tetri, as `printedMeets` reads it. */
-const thousandthsOf = (totals: PrintedTotals, total: number): number | null | undefined =>
-  totals.has(total) ? (totals.get(total) ?? null) : undefined
 
 /**
  * Whether a line's arithmetic holds: quantity × price = sum + discount — the quantity in thousandths of its unit; the
@@ -212,7 +210,9 @@ function canonicalAnswer(
   const totals = thousandths
     ? amounts.map(({ label, amount }) => ({ label, amount: inHundredths(amount) ?? amount }))
     : amounts
-  // each total in tetri with what it printed in thousandths; two that round alike, a doubt
+  // each total in tetri with what it printed in thousandths; two that round alike, a doubt — but a whole tetri printed
+  // with three, a card's payment as the till prints the rest, «ბარათი 23.870» beside «ლარი 23.868», is that tetri and no
+  // doubt of the thousandths (adversarial В1, round 3)
   const printedTotals = new Map<number, number | null>()
   if (thousandths) {
     for (const { amount } of amounts) {
@@ -220,7 +220,15 @@ function canonicalAnswer(
       if (milli === null || decimalsOf(amount) !== THOUSANDTHS) continue
       const tetri = halfUpHundredths(milli)
       const known = printedTotals.get(tetri)
-      printedTotals.set(tetri, known === undefined || known === milli ? milli : null)
+      const whole = (one: number): boolean => one % THOUSANDTHS_PER_HUNDREDTH === 0
+      printedTotals.set(
+        tetri,
+        known === undefined || known === milli || (known !== null && whole(known))
+          ? milli
+          : whole(milli)
+            ? known
+            : null,
+      )
     }
   }
   let unparsed = 0
@@ -602,7 +610,7 @@ function totalOf(
     // 2.010 is a figure misread, though 1,00 + 1,01 is 2,01
     const milli = asPrinted ? printedSum(lines) : null
     const meets = (one: number): boolean =>
-      milli === null ? one === sum : printedMeets(milli, one, thousandthsOf(printedTotals, one))
+      milli === null ? one === sum : printedMeets(milli, one, printedTotals.get(one))
     const shown = asPrinted ? totals.find(meets) : undefined
     const met = shown !== undefined
     if (met) {
@@ -1161,8 +1169,8 @@ export function receiptTextOfModel(
           : 'class'
   const { tin, number } = keyOf(reading, answer)
   // a pharmacy's lines and total as printed (MOL-421): what they are judged by, here and by the check
-  const totalThousandths = total === null ? undefined : thousandthsOf(printedTotals, total)
-  const milli = cashback === null && service === null ? printedSum(lines) : null
+  const totalThousandths = total === null ? undefined : printedTotals.get(total)
+  const milli = pharmacySum({ cashbackHundredths: cashback, serviceHundredths: service, lines })
   return {
     layout,
     tin,
