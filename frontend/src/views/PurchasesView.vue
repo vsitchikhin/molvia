@@ -152,7 +152,7 @@
       kind="empty"
       :icon="IconCart"
       :title="t('purchases.empty.title')"
-      :body="t(country ? 'purchases.empty_capture.body' : 'purchases.empty.body')"
+      :body="t(readCountry ? 'purchases.empty_capture.body' : 'purchases.empty.body')"
     />
 
     <!-- Always a section's error: the strip records a purchase with the server down, through the
@@ -361,7 +361,8 @@ export default defineComponent({
     // Receipts (MOL-127): the version «с чеком» — the camera — for a person whose country the server
     // reads (Р-1); the receipts a person holds are shown whatever the country, since one taken before a
     // move to Georgia or Serbia is still to be recorded or removed (MOL-109, adversarial А2).
-    const { country } = useReceiptCapture()
+    // «строки прочитаем сами» only where somebody reads the receipt (MOL-276, adversarial А5)
+    const { country, readCountry } = useReceiptCapture()
     // the strip's receipt: the camera, a Serbian receipt's QR read off the photo (MOL-233) included
     const capture = country
     // The place of «Вернуть» only while a removal waits: each strip still decides whether its ten
@@ -694,6 +695,7 @@ export default defineComponent({
         })
       },
       country,
+      readCountry,
       capture,
       receipts,
       receiptRows,

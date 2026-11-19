@@ -13,6 +13,7 @@ import type {
   Currency,
   PendingVerdicts,
   Rating,
+  ReceiptsAccess,
   ReceiptsResponse,
   VerdictAmendment,
   VerdictCard,
@@ -173,6 +174,7 @@ async function render({
   spendCurrency = 'AMD',
   trip = false,
   receiptsByModel,
+  receiptsAccess,
 }: {
   identity?: boolean
   country?: string
@@ -181,6 +183,8 @@ async function render({
   trip?: boolean
   /** What `/actors/me` said of the model (MOL-408); left out, the store holds no answer. */
   receiptsByModel?: boolean
+  /** Where the person stands with the model (MOL-276), said with `receiptsByModel`. */
+  receiptsAccess?: ReceiptsAccess
 } = {}) {
   localStorage.setItem('molvia.actor', ME)
   localStorage.setItem(
@@ -200,6 +204,7 @@ async function render({
       createdAt: new Date('2026-10-01T10:00:00.000Z'),
       updatedAt: new Date('2026-10-01T10:00:00.000Z'),
       receiptsByModel,
+      ...(receiptsAccess ? { receiptsAccess } : {}),
     }
   }
   if (trip) useTripStore().current = openTrip()
@@ -684,6 +689,30 @@ describe('AdviceView', () => {
       expect(view.text()).toContain(en.advice.home.new.title)
       expect(view.text()).not.toContain(en.advice.home.new_capture.title)
       expect(view.get('.dock').text()).not.toContain(en.purchases.capture)
+    })
+
+    it('a Georgian newcomer whose trial is spent: the camera to say why, and no promise that anyone reads (MOL-276, А5)', async () => {
+      advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Тбилиси' } }))
+      const { view } = await render({
+        country: 'GE',
+        city: 'Тбилиси',
+        spendCurrency: 'GEL',
+        receiptsByModel: false,
+        receiptsAccess: {
+          until: null,
+          ended: null,
+          trialLeft: 0,
+          trialOf: 10,
+          month: '2026-11-01',
+          read: 10,
+          limit: 100,
+        },
+      })
+      expect(view.text()).toContain(en.advice.home.new.title)
+      expect(view.text()).not.toContain(en.advice.home.new_capture.title)
+      expect(view.text()).toContain(en.advice.home.step_purchases_body)
+      expect(view.text()).not.toContain(en.advice.home.step_purchases_capture_body)
+      expect(view.get('.dock').text()).toContain(en.purchases.capture)
     })
 
     it('a newcomer in Moscow: no receipt and no camera, whoever the model reads for (MOL-412)', async () => {

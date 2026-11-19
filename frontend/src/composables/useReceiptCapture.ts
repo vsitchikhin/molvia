@@ -1,12 +1,8 @@
 import { computed } from 'vue'
 import type { ComputedRef } from 'vue'
-import {
-  modelAlone,
-  photoReceiptCountrySchema,
-  receiptCountrySchema,
-  receiptsClosedBy,
-} from '@molvia/model'
+import { modelAlone, photoReceiptCountrySchema, receiptCountrySchema } from '@molvia/model'
 import type { PhotoReceiptCountry, ReceiptCountry } from '@molvia/model'
+import { useReceiptsAccess } from '@/composables/useReceiptsAccess'
 import { useActorStore } from '@/stores/actor'
 
 /**
@@ -26,12 +22,20 @@ export function useReceiptCapture(): {
    */
   readonly country: ComputedRef<ReceiptCountry | null>
   /**
+   * The same country only where somebody reads the receipt shot there (adversarial А5): not with the tariff closed and
+   * nobody in the model's place — the фф `payments` on, or Georgia. What the screens promise of a receipt — «Molvia
+   * прочитает чек» — goes by it; the camera and its strip by `country`.
+   */
+  readonly readCountry: ComputedRef<ReceiptCountry | null>
+  /**
    * The country when its receipts are read off the photo itself: «Переснять» is its alone — and only where they are
    * read, never Georgia's with its tariff closed, where a new shot is read by nobody.
    */
   readonly photoCountry: ComputedRef<PhotoReceiptCountry | null>
 } {
   const actor = useActorStore()
+  // whether the tariff is closed is `useReceiptsAccess`'s alone (review №4)
+  const { closed, othersRead } = useReceiptsAccess()
   const settled = computed(() => {
     const parsed = receiptCountrySchema.safeParse(actor.settings?.country)
     return parsed.success ? parsed.data : null
@@ -40,12 +44,13 @@ export function useReceiptCapture(): {
     if (settled.value === null || !modelAlone(settled.value)) return settled.value
     return actor.actor?.receiptsByModel === true ? settled.value : null
   })
+  const country = computed(() => {
+    if (reads.value !== null || settled.value === null) return reads.value
+    return closed.value ? settled.value : null
+  })
   return {
-    country: computed(() => {
-      if (reads.value !== null || settled.value === null) return reads.value
-      const access = actor.actor?.receiptsAccess
-      return access && receiptsClosedBy(access) ? settled.value : null
-    }),
+    country,
+    readCountry: computed(() => (closed.value && !othersRead.value ? null : country.value)),
     photoCountry: computed(() => {
       const parsed = photoReceiptCountrySchema.safeParse(reads.value)
       return parsed.success ? parsed.data : null
