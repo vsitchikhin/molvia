@@ -20,15 +20,15 @@ First market is Gyumri and Yerevan, the Russian-speaking diaspora. It runs at
   free, other people's in aggregate from three people.
 - **Purchases and trips** — a catalogue lookup with transliteration and typo tolerance, barcodes,
   unit prices; written offline through a queue on the phone.
-- **Receipts** — a photo of a receipt read into lines (Claude Haiku for those granted it,
-  Tesseract for the rest), a Serbian receipt by its QR from the tax office.
+- **Receipts** — a photo of a receipt read into lines (Claude Haiku for everyone's first ten and
+  for those granted it, Tesseract for the rest), a Serbian receipt by its QR from the tax office.
 - **Money** — spendings, incomes, exchanges with the person's own rate, accounts, budget, charts.
 - **The bot** — the way in, rating reminders, notices.
 
 ## Quick start
 
-Requires Node 22, at least 22.22.2 (`.nvmrc`; the linters refuse an older one), Docker, and
-Python 3 only for regenerating icons.
+Requires Node 22, at least 22.22.2 (`.nvmrc`; npm will not install stylelint 18 on an older
+one), Docker, and Python 3 only for regenerating icons.
 
 ```bash
 make setup   # symlinks, .env with this copy's ports, dependencies, git hooks
