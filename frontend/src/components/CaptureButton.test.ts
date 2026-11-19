@@ -8,12 +8,14 @@ import type { PropType } from 'vue'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { ActorView, ReceiptCountry, ReceiptsAccess } from '@molvia/model'
 import CaptureButton from '@/components/CaptureButton.vue'
+import RealManualEntryButton from '@/components/ManualEntryButton.vue'
 import { createAppI18n } from '@/i18n'
 import { useActorStore } from '@/stores/actor'
 import { hearFf } from '@/stores/ff'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 
-vi.mock('@/api', () => ({ api: {} }))
+const me = vi.fn()
+vi.mock('@/api', () => ({ api: { me: (...args: unknown[]) => me(...args) } }))
 
 const OWNER = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const ARMENIA: ActorView = {
@@ -27,6 +29,7 @@ const ARMENIA: ActorView = {
 }
 const OPEN: ReceiptsAccess = {
   until: null,
+  ended: null,
   trialLeft: 6,
   trialOf: 10,
   month: '2026-11-01',
@@ -35,6 +38,15 @@ const OPEN: ReceiptsAccess = {
 }
 const TRIAL_OVER: ReceiptsAccess = { ...OPEN, trialLeft: 0, read: 10 }
 const HUNDRED: ReceiptsAccess = { ...OPEN, until: new Date('2026-12-18T00:00:00Z'), read: 100 }
+/** The developer opened the reading by hand — what the sheet promises. */
+const GRANTED: ReceiptsAccess = { ...TRIAL_OVER, until: new Date('2026-12-19T10:00:00Z') }
+/** That grant run out: none paid, sixty read this month — no trial gives that. */
+const LAPSED: ReceiptsAccess = {
+  ...TRIAL_OVER,
+  ended: new Date('2026-12-19T10:00:00Z'),
+  month: '2026-12-01',
+  read: 60,
+}
 
 /** A sheet as the button sees it: its props, and nothing drawn. */
 const closer = { type: Function as PropType<() => void>, default: undefined }
@@ -73,7 +85,11 @@ const ManualEntryButton = defineComponent({
 })
 
 const views: VueWrapper[] = []
-async function render(actor: ActorView, country: ReceiptCountry = 'AM') {
+async function render(actor: ActorView, country: ReceiptCountry = 'AM'): Promise<VueWrapper> {
+  return (await rendered(actor, country)).view
+}
+
+async function rendered(actor: ActorView, country: ReceiptCountry = 'AM') {
   const pinia = createPinia()
   setActivePinia(pinia)
   const store = useActorStore()
@@ -97,7 +113,13 @@ async function render(actor: ActorView, country: ReceiptCountry = 'AM') {
     },
   })
   views.push(view)
-  return view
+  return { view, store }
+}
+
+/** An answer of `/actors/me` landing while the screen is open (`verify` as the app comes back). */
+async function answered(store: ReturnType<typeof useActorStore>, access: ReceiptsAccess) {
+  store.actor = { ...(store.actor as ActorView), receiptsAccess: access }
+  await flushPromises()
 }
 
 async function tap(view: VueWrapper): Promise<void> {
@@ -118,6 +140,7 @@ const closedSheet = (view: VueWrapper) => view.findComponent(ReceiptsClosedSheet
 const camera = (view: VueWrapper) => view.findComponent(CaptureSheet)
 
 beforeEach(() => {
+  me.mockReset()
   localStorage.clear()
   sessionStorage.clear()
   hearFf(new Set())
@@ -126,6 +149,7 @@ beforeEach(() => {
 
 afterEach(() => {
   for (const view of views.splice(0)) view.unmount()
+  vi.useRealTimers()
 })
 
 describe('«Сфотографировать чек» where the model reads no more (MOL-276)', () => {
@@ -246,7 +270,7 @@ describe('«Сфотографировать чек» where the model reads no m
     expect(camera(view).exists()).toBe(false)
   })
 
-  it('«Написать разработчику» opens the developer’s sheet once this one is away', async () => {
+  it('«Написать разработчику» opens the developer’s sheet once this one is away, named as its own way in', async () => {
     hearFf(new Set(['payments']))
     const view = await render({ ...ARMENIA, receiptsAccess: TRIAL_OVER })
     await tap(view)
@@ -254,6 +278,8 @@ describe('«Сфотографировать чек» where the model reads no m
     expect(feedback.shown).toBe(false)
     await choose(view, 'developer')
     expect(feedback.shown).toBe(true)
+    // never «the settings» it is not (review №5)
+    expect(feedback.entry).toEqual({ from: 'receipts-closed' })
     expect(begin).not.toHaveBeenCalled()
   })
 
@@ -263,5 +289,129 @@ describe('«Сфотографировать чек» where the model reads no m
     expect(view.emitted('busy')?.at(-1)).toEqual([true])
     await choose(view, 'developer')
     expect(view.emitted('busy')?.at(-1)).toEqual([false])
+  })
+
+  it('stays up with its words when a fresh answer opens the reading under it, and goes only as it is put away (adversarial А1)', async () => {
+    const { view, store } = await rendered(
+      {
+        ...ARMENIA,
+        country: 'GE',
+        city: 'Тбилиси',
+        spendCurrency: 'GEL',
+        receiptsAccess: TRIAL_OVER,
+      },
+      'GE',
+    )
+    await tap(view)
+    await answered(store, GRANTED)
+    expect(closedSheet(view).props()).toMatchObject({ open: true, reason: 'trial' })
+
+    await choose(view, 'developer')
+    expect(closedSheet(view).exists()).toBe(false)
+    expect(view.emitted('busy')?.at(-1)).toEqual([false])
+  })
+
+  it('never rises by itself when the reading closes again later, untapped (adversarial А1)', async () => {
+    const { view, store } = await rendered(
+      {
+        ...ARMENIA,
+        country: 'GE',
+        city: 'Тбилиси',
+        spendCurrency: 'GEL',
+        receiptsAccess: TRIAL_OVER,
+      },
+      'GE',
+    )
+    await tap(view)
+    await choose(view, 'developer')
+    await answered(store, GRANTED)
+    await answered(store, HUNDRED)
+    expect(closedSheet(view).exists()).toBe(false)
+  })
+
+  it('says a paid reading’s end once for each grant while Tesseract reads, the trial’s end said before (adversarial А2)', async () => {
+    const { view, store } = await rendered({ ...ARMENIA, receiptsAccess: TRIAL_OVER })
+    await tap(view)
+    await choose(view, 'photo')
+    camera(view).vm.$emit('update:open', false)
+    camera(view).props('onClosed')?.()
+    await flushPromises()
+
+    await answered(store, GRANTED)
+    await answered(store, LAPSED)
+    await tap(view)
+    expect(closedSheet(view).props()).toMatchObject({ reason: 'ended', othersRead: true })
+    await choose(view, 'photo')
+    camera(view).vm.$emit('update:open', false)
+    camera(view).props('onClosed')?.()
+    await flushPromises()
+
+    // the same grant's end: the camera at once
+    await tap(view)
+    expect(closedSheet(view).exists()).toBe(false)
+    camera(view).vm.$emit('update:open', false)
+    camera(view).props('onClosed')?.()
+    await flushPromises()
+
+    // another grant run out is told again
+    await answered(store, { ...LAPSED, ended: new Date('2027-01-19T10:00:00Z') })
+    await tap(view)
+    expect(closedSheet(view).props('reason')).toBe('ended')
+  })
+
+  it('marks the sheet told only when it is shown, never by being asked (review №1)', async () => {
+    const view = await render({ ...ARMENIA, receiptsAccess: TRIAL_OVER })
+    expect(localStorage.getItem(`molvia.receipts-told.${OWNER}`)).toBeNull()
+    await tap(view)
+    expect(JSON.parse(localStorage.getItem(`molvia.receipts-told.${OWNER}`) ?? '{}')).toEqual({
+      trial: true,
+    })
+  })
+
+  it('asks where the person stands again at midnight with the screen in view (adversarial А3)', async () => {
+    vi.useFakeTimers({ now: new Date(2026, 10, 30, 23, 58), toFake: ['Date', 'setTimeout'] })
+    me.mockResolvedValue({
+      ...ARMENIA,
+      country: 'GE',
+      city: 'Тбилиси',
+      spendCurrency: 'GEL',
+      receiptsByModel: true,
+      receiptsAccess: { ...HUNDRED, month: '2026-12-01', read: 0 },
+    })
+    const view = await render(
+      {
+        ...ARMENIA,
+        country: 'GE',
+        city: 'Тбилиси',
+        spendCurrency: 'GEL',
+        receiptsByModel: false,
+        receiptsAccess: HUNDRED,
+      },
+      'GE',
+    )
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
+    await flushPromises()
+    expect(me).toHaveBeenCalledTimes(1)
+
+    await tap(view)
+    expect(closedSheet(view).exists()).toBe(false)
+    expect(camera(view).props('open')).toBe(true)
+  })
+
+  it('«Записать вручную» bare offers `begin`, the one method the button calls (review №6)', async () => {
+    const pinia = createPinia()
+    setActivePinia(pinia)
+    const router = createRouter({
+      history: createMemoryHistory(),
+      routes: [{ path: '/', name: 'purchases', component: { render: () => null } }],
+    })
+    await router.push('/')
+    const bare = mount(RealManualEntryButton, {
+      props: { bare: true },
+      global: { plugins: [router, pinia, createAppI18n('ru')], stubs: { BottomSheet: true } },
+    })
+    views.push(bare)
+    expect(bare.find('button').exists()).toBe(false)
+    expect(typeof (bare.vm as unknown as { begin?: unknown }).begin).toBe('function')
   })
 })

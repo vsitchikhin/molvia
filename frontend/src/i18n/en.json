@@ -2386,13 +2386,18 @@
       "trial": "Trial receipts left: {left} of {of}",
       "trial_over_read": "Trial receipts are used up. Receipts are read by simple recognition — it makes more mistakes",
       "trial_over_manual": "Trial receipts are used up. Purchases can be recorded by hand",
+      "ended_read": "Paid receipt reading ended on {date}. Receipts are read by simple recognition — it makes more mistakes",
+      "ended_manual": "Paid receipt reading ended on {date}. Purchases can be recorded by hand",
       "month_read": "{limit} of {limit} read in {month} — again from {next}",
-      "unknown": "We’ll know once there’s a connection"
+      "unknown": "Not known yet — we’ll ask the server"
     },
     "sheet": {
       "trial_title": "Trial receipts are used up",
       "trial_read": "You’ve had {of} receipts read. From now on simple recognition reads them — it makes more mistakes, so check the lines. The developer can open receipt reading; payment comes later.",
       "trial_manual": "You’ve had {of} receipts read. Purchases can be recorded by hand. Payment for receipt reading comes later; until then the developer opens it.",
+      "ended_title": "Paid receipt reading has ended",
+      "ended_read": "Receipt reading was open until {date}. From now on simple recognition reads them — it makes more mistakes, so check the lines. The developer can extend receipt reading; payment comes later.",
+      "ended_manual": "Receipt reading was open until {date}. Purchases can be recorded by hand. Payment for receipt reading comes later; until then the developer extends it.",
       "month_title": "This month’s hundred receipts are read",
       "month_read": "{limit} of {limit} receipts read in {month}. Again from {next}. Until then simple recognition reads them — it makes more mistakes, so check the lines.",
       "month_manual": "{limit} of {limit} receipts read in {month}. Again from {next}. Until then purchases can be recorded by hand.",

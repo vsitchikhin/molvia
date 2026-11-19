@@ -17,13 +17,14 @@
   <LinkReceiptSheet v-else-if="mounted" v-model:open="open" :on-closed="unmount" @sent="sent" />
 
   <!-- «Пробные чеки закончились» (MOL-276): before the camera when the model reads no more. Mounted on
-       the tap, as the camera's sheet, and every way it offers goes once it is away. -->
+       the tap with what it says then, and taken away only by its own `onClosed`: a fresh `/actors/me` under it
+       neither pulls it from under the finger nor leaves its history entry behind (adversarial А1). -->
   <ReceiptsClosedSheet
-    v-if="closedShown && closed && access"
+    v-if="shown"
     v-model:open="closedOpen"
-    :reason="closed"
-    :access="access"
-    :others-read="othersRead"
+    :reason="shown.reason"
+    :access="shown.access"
+    :others-read="shown.othersRead"
     :on-closed="afterClosed"
     @choose="choose"
   />
@@ -38,19 +39,26 @@ import { useI18n } from 'vue-i18n'
 import { useRoute } from 'vue-router'
 import IconCamera from '~icons/mdi/camera-outline'
 import { photoReceiptCountrySchema } from '@molvia/model'
-import type { ReceiptCountry } from '@molvia/model'
+import type { ReceiptCountry, ReceiptsAccess, ReceiptsClosed } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import CaptureSheet from '@/components/CaptureSheet.vue'
 import LinkReceiptSheet from '@/components/LinkReceiptSheet.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import ReceiptsClosedSheet from '@/components/ReceiptsClosedSheet.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
+import { useLocalDay } from '@/composables/useLocalDay'
 import { useReceiptsAccess } from '@/composables/useReceiptsAccess'
 import type { ReceiptsClosedWay } from '@/composables/useReceiptsAccess'
 import { useReconnect } from '@/composables/useReconnect'
 import { afterStep, useNavigation } from '@/navigation'
-import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
+
+/** What the sheet says, as it was at the tap. */
+interface Shown {
+  readonly reason: ReceiptsClosed
+  readonly access: ReceiptsAccess
+  readonly othersRead: boolean
+}
 
 /**
  * «Сфотографировать чек» (MOL-127, handoff 01–03): the main action of the strip on «Что брать» and
@@ -61,8 +69,9 @@ import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
  *
  * **Where the model reads no more, the tap meets «Пробные чеки закончились» first** (MOL-276): at every tap where
  * nobody would read the receipt — the фф `payments` on, or Georgia — else once, the camera first in it (owner's В-1
- * «а»). Decided by `/actors/me` as last heard, asked again as the app comes back into view (Р-3); not known — a
- * launch offline, a server before MOL-275 — is no sheet, and the server decides who reads (Р-2).
+ * «а»). Decided by `/actors/me` as last heard, asked again as the app comes back into view and at midnight (Р-3,
+ * adversarial А3); not known — a launch offline, a server before MOL-275 — is no sheet, and the server decides who
+ * reads (Р-2).
  */
 export default defineComponent({
   name: 'CaptureButton',
@@ -88,13 +97,13 @@ export default defineComponent({
     const announce = useAnnouncer()
     const open = ref(false)
     const mounted = ref(false)
-    const actor = useActorStore()
     const feedback = useFeedbackSheetStore()
-    const { access, closed, othersRead, sheetFirst } = useReceiptsAccess()
+    const { access, closed, othersRead, sheetFirst, told, askAgain } = useReceiptsAccess()
     const closedOpen = ref(false)
-    const closedShown = ref(false)
+    const shown = ref<Shown | null>(null)
     const manualUsed = ref(false)
     const manualBusy = ref(false)
+    // the one method of «Записать вручную» this button calls; its test holds the real button to it (review №6)
     const manual = ref<{ begin: () => void } | null>(null)
     let chosen: ReceiptsClosedWay | null = null
     watch([open, closedOpen, manualBusy], (ups) => {
@@ -102,10 +111,10 @@ export default defineComponent({
     })
 
     // Where the person stands with the model is asked again as the app comes back (MOL-276, Р-3): the trial may
-    // have ended on another phone, a grant come meanwhile. `verify` asks once for every button that asks with it.
-    useReconnect(() => {
-      if (actor.state === 'ready' && navigator.onLine) void actor.verify()
-    })
+    // have ended on another phone, a grant come meanwhile — and at midnight, when a month's hundred opens again
+    // (adversarial А3).
+    useReconnect(askAgain)
+    watch(useLocalDay(), askAgain)
 
     function camera(): void {
       mounted.value = true
@@ -122,12 +131,16 @@ export default defineComponent({
     function afterClosed(): void {
       const way = chosen
       chosen = null
-      closedShown.value = false
+      shown.value = null
       afterStep(() => {
         if (way === 'photo') camera()
-        else if (way === 'manual') manual.value?.begin()
-        // The plain way in, nothing attached: today the developer opens the reading by hand.
-        else if (way === 'developer') feedback.open({ from: 'settings' })
+        else if (way === 'manual') {
+          // Mounted since `choose`: none here is a defect to see, never a tap that does nothing (review №6).
+          if (!manual.value) throw new Error('«Записать вручную» is not mounted')
+          manual.value.begin()
+        }
+        // Today the developer opens the reading by hand.
+        else if (way === 'developer') feedback.open({ from: 'receipts-closed' })
       })
     }
 
@@ -149,11 +162,8 @@ export default defineComponent({
       photo,
       open,
       mounted,
-      access,
-      closed,
-      othersRead,
+      shown,
       closedOpen,
-      closedShown,
       manualUsed,
       manualBusy,
       manual,
@@ -161,8 +171,13 @@ export default defineComponent({
       afterClosed,
       // A photo country only: Serbia's receipt is read by its link, never by the model (MOL-232).
       opened: () => {
-        if (photo.value && sheetFirst()) {
-          closedShown.value = true
+        if (photo.value && sheetFirst() && closed.value && access.value) {
+          told()
+          shown.value = {
+            reason: closed.value,
+            access: access.value,
+            othersRead: othersRead.value,
+          }
           closedOpen.value = true
         } else camera()
       },

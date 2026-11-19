@@ -755,6 +755,7 @@ describe('whether the model reads the receipts (MOL-408)', () => {
   it('keeps where the person stands with the model past the settings’ answer (MOL-276)', async () => {
     const access = {
       until: null,
+      ended: null,
       trialLeft: 6,
       trialOf: 10 as const,
       month: '2026-11-01',

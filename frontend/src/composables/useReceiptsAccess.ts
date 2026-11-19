@@ -1,8 +1,14 @@
 import { computed } from 'vue'
 import type { ComputedRef } from 'vue'
-import { modelAlone, photoReceiptCountrySchema, receiptsClosedBy } from '@molvia/model'
-import type { PhotoReceiptCountry, ReceiptsAccess } from '@molvia/model'
-import { shiftDay } from '@/days'
+import {
+  modelAlone,
+  monthOf,
+  nextMonth,
+  photoReceiptCountrySchema,
+  receiptsClosedBy,
+} from '@molvia/model'
+import type { PhotoReceiptCountry, ReceiptsAccess, ReceiptsClosed } from '@molvia/model'
+import { calendarDay } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useFf } from '@/stores/ff'
 import { read, write } from '@/stores/storage'
@@ -16,13 +22,10 @@ const TOLD_KEY = 'molvia.receipts-told'
 interface Told {
   /** The trial's end was said: once ever, it does not come back. */
   readonly trial?: boolean
+  /** The paid reading whose end was said, by its moment (adversarial А2): once for each grant that runs out. */
+  readonly ended?: string
   /** The month whose hundred was said (`YYYY-MM-01`): once a month. */
   readonly month?: string
-}
-
-/** The first day of the month after `month` (`YYYY-MM-01`): 31 days on from a first always land in the next. */
-export function nextMonth(month: string): string {
-  return `${shiftDay(month, 31).slice(0, 8)}01`
 }
 
 function toldOf(owner: string): Told {
@@ -31,11 +34,35 @@ function toldOf(owner: string): Told {
     const kept = raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
     return {
       ...(kept.trial === true ? { trial: true } : {}),
+      ...(typeof kept.ended === 'string' ? { ended: kept.ended } : {}),
       ...(typeof kept.month === 'string' ? { month: kept.month } : {}),
     }
   } catch {
     // Unreadable is never said: the sheet comes once more.
     return {}
+  }
+}
+
+/** What a reason says was told, of these figures: the trial at all, a grant by its end, the hundred by its month. */
+function toldNow(reason: ReceiptsClosed, figures: ReceiptsAccess): Told {
+  if (reason === 'trial') return { trial: true }
+  if (reason === 'ended') return { ended: figures.ended?.toISOString() ?? '' }
+  return { month: figures.month }
+}
+
+/**
+ * The figures of the month's hundred in words (review №3): the month's name, the hundred and the first of the next
+ * month — one place for the status of «Настройки» and the sheet, so the two never part.
+ */
+export function monthWords(
+  access: ReceiptsAccess,
+  t: (key: string) => string,
+  locale: string,
+): { month: string; limit: number; next: string } {
+  return {
+    month: t(`spending.month_in.${access.month.slice(5, 7)}`),
+    limit: access.limit,
+    next: calendarDay(`${nextMonth(monthOf(access.month))}-01`, locale),
   }
 }
 
@@ -50,14 +77,22 @@ export function useReceiptsAccess(): {
   readonly country: ComputedRef<PhotoReceiptCountry | null>
   /** The server's figures; none where it has not said them — a launch offline, a server before MOL-275. */
   readonly access: ComputedRef<ReceiptsAccess | null>
-  readonly closed: ComputedRef<'trial' | 'month' | null>
+  readonly closed: ComputedRef<ReceiptsClosed | null>
   /** With the model closed, Tesseract still reads the receipt (В-1): the camera stays a way on. */
   readonly othersRead: ComputedRef<boolean>
   /**
    * Whether a tap on «Сфотографировать чек» meets the sheet first (В-1 «а»): at every tap where nobody would read
-   * the receipt, else once — the trial once ever, the month's hundred once a month — and marked so as it is asked.
+   * the receipt, else once — the trial once ever, a grant run out once for each, the month's hundred once a month.
+   * Only asks: the sheet shown is marked by `told` (review №1).
    */
   readonly sheetFirst: () => boolean
+  /** Marks the sheet shown for the reason it stands for now, where it is shown once. */
+  readonly told: () => void
+  /**
+   * Asks `/actors/me` again, quietly (Р-3): as the app comes back into view and at midnight with a screen in view
+   * (adversarial А3) — a month's hundred opens again on the 1st. `verify` asks once for everyone who asks with it.
+   */
+  readonly askAgain: () => void
 } {
   const actor = useActorStore()
   const payments = useFf('payments')
@@ -77,16 +112,24 @@ export function useReceiptsAccess(): {
     const owner = actor.id
     if (!reason || !figures || !owner) return false
     if (!othersRead.value) return true
-    const told = toldOf(owner)
-    if (reason === 'trial' ? told.trial === true : told.month === figures.month) return false
-    write(
-      `${TOLD_KEY}.${owner}`,
-      JSON.stringify(
-        reason === 'trial' ? { ...told, trial: true } : { ...told, month: figures.month },
-      ),
-    )
-    return true
+    const said = toldNow(reason, figures)
+    const kept = toldOf(owner)
+    if (reason === 'trial') return kept.trial !== true
+    if (reason === 'ended') return kept.ended !== said.ended
+    return kept.month !== said.month
   }
 
-  return { country, access, closed, othersRead, sheetFirst }
+  function told(): void {
+    const reason = closed.value
+    const figures = access.value
+    const owner = actor.id
+    if (!reason || !figures || !owner || !othersRead.value) return
+    write(`${TOLD_KEY}.${owner}`, JSON.stringify({ ...toldOf(owner), ...toldNow(reason, figures) }))
+  }
+
+  function askAgain(): void {
+    if (actor.state === 'ready' && navigator.onLine) void actor.verify()
+  }
+
+  return { country, access, closed, othersRead, sheetFirst, told, askAgain }
 }

@@ -1,4 +1,4 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -9,7 +9,8 @@ import ru from '@/i18n/ru.json'
 import { useActorStore } from '@/stores/actor'
 import { hearFf } from '@/stores/ff'
 
-vi.mock('@/api', () => ({ api: {} }))
+const me = vi.fn()
+vi.mock('@/api', () => ({ api: { me: (...args: unknown[]) => me(...args) } }))
 
 const OWNER = '9f1b8c7d-4e2a-4b6f-8c3d-1a2b3c4d5e6f'
 const ARMENIA: ActorView = {
@@ -23,6 +24,7 @@ const ARMENIA: ActorView = {
 }
 const TRIAL: ReceiptsAccess = {
   until: null,
+  ended: null,
   trialLeft: 6,
   trialOf: 10,
   month: '2026-11-01',
@@ -37,6 +39,7 @@ function render(actor: ActorView): VueWrapper {
   const store = useActorStore()
   store.id = actor.id
   store.actor = actor
+  store.state = 'ready'
   const view = mount(ReceiptsAccessGroup, { global: { plugins: [pinia, createAppI18n('ru')] } })
   views.push(view)
   return view
@@ -44,6 +47,7 @@ function render(actor: ActorView): VueWrapper {
 const status = (view: VueWrapper) => view.get('.list-row').text()
 
 beforeEach(() => {
+  me.mockReset()
   localStorage.clear()
   sessionStorage.clear()
   hearFf(new Set())
@@ -124,7 +128,46 @@ describe('«Распознавание чеков» (MOL-276)', () => {
     expect(status(view)).toContain('В декабре прочитано 100 из 100 — снова с 1 января')
   })
 
-  it('says it is not known where the server has not said it', () => {
-    expect(status(render(ARMENIA))).toContain(ru.receipts_access.status.unknown)
+  it('says it is not known where the server has not said it — never blaming a connection that is there (А4)', () => {
+    expect(navigator.onLine).toBe(true)
+    const view = render(ARMENIA)
+    expect(status(view)).toContain(ru.receipts_access.status.unknown)
+    expect(status(view)).not.toContain('связь')
+  })
+
+  it('says a paid reading ran out, apart from a trial spent, with what reads now (adversarial А2)', () => {
+    const lapsed = {
+      ...TRIAL,
+      ended: new Date('2026-11-02T09:30:00Z'),
+      trialLeft: 0,
+      read: 60,
+    }
+    const view = render({ ...ARMENIA, receiptsAccess: lapsed })
+    expect(status(view)).toContain(
+      'Оплаченное распознавание закончилось 2 ноября. Чеки читаем простым распознаванием',
+    )
+    expect(status(view)).not.toContain('Пробные')
+    hearFf(new Set(['payments']))
+    expect(status(render({ ...ARMENIA, receiptsAccess: lapsed }))).toContain(
+      'Оплаченное распознавание закончилось 2 ноября. Покупки можно записать вручную',
+    )
+  })
+
+  it('asks the server again at midnight with the screen in view: the hundred opens on the 1st (adversarial А3)', async () => {
+    vi.useFakeTimers({ now: new Date(2026, 10, 30, 23, 58), toFake: ['Date', 'setTimeout'] })
+    const until = new Date('2026-12-18T09:00:00Z')
+    const hundred = { ...TRIAL, until, read: 100 }
+    me.mockResolvedValue({
+      ...ARMENIA,
+      receiptsAccess: { ...hundred, month: '2026-12-01', read: 0 },
+    })
+    const view = render({ ...ARMENIA, receiptsAccess: hundred })
+    expect(status(view)).toContain('снова с 1 декабря')
+    expect(me).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(5 * 60_000)
+    await flushPromises()
+    expect(me).toHaveBeenCalledTimes(1)
+    expect(status(view)).toContain('в декабре прочитано 0 из 100')
   })
 })

@@ -17,15 +17,15 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent } from 'vue'
+import { computed, defineComponent, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconReceipt from '~icons/mdi/receipt-text-outline'
 import AppCard from '@/components/AppCard.vue'
 import ListRow from '@/components/ListRow.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { nextMonth, useReceiptsAccess } from '@/composables/useReceiptsAccess'
-import { calendarDay, dateOfAnyYear } from '@/days'
+import { monthWords, useReceiptsAccess } from '@/composables/useReceiptsAccess'
+import { dateOfAnyYear } from '@/days'
 
 /**
  * «Распознавание чеков» (MOL-276): where the person stands with the model that reads receipts — until when it is
@@ -39,28 +39,27 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const today = useLocalDay()
-    const { access, closed, othersRead } = useReceiptsAccess()
+    const { access, closed, othersRead, askAgain } = useReceiptsAccess()
+    // The month's hundred opens again on the 1st: a screen in view over midnight asks the server (adversarial А3).
+    watch(today, askAgain)
 
     const status = computed(() => {
       const figures = access.value
       if (!figures) return t('receipts_access.status.unknown')
-      const month = t(`spending.month_in.${figures.month.slice(5, 7)}`)
-      if (closed.value === 'trial')
-        return t(
-          othersRead.value
-            ? 'receipts_access.status.trial_over_read'
-            : 'receipts_access.status.trial_over_manual',
-        )
-      if (closed.value === 'month')
-        return t('receipts_access.status.month_read', {
-          month,
-          limit: figures.limit,
-          next: calendarDay(nextMonth(figures.month), locale.value),
+      const reads = othersRead.value ? 'read' : 'manual'
+      if (closed.value === 'trial') return t(`receipts_access.status.trial_over_${reads}`)
+      if (closed.value === 'ended')
+        return t(`receipts_access.status.ended_${reads}`, {
+          date: figures.ended
+            ? dateOfAnyYear(figures.ended, locale.value, today.value, 'long')
+            : '',
         })
+      const words = monthWords(figures, t, locale.value)
+      if (closed.value === 'month') return t('receipts_access.status.month_read', words)
       if (figures.until)
         return t('receipts_access.status.paid', {
           until: dateOfAnyYear(figures.until, locale.value, today.value, 'long'),
-          month,
+          month: words.month,
           read: figures.read,
           limit: figures.limit,
         })
