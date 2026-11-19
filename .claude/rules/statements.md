@@ -147,8 +147,11 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   was measured on names of two words, and fifty words against twenty took 0.4 ms a pair, 15 s at 1.5 % of the
   ceiling): two names weigh a pair a word against a word and one more per `STATEMENT_LETTERS_PER_PAIR` (32) of their
   letters multiplied (`statementNamesWeight`; measured, 0.04–0.27 µs a unit), a pair's names only beyond
-  `STATEMENT_NAMES_IN_A_PAIR` (4), those it was measured with; the pairs that fit are found first, their names
-  weighed, and only then compared — none past the ceiling. A seller's name is read by its first `SELLER_WORDS_MAX`
+  `STATEMENT_NAMES_IN_A_PAIR` (4), those it was measured with; a pair's names are weighed just before they are
+  compared, and past the ceiling none is — the work before the refusal bounded by it, as the steps' (review №30). A
+  refund names its seller: a «+» line or a record naming none is one seller with nothing, so it is weighed against
+  nothing and goes through no record (adversarial А25: weighing nothing, it went through every record of its sum,
+  13–15 s). A seller's name is read by its first `SELLER_WORDS_MAX`
   (8) words, each by its first `SELLER_WORD_LETTERS` (20) letters, and two words further apart in length than
   their edits are never measured. **The price, named:** a note listing a whole basket is read by its first eight
   words, and a statement of thousands of lines of one sum against such notes is refused. A year of
