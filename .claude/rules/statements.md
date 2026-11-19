@@ -104,19 +104,22 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   a line a refund of a record noted «Оплата», and «PURCHASE» and «PAYMENT» never part one seller.
 - **One to one by the greatest matching** (А3, Б2, Kuhn's path): what met exactly first, the doubts only for records
   left free — or freed: a doubt takes a record held by an earlier fit where that line moves to a record as good in its
-  own fit, free or freed by a path of such moves (А28: one step left two holders in a chain to the records' ids), and
-  a tie of two records is their ids, never the order MOL-433 read them in (adversarial А27: in one order a line a
-  fifth over its record came back new, ticked — a duplicate — in the other a doubt «чаевые?»). A line takes a free
-  record as good as its first before it takes one over, and what a failed search went through leads nowhere until a
-  line is matched, so the next line's search skips it (А20: a crowd of one sum, more lines than records, searched
-  every record again for every line left over — 10⁹ steps, 20–27 s under the ceiling of pairs; now 0.7 s, the steps of
-  the order of the pairs, and the answer the same). The answer counts them (`steps`), a test holds them. **The
-  matching's steps have a ceiling of their own** (`STATEMENT_STEPS_MAX`, twenty million, some 0.6 s): two ranks are
-  enough to undo the shortcut — a crowd of one sum on one day, its free records the next day, a rank worse, sends
-  every line left over through the whole crowd (adversarial А22: 856 642 712 steps, 25 s under the ceiling of pairs) —
-  and past it the rule stops and answers `too_heavy`. **The price, named:** such a crowd, some hundreds of rides of
-  one price a day, is refused rather than matched; and the two ceilings add up — one call weighs up to 0.66 s and
-  matches up to 0.6 s more, 1.3 s of the API's loop at worst (review №29).
+  own fit, free or freed by a path of such moves (А28: one step left two holders in a chain to the records' ids) — a
+  line of the doubt's own fit on the path moves as that fit's search moves it, and the path keeps its own `seen`, so a
+  record a stricter move failed through is no dead end for the search (review №32: two lines of three came back new,
+  ticked), a live record goes before its copy removed within «Вернуть» (А29: the doubt «вернуть?» offered the removed
+  one back beside the live), and a tie of two records is their ids, never the order MOL-433 read them in (adversarial
+  А27: in one order a line a fifth over its record came back new, ticked — a duplicate — in the other a doubt
+  «чаевые?»). A line takes a free record as good as its first before it takes one over, and what a failed search went
+  through leads nowhere until a line is matched, so the next line's search skips it (А20: a crowd of one sum, more
+  lines than records, searched every record again for every line left over — 10⁹ steps, 20–27 s under the ceiling of
+  pairs; now 0.7 s, the steps of the order of the pairs, and the answer the same). The answer counts them (`steps`), a
+  test holds them. **The matching's steps have a ceiling of their own** (`STATEMENT_STEPS_MAX`, twenty million, some
+  0.6 s): two ranks are enough to undo the shortcut — a crowd of one sum on one day, its free records the next day, a
+  rank worse, sends every line left over through the whole crowd (adversarial А22: 856 642 712 steps, 25 s under the
+  ceiling of pairs) — and past it the rule stops and answers `too_heavy`. **The price, named:** such a crowd, some
+  hundreds of rides of one price a day, is refused rather than matched; and the two ceilings add up — one call weighs
+  up to 0.66 s and matches up to 0.6 s more, 1.3 s of the API's loop at worst (review №29).
 - **The link decides another line** (Г2, Д1, Д2, Е1, Е2), past the window too where it names it: its own line, by its
   key; another form on the link's day, ± 1 for a form whose day moves — **and a screenshot against a file's line by
   the posting day the file prints, and by it alone** (adversarial А1, А11: the bench took a screenshot's day for the
