@@ -1735,6 +1735,57 @@ describe('matchStatement — adversarial, round 12', () => {
   })
 })
 
+describe('matchStatement — review and adversarial, round 13', () => {
+  const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+  const sas = (n: number, day: string, amount: string, removed = false) =>
+    spendingCandidate(
+      {
+        id: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+        spentOn: day,
+        amount: cash(amount, 'AMD'),
+        debited: null,
+        accountId: ARDSHIN,
+        place: 'SAS',
+        note: null,
+      },
+      { removed, link: null },
+    )
+  const at = (day: string, amount: string, payee = 'Ք: SAS SUPERMARKET YEREVAN AM') =>
+    line(day, amount, 'AMD', payee)
+
+  it('№32: a move of holders keeps its own path — a record it failed through is no dead end for the search', () => {
+    const x = sas(1, '2026-11-10', '1000.00')
+    const r = sas(2, '2026-11-12', '1000.00')
+    const f = sas(3, '2026-11-15', '950.00')
+    const h = at('2026-11-11', '1000.00')
+    const n = at('2026-11-13', '1100.00')
+    const l = at('2026-11-08', '1100.00')
+    const m = at('2026-11-13', '1180.00', 'XYZ')
+    // The move for L failed through R and left it in the search's `seen`: M found no path, and L and M both
+    // came back new, ticked — two lines of three matched.
+    expect(decide([x, r, f], [h, n, l, m], o)).toEqual([
+      recorded(r),
+      recorded(f, 'tip'),
+      recorded(x, 'tip'),
+      NEW,
+    ])
+    expect(decide([x, r, f], [h, n, m], o).map(group)).toEqual(['recorded', 'recorded', 'recorded'])
+  })
+
+  it('А29: a live record goes before its copy removed within «Вернуть», whatever their ids', () => {
+    for (const [live, removed] of [
+      [1, 2],
+      [2, 1],
+    ] as const) {
+      const kept = sas(live, '2026-11-12', '6400.00')
+      const gone = sas(removed, '2026-11-12', '6400.00', true)
+      expect(decide([gone, kept], [at('2026-11-12', '6400.00')], o)).toEqual([recorded(kept)])
+    }
+    const gone = sas(1, '2026-11-12', '6400.00', true)
+    expect(decide([gone], [at('2026-11-12', '6400.00')], o)).toEqual([recorded(gone, 'removed')])
+  })
+})
+
 describe('tripCandidate', () => {
   const base = {
     id: '00000000-0000-4000-8000-0000000000aa',

@@ -645,7 +645,7 @@ function notSpendingByLine(line: StatementLine): StatementNotSpending | null {
 }
 
 const sameRank = (p: Pair, q: Pair) =>
-  p.own === q.own && p.named === q.named && p.distance === q.distance
+  p.own === q.own && p.named === q.named && p.distance === q.distance && p.c.removed === q.c.removed
 
 /**
  * One to one by the greatest matching (А3, Б2): lines in the order of their best pair, each with its
@@ -677,29 +677,34 @@ function matchPairs(pairs: readonly Pair[]): {
     choice.set(row, p)
     return true
   }
-  // A line of an earlier fit moves to a record of its fit as good as the one it holds — a free one, else
-  // one whose line moves on in turn: a path, as a tie of two holders in a chain was decided by the
-  // records' ids (А27, А28).
-  const reseat = (holder: number, seen: Set<string>): boolean => {
-    const held = choice.get(holder)
-    if (held === undefined) return false
-    const alike = (byFit.get(held.fit)?.get(holder) ?? []).filter((p) => sameRank(p, held))
-    for (const p of alike) {
-      if (++steps > STATEMENT_STEPS_MAX) return false
-      if (!owner.has(p.c.id)) return take(holder, p)
-    }
-    for (const p of alike) {
-      if (++steps > STATEMENT_STEPS_MAX) return false
-      if (seen.has(p.c.id)) continue
-      seen.add(p.c.id)
-      const next = owner.get(p.c.id)
-      if (next !== undefined && next !== holder && reseat(next, seen)) return take(holder, p)
-    }
-    return false
-  }
   for (const fit of FIT_ORDER) {
     const options = byFit.get(fit) ?? new Map<number, Pair[]>()
-    const claim = (row: number, seen: Set<string>): boolean => {
+    // A line of an earlier fit moves to a record of its fit as good as the one it holds — a free one, else
+    // one whose line moves on in turn: a path, as a tie of two holders in a chain was decided by the
+    // records' ids (А27, А28). A line of this fit on the path moves as this fit's search moves it, and the
+    // path keeps its own `seen`: a record a stricter move failed through is no dead end for the search
+    // (review №32).
+    const reseat = (holder: number, seen: Set<string>): boolean => {
+      const held = choice.get(holder)
+      if (held === undefined) return false
+      const alike = (byFit.get(held.fit)?.get(holder) ?? []).filter((p) => sameRank(p, held))
+      for (const p of alike) {
+        if (++steps > STATEMENT_STEPS_MAX) return false
+        if (!owner.has(p.c.id)) return take(holder, p)
+      }
+      for (const p of alike) {
+        if (++steps > STATEMENT_STEPS_MAX) return false
+        if (seen.has(p.c.id)) continue
+        seen.add(p.c.id)
+        const next = owner.get(p.c.id)
+        if (next === undefined || next === holder) continue
+        const moved = choice.get(next)?.fit === fit ? claim(next, seen, seen) : reseat(next, seen)
+        if (moved) return take(holder, p)
+      }
+      return false
+    }
+    // `moving` — the path's own `seen` once a search is inside a move, so a path never begins anew.
+    const claim = (row: number, seen: Set<string>, moving: Set<string> | null): boolean => {
       const mine = options.get(row) ?? []
       const best = mine[0]
       for (const p of mine) {
@@ -714,13 +719,16 @@ function matchPairs(pairs: readonly Pair[]): {
         const holder = owner.get(p.c.id)
         if (holder === undefined) return take(row, p)
         const theirs = choice.get(holder)?.fit === fit
-        if (theirs ? claim(holder, seen) : reseat(holder, seen)) return take(row, p)
+        const moved = theirs
+          ? claim(holder, seen, moving)
+          : reseat(holder, moving ?? new Set<string>())
+        if (moved) return take(row, p)
       }
       return false
     }
     let seen = new Set<string>()
     for (const row of options.keys()) {
-      if (!choice.has(row) && claim(row, seen)) seen = new Set()
+      if (!choice.has(row) && claim(row, seen, null)) seen = new Set()
       if (steps > STATEMENT_STEPS_MAX) return { choice: null, steps }
     }
   }
@@ -887,6 +895,9 @@ export function matchStatement(
       q.named - p.named ||
       p.distance - q.distance ||
       p.row - q.row ||
+      // A live record before one removed within «Вернуть»: its copy typed again is not to be brought back
+      // (А29).
+      Number(p.c.removed) - Number(q.c.removed) ||
       // A tie is the record's id, never the order MOL-433 read the records in (А27, review №7).
       (p.c.id < q.c.id ? -1 : p.c.id > q.c.id ? 1 : 0),
   )
