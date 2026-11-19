@@ -1780,13 +1780,23 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
     }
   })
 
+  it('lets a total printed with three decide where a discount in tetri is the lines’ only vote (adversarial И1)', () => {
+    // «5.000» − «0.50» = «4.500», «2.500», «1.234», «ლარი 8.234»: the round ones cut, the third lost
+    const discounted = { ...piece('ა', '5', '4.5'), discount: '0.50' }
+    const text = readGe(pharmacy([discounted, piece('ბ', '2.5')], '8.234', 'ლარი'))
+    expect([text.balanced, text.readTotalHundredths]).toEqual([false, 823])
+    // must not: Р-1's weight «0.452» copied into a sum comes with a total of two — two, no figure
+    const weight = readGe(pharmacy([piece('ა', '1.50'), piece('ბ', '0.452')], '1.95'))
+    expect(weight.lines.map((l) => l.sumHundredths)).toEqual([150, null])
+  })
+
   it('reads three where the vote does not, by the lines’ sums meeting a total printed with three (adversarial Д1)', () => {
     // «5.00» beside «22.368»: the vote ties, the paper's own sum decides — 22.368 + 5.00 = 27.368
     const tie = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5.00')], '27.368', 'ლარი'))
     expect([tie.totalHundredths, tie.balanced]).toEqual([2_737, true])
     expect(tie.lines.map((l) => l.sumHundredths)).toEqual([2_237, 500])
-    // must not: the sums meet no total printed with three — two, as the vote says
-    const off = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5.00')], '27.369', 'ლარი'))
+    // must not: the vote tied and a total of two decimals — two, the line in thousandths no figure
+    const off = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5.00')], '27.37', 'ლარი'))
     expect(off.lines.map((l) => l.sumHundredths)).toEqual([null, 500])
     // «5» for «5.000», cut by the model, votes for neither: whole by the vote alone (owner's Е1 «а»)
     const cut = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5')], '27.368', 'ლარი'))
@@ -1829,9 +1839,14 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
       ),
     )
     expect([zero.totalHundredths, zero.balanced]).toEqual([2_387, true])
-    // must not: lines of two decimals read no total of three, as before
+    // lines of two decimals beside a total of three: the total is read (И1), and they do not meet it as printed — no
+    // receipt proven whole, no total shown
     const shop = readGe(pharmacy([piece('ა', '1.50'), piece('ბ', '22.37')], '23.868', 'ლარი'))
-    expect([shop.totalHundredths, shop.readTotalHundredths]).toEqual([null, null])
+    expect([shop.balanced, shop.totalHundredths, shop.readTotalHundredths]).toEqual([
+      false,
+      null,
+      2_387,
+    ])
   })
 
   it('proves whole the lines that meet the total as printed, the tetri they round apart its rounding (А1 «а»)', () => {

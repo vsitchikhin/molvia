@@ -208,14 +208,15 @@ function canonicalAnswer(
     return milli === null ? [] : [milli]
   })
   const meetsPrinted = sumMilli !== null && totalsMilli.includes(sumMilli)
-  // with no vote of the lines — none, or every amount of fewer decimals than two, «5», «2.5» — the totals decide, as with
-  // no line at all (adversarial Ж1, round 7): one printed with three is the receipt's format, beside a payment in tetri,
-  // «ბარათი 8.73», or cash rounded to five tetri, «ნაღდი 8.75» — fewer decimals read the same either way (З1, round 8);
-  // a three shown only where two places or the lines vouch for it, as any total (MOL-244)
+  // where the lines did not choose three — no vote, every amount «5», «2.5» (adversarial Ж1, round 7), or a discount in
+  // tetri their only vote (И1, round 9) — a total printed with three decides, beside a payment in tetri, «ბარათი
+  // 8.73», or cash rounded to five tetri, «ნაღდი 8.75» (З1, round 8): fewer decimals read the same either way, and a
+  // total is shown only where two places or the lines vouch for it (MOL-244). Р-1's weight «0.452» copied into a sum
+  // comes with a total of two decimals, and stays no figure
   const totalsDecide = ofTotals.includes(THOUSANDTHS)
   const thousandths =
     reading.numbers.some((format) => format.fractionDigits === THOUSANDTHS) &&
-    (meetsPrinted || (three + two > 0 ? three > two : totalsDecide))
+    (meetsPrinted || three > two || totalsDecide)
   const printed = new Map<ModelLine, LineThousandths>()
   const lines = thousandths
     ? spelt.map((line) => {
