@@ -82,6 +82,7 @@ describe('actorCodec', () => {
     const view = actorViewSchema.parse(actorSchema.parse(actor))
     const status = {
       until: new Date('2026-12-20T08:00:00.000Z'),
+      ended: null,
       trialLeft: 3,
       trialOf: 10 as const,
       month: '2026-11-01',
@@ -94,6 +95,15 @@ describe('actorCodec', () => {
     expect(actorCodec.parse(JSON.parse(JSON.stringify(wire))).receiptsAccess).toEqual(status)
     const unpaid = z.encode(actorCodec, { ...view, receiptsAccess: { ...status, until: null } })
     expect(actorCodec.parse(unpaid).receiptsAccess?.until).toBeNull()
+    // a grant gone, its moment as ISO too (MOL-276, adversarial А2)
+    const lapsed = { ...status, until: null, ended: new Date('2026-11-02T09:30:00.000Z') }
+    const wireLapsed = z.encode(actorCodec, { ...view, receiptsAccess: lapsed })
+    expect(wireLapsed.receiptsAccess?.ended).toBe('2026-11-02T09:30:00.000Z')
+    expect(actorCodec.parse(JSON.parse(JSON.stringify(wireLapsed))).receiptsAccess).toEqual(lapsed)
+    // a server before it says no `ended`: none, never a refusal of the whole answer
+    const before = { ...wire, receiptsAccess: { ...wire.receiptsAccess } }
+    delete (before.receiptsAccess as { ended?: unknown }).ended
+    expect(actorCodec.parse(before).receiptsAccess?.ended).toBeNull()
     expect(z.encode(actorCodec, view)).not.toHaveProperty('receiptsAccess')
     // past the trial's ten, or a limit other than the hundred, is no answer of this server
     expect(
@@ -153,6 +163,7 @@ describe('actorCodec', () => {
 describe('receiptsClosedBy (MOL-276)', () => {
   const open: ReceiptsAccess = {
     until: null,
+    ended: null,
     trialLeft: 6,
     trialOf: 10,
     month: '2026-11-01',
@@ -181,5 +192,14 @@ describe('receiptsClosedBy (MOL-276)', () => {
 
   it('names the trial where both close it: the hundred comes back next month, the trial never', () => {
     expect(receiptsClosedBy({ ...open, trialLeft: 0, read: 100 })).toBe('trial')
+  })
+
+  it('tells a paid reading run out from a trial spent (adversarial А2)', () => {
+    const ended = new Date('2026-11-02T09:30:00Z')
+    expect(receiptsClosedBy({ ...open, ended, trialLeft: 0, read: 60 })).toBe('ended')
+    // and before the month's hundred, which comes back while the payment does not
+    expect(receiptsClosedBy({ ...open, ended, trialLeft: 0, read: 100 })).toBe('ended')
+    // the trial still left after a grant gone keeps it open, as the server's tariff does
+    expect(receiptsClosedBy({ ...open, ended, trialLeft: 2 })).toBeNull()
   })
 })
