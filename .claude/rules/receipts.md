@@ -466,7 +466,43 @@ MOL-277 and MOL-283, the screen MOL-276.
   lands may make one over — the queue reads one receipt at a time; an account erased and signed in again starts with a
   new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt has no number (MOL-422), so a
   shot of it again after «Удалить» counts; with payment open, the review says «Строки на фото не разобрать» of a receipt
-  nobody read until MOL-276 stands the sheet «пробные чеки закончились» before the shot.
+  nobody read — MOL-276 stands the sheet «Пробные чеки закончились» before the shot, at every tap.
+
+## The status and the sheet on the phone (MOL-276)
+
+**Where a person stands with the model is the server's, said by the phone** (owner's В-1…В-4 «а», 19.11.2026; requirements
+and plan in `.scratch/tasks/{requirements,plans}/MOL-276.md`). `api.me()` asks `receiptsAccess` (`RECEIPTS_ACCESS_HEADER`)
+beside `receiptsByModel`, and the store keeps both over the settings' answer of the same owner, which says neither.
+
+- **The phone counts nothing** (Р-1): why the model reads no more is `receiptsClosedBy` of the domain over the server's
+  figures — `trial`, nothing paid and none of the ten left; `month`, the hundred of the phone's month read; the trial
+  named where both close it, since the hundred comes back next month and the trial never. `until` is already none for a
+  grant gone by the server's clock, so the phone's is never asked. The share ($2) and the cap ($200) close nothing here —
+  the server does not say them (MOL-367).
+- **«Распознавание чеков» in «Настройки»**, group «Чеки» over «Бот», a status with no chevron (В-3 «а»: nothing to open
+  until MOL-277): the trial left; paid until · the month's count; the trial over and who reads now — simple recognition
+  while the фф `payments` is off in a country Tesseract reads, the record by hand otherwise; the month's hundred and the
+  first of the next; «Узнаем, когда будет связь» where nothing is said. Only for a country read off the photo
+  (`photoReceiptCountrySchema`): Serbia's receipt is its link, which the model never reads. The settings ask `/actors/me`
+  anyway as they open, so the row is as fresh as the form.
+- **«Пробные чеки закончились» stands before the camera** (`ReceiptsClosedSheet`, `useReceiptsAccess.sheetFirst`): at
+  every tap where nobody would read the receipt — the фф on, or Georgia — and **once while Tesseract does** (В-1 «а»):
+  the trial once ever, the month's hundred once a month, remembered on the phone per owner (`molvia.receipts-told`),
+  with «Сфотографировать» first. Its ways — the camera, «Записать вручную» (`ManualEntryButton bare`, the strip's own
+  «Где вы?» / «Уже записываете»), «Написать разработчику» (the developer opens the reading by hand until payment) — go
+  once the sheet is away (`afterStep`). MOL-277 adds payment to it.
+- **Not known is no sheet** (Р-2): a launch offline, a server before MOL-275, the login's own answer — the camera
+  opens, and the server decides who reads. **`/actors/me` is asked again as the app comes back into view** on a screen
+  with the camera (`useReconnect` of `CaptureButton`, `verify`, one request whatever asks), and the settings ask it as
+  they open (Р-3).
+- **Georgia keeps its camera when the tariff is closed** (В-2 «а»): a tap says why and offers the record by hand, where
+  the button gone after the tenth receipt said nothing; a share or the cap spent still takes it away (`receiptsByModel`).
+  «Переснять» of the review stays Georgia's only while the model reads: a new shot of a closed tariff is read by nobody.
+- **The prices, named:** a receipt shot right after the tenth trial receipt, before the next answer, meets no sheet — the
+  server reads it by Tesseract or fails it `unreadable`, as it decides; right after a login on a second phone the status
+  is not known until the app is opened again or «Настройки» are, since the login's answer says no figures; and the
+  sheet told once is not told again on that phone after «Выйти», its memory going with the owner's other keys — a
+  second time, at most, per sign-in.
 
 ## The class code (MOL-226)
 
