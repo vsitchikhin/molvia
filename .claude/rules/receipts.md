@@ -514,8 +514,10 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   hundred opens on the 1st, and an app left on the screen over midnight said «снова с 1 декабря» on the 1st); as the
   screen comes, where the figures are of a month before the phone's (Б2: an app put away on «Деньги» over midnight and
   opened on «Покупки» on the 1st asked nobody); and as a paid reading's `until` passes with it in view, a day ahead at
-  most (Б3: Georgia's camera stayed for a receipt nobody would read) — once a moment, never once an answer: every
-  answer is a new `Date`, and a phone whose clock ran ahead of the server's asked every two seconds (В1). **Not the
+  most (Б3: Georgia's camera stayed for a receipt nobody would read) — armed again by every answer, so the one at
+  midnight sets it for a grant a day off (Г1: armed by the moment's change alone, a screen opened more than a day before
+  never caught the end), and never at once again for a moment already asked about: every answer is a new `Date`, and a
+  phone whose clock ran ahead of the server's asked every two seconds (В1). **Not the
   button, since the button may be gone** (В2): Georgia with its share or the cap spent draws none, and the 1st that gave
   the share back was heard by nobody until a restart. Only where receipts are read off the photo — nothing else changes
   with the answer. The phone only decides to ask; what it says is the answer. The settings' form reads `/actors/me` as
