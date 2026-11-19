@@ -197,14 +197,15 @@ const BANK_WORDS: ReadonlySet<string> = new Set(
 )
 
 /**
- * The words of a seller's name, folded, the bank's own and the place's aside — in a bank's line and a
- * record's name alike:
+ * The words of a seller's name, folded, the place's aside — in a bank's line and a record's name alike —
+ * and the bank's own words aside in a bank's line (`ofBank`) alone: a note «Покупка» is the person's word,
+ * and names the record (adversarial А17):
  * «Ереван Сити» is «siti», since every card line of Yerevan prints «YEREVAN» and the city would meet them
  * all (adversarial А6). A name that is nothing but a city's word — the restaurant «Казан», the cinema
  * «Москва» — keeps it: with none it would be no name, and met by any line (А10).
  */
-export function sellerWords(text: string): string[] {
-  const words = payeeWords(text).filter((word) => !BANK_WORDS.has(word))
+export function sellerWords(text: string, ofBank = false): string[] {
+  const words = payeeWords(text).filter((word) => !ofBank || !BANK_WORDS.has(word))
   const seller = words.filter((word) => !isPlaceWord(word))
   return seller.length > 0 ? seller : words
 }
