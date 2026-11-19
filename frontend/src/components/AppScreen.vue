@@ -6,8 +6,7 @@
   >
     <header ref="bar" class="bar">
       <!-- Asked of its width by the row inside it, a box of its own (MOL-336): a query cannot style its own
-           container, and the bar itself as one lost WebKit the page's place under a sheet (`sheet.spec`).
-           Classes of the kit's own words: a screen's `.row` stood beside it in every `.row` a test found. -->
+           container, and the bar itself as one lost WebKit the page's place under a sheet (`sheet.spec`). -->
       <div class="bar-room">
         <div class="bar-columns">
           <div ref="column" class="leading">
@@ -15,7 +14,7 @@
               <button ref="button" class="back" type="button" @click="goBack">
                 <IconChevronLeft ref="chevron" class="chevron" aria-hidden="true" />
                 <!-- «Back» shown, where it leads still read after it: the name is «Back Trip» on every
-                 step of the ladder, and the word shown starts it (review Р-2, owner's decision). -->
+                     step of the ladder, and the word shown starts it (review Р-2, owner's decision). -->
                 <template v-if="fit === 'short'">
                   <span class="label">{{ backWord }}</span>
                   <span class="hidden">{{ ` ${parent}` }}</span>
@@ -37,7 +36,7 @@
           </div>
 
           <!-- The large title below stays in the page, scrolled away or not, so a screen reader
-           reads it there; this copy is only for the eye. -->
+               reads it there; this copy is only for the eye. -->
           <p class="small" aria-hidden="true">{{ title }}</p>
 
           <div class="trailing">
@@ -336,6 +335,15 @@ export default defineComponent({
 $chevron-column: calc(var(--touch-target) - var(--space-1));
 $title-beside-action: 14rem;
 
+// The row at rest, and past the scroll where a narrow one keeps that look (owner's В-1 «б»).
+$columns-at-rest: minmax($chevron-column, 1fr) 0 minmax(min-content, auto);
+
+// The small title away: at rest, and beside an action in a narrow row.
+@mixin title-away {
+  opacity: 0;
+  transform: translateY(var(--space-2));
+}
+
 /* A column as tall as the viewport, so that what fills the content — an empty or an offline
    state — can take the free height and put its action at the bottom, under the thumb. */
 .screen {
@@ -390,17 +398,19 @@ $title-beside-action: 14rem;
    line left «‹» 28 px, the two buttons 30 px one over the other (MOL-336). */
 .bar-columns {
   display: grid;
-  grid-template-columns: minmax($chevron-column, 1fr) 0 minmax(min-content, auto);
+  grid-template-columns: $columns-at-rest;
   align-items: center;
   gap: var(--space-2);
   height: 100%;
 }
 
 /* The title in the middle of the row, and the sides equal while they can be, so that it is. An action
-   keeps its words — its column takes their width, its floor the chevron's — and the title gives way to
-   it: off the middle first, then cut by «…» (MOL-336; it squeezed «Править» to 60 px for 98 at 320). */
+   keeps its words — its column takes their width on one line, its floor the chevron's — and the title
+   gives way to it: off the middle first, then cut by «…» (MOL-336; it squeezed «Править» to 60 px for 98
+   at 320). On one line, not by its least width: from 115 % the kit's button hyphenates, and the title took
+   all but «Пра-», the word broken under the thumb at the scroll though it stood whole at rest. */
 .collapsed .bar-columns {
-  grid-template-columns: minmax($chevron-column, 1fr) minmax(0, auto) minmax(min-content, 1fr);
+  grid-template-columns: minmax($chevron-column, 1fr) minmax(0, auto) minmax(max-content, 1fr);
 }
 
 .collapsed .trailing {
@@ -412,12 +422,11 @@ $title-beside-action: 14rem;
    some 9.9rem beside «Править», and from 14rem it has 4, four letters and «…». */
 @container bar (width < #{$title-beside-action}) {
   .collapsed .bar-columns:has(> .trailing > *) {
-    grid-template-columns: minmax($chevron-column, 1fr) 0 minmax(min-content, auto);
+    grid-template-columns: $columns-at-rest;
   }
 
   .collapsed .bar-columns:has(> .trailing > *) > .small {
-    opacity: 0;
-    transform: translateY(var(--space-2));
+    @include title-away;
   }
 }
 
@@ -447,14 +456,14 @@ $title-beside-action: 14rem;
 }
 
 .small {
+  @include title-away;
+
   margin: 0;
   overflow: hidden;
   font-size: var(--text-headline);
   font-weight: var(--weight-medium);
   white-space: nowrap;
   text-overflow: ellipsis;
-  opacity: 0;
-  transform: translateY(var(--space-2));
   transition:
     opacity var(--dur) var(--ease),
     transform var(--dur) var(--ease);
