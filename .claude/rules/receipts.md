@@ -682,14 +682,20 @@ receipt proven whole, and its lines of one piece went empty.
   the stop by Georgia's memory, not the reading — «Haiku has to cope with it» (owner, 17.11.2026).
 - **A pharmacy's three decimals are read, half up to the tetri** (MOL-421, owner's В-1 «а», 19.11.2026): the till of
   ge-04 and ge-05 prints «22.368», «23.868 ლარი», and the model copies them as printed. `canonicalAnswer` reads them
-  only where the card names three decimals and **every** amount of the lines — a price, a sum, a discount — has three
-  (Р-1, one receipt, one format): a weight «0.452» copied into the sum of a receipt of two decimals stays no figure. A
-  nought carries no format — a column of discounts copied «0» — and a total beside such lines is read in any of them: a
-  card's payment is in tetri, «ბარათი 23.87» (adversarial А3, round 1); with no line, every total decides. **A line's
-  arithmetic is judged as printed, in thousandths**, and then every amount is hundredths, half up, as the rest of the
-  reading counts: rounded first, 3 × 0.255 = 0.765 is 3 × 0,26 against 0,77. **The check judges it so too**: the line
-  keeps its money as printed (`thousandths`, read through `printedThousandths` only while it rounds to the line's own
-  figures), or `verifiedReading` took the price of the very line Р-2 settled (adversarial А2, round 1). **Whole is
+  only where the card names three decimals and **more amounts of the lines print three than not** — a price, a sum, a
+  discount (Р-1, one receipt, one format, by its majority since round 4): a discount the till prints in tetri, «0.50»,
+  is outvoted (adversarial Г2), and a tie is two, so a weight «0.452» copied into the sum of a receipt of two decimals
+  stays no figure. One decimal votes for neither — «1.5» is a «1.500» the model cut short, and thousands grouped by a
+  point never print one — nor does a nought, a column of discounts copied «0»; a whole number votes against: «499»
+  beside «1.299» is a till grouping thousands (MOL-426 — made neutral, it took six figures wrong on the bench's
+  Icelandic set read through Georgia's card); a total beside such lines is read in any of them: a card's payment is in
+  tetri, «ბარათი 23.87» (adversarial А3, round 1); with no line, every total decides. **The rounding is named of sums
+  read right on a receipt not whole too** (Г1): a line whose quantity was misread keeps its sum, and «Прочитали не всё»
+  measures the lines by the total less the rounding, or it says a line lost of a pharmacy whose every sum was read. **A
+  line's arithmetic is judged as printed, in thousandths**, and then every amount is hundredths, half up, as the rest of
+  the reading counts: rounded first, 3 × 0.255 = 0.765 is 3 × 0,26 against 0,77. **The check judges it so too**: the
+  line keeps its money as printed (`thousandths`, read through `printedThousandths` only while it rounds to the line's
+  own figures), or `verifiedReading` took the price of the very line Р-2 settled (adversarial А2, round 1). **Whole is
   judged as printed, the tetri between its own figure** (owner's А1 «а», adversarial А1 of round 1 — Р-3 «whole in
   tetri» was the price before): the lines meet a total printed with three decimals in thousandths, one printed in tetri
   only by a sum that is that tetri to the thousandth (`printedMeets`, adversarial В2 of round 3: «26.70» cannot tell
@@ -708,11 +714,11 @@ receipt proven whole, and its lines of one piece went empty.
   the total's thousandths (`totalThousandths`), and `notWhole` and the sums that vouch for themselves (`sumsMeet`) meet
   it by `printedMeets` — a card's payment in tetri, «ბარათი 26.70», voting for 26,70 beside «ლარი 26.698» proves no
   misread thousandth whole, where 22,35 + 4,35 meet it in tetri (adversarial Б1: a quarter of such misreads were shown
-  as read). **A price that holds only in thousandths is shown on any receipt** (Б3, then В3 «а»): the record
-  keeps the sum shown, 0,77, as a line off by no more than its price's rounding (`lineAddsUp`), never 3 × 0,26 = 0,78. **A total below its lines by a rounding below nought is what was paid**
-  (Б2): the record's «a total below the lines was misread» (`receiptTotal`) allows exactly that far, or 22,37 + 4,34
-  against 26,70 went down as 26,71. The prompt did not change (Р-4), and the review shows 22,37 ₾ against 22.368 on the
-  paper (Р-5).
+  as read). **A price that holds only in thousandths is shown on any receipt** (Б3, then В3 «а»): the record keeps the
+  sum shown, 0,77, as a line off by no more than its price's rounding (`lineAddsUp`), never 3 × 0,26 = 0,78. **A total
+  below its lines by a rounding below nought is what was paid** (Б2): the record's «a total below the lines was misread»
+  (`receiptTotal`) allows exactly that far, or 22,37 + 4,34 against 26,70 went down as 26,71. The prompt did not change
+  (Р-4), and the review shows 22,37 ₾ against 22.368 on the paper (Р-5).
 - **A total under the currency alone is the total's place** (MOL-421, owner's В-2 «а»): the pharmacy prints «23.868
   ლარი» with no word, and the model labels it «ლარი» — an amount nothing named, so no total, no receipt proven whole and
   its lines of one piece empty. The card's `bareTotal` («ლარი», «₾», «GEL», marks around it at most; Armenia's `NEVER`)
@@ -720,12 +726,12 @@ receipt proven whole, and its lines of one piece went empty.
   stands** — two are a doubt — and it is shown by MOL-244's rule as any total: the lines that meet it every one as read,
   or two places; one place the lines do not meet is read (`readTotalHundredths`) and never shown. On the bench ge-04 and
   ge-05 come whole, 23,87 and 3,50, nothing made up (`.scratch/tasks/research/MOL-421.md`).
-- **The prices, named:** a cash payment in Georgia is rounded to 5 tetri (the National Bank, since 2019), so a cash
-  line of a pharmacy never meets its total — nor did it vote before; a receipt whose every amount is thousands grouped
-  by a point with no tetri — «31.000» for 31 000 — reads as three decimals, 31,00: no Georgian till was seen printing so
+- **The prices, named:** a cash payment in Georgia is rounded to 5 tetri (the National Bank, since 2019), so a cash line
+  of a pharmacy never meets its total — nor did it vote before; a receipt whose every amount is thousands grouped by a
+  point with no tetri — «31.000» for 31 000 — reads as three decimals, 31,00: no Georgian till was seen printing so
   (ge-01…05 print tetri always), and the bench's Indonesian set read through Georgia's card shows it (5 fields, 3
-  totals; MOL-426 is such a country's card); a rollback to a build before this task cannot list a person's receipts once one of
-  them is Georgian (Р-4); Serbia stays its link — a photo where the QR does not read is MOL-424 (В-1 «а»).
+  totals; MOL-426 is such a country's card); a rollback to a build before this task cannot list a person's receipts once
+  one of them is Georgian (Р-4); Serbia stays its link — a photo where the QR does not read is MOL-424 (В-1 «а»).
 
 **The bench** (`.scratch/tasks/research/MOL-408.md`, `tasks/status/MOL-408/`: the product's reader on 273 receipts of
 nine sets, $0,37): **the model copies any script about as well as Armenian** — Georgian 50 fields right of 51, Serbian
