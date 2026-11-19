@@ -368,8 +368,9 @@ export function readsReceiptsByModel(
 }
 
 /**
- * Where the person stands with the model in the phone's month (MOL-275), for MOL-276's screen: until when it is paid, the
- * trial's receipts left of ten, the month's read of a hundred — every figure the server's. None for nobody.
+ * Where the person stands with the model in the phone's month (MOL-275), for MOL-276's screen: until when it is paid, or
+ * when a paid reading ran out, the trial's receipts left of ten, the month's read of a hundred — every figure the
+ * server's. None for nobody.
  */
 export async function receiptsAccessOf(
   actors: Pick<ActorRepository, 'modelAccess'>,
@@ -381,6 +382,7 @@ export async function receiptsAccessOf(
   if (access === null) return null
   return {
     until: access.until,
+    ended: access.ended,
     trialLeft: access.trialLeft,
     trialOf: RECEIPT_TRIAL,
     month,

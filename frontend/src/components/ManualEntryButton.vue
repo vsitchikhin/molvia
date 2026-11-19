@@ -1,27 +1,30 @@
 <template>
-  <!-- On the newcomer's «Что брать» with receipts it is a row of its own under the cycle (2a): the
-       card is drawn here, around the row alone — around this component it would draw the kit's
-       hairline over the sheets below as well. The chevron is В-14's either way: «Где вы?», or with a
-       record open the fork whose both ways go on to fields (MOL-203, adversarial А2). -->
-  <AppCard v-if="row" list>
-    <ListRow
-      :icon="IconPencil"
-      :title="t('purchases.manual_by_hand')"
-      :meta="t('advice.home.manual_body')"
-      wrap
-      whole
-      next
-      @click="begin"
-    />
-  </AppCard>
-  <!-- With receipts it is the quieter second way, «Записать вручную» under the camera (handoff 03). -->
-  <AppButton v-else-if="byHand" variant="ghost" block @click="begin">
-    {{ t('purchases.manual_by_hand') }}
-  </AppButton>
-  <AppButton v-else size="large" block @click="begin">
-    <template #icon><IconPencil /></template>
-    {{ t('purchases.manual') }}
-  </AppButton>
+  <!-- Bare, the sheets alone: another sheet's «Записать вручную» begins the same way (MOL-276). -->
+  <template v-if="!bare">
+    <!-- On the newcomer's «Что брать» with receipts it is a row of its own under the cycle (2a): the
+         card is drawn here, around the row alone — around this component it would draw the kit's
+         hairline over the sheets below as well. The chevron is В-14's either way: «Где вы?», or with a
+         record open the fork whose both ways go on to fields (MOL-203, adversarial А2). -->
+    <AppCard v-if="row" list>
+      <ListRow
+        :icon="IconPencil"
+        :title="t('purchases.manual_by_hand')"
+        :meta="t('advice.home.manual_body')"
+        wrap
+        whole
+        next
+        @click="begin"
+      />
+    </AppCard>
+    <!-- With receipts it is the quieter second way, «Записать вручную» under the camera (handoff 03). -->
+    <AppButton v-else-if="byHand" variant="ghost" block @click="begin">
+      {{ t('purchases.manual_by_hand') }}
+    </AppButton>
+    <AppButton v-else size="large" block @click="begin">
+      <template #icon><IconPencil /></template>
+      {{ t('purchases.manual') }}
+    </AppButton>
+  </template>
 
   <!-- Mounted always and led by `open`: under a `v-if` a sheet would be gone before it could step
        back off its own history entry (MOL-18; review 5). -->
@@ -85,12 +88,17 @@ export default defineComponent({
     byHand: { type: Boolean, default: false },
     /** The same as a row of the kit in a card of its own, with what it is for (MOL-203, 2a). */
     row: { type: Boolean, default: false },
+    /**
+     * No button at all, only the way it opens (MOL-276): «Записать вручную» of «Пробные чеки закончились» calls
+     * `begin` once that sheet is away, so «Где вы?» and «Уже записываете» are asked as the strip's button asks them.
+     */
+    bare: { type: Boolean, default: false },
   },
   emits: {
     /** Whether a sheet of its own is up: the screen keeps the button mounted meanwhile (Р-15). */
     busy: (up: boolean) => typeof up === 'boolean',
   },
-  setup(_props, { emit }) {
+  setup(_props, { emit, expose }) {
     const { t, locale } = useI18n()
     // The screen's day, asked again as the app comes back: the day words are said from it (MOL-329).
     const today = useLocalDay()
@@ -202,6 +210,8 @@ export default defineComponent({
       replacing.value = null
       if (go) afterStep(() => void router.push({ name: 'purchase-manual' }))
     }
+
+    expose({ begin })
 
     return {
       t,

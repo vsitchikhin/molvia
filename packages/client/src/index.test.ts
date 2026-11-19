@@ -6,6 +6,8 @@ import {
   RECEIPT_FOOD_HEADER,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
+  RECEIPTS_ACCESS_HEADER,
+  RECEIPTS_BY_MODEL_HEADER,
   TODAY_HEADER,
   TRIP_HISTORY_CATEGORY_HEADER,
   VERSION_HEADER,
@@ -441,6 +443,16 @@ describe('what the client knows about identity', () => {
     await client.me()
 
     expect(calls[0]?.credentials).toBe('same-origin')
+  })
+
+  it('asks who reads the receipts and where the person stands with the model (MOL-408, MOL-276)', async () => {
+    // Both only to a phone that asks: a build before them reads the answer strictly.
+    const { client, calls } = clientRecording()
+
+    await client.me()
+
+    expect(calls[0]?.headers.get(RECEIPTS_BY_MODEL_HEADER)).toBe('1')
+    expect(calls[0]?.headers.get(RECEIPTS_ACCESS_HEADER)).toBe('1')
   })
 
   it('can be told otherwise, which is what a client outside a browser is', async () => {
