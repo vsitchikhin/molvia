@@ -142,8 +142,16 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   keys under an upload are kept by the account the key reads (`statementKeyAccount`): masks of one number are one, and
   the statement's own are its lines'. **A refund weighs too** (adversarial А23): it is looked for among the purchases
   and the records of its own sum alone, and every seller it may weigh — a «+» line against each purchase of its sum (В3)
-  and each record of it (Г4) — is `STATEMENT_SELLER_WEIGHT` (8) pairs, words one edit apart some 2.7 µs; before, a
-  statement of «+» lines alone weighed nothing and went through every record, 24 s. A year of
+  and each record of it (Г4) — is weighed by its names, both ways; before, a statement of «+» lines alone weighed
+  nothing and went through every record, 24 s. **Names weigh by their words** (adversarial А24: the pair's 0.33 µs
+  was measured on names of two words, and fifty words against twenty took 0.4 ms a pair, 15 s at 1.5 % of the
+  ceiling): two names weigh a pair a word against a word and one more per `STATEMENT_LETTERS_PER_PAIR` (32) of their
+  letters multiplied (`statementNamesWeight`; measured, 0.04–0.27 µs a unit), a pair's names only beyond
+  `STATEMENT_NAMES_IN_A_PAIR` (4), those it was measured with; the pairs that fit are found first, their names
+  weighed, and only then compared — none past the ceiling. A seller's name is read by its first `SELLER_WORDS_MAX`
+  (8) words, each by its first `SELLER_WORD_LETTERS` (20) letters, and two words further apart in length than
+  their edits are never measured. **The price, named:** a note listing a whole basket is read by its first eight
+  words, and a statement of thousands of lines of one sum against such notes is refused. A year of
   3 000 lines against 3 000 records linked to screenshots weighs some 1 500 000, half a second here; the same in one
   month weighs all 9 000 000, seconds. The answer carries `pairs` and `steps`, for the log; a counter kept in the domain
   was state a pure rule had no business keeping (review №19). A month against a year with no links, folded a pair at a time,
