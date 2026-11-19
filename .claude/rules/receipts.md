@@ -508,13 +508,18 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   to the developer, the reading opened — pulled it out by its `v-if` in one frame: its history entry stayed with no step
   back, the button stayed «busy», and the next closing of the reading stood it up again with no tap.
 - **Not known is no sheet** (Р-2): a launch offline, a server before MOL-275, the login's own answer — the camera
-  opens, and the server decides who reads. **A screen with the camera keeps `/actors/me` fresh** (`useAccessKeptFresh`,
-  `askAgain` — `verify`, one request whatever asks; Р-3): as the app comes back into view; at midnight (adversarial А3:
-  the month's hundred opens on the 1st, and an app left on the screen over midnight said «снова с 1 декабря» on the
-  1st); as it comes, where the figures are of a month before the phone's (Б2: an app put away on «Деньги» over
-  midnight and opened on «Покупки» on the 1st asked nobody); and as a paid reading's `until` passes with it in view, a
-  day ahead at most (Б3: Georgia's camera stayed for a receipt nobody would read). The phone only decides to ask; what
-  it says is the answer. The settings ask as they open, and again at midnight with the row in view.
+  opens, and the server decides who reads. **The screens that hold the camera keep `/actors/me` fresh** — «Что брать»
+  and «Покупки», never the button (`useAccessKeptFresh`, `askAgain` — `verify`, one request whatever asks; Р-3), the
+  one rule of when to ask (review №12): as the app comes back into view; at midnight (adversarial А3: the month's
+  hundred opens on the 1st, and an app left on the screen over midnight said «снова с 1 декабря» on the 1st); as the
+  screen comes, where the figures are of a month before the phone's (Б2: an app put away on «Деньги» over midnight and
+  opened on «Покупки» on the 1st asked nobody); and as a paid reading's `until` passes with it in view, a day ahead at
+  most (Б3: Georgia's camera stayed for a receipt nobody would read) — once a moment, never once an answer: every
+  answer is a new `Date`, and a phone whose clock ran ahead of the server's asked every two seconds (В1). **Not the
+  button, since the button may be gone** (В2): Georgia with its share or the cap spent draws none, and the 1st that gave
+  the share back was heard by nobody until a restart. Only where receipts are read off the photo — nothing else changes
+  with the answer. The phone only decides to ask; what it says is the answer. The settings' form reads `/actors/me` as
+  it opens and as the app comes back, so their row keeps only the midnight and a grant's end (`readByScreen`).
 - **Georgia keeps its camera when the tariff is closed** (В-2 «а»): a tap says why and offers the record by hand, where
   the button gone after the tenth receipt said nothing; a share or the cap spent still takes it away (`receiptsByModel`).
   «Переснять» of the review stays Georgia's only while the model reads: a new shot of a closed tariff is read by nobody.
@@ -530,7 +535,8 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   at most, per sign-in; a sheet up while the reading opens under it keeps its words until put away, and «Сфотографировать»
   there is read by whoever the server then decides; offline over midnight, or past a grant's end, the row and the sheet
   still say what the server last said until it answers — the phone counts nothing; a grant more than a day off is waited
-  for by the next midnight's answer, not by a timer; and a grant run out while trial receipts were left is said with the
+  for by the next midnight's answer, not by a timer, and so is the end of one a phone whose clock runs ahead asked about
+  too early — one ask a moment, then midnight or the app's return; and a grant run out while trial receipts were left is said with the
   trial once that trial is spent, by the grant's date.
 
 ## The class code (MOL-226)
