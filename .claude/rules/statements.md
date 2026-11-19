@@ -107,8 +107,11 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   through leads nowhere until a line is matched, so the next line's search skips it (А20: a crowd of one sum, more
   lines than records, searched every record again for every line left over — 10⁹ steps, 20–27 s under the ceiling of
   pairs; now 0.7 s, the steps of the order of the pairs, and the answer the same). The answer counts them (`steps`), a
-  test holds them. **The price, named:** a chain of records each a rank apart — the share of the name, the day — is
-  still Kuhn's, its steps unbounded by the ceiling.
+  test holds them. **The matching's steps have a ceiling of their own** (`STATEMENT_STEPS_MAX`, twenty million, some
+  0.6 s): two ranks are enough to undo the shortcut — a crowd of one sum on one day, its free records the next day, a
+  rank worse, sends every line left over through the whole crowd (adversarial А22: 856 642 712 steps, 25 s under the
+  ceiling of pairs) — and past it the rule stops and answers `too_heavy`. **The price, named:** such a crowd, some
+  hundreds of rides of one price a day, is refused rather than matched.
 - **The link decides another line** (Г2, Д1, Д2, Е1, Е2), past the window too where it names it: its own line, by its
   key; another form on the link's day, ± 1 for a form whose day moves — **and a screenshot against a file's line by
   the posting day the file prints, and by it alone** (adversarial А1, А11: the bench took a screenshot's day for the
