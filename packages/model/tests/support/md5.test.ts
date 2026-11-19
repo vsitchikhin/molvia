@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
-import { md5Hex } from '#model/support/md5'
+import { md5Hex, nameUuid } from '#model/support/md5'
 
 const nodeMd5 = (bytes: Uint8Array): string => createHash('md5').update(bytes).digest('hex')
 
@@ -17,5 +17,22 @@ describe('md5Hex', () => {
       const bytes = Uint8Array.from({ length }, (_, i) => (i * 37 + length) & 255)
       expect(md5Hex(bytes), `length ${String(length)}`).toBe(nodeMd5(bytes))
     }
+  })
+})
+
+describe('nameUuid', () => {
+  const DNS = '6ba7b810-9dad-11d1-80b4-00c04fd430c8'
+
+  it('gives the version-3 uuid of RFC 4122 for a name in the DNS namespace', () => {
+    expect(nameUuid(DNS, 'www.example.com')).toBe('5df41881-3aed-3515-88a7-2f4a814cf09e')
+  })
+
+  it('is the same for the same name and another for another name', () => {
+    expect(nameUuid(DNS, 'Ереван Сити')).toBe(nameUuid(DNS, 'Ереван Сити'))
+    expect(nameUuid(DNS, 'Ереван Сити')).not.toBe(nameUuid(DNS, 'Ереван Сити '))
+  })
+
+  it('refuses a namespace that is not a uuid', () => {
+    expect(() => nameUuid('dns', 'x')).toThrow()
   })
 })
