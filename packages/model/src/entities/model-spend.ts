@@ -120,3 +120,37 @@ export function modelSpendStep(spentMicroUsd: number, capMicroUsd: number): Mode
 
 /** The month a call is counted in: the calendar month in UTC, as Anthropic bills. */
 export const spendMonthOf = (at: Date): string => `${at.toISOString().slice(0, 7)}-01`
+
+/**
+ * The receipts the model reads free for anyone who has never paid (MOL-275, MOL-271's «пробник»): the first ten of
+ * their life, a count on the person that only goes down, spent only while no paid access is open
+ * (`receipts_model_until`).
+ */
+export const RECEIPT_TRIAL = 10
+
+/**
+ * The receipts the model reads a person in their month at most, paid or on the trial (MOL-275, MOL-271: the tariff of
+ * receipts is «до 100 в месяц»). The month is the phone's when the receipt was sent (MOL-121); a receipt counts once
+ * its reading reached the review, a repeat of a counted one never. Beside the share's dollars, which hold the money.
+ */
+export const RECEIPTS_MODEL_MONTH_MAX = 100
+
+/**
+ * The share of the month's cap past which the model no longer reads on the trial (MOL-275, owner's В-3 «а»): the
+ * trial stops first, paid access last; half, the owner's first notice, so the day it stops is the day he hears.
+ */
+export const RECEIPT_TRIAL_CAP_PERCENT = 50
+
+/** What of the month's cap the trial may take: `RECEIPT_TRIAL_CAP_PERCENT` of it, to the micro-dollar below. */
+export const trialCapMicroUsd = (capMicroUsd: number): number =>
+  Math.floor((capMicroUsd * RECEIPT_TRIAL_CAP_PERCENT) / 100)
+
+/** The month a receipt sent on the phone's `day` counts in (MOL-275, MOL-121): its first day, `YYYY-MM-01`. */
+export const receiptsMonthOf = (day: string): string => `${day.slice(0, 7)}-01`
+
+/**
+ * How a receipt the model read was counted (MOL-275): `trial` — a trial receipt and a place in the hundred, `month` — a
+ * place alone, the reading paid. «Переснять» gives back what it took (owner's В-4 «а»), so it is kept.
+ */
+export const RECEIPT_COUNTS = ['trial', 'month'] as const
+export type ReceiptCount = (typeof RECEIPT_COUNTS)[number]

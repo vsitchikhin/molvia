@@ -562,6 +562,7 @@ export function createTripRepository(db: Conn): TripRepository {
           finishedAt: trips.finishedAt,
           finishedOnDeviceAt: trips.finishedOnDeviceAt,
           fromReceipt: sql<boolean>`exists (select 1 from receipts r where r.trip_id = ${trips.id})`,
+          categoryId: trips.categoryId,
           cursorAt: sql<string>`to_char(${time} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.US"Z"')`,
         })
         .from(trips)
@@ -582,20 +583,23 @@ export function createTripRepository(db: Conn): TripRepository {
       const last = page.at(-1)
       const sums = await purchasesOf(page.map((row) => row.id))
       return {
-        trips: page.map(({ id, place, startedAt, finishedAt, finishedOnDeviceAt, fromReceipt }) => {
-          if (!finishedAt) throw new Error('history contained an unfinished trip')
-          const counted = sums.get(id)
-          return {
-            id,
-            place,
-            startedAt,
-            finishedAt,
-            finishedOnDeviceAt,
-            itemCount: counted?.itemCount ?? 0,
-            total: counted ? counted.total : [],
-            fromReceipt,
-          }
-        }),
+        trips: page.map(
+          ({ id, place, startedAt, finishedAt, finishedOnDeviceAt, fromReceipt, categoryId }) => {
+            if (!finishedAt) throw new Error('history contained an unfinished trip')
+            const counted = sums.get(id)
+            return {
+              id,
+              place,
+              startedAt,
+              finishedAt,
+              finishedOnDeviceAt,
+              itemCount: counted?.itemCount ?? 0,
+              total: counted ? counted.total : [],
+              fromReceipt,
+              categoryId,
+            }
+          },
+        ),
         nextCursor:
           rows.length > TRIP_HISTORY_PAGE_SIZE && last ? { at: last.cursorAt, id: last.id } : null,
       }

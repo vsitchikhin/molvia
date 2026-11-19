@@ -1,8 +1,8 @@
 import { eq, sql } from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
-import { modelSpendStep } from '@molvia/model'
+import { modelSpendStep, trialCapMicroUsd } from '@molvia/model'
 import type { ModelShareNotice, ModelSpendNotice, ModelSpendStep } from '@molvia/model'
-import { READS_BY_MODEL } from './actors-repository'
+import { PAID_BY_MODEL, readsByModel } from './actors-repository'
 import type { Conn, Db } from './index'
 import { idOrNull } from './rows'
 import { actors, modelSpend, ownerNotices } from './schema'
@@ -14,6 +14,15 @@ export interface MonthSpend {
   readonly noticed: number
 }
 
+/**
+ * The two months of a person's reading (MOL-275): the spending's — UTC, the bill's — and the phone's a receipt counts
+ * its hundred in. Named apart, so they are never passed one for the other.
+ */
+export interface ModelMonths {
+  readonly spend: string
+  readonly receipts: string
+}
+
 /** Whose call it is and what holds it (MOL-367): the month's cap and the person's share of it. */
 export interface ModelCall {
   readonly actorId: string
@@ -21,8 +30,11 @@ export interface ModelCall {
   readonly shareMicroUsd: number
 }
 
-/** A call reserved, or refused by the person's share or by the month's cap. */
-export type ModelReserved = 'reserved' | 'share' | 'cap'
+/**
+ * A call reserved, or refused by the person's share, by the month's cap — or, on the trial, by the trial's part of the
+ * cap (MOL-275, `trialCapMicroUsd`).
+ */
+export type ModelReserved = 'reserved' | 'share' | 'cap' | 'trial'
 
 /**
  * The month's spending on the model that reads receipts (MOL-272): the cap is held here, in one statement
@@ -34,7 +46,9 @@ export interface ModelSpendRepository {
   /**
    * Counts a call's worst price into the person's share and its month if both stay within their bounds, and
    * says which refused it: the share leaves the month untouched, the cap gives the share back. The owner hears
-   * of the stop once a month, and of a person's share reached once a person a month.
+   * of the stop once a month, and of a person's share reached once a person a month. **A person on the trial is held
+   * to the trial's part of the cap** (MOL-275, owner's В-3 «а»): refused there, `'trial'`, the share given back and
+   * no stop told — the month still takes the paid — but the half told once a month, if it was not (adversarial А1).
    */
   reserve(month: string, worstMicroUsd: number, call: ModelCall, at: Date): Promise<ModelReserved>
   /**
@@ -57,11 +71,12 @@ export interface ModelSpendRepository {
   keepInMonth(month: string, worstMicroUsd: number, call: ModelCall): Promise<void>
   month(month: string): Promise<MonthSpend | null>
   /**
-   * Whether the model reads for the person now (MOL-408, adversarial А3, Р2-А1): granted and edition 5
-   * (`READS_BY_MODEL`), and a call of `worstMicroUsd` would fit their share of the month and the month's cap — by
-   * `reserve`'s own inequality, `fits`, over the same spending. What `/actors/me` offers Georgia's camera by.
+   * Whether the model reads for the person now (MOL-408, adversarial А3, Р2-А1; MOL-275): `readsByModel` of the
+   * phone's month — edition 5, paid or on the trial, the hundred not read — and a call of `worstMicroUsd` would fit
+   * their share of the spending's month and its cap, the trial's part of it on the trial — by `reserve`'s own
+   * inequality, `fits`, over the same spending. What `/actors/me` offers Georgia's camera by.
    */
-  readsFor(month: string, worstMicroUsd: number, call: ModelCall): Promise<boolean>
+  readsFor(months: ModelMonths, worstMicroUsd: number, call: ModelCall): Promise<boolean>
 }
 
 /** What the person has spent of `month`, as their share counts it: a month gone is nought. */
@@ -76,6 +91,31 @@ const fits = (spent: SQL, worstMicroUsd: number, bound: number) =>
 const monthSpentOf = (month: string) =>
   sql`coalesce((select ${modelSpend.spentMicroUsd} from ${modelSpend} where ${modelSpend.month} = ${month}::date), 0)`
 
+/**
+ * A step of the month told once (В-2 «а»): marked in the month's row where it was not, and told in the same transaction
+ * — the stop at the first call the cap refuses, the half at the trial's first refusal (MOL-275, adversarial А1).
+ */
+async function noticeOnce(
+  tx: Conn,
+  owner: boolean,
+  month: string,
+  step: ModelSpendStep,
+  capMicroUsd: number,
+  at: Date,
+): Promise<void> {
+  const [row] = await tx.execute<{ spent: string }>(sql`
+    insert into ${modelSpend} (month, noticed) values (${month}::date, ${step}::smallint)
+    on conflict (month) do update set noticed = ${step}::smallint where ${modelSpend.noticed} < ${step}::smallint
+    returning spent_micro_usd as spent`)
+  if (row === undefined) return
+  await tell(
+    tx,
+    owner,
+    { kind: 'model_spend', month, step, spentMicroUsd: Number(row.spent), capMicroUsd },
+    at,
+  )
+}
+
 async function tell(
   tx: Conn,
   owner: boolean,
@@ -87,10 +127,11 @@ async function tell(
 }
 
 /**
- * The person's share of the month taken, in one statement under their row's lock: a new month starts it at nought.
+ * The person's share of the month taken, in one statement under their row's lock: a new month starts it at nought —
+ * and whether their reading is paid (MOL-275, `PAID_BY_MODEL`), read in the same statement.
  * **The month only moves on** (adversarial А4): a call whose month was taken before midnight, reserved after a call of
  * the new one — two processes at a rollout, a clock stepped back — counts in the new month's share, never sets it back
- * to the old one and its spending to nought. `false` where the call would not fit — or the person is gone, erased while
+ * to the old one and its spending to nought. `null` where the call would not fit — or the person is gone, erased while
  * their receipt was read.
  */
 async function takeShare(
@@ -98,26 +139,28 @@ async function takeShare(
   month: string,
   worstMicroUsd: number,
   { actorId, shareMicroUsd }: ModelCall,
-): Promise<boolean> {
+): Promise<{ readonly paid: boolean } | null> {
   const spent = spentOf(month)
-  const taken = await tx.execute(sql`
+  const [taken] = await tx.execute<{ paid: boolean }>(sql`
     update ${actors}
     set model_month = greatest(${actors.modelMonth}, ${month}::date),
         model_spent_micro_usd = ${spent} + ${worstMicroUsd}::bigint
     where ${actors.id} = ${actorId} and ${fits(spent, worstMicroUsd, shareMicroUsd)}
-    returning 1`)
-  return taken.length > 0
+    returning ${PAID_BY_MODEL} as paid`)
+  return taken === undefined ? null : { paid: taken.paid }
 }
 
 export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRepository {
   return {
-    async readsFor(month, worstMicroUsd, { actorId, capMicroUsd, shareMicroUsd }) {
+    async readsFor({ spend: spendMonth, receipts: receiptsMonth }, worstMicroUsd, call) {
+      const { actorId, capMicroUsd, shareMicroUsd } = call
       if (idOrNull(actorId) === null) return false
       const [row] = await db
         .select({
-          reads: sql<boolean>`${READS_BY_MODEL}
-            and ${fits(spentOf(month), worstMicroUsd, shareMicroUsd)}
-            and ${fits(monthSpentOf(month), worstMicroUsd, capMicroUsd)}`,
+          reads: sql<boolean>`${readsByModel(sql`${receiptsMonth}::date`)}
+            and ${fits(spentOf(spendMonth), worstMicroUsd, shareMicroUsd)}
+            and ${fits(monthSpentOf(spendMonth), worstMicroUsd, capMicroUsd)}
+            and (${PAID_BY_MODEL} or ${fits(monthSpentOf(spendMonth), worstMicroUsd, trialCapMicroUsd(capMicroUsd))})`,
         })
         .from(actors)
         .where(eq(actors.id, actorId))
@@ -128,7 +171,8 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
       const { actorId, capMicroUsd, shareMicroUsd } = call
       return db.transaction(async (tx) => {
         // the account first, as every lock is taken (privacy.md)
-        if (!(await takeShare(tx, month, worstMicroUsd, call))) {
+        const taken = await takeShare(tx, month, worstMicroUsd, call)
+        if (taken === null) {
           // once a month, and never again for a month told before a later one (adversarial А4б)
           const reached = await tx.execute(sql`
             update ${actors} set model_share_told = ${month}::date
@@ -140,40 +184,35 @@ export function createModelSpendRepository(db: Db, owner: boolean): ModelSpendRe
           }
           return 'share'
         }
-        // one statement takes the month's row and holds the cap: no second call fits between a read and a
-        // write, whatever runs beside it
+        // one statement takes the month's row and holds the cap — the trial's part of it on the trial (MOL-275): no
+        // second call fits between a read and a write, whatever runs beside it
+        const bound = taken.paid ? capMicroUsd : trialCapMicroUsd(capMicroUsd)
         const counted = await tx.execute<{ spent: string }>(sql`
           insert into ${modelSpend} (month, spent_micro_usd, calls)
-          select ${month}::date, ${worstMicroUsd}::bigint, 1 where ${fits(sql`0`, worstMicroUsd, capMicroUsd)}
+          select ${month}::date, ${worstMicroUsd}::bigint, 1 where ${fits(sql`0`, worstMicroUsd, bound)}
           on conflict (month) do update
             set spent_micro_usd = ${modelSpend.spentMicroUsd} + excluded.spent_micro_usd,
                 calls = ${modelSpend.calls} + 1
-            where ${fits(sql`${modelSpend.spentMicroUsd}`, worstMicroUsd, capMicroUsd)}
+            where ${fits(sql`${modelSpend.spentMicroUsd}`, worstMicroUsd, bound)}
           returning spent_micro_usd as spent`)
         if (counted.length > 0) return 'reserved'
         // the share given back: the call is not made
         await tx.execute(sql`
           update ${actors} set model_spent_micro_usd = ${actors.modelSpentMicroUsd} - ${worstMicroUsd}::bigint
           where ${actors.id} = ${actorId}`)
-        const stopped = await tx.execute<{ spent: string }>(sql`
-          insert into ${modelSpend} (month, noticed) values (${month}::date, 100)
-          on conflict (month) do update set noticed = 100 where ${modelSpend.noticed} < 100
-          returning spent_micro_usd as spent`)
-        const [row] = stopped
-        if (row !== undefined) {
-          await tell(
-            tx,
-            owner,
-            {
-              kind: 'model_spend',
-              month,
-              step: 100,
-              spentMicroUsd: Number(row.spent),
-              capMicroUsd,
-            },
-            at,
+        // refused by the trial's part alone, the cap still takes the paid: no stop to tell — but the half, once a
+        // month, here: a month the trial alone reads settles below it for good, the worst reserved above its own
+        // price, and the owner would hear neither (MOL-275, adversarial А1)
+        if (!taken.paid) {
+          const [fitsCap] = await tx.execute<{ fits: boolean }>(
+            sql`select ${fits(monthSpentOf(month), worstMicroUsd, capMicroUsd)} as fits`,
           )
+          if (fitsCap?.fits === true) {
+            await noticeOnce(tx, owner, month, 50, capMicroUsd, at)
+            return 'trial'
+          }
         }
+        await noticeOnce(tx, owner, month, 100, capMicroUsd, at)
         return 'cap'
       })
     },

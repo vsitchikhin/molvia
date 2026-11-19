@@ -60,9 +60,10 @@ file holds what belongs to no single area, and what the audit found missing.
   (`addressMinute`). A forged header changes nothing — the audit sent sixty under sixty addresses
   and was refused at the sixty-first. **The address is a key of a count, never a column or a line of the
   log** (`privacy.md`).
-- **The money of the owner is the model's alone, and only a column the owner writes opens it**:
-  `receipts_model_until`, set by hand, and no route writes it. Within it there is no share per person yet
-  (MOL-367).
+- **The money of the owner is the model's alone, and only a column the owner writes or the trial opens it**:
+  `receipts_model_until`, set by hand, and no route writes it; the trial is ten receipts a person, held to half the
+  month's cap, and every reading to a hundred a month (MOL-275) — a stranger's way to the owner's money is a new
+  account's ten, behind the login's quota. Within it, the person's share of the month (MOL-367).
 
 ## What the server asks of others
 

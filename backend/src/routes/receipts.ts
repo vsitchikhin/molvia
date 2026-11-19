@@ -12,6 +12,7 @@ import {
   RECEIPT_PAID_BY_HEADER,
   RECEIPT_BILL_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
+  RECEIPT_FOOD_HEADER,
   ERROR,
   RECEIPT_PART_BYTES_MAX,
   receiptBodySchema,
@@ -43,7 +44,8 @@ export interface ReceiptsApi {
   ): Promise<{ receipt: ReceiptSummary; created: boolean }>
   putPart(actorId: string, id: string, part: string, photo: Buffer): Promise<ReceiptSummary>
   /** `shown` — the phone asked with its page in view (MOL-129, А1): what it is handed read is heard. */
-  list(actor: Actor, shown: boolean): Promise<ReceiptSummary[]>
+  /** `food` — the phone knows a summary's `food` (`RECEIPT_FOOD_HEADER`, MOL-406). */
+  list(actor: Actor, shown: boolean, food: boolean): Promise<ReceiptSummary[]>
   /**
    * The review reads the rate of the receipt's day, and «today» is the phone's (MOL-121). `codes` — the
    * phone knows a line's `code` (`RECEIPT_CODES_HEADER`, MOL-234, adversarial А3); `readTotal` — the
@@ -129,6 +131,11 @@ function paidByOf(request: FastifyRequest): boolean {
 /** Whether the phone knows the detail's `service` and `slip` (MOL-310). */
 function billOf(request: FastifyRequest): boolean {
   return request.headers[RECEIPT_BILL_HEADER.toLowerCase()] === '1'
+}
+
+/** Whether the phone knows a summary's `food` (MOL-406). */
+function foodOf(request: FastifyRequest): boolean {
+  return request.headers[RECEIPT_FOOD_HEADER.toLowerCase()] === '1'
 }
 
 function ownerOf(request: FastifyRequest): string {
@@ -223,7 +230,7 @@ export function receiptRoutes(app: FastifyInstance, api: ReceiptsApi): void {
     scope.get('/receipts', { exposeHeadRoute: false }, async (request, reply) =>
       privately(reply).send(
         z.encode(receiptsResponseCodec, {
-          receipts: await api.list(actorOf(request), shownOf(request)),
+          receipts: await api.list(actorOf(request), shownOf(request), foodOf(request)),
         }),
       ),
     )

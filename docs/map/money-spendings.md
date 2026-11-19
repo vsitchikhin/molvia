@@ -72,7 +72,8 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 - `frontend/src/components/ChartsYear.vue` — «Графики → Год» (MOL-160): «‹ 2026 ›», the year's ring, twelve months against the usual, in and out with the year's «Разница», a category by month chosen by a sector of the ring too.
 - `frontend/src/components/CategoryChips.vue` — Category chips of a spending (MOL-198): two rows by the browser's measure of the chips, «Ещё…» last in the second, the radios only of the chips shown, nothing preselected.
 - `frontend/src/components/CategoryPickerSheet.vue` — «Категория» over the spending sheet (MOL-198): every category in the chips' order on `ListRow` with its dot, a tap chooses and goes back, «+ Своя» last — none over a trip's (`addable`, MOL-400).
-- `frontend/src/components/TripCategoryRow.vue` — «Категория ›» of a trip (MOL-400): a field's `NavRow` with the category's icon on the receipt's review, in «Закончить» and in the summary of «Траты», opening `CategoryPickerSheet` with no «+ Своя»; none chosen — «Продукты».
+- `frontend/src/components/TripCategoryRow.vue` — «Категория ›» of a trip (MOL-400): a field's `NavRow` with the category's icon on the receipt's review, in «Закончить» and in the summary of «Траты», opening `CategoryPickerSheet` with no «+ Своя»; none chosen — «Продукты»; one the list lacks — the cart and «Прочее», nothing chosen (MOL-406).
+- `frontend/src/components/TripCategoryRow.test.ts` — Component test: the field names the trip's category, «Продукты» for none, the cart for one the list lacks.
 - `frontend/src/components/CategorySheet.vue` — «Новая категория» over the spending sheet — from «Ещё…», taking the list with it when made (`closes`, MOL-198) — or from «Категории», and one's own amended (MOL-285): a name, an icon of the set, a colour of the palette, through the queue; a preset's name refused; «Убрать категорию» in the footer of one's own.
 - `frontend/src/components/MoneyAccountsNow.vue` — «На счетах сейчас» over the switcher of «Деньги» (MOL-183): the live accounts now in the income currency, «можно тратить», the count, the one way into «Счета».
 - `frontend/src/components/MoneyEntries.vue` — The ways out of «Деньги», rows of `NavRow`: «Траты» and «Бюджет» of the month, «Счета» only without «На счетах сейчас», «Обмен денег», «Доходы», «Категории», each with one figure or none until known.
@@ -98,6 +99,7 @@ Rules: `.claude/rules/money-spendings.md`. A test beside its source, or mirrorin
 ## frontend · stores
 
 - `frontend/src/stores/placeCategories.ts` — The category of the last trip at each place (MOL-400, Р-6): the server's answer laid over what this phone recorded since, per owner; what the guess of a receipt and «Закончить» starts from.
+- `frontend/src/composables/usePlaceCategories.ts` — Composable: the places' last categories for a screen's guess — kept at once, the server's laid over them on its answer; one for a receipt's review and its row in «Покупки» (MOL-406).
 - `frontend/src/stores/spendingHandoff.ts` — Store: a record with no purchases handed over to «Деньги» as a spending (MOL-78, В-1), taken once by the sheet.
 - `frontend/src/stores/spendingQueue.ts` — Store: the on-device queue of every spending and category write, folded while waiting, sent one window at a time.
 

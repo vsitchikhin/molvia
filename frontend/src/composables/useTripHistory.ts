@@ -23,6 +23,8 @@ export interface HistoryRow {
   fromReceipt: boolean
   /** Finished on this phone and in no answer yet: no read drew it, failed or not (adversarial Б3). */
   onPhone: boolean
+  /** Its category (MOL-406), `null` — «Продукты»; absent — not known: a row the phone made, a server before it. */
+  categoryId?: string | null
 }
 interface TripHistoryScreen {
   t: ReturnType<typeof useI18n>['t']
@@ -76,6 +78,9 @@ export function useTripHistory(): TripHistoryScreen {
     // A list moved under every read is the answer by its rows; a count the answer does not say is
     // unknown, never memory said as the answer (MOL-307, owner's В-2 «а»).
     const unsure = moved.value ? history.unconfirmed() : new Set<string>()
+    // A category the last answer does not say is not known whenever there is one, not only while the list moves:
+    // another window's older copy of it reaches the page by the shelf after an answer taken too (MOL-406, Р2-Б2, Р3-В3).
+    const unsureCategory = history.categoryUnconfirmed()
     const rows = new Map(
       history.page.trips.map((row) => [
         row.id,
@@ -88,6 +93,9 @@ export function useTripHistory(): TripHistoryScreen {
           total: unsure.has(row.id) ? null : row.total,
           fromReceipt: row.fromReceipt,
           onPhone: false,
+          ...(row.categoryId === undefined || unsureCategory.has(row.id)
+            ? {}
+            : { categoryId: row.categoryId }),
         },
       ]),
     )

@@ -18,6 +18,7 @@ function fakeActors(overrides: Partial<ActorRepository> = {}): ActorRepository {
     acceptConsent: () => Promise.reject(new Error('acceptConsent was not expected')),
     markSeen: () => Promise.reject(new Error('markSeen was not expected')),
     markLocale: () => Promise.reject(new Error('markLocale was not expected')),
+    modelAccess: () => Promise.reject(new Error('modelAccess was not expected')),
     ...overrides,
   }
 }
@@ -66,7 +67,15 @@ describe('createActor', () => {
       },
     })
 
-    for (const zone of ['Asia/Tbilisi', 'Europe/Belgrade', 'Asia/Yerevan', 'Europe/Moscow']) {
+    const zones = [
+      'Asia/Tbilisi',
+      'Europe/Belgrade',
+      'Asia/Yerevan',
+      'Europe/Moscow',
+      'Europe/Volgograd',
+      'Europe/Samara',
+    ]
+    for (const zone of zones) {
       await createActor(actors, TELEGRAM_ID, zone)
     }
     await createActor(actors, TELEGRAM_ID)
@@ -75,14 +84,20 @@ describe('createActor', () => {
       ['GE', 'Тбилиси'],
       ['RS', 'Белград'],
       ['AM', 'Гюмри'],
+      // Volgograd's phone names a zone of its own, on Moscow's clock (MOL-412); Samara's is MOL-419's
+      ['RU', 'Москва'],
+      ['RU', 'Москва'],
       ['AM', 'Гюмри'],
       ['AM', 'Гюмри'],
     ])
-    // Tbilisi spends lari (MOL-110), Belgrade dinars (MOL-230); the income stays the rouble.
+    // Tbilisi spends lari (MOL-110), Belgrade dinars (MOL-230), Moscow roubles (MOL-412); the
+    // income stays the rouble.
     expect(written.map((input) => [input.spendCurrency, input.incomeCurrency])).toEqual([
       ['GEL', 'RUB'],
       ['RSD', 'RUB'],
       ['AMD', 'RUB'],
+      ['RUB', 'RUB'],
+      ['RUB', 'RUB'],
       ['AMD', 'RUB'],
       ['AMD', 'RUB'],
     ])

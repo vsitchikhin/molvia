@@ -5,16 +5,20 @@ import type { ActorRepository } from '@/db/actors-repository'
 
 /**
  * What a country's shops take, where it is not the dram: a person from Tbilisi starts spending lari
- * (MOL-110), one from Belgrade dinars (MOL-230).
+ * (MOL-110), one from Belgrade dinars (MOL-230), one from Moscow roubles (MOL-412).
  */
-const SPEND_CURRENCY: Readonly<Partial<Record<string, Currency>>> = { GE: 'GEL', RS: 'RSD' }
+const SPEND_CURRENCY: Readonly<Partial<Record<string, Currency>>> = {
+  GE: 'GEL',
+  RU: 'RUB',
+  RS: 'RSD',
+}
 
 /**
  * Four columns are NOT NULL, so the server names them before the person has seen the settings.
  * The country and its first city are `firstGeography`'s — the ones the phone's time zone lives in
- * (MOL-109, В-3): a person from Belgrade does not start in Gyumri, and every other zone does, as
- * every account began before. The spending currency is the country's (`SPEND_CURRENCY`), the
- * income one the author's ruble; the settings change all four in a tap.
+ * (MOL-109, В-3): a person from Belgrade or Moscow does not start in Gyumri, and every other zone
+ * does, as every account began before. The spending currency is the country's (`SPEND_CURRENCY`),
+ * the income one the author's ruble; the settings change all four in a tap.
  */
 function firstVisit(zone: string | undefined): NewActor {
   const geography = firstGeography(zone)
