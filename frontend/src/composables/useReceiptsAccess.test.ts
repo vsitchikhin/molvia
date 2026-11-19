@@ -119,6 +119,40 @@ describe('where the person stands, kept fresh by the screen that holds the camer
     expect(me).toHaveBeenCalledTimes(1)
   })
 
+  it('arms the grant’s end by the answer at midnight, the screen open more than a day before it (adversarial Г1)', async () => {
+    vi.useFakeTimers({ now: new Date('2026-12-18T08:00:00Z'), toFake: ['Date', 'setTimeout'] })
+    const until = new Date('2026-12-19T10:00:00Z')
+    const asked: number[] = []
+    // the server's word by its clock, the same as the phone's: the grant goes on until 10:00
+    me.mockImplementation(() => {
+      asked.push(Date.now())
+      return Promise.resolve({
+        ...GEORGIA,
+        receiptsAccess:
+          Date.now() < until.getTime()
+            ? { ...OPEN, month: '2026-12-01', until: new Date(until) }
+            : { ...OPEN, month: '2026-12-01', trialLeft: 0, ended: new Date(until) },
+      })
+    })
+    await screen({ ...GEORGIA, receiptsAccess: { ...OPEN, month: '2026-12-01', until } })
+    await vi.advanceTimersByTimeAsync(26 * 60 * 60_000 + 5 * 60_000)
+    expect(asked.filter((at) => at >= until.getTime())).toHaveLength(1)
+    expect(useActorStore().actor?.receiptsAccess?.ended).toEqual(until)
+  })
+
+  it('asks once about a grant the phone’s clock finds over, every answer after it saying it goes on (В1, Г1)', async () => {
+    vi.useFakeTimers({ now: new Date('2026-12-19T10:00:00Z'), toFake: ['Date', 'setTimeout'] })
+    const paid = () => ({ ...OPEN, month: '2026-12-01', until: new Date('2026-12-19T10:00:00Z') })
+    me.mockImplementation(() => Promise.resolve({ ...GEORGIA, receiptsAccess: paid() }))
+    await screen({ ...GEORGIA, receiptsAccess: paid() })
+    await vi.advanceTimersByTimeAsync(60_000)
+    cameBack()
+    await flushPromises()
+    await vi.advanceTimersByTimeAsync(60_000)
+    // one for the grant's end, one for the return — and no timer armed again by either answer
+    expect(me).toHaveBeenCalledTimes(2)
+  })
+
   it('must not ask where receipts are not read off the photo: Serbia’s are their link', async () => {
     await screen({
       ...GEORGIA,
@@ -136,7 +170,7 @@ describe('where the person stands, kept fresh by the screen that holds the camer
 describe('the settings, whose form reads `/actors/me` itself (review №12)', () => {
   it('leave the return and the coming to the form, and keep the midnight', async () => {
     vi.useFakeTimers({ now: new Date(2026, 11, 1, 23, 58), toFake: ['Date', 'setTimeout'] })
-    me.mockResolvedValue({ ...GEORGIA, receiptsAccess: { ...OPEN, month: '2026-12-02' } })
+    me.mockResolvedValue({ ...GEORGIA, receiptsAccess: { ...OPEN, month: '2026-12-01' } })
     await screen({ ...GEORGIA, receiptsAccess: OPEN }, true)
     cameBack()
     await flushPromises()

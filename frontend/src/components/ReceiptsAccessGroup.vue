@@ -20,11 +20,11 @@
 import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconReceipt from '~icons/mdi/receipt-text-outline'
+import type { ReceiptsClosed } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
 import ListRow from '@/components/ListRow.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
-import type { ReceiptsClosed } from '@molvia/model'
 import {
   closedWords,
   monthWords,

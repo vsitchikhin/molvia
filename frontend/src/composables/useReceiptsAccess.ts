@@ -197,18 +197,27 @@ export function useAccessKeptFresh({
     })
   }
 
-  // By the moment, never the object: every answer is a new `Date`, and a phone whose clock runs ahead of the server's
-  // — for it the grant is over, for the server not yet — asked every two seconds until the server's clock got there
-  // (adversarial В1). One ask a grant's end; an answer still saying it, the next midnight or return asks again.
+  // Armed again by every answer — the one at midnight sets the timer for a grant a day off (adversarial Г1) — but
+  // never at once again for a moment already asked about: a phone whose clock runs ahead of the server's finds its
+  // grant over while the server's goes on, and re-armed by each answer it asked every two seconds (В1). One ask a
+  // moment; an answer still saying it, the next midnight or return asks again.
   let grantEnds: ReturnType<typeof setTimeout> | undefined
+  let askedAbout: number | undefined
   watch(
-    () => access.value?.until?.getTime(),
-    (until) => {
+    access,
+    (figures) => {
       clearTimeout(grantEnds)
+      const until = figures?.until?.getTime()
       if (until === undefined) return
       const left = until - Date.now()
-      if (left <= GRANT_WAIT_MAX_MS)
-        grantEnds = setTimeout(askAgain, Math.max(0, left) + GRANT_END_SLACK_MS)
+      if (left > GRANT_WAIT_MAX_MS || (left <= 0 && askedAbout === until)) return
+      grantEnds = setTimeout(
+        () => {
+          askedAbout = until
+          askAgain()
+        },
+        Math.max(0, left) + GRANT_END_SLACK_MS,
+      )
     },
     { immediate: true },
   )
