@@ -11,17 +11,21 @@ import type { ItemNameLanguage, ReceiptCountry } from '#model/entities/receipt'
 // section «Բաժին» — stay hints of the parse: they are the forms of rows, not the country's words.
 
 /**
- * How a country's tills print an amount. The parse counts in hundredths throughout (`hundredthsOf`), so
- * a card names only formats it reads (`PARSED_FRACTION_DIGITS`): the parse refuses a card with none or
- * with another, rather than read every sum of it wrong. Georgia's pharmacies print three decimals,
- * «23.868 ლარი», and come with the parse that reads them (MOL-248).
+ * How a country's tills print an amount. Tesseract's parse counts in hundredths throughout (`hundredthsOf`), so a card
+ * it reads names only formats it reads (`PARSED_FRACTION_DIGITS`): the parse refuses a card with none or with another,
+ * rather than read every sum of it wrong. The model's reading takes three decimals too (MOL-421): Georgia's pharmacies
+ * print «23.868 ლარი», and a receipt whose every amount has three is rounded half up to the hundredth once its lines'
+ * arithmetic held as printed (`MODEL_FRACTION_DIGITS`).
  */
 export interface NumberFormat {
   readonly fractionDigits: number
 }
 
-/** The decimals the parse reads an amount with. */
+/** The decimals Tesseract's parse reads an amount with. */
 export const PARSED_FRACTION_DIGITS: readonly number[] = [2]
+
+/** The decimals the model's reading reads an amount with (MOL-421): hundredths, and a pharmacy's thousandths. */
+export const MODEL_FRACTION_DIGITS: readonly number[] = [2, 3]
 
 /**
  * The words of a country's receipts as OCR reads them — each a fragment of a regular expression, since a
@@ -186,6 +190,9 @@ export interface ReceiptCard {
   readonly photo: PhotoReading | null
 }
 
+/** A word a country's tills never print: a field of the card no rule of that country reads. */
+const NEVER = '(?!)'
+
 /**
  * Armenia: the bench of MOL-114, the layouts of MOL-125, the class code of MOL-226, MOL-227's section.
  * Read by name where a rule is Armenia's alone — the city of an Armenian till's head.
@@ -256,9 +263,6 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
   },
 }
 
-/** A word a country's tills never print: a field of the card no rule of that country reads. */
-const NEVER = '(?!)'
-
 /** Georgia's letters: Mkhedruli, which has no case, and Mtavruli, its capitals for headings. */
 const GEORGIAN = { capital: 'Ა-ᲺᲽ-Ჿ', small: 'ა-ჺჽ-ჿ' }
 
@@ -271,8 +275,8 @@ const SUL = `(?<![${GEORGIAN.small}])სულ(?![${GEORGIAN.small}])`
  * (`research/MOL-229/cards/GE.json`) — and a word no Georgian receipt has shown is `NEVER`, as is what Georgia prints
  * no counterpart of (the card's cashback, the sum since the year's start): a word without a paper behind it would
  * decide what a total is. The model's 5↔6 was seen only where the total put a sum right (Carrefour, MOL-420): a swap of
- * the repair alone, never the shop's memory's doubt, which nobody measured. The pharmacies' three decimals,
- * «23.868 ლარი», are not read: such a figure stays empty (MOL-421).
+ * the repair alone, never the shop's memory's doubt, which nobody measured. The pharmacies print three decimals,
+ * «23.868 ლარი» (ge-04, ge-05): the model's reading takes them (MOL-421).
  */
 export const GEORGIAN_RECEIPTS: PhotoReading = {
   languages: null,
@@ -281,7 +285,8 @@ export const GEORGIAN_RECEIPTS: PhotoReading = {
   tinDigits: [9, 11],
   // the receipt's number «ქვითარი 1687592» (ge-02) is not read yet (Р-5, MOL-422)
   fiscalDigits: [],
-  numbers: [{ fractionDigits: 2 }],
+  // «23.868 ლარი» of the pharmacies (ge-04, ge-05)
+  numbers: [{ fractionDigits: 2 }, { fractionDigits: 3 }],
   swaps: {},
   modelSwaps: {},
   // Carrefour's «5,85» copied «5,86» (ge-03): the total printed twice puts it right (MOL-420)

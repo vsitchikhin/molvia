@@ -1639,6 +1639,89 @@ describe('a Georgian receipt the model read (MOL-408)', () => {
   })
 })
 
+// MOL-421: a Georgian pharmacy's till prints three decimals, «22.368», «23.868 ლარი» (ge-04, ge-05 of MOL-229) — made-up
+// names and sums in its shape
+describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
+  const piece = (printed: string, price: string, sum = price, quantity = '1.000'): Line =>
+    line({ printed, code: null, article: null, quantity, unit_price: price, sum })
+  const pharmacy = (lines: Line[], total: string, label = 'სულ'): ModelReceipt =>
+    answer({
+      shop: 'შპს «აფთიაქი»',
+      address: 'თბილისი',
+      id_rows: [],
+      lines,
+      totals: [{ label, amount: total }],
+    })
+  const readGe = (a: ModelReceipt) => receiptTextOfModel(GEORGIAN_RECEIPTS, a)
+  const sums = (a: ModelReceipt) => readGe(a).lines.map((l) => l.sumHundredths)
+
+  it('reads every amount in tetri, half up, and proves the receipt whole', () => {
+    const text = readGe(
+      pharmacy([piece('ხსნარი 100მლ', '1.500'), piece('სიროფი 100მლ', '22.368')], '23.868'),
+    )
+    expect(text.lines.map((l) => [l.priceHundredths, l.sumHundredths])).toEqual([
+      [150, 150],
+      [2_237, 2_237],
+    ])
+    expect([text.totalHundredths, text.balanced]).toEqual([2_387, true])
+    const shown = verifiedReading(text, { byModel: true }).lines
+    expect(shown.map((l) => l.sumHundredths)).toEqual([150, 2_237])
+  })
+
+  it('rounds the half up and below it down', () => {
+    expect(sums(pharmacy([piece('ა', '0.125')], '0.125'))).toEqual([13])
+    expect(sums(pharmacy([piece('ა', '0.124')], '0.124'))).toEqual([12])
+    expect(sums(pharmacy([piece('ა', '9.995')], '9.995'))).toEqual([1_000])
+  })
+
+  it('judges a line’s arithmetic as printed, in thousandths, before it rounds (Р-2)', () => {
+    // 3 × 0.255 = 0.765 holds; rounded first it is 3 × 0,26 against 0,77
+    const [three] = readGe(pharmacy([piece('ა', '0.255', '0.765', '3.000')], '0.765')).lines
+    expect([three?.priceHundredths, three?.sumHundredths, three?.settled]).toEqual([26, 77, true])
+    // a weight: 0.500 × 3.333 = 1.667
+    const [weighed] = readGe(pharmacy([piece('ა', '3.333', '1.667', '0.500')], '1.667')).lines
+    expect(weighed?.settled).toBe(true)
+    // must not: 1 × 1.004 is no 1.000, though both round to 1,00
+    const [off] = readGe(pharmacy([piece('ა', '1.004', '1.000')], '1.000')).lines
+    expect([off?.priceHundredths, off?.sumHundredths, off?.settled]).toEqual([100, 100, false])
+  })
+
+  it('leaves a receipt whose rounded lines miss its total by a tetri not whole (Р-3)', () => {
+    // 1.005 + 1.005 = 2.010 printed, 1,01 + 1,01 against 2,01 counted
+    const text = readGe(pharmacy([piece('ა', '1.005'), piece('ბ', '1.005')], '2.010'))
+    expect(text.balanced).toBe(false)
+    // its lines of one piece are one number printed twice, shown only on a receipt proven whole (MOL-255)
+    expect(verifiedReading(text, { byModel: true }).lines.map((l) => l.sumHundredths)).toEqual([
+      null,
+      null,
+    ])
+  })
+
+  it('reads three decimals only where every amount has three: one receipt, one format (Р-1)', () => {
+    // must not: a weight copied into a sum of a receipt of two decimals is no 0,45
+    const mixed = pharmacy([piece('ა', '1.50'), piece('ბ', '0.452')], '1.95')
+    expect(sums(mixed)).toEqual([150, null])
+    expect(unparsedFigures(GEORGIAN_RECEIPTS, mixed)).toBe(2)
+    expect(unparsedFigures(GEORGIAN_RECEIPTS, pharmacy([piece('ა', '1.500')], '1.500'))).toBe(0)
+    // must not: a card that names no three decimals reads none — Armenia's, as before
+    const armenian = receiptTextOfModel(
+      ARMENIAN_RECEIPTS,
+      pharmacy([piece('ա', '23.868')], '23.868'),
+    )
+    expect(armenian.lines.map((l) => l.sumHundredths)).toEqual([null])
+    expect(unparsedFigures(ARMENIAN_RECEIPTS, pharmacy([piece('ա', '23.868')], '23.868'))).toBe(3)
+  })
+
+  it('asks the card’s lexicon on the model’s path without a refusal, and refuses a format nobody reads', () => {
+    const paid = pharmacy([piece('ა', '1.500')], '1.500')
+    expect(
+      modelPaidBy(GEORGIAN_RECEIPTS, { ...paid, totals: [{ label: 'ნაღდი', amount: '1.500' }] }),
+    ).toBe('cash')
+    const four = { ...GEORGIAN_RECEIPTS, numbers: [{ fractionDigits: 4 }] }
+    expect(() => modelPaidBy(four, paid)).toThrow(RangeError)
+  })
+})
+
 // MOL-420: Georgia's Carrefour prints a line's sum alone, and the model copied one «5,85» as «5,86» (ge-03) — made-up
 // names and sums in its shape, the total printed twice («TOT» and the card's «EFT»)
 describe('a line of a sum alone put right by the total (MOL-420)', () => {

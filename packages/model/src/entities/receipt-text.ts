@@ -13,7 +13,12 @@
 // with a word in it is built from the card, once a card. The tills' layouts stay the parse's own.
 
 import type { ReceiptPaidBy } from '#model/entities/receipt'
-import { PARSED_FRACTION_DIGITS, digitCounts } from '#model/entities/receipt-card'
+import {
+  MODEL_FRACTION_DIGITS,
+  PARSED_FRACTION_DIGITS,
+  digitCounts,
+  tesseractReads,
+} from '#model/entities/receipt-card'
 import type { DateOrder, PhotoReading } from '#model/entities/receipt-card'
 
 /** A line's four figures: thousandths of its unit, hundredths of money. */
@@ -211,9 +216,11 @@ const lexicons = new WeakMap<PhotoReading, Lexicon>()
 function lexiconOf(reading: PhotoReading): Lexicon {
   const known = lexicons.get(reading)
   if (known !== undefined) return known
-  // a card names only formats of numbers the parse reads: amounts are hundredths throughout, and three
-  // decimals read as two would be every sum wrong (MOL-248 adds the third with the reading of it)
-  const unread = reading.numbers.find((f) => !PARSED_FRACTION_DIGITS.includes(f.fractionDigits))
+  // a card names only formats of numbers its reader reads: Tesseract's amounts are hundredths throughout, and three
+  // decimals read as two would be every sum wrong; a card the model alone reads takes the model's (MOL-421) — the
+  // model's path asks this lexicon too (`paidByOf`), and the parse of a card read so reads no row of Tesseract's
+  const formats = tesseractReads(reading) ? PARSED_FRACTION_DIGITS : MODEL_FRACTION_DIGITS
+  const unread = reading.numbers.find((f) => !formats.includes(f.fractionDigits))
   if (reading.numbers.length === 0 || unread !== undefined) {
     throw new RangeError(
       `a card's formats of numbers are not the parse's: ${JSON.stringify(reading.numbers)}`,
