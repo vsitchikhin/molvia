@@ -5,40 +5,44 @@
     :style="dockStyle"
   >
     <header ref="bar" class="bar">
-      <!-- The columns are the row's, not the bar's: the bar is the container its width is asked of (MOL-336). -->
-      <div class="row">
-        <div ref="column" class="leading">
-          <template v-if="parentTitleKey">
-            <button ref="button" class="back" type="button" @click="goBack">
-              <IconChevronLeft ref="chevron" class="chevron" aria-hidden="true" />
-              <!-- «Back» shown, where it leads still read after it: the name is «Back Trip» on every
+      <!-- Asked of its width by the row inside it, a box of its own (MOL-336): a query cannot style its own
+           container, and the bar itself as one lost WebKit the page's place under a sheet (`sheet.spec`).
+           Classes of the kit's own words: a screen's `.row` stood beside it in every `.row` a test found. -->
+      <div class="bar-room">
+        <div class="bar-columns">
+          <div ref="column" class="leading">
+            <template v-if="parentTitleKey">
+              <button ref="button" class="back" type="button" @click="goBack">
+                <IconChevronLeft ref="chevron" class="chevron" aria-hidden="true" />
+                <!-- «Back» shown, where it leads still read after it: the name is «Back Trip» on every
                  step of the ladder, and the word shown starts it (review Р-2, owner's decision). -->
-              <template v-if="fit === 'short'">
-                <span class="label">{{ backWord }}</span>
-                <span class="hidden">{{ ` ${parent}` }}</span>
-              </template>
-              <template v-else>
-                <!-- The space is the hidden word's, so that it is read «Back Trip», not «BackTrip». -->
-                <span class="hidden">{{ `${backWord} ` }}</span>
-                <span :class="parentClass">{{ parent }}</span>
-              </template>
-            </button>
-            <span class="samples" aria-hidden="true">
-              <span ref="full">{{ parent }}</span>
-              <span ref="short">{{ backWord }}</span>
-            </span>
-          </template>
-          <div v-else-if="$slots.meta" class="meta" :aria-hidden="collapsed ? 'true' : undefined">
-            <slot name="meta" />
+                <template v-if="fit === 'short'">
+                  <span class="label">{{ backWord }}</span>
+                  <span class="hidden">{{ ` ${parent}` }}</span>
+                </template>
+                <template v-else>
+                  <!-- The space is the hidden word's, so that it is read «Back Trip», not «BackTrip». -->
+                  <span class="hidden">{{ `${backWord} ` }}</span>
+                  <span :class="parentClass">{{ parent }}</span>
+                </template>
+              </button>
+              <span class="samples" aria-hidden="true">
+                <span ref="full">{{ parent }}</span>
+                <span ref="short">{{ backWord }}</span>
+              </span>
+            </template>
+            <div v-else-if="$slots.meta" class="meta" :aria-hidden="collapsed ? 'true' : undefined">
+              <slot name="meta" />
+            </div>
           </div>
-        </div>
 
-        <!-- The large title below stays in the page, scrolled away or not, so a screen reader
+          <!-- The large title below stays in the page, scrolled away or not, so a screen reader
            reads it there; this copy is only for the eye. -->
-        <p class="small" aria-hidden="true">{{ title }}</p>
+          <p class="small" aria-hidden="true">{{ title }}</p>
 
-        <div class="trailing">
-          <slot name="trailing" />
+          <div class="trailing">
+            <slot name="trailing" />
+          </div>
         </div>
       </div>
     </header>
@@ -348,9 +352,6 @@ $title-beside-action: 14rem;
   right: 0;
   left: 0;
   z-index: 1;
-
-  /* Asked of its width in rem, which grows with the text: whether the small title has room (MOL-336). */
-  container: bar / inline-size;
   height: calc(var(--bar-height) + var(--safe-top));
   padding: var(--safe-top) calc(var(--space-4) + var(--safe-right)) 0
     calc(var(--space-4) + var(--safe-left));
@@ -377,11 +378,17 @@ $title-beside-action: 14rem;
   border-bottom-color: var(--border);
 }
 
+/* Asked of its width in rem, which grows with the text: whether the small title has room (MOL-336). */
+.bar-room {
+  container: bar / inline-size;
+  height: 100%;
+}
+
 /* At rest the small title is not shown, and its column is nothing: the back label has the row. The
    chevron's column is never narrower than the chevron alone, whose button stands a --space-1 out of it —
    40 here is 44 to tap — and an action's never narrower than its words: at 200 % on 320 «Править» on one
    line left «‹» 28 px, the two buttons 30 px one over the other (MOL-336). */
-.row {
+.bar-columns {
   display: grid;
   grid-template-columns: minmax($chevron-column, 1fr) 0 minmax(min-content, auto);
   align-items: center;
@@ -392,7 +399,7 @@ $title-beside-action: 14rem;
 /* The title in the middle of the row, and the sides equal while they can be, so that it is. An action
    keeps its words — its column takes their width, its floor the chevron's — and the title gives way to
    it: off the middle first, then cut by «…» (MOL-336; it squeezed «Править» to 60 px for 98 at 320). */
-.collapsed .row {
+.collapsed .bar-columns {
   grid-template-columns: minmax($chevron-column, 1fr) minmax(0, auto) minmax(min-content, 1fr);
 }
 
@@ -404,11 +411,11 @@ $title-beside-action: 14rem;
    so it keeps its look at rest past the scroll (owner's В-1 «б»): the title takes the row's width less
    some 9.9rem beside «Править», and from 14rem it has 4, four letters and «…». */
 @container bar (width < #{$title-beside-action}) {
-  .collapsed .row:has(> .trailing > *) {
+  .collapsed .bar-columns:has(> .trailing > *) {
     grid-template-columns: minmax($chevron-column, 1fr) 0 minmax(min-content, auto);
   }
 
-  .collapsed .row:has(> .trailing > *) > .small {
+  .collapsed .bar-columns:has(> .trailing > *) > .small {
     opacity: 0;
     transform: translateY(var(--space-2));
   }
