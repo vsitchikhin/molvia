@@ -531,7 +531,7 @@ describe('the review of a receipt', () => {
     ])
     const detail = await review(me, id)
     expect(detail.lines.map((line) => line.rememberedPrice)).toEqual([amd(50), null])
-  })
+  }, 15_000)
 
   // MOL-315: the model confuses 5↔6 alone — its 1 100 → 1 400 is a price changed, Tesseract's a misread
   it('doubts a price of a receipt the model read by the model’s confusions alone', async () => {

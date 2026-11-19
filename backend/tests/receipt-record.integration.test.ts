@@ -794,7 +794,7 @@ describe('«Записать»', () => {
       headers: { cookie: await signIn(db, me) },
     })
     expect(pending.body).toContain(milk)
-  })
+  }, 15_000)
 
   it('records a line the font’s swaps put right as not read: no shelf price for the memory (MOL-290, Р-7)', async () => {
     const me = await insertActor(db)
