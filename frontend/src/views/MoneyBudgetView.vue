@@ -122,8 +122,9 @@
                 </span>
               </template>
               <template #meta>
-                <span>{{ row.of }}</span
-                ><span v-if="row.used" :class="{ over: row.over }">{{ row.used }}</span>
+                <span>{{ row.of }}</span><span v-if="row.used" :class="{ over: row.over }">{{
+                  row.used
+                }}</span>
               </template>
               <template v-if="row.archived" #tail><span class="no-chevron"></span></template>
               <template #below>
