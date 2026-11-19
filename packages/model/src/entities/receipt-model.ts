@@ -188,11 +188,11 @@ function canonicalAnswer(
   const ofTotals = decimalsIn(amounts.map(({ amount }) => amount))
   // the lines decide by what most of their amounts print (adversarial Г2, round 4): a discount the till prints in tetri,
   // «0.50», is outvoted by the thousandths beside it, and a tie is two — a weight «0.452» copied into the sum of a
-  // receipt of two decimals stays no figure (Р-1). One decimal votes for neither: «1.5» is a «1.500» the model cut short,
-  // and thousands grouped by a point never print one; nor do four and more, no figure either way. Two decimals and a
-  // whole number vote for two: «499» beside «1.299» is a till grouping thousands by a point (MOL-426)
+  // receipt of two decimals stays no figure (Р-1). Fewer decimals than two vote for neither: «1.5» is a «1.500» the model cut
+  // short, «5» a «5.000» (owner's Е1 «а», round 6) — a Georgian till prints tetri always, and a country grouping
+  // thousands by a point, «499» beside «1.299», is its own card's (MOL-426); nor do four and more, no figure either way
   const three = ofLines.filter((count) => count === THOUSANDTHS).length
-  const two = ofLines.filter((count) => count === 2 || count === 0).length
+  const two = ofLines.filter((count) => count === 2).length
   // where the vote does not choose three, the paper's own arithmetic does: the lines' sums as thousandths meeting a total
   // printed with three to the thousandth — 22.368 + «5», a «5.000» the model cut, is «27.368»; «1.299» + «499» meets no
   // «1.798» (adversarial Д1, round 5)

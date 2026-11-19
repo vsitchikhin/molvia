@@ -1749,19 +1749,24 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
     // must not: as many of two decimals as of three is two — Р-1's weight «0.452» copied into a sum stays no figure
     const tie = readGe(pharmacy([piece('ა', '1.50'), piece('ბ', '0.452')], '1.95'))
     expect(tie.lines.map((l) => l.sumHundredths)).toEqual([150, null])
-    // must not: a whole number votes for two — «499» beside «1.299» is a till grouping thousands by a point (MOL-426)
-    const grouped = readGe(pharmacy([piece('a', '1.299'), piece('b', '499')], '1.798'))
-    expect(grouped.lines.map((l) => l.sumHundredths)).toEqual([null, 49_900])
+    // a whole number votes for neither: «5» is a «5.000» the model cut — beside a line lost, the line in thousandths and
+    // the total still read (owner's Е1 «а»)
+    const lost = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5')], '28.602', 'ლარი'))
+    expect(lost.lines.map((l) => l.sumHundredths)).toEqual([2_237, 500])
+    expect([lost.balanced, lost.readTotalHundredths]).toEqual([false, 2_860])
   })
 
   it('reads three where the vote does not, by the lines’ sums meeting a total printed with three (adversarial Д1)', () => {
-    // «5» for «5.000», cut by the model: the vote ties, the paper's own sum decides — 22.368 + 5 = 27.368
+    // «5.00» beside «22.368»: the vote ties, the paper's own sum decides — 22.368 + 5.00 = 27.368
+    const tie = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5.00')], '27.368', 'ლარი'))
+    expect([tie.totalHundredths, tie.balanced]).toEqual([2_737, true])
+    expect(tie.lines.map((l) => l.sumHundredths)).toEqual([2_237, 500])
+    // must not: the sums meet no total printed with three — two, as the vote says
+    const off = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5.00')], '27.369', 'ლარი'))
+    expect(off.lines.map((l) => l.sumHundredths)).toEqual([null, 500])
+    // «5» for «5.000», cut by the model, votes for neither: whole by the vote alone (owner's Е1 «а»)
     const cut = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5')], '27.368', 'ლარი'))
     expect([cut.totalHundredths, cut.balanced]).toEqual([2_737, true])
-    expect(cut.lines.map((l) => l.sumHundredths)).toEqual([2_237, 500])
-    // must not: the sums meet no total printed with three — two, as the vote says
-    const off = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5')], '27.369', 'ლარი'))
-    expect(off.lines.map((l) => l.sumHundredths)).toEqual([null, 500])
   })
 
   it('keeps the thousandths of a line the service was set apart from (`serviceApart` passes it on as it is)', () => {
