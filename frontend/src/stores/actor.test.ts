@@ -682,10 +682,11 @@ describe('when the server last said the settings (MOL-215)', () => {
 
     const later = new Date('2026-10-31T11:00:00.000Z')
     vi.setSystemTime(later)
-    store.apply({ ...FIRST, updatedAt: new Date('2026-09-01T00:00:00.000Z') })
+    // and says so: a screen that asked for the answer asks again when it was let go (MOL-276, Ж1)
+    expect(store.apply({ ...FIRST, updatedAt: new Date('2026-09-01T00:00:00.000Z') })).toBe(false)
     expect(store.settingsReadAt).toEqual(READ)
 
-    store.apply({ ...FIRST, city: 'Ереван' })
+    expect(store.apply({ ...FIRST, city: 'Ереван' })).toBe(true)
     expect(store.settingsReadAt).toEqual(later)
   })
 
@@ -750,6 +751,32 @@ describe('whether the model reads the receipts (MOL-408)', () => {
 
     store.apply({ ...FIRST, city: 'Ереван', updatedAt: new Date('2026-12-01T00:00:00.000Z') })
     expect([store.actor?.city, store.actor?.receiptsByModel]).toEqual(['Ереван', true])
+  })
+
+  it('keeps where the person stands with the model past the settings’ answer (MOL-276)', async () => {
+    const access = {
+      until: null,
+      ended: null,
+      trialLeft: 6,
+      trialOf: 10 as const,
+      month: '2026-11-01',
+      read: 4,
+      limit: 100 as const,
+    }
+    me.mockResolvedValue({ ...FIRST, receiptsAccess: access })
+    const { store } = await freshStore()
+    await store.start()
+
+    store.apply({ ...FIRST, city: 'Ереван', updatedAt: new Date('2026-12-01T00:00:00.000Z') })
+    expect([store.actor?.city, store.actor?.receiptsAccess]).toEqual(['Ереван', access])
+
+    me.mockResolvedValue({
+      ...FIRST,
+      updatedAt: new Date('2026-12-01T00:00:00.000Z'),
+      receiptsAccess: { ...access, trialLeft: 0, read: 10 },
+    })
+    await store.start()
+    expect(store.actor?.receiptsAccess?.trialLeft).toBe(0)
   })
 
   it('is said again by the next `/actors/me`, a grant ended included', async () => {

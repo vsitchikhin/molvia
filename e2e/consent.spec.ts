@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { POLICY_VERSION } from '@molvia/model'
 import { ACCEPT, AGE, DEV_SEAM, asBrowser } from './session'
+import { risen } from './sheet-risen'
 
 test.use({ reducedMotion: 'reduce' })
 
@@ -10,16 +11,6 @@ test.use({ reducedMotion: 'reduce' })
  * edition. **Not through `open()`**, which passes the step for every other spec — here the step is
  * what is looked at, so the spec presses the seam itself, as `login-screen.spec` does.
  */
-/** Until it has risen a sheet takes no tap at all (MOL-69): its rise, then the double-tap floor. */
-async function risen(page: Page): Promise<void> {
-  await page
-    .locator('dialog[open]')
-    .evaluate((dialog) =>
-      Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
-    )
-  await page.waitForTimeout(350)
-}
-
 async function newcomer(page: Page): Promise<void> {
   await page.goto('/')
   await page.getByRole('button', { name: DEV_SEAM }).click()

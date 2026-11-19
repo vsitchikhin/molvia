@@ -11,6 +11,7 @@ import {
   RECEIPT_FOOD_HEADER,
   RECEIPT_READ_PARTLY_HEADER,
   RECEIPT_READ_TOTAL_HEADER,
+  RECEIPTS_ACCESS_HEADER,
   RECEIPTS_BY_MODEL_HEADER,
   RECEIPT_REPAIRED_HEADER,
   RECEIPT_RETAKE_HEADER,
@@ -705,7 +706,7 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     me: () =>
       request('/actors/me', actorCodec, {
-        headers: new Headers({ [RECEIPTS_BY_MODEL_HEADER]: '1' }),
+        headers: new Headers({ [RECEIPTS_BY_MODEL_HEADER]: '1', [RECEIPTS_ACCESS_HEADER]: '1' }),
       }),
     sessions: async () => request('/sessions', sessionsResponseCodec),
     exportMine: async (options = {}) => {

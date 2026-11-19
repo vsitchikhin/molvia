@@ -131,14 +131,19 @@ export const useActorStore = defineStore('actor', () => {
   let revision = 0
 
   /**
-   * The answer, with what the store knew of the model kept where the answer does not say (MOL-408): only `/actors/me`
-   * says `receiptsByModel`, and the settings' answer, the same owner's, would put Georgia's camera away.
+   * The answer, with what the store knew of the model kept where the answer does not say (MOL-408, MOL-276): only
+   * `/actors/me` says `receiptsByModel` and `receiptsAccess`, and the settings' answer, the same owner's, would put
+   * Georgia's camera away and the status of «Распознавание чеков» with it.
    */
   function withModel(loaded: ActorView): ActorView {
-    const known = actor.value?.id === loaded.id ? actor.value.receiptsByModel : undefined
-    return loaded.receiptsByModel === undefined && known !== undefined
-      ? { ...loaded, receiptsByModel: known }
-      : loaded
+    const known = actor.value?.id === loaded.id ? actor.value : null
+    const byModel = loaded.receiptsByModel ?? known?.receiptsByModel
+    const access = loaded.receiptsAccess ?? known?.receiptsAccess
+    return {
+      ...loaded,
+      ...(byModel === undefined ? {} : { receiptsByModel: byModel }),
+      ...(access === undefined ? {} : { receiptsAccess: access }),
+    }
   }
 
   function settle(loaded: ActorView): void {
@@ -421,15 +426,20 @@ export const useActorStore = defineStore('actor', () => {
     forgetOwner(owner)
   })
 
-  function apply(loaded: ActorView): void {
+  /**
+   * Takes an answer a screen asked for itself, and says whether it took it: another owner's, or a row older than the
+   * one held — a «Сохранить» answered meanwhile — is let go, and a screen waiting on it asks again (MOL-276, Ж1).
+   */
+  function apply(loaded: ActorView): boolean {
     if (
       loaded.id !== id.value ||
       (actor.value?.id === loaded.id && actor.value.updatedAt > loaded.updatedAt)
     )
-      return
+      return false
     settingsReadAt.value = new Date()
     actor.value = withModel(loaded)
     state.value = 'ready'
+    return true
   }
 
   return {
