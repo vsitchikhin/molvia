@@ -13,12 +13,7 @@
 // with a word in it is built from the card, once a card. The tills' layouts stay the parse's own.
 
 import type { ReceiptPaidBy } from '#model/entities/receipt'
-import {
-  MODEL_FRACTION_DIGITS,
-  PARSED_FRACTION_DIGITS,
-  digitCounts,
-  tesseractReads,
-} from '#model/entities/receipt-card'
+import { digitCounts, fractionDigitsReadBy } from '#model/entities/receipt-card'
 import type { DateOrder, PhotoReading } from '#model/entities/receipt-card'
 
 /** A line's four figures: thousandths of its unit, hundredths of money. */
@@ -27,6 +22,32 @@ export interface LineFigures {
   readonly priceHundredths: number | null
   readonly discountHundredths: number | null
   readonly sumHundredths: number | null
+}
+
+/** A line's money as a pharmacy prints it (MOL-421), in thousandths: «22.368» is 22 368. */
+export interface LineThousandths {
+  readonly price: number | null
+  readonly sum: number | null
+  readonly discount: number | null
+}
+
+/** Thousandths as hundredths, half up (MOL-421, owner's В-1 «а»): 22 368 is 2 237, 1 005 is 101. */
+export const halfUpHundredths = (thousandths: number): number => Math.floor((thousandths + 5) / 10)
+
+/**
+ * A line's money as printed in thousandths, where it still is the line's (MOL-421): every figure rounds half up to the
+ * line's own. A line whose figures were put right since — by the font's swaps, the memory — is judged on its own.
+ */
+export function printedThousandths(line: ReceiptTextLine): LineThousandths | null {
+  const printed = line.thousandths
+  if (printed === undefined) return null
+  const same = (milli: number | null, hundredths: number | null): boolean =>
+    milli === null ? hundredths === null : halfUpHundredths(milli) === hundredths
+  return same(printed.price, line.priceHundredths) &&
+    same(printed.sum, line.sumHundredths) &&
+    same(printed.discount, line.discountHundredths)
+    ? printed
+    : null
 }
 
 /** One row of a reading: its text and where it stands on the photo of its part. */
@@ -79,6 +100,12 @@ export interface ReceiptTextLine {
    * the shop's memory sets its shelf price against. None on a line no article keys — a table's, a journal's.
    */
   readonly read?: LineFigures
+  /**
+   * A model's line of a receipt that prints thousandths (MOL-421): its price, sum and discount as printed — its
+   * arithmetic is judged on them, by the reading and by the check alike, never on the tetri they round to (Р-2): 3 ×
+   * 0.255 = 0.765 holds, where 3 × 0,26 = 0,78 against 0,77 would not. Read through `printedThousandths`.
+   */
+  readonly thousandths?: LineThousandths
   /**
    * What the shop's memory said of the line (MOL-291): its price `confirmed` a line as printed, `repaired`
    * one that did not hold, or `doubted` one as printed one confused digit off it — emptied by the check.
@@ -219,7 +246,7 @@ function lexiconOf(reading: PhotoReading): Lexicon {
   // a card names only formats of numbers its reader reads: Tesseract's amounts are hundredths throughout, and three
   // decimals read as two would be every sum wrong; a card the model alone reads takes the model's (MOL-421) — the
   // model's path asks this lexicon too (`paidByOf`), and the parse of a card read so reads no row of Tesseract's
-  const formats = tesseractReads(reading) ? PARSED_FRACTION_DIGITS : MODEL_FRACTION_DIGITS
+  const formats = fractionDigitsReadBy(reading)
   const unread = reading.numbers.find((f) => !formats.includes(f.fractionDigits))
   if (reading.numbers.length === 0 || unread !== undefined) {
     throw new RangeError(

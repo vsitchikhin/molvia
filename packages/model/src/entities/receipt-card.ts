@@ -12,20 +12,23 @@ import type { ItemNameLanguage, ReceiptCountry } from '#model/entities/receipt'
 
 /**
  * How a country's tills print an amount. Tesseract's parse counts in hundredths throughout (`hundredthsOf`), so a card
- * it reads names only formats it reads (`PARSED_FRACTION_DIGITS`): the parse refuses a card with none or with another,
+ * it reads names only formats it reads (`fractionDigitsReadBy`): the parse refuses a card with none or with another,
  * rather than read every sum of it wrong. The model's reading takes three decimals too (MOL-421): Georgia's pharmacies
  * print «23.868 ლარი», and a receipt whose every amount has three is rounded half up to the hundredth once its lines'
- * arithmetic held as printed (`MODEL_FRACTION_DIGITS`).
+ * arithmetic held as printed.
  */
 export interface NumberFormat {
   readonly fractionDigits: number
 }
 
+/** A pharmacy's amounts (MOL-421): the one format beside hundredths the model's reading reads, «23.868 ლარი». */
+export const THOUSANDTHS = 3
+
 /** The decimals Tesseract's parse reads an amount with. */
-export const PARSED_FRACTION_DIGITS: readonly number[] = [2]
+const PARSED_FRACTION_DIGITS: readonly number[] = [2]
 
 /** The decimals the model's reading reads an amount with (MOL-421): hundredths, and a pharmacy's thousandths. */
-export const MODEL_FRACTION_DIGITS: readonly number[] = [2, 3]
+const MODEL_FRACTION_DIGITS: readonly number[] = [2, THOUSANDTHS]
 
 /**
  * The words of a country's receipts as OCR reads them — each a fragment of a regular expression, since a
@@ -371,6 +374,14 @@ export type TesseractReading = PhotoReading & { readonly languages: string }
  */
 export function tesseractReads(reading: PhotoReading): reading is TesseractReading {
   return reading.languages !== null
+}
+
+/**
+ * The decimals of an amount the reader of a card reads (MOL-421): Tesseract's parse hundredths alone, the model's
+ * thousandths too. A card names only these, or the parse refuses it (`lexiconOf`).
+ */
+export function fractionDigitsReadBy(reading: PhotoReading): readonly number[] {
+  return tesseractReads(reading) ? PARSED_FRACTION_DIGITS : MODEL_FRACTION_DIGITS
 }
 
 /**

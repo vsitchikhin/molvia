@@ -1,4 +1,9 @@
-import { TOLERANCE_HUNDREDTHS, linesTotalHundredths } from '#model/entities/receipt-text'
+import { THOUSANDTHS } from '#model/entities/receipt-card'
+import {
+  TOLERANCE_HUNDREDTHS,
+  linesTotalHundredths,
+  printedThousandths,
+} from '#model/entities/receipt-text'
 import type { ReceiptLayout, ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
 
 /**
@@ -351,8 +356,18 @@ function verifiedLine(
     qty === 1_000 && discount === 0 && price !== null && Math.abs(price - sum) <= apart
   // the memory's price is the second source of one number printed twice (MOL-291)
   if (oneAlike && !proven && !byMemory) return emptied('one_alike_unproven')
+  // a pharmacy's line is judged as printed, in thousandths, as the reading judged it (MOL-421, Р-2, adversarial А2):
+  // 3 × 0.255 = 0.765 holds, 3 × 0,26 against 0,77 would not
+  const printed = printedThousandths(line)
   const holds =
-    price !== null && Math.abs(Math.round((qty * price) / 1_000) - (sum + discount)) <= rounding
+    printed === null
+      ? price !== null && Math.abs(Math.round((qty * price) / 1_000) - (sum + discount)) <= rounding
+      : printed.price !== null &&
+        printed.sum !== null &&
+        Math.abs(
+          Math.round((qty * printed.price) / 1_000) - (printed.sum + (printed.discount ?? 0)),
+        ) <=
+          rounding * 10 ** (THOUSANDTHS - 2)
   return holds
     ? { line, reason: null }
     : {
