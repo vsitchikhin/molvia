@@ -200,12 +200,12 @@ function canonicalAnswer(
   const sumMilli = lineSums.every((one) => one !== null)
     ? lineSums.reduce((all, one) => all + one, 0)
     : null
-  const meetsPrinted =
-    sumMilli !== null &&
-    amounts.some(
-      ({ amount }) =>
-        decimalsOf(amount) === THOUSANDTHS && figureOf(amount, THOUSANDTHS) === sumMilli,
-    )
+  // the totals printed with three decimals, in thousandths: what the lines' sums meet, and what each total is printed
+  const totalsMilli = amounts.flatMap(({ amount }) => {
+    const milli = decimalsOf(amount) === THOUSANDTHS ? figureOf(amount, THOUSANDTHS) : null
+    return milli === null ? [] : [milli]
+  })
+  const meetsPrinted = sumMilli !== null && totalsMilli.includes(sumMilli)
   // with no line, every total of two or three decides
   const thousandths =
     reading.numbers.some((format) => format.fractionDigits === THOUSANDTHS) &&
@@ -238,9 +238,7 @@ function canonicalAnswer(
   const printedTotals = new Map<number, number | null>()
   const whole = (milli: number): boolean => milli % THOUSANDTHS_PER_HUNDREDTH === 0
   if (thousandths) {
-    for (const { amount } of amounts) {
-      const milli = figureOf(amount, THOUSANDTHS)
-      if (milli === null || decimalsOf(amount) !== THOUSANDTHS) continue
+    for (const milli of totalsMilli) {
       const tetri = halfUpHundredths(milli)
       const known = printedTotals.get(tetri)
       // the first, or the same again: this one

@@ -185,7 +185,9 @@ function receiptMoney(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
  * printed one, or the person's correction of what OCR misread; without it the printed total where it is
  * not below the lines — what was paid, the lines left out and those OCR lost included, while a lost line
  * only ever raises a total, so one below the lines was misread; a pharmacy's rounding below nought prints it exactly
- * that far below them, as paid (MOL-421, adversarial Б2) — else the sum of every line: a recorded
+ * that far below them, as paid (MOL-421, adversarial Б2); on a receipt with no total vouched for, the total as read in
+ * one place where the lines the person typed and a pharmacy's rounding meet it exactly (adversarial Д2) — else the sum
+ * of every line: a recorded
  * one at what the person settled on, one left out at what it would have been recorded at (В-5), and what a card
  * sent to the card (MOL-289). `null`
  * when nothing is known: the trip then counts its prices (MOL-78).
