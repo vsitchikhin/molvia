@@ -10,8 +10,8 @@ import { asBrowser } from './session'
 export const TITLE_GAP = 7.5
 
 /**
- * How far an action's words may stand past its padding and still be whole: a box is laid out in 64ths of a pixel and
- * its words measured in floats, so a word as wide as its column read 0.0125 past it at 195 % on 360.
+ * How far words may stand past their box and still be whole: a box is laid out in 64ths of a pixel and its words
+ * measured in floats, so «Править», as wide as its column, read 0.0125 past it at 195 % on 360.
  */
 export const LAYOUT_UNIT = 1 / 64
 
@@ -22,12 +22,18 @@ export interface Box {
   bottom: number
 }
 
+/**
+ * Two boxes apart, or meeting edge to edge: each is laid out in 64ths, so two that meet may share one of either —
+ * «‹» and the action at rest stand edge to edge where the action takes the row, 2/64 one over the other at 205 % on
+ * 320 (adversarial, round 3).
+ */
 export function apart(one: Box, other: Box): boolean {
+  const met = 2 * LAYOUT_UNIT
   return (
-    one.right <= other.left ||
-    other.right <= one.left ||
-    one.bottom <= other.top ||
-    other.bottom <= one.top
+    one.right <= other.left + met ||
+    other.right <= one.left + met ||
+    one.bottom <= other.top + met ||
+    other.bottom <= one.top + met
   )
 }
 
@@ -98,7 +104,7 @@ export async function anAccount(page: Page, name: string): Promise<string> {
  * The action of the row, the back button and the small title, read in one frame: how far the action's
  * words stand past its box's padding either side, in fractions (MOL-336: «Править» was 60 px, its words
  * 63 and its padding 32), on how many lines they stand, the gap from the title to the action, and whether
- * the small title is cut — its words wider than its box.
+ * the small title is cut — its words past its box by a layout unit or more.
  */
 export async function actionRow(page: Page): Promise<{
   back: Box
@@ -110,7 +116,7 @@ export async function actionRow(page: Page): Promise<{
   cut: boolean
   page: number
 }> {
-  return page.evaluate(() => {
+  return page.evaluate((unit) => {
     const box = (node: Element) => {
       const { left, right, top, bottom } = node.getBoundingClientRect()
       return { left, right, top, bottom }
@@ -141,8 +147,8 @@ export async function actionRow(page: Page): Promise<{
       ),
       actionLines: new Set(lines.map((line) => Math.round(line.top))).size,
       gap: outer.left - title.right,
-      cut: Math.max(...titleLines.map((line) => line.right)) - title.right > 0.01,
+      cut: Math.max(...titleLines.map((line) => line.right)) - title.right >= unit,
       page: document.documentElement.scrollWidth,
     }
-  })
+  }, LAYOUT_UNIT)
 }
