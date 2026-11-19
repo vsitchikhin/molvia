@@ -392,7 +392,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **The payee is folded by its own tables, never `toSearchKey`**, a city aside on both sides; the windows are
   measured — a file ± 2 days, a screenshot from 2 before to 4 after, the sum exact — and 7, 30, 60 days, a tip's fifth
   and a hold's half are named prices. **A file dates a line by its operation, a screenshot by its posting**: a hold's
-  posting in a file is on the hold's day, and a screenshot meets a file's line on the posting day it prints.
+  posting in a file is on the hold's day, a screenshot meets a file's line by the posting day it prints, and one
+  printing none a day to four before a screenshot is a doubt; a line known only by its key under another account is a
+  doubt too. **A line weighs only the records that reach its day**, at most `STATEMENT_LINES_MAX` lines.
 
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 

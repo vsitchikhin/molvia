@@ -34,18 +34,20 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
 
 - **A line's key is its spending's id** (Р-2, `statementLineKeys`): a uuid v3 (`nameUuid` over `md5Hex` — the domain
   imports no `node:crypto`; MD5 here is a name, not a secret) of the person, the statement's account, the day, the
-  sign, the amount and the payee as printed, spaces squeezed, and the turn among equal lines — a declined line takes
-  no turn of the others, since a later export may leave the refusal out (adversarial А5). The same line uploaded
-  again is the same id, written once. **The person is in it**: two people's like lines of statements with no
+  sign, the amount and the payee as printed, spaces squeezed, and the turn among equal lines **of its status** — a
+  later export may leave out a refusal or a hold the bank dropped, and the payment made again beside it would take
+  its key (adversarial А5, А9). So a hold and its posting are two keys: the link lets the posting in. The same line
+  uploaded again is the same id, written once. **The person is in it**: two people's like lines of statements with no
   account would be one id, and the spendings' id is one primary key for everyone — the second would vanish silently
   on a conflict. **The form is not**: the same text in a bank's CSV and its PDF is the same line. The reader's
-  additions — status, kind, time, posting day — move nothing.
+  other additions — kind, time, posting day — move nothing.
 - **The link** (`statementLinkSchema`, stored by MOL-433 on a spending, a trip and a transfer) keeps the key and the
   account of the upload it was keyed under, the day and the posting day, «pending», the form, the amount, the payee
   and the time: enough to know its own line again after an account chosen since (adversarial А4: the account is in
-  the key, so the same file uploaded first «без счёта» was all new), tell another line from it (Г2, Д2), let a
-  hold's posting in (Г2б), compare two screenshots' times (Ж2) and write the line of a relinked record as a spending
-  (Д1).
+  the key, so the same file uploaded first «без счёта» was all new) — **as a doubt «другой счёт», never silently**:
+  the same file again and a like line of another card of the bank are one key there (А8) — tell another line from it
+  (Г2, Д2), let a hold's posting in (Г2б), compare two screenshots' times (Ж2) and write the line of a relinked
+  record as a spending (Д1).
 
 ## «Не траты»
 
@@ -79,13 +81,17 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   words of a place are no seller's** — the cities of the settings folded (`COUNTRY_CITIES`, Р-4), exact under six
   letters so «SAS» is no «Сад»: aside in a bank's line (М1) and in a record's name alike, or «Ереван Сити» meets every
   card line of Yerevan and a purchase at SAS is silently its trip (adversarial А6). **One seller** (В3, Г4) is every
-  word of one name in the other, and one common word is no seller (Н1).
+  word of one name in the other, and one common word is no seller (Н1). **A name that is nothing but a city's word
+  keeps it** (А10): the restaurant «Казан», the cinema «Москва» would be no name, met by any line; with the line's
+  city aside too, such a record meets its own line in no word — a doubt «другое имя», a tap.
 - **One to one by the greatest matching** (А3, Б2, Kuhn's path): what met exactly first, the doubts only for records
   left free.
 - **The link decides another line** (Г2, Д1, Д2, Е1, Е2), past the window too where it names it: its own line, by its
-  key under the link's account; another form on the link's day, ± 1 for a form whose day moves — **and a screenshot
-  against a file's line on the posting day the file prints** (adversarial А1: the bench took a screenshot's day for
-  the operation's, MOL-428 measured the posting's; with no posting day printed, one day only — a named price); never
+  key; another form on the link's day, ± 1 for a form whose day moves — **and a screenshot against a file's line by
+  the posting day the file prints, and by it alone** (adversarial А1, А11: the bench took a screenshot's day for the
+  operation's, MOL-428 measured the posting's); **a file that prints none — Ameria's CSV — against a screenshot one
+  to four days after it is a doubt «день проводки?»** (А12: Ameria posts its card lines one to three days late, 32
+  of 32 measured, so one day only made a duplicate of almost every such pair); never
   another key of the same file; **a hold's posting** — in a file on the hold's own day, the operation's (adversarial
   А2, А3: a week after it a file's line is another operation, and let in it was a spending lost silently), on a
   screenshot within its 7 days. A screenshot against a screenshot on one day is told by the time (`printed-time.ts`:
@@ -97,10 +103,13 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
 - **A hold with no posting** (Д3, Е4, Ж1): a record made from a «pending» line, on the statement's account, that no line
   met, where the statement covers its day — «убрать трату?» once it runs 7 days past it, ticked only for a bank's file
   with a period in its head; a screenshot is what the person chose to show.
-- **The rule's ceiling is measured in time** (review №1): it runs in the API's process. Every line meets every
-  record, the window and the sum first; a name is folded once a line and once a record. A month of 300 lines
-  against a year of 3 000 records is some 0.1 s here; folded a pair at a time it was 8.1 s, the whole API held. A
-  test bounds it at 4 s.
+- **The rule's ceiling is held by its work** (review №1, А13): it runs in the API's process. A line weighs only the
+  records whose window or link reaches its day — a link at most a late posting's thirty days either way — the sum
+  first, a name folded once a line and once a record; a statement holds `STATEMENT_LINES_MAX` lines (3 000, five
+  years of the samples' 30–50 a month). Linked records passed every window and took a year 4–10 s; now 3 000 lines
+  against 3 000 records linked to screenshots is some 0.5 s here, and a test holds the count weighed
+  (`statementRecordsWeighed`) under a quarter of every pair — a clock on CI does not tell a second from four. A
+  month against a year with no links, folded a pair at a time, was 8.1 s: a test bounds it at 4 s.
 - **The answer is a discriminated union** (Р-9, `StatementLineDecision`): `new` (ticked, a note, a hint),
   `recorded` (the record and the doubt, or none), `not_spending` (the reason and the record that settled it); the holds
   apart (`unposted`). MOL-433 and MOL-435 read one shape and repeat no rule.
@@ -110,5 +119,6 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
 - **The bench's truth is the rule's own feature**: MOL-428's pairs were gathered by «the same sum, the day ± 3» — false
   «recorded» answers are not measured. A doubt is shown, not ticked, so an error costs a tap, never a lost spending.
 - **The unmeasured constants** — 7, 30, 60 days, a fifth, a half, T-Bank's day, and a file with no posting day
-  meeting a screenshot on one day only — are measured by the parsers' tasks on the owner's files; a change is a test
-  of its boundary moved.
+  meeting a screenshot one to four days later as a doubt — are measured by the parsers' tasks on the owner's files;
+  a change is a test of its boundary moved. Whether Ameria's CSV «Date» is the operation's day is MOL-432's: if it is
+  the posting's, the form is no `isBankFile` of that kind, and the doubt asks for nothing.
