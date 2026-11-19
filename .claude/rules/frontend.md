@@ -1468,6 +1468,16 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   «Back», else the chevron alone — never a fragment, which «Покуп…» would be — and the title yields
   last, only when it alone does not fit between two chevrons. The width is read in fractions, as the
   label is drawn: rounded, a word 0.4px too wide passed as whole and was drawn «Наз…» (review А1).
+  **An action in the row keeps its words whole; the small title gives way to it** (MOL-336): the
+  action's column is never narrower than its words, the chevron's never narrower than the chevron — at
+  rest too — and the title, centred while the sides can be equal, moves off the middle and then is cut by
+  «…»; «Править» had been squeezed to 60 px for 98 at 320, and at 200 % at rest its one line left «‹» 28
+  px, the two buttons 30 px one over the other. **Beside an action the title comes only in a row of 14rem**
+  (`@container bar`, owner's В-1 «б»): narrower, at 130 % on 320 and up, it had a letter or none — 6 px
+  at 200 % — and the row keeps its look at rest past the scroll. The threshold is measured on «Править»
+  (the title gets the row less some 9.9rem); a longer action is measured again. The columns are `.row`'s,
+  since a container query cannot style the container itself; `.screen` is no container — a query
+  container with layout containment, as older engines apply it, would hold its fixed bars.
   **The name does not follow the ladder** — «Back Purchases» on every step, the word shown first
   (owner's decision on review). **It
   leads to the screen underneath when that screen is any ancestor** — the step the system
