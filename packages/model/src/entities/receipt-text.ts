@@ -89,9 +89,21 @@ export function printedMeets(
   totalHundredths: number,
   totalThousandths: number | null | undefined,
 ): boolean {
-  const printed =
-    totalThousandths === undefined ? totalHundredths * THOUSANDTHS_PER_HUNDREDTH : totalThousandths
+  const printed = printedTotal(totalHundredths, totalThousandths)
   return printed !== null && milli === printed
+}
+
+/**
+ * A pharmacy's total as printed, in thousandths (MOL-421): its own thousandths, one printed in tetri (`undefined`) as
+ * that tetri; `null` — two printed apart round to it.
+ */
+export function printedTotal(
+  totalHundredths: number,
+  totalThousandths: number | null | undefined,
+): number | null {
+  return totalThousandths === undefined
+    ? totalHundredths * THOUSANDTHS_PER_HUNDREDTH
+    : totalThousandths
 }
 
 /** One row of a reading: its text and where it stands on the photo of its part. */

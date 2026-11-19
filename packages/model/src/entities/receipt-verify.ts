@@ -5,6 +5,7 @@ import {
   pharmacySum,
   printedMeets,
   printedThousandths,
+  printedTotal,
 } from '#model/entities/receipt-text'
 import type { ReceiptLayout, ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
 
@@ -281,7 +282,10 @@ function notWhole(text: ReceiptText): ReceiptReason | null {
   const milli = pharmacySum(text)
   if (milli === null || printedMeets(milli, text.totalHundredths, text.totalThousandths))
     return null
-  const printed = text.totalThousandths ?? text.totalHundredths * THOUSANDTHS_PER_HUNDREDTH
+  // two printed apart: short or over by the tetri the total rounds to
+  const printed =
+    printedTotal(text.totalHundredths, text.totalThousandths) ??
+    text.totalHundredths * THOUSANDTHS_PER_HUNDREDTH
   return milli < printed ? 'lines_lost' : 'lines_over'
 }
 

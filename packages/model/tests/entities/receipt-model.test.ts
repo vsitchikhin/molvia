@@ -13,7 +13,7 @@ import {
   unparsedFigures,
 } from '#model/entities/receipt-model'
 import { betterReading, explainedReading, verifiedReading } from '#model/entities/receipt-verify'
-import { recordedSums } from '#model/entities/receipt-sum'
+import { linesTotalOf, readPartly, recordedSums } from '#model/entities/receipt-sum'
 import type { ModelReceipt } from '#model/entities/receipt-model'
 
 // a made-up head: the repository is public, and a receipt's own carries a customer's name
@@ -1714,9 +1714,44 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
       text.lines.map((l) => [l.priceHundredths, l.discountHundredths, l.sumHundredths, l.settled]),
     ).toEqual([[256, 11, 245, true]])
     expect([text.totalHundredths, text.balanced]).toEqual([245, true])
-    // must not: a discount of two decimals on lines of three is two formats, none read
-    const mixed = readGe(pharmacy([{ ...discounted, discount: '0.10' }], '2.450', 'ლარი'))
-    expect(mixed.lines.map((l) => l.sumHundredths)).toEqual([null])
+    // a discount the till prints in tetri among amounts of three is read as it is: 0.10 is 0.100 (adversarial Г2)
+    const inTetri = readGe(pharmacy([{ ...discounted, discount: '0.10' }], '2.450', 'ლარი'))
+    expect(inTetri.lines.map((l) => [l.discountHundredths, l.sumHundredths])).toEqual([[10, 245]])
+  })
+
+  it('names the rounding of sums read right on a receipt not whole: no «Прочитали не всё» of no line lost (Г1)', () => {
+    // 22.364 + 2 × 2.167 = 4.334, «ლარი 26.698»; the second quantity copied 1.000 — its sum read right
+    const text = readGe(
+      pharmacy([piece('ა', '22.364'), piece('ბ', '2.167', '4.334', '1.000')], '26.698', 'ლარი'),
+    )
+    expect([text.balanced, text.totalHundredths, text.readTotalHundredths]).toEqual([
+      false,
+      null,
+      2_670,
+    ])
+    expect(text.roundingHundredths).toBe(1)
+    const gel = (minor: bigint) => ({ minor, currency: 'GEL' as const })
+    const read = text.lines.map((l) => ({
+      settled: l.settled,
+      sum: l.sumHundredths === null ? null : gel(BigInt(l.sumHundredths)),
+    }))
+    expect(readPartly(read, linesTotalOf(gel(2_670n), null, null, gel(1n)))).toBe(false)
+    // must not: a line lost is still a line lost — the sums as read meet no total as printed, so no rounding
+    const lost = readGe(pharmacy([piece('ა', '22.364')], '26.698', 'ლარი'))
+    expect(lost.roundingHundredths).toBeNull()
+  })
+
+  it('reads three decimals by most of the lines’ amounts: one of fewer reads the same, a tie is two (Г2)', () => {
+    // a sum copied without its trailing noughts, «1.5» for «1.500»
+    const short = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '1.5')], '23.868', 'ლარი'))
+    expect([short.totalHundredths, short.balanced]).toEqual([2_387, true])
+    expect(short.lines.map((l) => l.sumHundredths)).toEqual([2_237, 150])
+    // must not: as many of two decimals as of three is two — Р-1's weight «0.452» copied into a sum stays no figure
+    const tie = readGe(pharmacy([piece('ა', '1.50'), piece('ბ', '0.452')], '1.95'))
+    expect(tie.lines.map((l) => l.sumHundredths)).toEqual([150, null])
+    // must not: a whole number votes for two — «499» beside «1.299» is a till grouping thousands by a point (MOL-426)
+    const grouped = readGe(pharmacy([piece('a', '1.299'), piece('b', '499')], '1.798'))
+    expect(grouped.lines.map((l) => l.sumHundredths)).toEqual([null, 49_900])
   })
 
   it('keeps the thousandths of a line the service was set apart from (`serviceApart` passes it on as it is)', () => {

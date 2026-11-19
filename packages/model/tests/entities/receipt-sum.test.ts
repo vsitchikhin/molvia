@@ -91,6 +91,12 @@ describe('a line adds up', () => {
     expect(lineAddsUp(figures(pcs(3), gel(0.26), gel(0.76)), 2)).toBe(false)
     // must not: «Ереван Сити»'s 419,98 for a piece at 420 is the till's rounding of what was paid, past a piece's half
     expect(lineAddsUp(figures(pcs(1), amd(419.98), amd(420)), 2)).toBe(false)
+    // a receipt of whole drams: its step is a dram — 3 × 333 against 1 000 is one off, the bound 1,5; 1 001 two off
+    expect(lineAddsUp(figures(pcs(3), amd(333), amd(1_000)), 0)).toBe(true)
+    expect(lineAddsUp(figures(pcs(3), amd(333), amd(1_001)), 0)).toBe(false)
+    // a weight's bound is under half a step: 0,5 kg × 1,01 is 0,505 — 0,51 by its rounding, never 0,50
+    expect(lineAddsUp(figures(kg(500), gel(1.01), gel(0.51)), 2)).toBe(true)
+    expect(lineAddsUp(figures(kg(500), gel(1.01), gel(0.5)), 2)).toBe(false)
   })
 
   it('does not hold with a figure missing or in another currency', () => {

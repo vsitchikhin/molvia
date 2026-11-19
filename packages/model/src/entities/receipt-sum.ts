@@ -31,10 +31,15 @@ export function receiptDigits(currency: Currency, amounts: readonly (Money | nul
     : MINOR_EXPONENT[currency]
 }
 
+/** The step of the last digit a receipt prints, in the currency's minor units: a whole dram is 100. */
+function printedStep(currency: Currency, digits: number): bigint {
+  return 10n ** BigInt(Math.max(0, MINOR_EXPONENT[currency] - digits))
+}
+
 /** Quantity × price, rounded half up to the digits the receipt prints (П-2). */
 export function lineProduct(quantity: Quantity, price: Money, digits: number): Money {
   // one rounding, never two: 0,4995 rounded to hundredths and then to units would be 1
-  const step = 10n ** BigInt(Math.max(0, MINOR_EXPONENT[price.currency] - digits))
+  const step = printedStep(price.currency, digits)
   return {
     minor: divideRounded(quantity.milli * price.minor, 1000n * step) * step,
     currency: price.currency,
@@ -56,7 +61,7 @@ export function lineAddsUp(line: ReceiptFigures, digits: number): boolean {
   if (line.discount !== null && line.discount.currency !== price.currency) return false
   if (lineProduct(quantity, price, digits).minor === sum.minor + discount) return true
   // |quantity × price − paid − discount| ≤ quantity × half a step, in thousandths of the minor unit
-  const step = 10n ** BigInt(Math.max(0, MINOR_EXPONENT[price.currency] - digits))
+  const step = printedStep(price.currency, digits)
   const off = quantity.milli * price.minor - (sum.minor + discount) * 1000n
   return 2n * (off < 0n ? -off : off) <= quantity.milli * step
 }

@@ -8,13 +8,13 @@ import { cardRate, rememberedLines } from '#model/entities/receipt-remembered'
 import type { RememberedPrices } from '#model/entities/receipt-remembered'
 import {
   DEPARTMENT,
+  THOUSANDTHS_PER_HUNDREDTH,
   TOLERANCE_HUNDREDTHS,
   halfUpHundredths,
   linesTotalHundredths,
   paidByOf,
-  printedDayOf,
-  THOUSANDTHS_PER_HUNDREDTH,
   pharmacySum,
+  printedDayOf,
   printedMeets,
   printedSum,
 } from '#model/entities/receipt-text'
@@ -185,11 +185,19 @@ function canonicalAnswer(
       .map(decimalsOf)
       .filter((count) => count !== null)
   const ofLines = decimalsIn(spelt.flatMap((line) => [line.unit_price, line.discount, line.sum]))
-  const decimals = ofLines.length > 0 ? ofLines : decimalsIn(amounts.map(({ amount }) => amount))
+  const ofTotals = decimalsIn(amounts.map(({ amount }) => amount))
+  // the lines decide by what most of their amounts print (adversarial Г2, round 4): a discount the till prints in tetri,
+  // «0.50», is outvoted by the thousandths beside it, and a tie is two — a weight «0.452» copied into the sum of a
+  // receipt of two decimals stays no figure (Р-1). One decimal votes for neither: «1.5» is a «1.500» the model cut short,
+  // and thousands grouped by a point never print one. A whole number votes for two: «499» beside «1.299» is a till
+  // grouping thousands by a point (MOL-426), never a pharmacy. With no line, every total of two or three decides
+  const three = ofLines.filter((count) => count === THOUSANDTHS).length
+  const two = ofLines.filter((count) => count !== THOUSANDTHS && count !== 1).length
   const thousandths =
     reading.numbers.some((format) => format.fractionDigits === THOUSANDTHS) &&
-    decimals.length > 0 &&
-    decimals.every((count) => count === THOUSANDTHS)
+    (ofLines.length > 0
+      ? three > two
+      : ofTotals.length > 0 && ofTotals.every((count) => count === THOUSANDTHS))
   const printed = new Map<ModelLine, LineThousandths>()
   const lines = thousandths
     ? spelt.map((line) => {
@@ -214,21 +222,21 @@ function canonicalAnswer(
   // with three, a card's payment as the till prints the rest, «ბარათი 23.870» beside «ლარი 23.868», is that tetri and no
   // doubt of the thousandths (adversarial В1, round 3)
   const printedTotals = new Map<number, number | null>()
+  const whole = (milli: number): boolean => milli % THOUSANDTHS_PER_HUNDREDTH === 0
   if (thousandths) {
     for (const { amount } of amounts) {
       const milli = figureOf(amount, THOUSANDTHS)
       if (milli === null || decimalsOf(amount) !== THOUSANDTHS) continue
       const tetri = halfUpHundredths(milli)
       const known = printedTotals.get(tetri)
-      const whole = (one: number): boolean => one % THOUSANDTHS_PER_HUNDREDTH === 0
-      printedTotals.set(
-        tetri,
-        known === undefined || known === milli || (known !== null && whole(known))
-          ? milli
-          : whole(milli)
-            ? known
-            : null,
-      )
+      // the first, or the same again: this one
+      if (known === undefined || known === milli) printedTotals.set(tetri, milli)
+      // the one before a whole tetri: these thousandths say more
+      else if (known !== null && whole(known)) printedTotals.set(tetri, milli)
+      // this one a whole tetri: the one before stays
+      else if (whole(milli)) continue
+      // two thousandths apart: a doubt
+      else printedTotals.set(tetri, null)
     }
   }
   let unparsed = 0
@@ -1171,6 +1179,19 @@ export function receiptTextOfModel(
   // a pharmacy's lines and total as printed (MOL-421): what they are judged by, here and by the check
   const totalThousandths = total === null ? undefined : printedTotals.get(total)
   const milli = pharmacySum({ cashbackHundredths: cashback, serviceHundredths: service, lines })
+  // the lines' sums as read meeting the total as printed round apart from it whole or not: a line whose quantity was
+  // misread keeps its sum, and «Прочитали не всё» measures the lines by the total less the rounding, or it says a line
+  // lost of a pharmacy whose every sum was read (adversarial Г1, round 4)
+  const against = total ?? read
+  const sums = lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
+  const rounded =
+    rounding ??
+    (milli !== null &&
+    against !== null &&
+    against !== sums &&
+    printedMeets(milli, against, printedTotals.get(against))
+      ? against - sums
+      : null)
   return {
     layout,
     tin,
@@ -1193,7 +1214,7 @@ export function receiptTextOfModel(
     cashbackHundredths: cashback,
     redeemedHundredths: redeemed,
     serviceHundredths: service,
-    roundingHundredths: rounding,
+    roundingHundredths: rounded,
     ...(totalThousandths === undefined ? {} : { totalThousandths }),
     lines,
   }
