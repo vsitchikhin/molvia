@@ -56,8 +56,7 @@
         class="label"
         :class="{ chosen: index === modelValue }"
       >
-        <span class="word">{{ bar.label }}</span
-        ><span v-if="bars.length > FEW" class="letter">{{
+        <span class="word">{{ bar.label }}</span><span v-if="bars.length > FEW" class="letter">{{
           bar.label.charAt(0).toLocaleUpperCase()
         }}</span>
       </span>
