@@ -692,38 +692,39 @@ receipt proven whole, and its lines of one piece went empty.
   **where the vote does not choose three, the paper's own sum does** (adversarial Д1, round 5): the lines' sums as
   thousandths meeting a total printed with three — 22.368 + «5», a «5.000» the model cut, is «27.368», where «1.299» +
   «499» meets no «1.798»; a total beside such lines is read in any of them: a card's payment is in tetri, «ბარათი 23.87»
-  (adversarial А3, round 1); with no line, every total decides. **The rounding is named of sums read right on a receipt
-  not whole too** (Г1): a line whose quantity was misread keeps its sum, and «Прочитали не всё» measures the lines by
-  the total less the rounding, or it says a line lost of a pharmacy whose every sum was read. **And «Записать» takes
-  it**: on a receipt not whole the lines the person typed and the rounding meeting the total as read are what was paid,
-  that total (`receiptTotal`, Д2) — the lines alone were a tetri off what the review said. **A line's arithmetic is
-  judged as printed, in thousandths**, and then every amount is hundredths, half up, as the rest of the reading counts:
-  rounded first, 3 × 0.255 = 0.765 is 3 × 0,26 against 0,77. **The check judges it so too**: the line keeps its money as
-  printed (`thousandths`, read through `printedThousandths` only while it rounds to the line's own figures), or
-  `verifiedReading` took the price of the very line Р-2 settled (adversarial А2, round 1). **Whole is judged as printed,
-  the tetri between its own figure** (owner's А1 «а», adversarial А1 of round 1 — Р-3 «whole in tetri» was the price
-  before): the lines meet a total printed with three decimals in thousandths, one printed in tetri only by a sum that is
-  that tetri to the thousandth (`printedMeets`, adversarial В2 of round 3: «26.70» cannot tell 26.698 from a misread
-  26.703, so a pharmacy that prints its total in tetri beside lines of three decimals is the price — not seen), and a
-  payment printed with three decimals but a whole tetri, «ბარათი 23.870», is that tetri, no doubt of the total's
-  «23.868» (В1), and rounded each they come to it less a rounding, either sign — 22.364 + 4.334 = 26.698 is 22,36 + 4,33
-  against 26,70, +0,01; 1.005 + 1.005 against 2.010, −0,01. Judged in tetri a quarter of two-line pharmacies and a third
-  of three-line ones were not whole: their lines of one piece empty, Sonnet asked to copy the same paper, «Прочитали не
-  всё» and a notice to the developer of a receipt read right. **Never whole by the tetri alone**: 1.004 + 1.005 against
-  2.010 is a figure misread, though 1,00 + 1,01 is 2,01. The rounding is a café's service's kin (MOL-310):
-  `roundingHundredths` of the reading, `receipts.rounding_minor` (null or not nought), the lines make the total less it
-  in every comparison (`linesTotalHundredths`, `linesTotalOf` — the check, «Прочитали не всё», the review, «Записать»),
-  the trip is the total; the review says it in a row of its own, «Округление +0,01 ₾», to a phone that asks
-  (`RECEIPT_ROUNDING_HEADER`) — an earlier build is told the lines' total as the receipt's, and its echo of it at
-  «Записать» is the printed total. **The check judges it as printed too** (round 2): the reading hands it the total's
-  thousandths (`totalThousandths`), and `notWhole` and the sums that vouch for themselves (`sumsMeet`) meet it by
-  `printedMeets` — a card's payment in tetri, «ბარათი 26.70», voting for 26,70 beside «ლარი 26.698» proves no misread
-  thousandth whole, where 22,35 + 4,35 meet it in tetri (adversarial Б1: a quarter of such misreads were shown as read).
-  **A price that holds only in thousandths is shown on any receipt** (Б3, then В3 «а»): the record keeps the sum shown,
-  0,77, as a line off by no more than its price's rounding (`lineAddsUp`), never 3 × 0,26 = 0,78. **A total below its
-  lines by a rounding below nought is what was paid** (Б2): the record's «a total below the lines was misread»
-  (`receiptTotal`) allows exactly that far, or 22,37 + 4,34 against 26,70 went down as 26,71. The prompt did not change
-  (Р-4), and the review shows 22,37 ₾ against 22.368 on the paper (Р-5).
+  (adversarial А3, round 1); with no line, or none of them voting — every amount «5», «2.5» — every total decides
+  (adversarial Ж1, round 7). **The rounding is named of sums read right on a receipt not whole too** (Г1): a line whose
+  quantity was misread keeps its sum, and «Прочитали не всё» measures the lines by the total less the rounding, or it
+  says a line lost of a pharmacy whose every sum was read. **And «Записать» takes it**: on a receipt not whole the lines
+  the person typed and the rounding meeting the total as read are what was paid, that total (`receiptTotal`, Д2) — the
+  lines alone were a tetri off what the review said. **A line's arithmetic is judged as printed, in thousandths**, and
+  then every amount is hundredths, half up, as the rest of the reading counts: rounded first, 3 × 0.255 = 0.765 is 3 ×
+  0,26 against 0,77. **The check judges it so too**: the line keeps its money as printed (`thousandths`, read through
+  `printedThousandths` only while it rounds to the line's own figures), or `verifiedReading` took the price of the very
+  line Р-2 settled (adversarial А2, round 1). **Whole is judged as printed, the tetri between its own figure** (owner's
+  А1 «а», adversarial А1 of round 1 — Р-3 «whole in tetri» was the price before): the lines meet a total printed with
+  three decimals in thousandths, one printed in tetri only by a sum that is that tetri to the thousandth
+  (`printedMeets`, adversarial В2 of round 3: «26.70» cannot tell 26.698 from a misread 26.703, so a pharmacy that
+  prints its total in tetri beside lines of three decimals is the price — not seen), and a payment printed with three
+  decimals but a whole tetri, «ბარათი 23.870», is that tetri, no doubt of the total's «23.868» (В1), and rounded each
+  they come to it less a rounding, either sign — 22.364 + 4.334 = 26.698 is 22,36 + 4,33 against 26,70, +0,01; 1.005 +
+  1.005 against 2.010, −0,01. Judged in tetri a quarter of two-line pharmacies and a third of three-line ones were not
+  whole: their lines of one piece empty, Sonnet asked to copy the same paper, «Прочитали не всё» and a notice to the
+  developer of a receipt read right. **Never whole by the tetri alone**: 1.004 + 1.005 against 2.010 is a figure
+  misread, though 1,00 + 1,01 is 2,01. The rounding is a café's service's kin (MOL-310): `roundingHundredths` of the
+  reading, `receipts.rounding_minor` (null or not nought), the lines make the total less it in every comparison
+  (`linesTotalHundredths`, `linesTotalOf` — the check, «Прочитали не всё», the review, «Записать»), the trip is the
+  total; the review says it in a row of its own, «Округление +0,01 ₾», to a phone that asks (`RECEIPT_ROUNDING_HEADER`)
+  — an earlier build is told the lines' total as the receipt's, and its echo of it at «Записать» is the printed total.
+  **The check judges it as printed too** (round 2): the reading hands it the total's thousandths (`totalThousandths`),
+  and `notWhole` and the sums that vouch for themselves (`sumsMeet`) meet it by `printedMeets` — a card's payment in
+  tetri, «ბარათი 26.70», voting for 26,70 beside «ლარი 26.698» proves no misread thousandth whole, where 22,35 + 4,35
+  meet it in tetri (adversarial Б1: a quarter of such misreads were shown as read). **A price that holds only in
+  thousandths is shown on any receipt** (Б3, then В3 «а»): the record keeps the sum shown, 0,77, as a line off by no
+  more than its price's rounding (`lineAddsUp`), never 3 × 0,26 = 0,78. **A total below its lines by a rounding below
+  nought is what was paid** (Б2): the record's «a total below the lines was misread» (`receiptTotal`) allows exactly
+  that far, or 22,37 + 4,34 against 26,70 went down as 26,71. The prompt did not change (Р-4), and the review shows
+  22,37 ₾ against 22.368 on the paper (Р-5).
 - **A total under the currency alone is the total's place** (MOL-421, owner's В-2 «а»): the pharmacy prints «23.868
   ლარი» with no word, and the model labels it «ლარი» — an amount nothing named, so no total, no receipt proven whole and
   its lines of one piece empty. The card's `bareTotal` («ლარი», «₾», «GEL», marks around it at most; Armenia's `NEVER`)
