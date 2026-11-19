@@ -708,9 +708,8 @@ receipt proven whole, and its lines of one piece went empty.
   the total's thousandths (`totalThousandths`), and `notWhole` and the sums that vouch for themselves (`sumsMeet`) meet
   it by `printedMeets` — a card's payment in tetri, «ბარათი 26.70», voting for 26,70 beside «ლარი 26.698» proves no
   misread thousandth whole, where 22,35 + 4,35 meet it in tetri (adversarial Б1: a quarter of such misreads were shown
-  as read). **A price that holds only in thousandths stays only on a receipt proven whole** (Б3): the record takes
-  quantity × price unless the total confirms the lines (`recordedSums`), and 3 × 0,26 is 0,78, not the 0,77 shown —
-  elsewhere the price goes and the sum stays. **A total below its lines by a rounding below nought is what was paid**
+  as read). **A price that holds only in thousandths is shown on any receipt** (Б3, then В3 «а»): the record
+  keeps the sum shown, 0,77, as a line off by no more than its price's rounding (`lineAddsUp`), never 3 × 0,26 = 0,78. **A total below its lines by a rounding below nought is what was paid**
   (Б2): the record's «a total below the lines was misread» (`receiptTotal`) allows exactly that far, or 22,37 + 4,34
   against 26,70 went down as 26,71. The prompt did not change (Р-4), and the review shows 22,37 ₾ against 22.368 on the
   paper (Р-5).
@@ -1313,6 +1312,11 @@ every look at a receipt reads its seller's place off them.
 line that adds up — what was paid; one that does not — the printed sum where the printed total confirms
 it, else quantity × price. Quantity × price is rounded half up to the digits the receipt prints — none
 when every amount on it is whole — once: 0,742 kg × 1 290 = 957,18 is 957 on a receipt of whole drams.
+**A line off its sum by no more than its price's own rounding adds up** (MOL-421, owner's В3 «а», 19.11.2026): the
+price is itself a figure rounded to those digits, so quantity × price may stand off what was paid by half the last digit
+a unit of the quantity — a pharmacy's 3 × 0.255 = 0.765 reads 3 × 0,26 against 0,77, and 0,77 is recorded, a total the
+person corrects included (adversarial В3: it moved to 0,78). In every country, and only such lines: «Ереван Сити»'s
+419,98 for a piece at 420 is two luma off a bound of half, and a weight's bound is under a luma.
 The phone calls these very functions on the review (В-6 of MOL-124).
 
 **The place is found by the receipts of its seller recorded in a city** (Р-6; review В4). **The city is the
