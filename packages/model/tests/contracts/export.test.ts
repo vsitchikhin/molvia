@@ -260,6 +260,7 @@ const file: ExportFile = {
       cashback: money(740n, 'AMD'),
       redeemed: null,
       service: null,
+      rounding: null,
       readPartly: false,
       paidBy: 'card',
       balanced: true,

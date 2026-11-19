@@ -777,6 +777,33 @@ describe('ReceiptView (MOL-127)', () => {
     expect(view.get('.total').text()).toMatch(/Обслуживание\s*90\s֏/)
   })
 
+  // MOL-421: a pharmacy's lines met its total as printed, in thousandths, and round a tetri apart from it
+  it('sets the lines against the total less a pharmacy’s rounding, either sign, and says it at the foot', async () => {
+    const up = detail()
+    receipt.mockResolvedValue({
+      ...up,
+      receipt: { ...up.receipt, total: amd('901') },
+      rounding: amd('1'),
+    })
+    const { view } = await render()
+    expect(view.find('.partly').exists()).toBe(false)
+    expect(view.find('.difference').exists()).toBe(false)
+    expect(view.get('.total').text()).toMatch(/Округление\s*\+1\s֏/)
+    view.unmount()
+    receipt.mockResolvedValue({
+      ...up,
+      receipt: { ...up.receipt, total: amd('899') },
+      rounding: { minor: -100n, currency: 'AMD' },
+    })
+    const down = (await render()).view
+    expect(down.find('.difference').exists()).toBe(false)
+    expect(down.get('.total').text()).toMatch(/Округление\s*−1\s֏/)
+    // must not: a receipt with no rounding has no such row
+    down.unmount()
+    receipt.mockResolvedValue(up)
+    expect((await render()).view.get('.total').text()).not.toContain('Округление')
+  })
+
   // MOL-329, adversarial Ж1: the rate's day names its year when it is not the screen's — December seen in January.
   it('names the year of a rate of another year at the foot', async () => {
     const shown = detail()

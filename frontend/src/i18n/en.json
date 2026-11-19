@@ -2455,6 +2455,7 @@
       "cashback": "Cashback to the card",
       "redeemed": "Paid with the card’s bonus",
       "service": "Service",
+      "rounding": "Rounding",
       "repaired_note": "Figures corrected — check them against the paper",
       "approx": "≈ {amount} at the {day} rate",
       "diff": "{amount} off — probably in the “{line}” line. You can save it anyway",

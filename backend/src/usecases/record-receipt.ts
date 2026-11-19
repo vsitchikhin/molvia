@@ -157,13 +157,18 @@ function editsOf(
  * shown the lines' total for the receipt's — the total less what went to the card, and less a café's service
  * (MOL-310) — and sends exactly that back when «Итог» is opened and saved as it was. That echo is the printed total,
  * neither the trip's money nor a correction; anything else it sends is the person's own word. A build that knows the
- * cashback and not the service echoes the total less the service alone.
+ * cashback and not the service echoes the total less the service alone; one that knows both and not a pharmacy's
+ * rounding (MOL-421), the total less the rounding alone.
  */
 function echoed(held: ReceiptToRecord, body: ReceiptRecordBody): ReceiptRecordBody {
-  const { total, cashback, service } = held
+  const { total, cashback, service, rounding } = held
   const sent = body.total
   if (sent === undefined || total === null) return body
-  const told = [linesTotalOf(total, cashback, service), linesTotalOf(total, null, service)]
+  const told = [
+    linesTotalOf(total, cashback, service, rounding),
+    linesTotalOf(total, null, service, rounding),
+    linesTotalOf(total, null, null, rounding),
+  ]
   return told.some((one) => sameMoney(sent, one)) ? { ...body, total } : body
 }
 
@@ -195,8 +200,13 @@ function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
     printed,
     ...stored.flatMap((line) => [line.price, line.sum, line.discount]),
   ])
-  // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
-  const left = recordedSums(stored, linesTotalOf(printed, held.cashback, held.service), digits)
+  // the lines make the total less what a card sent to the card (MOL-289), less a café's service (MOL-310) and less a
+  // pharmacy's rounding (MOL-421)
+  const left = recordedSums(
+    stored,
+    linesTotalOf(printed, held.cashback, held.service, held.rounding),
+    digits,
+  )
   let sum: Money | null = { minor: 0n, currency }
   const amounts = [
     ...body.lines.map((line) => (line.skip ? (left[line.position] ?? null) : line.amount)),
@@ -324,7 +334,7 @@ export async function recordReceipt(
       actor.id,
       held.tin,
       held.lines,
-      linesTotalOf(body.total ?? held.total, held.cashback, held.service),
+      linesTotalOf(body.total ?? held.total, held.cashback, held.service, held.rounding),
       held.currency,
     )
 

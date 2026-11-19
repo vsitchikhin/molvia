@@ -193,6 +193,12 @@ export interface ReadReceiptsDeps {
   readonly now?: () => Date
 }
 
+/** A pharmacy's rounding in the currency's minor units, its sign kept (MOL-421); nought is none. */
+function signedMinorOf(hundredths: number | null, currency: Currency): bigint | null {
+  if (hundredths === null) return null
+  const size = moneyOfHundredths(Math.abs(hundredths), currency)?.minor ?? null
+  return size === null || size === 0n ? null : hundredths < 0 ? -size : size
+}
 /** How many lines the shop's memory confirmed, put right and doubted on a reading (MOL-291). */
 export interface RememberedVoice {
   readonly confirmed: number
@@ -289,6 +295,7 @@ function headOf(
     readTotalMinor: moneyOfHundredths(text.readTotalHundredths, currency)?.minor ?? null,
     cashbackMinor: moneyOfHundredths(text.cashbackHundredths ?? null, currency)?.minor ?? null,
     serviceMinor: moneyOfHundredths(text.serviceHundredths ?? null, currency)?.minor ?? null,
+    roundingMinor: signedMinorOf(text.roundingHundredths ?? null, currency),
     redeemedMinor: moneyOfHundredths(text.redeemedHundredths ?? null, currency)?.minor ?? null,
     paidBy,
     balanced: text.balanced,
@@ -898,11 +905,14 @@ async function parsed(
   const measured = head.totalMinor ?? head.readTotalMinor
   const cashback = head.cashbackMinor ?? null
   const service = head.serviceMinor ?? null
-  // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
+  const rounding = head.roundingMinor ?? null
+  // the lines make the total less what a card sent to the card (MOL-289), less a café's service (MOL-310) and less a
+  // pharmacy's rounding (MOL-421)
   const total = linesTotalOf(
     measured === null ? null : { minor: measured, currency },
     cashback === null ? null : { minor: cashback, currency },
     service === null ? null : { minor: service, currency },
+    rounding === null ? null : { minor: rounding, currency },
   )
   return {
     kind: 'parsed',

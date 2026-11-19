@@ -174,6 +174,8 @@ export async function aLife(
       redeemedMinor: 1_000n,
       // a café's service (MOL-310): a field of the copy, filled in some row
       serviceMinor: 500n,
+      // a pharmacy's rounding (MOL-421), either sign: a field of the copy, filled in some row
+      roundingMinor: -1n,
       paidBy: 'card',
       balanced: true,
       // the month it counts in, and counted among the model's (MOL-275): fields of the copy, filled in some row

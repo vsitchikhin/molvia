@@ -16,6 +16,12 @@
         <span>{{ t('receipt.review.service') }}</span>
         <span class="figure">{{ serviceText }}</span>
       </div>
+      <!-- A pharmacy's rounding (MOL-421): the lines met the total as printed, in thousandths, and rounded to the
+           tetri they come to it less this, either sign. -->
+      <div v-if="roundingText" class="line">
+        <span>{{ t('receipt.review.rounding') }}</span>
+        <span class="figure">{{ roundingText }}</span>
+      </div>
       <hr class="rule" />
     </template>
     <!-- The total is a button (Р-8): OCR misses it on half the receipts, and the trip's money is the
@@ -71,6 +77,8 @@ export default defineComponent({
     redeemed: { type: Object as PropType<Money | null>, default: null },
     /** A café's service (MOL-310). */
     service: { type: Object as PropType<Money | null>, default: null },
+    /** A pharmacy's rounding, either sign (MOL-421). */
+    rounding: { type: Object as PropType<Money | null>, default: null },
     rate: { type: Object as PropType<ExchangeRate | null>, default: null },
     /** The day the rate is of: the receipt's. */
     day: { type: String, required: true },
@@ -120,6 +128,16 @@ export default defineComponent({
       totalText: computed(() => money(props.total)),
       cashbackText: computed(() => (props.noItems ? null : money(props.cashback))),
       serviceText: computed(() => (props.noItems ? null : money(props.service))),
+      // signed: what the total adds to the lines, or takes off them
+      roundingText: computed(() => {
+        const { rounding } = props
+        if (props.noItems || !rounding || rounding.minor === 0n) return null
+        const size = money({
+          ...rounding,
+          minor: rounding.minor < 0n ? -rounding.minor : rounding.minor,
+        })
+        return `${rounding.minor < 0n ? '−' : '+'}${size ?? ''}`
+      }),
       redeemedText: computed(() => money(props.redeemed)),
       approx,
       difference,

@@ -144,6 +144,8 @@ export interface ReceiptHead {
   readonly redeemedMinor?: bigint | null
   /** A café's service (MOL-310): only a model's reading names it. */
   readonly serviceMinor?: bigint | null
+  /** A pharmacy's rounding, either sign (MOL-421): only a model's reading of three decimals names it. */
+  readonly roundingMinor?: bigint | null
   /** How it was paid, as its words of payment say (MOL-312); a receipt by its link has none. */
   readonly paidBy?: ReceiptPaidBy | null
   readonly balanced: boolean
@@ -269,6 +271,8 @@ export interface StoredReceipt {
   readonly redeemed: Money | null
   /** A café's service: the lines make the total less it (MOL-310). */
   readonly service: Money | null
+  /** A pharmacy's rounding, either sign: the lines make the total less it (MOL-421). */
+  readonly rounding: Money | null
   /** Read in part, of the lines as read before the check (MOL-255, А6 «а»); `null` — read before it. */
   readonly readPartly: boolean | null
   /** How it was paid, as its words say (MOL-312); `null` — it does not say, or read before it. */
@@ -331,6 +335,8 @@ export interface ReceiptToRecord {
   readonly redeemed: Money | null
   /** A café's service (MOL-310). */
   readonly service: Money | null
+  /** A pharmacy's rounding, either sign (MOL-421). */
+  readonly rounding: Money | null
   readonly city: ReceiptCity | null
   /** The trip it was recorded as; `null` — not recorded: a trip removed for good takes it (MOL-240). */
   readonly tripId: string | null
@@ -821,6 +827,7 @@ function toStored(found: SummaryRow): StoredReceipt {
     cashback: cashOf(found.row.cashbackMinor, found.row.currency),
     redeemed: cashOf(found.row.redeemedMinor, found.row.currency),
     service: cashOf(found.row.serviceMinor, found.row.currency),
+    rounding: cashOf(found.row.roundingMinor, found.row.currency),
     readPartly: found.row.readPartly,
     paidBy: found.row.paidBy,
     byModel: byModel(found.row.readerVersion),
@@ -1328,6 +1335,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         cashback: cashOf(row.cashbackMinor, row.currency),
         redeemed: cashOf(row.redeemedMinor, row.currency),
         service: cashOf(row.serviceMinor, row.currency),
+        rounding: cashOf(row.roundingMinor, row.currency),
         city: row.city,
         tripId: row.tripId,
         tripAlive,
@@ -1851,6 +1859,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                   cashbackMinor: head.cashbackMinor ?? null,
                   redeemedMinor: head.redeemedMinor ?? null,
                   serviceMinor: head.serviceMinor ?? null,
+                  roundingMinor: head.roundingMinor ?? null,
                   paidBy: head.paidBy ?? null,
                   balanced: head.balanced,
                   city: head.city,

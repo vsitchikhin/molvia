@@ -1293,6 +1293,44 @@ describe('«Записать»', () => {
     expect(await moneyOf(typed, body({ total: amount(2_300) }))).toBe(230_000n)
   }, 10_000)
 
+  it('takes what a pharmacy was paid, its rounding with it, from an earlier build’s echo too (MOL-421)', async () => {
+    const me = await insertActor(db)
+    const place = await insertPlace(db)
+    const milk = await insertItem(db)
+    const body = (over: Record<string, unknown> = {}) => ({
+      tripId: randomUUID(),
+      place: { id: place },
+      purchasedOn: '2026-09-26',
+      lines: [
+        { position: 0, skip: false, item: { id: milk }, quantity: pieces(2), amount: amount(740) },
+        {
+          position: 1,
+          skip: false,
+          item: { id: milk },
+          quantity: pieces(1),
+          amount: amount(1_450),
+        },
+      ],
+      ...over,
+    })
+    const moneyOf = async (receipt: string, payload: ReturnType<typeof body>) => {
+      expect((await record(me, receipt, payload)).statusCode).toBe(200)
+      const trip = onlyRow(await db.select().from(trips).where(eq(trips.id, payload.tripId)))
+      return trip?.receiptMinor
+    }
+    // lines of 2 190 rounded, the total 2 191: a rounding of +1, the lines met the total as printed
+    const pharmacy = { totalMinor: 219_100n, roundingMinor: 100n, layout: 'class' as const }
+    const sent = await parsedReceipt(me, LINES.slice(0, 2), { ...pharmacy, receiptNo: '1' })
+    expect(await moneyOf(sent, body())).toBe(219_100n)
+    // an earlier build is shown the lines' total and sends it back as it was: the printed total, no correction
+    const echoed = await parsedReceipt(me, LINES.slice(0, 2), { ...pharmacy, receiptNo: '2' })
+    expect(await moneyOf(echoed, body({ total: amount(2_190) }))).toBe(219_100n)
+    expect(sum((await db.select().from(receiptDays)).map((day) => day.totalsCorrected))).toBe(0)
+    // must not: another figure is the person's word
+    const typed = await parsedReceipt(me, LINES.slice(0, 2), { ...pharmacy, receiptNo: '3' })
+    expect(await moneyOf(typed, body({ total: amount(2_300) }))).toBe(230_000n)
+  }, 10_000)
+
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard
   // against a second record — it goes with its trip, never before it, and never after (MOL-240, А2 of
   // the adversarial review of MOL-97): nobody sees a recorded receipt without its trip
