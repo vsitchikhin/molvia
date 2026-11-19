@@ -93,6 +93,8 @@
          their reads go at once, and hidden while the form's skeleton stands (MOL-269): the form coming
          in its place moved them from under the finger. -->
     <SalaryShiftGroup v-show="groupsShown" class="group" />
+    <!-- Where the person stands with the model that reads receipts (MOL-276): a status, never saved. -->
+    <ReceiptsAccessGroup v-if="receiptsCountry" v-show="groupsShown" class="group" />
     <!-- The bot's messages, a switch each, on a page of their own (MOL-129, В-2). -->
     <section v-show="groupsShown" class="group">
       <SectionCaption>{{ t('settings.group_bot') }}</SectionCaption>
@@ -221,6 +223,7 @@ import AppCard from '@/components/AppCard.vue'
 import AppButton from '@/components/AppButton.vue'
 import ListRow from '@/components/ListRow.vue'
 import NavRow from '@/components/NavRow.vue'
+import ReceiptsAccessGroup from '@/components/ReceiptsAccessGroup.vue'
 import SalaryShiftGroup from '@/components/SalaryShiftGroup.vue'
 import SchemeGroup from '@/components/SchemeGroup.vue'
 import LocaleGroup from '@/components/LocaleGroup.vue'
@@ -237,6 +240,7 @@ import type { StripKind } from '@/components/StatusStrip.vue'
 import YourDataGroup from '@/components/YourDataGroup.vue'
 import { useSettings } from '@/composables/useSettings'
 import { useLocalDay } from '@/composables/useLocalDay'
+import { useReceiptsAccess } from '@/composables/useReceiptsAccess'
 import { answeredAt } from '@/days'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
@@ -285,6 +289,7 @@ export default defineComponent({
       incomeCurrency: t(`settings.currencies.${value.incomeCurrency}`),
     })
     const settings = useSettings()
+    const { country: receiptsCountry } = useReceiptsAccess()
     const { form, online } = settings
     const actor = useActorStore()
 
@@ -392,6 +397,7 @@ export default defineComponent({
 
     return {
       t,
+      receiptsCountry,
       // The language the screen is drawn in: the order of a day is asked of English alone.
       language: computed(() => pickLocale(i18n.locale.value)),
       saidIn,
