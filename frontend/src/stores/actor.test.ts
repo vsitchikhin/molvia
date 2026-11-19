@@ -752,6 +752,31 @@ describe('whether the model reads the receipts (MOL-408)', () => {
     expect([store.actor?.city, store.actor?.receiptsByModel]).toEqual(['Ереван', true])
   })
 
+  it('keeps where the person stands with the model past the settings’ answer (MOL-276)', async () => {
+    const access = {
+      until: null,
+      trialLeft: 6,
+      trialOf: 10 as const,
+      month: '2026-11-01',
+      read: 4,
+      limit: 100 as const,
+    }
+    me.mockResolvedValue({ ...FIRST, receiptsAccess: access })
+    const { store } = await freshStore()
+    await store.start()
+
+    store.apply({ ...FIRST, city: 'Ереван', updatedAt: new Date('2026-12-01T00:00:00.000Z') })
+    expect([store.actor?.city, store.actor?.receiptsAccess]).toEqual(['Ереван', access])
+
+    me.mockResolvedValue({
+      ...FIRST,
+      updatedAt: new Date('2026-12-01T00:00:00.000Z'),
+      receiptsAccess: { ...access, trialLeft: 0, read: 10 },
+    })
+    await store.start()
+    expect(store.actor?.receiptsAccess?.trialLeft).toBe(0)
+  })
+
   it('is said again by the next `/actors/me`, a grant ended included', async () => {
     me.mockResolvedValue({ ...FIRST, receiptsByModel: true })
     const { store } = await freshStore()

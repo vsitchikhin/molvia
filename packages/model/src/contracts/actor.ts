@@ -46,6 +46,17 @@ export const receiptsAccessSchema = z.strictObject({
 })
 export type ReceiptsAccess = z.infer<typeof receiptsAccessSchema>
 
+/**
+ * Why the model reads the person's receipts no more (MOL-276), by the server's figures alone — the tariff of
+ * `tariffOpens`: nothing paid and the trial spent is `trial`, the month's hundred read is `month`; none while it is
+ * open. `until` is already none for a date gone by the server's clock, so the phone's is never asked. The person's
+ * share and the month's cap close nothing here: the server does not say them (MOL-367).
+ */
+export function receiptsClosedBy(access: ReceiptsAccess): 'trial' | 'month' | null {
+  if (access.until === null && access.trialLeft === 0) return 'trial'
+  return access.read >= access.limit ? 'month' : null
+}
+
 /** The same on the wire, its moment as ISO. */
 const receiptsAccessWireSchema = receiptsAccessSchema.extend({
   until: z.iso.datetime().nullable(),
