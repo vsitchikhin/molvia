@@ -3,6 +3,8 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
+import { actionRow, anAccount, apart, collapse } from './header-row'
+import type { Box } from './header-row'
 import { asBrowser, signedIn } from './session'
 
 /**
@@ -30,6 +32,9 @@ interface Words {
   /** The record typed by hand, over its search. */
   entry: string
   purchases: string
+  /** The parent of an account's screen, and the action in its row (MOL-336). */
+  accounts: string
+  edit: string
 }
 
 const LANGUAGES: [string, Words][] = [
@@ -42,6 +47,8 @@ const LANGUAGES: [string, Words][] = [
       money: 'Деньги',
       entry: 'Запись',
       purchases: 'Покупки',
+      accounts: 'Счета',
+      edit: 'Править',
     },
   ],
   [
@@ -53,6 +60,8 @@ const LANGUAGES: [string, Words][] = [
       money: 'Money',
       entry: 'Entry',
       purchases: 'Purchases',
+      accounts: 'Accounts',
+      edit: 'Edit',
     },
   ],
 ]
@@ -92,37 +101,6 @@ async function finishedTrip(page: Page): Promise<string> {
   return id
 }
 
-interface Box {
-  left: number
-  right: number
-  top: number
-  bottom: number
-}
-
-/**
- * Waits until the row has settled after the scroll: the class comes first, and the column narrows
- * under the small title a frame or two later, the label following it by the observer. Read in
- * between, the label of the wide column was caught and gone by the next read.
- */
-async function settled(page: Page): Promise<void> {
-  await page.evaluate(
-    () =>
-      new Promise<void>((done) => {
-        const width = () => document.querySelector('.leading')?.getBoundingClientRect().width
-        let last = width()
-        let still = 0
-        const frame = () => {
-          const now = width()
-          still = now === last ? still + 1 : 0
-          last = now
-          if (still >= 3) done()
-          else requestAnimationFrame(frame)
-        }
-        requestAnimationFrame(frame)
-      }),
-  )
-}
-
 /** The button, the small title and the page's width, read in one frame. */
 async function row(
   page: Page,
@@ -158,15 +136,6 @@ async function whole(page: Page): Promise<boolean> {
     if (!label || !sample) throw new Error('no label, or no sample drawn for it')
     return label.getBoundingClientRect().width >= sample.getBoundingClientRect().width - 0.01
   })
-}
-
-function apart(one: Box, other: Box): boolean {
-  return (
-    one.right <= other.left ||
-    other.right <= one.left ||
-    one.bottom <= other.top ||
-    other.bottom <= one.top
-  )
 }
 
 for (const [locale, words] of LANGUAGES) {
@@ -208,17 +177,7 @@ for (const [locale, words] of LANGUAGES) {
         await test.step(path, async () => {
           await page.goto(path)
           await expect(page.locator('.back')).toBeVisible()
-          // A short screen has nothing to scroll; room under it changes nothing in the row.
-          await page.addStyleTag({ content: 'body { padding-bottom: 150vh; }' })
-          // Scrolled again until it holds: once on CI one scroll left /money/categories open, «screen
-          // docked held» (run 41674793280), not reproduced — the state is waited for, not supposed.
-          await expect(async () => {
-            await page.evaluate(() => {
-              window.scrollTo(0, 400)
-            })
-            await expect(page.locator('.screen')).toHaveClass(/collapsed/, { timeout: 1000 })
-          }).toPass({ timeout: 10_000 })
-          await settled(page)
+          await collapse(page)
 
           const { back, small, label, page: width } = await row(page)
           expect(back.left).toBeGreaterThanOrEqual(0)
@@ -239,6 +198,47 @@ for (const [locale, words] of LANGUAGES) {
             await expect(shown).toHaveText(new RegExp(`^(${parent}|${words.back})$`))
             expect(await whole(page)).toBe(true)
           }
+        })
+      }
+    })
+
+    test('an action in the row keeps its words, and the small title gives way before it (MOL-336)', async ({
+      page,
+    }) => {
+      test.setTimeout(60_000)
+      await signedIn(page)
+      // 28 letters: wider than the row at 320 and at 390 alike; «Наличные» fits beside the action.
+      for (const [name, cut] of [
+        ['Зарплатная карта Ардшинбанка', true],
+        ['Наличные', false],
+      ] as const) {
+        const id = await anAccount(page, name)
+        await test.step(name, async () => {
+          await page.goto(`/money/accounts/${id}`)
+          const action = page.getByRole('button', { name: words.edit, exact: true })
+          await expect(action).toBeVisible()
+          await expect(
+            page.getByRole('button', { name: `${words.back} ${words.accounts}`, exact: true }),
+          ).toBeVisible()
+          await expect(page.locator('.screen')).not.toHaveClass(/collapsed/)
+          const rest = await actionRow(page)
+          expect(rest.wordsPast, 'the action at rest').toBeLessThanOrEqual(0.01)
+          expect(apart(rest.back, rest.action), 'the back button reaches under the action').toBe(
+            true,
+          )
+
+          await collapse(page)
+
+          const row = await actionRow(page)
+          // The action's words whole inside its box, and «…» on the title only where it does not fit.
+          expect(row.wordsPast, 'the action collapsed').toBeLessThanOrEqual(0.01)
+          expect(row.cut, 'the small title cut').toBe(cut)
+          // A gap of --space-2 between the title and the action, never the one against the other.
+          expect(row.action.left - row.small.right).toBeGreaterThanOrEqual(7.5)
+          expect(apart(row.back, row.small)).toBe(true)
+          expect(apart(row.back, row.action)).toBe(true)
+          expect(row.action.right).toBeLessThanOrEqual(320)
+          expect(row.page).toBeLessThanOrEqual(320)
         })
       }
     })

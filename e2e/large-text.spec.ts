@@ -6,6 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page, Route } from '@playwright/test'
+import { actionRow, anAccount, apart, collapse } from './header-row'
 import { facesIn, stillIn } from './scroll'
 import { asBrowser, signedIn } from './session'
 import { textAt } from './text-size'
@@ -562,6 +563,30 @@ for (const size of ['150%', '200%'])
     // «мой — ЦБ РА сегодня» under «Мой курс» (MOL-348): end to end has no rate of the central bank, so the
     // server sends no line — the answer is given one, the dots at the ends, as `walletTrack` puts them apart.
     // Centred on its dot, «ЦБ РА сегодня 4,90 ֏/₽» stood 23 px past the phone at 200 % (adversarial Б1).
+    test('an account’s row keeps «Править» whole and no small title beside it (MOL-336)', async ({
+      page,
+    }) => {
+      test.setTimeout(60_000)
+      await signedIn(page)
+      await page.goto(`/money/accounts/${await anAccount(page, 'Карта Ардшинбанк')}`)
+      await expect(page.getByRole('button', { name: 'Править', exact: true })).toBeVisible()
+      await facesIn(page)
+      // At rest at 200 % «Править» held one line, 196 px, and left «‹» 28 of its 88: the two boxes stood 30 px
+      // one over the other, a tap on the chevron's right half opening the sheet (Р-2).
+      const rest = await actionRow(page)
+      expect(rest.wordsPast, 'the action at rest').toBeLessThanOrEqual(0.01)
+      expect(apart(rest.back, rest.action), 'the back button reaches under the action').toBe(true)
+      expect(rest.page).toBeLessThanOrEqual(320)
+      // Narrower than 14rem the row keeps its look at rest past the scroll (owner's В-1 «б»): at 200 % the title
+      // had 6 px beside «Пра-/вить», not even its «…».
+      await collapse(page)
+      const row = await actionRow(page)
+      expect(row.small.right - row.small.left, 'the small title').toBeLessThanOrEqual(0.5)
+      expect(row.wordsPast, 'the action collapsed').toBeLessThanOrEqual(0.01)
+      expect(apart(row.back, row.action), 'the back button reaches under the action').toBe(true)
+      expect(row.page).toBeLessThanOrEqual(320)
+    })
+
     test('the line «мой — ЦБ РА» under «Мой курс» stands within its card', async ({ page }) => {
       await page.route('**/api/exchanges', async (route) => {
         if (route.request().method() !== 'GET') return route.continue()
@@ -1140,6 +1165,26 @@ for (const size of ['110%', '115%'])
 
 // At 100 % on 320 nothing of MOL-334 moves (the control): no figure shrinks, the scale keeps its gap of 8 and its
 // keys of 44, and no word is hyphenated — but «Написать разработчику», which read «Написать разработч…» (MOL-334).
+test('at 115 % on 320 an account’s row still takes its small title beside «Править» (MOL-336)', async ({
+  page,
+}) => {
+  test.setTimeout(60_000)
+  await page.setViewportSize({ width: 320, height: 720 })
+  await textAt(page, '115%')
+  await signedIn(page)
+  await page.goto(`/money/accounts/${await anAccount(page, 'Карта Ардшинбанк')}`)
+  await expect(page.getByRole('button', { name: 'Править', exact: true })).toBeVisible()
+  await facesIn(page)
+  await collapse(page)
+  // Android's first step up keeps the row 15.4rem wide, over the 14 the title needs: «Карта Ардш…».
+  const row = await actionRow(page)
+  expect(row.small.right - row.small.left, 'the small title').toBeGreaterThan(100)
+  expect(row.cut).toBe(true)
+  expect(row.wordsPast, 'the action collapsed').toBeLessThanOrEqual(0.01)
+  expect(row.action.left - row.small.right).toBeGreaterThanOrEqual(7.5)
+  expect(row.page).toBeLessThanOrEqual(320)
+})
+
 test('the text at 100 % on a phone of 320 keeps its look', async ({ page }) => {
   test.setTimeout(60_000)
   await page.setViewportSize({ width: 320, height: 720 })
