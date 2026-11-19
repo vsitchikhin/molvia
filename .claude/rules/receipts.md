@@ -521,7 +521,9 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   marked by an answer, never by the ask** (Д1): an ask the network lost, or one `verify` swallowed while a question
   asked before the end was out, learnt nothing — marked as asked, the end went unheard until midnight; so an ask with
   no answer is asked again, 5 s doubling to a minute (the identity's `doublingRetry`), until any answer comes, and the
-  figures the screen came with are no answer. **Not the
+  figures the screen came with are no answer. **A second such answer keeps the re-ask the first armed** (Е1): two
+  questions out at the end — the return's and «Что брать»'s own on a city moved elsewhere — answered before it and
+  heard after it, and the later one took the re-ask away; it takes only the retry. **Not the
   button, since the button may be gone** (В2): Georgia with its share or the cap spent draws none, and the 1st that gave
   the share back was heard by nobody until a restart. Only where receipts are read off the photo — nothing else changes
   with the answer. The phone only decides to ask; what it says is the answer. The settings' form reads `/actors/me` as
