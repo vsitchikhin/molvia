@@ -189,13 +189,22 @@ function isPlaceWord(word: string): boolean {
 }
 
 /**
- * The words of a seller's name, folded, the place's aside — in a bank's line and a record's name alike:
+ * What a bank prints for a payment where it names no seller — Ardshin's screen shows «Безналичная оплата»
+ * for every card line (MOL-409) — folded: no seller's words (adversarial А15).
+ */
+const BANK_WORDS: ReadonlySet<string> = new Set(
+  payeeWords('безналичная оплата покупка платёж payment purchase'),
+)
+
+/**
+ * The words of a seller's name, folded, the bank's own and the place's aside — in a bank's line and a
+ * record's name alike:
  * «Ереван Сити» is «siti», since every card line of Yerevan prints «YEREVAN» and the city would meet them
  * all (adversarial А6). A name that is nothing but a city's word — the restaurant «Казан», the cinema
  * «Москва» — keeps it: with none it would be no name, and met by any line (А10).
  */
 export function sellerWords(text: string): string[] {
-  const words = payeeWords(text)
+  const words = payeeWords(text).filter((word) => !BANK_WORDS.has(word))
   const seller = words.filter((word) => !isPlaceWord(word))
   return seller.length > 0 ? seller : words
 }
