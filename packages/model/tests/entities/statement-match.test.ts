@@ -1610,6 +1610,33 @@ describe('matchStatement — adversarial, round 8', () => {
   }, 60_000)
 })
 
+describe('matchStatement — adversarial, round 9', () => {
+  it('А25: a «+» line naming no seller refunds nothing and weighs no record of its sum', () => {
+    const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+    const incomes = (payee: string) =>
+      Array.from({ length: 3000 }, () => line('2026-11-30', '6400.00', 'AMD', payee, { sign: '+' }))
+    const longAgo = Array.from({ length: 30_000 }, (_, i) =>
+      spending(
+        new Date(Date.UTC(2020, 0, 1) + (i % 2000) * 86_400_000).toISOString().slice(0, 10),
+        '6400.00',
+        'AMD',
+        { place: 'SAS', account: ARDSHIN },
+      ),
+    )
+    // Each went through every record of its sum, at a weight of 0: 13–15 s.
+    const started = performance.now()
+    const out = match(longAgo, incomes(''), o)
+    expectWithin(performance.now() - started, 4_000)
+    expect(out.pairs).toBe(0)
+    expect(new Set(out.lines.map((l) => l.decision.group))).toEqual(new Set(['not_spending']))
+    // A record naming nothing is no seller of a refund either.
+    const nameless = spending('2026-11-20', '6400.00', 'AMD', { account: ARDSHIN })
+    expect(decide([nameless], incomes('Ք: SAS SUPERMARKET YEREVAN AM').slice(0, 1), o)).toEqual([
+      { group: 'not_spending', reason: 'income', record: null },
+    ])
+  }, 60_000)
+})
+
 describe('tripCandidate', () => {
   const base = {
     id: '00000000-0000-4000-8000-0000000000aa',

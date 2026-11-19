@@ -746,13 +746,20 @@ export function matchStatement(
     if (weighed(row.line)) spend.push(row)
   }
 
-  // A refund (В3, Г4) is looked for among the lines and records of its own sum alone (А23).
-  const refunds = rows.filter((row) => !decisions.has(row.index) && row.line.sign === '+')
+  // A refund (В3, Г4) is looked for among the lines and records of its own sum alone (А23), and names its
+  // seller: a line or a record naming none is one seller with nothing (`sameSeller`), and is not weighed
+  // against a thing (А25).
+  const refunds = rows.filter(
+    (row) => !decisions.has(row.index) && row.line.sign === '+' && row.words.length > 0,
+  )
   const refundsBySum = bySum(refunds, (row) => [row.line.amount])
   const refundable = bySum(
     known.filter(
-      ({ c }) =>
-        (c.what === 'spending' || c.what === 'trip') && !c.removed && onAccount(c, account),
+      ({ c, seller }) =>
+        (c.what === 'spending' || c.what === 'trip') &&
+        !c.removed &&
+        onAccount(c, account) &&
+        seller.length > 0,
     ),
     (k) => k.amounts,
   )
@@ -775,6 +782,7 @@ export function matchStatement(
   // counted no further than the ceiling.
   const tooHeavy = () => ({ outcome: 'too_heavy', pairs: weight, steps: 0 }) as const
   for (const row of spend) {
+    if (row.words.length === 0) continue
     for (const back of refundsBySum.get(sumKey(row.line.amount)) ?? [])
       weight += 2 * statementNamesWeight(row.words, back.words)
     if (weight > STATEMENT_WEIGHED_MAX) return tooHeavy()
@@ -788,20 +796,11 @@ export function matchStatement(
   if (weight > STATEMENT_WEIGHED_MAX) return tooHeavy()
 
   // Every pair whose sum fits, then one to one: met before doubts, the line a record was made from
-  // first, then by the share of the name (А4), the nearer day, the order of the lines. The names of the
-  // pairs that fit are weighed too, before any of them is (А24).
-  const fitting: {
-    readonly row: Row
-    readonly k: Known
-    readonly fit: Fit
-    readonly moves: boolean
-    readonly own: boolean
-    readonly reached: boolean
-    readonly distance: number
-  }[] = []
+  // first, then by the share of the name (А4), the nearer day, the order of the lines. A pair's names are
+  // weighed before they are compared (А24), and past the ceiling none is (review №30).
+  const pairs: Pair[] = []
   for (const row of spend) {
-    for (const k of reaching(byDay, row)) {
-      const { c, days, link, amounts } = k
+    for (const { c, days, link, amounts, seller } of reaching(byDay, row)) {
       const moves = c.what === 'transfer' || c.what === 'exchange'
       if (moves && !onAccount(c, account)) continue
       const inside = days.some((d) => inWindow(form, row.day, d))
@@ -825,41 +824,27 @@ export function matchStatement(
           exact && relinks(c, link, days, distance) ? 'relink' : lateFit(link, row, form, amount)
       else fit = amount
       if (fit === null) continue
-      weight += Math.max(0, statementNamesWeight(row.words, k.seller) - STATEMENT_NAMES_IN_A_PAIR)
-      fitting.push({
-        row,
-        k,
+      weight += Math.max(0, statementNamesWeight(row.words, seller) - STATEMENT_NAMES_IN_A_PAIR)
+      if (weight > STATEMENT_WEIGHED_MAX) return tooHeavy()
+      const named = wordsShare(row.words, seller)
+      // A late posting and a hold are known by the name; a hold only on the statement's account: a hold
+      // is a card's, and a record with no account is cash or before the accounts — a purchase under it
+      // in the same chain is new (Г3).
+      if (fit === 'late' && named === 0) continue
+      if (fit === 'hold' && (named === 0 || account === null || c.account !== account)) continue
+      if (fit === 'exact' && !moves && !onAccount(c, account)) fit = 'elsewhere' // В-1 «а»
+      pairs.push({
+        row: row.index,
+        c,
         fit,
-        moves,
         own: says === 'own' || says === 'other_upload',
-        reached: link !== null && says !== 'no',
+        named,
+        // A line that names no seller is no other name only for a record its link reaches: by the window
+        // alone a dinner typed by hand would take a purchase silently (А15, А17).
+        nameless: seller.length === 0 || (row.words.length === 0 && link !== null && says !== 'no'),
         distance,
       })
     }
-    if (weight > STATEMENT_WEIGHED_MAX) return tooHeavy()
-  }
-  const pairs: Pair[] = []
-  for (const { row, k, moves, own, reached, distance, ...f } of fitting) {
-    const { c, seller } = k
-    let { fit } = f
-    const named = wordsShare(row.words, seller)
-    // A late posting and a hold are known by the name; a hold only on the statement's account: a hold is
-    // a card's, and a record with no account is cash or before the accounts — a purchase under it in the
-    // same chain is new (Г3).
-    if (fit === 'late' && named === 0) continue
-    if (fit === 'hold' && (named === 0 || account === null || c.account !== account)) continue
-    if (fit === 'exact' && !moves && !onAccount(c, account)) fit = 'elsewhere' // В-1 «а»
-    pairs.push({
-      row: row.index,
-      c,
-      fit,
-      own,
-      named,
-      // A line that names no seller is no other name only for a record its link reaches: by the window
-      // alone a dinner typed by hand would take a purchase silently (А15, А17).
-      nameless: seller.length === 0 || (row.words.length === 0 && reached),
-      distance,
-    })
   }
   pairs.sort(
     (p, q) =>
@@ -884,7 +869,7 @@ export function matchStatement(
   // A purchase and its refund in the same file (В3): the purchase new and not ticked; one refund a purchase.
   const refunded = new Set<number>()
   for (const { index, line, words } of spend) {
-    if (decisions.has(index)) continue
+    if (decisions.has(index) || words.length === 0) continue
     const back = refundsBySum
       .get(sumKey(line.amount))
       ?.find(
