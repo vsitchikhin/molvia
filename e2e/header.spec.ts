@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
-import { TITLE_GAP, actionRow, anAccount, apart, collapse } from './header-row'
+import { LAYOUT_UNIT, TITLE_GAP, actionRow, anAccount, apart, collapse } from './header-row'
 import type { Box } from './header-row'
 import { asBrowser, signedIn } from './session'
 
@@ -222,7 +222,7 @@ for (const [locale, words] of LANGUAGES) {
           ).toBeVisible()
           await expect(page.locator('.screen')).not.toHaveClass(/collapsed/)
           const rest = await actionRow(page)
-          expect(rest.wordsPast, 'the action at rest').toBeLessThanOrEqual(0.01)
+          expect(rest.wordsPast, 'the action at rest').toBeLessThan(LAYOUT_UNIT)
           expect(apart(rest.back, rest.action), 'the back button reaches under the action').toBe(
             true,
           )
@@ -231,7 +231,7 @@ for (const [locale, words] of LANGUAGES) {
 
           const row = await actionRow(page)
           // The action's words whole inside its box, and «…» on the title only where it does not fit.
-          expect(row.wordsPast, 'the action collapsed').toBeLessThanOrEqual(0.01)
+          expect(row.wordsPast, 'the action collapsed').toBeLessThan(LAYOUT_UNIT)
           expect(row.cut, 'the small title cut').toBe(cut)
           // A gap of --space-2 between the title and the action, never the one against the other.
           expect(row.gap).toBeGreaterThanOrEqual(TITLE_GAP)

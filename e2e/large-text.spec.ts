@@ -6,7 +6,7 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
 import type { Locator, Page, Route } from '@playwright/test'
-import { TITLE_GAP, actionRow, anAccount, apart, collapse } from './header-row'
+import { LAYOUT_UNIT, TITLE_GAP, actionRow, anAccount, apart, collapse } from './header-row'
 import { facesIn, stillIn } from './scroll'
 import { asBrowser, signedIn } from './session'
 import { textAt } from './text-size'
@@ -571,7 +571,7 @@ for (const size of ['150%', '200%'])
       // At rest at 200 % «Править» held one line, 196 px, and left «‹» 28 of its 88: the two boxes stood 30 px
       // one over the other, a tap on the chevron's right half opening the sheet (Р-2).
       const rest = await actionRow(page)
-      expect(rest.wordsPast, 'the action at rest').toBeLessThanOrEqual(0.01)
+      expect(rest.wordsPast, 'the action at rest').toBeLessThan(LAYOUT_UNIT)
       expect(apart(rest.back, rest.action), 'the back button reaches under the action').toBe(true)
       expect(rest.page).toBeLessThanOrEqual(320)
       // Narrower than 14rem the row keeps its look at rest past the scroll (owner's В-1 «б»): at 200 % the title
@@ -579,7 +579,7 @@ for (const size of ['150%', '200%'])
       await collapse(page)
       const row = await actionRow(page)
       expect(row.small.right - row.small.left, 'the small title').toBeLessThanOrEqual(0.5)
-      expect(row.wordsPast, 'the action collapsed').toBeLessThanOrEqual(0.01)
+      expect(row.wordsPast, 'the action collapsed').toBeLessThan(LAYOUT_UNIT)
       expect(apart(row.back, row.action), 'the back button reaches under the action').toBe(true)
       expect(row.page).toBeLessThanOrEqual(320)
     })
@@ -1168,14 +1168,14 @@ for (const size of ['110%', '115%'])
 // broken under the thumb at the scroll though it stood whole at rest (adversarial А1). At 115 % on 320 the row is
 // 15.4rem and the long name is cut, «Карта Ардш…»; at 125 % on 390 «Наличные» stands whole beside the whole word.
 for (const [width, size, name, cut] of [
-  ['320', '115%', 'Карта Ардшинбанк', true],
-  ['390', '125%', 'Наличные', false],
+  [320, '115%', 'Карта Ардшинбанк', true],
+  [390, '125%', 'Наличные', false],
 ] as const)
-  test(`at ${size} on ${width} an account’s row takes its small title beside «Править» on one line (MOL-336)`, async ({
+  test(`at ${size} on ${String(width)} an account’s row takes its small title beside «Править» on one line (MOL-336)`, async ({
     page,
   }) => {
     test.setTimeout(60_000)
-    await page.setViewportSize({ width: Number(width), height: 720 })
+    await page.setViewportSize({ width, height: 720 })
     await textAt(page, size)
     await signedIn(page)
     await page.goto(`/money/accounts/${await anAccount(page, name)}`)
@@ -1186,7 +1186,7 @@ for (const [width, size, name, cut] of [
     await collapse(page)
     const row = await actionRow(page)
     expect(row.actionLines, 'the action collapsed').toBe(1)
-    expect(row.wordsPast, 'the action collapsed').toBeLessThanOrEqual(0.01)
+    expect(row.wordsPast, 'the action collapsed').toBeLessThan(LAYOUT_UNIT)
     // From 14rem the title has 4 of them, four letters and «…».
     const rem = await page.evaluate(() =>
       parseFloat(getComputedStyle(document.documentElement).fontSize),
@@ -1194,7 +1194,36 @@ for (const [width, size, name, cut] of [
     expect(row.small.right - row.small.left, 'the small title').toBeGreaterThanOrEqual(4 * rem)
     expect(row.cut, 'the small title cut').toBe(cut)
     expect(row.gap).toBeGreaterThanOrEqual(TITLE_GAP)
-    expect(row.page).toBeLessThanOrEqual(Number(width))
+    expect(row.page).toBeLessThanOrEqual(width)
+  })
+
+// At rest «Править» stands on one line wherever it fits beside «‹» (adversarial А3): a floor of the whole chevron beside
+// the empty title's two gaps took a rem from it, and from 170 % to some 225 % — by the phone's width — it broke into
+// «Пра-/вить» though it fit. Narrower than 14rem the row keeps that look past the scroll (owner's В-1 «б»).
+for (const [width, size] of [
+  [320, '175%'],
+  [360, '195%'],
+  [375, '200%'],
+] as const)
+  test(`at ${size} on ${String(width)} an account’s row keeps «Править» on one line at rest (MOL-336)`, async ({
+    page,
+  }) => {
+    test.setTimeout(60_000)
+    await page.setViewportSize({ width, height: 720 })
+    await textAt(page, size)
+    await signedIn(page)
+    await page.goto(`/money/accounts/${await anAccount(page, 'Наличные')}`)
+    await expect(page.getByRole('button', { name: 'Править', exact: true })).toBeVisible()
+    await facesIn(page)
+    const rest = await actionRow(page)
+    expect(rest.actionLines, 'the action at rest').toBe(1)
+    expect(rest.wordsPast, 'the action at rest').toBeLessThan(LAYOUT_UNIT)
+    expect(apart(rest.back, rest.action), 'the back button reaches under the action').toBe(true)
+    expect(rest.page).toBeLessThanOrEqual(width)
+    await collapse(page)
+    const row = await actionRow(page)
+    expect(row.actionLines, 'the action collapsed').toBe(1)
+    expect(apart(row.back, row.action), 'the back button reaches under the action').toBe(true)
   })
 
 // At 100 % on 320 nothing of MOL-334 moves (the control): no figure shrinks, the scale keeps its gap of 8 and its

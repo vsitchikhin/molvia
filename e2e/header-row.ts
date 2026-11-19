@@ -9,6 +9,12 @@ import { asBrowser } from './session'
 /** The gap between the small title and the action: --space-2, 8, less half a pixel of rounding. */
 export const TITLE_GAP = 7.5
 
+/**
+ * How far an action's words may stand past its padding and still be whole: a box is laid out in 64ths of a pixel and
+ * its words measured in floats, so a word as wide as its column read 0.0125 past it at 195 % on 360.
+ */
+export const LAYOUT_UNIT = 1 / 64
+
 export interface Box {
   left: number
   right: number
