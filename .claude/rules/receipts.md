@@ -690,9 +690,19 @@ receipt proven whole, and its lines of one piece went empty.
   reading counts: rounded first, 3 × 0.255 = 0.765 is 3 × 0,26 against 0,77. **The check judges it so too**: the line
   keeps its money as printed (`thousandths`, read through `printedThousandths` only while it rounds to the line's own
   figures), or `verifiedReading` took the price of the very line Р-2 settled (adversarial А2, round 1). **Whole is judged
-  in tetri** (Р-3): lines that drift a tetri off the total by their rounding — 1.005 + 1.005 against 2.010, 1,01 + 1,01
-  against 2,01 — leave the receipt not whole, its lines of one piece empty (MOL-255). Neither the prompt nor the phone
-  changed (Р-4, Р-5): the review shows 22,37 ₾ against 22.368 on the paper.
+  as printed, the tetri between its own figure** (owner's А1 «а», adversarial А1 of round 1 — Р-3 «whole in tetri» was
+  the price before): the lines meet a total printed with three decimals in thousandths, one printed in tetri by their sum
+  half up (`totalOf`), and rounded each they come to it less a rounding, either sign — 22.364 + 4.334 = 26.698 is 22,36 +
+  4,33 against 26,70, +0,01; 1.005 + 1.005 against 2.010, −0,01. Judged in tetri a quarter of two-line pharmacies and a
+  third of three-line ones were not whole: their lines of one piece empty, Sonnet asked to copy the same paper, «Прочитали
+  не всё» and a notice to the developer of a receipt read right. **Never whole by the tetri alone**: 1.004 + 1.005
+  against 2.010 is a figure misread, though 1,00 + 1,01 is 2,01. The rounding is a café's service's kin (MOL-310):
+  `roundingHundredths` of the reading, `receipts.rounding_minor` (null or not nought), the lines make the total less it
+  in every comparison (`linesTotalHundredths`, `linesTotalOf` — the check, «Прочитали не всё», the review, «Записать»),
+  the trip is the total; the review says it in a row of its own, «Округление +0,01 ₾», to a phone that asks
+  (`RECEIPT_ROUNDING_HEADER`) — an earlier build is told the lines' total as the receipt's, and its echo of it at
+  «Записать» is the printed total. The prompt did not change (Р-4), and the review shows 22,37 ₾ against 22.368 on the
+  paper (Р-5).
 - **A total under the currency alone is the total's place** (MOL-421, owner's В-2 «а»): the pharmacy prints «23.868
   ლარი» with no word, and the model labels it «ლარი» — an amount nothing named, so no total, no receipt proven whole and
   its lines of one piece empty. The card's `bareTotal` («ლარი», «₾», «GEL», marks around it at most; Armenia's `NEVER`)

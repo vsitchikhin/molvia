@@ -728,8 +728,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   country resting together through an outage, the round going on past them — the camera there only for whom
   `/actors/me` says `receiptsByModel` (a header: grant, share, cap), the digits of the tax and fiscal numbers the
   card's, every item a Georgian line finds «проверьте»; no tax number printed, no shop memory (MOL-438). A pharmacy's
-  three decimals are read where every amount of its lines has three, its lines judged as printed by the reading and the check alike, then half up to the tetri; its total
-  under «ლარი» alone is a place of the total where none has the word (`bareTotal`, MOL-421).
+  three decimals are read where every amount of its lines has three, its lines judged as printed by the reading and the
+  check alike, then half up to the tetri; lines that meet the total as printed are whole, the tetri they round apart a
+  row of its own, «Округление» (`rounding_minor`, А1 «а»); its total under «ლარი» alone is a place of the total where
+  none has the word (`bareTotal`, MOL-421).
 - **A model's answer goes through the parse's own gate** (MOL-272): `receiptTextOfModel` into
   `ReceiptText`, then `verifiedReading(text, { byModel: true })` — every number as printed, the layout and
   the total our code's by the card's words, never the model's; a figure in any spelling it writes it, a
