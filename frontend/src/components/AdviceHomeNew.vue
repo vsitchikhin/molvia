@@ -73,14 +73,14 @@
           :icon="IconCart"
           :title="
             t(
-              country
+              readCountry
                 ? 'advice.home.step_purchases_capture_title'
                 : 'advice.home.step_purchases_title',
             )
           "
           :meta="
             t(
-              country
+              readCountry
                 ? 'advice.home.step_purchases_capture_body'
                 : 'advice.home.step_purchases_body',
             )
@@ -180,7 +180,8 @@ export default defineComponent({
     const { goTab } = useNavigation()
     const queue = useVerdictQueue()
     const pending = computed(() => queue.count.value)
-    const { country } = useReceiptCapture()
+    // the camera and its strip by `country`; what is promised of a receipt only where somebody reads it (MOL-276, А5)
+    const { country, readCountry } = useReceiptCapture()
     const receipts = useReceipts()
     // Only a receipt being sent or read: a refused or stuck one is not «разбираем» (А4, review 11).
     const underWay = computed(() =>
@@ -208,11 +209,11 @@ export default defineComponent({
       parsing: { title: 'advice.home.parsing.title', body: 'advice.home.parsing.body' },
       // «и переведёт» only where the catalogue has the till's language: Georgia's and Serbia's lines are not
       // translated (MOL-408)
-      new: country.value
+      new: readCountry.value
         ? {
             title: 'advice.home.new_capture.title',
             body:
-              receiptCard(country.value).nameLanguage === null
+              receiptCard(readCountry.value).nameLanguage === null
                 ? 'advice.home.new_capture.body_untranslated'
                 : 'advice.home.new_capture.body',
           }
@@ -229,6 +230,7 @@ export default defineComponent({
       underWayMeta,
       pending,
       country,
+      readCountry,
       reading,
       breathing,
       INTRO,

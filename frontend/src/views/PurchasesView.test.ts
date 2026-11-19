@@ -27,6 +27,7 @@ import { createAppI18n } from '@/i18n'
 import { routes } from '@/router'
 import { categoryIcon, tripIcon } from '@/components/spending'
 import { useActorStore } from '@/stores/actor'
+import { hearFf } from '@/stores/ff'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
@@ -476,6 +477,39 @@ describe('PurchasesView (MOL-128)', () => {
       expect(words).not.toContain(ru.purchases.capture_link)
       expect(words).toContain(ru.purchases.manual_by_hand)
       expect(view.text()).toContain(ru.purchases.empty_capture.body)
+    })
+
+    it('пробные чеки кончились, читать некому — камера остаётся, «строки прочитаем сами» не обещается (MOL-276, А5)', async () => {
+      hearFf(new Set(['payments']))
+      try {
+        const { view } = await render({
+          before: () => {
+            useActorStore().actor = {
+              id: ME,
+              country: 'AM',
+              city: 'Гюмри',
+              spendCurrency: 'AMD',
+              incomeCurrency: 'RUB',
+              createdAt: new Date('2026-10-01T10:00:00.000Z'),
+              updatedAt: new Date('2026-10-01T10:00:00.000Z'),
+              receiptsAccess: {
+                until: null,
+                ended: null,
+                trialLeft: 0,
+                trialOf: 10,
+                month: '2026-11-01',
+                read: 10,
+                limit: 100,
+              },
+            }
+          },
+        })
+        expect(view.get('.dock').text()).toContain(ru.purchases.capture)
+        expect(view.text()).toContain(ru.purchases.empty.body)
+        expect(view.text()).not.toContain(ru.purchases.empty_capture.body)
+      } finally {
+        hearFf(new Set())
+      }
     })
 
     it('пока список чеков не ответил, «пусто» не говорится (ревью 7)', async () => {
