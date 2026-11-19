@@ -373,17 +373,14 @@ function verifiedLine(
     p !== null &&
     s !== null &&
     Math.abs(Math.round((qty * p) / 1_000) - (s + d)) <= tolerance * scale
-  const inTetri = arithmetic(price, sum, discount, 1)
   // a pharmacy's line is judged as printed, in thousandths, as the reading judged it (MOL-421, Р-2, adversarial А2):
-  // 3 × 0.255 = 0.765 holds, 3 × 0,26 against 0,77 would not. Its price stays where it holds so in tetri too, or on a
-  // receipt proven whole: the sum recorded is quantity × price unless the total confirms the lines (`recordedSums`),
-  // and 3 × 0,26 is 0,78, not the 0,77 shown (adversarial Б3)
+  // 3 × 0.255 = 0.765 holds, 3 × 0,26 against 0,77 would not — and the record keeps its 0,77 as a line off by no more
+  // than its price's rounding (`lineAddsUp`, owner's В3 «а»), so its price is shown on any receipt
   const printed = printedThousandths(line)
   const holds =
     printed === null
-      ? inTetri
-      : arithmetic(printed.price, printed.sum, printed.discount ?? 0, THOUSANDTHS_PER_HUNDREDTH) &&
-        (inTetri || proven)
+      ? arithmetic(price, sum, discount, 1)
+      : arithmetic(printed.price, printed.sum, printed.discount ?? 0, THOUSANDTHS_PER_HUNDREDTH)
   return holds
     ? { line, reason: null }
     : {

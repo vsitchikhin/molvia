@@ -78,6 +78,21 @@ describe('a line adds up', () => {
     expect(lineAddsUp(figures(pcs(1), amd(850), amd(760.74), amd(89.25)), 2)).toBe(false)
   })
 
+  it('takes a line off by no more than its price’s own rounding, half a step a unit (MOL-421, owner’s В3 «а»)', () => {
+    const gel = (lari: number): Money => ({
+      minor: BigInt(Math.round(lari * 100)),
+      currency: 'GEL',
+    })
+    // a pharmacy's 3 × 0.255 = 0.765, printed back in tetri: 3 × 0,26 is 0,78 against 0,77, one off, the bound 1,5
+    expect(lineAddsUp(figures(pcs(3), gel(0.26), gel(0.77)), 2)).toBe(true)
+    // so a total the person corrects moves it no more: its sum is recorded (adversarial В3)
+    expect(recordedSums([figures(pcs(3), gel(0.26), gel(0.77))], gel(3), 2)).toEqual([gel(0.77)])
+    // must not: two off is past it
+    expect(lineAddsUp(figures(pcs(3), gel(0.26), gel(0.76)), 2)).toBe(false)
+    // must not: «Ереван Сити»'s 419,98 for a piece at 420 is the till's rounding of what was paid, past a piece's half
+    expect(lineAddsUp(figures(pcs(1), amd(419.98), amd(420)), 2)).toBe(false)
+  })
+
   it('does not hold with a figure missing or in another currency', () => {
     expect(lineAddsUp(figures(null, amd(890), amd(890)), 0)).toBe(false)
     expect(lineAddsUp(figures(pcs(1), null, amd(890)), 0)).toBe(false)

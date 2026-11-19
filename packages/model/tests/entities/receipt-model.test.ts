@@ -1856,16 +1856,16 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
     expect(explainedReading(right, { byModel: true }).receipt).toBeNull()
   })
 
-  it('keeps a price that holds as printed alone only where the record keeps the sum it shows (adversarial Б3)', () => {
-    // 3 × 0.255 = 0.765 on a receipt whose total was not read: 3 × 0,26 is 0,78, and `recordedSums` would record it
+  it('keeps a price that holds as printed on any receipt, and the record keeps the sum it shows (Б3, В3 «а»)', () => {
+    // 3 × 0.255 = 0.765 on a receipt whose total was not read: shown 3 × 0,26 = 0,77, recorded 0,77
     const text = readGe({
       ...pharmacy([piece('ა', '0.255', '0.765', '3.000')], '0.765'),
       totals: [],
     })
     const explained = explainedReading(text, { byModel: true })
-    expect(explained.lines).toEqual(['price_dropped'])
+    expect(explained.lines).toEqual([null])
     const [shown] = explained.shown.lines
-    expect([shown?.priceHundredths, shown?.sumHundredths]).toEqual([null, 77])
+    expect([shown?.priceHundredths, shown?.sumHundredths]).toEqual([26, 77])
     const gel = (minor: number | null) =>
       minor === null ? null : { minor: BigInt(minor), currency: 'GEL' as const }
     const figures = explained.shown.lines.map((l) => ({
@@ -1875,12 +1875,12 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
       discount: gel(l.discountHundredths),
     }))
     expect(recordedSums(figures, null, 2).map((one) => one?.minor)).toEqual([77n])
-    // must not: one that holds in tetri as well keeps its price on any receipt — 2 × 0.250 = 0.500
-    const even = readGe({
-      ...pharmacy([piece('ა', '0.250', '0.500', '2.000')], '0.500'),
+    // must not: one that holds in neither scale loses its price — 3 × 0.255 against 0.770
+    const off = readGe({
+      ...pharmacy([piece('ა', '0.255', '0.770', '3.000')], '0.770'),
       totals: [],
     })
-    expect(explainedReading(even, { byModel: true }).lines).toEqual([null])
+    expect(off.lines[0]?.settled).toBe(false)
   })
 
   it('reads three decimals only where every amount has three: one receipt, one format (Р-1)', () => {

@@ -43,7 +43,10 @@ export function lineProduct(quantity: Quantity, price: Money, digits: number): M
 
 /**
  * The line's own arithmetic holds: quantity × price = paid + discount, the product rounded to the
- * receipt's digits. A line missing a figure, or with one in another currency, does not add up.
+ * receipt's digits — or off it by no more than the price's own rounding, half the receipt's last digit a unit of the
+ * quantity (MOL-421, owner's В3 «а»): a price is itself a figure rounded to those digits, and a pharmacy's 3 × 0.255 =
+ * 0.765 is printed back as 3 × 0,26 against 0,77 — 0,77 is what was paid. A line missing a figure, or with one in
+ * another currency, does not add up.
  */
 export function lineAddsUp(line: ReceiptFigures, digits: number): boolean {
   const { quantity, price, sum } = line
@@ -51,7 +54,11 @@ export function lineAddsUp(line: ReceiptFigures, digits: number): boolean {
   const discount = line.discount?.minor ?? 0n
   if (sum.currency !== price.currency) return false
   if (line.discount !== null && line.discount.currency !== price.currency) return false
-  return lineProduct(quantity, price, digits).minor === sum.minor + discount
+  if (lineProduct(quantity, price, digits).minor === sum.minor + discount) return true
+  // |quantity × price − paid − discount| ≤ quantity × half a step, in thousandths of the minor unit
+  const step = 10n ** BigInt(Math.max(0, MINOR_EXPONENT[price.currency] - digits))
+  const off = quantity.milli * price.minor - (sum.minor + discount) * 1000n
+  return 2n * (off < 0n ? -off : off) <= quantity.milli * step
 }
 
 /** What the line comes to by its quantity and price: quantity × price less its discount. */
