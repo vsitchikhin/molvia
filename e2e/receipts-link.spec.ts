@@ -3,6 +3,7 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { madeUpSerbianLink } from '@molvia/model/testing/serbian-receipt'
 import { signedIn } from './session'
+import { risen } from './sheet-risen'
 
 // A Serbian receipt by the link of its QR code (MOL-232): pasted on the phone — the sheet's way past
 // its camera since MOL-233, whose own spec is `receipts-qr.spec.ts` — sent through the
@@ -23,13 +24,6 @@ function link(requestedBy = 'TESTAAAA'): string {
     requestedBy,
     counter: Date.now() % 4_000_000_000,
   })
-}
-
-async function risen(page: Page): Promise<void> {
-  await sheet(page).evaluate((dialog) =>
-    Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
-  )
-  await page.waitForTimeout(350)
 }
 
 /** The link pasted in the sheet of a Serbian receipt, past its camera (MOL-233): «Paste». */

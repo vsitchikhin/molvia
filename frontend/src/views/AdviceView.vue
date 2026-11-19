@@ -204,6 +204,7 @@ import type { SavedVerdict, Score } from '@/components/rating'
 import { useAdvice } from '@/composables/useAdvice'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
+import { useAccessKeptFresh } from '@/composables/useReceiptsAccess'
 import { answeredAt } from '@/days'
 import { focusScreenTitle } from '@/transitions'
 
@@ -257,6 +258,9 @@ export default defineComponent({
     /** A sheet of «Записать покупки» is up. */
     const entering = ref(false)
     const { country } = useReceiptCapture()
+    // where the person stands with the model, kept fresh here and not by the camera — gone with a share spent, it
+    // would take the asking with it (MOL-276, adversarial В2)
+    useAccessKeptFresh()
     /** The focus is in the field or its «Очистить». */
     const fieldFocused = ref(false)
     /**

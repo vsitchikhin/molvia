@@ -65,11 +65,12 @@ describe('receiptsAccessOf (MOL-275)', () => {
     const actors = {
       modelAccess: (_actorId: string, month: string) => {
         asked.push(month)
-        return Promise.resolve({ until, trialLeft: 4, read: 6 })
+        return Promise.resolve({ until, ended: null, trialLeft: 4, read: 6 })
       },
     }
     expect(await receiptsAccessOf(actors, 'a-person', '2026-11-30')).toEqual({
       until,
+      ended: null,
       trialLeft: 4,
       trialOf: 10,
       month: '2026-11-01',
@@ -77,6 +78,17 @@ describe('receiptsAccessOf (MOL-275)', () => {
       limit: 100,
     })
     expect(asked).toEqual(['2026-11-01'])
+  })
+
+  it('passes when a paid reading ran out (MOL-276, adversarial А2)', async () => {
+    const ended = new Date('2026-11-02T09:30:00.000Z')
+    const actors = {
+      modelAccess: () => Promise.resolve({ until: null, ended, trialLeft: 0, read: 60 }),
+    }
+    expect(await receiptsAccessOf(actors, 'a-person', '2026-11-30')).toMatchObject({
+      until: null,
+      ended,
+    })
   })
 
   it('says nothing of nobody', async () => {

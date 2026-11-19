@@ -6,6 +6,7 @@ import type { Page } from '@playwright/test'
 import { prepareZXingModule, writeBarcode } from 'zxing-wasm/writer'
 import { madeUpSerbianLink } from '@molvia/model/testing/serbian-receipt'
 import { signedIn } from './session'
+import { risen } from './sheet-risen'
 
 // A Serbian receipt photographed (MOL-233): the phone reads the QR code off the photo in its worker,
 // with the app's own wasm, and only the link goes — through the receipts' queue to the API, which asks
@@ -88,13 +89,6 @@ async function photo(page: Page, qr: string | null): Promise<Buffer> {
     return btoa(binary)
   }, code)
   return Buffer.from(encoded, 'base64')
-}
-
-async function risen(page: Page): Promise<void> {
-  await sheet(page).evaluate((dialog) =>
-    Promise.allSettled(dialog.getAnimations().map((animation) => animation.finished)),
-  )
-  await page.waitForTimeout(350)
 }
 
 /** «Photograph a receipt» → «Choose photo» with the photo given. */
