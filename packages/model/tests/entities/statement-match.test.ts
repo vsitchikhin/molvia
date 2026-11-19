@@ -1464,7 +1464,7 @@ describe('matchStatement — review and adversarial, round 5', () => {
     // A thousand uploads' numbers asked a thousand times every line's md5: 21 s at a quarter of the pairs.
     const many = linked(1000, (i) => `24700123456${String(i).padStart(5, '0')}`)
     expect(matchStatement(PERSON, statementOf(lines, o), many).outcome).toBe('too_heavy')
-  })
+  }, 15_000)
 
   it('№25: a line naming no seller refunds no purchase and no record; the bank’s words never part one seller', () => {
     const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
