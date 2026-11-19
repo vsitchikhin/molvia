@@ -1694,6 +1694,47 @@ describe('matchStatement — adversarial, round 11', () => {
   })
 })
 
+describe('matchStatement — adversarial, round 12', () => {
+  it('А28: a doubt frees a record through a path of lines moving to records as good — whatever the ids', () => {
+    const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+    const sas = (n: number, day: string) =>
+      spendingCandidate(
+        {
+          id: `00000000-0000-4000-8000-${String(n).padStart(12, '0')}`,
+          spentOn: day,
+          amount: cash('6400.00', 'AMD'),
+          debited: null,
+          accountId: ARDSHIN,
+          place: 'SAS',
+          note: null,
+        },
+        { removed: false, link: null },
+      )
+    const lines = [
+      line('2026-11-11', '6400.00', 'AMD', 'Ք: SAS SUPERMARKET YEREVAN AM'),
+      line('2026-11-13', '6400.00', 'AMD', 'Ք: SAS SUPERMARKET YEREVAN AM'),
+      line('2026-11-08', '7000.00', 'AMD', 'Ք: SAS SUPERMARKET YEREVAN AM'),
+    ]
+    // The 11th meets X and Y alike, the 13th Y and Z, the 8th only X and a fifth over. With X's id first the
+    // 11th took X, the 13th Y, and the 8th came back new, ticked: one step could not free X.
+    for (const [x, y, z] of [
+      [1, 2, 3],
+      [1, 3, 2],
+      [2, 1, 3],
+      [2, 3, 1],
+      [3, 1, 2],
+      [3, 2, 1],
+    ] as const) {
+      const [xs, ys, zs] = [sas(x, '2026-11-10'), sas(y, '2026-11-12'), sas(z, '2026-11-14')]
+      expect(decide([xs, ys, zs], lines, o)).toEqual([
+        recorded(ys),
+        recorded(zs),
+        recorded(xs, 'tip'),
+      ])
+    }
+  })
+})
+
 describe('tripCandidate', () => {
   const base = {
     id: '00000000-0000-4000-8000-0000000000aa',

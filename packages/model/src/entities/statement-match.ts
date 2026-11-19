@@ -654,8 +654,9 @@ const sameRank = (p: Pair, q: Pair) =>
  * left free. The records a failed search went through lead nowhere until a line is matched, so the next
  * line's search skips them: a crowd of one sum, more lines than records, searched again every record for
  * every line left over — some 10⁹ steps under the ceiling of pairs (adversarial А20). A record held by an
- * earlier fit is taken over only where its line moves to a free record as good in that fit (А27): a tie of
- * two records the exact phase broke one way left the other free and a tip line new, ticked — a duplicate.
+ * earlier fit is taken over only where its line moves to a record as good in that fit, free or freed by a
+ * path of such moves (А27, А28): a tie of two records the exact phase broke one way left the other free and
+ * a tip line new, ticked — a duplicate.
  */
 function matchPairs(pairs: readonly Pair[]): {
   readonly choice: Map<number, Pair> | null
@@ -676,13 +677,23 @@ function matchPairs(pairs: readonly Pair[]): {
     choice.set(row, p)
     return true
   }
-  // A line of an earlier fit moves to a free record of its fit, as good as the one it holds (А27).
-  const reseat = (holder: number): boolean => {
+  // A line of an earlier fit moves to a record of its fit as good as the one it holds — a free one, else
+  // one whose line moves on in turn: a path, as a tie of two holders in a chain was decided by the
+  // records' ids (А27, А28).
+  const reseat = (holder: number, seen: Set<string>): boolean => {
     const held = choice.get(holder)
     if (held === undefined) return false
-    for (const p of byFit.get(held.fit)?.get(holder) ?? []) {
+    const alike = (byFit.get(held.fit)?.get(holder) ?? []).filter((p) => sameRank(p, held))
+    for (const p of alike) {
       if (++steps > STATEMENT_STEPS_MAX) return false
-      if (sameRank(p, held) && !owner.has(p.c.id)) return take(holder, p)
+      if (!owner.has(p.c.id)) return take(holder, p)
+    }
+    for (const p of alike) {
+      if (++steps > STATEMENT_STEPS_MAX) return false
+      if (seen.has(p.c.id)) continue
+      seen.add(p.c.id)
+      const next = owner.get(p.c.id)
+      if (next !== undefined && next !== holder && reseat(next, seen)) return take(holder, p)
     }
     return false
   }
@@ -703,7 +714,7 @@ function matchPairs(pairs: readonly Pair[]): {
         const holder = owner.get(p.c.id)
         if (holder === undefined) return take(row, p)
         const theirs = choice.get(holder)?.fit === fit
-        if (theirs ? claim(holder, seen) : reseat(holder)) return take(row, p)
+        if (theirs ? claim(holder, seen) : reseat(holder, seen)) return take(row, p)
       }
       return false
     }
