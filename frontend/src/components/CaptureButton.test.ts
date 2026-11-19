@@ -27,6 +27,7 @@ const ARMENIA: ActorView = {
   createdAt: new Date('2026-09-16T10:00:00Z'),
   updatedAt: new Date('2026-09-16T10:00:00Z'),
 }
+const GEORGIA: ActorView = { ...ARMENIA, country: 'GE', city: 'Тбилиси', spendCurrency: 'GEL' }
 const OPEN: ReceiptsAccess = {
   until: null,
   ended: null,
@@ -139,7 +140,16 @@ async function choose(view: VueWrapper, way: 'photo' | 'manual' | 'developer'): 
 const closedSheet = (view: VueWrapper) => view.findComponent(ReceiptsClosedSheet)
 const camera = (view: VueWrapper) => view.findComponent(CaptureSheet)
 
+/** The camera's sheet put away with no photo, as `BottomSheet` tells it once it is down. */
+async function closeCamera(view: VueWrapper): Promise<void> {
+  camera(view).vm.$emit('update:open', false)
+  camera(view).props('onClosed')?.()
+  await flushPromises()
+}
+
 beforeEach(() => {
+  // one clock the test sets: the figures' month is the phone's, and no grant ends within the day
+  vi.useFakeTimers({ now: new Date('2026-11-19T12:00:00Z'), toFake: ['Date'] })
   me.mockReset()
   localStorage.clear()
   sessionStorage.clear()
@@ -207,16 +217,7 @@ describe('«Сфотографировать чек» where the model reads no m
   })
 
   it('stands at every tap in Georgia, which no Tesseract reads, the фф off', async () => {
-    const view = await render(
-      {
-        ...ARMENIA,
-        country: 'GE',
-        city: 'Тбилиси',
-        spendCurrency: 'GEL',
-        receiptsAccess: TRIAL_OVER,
-      },
-      'GE',
-    )
+    const view = await render({ ...GEORGIA, receiptsAccess: TRIAL_OVER }, 'GE')
     await tap(view)
     expect(closedSheet(view).props('othersRead')).toBe(false)
     await choose(view, 'developer')
@@ -229,9 +230,7 @@ describe('«Сфотографировать чек» where the model reads no m
     await tap(view)
     expect(closedSheet(view).props('reason')).toBe('month')
     await choose(view, 'photo')
-    camera(view).vm.$emit('update:open', false)
-    camera(view).props('onClosed')?.()
-    await flushPromises()
+    await closeCamera(view)
 
     await tap(view)
     expect(closedSheet(view).exists()).toBe(false)
@@ -292,16 +291,7 @@ describe('«Сфотографировать чек» where the model reads no m
   })
 
   it('stays up with its words when a fresh answer opens the reading under it, and goes only as it is put away (adversarial А1)', async () => {
-    const { view, store } = await rendered(
-      {
-        ...ARMENIA,
-        country: 'GE',
-        city: 'Тбилиси',
-        spendCurrency: 'GEL',
-        receiptsAccess: TRIAL_OVER,
-      },
-      'GE',
-    )
+    const { view, store } = await rendered({ ...GEORGIA, receiptsAccess: TRIAL_OVER }, 'GE')
     await tap(view)
     await answered(store, GRANTED)
     expect(closedSheet(view).props()).toMatchObject({ open: true, reason: 'trial' })
@@ -312,16 +302,7 @@ describe('«Сфотографировать чек» where the model reads no m
   })
 
   it('never rises by itself when the reading closes again later, untapped (adversarial А1)', async () => {
-    const { view, store } = await rendered(
-      {
-        ...ARMENIA,
-        country: 'GE',
-        city: 'Тбилиси',
-        spendCurrency: 'GEL',
-        receiptsAccess: TRIAL_OVER,
-      },
-      'GE',
-    )
+    const { view, store } = await rendered({ ...GEORGIA, receiptsAccess: TRIAL_OVER }, 'GE')
     await tap(view)
     await choose(view, 'developer')
     await answered(store, GRANTED)
@@ -333,25 +314,19 @@ describe('«Сфотографировать чек» where the model reads no m
     const { view, store } = await rendered({ ...ARMENIA, receiptsAccess: TRIAL_OVER })
     await tap(view)
     await choose(view, 'photo')
-    camera(view).vm.$emit('update:open', false)
-    camera(view).props('onClosed')?.()
-    await flushPromises()
+    await closeCamera(view)
 
     await answered(store, GRANTED)
     await answered(store, LAPSED)
     await tap(view)
     expect(closedSheet(view).props()).toMatchObject({ reason: 'ended', othersRead: true })
     await choose(view, 'photo')
-    camera(view).vm.$emit('update:open', false)
-    camera(view).props('onClosed')?.()
-    await flushPromises()
+    await closeCamera(view)
 
     // the same grant's end: the camera at once
     await tap(view)
     expect(closedSheet(view).exists()).toBe(false)
-    camera(view).vm.$emit('update:open', false)
-    camera(view).props('onClosed')?.()
-    await flushPromises()
+    await closeCamera(view)
 
     // another grant run out is told again
     await answered(store, { ...LAPSED, ended: new Date('2027-01-19T10:00:00Z') })
@@ -371,24 +346,11 @@ describe('«Сфотографировать чек» where the model reads no m
   it('asks where the person stands again at midnight with the screen in view (adversarial А3)', async () => {
     vi.useFakeTimers({ now: new Date(2026, 10, 30, 23, 58), toFake: ['Date', 'setTimeout'] })
     me.mockResolvedValue({
-      ...ARMENIA,
-      country: 'GE',
-      city: 'Тбилиси',
-      spendCurrency: 'GEL',
+      ...GEORGIA,
       receiptsByModel: true,
       receiptsAccess: { ...HUNDRED, month: '2026-12-01', read: 0 },
     })
-    const view = await render(
-      {
-        ...ARMENIA,
-        country: 'GE',
-        city: 'Тбилиси',
-        spendCurrency: 'GEL',
-        receiptsByModel: false,
-        receiptsAccess: HUNDRED,
-      },
-      'GE',
-    )
+    const view = await render({ ...GEORGIA, receiptsByModel: false, receiptsAccess: HUNDRED }, 'GE')
     await vi.advanceTimersByTimeAsync(5 * 60_000)
     await flushPromises()
     expect(me).toHaveBeenCalledTimes(1)
@@ -396,6 +358,52 @@ describe('«Сфотографировать чек» where the model reads no m
     await tap(view)
     expect(closedSheet(view).exists()).toBe(false)
     expect(camera(view).props('open')).toBe(true)
+  })
+
+  it('asks again as it comes, where the figures are of a month before the phone’s — put away over midnight elsewhere (Б2)', async () => {
+    vi.useFakeTimers({ now: new Date('2026-12-01T08:00:00Z'), toFake: ['Date'] })
+    me.mockResolvedValue({
+      ...GEORGIA,
+      receiptsByModel: true,
+      receiptsAccess: { ...HUNDRED, month: '2026-12-01', read: 0 },
+    })
+    const view = await render({ ...GEORGIA, receiptsByModel: false, receiptsAccess: HUNDRED }, 'GE')
+    expect(me).toHaveBeenCalledTimes(1)
+
+    await tap(view)
+    expect(closedSheet(view).exists()).toBe(false)
+    expect(camera(view).props('open')).toBe(true)
+  })
+
+  it('must not ask as it comes where the figures are of the phone’s month (Б2)', async () => {
+    await render({ ...ARMENIA, receiptsAccess: HUNDRED })
+    expect(me).not.toHaveBeenCalled()
+  })
+
+  it('asks again as a paid reading runs out with the screen in view (Б3)', async () => {
+    vi.useFakeTimers({ now: new Date('2026-12-19T09:58:00Z'), toFake: ['Date', 'setTimeout'] })
+    const until = new Date('2026-12-19T10:00:00Z')
+    me.mockResolvedValue({
+      ...GEORGIA,
+      receiptsByModel: false,
+      receiptsAccess: { ...TRIAL_OVER, month: '2026-12-01', ended: until },
+    })
+    const view = await render(
+      {
+        ...GEORGIA,
+        receiptsByModel: true,
+        receiptsAccess: { ...TRIAL_OVER, month: '2026-12-01', until },
+      },
+      'GE',
+    )
+    await vi.advanceTimersByTimeAsync(60_000)
+    expect(me).not.toHaveBeenCalled()
+    await vi.advanceTimersByTimeAsync(2 * 60_000)
+    expect(me).toHaveBeenCalledTimes(1)
+
+    await tap(view)
+    expect(closedSheet(view).props('reason')).toBe('ended')
+    expect(camera(view).exists()).toBe(false)
   })
 
   it('«Записать вручную» bare offers `begin`, the one method the button calls (review №6)', async () => {

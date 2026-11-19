@@ -80,20 +80,25 @@ describe('«Пробные чеки закончились» (MOL-276)', () => {
     )
   })
 
-  it('says a paid reading ran out — never «Вы распознали 10 чеков» after a month of sixty (adversarial А2)', () => {
+  it('says a paid period over and the trial spent — both, whichever closed last (adversarial А2, Б1)', () => {
     // one clock the test sets: a day of another year is said with its year
     vi.useFakeTimers({ now: new Date('2026-11-19T12:00:00Z'), toFake: ['Date'] })
     const lapsed = { ...TRIAL_OVER, ended: new Date('2026-11-02T09:30:00Z'), read: 60 }
     const read = render('ended', true, lapsed)
     expect(read.get('h2').text()).toBe(ru.receipts_access.sheet.ended_title)
     expect(read.get('.body').text()).toContain(
-      'Распознавание было открыто до 2 ноября. Дальше читаем простым распознаванием',
+      'Оплаченный срок кончился 2 ноября, пробные чеки тоже потрачены. Дальше читаем простым распознаванием',
     )
+    // never «Вы распознали 10 чеков» after a month of sixty
     expect(read.text()).not.toContain('Вы распознали')
     expect(buttons(read)[0]).toBe(ru.receipts_access.sheet.photograph)
     const manual = render('ended', false, lapsed)
     expect(manual.get('.body').text()).toContain('Покупки можно записать вручную')
     expect(buttons(manual)).toEqual([ru.purchases.manual_by_hand, ru.settings.feedback.label])
+  })
+
+  it('refuses the reason `ended` with no moment it ended, never words with a hole (review №8)', () => {
+    expect(() => render('ended', true, TRIAL_OVER)).toThrow('no moment it ended')
   })
 
   it('names the way chosen, and leaves the going to the button that opened it', async () => {

@@ -39,7 +39,8 @@ export const receiptsAccessSchema = z.strictObject({
   until: z.date().nullable(),
   /**
    * When a paid reading ran out, by the server's clock (MOL-276, adversarial А2): none while it is to come or was
-   * never set. Beside `until`, which is none for both, it tells a grant gone from a trial spent.
+   * never set. Beside `until`, which is none for both, it tells a person who had paid from one who never did — not
+   * which of the two closed last, the grant or the trial (Б1).
    */
   ended: z.date().nullable(),
   trialLeft: z.int().min(0).max(RECEIPT_TRIAL),
@@ -56,8 +57,9 @@ export type ReceiptsClosed = 'trial' | 'ended' | 'month'
 
 /**
  * Why the model reads the person's receipts no more (MOL-276), by the server's figures alone — the tariff of
- * `tariffOpens`: nothing paid and the trial spent is `trial`, or `ended` where a paid reading ran out (adversarial
- * А2); the month's hundred read is `month`; none while it is open. `until` is already none for a date gone by the
+ * `tariffOpens`: nothing paid and the trial spent is `trial`, or `ended` where a paid reading ran out besides
+ * (adversarial А2) — both are so then, and its words say both, since which closed last the figures do not tell (Б1);
+ * the month's hundred read is `month`; none while it is open. `until` is already none for a date gone by the
  * server's clock, so the phone's is never asked. The person's share and the month's cap close nothing here: the server
  * does not say them (MOL-367).
  */

@@ -34,9 +34,8 @@ import type { ReceiptsAccess, ReceiptsClosed } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { monthWords } from '@/composables/useReceiptsAccess'
+import { closedWords } from '@/composables/useReceiptsAccess'
 import type { ReceiptsClosedWay } from '@/composables/useReceiptsAccess'
-import { dateOfAnyYear } from '@/days'
 
 /**
  * «Пробные чеки закончились» (MOL-276): stood before the camera when the model reads the person's receipts no more —
@@ -65,16 +64,12 @@ export default defineComponent({
     const today = useLocalDay()
 
     const title = computed(() => t(`receipts_access.sheet.${props.reason}_title`))
-    const body = computed(() => {
-      const key = `receipts_access.sheet.${props.reason}_${props.othersRead ? 'read' : 'manual'}`
-      const { access } = props
-      if (props.reason === 'trial') return t(key, { of: access.trialOf })
-      if (props.reason === 'ended')
-        return t(key, {
-          date: access.ended ? dateOfAnyYear(access.ended, locale.value, today.value, 'long') : '',
-        })
-      return t(key, monthWords(access, t, locale.value))
-    })
+    const body = computed(() =>
+      t(
+        `receipts_access.sheet.${props.reason}_${props.othersRead ? 'read' : 'manual'}`,
+        closedWords(props.reason, props.access, t, locale.value, today.value),
+      ),
+    )
 
     return { t, title, body }
   },

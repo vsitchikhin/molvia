@@ -194,7 +194,7 @@ describe('receiptsClosedBy (MOL-276)', () => {
     expect(receiptsClosedBy({ ...open, trialLeft: 0, read: 100 })).toBe('trial')
   })
 
-  it('tells a paid reading run out from a trial spent (adversarial А2)', () => {
+  it('tells one who had paid from one who never did, the trial spent either way (adversarial А2, Б1)', () => {
     const ended = new Date('2026-11-02T09:30:00Z')
     expect(receiptsClosedBy({ ...open, ended, trialLeft: 0, read: 60 })).toBe('ended')
     // and before the month's hundred, which comes back while the payment does not

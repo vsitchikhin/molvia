@@ -135,7 +135,7 @@ describe('«Распознавание чеков» (MOL-276)', () => {
     expect(status(view)).not.toContain('связь')
   })
 
-  it('says a paid reading ran out, apart from a trial spent, with what reads now (adversarial А2)', () => {
+  it('says a paid period over and the trial spent, with what reads now (adversarial А2, Б1)', () => {
     const lapsed = {
       ...TRIAL,
       ended: new Date('2026-11-02T09:30:00Z'),
@@ -144,13 +144,29 @@ describe('«Распознавание чеков» (MOL-276)', () => {
     }
     const view = render({ ...ARMENIA, receiptsAccess: lapsed })
     expect(status(view)).toContain(
-      'Оплаченное распознавание закончилось 2 ноября. Чеки читаем простым распознаванием',
+      'Оплаченный срок кончился 2 ноября, пробных чеков не осталось. Чеки читаем простым распознаванием',
     )
-    expect(status(view)).not.toContain('Пробные')
     hearFf(new Set(['payments']))
     expect(status(render({ ...ARMENIA, receiptsAccess: lapsed }))).toContain(
-      'Оплаченное распознавание закончилось 2 ноября. Покупки можно записать вручную',
+      'Оплаченный срок кончился 2 ноября, пробных чеков не осталось. Покупки можно записать вручную',
     )
+  })
+
+  it('says the trial too where it ran out weeks after the paid period — the trial is named, not the period alone (Б1)', () => {
+    // paid while trial receipts were left; the model read them on after the period, the last on 10 January
+    vi.useFakeTimers({ now: new Date('2027-01-10T09:00:00Z'), toFake: ['Date'] })
+    const view = render({
+      ...ARMENIA,
+      receiptsAccess: {
+        ...TRIAL,
+        ended: new Date('2026-12-19T10:00:00Z'),
+        trialLeft: 0,
+        month: '2027-01-01',
+        read: 4,
+      },
+    })
+    expect(status(view)).toContain('пробных чеков не осталось')
+    expect(status(view)).toContain('кончился 19 декабря 2026')
   })
 
   it('asks the server again at midnight with the screen in view: the hundred opens on the 1st (adversarial А3)', async () => {

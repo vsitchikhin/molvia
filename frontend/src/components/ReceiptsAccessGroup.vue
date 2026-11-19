@@ -24,7 +24,7 @@ import AppCard from '@/components/AppCard.vue'
 import ListRow from '@/components/ListRow.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { monthWords, useReceiptsAccess } from '@/composables/useReceiptsAccess'
+import { closedWords, monthWords, useReceiptsAccess } from '@/composables/useReceiptsAccess'
 import { dateOfAnyYear } from '@/days'
 
 /**
@@ -46,16 +46,20 @@ export default defineComponent({
     const status = computed(() => {
       const figures = access.value
       if (!figures) return t('receipts_access.status.unknown')
-      const reads = othersRead.value ? 'read' : 'manual'
-      if (closed.value === 'trial') return t(`receipts_access.status.trial_over_${reads}`)
-      if (closed.value === 'ended')
-        return t(`receipts_access.status.ended_${reads}`, {
-          date: figures.ended
-            ? dateOfAnyYear(figures.ended, locale.value, today.value, 'long')
-            : '',
-        })
+      const reason = closed.value
+      if (reason) {
+        // the month's hundred says when it opens again, whoever reads meanwhile
+        const reads = othersRead.value ? 'read' : 'manual'
+        const key =
+          reason === 'month'
+            ? 'month_read'
+            : `${reason === 'trial' ? 'trial_over' : 'ended'}_${reads}`
+        return t(
+          `receipts_access.status.${key}`,
+          closedWords(reason, figures, t, locale.value, today.value),
+        )
+      }
       const words = monthWords(figures, t, locale.value)
-      if (closed.value === 'month') return t('receipts_access.status.month_read', words)
       if (figures.until)
         return t('receipts_access.status.paid', {
           until: dateOfAnyYear(figures.until, locale.value, today.value, 'long'),
