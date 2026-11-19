@@ -516,14 +516,16 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   opened on «Покупки» on the 1st asked nobody); and as a paid reading's `until` passes with it in view, a day ahead at
   most (Б3: Georgia's camera stayed for a receipt nobody would read) — armed again by every answer, so the one at
   midnight sets it for a grant a day off (Г1: armed by the moment's change alone, a screen opened more than a day before
-  never caught the end), and never at once again for a moment an answer that came after it still names: every answer
-  is a new `Date`, and a phone whose clock ran ahead of the server's asked every two seconds (В1). **The moment is
-  marked by an answer, never by the ask** (Д1): an ask the network lost, or one `verify` swallowed while a question
-  asked before the end was out, learnt nothing — marked as asked, the end went unheard until midnight; so an ask with
-  no answer is asked again, 5 s doubling to a minute (the identity's `doublingRetry`), until any answer comes, and the
-  figures the screen came with are no answer. **A second such answer keeps the re-ask the first armed** (Е1): two
-  questions out at the end — the return's and «Что брать»'s own on a city moved elsewhere — answered before it and
-  heard after it, and the later one took the re-ask away; it takes only the retry. **Not the
+  never caught the end). **The grant's end is the screen's own question** (adversarial Д1, Е1, Е2): `api.me()` taken
+  in by `apply`, as «Что брать» takes its own, never `verify`, which asks nothing while another question is out — an
+  answer to a question asked before the end, heard after it, could not be told from the answer to this one, and each
+  rule of «which answer marks the moment» left one more order of answers that kept the end unheard until midnight
+  (the ask lost, swallowed, a second late answer taking the re-ask away, `verify`'s own late answer taking the retry).
+  So the moment is marked by the answer to this question alone, asked after the moment by the phone's clock: one still
+  naming it is believed — a phone whose clock runs ahead of the server's asks once a moment, never every two seconds
+  (В1) — and another answer heard past the moment asks only where this question is neither out, nor answered, nor
+  armed; a question with no answer is asked again, 5 s doubling to a minute (the identity's `doublingRetry`), and the
+  figures the screen came with are no answer. **Not the
   button, since the button may be gone** (В2): Georgia with its share or the cap spent draws none, and the 1st that gave
   the share back was heard by nobody until a restart. Only where receipts are read off the photo — nothing else changes
   with the answer. The phone only decides to ask; what it says is the answer. The settings' form reads `/actors/me` as
@@ -544,9 +546,10 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   there is read by whoever the server then decides; offline over midnight, or past a grant's end, the row and the sheet
   still say what the server last said until it answers — the phone counts nothing; a grant more than a day off is waited
   for by the next midnight's answer, not by a timer, and so is the end of one a phone whose clock runs ahead asked about
-  too early — two asks a moment at most (the first answer past it asks once more, since it may answer a question
-  asked before the end), then midnight or the app's return; with the server silent the grant's end is asked once a
-  minute while the screen is in view, until it answers; and a grant run out while trial receipts were left is said with the
+  too early — one ask a moment, then midnight or the app's return; an old answer heard after the screen's own one, the
+  server's word from before the end, puts the grant back on the phone, and the screen asks once more two seconds later;
+  with the server silent the grant's end is asked once a minute while the screen is in view, until it answers; the
+  grant's end is one request beside `verify`'s, never folded into it; and a grant run out while trial receipts were left is said with the
   trial once that trial is spent, by the grant's date.
 
 ## The class code (MOL-226)
