@@ -524,8 +524,9 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   So the moment is marked by the answer to this question alone, asked after the moment by the phone's clock: one still
   naming it is believed — a phone whose clock runs ahead of the server's asks once a moment, never every two seconds
   (В1) — and another answer heard past the moment asks only where this question is neither out, nor answered, nor
-  armed; a question with no answer is asked again, 5 s doubling to a minute (the identity's `doublingRetry`), and the
-  figures the screen came with are no answer. **Not the
+  armed; a question with no answer is asked again, 5 s doubling to a minute (the identity's `doublingRetry`) — and so
+  is one whose answer the store let go (`apply` says whether it took it, Ж1: a «Сохранить» of «Настройки» answered
+  meanwhile is a row newer) — and the figures the screen came with are no answer. **Not the
   button, since the button may be gone** (В2): Georgia with its share or the cap spent draws none, and the 1st that gave
   the share back was heard by nobody until a restart. Only where receipts are read off the photo — nothing else changes
   with the answer. The phone only decides to ask; what it says is the answer. The settings' form reads `/actors/me` as
