@@ -1475,9 +1475,12 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   px, the two buttons 30 px one over the other. **Beside an action the title comes only in a row of 14rem**
   (`@container bar`, owner's В-1 «б»): narrower, at 130 % on 320 and up, it had a letter or none — 6 px
   at 200 % — and the row keeps its look at rest past the scroll. The threshold is measured on «Править»
-  (the title gets the row less some 9.9rem); a longer action is measured again. The columns are `.row`'s,
-  since a container query cannot style the container itself; `.screen` is no container — a query
-  container with layout containment, as older engines apply it, would hold its fixed bars.
+  (the title gets the row less some 9.9rem); a longer action is measured again. The container is `.bar-room`, a box of its own in the bar, and
+  the columns are `.bar-columns` in it, since a query cannot style its own container. Not the bar itself:
+  as a container it lost WebKit the page's place under a sheet (`sheet.spec`, «does not jump», every run);
+  not `.screen`, whose fixed bars a container with layout containment, as older engines apply it, would
+  hold. The classes are the kit's own words: a `.row` beside a screen's own stood in every `.row` a test
+  found.
   **The name does not follow the ladder** — «Back Purchases» on every step, the word shown first
   (owner's decision on review). **It
   leads to the screen underneath when that screen is any ancestor** — the step the system
