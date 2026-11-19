@@ -111,7 +111,8 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   0.6 s): two ranks are enough to undo the shortcut — a crowd of one sum on one day, its free records the next day, a
   rank worse, sends every line left over through the whole crowd (adversarial А22: 856 642 712 steps, 25 s under the
   ceiling of pairs) — and past it the rule stops and answers `too_heavy`. **The price, named:** such a crowd, some
-  hundreds of rides of one price a day, is refused rather than matched.
+  hundreds of rides of one price a day, is refused rather than matched; and the two ceilings add up — one call weighs
+  up to 0.66 s and matches up to 0.6 s more, 1.3 s of the API's loop at worst (review №29).
 - **The link decides another line** (Г2, Д1, Д2, Е1, Е2), past the window too where it names it: its own line, by its
   key; another form on the link's day, ± 1 for a form whose day moves — **and a screenshot against a file's line by
   the posting day the file prints, and by it alone** (adversarial А1, А11: the bench took a screenshot's day for the
@@ -139,7 +140,10 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   reaching link was keyed under, `STATEMENT_KEY_WEIGHT` (20) pairs a key — an md5 is some 7 µs, a pair at its worst
   0.33 µs (А21: a thousand links under a thousand numbers asked 3 000 000 md5 at a quarter of the pairs, 21 s). The
   keys under an upload are kept by the account the key reads (`statementKeyAccount`): masks of one number are one, and
-  the statement's own are its lines'. A year of
+  the statement's own are its lines'. **A refund weighs too** (adversarial А23): it is looked for among the purchases
+  and the records of its own sum alone, and every seller it may weigh — a «+» line against each purchase of its sum (В3)
+  and each record of it (Г4) — is `STATEMENT_SELLER_WEIGHT` (8) pairs, words one edit apart some 2.7 µs; before, a
+  statement of «+» lines alone weighed nothing and went through every record, 24 s. A year of
   3 000 lines against 3 000 records linked to screenshots weighs some 1 500 000, half a second here; the same in one
   month weighs all 9 000 000, seconds. The answer carries `pairs` and `steps`, for the log; a counter kept in the domain
   was state a pure rule had no business keeping (review №19). A month against a year with no links, folded a pair at a time,

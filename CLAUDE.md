@@ -398,7 +398,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   before the account chosen in Molvia. **A line weighs only the records that reach its days**, at most
   `STATEMENT_LINES_MAX` lines, and past `STATEMENT_WEIGHED_MAX` pairs — a key under another upload twenty — the rule
   answers `too_heavy` and weighs none; the matching skips what a failed search went through (А20), and past
-  `STATEMENT_STEPS_MAX` steps stops with `too_heavy` too (А22).
+  `STATEMENT_STEPS_MAX` steps stops with `too_heavy` too (А22) — 1.3 s at worst; a refund weighs the sellers of its
+  sum alone, counted in the pairs (А23).
 
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 
