@@ -557,10 +557,10 @@ read by photo.
 subtotal and not-an-item, the codes and the QR, which no rule of Armenia reads; they come with their first
 reader (MOL-248). A field nobody reads is a word nobody checks. **The formats of numbers are a list** — Georgia's
 pharmacies print three decimals beside its shops' two — **and a card may name only a format its reader reads**:
-Tesseract's parse counts in hundredths throughout (`PARSED_FRACTION_DIGITS`), so it **refuses** a card it reads with
+Tesseract's parse counts in hundredths throughout (`fractionDigitsReadBy`, one rule for the parse and its test), so it **refuses** a card it reads with
 no format or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals read as
 two would be every sum wrong, and only a refusal makes the field more than a declaration. A card the model alone reads
-(`tesseractReads` false) may name its three decimals too (`MODEL_FRACTION_DIGITS`, MOL-421): `lexiconOf` is asked on
+(`tesseractReads` false) may name its three decimals too (`THOUSANDTHS`, MOL-421): `lexiconOf` is asked on
 the model's path as well (`paidByOf`), and refusing there would have failed every Georgian receipt. Tesseract for
 Georgia (MOL-423) inherits the refusal until its parse reads them.
 
@@ -682,10 +682,14 @@ receipt proven whole, and its lines of one piece went empty.
   the stop by Georgia's memory, not the reading — «Haiku has to cope with it» (owner, 17.11.2026).
 - **A pharmacy's three decimals are read, half up to the tetri** (MOL-421, owner's В-1 «а», 19.11.2026): the till of
   ge-04 and ge-05 prints «22.368», «23.868 ლარი», and the model copies them as printed. `canonicalAnswer` reads them only
-  where the card names three decimals and **every** amount the model copied — a price, a sum, a discount, a total — has
-  three (Р-1, one receipt, one format): a weight «0.452» copied into the sum of a receipt of two decimals stays no figure.
-  **A line's arithmetic is judged as printed, in thousandths** (Р-2, `held`), and then every amount is hundredths, half
-  up, as the rest of the reading counts: rounded first, 3 × 0.255 = 0.765 is 3 × 0,26 against 0,77. **Whole is judged
+  where the card names three decimals and **every** amount of the lines — a price, a sum, a discount — has three (Р-1,
+  one receipt, one format): a weight «0.452» copied into the sum of a receipt of two decimals stays no figure. A nought
+  carries no format — a column of discounts copied «0» — and a total beside such lines is read in any of them: a card's
+  payment is in tetri, «ბარათი 23.87» (adversarial А3, round 1); with no line, every total decides. **A line's
+  arithmetic is judged as printed, in thousandths**, and then every amount is hundredths, half up, as the rest of the
+  reading counts: rounded first, 3 × 0.255 = 0.765 is 3 × 0,26 against 0,77. **The check judges it so too**: the line
+  keeps its money as printed (`thousandths`, read through `printedThousandths` only while it rounds to the line's own
+  figures), or `verifiedReading` took the price of the very line Р-2 settled (adversarial А2, round 1). **Whole is judged
   in tetri** (Р-3): lines that drift a tetri off the total by their rounding — 1.005 + 1.005 against 2.010, 1,01 + 1,01
   against 2,01 — leave the receipt not whole, its lines of one piece empty (MOL-255). Neither the prompt nor the phone
   changed (Р-4, Р-5): the review shows 22,37 ₾ against 22.368 on the paper.
