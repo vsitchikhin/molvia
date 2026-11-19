@@ -1767,6 +1767,17 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
       873,
       [500, 250],
     ])
+    // a payment in tetri or cash rounded to five tetri beside «ლარი 8.734» leaves it the receipt's format (З1)
+    for (const paid of [
+      { label: 'ბარათი', amount: '8.73' },
+      { label: 'ნაღდი', amount: '8.75' },
+    ]) {
+      const text = readGe({
+        ...pharmacy([piece('ა', '5'), piece('ბ', '2.5')], '8.734', 'ლარი'),
+        totals: [{ label: 'ლარი', amount: '8.734' }, paid],
+      })
+      expect(text.readTotalHundredths, paid.label).toBe(873)
+    }
   })
 
   it('reads three where the vote does not, by the lines’ sums meeting a total printed with three (adversarial Д1)', () => {
