@@ -204,40 +204,32 @@ export function useAccessKeptFresh({
   // such answer it asked every two seconds (В1). Marked by an answer, never by the ask (Д1): an ask lost by the network
   // or swallowed by `verify` while another question was out learnt nothing — that one is asked again with a doubling
   // pause, the identity's rhythm, until any answer comes; and the figures the screen came with are no answer after it.
+  // A second such answer keeps the ask the first one armed (Е1): two questions out at the end — the return's and «Что
+  // брать»'s on a city moved — answered before it and heard after it, and the later one took the re-ask away.
   let grantEnds: ReturnType<typeof setTimeout> | undefined
   let heardPast: number | undefined
-  let answered = false
-  const unheard = doublingRetry(
-    () => {
-      askAgain()
-      unheard.later()
-    },
-    IDENTITY_RETRY_FIRST_MS,
-    IDENTITY_RETRY_LAST_MS,
-  )
+  let cameWith = true
+  /** Asks, and asks again with a doubling pause until an answer comes. */
+  function askAboutEnd(): void {
+    askAgain()
+    unheard.later()
+  }
+  const unheard = doublingRetry(askAboutEnd, IDENTITY_RETRY_FIRST_MS, IDENTITY_RETRY_LAST_MS)
   watch(
     access,
     (figures) => {
-      clearTimeout(grantEnds)
       unheard.cancel()
       unheard.reset()
-      const answer = answered
-      answered = true
+      const fromServer = !cameWith
+      cameWith = false
       const until = figures?.until?.getTime()
-      if (until === undefined) return
-      const left = until - Date.now()
-      if (left > GRANT_WAIT_MAX_MS) return
-      if (left <= 0 && answer) {
-        if (heardPast === until) return
-        heardPast = until
-      }
-      grantEnds = setTimeout(
-        () => {
-          askAgain()
-          unheard.later()
-        },
-        Math.max(0, left) + GRANT_END_SLACK_MS,
-      )
+      const left = until === undefined ? 0 : until - Date.now()
+      const past = fromServer && until !== undefined && left <= 0
+      if (past && heardPast === until) return
+      clearTimeout(grantEnds)
+      if (until === undefined || left > GRANT_WAIT_MAX_MS) return
+      if (past) heardPast = until
+      grantEnds = setTimeout(askAboutEnd, Math.max(0, left) + GRANT_END_SLACK_MS)
     },
     { immediate: true },
   )

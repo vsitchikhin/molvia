@@ -206,6 +206,39 @@ describe('where the person stands, kept fresh by the screen that holds the camer
     expect(useActorStore().actor?.receiptsAccess?.ended).toEqual(until)
   })
 
+  it('keeps the re-ask of one late answer through a second late answer (adversarial Е1)', async () => {
+    clockAt(new Date('2026-12-19T09:59:50Z'))
+    const until = new Date('2026-12-19T10:00:00Z')
+    const goesOn = () => ({ ...OPEN, month: '2026-12-01', until: new Date(until) })
+    const asked: number[] = []
+    // the server answers by its clock, the phone's, as the question reaches it: the return's takes five seconds back
+    me.mockImplementation(() => {
+      asked.push(Date.now())
+      const access =
+        Date.now() < until.getTime()
+          ? goesOn()
+          : { ...OPEN, month: '2026-12-01', trialLeft: 0, ended: new Date(until) }
+      return new Promise((resolve) => {
+        setTimeout(
+          () => {
+            resolve({ ...GEORGIA, receiptsAccess: access })
+          },
+          asked.length === 1 ? 5_000 : 1_000,
+        )
+      })
+    })
+    await screen({ ...GEORGIA, receiptsAccess: goesOn() })
+    await vi.advanceTimersByTimeAsync(8_000) // 09:59:58: the return asks
+    cameBack()
+    // 10:00:01.5: «Что брать»'s own `/actors/me`, asked before the end on a city moved, is heard after it
+    await vi.advanceTimersByTimeAsync(3_500)
+    useActorStore().apply({ ...GEORGIA, receiptsAccess: goesOn() })
+    // 10:00:03: the return's answer, as old, comes in the two seconds of the re-ask
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(asked.filter((at) => at >= until.getTime())).toEqual([until.getTime() + 3_500])
+    expect(useActorStore().actor?.receiptsAccess?.ended).toEqual(until)
+  })
+
   it('must not ask where receipts are not read off the photo: Serbia’s are their link', async () => {
     await screen({
       ...GEORGIA,
