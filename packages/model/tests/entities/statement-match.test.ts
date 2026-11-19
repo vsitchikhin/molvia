@@ -1662,6 +1662,38 @@ describe('matchStatement — adversarial, round 10', () => {
   })
 })
 
+describe('matchStatement — adversarial, round 11', () => {
+  it('А27: a tie of two records is broken by their ids, and a doubt may move the exact line to the other', () => {
+    const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+    const sas = (id: string, day: string) =>
+      spendingCandidate(
+        {
+          id,
+          spentOn: day,
+          amount: cash('6400.00', 'AMD'),
+          debited: null,
+          accountId: ARDSHIN,
+          place: 'SAS',
+          note: null,
+        },
+        { removed: false, link: null },
+      )
+    const x = sas('00000000-0000-4000-8000-00000000000a', '2026-11-13')
+    const y = sas('00000000-0000-4000-8000-00000000000b', '2026-11-11')
+    const lines = [
+      line('2026-11-12', '6400.00', 'AMD', 'Ք: SAS SUPERMARKET YEREVAN AM'),
+      line('2026-11-15', '7000.00', 'AMD', 'Ք: SAS SUPERMARKET YEREVAN AM'),
+    ]
+    // The 12th meets both alike; the 15th, a fifth over, only X. In the order [X, Y] the 12th took X and
+    // the 15th came back new, ticked: a duplicate of X with its tip.
+    for (const order of [
+      [x, y],
+      [y, x],
+    ])
+      expect(decide(order, lines, o)).toEqual([recorded(y), recorded(x, 'tip')])
+  })
+})
+
 describe('tripCandidate', () => {
   const base = {
     id: '00000000-0000-4000-8000-0000000000aa',

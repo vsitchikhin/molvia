@@ -653,7 +653,9 @@ const sameRank = (p: Pair, q: Pair) =>
  * and only when no record as good as it is free. The fits go in `FIT_ORDER`: a doubt takes only a record
  * left free. The records a failed search went through lead nowhere until a line is matched, so the next
  * line's search skips them: a crowd of one sum, more lines than records, searched again every record for
- * every line left over — some 10⁹ steps under the ceiling of pairs (adversarial А20).
+ * every line left over — some 10⁹ steps under the ceiling of pairs (adversarial А20). A record held by an
+ * earlier fit is taken over only where its line moves to a free record as good in that fit (А27): a tie of
+ * two records the exact phase broke one way left the other free and a tip line new, ticked — a duplicate.
  */
 function matchPairs(pairs: readonly Pair[]): {
   readonly choice: Map<number, Pair> | null
@@ -662,19 +664,30 @@ function matchPairs(pairs: readonly Pair[]): {
   const owner = new Map<string, number>()
   const choice = new Map<number, Pair>()
   let steps = 0
+  const byFit = new Map<Fit, Map<number, Pair[]>>(FIT_ORDER.map((fit) => [fit, new Map()]))
+  for (const p of pairs) {
+    const options = byFit.get(p.fit)
+    const held = options?.get(p.row)
+    if (held) held.push(p)
+    else options?.set(p.row, [p])
+  }
+  const take = (row: number, p: Pair) => {
+    owner.set(p.c.id, row)
+    choice.set(row, p)
+    return true
+  }
+  // A line of an earlier fit moves to a free record of its fit, as good as the one it holds (А27).
+  const reseat = (holder: number): boolean => {
+    const held = choice.get(holder)
+    if (held === undefined) return false
+    for (const p of byFit.get(held.fit)?.get(holder) ?? []) {
+      if (++steps > STATEMENT_STEPS_MAX) return false
+      if (sameRank(p, held) && !owner.has(p.c.id)) return take(holder, p)
+    }
+    return false
+  }
   for (const fit of FIT_ORDER) {
-    const options = new Map<number, Pair[]>()
-    for (const p of pairs) {
-      if (p.fit !== fit) continue
-      const held = options.get(p.row)
-      if (held) held.push(p)
-      else options.set(p.row, [p])
-    }
-    const take = (row: number, p: Pair) => {
-      owner.set(p.c.id, row)
-      choice.set(row, p)
-      return true
-    }
+    const options = byFit.get(fit) ?? new Map<number, Pair[]>()
     const claim = (row: number, seen: Set<string>): boolean => {
       const mine = options.get(row) ?? []
       const best = mine[0]
@@ -688,8 +701,9 @@ function matchPairs(pairs: readonly Pair[]): {
         if (seen.has(p.c.id)) continue
         seen.add(p.c.id)
         const holder = owner.get(p.c.id)
-        if (holder === undefined || (choice.get(holder)?.fit === fit && claim(holder, seen)))
-          return take(row, p)
+        if (holder === undefined) return take(row, p)
+        const theirs = choice.get(holder)?.fit === fit
+        if (theirs ? claim(holder, seen) : reseat(holder)) return take(row, p)
       }
       return false
     }
@@ -861,7 +875,9 @@ export function matchStatement(
       Number(q.own) - Number(p.own) ||
       q.named - p.named ||
       p.distance - q.distance ||
-      p.row - q.row,
+      p.row - q.row ||
+      // A tie is the record's id, never the order MOL-433 read the records in (А27, review №7).
+      (p.c.id < q.c.id ? -1 : p.c.id > q.c.id ? 1 : 0),
   )
   const { choice, steps } = matchPairs(pairs)
   if (choice === null) return { ...tooHeavy(), steps }
