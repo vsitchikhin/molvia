@@ -43,6 +43,12 @@ export interface ReceiptWords {
   /** What OCR keeps of the discount's word: a row of the total with it is the discount's. */
   readonly discountKept: string
   /**
+   * An amount labelled by the currency alone — a Georgian pharmacy's «23.868 ლარი» (MOL-421, owner's В-2 «а»): a place
+   * of the total only where no amount carries the total's word, and only one such amount; shown by MOL-244's rule as any
+   * total is. The whole label, marks around it at most. The model's reading only.
+   */
+  readonly bareTotal: string
+  /**
    * A sum since the start of the year or the month — «Ընդամենը ամվա սկզբից», what a card bought there this
    * year: never the receipt's total, neither read nor a vote (MOL-288).
    */
@@ -216,6 +222,7 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
     totalKept: 'դամե',
     // «զեղչ», «Զեղչ», «qեղչ» — as loosely as the total's word
     discountKept: 'եղչ',
+    bareTotal: NEVER,
     // «ամվա սկզբից», «ամսվա սկզբից»
     sinceStart: 'սկզբ',
     cashback: 'գործարք',
@@ -275,8 +282,8 @@ const SUL = `(?<![${GEORGIAN.small}])სულ(?![${GEORGIAN.small}])`
  * (`research/MOL-229/cards/GE.json`) — and a word no Georgian receipt has shown is `NEVER`, as is what Georgia prints
  * no counterpart of (the card's cashback, the sum since the year's start): a word without a paper behind it would
  * decide what a total is. The model's 5↔6 was seen only where the total put a sum right (Carrefour, MOL-420): a swap of
- * the repair alone, never the shop's memory's doubt, which nobody measured. The pharmacies print three decimals,
- * «23.868 ლარი» (ge-04, ge-05): the model's reading takes them (MOL-421).
+ * the repair alone, never the shop's memory's doubt, which nobody measured. The pharmacies print three decimals and
+ * their total under the currency alone, «23.868 ლარი» (ge-04, ge-05): the model's reading takes both (MOL-421).
  */
 export const GEORGIAN_RECEIPTS: PhotoReading = {
   languages: null,
@@ -299,6 +306,8 @@ export const GEORGIAN_RECEIPTS: PhotoReading = {
     total: `${SUL}|\\bTOT\\b`,
     totalKept: `${SUL}|\\bTOT\\b`,
     discountKept: NEVER,
+    // the pharmacies' total, «ლარი» alone on its row (ge-04, ge-05)
+    bareTotal: 'ლარი|₾|GEL',
     sinceStart: NEVER,
     cashback: NEVER,
     taxed: NEVER,

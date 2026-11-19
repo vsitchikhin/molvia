@@ -473,7 +473,8 @@ function totalOf(
   const percents = (served ?? []).flatMap((one) => (one.percent === null ? [] : [one.percent]))
   // what the card's words do not name, and the prepayment slip's own sum (MOL-310, Р-1)
   const prepaid = new RegExp(`^${MARKS}(?:${w.prepayment})${MARKS}$`, 'u')
-  const [slips, unnamed] = [new Set<number>(), new Set<number>()]
+  const bareWord = new RegExp(`^${MARKS}(?:${w.bareTotal})${MARKS}$`, 'iu')
+  const [slips, unnamed, bare] = [new Set<number>(), new Set<number>(), new Set<number>()]
   for (const { label, amount } of answer.totals) {
     const hundredths = figureOf(amount, 2)
     if (hundredths === null || hundredths <= 0) continue
@@ -493,9 +494,16 @@ function totalOf(
     else if (paid.test(label)) places.get('paid')?.add(hundredths)
     else if (lines.length === 0 && DEPARTMENT.test(label)) places.get('section')?.add(hundredths)
     else if (prepaid.test(label)) slips.add(hundredths)
+    else if (bareWord.test(label)) bare.add(hundredths)
     else unnamed.add(hundredths)
   }
-  const totals = [...(places.get('total') ?? [])]
+  // an amount under the currency alone is the total's place where no amount has its word, and only one such amount
+  // (MOL-421, owner's В-2 «а»): a Georgian pharmacy's «23.868 ლარი»; else it is an amount nothing names, as before
+  const named = places.get('total') ?? new Set<number>()
+  const bareTotal = named.size === 0 ? sole(bare) : null
+  if (bareTotal === null) for (const amount of bare) unnamed.add(amount)
+  else named.add(bareTotal)
+  const totals = [...named]
   // the largest the total's word stands by: a prepayment slip's total is smaller and the one before the
   // card's discount larger, so «Прочитали не всё» errs only towards being said (MOL-244)
   const read = totals.length === 0 ? null : Math.max(...totals)

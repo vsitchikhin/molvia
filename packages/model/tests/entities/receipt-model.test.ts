@@ -1712,6 +1712,81 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
     expect(unparsedFigures(ARMENIAN_RECEIPTS, pharmacy([piece('ա', '23.868')], '23.868'))).toBe(3)
   })
 
+  describe('a total printed under the currency alone (owner’s В-2 «а»)', () => {
+    const lines = [piece('ხსნარი 100მლ', '1.500'), piece('სიროფი 100მლ', '22.368')]
+    const withTotals = (totals: ModelReceipt['totals']): ModelReceipt => ({
+      ...pharmacy(lines, '0.000'),
+      totals,
+    })
+
+    it('takes «ლარი» alone as the total’s place, and the lines that meet it prove the receipt whole', () => {
+      for (const label of ['ლარი', ' ლარი:', '₾', 'GEL']) {
+        const text = readGe(pharmacy(lines, '23.868', label))
+        expect([text.totalHundredths, text.balanced], label).toEqual([2_387, true])
+        const shown = verifiedReading(text, { byModel: true }).lines
+        expect(
+          shown.map((l) => l.sumHundredths),
+          label,
+        ).toEqual([150, 2_237])
+      }
+      // ge-05: a count and a sum, no price
+      const one = line({
+        printed: 'ბინტი',
+        code: null,
+        article: null,
+        quantity: '1.000',
+        unit_price: null,
+        sum: '3.500',
+      })
+      const text = readGe(pharmacy([one], '3.500', 'ლარი'))
+      expect([text.totalHundredths, text.balanced]).toEqual([350, true])
+    })
+
+    it('is no total where an amount has the total’s word', () => {
+      // must not: the lines meet «ლარი», but «სულ» is the total and they do not meet it
+      const text = readGe(
+        withTotals([
+          { label: 'სულ', amount: '25.000' },
+          { label: 'ლარი', amount: '23.868' },
+        ]),
+      )
+      expect([text.totalHundredths, text.balanced]).toEqual([null, false])
+    })
+
+    it('is shown only by MOL-244’s rule: one place the lines do not meet is no total', () => {
+      const text = readGe(withTotals([{ label: 'ლარი', amount: '25.000' }]))
+      expect(text.totalHundredths).toBeNull()
+      expect(text.readTotalHundredths).toBe(2_500)
+      // must not: one row copied twice is one place, never two that vouch for it
+      const twice = readGe(
+        withTotals([
+          { label: 'ლარი', amount: '25.000' },
+          { label: 'ლარი', amount: '25.000' },
+        ]),
+      )
+      expect(twice.totalHundredths).toBeNull()
+    })
+
+    it('is a doubt where two amounts stand under the currency alone', () => {
+      const text = readGe(
+        withTotals([
+          { label: 'ლარი', amount: '23.868' },
+          { label: 'ლარი', amount: '20.000' },
+        ]),
+      )
+      expect([text.totalHundredths, text.balanced]).toEqual([null, false])
+    })
+
+    it('takes a currency in a longer label for no total, nor Armenia’s dram alone', () => {
+      // must not: a row that says more than the currency is no total's place
+      expect(readGe(pharmacy(lines, '23.868', 'ფასდაკლება ლარი')).totalHundredths).toBeNull()
+      expect(
+        read(answer({ lines: [line()], totals: [{ label: 'դրամ', amount: '740' }] }))
+          .totalHundredths,
+      ).toBeNull()
+    })
+  })
+
   it('asks the card’s lexicon on the model’s path without a refusal, and refuses a format nobody reads', () => {
     const paid = pharmacy([piece('ა', '1.500')], '1.500')
     expect(
