@@ -158,8 +158,9 @@ export function useReceiptsAccess(): {
     write(`${TOLD_KEY}.${owner}`, JSON.stringify({ ...toldOf(owner), ...toldNow(shown) }))
   }
 
+  // only where receipts are read off the photo: nothing here would change what anyone else sees
   function askAgain(): void {
-    if (actor.state === 'ready' && navigator.onLine) void actor.verify()
+    if (country.value && actor.state === 'ready' && navigator.onLine) void actor.verify()
   }
 
   return { country, access, closed, othersRead, sheetFirst, told, askAgain }
@@ -171,30 +172,41 @@ const GRANT_WAIT_MAX_MS = 24 * 60 * 60 * 1000
 const GRANT_END_SLACK_MS = 2_000
 
 /**
- * Keeps where the person stands as fresh as the screen that acts on it (MOL-276, Р-3): `/actors/me` asked again as
- * the app comes back into view and at midnight (adversarial А3); as the screen comes, where the figures are of a month
- * before the phone's — an app put away on another screen over midnight (Б2); and as a paid reading runs out with the
- * screen in view, its `until` known (Б3). The phone only decides to ask: what it says is the server's answer.
+ * Keeps where the person stands as fresh as the screen that acts on it (MOL-276, Р-3) — the one rule of when to ask
+ * `/actors/me` again (review №12): as the app comes back into view and at midnight (adversarial А3); as the screen
+ * comes, where the figures are of a month before the phone's — an app put away on another screen over midnight (Б2);
+ * and as a paid reading runs out with the screen in view, its `until` known (Б3). The phone only decides to ask: what
+ * it says is the server's answer.
+ *
+ * Called by the screens that hold the camera — «Что брать» and «Покупки» — never by the button: Georgia's camera gone
+ * with a share spent would take the asking with it, and the 1st that gives the share back went unheard (adversarial
+ * В2). `readByScreen` — the settings, whose form reads `/actors/me` as it opens and as the app comes back — keeps the
+ * midnight and the grant's end alone, so the same moment is not asked twice.
  */
-export function useAccessKeptFresh(
-  access: ComputedRef<ReceiptsAccess | null>,
-  askAgain: () => void,
-): void {
+export function useAccessKeptFresh({
+  readByScreen = false,
+}: { readByScreen?: boolean } = {}): void {
+  const { access, askAgain } = useReceiptsAccess()
   const today = useLocalDay()
-  useReconnect(askAgain)
   watch(today, askAgain)
-  onMounted(() => {
-    const figures = access.value
-    if (figures && monthOf(figures.month) < monthOf(today.value)) askAgain()
-  })
+  if (!readByScreen) {
+    useReconnect(askAgain)
+    onMounted(() => {
+      const figures = access.value
+      if (figures && monthOf(figures.month) < monthOf(today.value)) askAgain()
+    })
+  }
 
+  // By the moment, never the object: every answer is a new `Date`, and a phone whose clock runs ahead of the server's
+  // — for it the grant is over, for the server not yet — asked every two seconds until the server's clock got there
+  // (adversarial В1). One ask a grant's end; an answer still saying it, the next midnight or return asks again.
   let grantEnds: ReturnType<typeof setTimeout> | undefined
   watch(
-    () => access.value?.until,
+    () => access.value?.until?.getTime(),
     (until) => {
       clearTimeout(grantEnds)
-      if (!until) return
-      const left = until.getTime() - Date.now()
+      if (until === undefined) return
+      const left = until - Date.now()
       if (left <= GRANT_WAIT_MAX_MS)
         grantEnds = setTimeout(askAgain, Math.max(0, left) + GRANT_END_SLACK_MS)
     },

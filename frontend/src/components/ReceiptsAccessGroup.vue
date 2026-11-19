@@ -17,15 +17,34 @@
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, watch } from 'vue'
+import { computed, defineComponent } from 'vue'
 import { useI18n } from 'vue-i18n'
 import IconReceipt from '~icons/mdi/receipt-text-outline'
 import AppCard from '@/components/AppCard.vue'
 import ListRow from '@/components/ListRow.vue'
 import SectionCaption from '@/components/SectionCaption.vue'
 import { useLocalDay } from '@/composables/useLocalDay'
-import { closedWords, monthWords, useReceiptsAccess } from '@/composables/useReceiptsAccess'
+import type { ReceiptsClosed } from '@molvia/model'
+import {
+  closedWords,
+  monthWords,
+  useAccessKeptFresh,
+  useReceiptsAccess,
+} from '@/composables/useReceiptsAccess'
 import { dateOfAnyYear } from '@/days'
+
+/** The status of each reason, by whether Tesseract reads meanwhile: the month's hundred says only when it opens again. */
+const STATUS: Record<ReceiptsClosed, { readonly read: string; readonly manual: string }> = {
+  trial: {
+    read: 'receipts_access.status.trial_over_read',
+    manual: 'receipts_access.status.trial_over_manual',
+  },
+  ended: {
+    read: 'receipts_access.status.ended_read',
+    manual: 'receipts_access.status.ended_manual',
+  },
+  month: { read: 'receipts_access.status.month_read', manual: 'receipts_access.status.month_read' },
+}
 
 /**
  * «Распознавание чеков» (MOL-276): where the person stands with the model that reads receipts — until when it is
@@ -39,26 +58,19 @@ export default defineComponent({
   setup() {
     const { t, locale } = useI18n()
     const today = useLocalDay()
-    const { access, closed, othersRead, askAgain } = useReceiptsAccess()
-    // The month's hundred opens again on the 1st: a screen in view over midnight asks the server (adversarial А3).
-    watch(today, askAgain)
+    const { access, closed, othersRead } = useReceiptsAccess()
+    // the settings' form reads `/actors/me` as it opens and as the app comes back (review №12)
+    useAccessKeptFresh({ readByScreen: true })
 
     const status = computed(() => {
       const figures = access.value
       if (!figures) return t('receipts_access.status.unknown')
       const reason = closed.value
-      if (reason) {
-        // the month's hundred says when it opens again, whoever reads meanwhile
-        const reads = othersRead.value ? 'read' : 'manual'
-        const key =
-          reason === 'month'
-            ? 'month_read'
-            : `${reason === 'trial' ? 'trial_over' : 'ended'}_${reads}`
+      if (reason)
         return t(
-          `receipts_access.status.${key}`,
+          STATUS[reason][othersRead.value ? 'read' : 'manual'],
           closedWords(reason, figures, t, locale.value, today.value),
         )
-      }
       const words = monthWords(figures, t, locale.value)
       if (figures.until)
         return t('receipts_access.status.paid', {

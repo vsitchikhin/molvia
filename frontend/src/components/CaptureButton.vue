@@ -46,7 +46,7 @@ import LinkReceiptSheet from '@/components/LinkReceiptSheet.vue'
 import ManualEntryButton from '@/components/ManualEntryButton.vue'
 import ReceiptsClosedSheet from '@/components/ReceiptsClosedSheet.vue'
 import { useAnnouncer } from '@/composables/useAnnouncer'
-import { useAccessKeptFresh, useReceiptsAccess } from '@/composables/useReceiptsAccess'
+import { useReceiptsAccess } from '@/composables/useReceiptsAccess'
 import type { ReceiptsClosedWay, ReceiptsShown } from '@/composables/useReceiptsAccess'
 import { afterStep, useNavigation } from '@/navigation'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
@@ -60,8 +60,8 @@ import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
  *
  * **Where the model reads no more, the tap meets «Пробные чеки закончились» first** (MOL-276): at every tap where
  * nobody would read the receipt — the фф `payments` on, or Georgia — else once, the camera first in it (owner's В-1
- * «а»). Decided by `/actors/me` as last heard and kept fresh by `useAccessKeptFresh` (Р-3); not known — a launch
- * offline, a server before MOL-275 — is no sheet, and the server decides who reads (Р-2).
+ * «а»). Decided by `/actors/me` as last heard, kept fresh by the screen that holds it (`useAccessKeptFresh`, Р-3); not
+ * known — a launch offline, a server before MOL-275 — is no sheet, and the server decides who reads (Р-2).
  */
 export default defineComponent({
   name: 'CaptureButton',
@@ -88,7 +88,7 @@ export default defineComponent({
     const open = ref(false)
     const mounted = ref(false)
     const feedback = useFeedbackSheetStore()
-    const { access, sheetFirst, told, askAgain } = useReceiptsAccess()
+    const { sheetFirst, told } = useReceiptsAccess()
     const closedOpen = ref(false)
     /** The sheet as it stood at the tap: a fresh answer under it changes nothing it says (adversarial А1). */
     const shown = ref<ReceiptsShown | null>(null)
@@ -100,9 +100,6 @@ export default defineComponent({
     watch([open, closedOpen, manualBusy], (ups) => {
       emit('busy', ups.includes(true))
     })
-
-    // the trial may have ended on another phone, a grant come or gone, a month's hundred opened again (MOL-276, Р-3)
-    useAccessKeptFresh(access, askAgain)
 
     function camera(): void {
       mounted.value = true

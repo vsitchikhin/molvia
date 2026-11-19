@@ -37,6 +37,8 @@ const amendVerdict = vi.fn<(itemId: string, patch: VerdictAmendment) => Promise<
 const withdrawVerdict = vi.fn<(itemId: string) => Promise<void>>()
 const rateItem =
   vi.fn<(itemId: string, rating: Rating) => Promise<{ verdict: VerdictCard; created: boolean }>>()
+/** `/actors/me` asked again by the screen (MOL-276); nothing unless a test says so. */
+const me = vi.fn()
 /** What the server holds of the person's receipts; none unless a test says so. */
 let held: ReceiptsResponse['receipts'] = []
 vi.mock('@/api', () => ({
@@ -48,6 +50,7 @@ vi.mock('@/api', () => ({
     amendVerdict: (itemId: string, patch: VerdictAmendment) => amendVerdict(itemId, patch),
     withdrawVerdict: (itemId: string) => withdrawVerdict(itemId),
     rateItem: (itemId: string, rating: Rating) => rateItem(itemId, rating),
+    me: () => me(),
   },
 }))
 
@@ -713,6 +716,50 @@ describe('AdviceView', () => {
       expect(view.text()).toContain(en.advice.home.step_purchases_body)
       expect(view.text()).not.toContain(en.advice.home.step_purchases_capture_body)
       expect(view.get('.dock').text()).toContain(en.purchases.capture)
+    })
+
+    it('a Georgian whose share was spent gets the camera back as the app comes back on the 1st — no button needed to ask (MOL-276, В2)', async () => {
+      vi.useFakeTimers({ now: new Date('2026-12-01T08:00:00Z'), toFake: ['Date'] })
+      try {
+        advice.mockResolvedValue(answer([], { geography: { country: 'GE', city: 'Тбилиси' } }))
+        const open: ReceiptsAccess = {
+          until: null,
+          ended: null,
+          trialLeft: 6,
+          trialOf: 10,
+          month: '2026-12-01',
+          read: 4,
+          limit: 100,
+        }
+        // the share of November spent: the tariff open, the model reads none, so no camera
+        const { view } = await render({
+          country: 'GE',
+          city: 'Тбилиси',
+          spendCurrency: 'GEL',
+          receiptsByModel: false,
+          receiptsAccess: open,
+        })
+        expect(view.get('.dock').text()).not.toContain(en.purchases.capture)
+        useActorStore().state = 'ready'
+        me.mockResolvedValue({
+          id: ME,
+          country: 'GE',
+          city: 'Тбилиси',
+          spendCurrency: 'GEL',
+          incomeCurrency: 'RUB',
+          createdAt: new Date('2026-10-01T10:00:00.000Z'),
+          updatedAt: new Date('2026-10-01T10:00:00.000Z'),
+          receiptsByModel: true,
+          receiptsAccess: open,
+        })
+        document.dispatchEvent(new Event('visibilitychange'))
+        await flushPromises()
+        expect(me).toHaveBeenCalledTimes(1)
+        expect(view.get('.dock').text()).toContain(en.purchases.capture)
+      } finally {
+        vi.useRealTimers()
+        me.mockReset()
+      }
     })
 
     it('a newcomer in Moscow: no receipt and no camera, whoever the model reads for (MOL-412)', async () => {

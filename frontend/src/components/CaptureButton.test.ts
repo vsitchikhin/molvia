@@ -343,69 +343,6 @@ describe('«Сфотографировать чек» where the model reads no m
     })
   })
 
-  it('asks where the person stands again at midnight with the screen in view (adversarial А3)', async () => {
-    vi.useFakeTimers({ now: new Date(2026, 10, 30, 23, 58), toFake: ['Date', 'setTimeout'] })
-    me.mockResolvedValue({
-      ...GEORGIA,
-      receiptsByModel: true,
-      receiptsAccess: { ...HUNDRED, month: '2026-12-01', read: 0 },
-    })
-    const view = await render({ ...GEORGIA, receiptsByModel: false, receiptsAccess: HUNDRED }, 'GE')
-    await vi.advanceTimersByTimeAsync(5 * 60_000)
-    await flushPromises()
-    expect(me).toHaveBeenCalledTimes(1)
-
-    await tap(view)
-    expect(closedSheet(view).exists()).toBe(false)
-    expect(camera(view).props('open')).toBe(true)
-  })
-
-  it('asks again as it comes, where the figures are of a month before the phone’s — put away over midnight elsewhere (Б2)', async () => {
-    vi.useFakeTimers({ now: new Date('2026-12-01T08:00:00Z'), toFake: ['Date'] })
-    me.mockResolvedValue({
-      ...GEORGIA,
-      receiptsByModel: true,
-      receiptsAccess: { ...HUNDRED, month: '2026-12-01', read: 0 },
-    })
-    const view = await render({ ...GEORGIA, receiptsByModel: false, receiptsAccess: HUNDRED }, 'GE')
-    expect(me).toHaveBeenCalledTimes(1)
-
-    await tap(view)
-    expect(closedSheet(view).exists()).toBe(false)
-    expect(camera(view).props('open')).toBe(true)
-  })
-
-  it('must not ask as it comes where the figures are of the phone’s month (Б2)', async () => {
-    await render({ ...ARMENIA, receiptsAccess: HUNDRED })
-    expect(me).not.toHaveBeenCalled()
-  })
-
-  it('asks again as a paid reading runs out with the screen in view (Б3)', async () => {
-    vi.useFakeTimers({ now: new Date('2026-12-19T09:58:00Z'), toFake: ['Date', 'setTimeout'] })
-    const until = new Date('2026-12-19T10:00:00Z')
-    me.mockResolvedValue({
-      ...GEORGIA,
-      receiptsByModel: false,
-      receiptsAccess: { ...TRIAL_OVER, month: '2026-12-01', ended: until },
-    })
-    const view = await render(
-      {
-        ...GEORGIA,
-        receiptsByModel: true,
-        receiptsAccess: { ...TRIAL_OVER, month: '2026-12-01', until },
-      },
-      'GE',
-    )
-    await vi.advanceTimersByTimeAsync(60_000)
-    expect(me).not.toHaveBeenCalled()
-    await vi.advanceTimersByTimeAsync(2 * 60_000)
-    expect(me).toHaveBeenCalledTimes(1)
-
-    await tap(view)
-    expect(closedSheet(view).props('reason')).toBe('ended')
-    expect(camera(view).exists()).toBe(false)
-  })
-
   it('«Записать вручную» bare offers `begin`, the one method the button calls (review №6)', async () => {
     const pinia = createPinia()
     setActivePinia(pinia)

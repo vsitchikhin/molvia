@@ -275,6 +275,7 @@ import { useCurrentTrip } from '@/composables/useCurrentTrip'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { usePendingFrom } from '@/composables/usePendingFrom'
 import { useReceiptCapture } from '@/composables/useReceiptCapture'
+import { useAccessKeptFresh } from '@/composables/useReceiptsAccess'
 import { WORKING, rejectedReasonWords, useReceipts } from '@/composables/useReceipts'
 import type { ReceiptRow } from '@/composables/useReceipts'
 import { useReconnect } from '@/composables/useReconnect'
@@ -363,6 +364,9 @@ export default defineComponent({
     // move to Georgia or Serbia is still to be recorded or removed (MOL-109, adversarial А2).
     // «строки прочитаем сами» only where somebody reads the receipt (MOL-276, adversarial А5)
     const { country, readCountry } = useReceiptCapture()
+    // where the person stands with the model, kept fresh here and not by the camera — gone with a share spent, it
+    // would take the asking with it (MOL-276, adversarial В2)
+    useAccessKeptFresh()
     // the strip's receipt: the camera, a Serbian receipt's QR read off the photo (MOL-233) included
     const capture = country
     // The place of «Вернуть» only while a removal waits: each strip still decides whether its ten
