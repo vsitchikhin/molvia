@@ -335,8 +335,11 @@ export default defineComponent({
 $chevron-column: calc(var(--touch-target) - var(--space-1));
 $title-beside-action: 14rem;
 
-// The row at rest, and past the scroll where a narrow one keeps that look (owner's В-1 «б»).
-$columns-at-rest: minmax($chevron-column, 1fr) 0 minmax(min-content, auto);
+// The row at rest, and past the scroll where a narrow one keeps that look (owner's В-1 «б»). The title's
+// column is nothing there, its two gaps beside it empty, so «‹» has them too: a floor of the whole chevron
+// took a rem more from the action, and «Править» broke at 175 % on 320 though it fit (adversarial А3).
+$columns-at-rest: minmax(calc($chevron-column - 2 * var(--space-2)), 1fr) 0
+  minmax(min-content, auto);
 
 // The small title away: at rest, and beside an action in a narrow row.
 @mixin title-away {
@@ -393,9 +396,9 @@ $columns-at-rest: minmax($chevron-column, 1fr) 0 minmax(min-content, auto);
 }
 
 /* At rest the small title is not shown, and its column is nothing: the back label has the row. The
-   chevron's column is never narrower than the chevron alone, whose button stands a --space-1 out of it —
-   40 here is 44 to tap — and an action's never narrower than its words: at 200 % on 320 «Править» on one
-   line left «‹» 28 px, the two buttons 30 px one over the other (MOL-336). */
+   chevron's column with the gaps beside it is never narrower than the chevron alone, whose button stands
+   a --space-1 out of it — 40 here is 44 to tap — and an action's never narrower than its words: at 200 %
+   on 320 «Править» on one line left «‹» 28 px, the two buttons 30 px one over the other (MOL-336). */
 .bar-columns {
   display: grid;
   grid-template-columns: $columns-at-rest;
