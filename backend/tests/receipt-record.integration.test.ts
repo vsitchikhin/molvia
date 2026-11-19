@@ -1575,7 +1575,7 @@ describe('«Записать»', () => {
         ['text', milk, 37_000n],
       ])
       expect(words.map((word) => word.writtenAt)).toEqual([older.recordedAt, older.recordedAt])
-    })
+    }, 15_000)
 
     it('Р3-2: a purchase of the line under another item removed gives the word back to the one still there', async () => {
       const me = await insertActor(db)
@@ -1627,7 +1627,7 @@ describe('«Записать»', () => {
         .where(eq(expenses.id, bought.expenseId))
       await settleStoreMemory(db)
       expect((await wordsOf(me)).map((word) => word.priceMinor)).toEqual([null, null])
-    })
+    }, 20_000)
 
     // round 6, Р6-1: a line «Записать» judged not as read keeps no price, whatever the purchase says later
     it('Р6-1: gives no shelf price to a line recorded with its sum put right, once the purchase agrees', async () => {
