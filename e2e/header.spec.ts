@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { actorCodec, settingsOf } from '@molvia/model'
-import { actionRow, anAccount, apart, collapse } from './header-row'
+import { TITLE_GAP, actionRow, anAccount, apart, collapse } from './header-row'
 import type { Box } from './header-row'
 import { asBrowser, signedIn } from './session'
 
@@ -234,7 +234,7 @@ for (const [locale, words] of LANGUAGES) {
           expect(row.wordsPast, 'the action collapsed').toBeLessThanOrEqual(0.01)
           expect(row.cut, 'the small title cut').toBe(cut)
           // A gap of --space-2 between the title and the action, never the one against the other.
-          expect(row.action.left - row.small.right).toBeGreaterThanOrEqual(7.5)
+          expect(row.gap).toBeGreaterThanOrEqual(TITLE_GAP)
           expect(apart(row.back, row.small)).toBe(true)
           expect(apart(row.back, row.action)).toBe(true)
           expect(row.action.right).toBeLessThanOrEqual(320)

@@ -1,10 +1,13 @@
 /// <reference lib="dom" />
+// The top row of a screen as `header.spec` and `large-text.spec` read it: the back button, the small title, the action.
 import { randomUUID } from 'node:crypto'
 import { expect } from '@playwright/test'
 import type { Page } from '@playwright/test'
+import { yerevanDay } from './days'
 import { asBrowser } from './session'
 
-/** The top row of a screen as `header.spec` and `large-text.spec` read it: the back button, the small title, the action. */
+/** The gap between the small title and the action: --space-2, 8, less half a pixel of rounding. */
+export const TITLE_GAP = 7.5
 
 export interface Box {
   left: number
@@ -63,12 +66,13 @@ export async function collapse(page: Page): Promise<void> {
   await settled(page)
 }
 
-export /** An account named so, started today with nothing on it: a screen whose row holds an action. */
-async function anAccount(page: Page, name: string): Promise<string> {
+/**
+ * An account named so, with nothing on it: a screen whose row holds an action. Started some days back, so no
+ * clock of the run puts its start past the server's today.
+ */
+export async function anAccount(page: Page, name: string): Promise<string> {
   const id = randomUUID()
-  const startOn = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Yerevan' }).format(
-    new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-  )
+  const startOn = yerevanDay(-3)
   const made = await page.request.post('/api/money/accounts', {
     headers: await asBrowser(page),
     data: {
@@ -84,14 +88,22 @@ async function anAccount(page: Page, name: string): Promise<string> {
   return id
 }
 
-export /**
+/**
  * The action of the row, the back button and the small title, read in one frame: how far the action's
  * words stand past its box's padding either side, in fractions (MOL-336: «Править» was 60 px, its words
- * 63 and its padding 32), and whether the small title is cut — its words wider than its box.
+ * 63 and its padding 32), on how many lines they stand, the gap from the title to the action, and whether
+ * the small title is cut — its words wider than its box.
  */
-async function actionRow(
-  page: Page,
-): Promise<{ back: Box; small: Box; action: Box; wordsPast: number; cut: boolean; page: number }> {
+export async function actionRow(page: Page): Promise<{
+  back: Box
+  small: Box
+  action: Box
+  wordsPast: number
+  actionLines: number
+  gap: number
+  cut: boolean
+  page: number
+}> {
   return page.evaluate(() => {
     const box = (node: Element) => {
       const { left, right, top, bottom } = node.getBoundingClientRect()
@@ -108,21 +120,22 @@ async function actionRow(
     if (!back || !small || !action)
       throw new Error('no back button, small title or action in the row')
     const style = getComputedStyle(action)
-    const outer = action.getBoundingClientRect()
+    const outer = box(action)
+    const title = box(small)
     const lines = words(action)
     const titleLines = words(small)
     return {
       back: box(back),
-      small: box(small),
-      action: box(action),
+      small: title,
+      action: outer,
       wordsPast: Math.max(
         Math.max(...lines.map((line) => line.right)) -
           (outer.right - parseFloat(style.paddingRight)),
         outer.left + parseFloat(style.paddingLeft) - Math.min(...lines.map((line) => line.left)),
       ),
-      cut:
-        Math.max(...titleLines.map((line) => line.right)) - small.getBoundingClientRect().right >
-        0.01,
+      actionLines: new Set(lines.map((line) => Math.round(line.top))).size,
+      gap: outer.left - title.right,
+      cut: Math.max(...titleLines.map((line) => line.right)) - title.right > 0.01,
       page: document.documentElement.scrollWidth,
     }
   })
