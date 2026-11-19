@@ -103,7 +103,9 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   line, `sellerWords` of a record (review №25): two lines «Безналичная оплата» are no purchase and its refund, nor such
   a line a refund of a record noted «Оплата», and «PURCHASE» and «PAYMENT» never part one seller.
 - **One to one by the greatest matching** (А3, Б2, Kuhn's path): what met exactly first, the doubts only for records
-  left free. A line takes a free record as good as its first before it takes one over, and what a failed search went
+  left free — or freed: a doubt takes a record held by an earlier fit where that line moves to a free record as good
+  in its own fit, and a tie of two records is their ids, never the order MOL-433 read them in (adversarial А27: in
+  one order a line a fifth over its record came back new, ticked — a duplicate — in the other a doubt «чаевые?»). A line takes a free record as good as its first before it takes one over, and what a failed search went
   through leads nowhere until a line is matched, so the next line's search skips it (А20: a crowd of one sum, more
   lines than records, searched every record again for every line left over — 10⁹ steps, 20–27 s under the ceiling of
   pairs; now 0.7 s, the steps of the order of the pairs, and the answer the same). The answer counts them (`steps`), a
