@@ -389,8 +389,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and the turn among equal lines — the person always in it, the form never.
 - **An exchange is a candidate, a record on another account a doubt, never filtered** (MOL-428, owner's В-1 «а»); a
   transfer or an exchange settles a line only exactly, on its day, from its own account, on a line naming itself so.
-- **The payee is folded by its own tables, never `toSearchKey`**; the windows are measured — a file ± 2 days, a
-  screenshot from 2 before to 4 after, the sum exact — and 7, 30, 60 days are named prices.
+- **The payee is folded by its own tables, never `toSearchKey`**, a city aside on both sides; the windows are
+  measured — a file ± 2 days, a screenshot from 2 before to 4 after, the sum exact — and 7, 30, 60 days, a tip's fifth
+  and a hold's half are named prices. **A file dates a line by its operation, a screenshot by its posting**: a hold's
+  posting in a file is on the hold's day, and a screenshot meets a file's line on the posting day it prints.
 
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 
