@@ -394,9 +394,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   and a hold's half are named prices. **A file dates a line by its operation, a screenshot by its posting**: a hold's
   posting in a file is on the hold's day, a screenshot meets a file's line by the posting day it prints, and one
   printing none a day to four before a screenshot is a doubt; a line known only by its key under another account is a
-  doubt too; the key reads the account's number the bank's head prints before the account chosen in Molvia. **A line
-  weighs only the records that reach its days**, at most `STATEMENT_LINES_MAX` lines, and MOL-433 refuses a statement
-  whose `statementWeighing` passes `STATEMENT_WEIGHED_MAX` before the rule.
+  doubt unless the account in Molvia is one; the key reads the last four digits of the number the bank's head prints
+  before the account chosen in Molvia. **A line weighs only the records that reach its days**, at most
+  `STATEMENT_LINES_MAX` lines, and past `STATEMENT_WEIGHED_MAX` pairs the rule answers `too_heavy` and weighs none.
 
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 

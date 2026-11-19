@@ -34,9 +34,11 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
 
 - **A line's key is its spending's id** (Р-2, `statementLineKeys`): a uuid v3 (`nameUuid` over `md5Hex` — the domain
   imports no `node:crypto`; MD5 here is a name, not a secret) of the person, the statement's account — **the number
-  the bank's head prints** (`accountNumber`, read by the parser), else the account chosen in Molvia: two cards of one
-  bank uploaded «без счёта» were one key, and a line of the second card was the first's own, silently (adversarial
-  А14); with the number, a file uploaded again with an account chosen since is the same key too (А4) — the day, the
+  the bank's head prints, by its last four digits** (`accountNumber` as printed, `accountNumberKey` reads it: one
+  card's number comes whole, masked or cut by the format, review №22), else the account chosen in Molvia: two cards
+  of one bank uploaded «без счёта» were one key, and a line of the second card was the first's own, silently
+  (adversarial А14); with the number, a file uploaded again with an account chosen since is the same key too (А4).
+  **The price, named:** two cards or accounts of one bank ending in the same four digits are one number — the day, the
   sign, the amount and the payee as printed, spaces squeezed, and the turn among equal lines **of its status** — a
   later export may leave out a refusal or a hold the bank dropped, and the payment made again beside it would take
   its key (adversarial А5, А9). So a hold and its posting are two keys: the link lets the posting in. The same line
@@ -45,10 +47,13 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   on a conflict. **The form is not**: the same text in a bank's CSV and its PDF is the same line. The reader's
   other additions — kind, time, posting day — move nothing.
 - **The link** (`statementLinkSchema`, stored by MOL-433 on a spending, a trip and a transfer) keeps the key and the
-  account of the upload it was keyed under — read only where the head printed no number, the day and the posting day, «pending», the form, the amount, the payee
-  and the time: enough to know its own line again after an account chosen since (adversarial А4: the account is in
-  the key, so the same file uploaded first «без счёта» was all new) — **as a doubt «другой счёт», never silently**:
-  the same file again and a like line of another card of the bank are one key there (А8) — tell another line from it
+  upload it was keyed under — the account in Molvia and the bank's number — the day and the posting day, «pending»,
+  the form, the amount, the payee and the time: enough to know its own line again by the key it had under that upload.
+  **Silently where the account in Molvia is one** — its card's statement and its account's, a card reissued
+  (adversarial А18: the bank's number keyed one purchase twice, and every line of the second file came back ticked
+  new) — **else as a doubt «другой счёт»**: the same file again under another choice of account and a like line of
+  another card are one key there (А4, А8, А14). **The price, named:** two cards of one bank under one account in
+  Molvia take each other's like lines silently, as one account's two cards always do. It also tells another line from it
   (Г2, Д2), let a hold's posting in (Г2б), compare two screenshots' times (Ж2) and write the line of a relinked
   record as a spending (Д1).
 
@@ -87,8 +92,10 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   word of one name in the other, and one common word is no seller (Н1). **A name that is nothing but a city's word
   keeps it** (А10): the restaurant «Казан», the cinema «Москва» would be no name, met by any line; with the line's
   city aside too, such a record meets its own line in no word — a doubt «другое имя», a tap. **The bank's own words
-  are no seller's** (А15): Ardshin's screen shows «Безналичная оплата» for every card line, and a line that names no
-  seller — so, or empty — is no other name, as a record with no name is not.
+  are no seller's in a bank's line** (А15): Ardshin's screen shows «Безналичная оплата» for every card line, and a
+  line that names no seller — so, or empty — **is no other name for a record its link reaches**, and is for any other
+  (А17: by the window alone it took a dinner typed by hand silently). A record's own note «Покупка» is the person's
+  word and names it.
 - **One to one by the greatest matching** (А3, Б2, Kuhn's path): what met exactly first, the doubts only for records
   left free.
 - **The link decides another line** (Г2, Д1, Д2, Е1, Е2), past the window too where it names it: its own line, by its
@@ -112,13 +119,14 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   the records whose window or link reaches its day or its posting day — a link at most a late posting's thirty days
   either way, so the index spares pairs and decides nothing (review №20) — the sum first, a name folded once a line
   and once a record; a statement holds `STATEMENT_LINES_MAX` lines (3 000, five years of the samples' 30–50 a month).
-  **The work is a pure measure, `statementWeighing`, and `STATEMENT_WEIGHED_MAX` its ceiling** (2 000 000): a year of
+  **The rule counts its work on its own index before weighing any of it, and past `STATEMENT_WEIGHED_MAX` (2 000 000)
+  answers `too_heavy`** (А16, review №23): no caller weighs past it, and MOL-433 only says so on the screen. A year of
   3 000 lines against 3 000 records linked to screenshots weighs some 1 500 000, half a second here; the same in one
-  month weighs all 9 000 000, seconds. **MOL-433 asks the measure before the rule and refuses past it**, with its own
-  word for the screen; the rule counts nothing itself — a counter in the domain was state a pure rule had no business
-  keeping (review №19). A month against a year with no links, folded a pair at a time, was 8.1 s: a test bounds it at
-  4 s.
-- **The answer is a discriminated union** (Р-9, `StatementLineDecision`): `new` (ticked, a note, a hint),
+  month weighs all 9 000 000, seconds. The answer carries `pairs`, for the log; a counter kept in the domain was state
+  a pure rule had no business keeping (review №19). A month against a year with no links, folded a pair at a time,
+  was 8.1 s: a test bounds it at 4 s.
+- **The answer is a discriminated union** (Р-9, `StatementMatch`, `StatementLineDecision`): `matched` or `too_heavy`;
+  a line's `new` (ticked, a note, a hint),
   `recorded` (the record and the doubt, or none), `not_spending` (the reason and the record that settled it); the holds
   apart (`unposted`). MOL-433 and MOL-435 read one shape and repeat no rule.
 
