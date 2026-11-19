@@ -14,7 +14,7 @@ export const spendingTextSchema = visibleLine(SPENDING_TEXT_MAX)
 /** The same ten minutes as an exchange and an income (MOL-73, В-4): one rule for one's own money. */
 export const SPENDING_UNDO_MINUTES = EXCHANGE_UNDO_MINUTES
 
-const positiveMoneySchema = priceSchema.refine((value) => value.minor > 0n, {
+export const positiveMoneySchema = priceSchema.refine((value) => value.minor > 0n, {
   error: ERROR.INVALID_AMOUNT,
 })
 

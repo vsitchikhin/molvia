@@ -87,6 +87,14 @@ describe('statementLineKeys', () => {
       expect(other[0]).not.toBe(base)
   })
 
+  it('keeps a line’s turn whether a declined twin before it is printed or not (adversarial А5)', () => {
+    const declined = line({ status: 'declined' })
+    const [, paid] = keys([declined, line()])
+    expect(keys([line()])).toEqual([paid])
+    expect(keys([line(), declined])).toEqual([paid, keys([declined])[0]])
+    expect(keys([declined])).not.toEqual([paid])
+  })
+
   it('does not move with what the reader adds: status, kind, time, the posting day', () => {
     const [base] = keys([line()])
     expect(
@@ -98,9 +106,19 @@ describe('statementLineKeys', () => {
 describe('statementLinkOf', () => {
   it('keeps what the rule reads of the line again', () => {
     const held = line({ status: 'pending', time: '14:35' })
-    expect(statementLinkOf(held, 'k', 'screenshot')).toEqual({
+    const posted = line({ postedOn: '2026-11-16' })
+    expect(
+      statementLinkOf(posted, 'k', { form: 'ardshin-xlsx', accountId: ARDSHIN }),
+    ).toMatchObject({
+      accountId: ARDSHIN,
+      postedOn: '2026-11-16',
+      pending: false,
+    })
+    expect(statementLinkOf(held, 'k', { form: 'screenshot', accountId: null })).toEqual({
       key: 'k',
+      accountId: null,
       day: '2026-11-14',
+      postedOn: null,
       pending: true,
       form: 'screenshot',
       amount: held.amount,

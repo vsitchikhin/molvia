@@ -1,7 +1,7 @@
 // The time a screenshot of a bank's app prints beside a line (MOL-409, Ж2…Л1), as the model read it.
 
 /** Two screenshots' times are two operations only an hour apart or more (Ж2: there and back are hours). */
-export const TIME_APART_MINUTES = 60
+export const STATEMENT_TIME_APART_MINUTES = 60
 
 /**
  * Digits the model confuses in the apps' fonts — measured on receipts, 5↔6 (MOL-290) — at most two a
@@ -44,7 +44,7 @@ export function printedTimesSay(a: string | null, b: string | null): 'same' | 'a
   const [x, y] = [printedClock(a), printedClock(b)]
   if (x === null || y === null || a === null || b === null) return null
   if (x === y) return 'same'
-  return Math.abs(minutesOf(x) - minutesOf(y)) >= TIME_APART_MINUTES && !glyphsApart(a, b)
+  return Math.abs(minutesOf(x) - minutesOf(y)) >= STATEMENT_TIME_APART_MINUTES && !glyphsApart(a, b)
     ? 'apart'
     : null
 }

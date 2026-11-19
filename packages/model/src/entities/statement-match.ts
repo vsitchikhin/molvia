@@ -1,8 +1,13 @@
-import { COUNTRY_CITIES } from '#model/contracts/settings'
 import type { Exchange } from '#model/entities/exchange'
 import type { Expense } from '#model/entities/expense'
 import type { Spending } from '#model/entities/spending'
-import { formKeyIsStable, statementLineKeys } from '#model/entities/statement-line'
+import type { SpendingPreset } from '#model/entities/spending-category'
+import {
+  formKeyIsStable,
+  isBankFile,
+  statementKeyedLines,
+  statementLineKeys,
+} from '#model/entities/statement-line'
 import type {
   Statement,
   StatementForm,
@@ -11,8 +16,7 @@ import type {
 } from '#model/entities/statement-line'
 import type { Transfer } from '#model/entities/transfer'
 import { tripMoney } from '#model/entities/trip'
-import { levenshtein } from '#model/support/edits'
-import { payeeNameShare, payeeWords, payeeWordsNear } from '#model/support/payee-name'
+import { payeeWords, sameSeller, sellerWords, wordsShare } from '#model/support/payee-name'
 import { printedTimesSay } from '#model/support/printed-time'
 import type { Money } from '#model/values/money'
 import { yerevanDate } from '#model/values/rates'
@@ -21,7 +25,8 @@ import { yerevanDate } from '#model/values/rates'
 // a transfer, an exchange — which are new spendings, and which are no spendings at all. The rule is the
 // bench's of MOL-409 (`research/MOL-409/bench/match.mjs`, rounds А…Н, each named where it acts), with
 // the two findings of MOL-428's measurement: an exchange is a candidate, and a record on another account
-// is a doubt (owner's В-1 «а»). The windows and the tolerance are measured there.
+// is a doubt (owner's В-1 «а»). The windows and the exact sum are measured there; the tip's fifth, the
+// hold's half and the days of a hold, a late posting and a refund are not — named prices.
 
 /** A file's line meets a record within two days of it (MOL-428). */
 export const STATEMENT_FILE_WINDOW_DAYS = 2
@@ -30,10 +35,13 @@ export const STATEMENT_FILE_WINDOW_DAYS = 2
 export const STATEMENT_SCREENSHOT_DAYS_BEFORE = 2
 export const STATEMENT_SCREENSHOT_DAYS_AFTER = 4
 
-/** A line up to a fifth over the record — a tip, a service — is a doubt, never a match (А2). */
+/**
+ * A line up to a fifth over the record — a tip, a service — is a doubt, never a match (А2). Not
+ * measured — MOL-409 had one tip, +5 %: a named price.
+ */
 const TIP_PERMILLE = 200n
 
-/** A posting under its hold, down to half of it, with the same name, is a doubt (В4). */
+/** A posting under its hold, down to half of it, with the same name, is a doubt (В4). Not measured. */
 const HOLD_FLOOR_PERMILLE = 500n
 
 /** A hold's posting comes within these days (Г2б). Not measured — a named price. */
@@ -60,8 +68,8 @@ const EXCHANGE_WORDS = /обмен|конверс|купля|продажа ва
 export type StatementCandidateKind = 'spending' | 'trip' | 'transfer' | 'exchange'
 
 /**
- * What the rule reads of a record. `accounts` are the record's account — for a transfer the source and
- * the destination, for an exchange the account given from; `days` — a trip's start and finish.
+ * What the rule reads of a record: `days` — a trip's start and finish; `account` — the one its money
+ * left, a transfer's source and an exchange's given side too, or none (Б1а).
  */
 export interface StatementCandidate {
   readonly id: string
@@ -69,7 +77,7 @@ export interface StatementCandidate {
   readonly days: readonly string[]
   readonly money: readonly Money[]
   readonly debited: Money | null
-  readonly accounts: readonly (string | null)[]
+  readonly account: string | null
   readonly name: string
   readonly removed: boolean
   readonly link: StatementLink | null
@@ -94,7 +102,7 @@ export function spendingCandidate(
     days: [spending.spentOn],
     money: [spending.amount],
     debited: spending.debited,
-    accounts: [spending.accountId],
+    account: spending.accountId,
     name: spending.place ?? spending.note ?? '',
     removed,
     link,
@@ -131,7 +139,7 @@ export function tripCandidate(
     days: started === finished ? [started] : [started, finished],
     money,
     debited: trip.debited,
-    accounts: [trip.accountId],
+    account: trip.accountId,
     name: trip.placeName,
     removed,
     link,
@@ -139,10 +147,7 @@ export function tripCandidate(
 }
 
 export function transferCandidate(
-  transfer: Pick<
-    Transfer,
-    'id' | 'fromAccountId' | 'toAccountId' | 'amount' | 'transferredOn' | 'note'
-  >,
+  transfer: Pick<Transfer, 'id' | 'fromAccountId' | 'amount' | 'transferredOn' | 'note'>,
   { removed, link }: RecordState,
 ): StatementCandidate {
   return {
@@ -151,7 +156,7 @@ export function transferCandidate(
     days: [transfer.transferredOn],
     money: [transfer.amount],
     debited: null,
-    accounts: [transfer.fromAccountId, transfer.toAccountId],
+    account: transfer.fromAccountId,
     name: transfer.note ?? '',
     removed,
     link,
@@ -169,7 +174,7 @@ export function exchangeCandidate(
     days: [exchange.exchangedOn],
     money: [exchange.given],
     debited: null,
-    accounts: [exchange.givenAccountId],
+    account: exchange.givenAccountId,
     name: exchange.note ?? '',
     removed,
     link,
@@ -217,7 +222,7 @@ export type StatementLineDecision =
       readonly group: 'new'
       readonly ticked: boolean
       readonly note: 'transfer' | 'refunded' | null
-      readonly categoryHint: 'other' | null
+      readonly categoryHint: Extract<SpendingPreset, 'other'> | null
     }
   | {
       readonly group: 'recorded'
@@ -251,43 +256,36 @@ type Fit = 'exact' | 'unsure' | 'elsewhere' | 'tip' | 'hold' | 'late' | 'relink'
 /** The fits in the order the matching takes them: what met first, the doubts only for what is left. */
 const FIT_ORDER: readonly Fit[] = ['exact', 'unsure', 'elsewhere', 'tip', 'hold', 'late', 'relink']
 
+/** A line as the rule reads it, each once: its key, its day as a number, its amounts, its payee folded. */
+interface Row {
+  readonly index: number
+  readonly line: StatementLine
+  readonly key: string
+  readonly day: number
+  readonly amounts: readonly Money[]
+  readonly words: readonly string[]
+}
+
+/** A record as the rule reads it, each once: its days as numbers, its amounts, its seller's words. */
+interface Known {
+  readonly c: StatementCandidate
+  readonly days: readonly number[]
+  readonly amounts: readonly Money[]
+  readonly seller: readonly string[]
+}
+
 interface Pair {
-  readonly line: number
+  readonly row: number
   readonly c: StatementCandidate
   readonly fit: Fit
+  /** The record's link names this very line by its key: the line it was made from goes first. */
+  readonly own: boolean
   readonly named: number
+  readonly nameless: boolean
   readonly distance: number
 }
 
 const dayNumber = (day: string) => Math.round(Date.parse(`${day}T00:00:00.000Z`) / 86_400_000)
-
-/** The words of a city of the settings, folded: «Москва» is «MOSCOW», «Ереван» is «YEREVAN» (Р-4). */
-const CITY_WORDS: readonly string[] = Object.values(COUNTRY_CITIES).flatMap((cities) =>
-  cities.flatMap((city) => payeeWords(city)),
-)
-
-/**
- * A word the bank's format puts in every card line of a city — «…\AM\YEREVAN\…» — which says nothing of
- * the seller (М1). Exact under six letters, «SAS» is no «Сад»; two edits from six, as any word.
- */
-function isPlaceWord(word: string): boolean {
-  return CITY_WORDS.some(
-    (city) =>
-      city === word || (Math.min(city.length, word.length) >= 6 && levenshtein(city, word) <= 2),
-  )
-}
-
-/**
- * One seller in two bank lines, or a line and a record (В3, Г4): every word of one name, places aside,
- * is the other's (Н1: one shared word — «SUPERMARKET», «PIZZA» — is no seller).
- */
-function sameSeller(a: string, b: string): boolean {
-  const ours = payeeWords(a).filter((w) => !isPlaceWord(w))
-  const theirs = payeeWords(b).filter((w) => !isPlaceWord(w))
-  const within = (xs: string[], ys: string[]) =>
-    xs.length > 0 && xs.every((x) => ys.some((y) => payeeWordsNear(x, y)))
-  return within(ours, theirs) || within(theirs, ours)
-}
 
 const amountsOfLine = (line: StatementLine): Money[] =>
   line.debited ? [line.amount, line.debited] : [line.amount]
@@ -298,10 +296,13 @@ const amountsOfRecord = (c: StatementCandidate): Money[] =>
  * Each amount the line shows against each the record has — its money and its «списано» (А1): `exact`
  * when one meets, `tip` a line up to a fifth over, `hold` a line under, down to half; else null.
  */
-function amountFit(line: StatementLine, c: StatementCandidate): 'exact' | 'tip' | 'hold' | null {
+function amountFit(
+  ofLine: readonly Money[],
+  ofRecord: readonly Money[],
+): 'exact' | 'tip' | 'hold' | null {
   let near: 'tip' | 'hold' | null = null
-  for (const a of amountsOfLine(line))
-    for (const r of amountsOfRecord(c)) {
+  for (const a of ofLine)
+    for (const r of ofRecord) {
       if (a.currency !== r.currency) continue
       if (a.minor === r.minor) return 'exact'
       if (a.minor > r.minor && (a.minor - r.minor) * 1000n <= r.minor * TIP_PERMILLE) near = 'tip'
@@ -311,10 +312,8 @@ function amountFit(line: StatementLine, c: StatementCandidate): 'exact' | 'tip' 
   return near
 }
 
-const sameAmount = (line: StatementLine, c: StatementCandidate) =>
-  amountsOfLine(line).some((a) =>
-    amountsOfRecord(c).some((r) => r.currency === a.currency && r.minor === a.minor),
-  )
+const sameAmount = (ofLine: readonly Money[], ofRecord: readonly Money[]) =>
+  ofLine.some((a) => ofRecord.some((r) => r.currency === a.currency && r.minor === a.minor))
 
 function inWindow(form: StatementForm, lineDay: number, recordDay: number): boolean {
   const after = lineDay - recordDay
@@ -327,37 +326,60 @@ const daySlack = (a: StatementForm, b: StatementForm) =>
   SHIFTED_FORMS.has(a) || SHIFTED_FORMS.has(b) ? 1 : 0
 
 /**
- * Whether a record's link lets this line in (Г2, Д2, Е1, Е2): its own line; a line of another form — or
- * a screenshot against a screenshot — on the link's day, ± 1 for a form whose day moves; never another
- * key of the same file, which would have given the same key; a hold's posting within its days. A
- * screenshot against a screenshot on one day is told by the time, else is a doubt (Ж2, З1, И1, И2).
+ * Whether a line of another form is the link's operation by its days (Д2, Е2): one day, ± 1 for a form
+ * whose day moves. A file dates a line by its operation and prints its posting day beside it where its
+ * format has one; a screenshot shows the posting day (MOL-428). So a screenshot meets a file's line on
+ * its posting day too (adversarial А1) — with none printed, on one day only; two files, by the
+ * operation's alone.
+ */
+function sameOperationDay(link: StatementLink, line: StatementLine, form: StatementForm): boolean {
+  const slack = daySlack(link.form, form)
+  const meet = (a: string, b: string) => Math.abs(dayNumber(a) - dayNumber(b)) <= slack
+  if (meet(link.day, line.day)) return true
+  if (link.form === 'screenshot' && isBankFile(form))
+    return line.postedOn !== null && meet(link.day, line.postedOn)
+  if (form === 'screenshot' && isBankFile(link.form))
+    return link.postedOn !== null && meet(link.postedOn, line.day)
+  return false
+}
+
+/**
+ * The posting of a hold the record was made from (Г2б). A file dates it by its operation — the hold's
+ * own day (Д2), so on that day only: a line of a file days after it is another operation (adversarial
+ * А2, А3). A screenshot shows the posting day: within `STATEMENT_HOLD_POST_DAYS` after the hold, past the
+ * window too, which is the measure of a record typed by hand, not of a bank's posting.
+ */
+function holdPosting(link: StatementLink, line: StatementLine, form: StatementForm): boolean {
+  if (!link.pending || line.status === 'pending') return false
+  const after = dayNumber(line.day) - dayNumber(link.day)
+  return isBankFile(form)
+    ? Math.abs(after) <= daySlack(link.form, form)
+    : after >= 0 && after <= STATEMENT_HOLD_POST_DAYS
+}
+
+/**
+ * Whether a record's link lets this line in (Г2, Д2, Е1, Е2): its own line — by its key, or by the key
+ * it had under the account the link was keyed under, the same file uploaded again with an account chosen
+ * since (adversarial А4); a line of another form — or a screenshot against a screenshot — of the link's
+ * operation by its days; never another key of the same file, which would have given the same key; a
+ * hold's posting. A screenshot against a screenshot on one day is told by the time, else is a doubt (Ж2,
+ * З1, И1, И2).
  */
 function linkLets(
   link: StatementLink,
-  line: StatementLine,
-  key: string,
+  row: Row,
   form: StatementForm,
+  keyUnder: (account: string | null, index: number) => string | undefined,
 ): boolean | 'unsure' {
-  if (link.key === key) return true
-  const day = dayNumber(line.day)
-  const linkDay = dayNumber(link.day)
-  if (link.form === 'screenshot' && form === 'screenshot' && day === linkDay) {
+  if (link.key === row.key || link.key === keyUnder(link.accountId, row.index)) return true
+  const { line } = row
+  if (link.form === 'screenshot' && form === 'screenshot' && link.day === line.day) {
     const said = printedTimesSay(link.time, line.time)
     return said === 'same' ? true : said === 'apart' ? false : 'unsure'
   }
   const sameFile = formKeyIsStable(form) && link.form === form
-  if (!sameFile && Math.abs(day - linkDay) <= daySlack(link.form, form)) return true
-  return holdPosting(link, line)
-}
-
-/**
- * The posting of a hold the record was made from (Г2б): posted, within `STATEMENT_HOLD_POST_DAYS` after it — past
- * the window too, which is the measure of a record typed by hand, not of a bank's posting.
- */
-function holdPosting(link: StatementLink | null, line: StatementLine): boolean {
-  if (link === null || !link.pending || line.status === 'pending') return false
-  const after = dayNumber(line.day) - dayNumber(link.day)
-  return after > 0 && after <= STATEMENT_HOLD_POST_DAYS
+  if (!sameFile && sameOperationDay(link, line, form)) return true
+  return holdPosting(link, line, form)
 }
 
 /**
@@ -365,34 +387,37 @@ function holdPosting(link: StatementLink | null, line: StatementLine): boolean {
  * recorded, it moves the link to itself and writes the link's line as a spending of its own. Neither a
  * hold nor a transfer or an exchange: they have paths of their own.
  */
-function relinks(c: StatementCandidate, distance: number): boolean {
+function relinks(c: StatementCandidate, days: readonly number[], distance: number): boolean {
   const link = c.link
   if (link === null || link.pending || c.what === 'transfer' || c.what === 'exchange') return false
   const linkDay = dayNumber(link.day)
-  return distance < Math.min(...c.days.map((d) => Math.abs(linkDay - dayNumber(d))))
+  return distance < Math.min(...days.map((d) => Math.abs(linkDay - d)))
 }
 
-/** A hold's late posting (Е3): posted, past `STATEMENT_HOLD_POST_DAYS`, within `STATEMENT_LATE_POST_DAYS`, by its name. */
+/**
+ * A hold's late posting (Е3): past `STATEMENT_HOLD_POST_DAYS`, within `STATEMENT_LATE_POST_DAYS` — on a
+ * screenshot, which shows the posting day; a file's posting is on the hold's day (Д2). Its name is
+ * asked by the caller.
+ */
 function lateFit(
   c: StatementCandidate,
   line: StatementLine,
-  fit: Fit | null,
-  named: number,
-): Fit | null {
+  form: StatementForm,
+  amount: 'exact' | 'tip' | 'hold',
+): 'late' | null {
   const link = c.link
-  if (link === null || !link.pending || line.status === 'pending' || named === 0) return null
-  if (fit !== 'exact' && fit !== 'hold') return null
+  if (link === null || !link.pending || line.status === 'pending' || isBankFile(form)) return null
+  if (amount === 'tip') return null
   const after = dayNumber(line.day) - dayNumber(link.day)
   return after > STATEMENT_HOLD_POST_DAYS && after <= STATEMENT_LATE_POST_DAYS ? 'late' : null
 }
 
-/** A record on the statement's account, or either of them with none. */
+/**
+ * A record on the statement's account, or either of them with none. For a transfer or an exchange the
+ * account is the one its money left (Б1а).
+ */
 const onAccount = (c: StatementCandidate, account: string | null) =>
-  account === null || c.accounts.every((a) => a === null) || c.accounts.includes(account)
-
-/** A transfer's or an exchange's money left this account — or either is not known (Б1а). */
-const fromAccount = (c: StatementCandidate, account: string | null) =>
-  account === null || c.accounts[0] === null || c.accounts[0] === account
+  account === null || c.account === null || c.account === account
 
 const saysTransfer = (line: StatementLine) =>
   line.kind === 'transfer' || TRANSFER_WORDS.test(line.payee)
@@ -413,10 +438,10 @@ function doubtOf(
   if (p.fit === 'tip') return 'tip'
   if (p.c.what === 'transfer' || p.c.what === 'exchange') {
     const says = p.c.what === 'transfer' ? saysTransfer(line) : saysExchange(line)
-    const sure = account !== null && p.c.accounts[0] === account && says && p.distance === 0
+    const sure = account !== null && p.c.account === account && says && p.distance === 0
     return sure ? 'settled' : p.c.what
   }
-  return payeeWords(p.c.name).length > 0 && p.named === 0 ? 'other_name' : null
+  return !p.nameless && p.named === 0 ? 'other_name' : null
 }
 
 /** What the reader's kind or the bank's sign says before any record is looked at (В1, А9, Р-5). */
@@ -443,22 +468,26 @@ function matchPairs(pairs: readonly Pair[]): Map<number, Pair> {
   const choice = new Map<number, Pair>()
   for (const fit of FIT_ORDER) {
     const options = new Map<number, Pair[]>()
-    for (const p of pairs)
-      if (p.fit === fit) options.set(p.line, [...(options.get(p.line) ?? []), p])
-    const claim = (line: number, seen: Set<string>): boolean => {
-      for (const p of options.get(line) ?? []) {
+    for (const p of pairs) {
+      if (p.fit !== fit) continue
+      const held = options.get(p.row)
+      if (held) held.push(p)
+      else options.set(p.row, [p])
+    }
+    const claim = (row: number, seen: Set<string>): boolean => {
+      for (const p of options.get(row) ?? []) {
         if (seen.has(p.c.id)) continue
         seen.add(p.c.id)
         const holder = owner.get(p.c.id)
         if (holder === undefined || (choice.get(holder)?.fit === fit && claim(holder, seen))) {
-          owner.set(p.c.id, line)
-          choice.set(line, p)
+          owner.set(p.c.id, row)
+          choice.set(row, p)
           return true
         }
       }
       return false
     }
-    for (const line of options.keys()) if (!choice.has(line)) claim(line, new Set())
+    for (const row of options.keys()) if (!choice.has(row)) claim(row, new Set())
   }
   return choice
 }
@@ -466,7 +495,9 @@ function matchPairs(pairs: readonly Pair[]): Map<number, Pair> {
 /**
  * The rule over one statement: a decision for every line, with its key, and the holds it shows no
  * posting of. The candidates are the person's spendings (removed ones still within «Вернуть»), finished
- * trips, transfers and exchanges, built by the functions above.
+ * trips, transfers and exchanges, built by the functions above. Every line is weighed against every
+ * record, the sum first; a name is folded once a line and once a record — a month of 300 lines against
+ * a year of 3 000 records is some 0.1 s (review №1), in the API's process.
  */
 export function matchStatement(
   actorId: string,
@@ -475,137 +506,170 @@ export function matchStatement(
 ): StatementMatch {
   const { form, lines } = statement
   const account = statement.accountId
-  const keys = statementLineKeys(actorId, statement)
-  const decisions = new Map<number, StatementLineDecision>()
-  const spend: number[] = []
-  lines.forEach((line, i) => {
-    const reason = notSpendingByLine(line)
-    if (reason !== null) decisions.set(i, { group: 'not_spending', reason, record: null })
-    else if (line.sign === '-') spend.push(i)
-  })
+  const rows: Row[] = statementKeyedLines(actorId, statement).map(({ line, key }, index) => ({
+    index,
+    line,
+    key,
+    day: dayNumber(line.day),
+    amounts: amountsOfLine(line),
+    words: payeeWords(line.payee),
+  }))
+  const known: Known[] = candidates.map((c) => ({
+    c,
+    days: c.days.map(dayNumber),
+    amounts: amountsOfRecord(c),
+    seller: sellerWords(c.name),
+  }))
+  // The keys the lines had under another account, asked only by a link keyed under one (А4).
+  const keysUnder = new Map<string | null, string[]>([[account, rows.map((r) => r.key)]])
+  const keyUnder = (other: string | null, index: number) => {
+    let keys = keysUnder.get(other)
+    if (keys === undefined) {
+      keys = statementLineKeys(actorId, { accountId: other, lines })
+      keysUnder.set(other, keys)
+    }
+    return keys[index]
+  }
 
-  // Every pair in the window, then one to one: met before doubts, by the share of the name (А4), the
-  // nearer day first, then the order of the lines.
+  const decisions = new Map<number, StatementLineDecision>()
+  const spend: Row[] = []
+  for (const row of rows) {
+    const reason = notSpendingByLine(row.line)
+    if (reason !== null) decisions.set(row.index, { group: 'not_spending', reason, record: null })
+    else if (row.line.sign === '-') spend.push(row)
+  }
+
+  // Every pair whose sum fits, then one to one: met before doubts, the line a record was made from
+  // first, then by the share of the name (А4), the nearer day, the order of the lines.
   const pairs: Pair[] = []
-  for (const i of spend) {
-    const line = lines[i]
-    const key = keys[i]
-    if (line === undefined || key === undefined) continue
-    const day = dayNumber(line.day)
-    for (const c of candidates) {
+  for (const row of spend) {
+    const { line } = row
+    for (const { c, days, amounts, seller } of known) {
       const own = c.what === 'transfer' || c.what === 'exchange'
-      if (own && !fromAccount(c, account)) continue
-      const days = c.days.map(dayNumber)
-      const distance = Math.min(...days.map((d) => Math.abs(day - d)))
-      const near = days.some((d) => inWindow(form, day, d)) || holdPosting(c.link, line)
-      const named = payeeNameShare(line.payee, c.name)
-      const amount = amountFit(line, c)
-      const lets = near && c.link !== null ? linkLets(c.link, line, key, form) : near
+      if (own && !onAccount(c, account)) continue
+      const inside = days.some((d) => inWindow(form, row.day, d))
+      if (!inside && c.link === null) continue // only a link reaches past the window
+      const amount = amountFit(row.amounts, amounts)
+      if (amount === null) continue
+      const distance = Math.min(...days.map((d) => Math.abs(row.day - d)))
+      const lets = c.link === null ? true : linkLets(c.link, row, form, keyUnder)
+      // A link that names the line lets it in past the window: its key, its operation, its hold's posting.
+      const near = inside || (c.link !== null && lets === true)
       let fit: Fit | null
       if (!near)
-        fit = lateFit(c, line, amount, named) // a hold's late posting, past the window too (Е3)
+        fit = lateFit(c, line, form, amount) // a hold's late posting, past the window too (Е3)
       else if (lets === 'unsure') fit = amount === 'exact' ? 'unsure' : null
       else if (!lets)
         fit =
-          amount === 'exact' && relinks(c, distance) ? 'relink' : lateFit(c, line, amount, named)
+          amount === 'exact' && relinks(c, days, distance)
+            ? 'relink'
+            : lateFit(c, line, form, amount)
       else fit = amount
       if (fit === null) continue
-      // A hold is known by its name and only on the statement's account: a hold is a card's, and a record
-      // with no account is cash or before the accounts — a purchase under it in the same chain is new (Г3).
-      if (fit === 'hold' && (named === 0 || account === null || !c.accounts.includes(account)))
-        continue
+      const named = wordsShare(row.words, seller)
+      // A late posting and a hold are known by the name; a hold only on the statement's account: a hold
+      // is a card's, and a record with no account is cash or before the accounts — a purchase under it
+      // in the same chain is new (Г3).
+      if (fit === 'late' && named === 0) continue
+      if (fit === 'hold' && (named === 0 || account === null || c.account !== account)) continue
       if (fit === 'exact' && !own && !onAccount(c, account)) fit = 'elsewhere' // В-1 «а»
-      pairs.push({ line: i, c, fit, named, distance })
+      pairs.push({
+        row: row.index,
+        c,
+        fit,
+        own: c.link?.key === row.key,
+        named,
+        nameless: seller.length === 0,
+        distance,
+      })
     }
   }
   pairs.sort(
     (p, q) =>
-      (p.fit === 'exact' ? 0 : 1) - (q.fit === 'exact' ? 0 : 1) ||
+      Number(q.own) - Number(p.own) ||
       q.named - p.named ||
       p.distance - q.distance ||
-      p.line - q.line,
+      p.row - q.row,
   )
   const choice = matchPairs(pairs)
-  for (const [i, p] of choice) {
-    const line = lines[i]
-    if (line === undefined) continue
+  for (const [index, p] of choice) {
+    const row = rows[index]
+    if (row === undefined) continue
     const record = { id: p.c.id, what: p.c.what }
-    const doubt = doubtOf(p, line, account)
+    const doubt = doubtOf(p, row.line, account)
     if (doubt === 'settled') {
       const reason = p.c.what === 'exchange' ? 'exchange' : 'own_transfer'
-      decisions.set(i, { group: 'not_spending', reason, record })
-    } else decisions.set(i, { group: 'recorded', record, doubt })
+      decisions.set(index, { group: 'not_spending', reason, record })
+    } else decisions.set(index, { group: 'recorded', record, doubt })
   }
 
   // A purchase and its refund in the same file (В3): the purchase new and not ticked; one refund a purchase.
-  const refunds = lines.flatMap((line, i) => (decisions.has(i) || line.sign !== '+' ? [] : [i]))
+  const refunds = rows.filter((row) => !decisions.has(row.index) && row.line.sign === '+')
   const refunded = new Set<number>()
-  for (const i of spend) {
-    const line = lines[i]
-    if (line === undefined || decisions.has(i)) continue
-    const back = refunds.find((r) => {
-      const refund = lines[r]
-      return (
-        refund !== undefined &&
+  for (const { index, line } of spend) {
+    if (decisions.has(index)) continue
+    const back = refunds.find(
+      ({ index: r, line: refund }) =>
         !refunded.has(r) &&
         refund.amount.currency === line.amount.currency &&
         refund.amount.minor === line.amount.minor &&
         refund.day >= line.day &&
-        sameSeller(refund.payee, line.payee)
-      )
-    })
+        sameSeller(refund.payee, line.payee),
+    )
     if (back === undefined) continue
-    refunded.add(back)
-    decisions.set(i, { group: 'new', ticked: false, note: 'refunded', categoryHint: null })
-    decisions.set(back, { group: 'not_spending', reason: 'refund', record: null })
+    refunded.add(back.index)
+    decisions.set(index, { group: 'new', ticked: false, note: 'refunded', categoryHint: null })
+    decisions.set(back.index, { group: 'not_spending', reason: 'refund', record: null })
   }
 
-  // A refund of a recorded spending or trip (Г4): the same sum from the same seller within STATEMENT_REFUND_DAYS
-  // after it — no spending, said with the record; one refund a record.
+  // A refund of a recorded spending or trip (Г4): the same sum from the same seller within
+  // STATEMENT_REFUND_DAYS after it — no spending, said with the record; one refund a record, the nearest
+  // before it, then by id — never the order the records came in (review №7).
   const hinted = new Set<string>()
-  for (const i of refunds) {
-    const line = lines[i]
-    if (line === undefined || refunded.has(i)) continue
-    const day = dayNumber(line.day)
-    const c = candidates.find(
-      (c) =>
-        (c.what === 'spending' || c.what === 'trip') &&
-        !c.removed &&
-        !hinted.has(c.id) &&
-        onAccount(c, account) &&
-        c.days.some((d) => day >= dayNumber(d) && day - dayNumber(d) <= STATEMENT_REFUND_DAYS) &&
-        sameAmount(line, c) &&
-        sameSeller(line.payee, c.name),
-    )
-    if (c === undefined) continue
-    hinted.add(c.id)
-    decisions.set(i, {
+  for (const row of refunds) {
+    const { index, line, day } = row
+    if (refunded.has(index)) continue
+    let best: { readonly c: StatementCandidate; readonly after: number } | undefined
+    for (const { c, days, amounts } of known) {
+      if ((c.what !== 'spending' && c.what !== 'trip') || c.removed || hinted.has(c.id)) continue
+      if (!onAccount(c, account) || !sameAmount(row.amounts, amounts)) continue
+      const afters = days.map((d) => day - d).filter((a) => a >= 0 && a <= STATEMENT_REFUND_DAYS)
+      if (afters.length === 0 || !sameSeller(line.payee, c.name)) continue
+      const after = Math.min(...afters)
+      if (best === undefined || after < best.after || (after === best.after && c.id < best.c.id))
+        best = { c, after }
+    }
+    if (best === undefined) continue
+    hinted.add(best.c.id)
+    decisions.set(index, {
       group: 'not_spending',
       reason: 'refund',
-      record: { id: c.id, what: c.what },
+      record: { id: best.c.id, what: best.c.what },
     })
   }
 
-  const decided = lines.map((line, i): StatementLineDecision => {
-    const known = decisions.get(i)
-    if (known !== undefined) return known
-    if (line.sign === '+') return { group: 'not_spending', reason: 'income', record: null }
-    const transfer = line.kind === 'transfer' // В-2 «б»: shown, not ticked, asked whether it is a spending
-    return {
-      group: 'new',
-      ticked: !transfer,
-      note: transfer ? 'transfer' : null,
-      categoryHint: line.kind === 'fee' ? 'other' : null,
-    }
-  })
-
   return {
-    lines: decided.map((decision, i) => ({ key: keys[i] ?? '', decision })),
+    lines: rows.map(({ index, line, key }) => ({
+      key,
+      decision: decisions.get(index) ?? newLine(line),
+    })),
     unposted: unpostedHolds(
       statement,
       candidates,
       new Set([...choice.values()].map((p) => p.c.id)),
     ),
+  }
+}
+
+/** A line nothing decided: money in is income; out — a new spending (В-2 «б»: a transfer, not ticked). */
+function newLine(line: StatementLine): StatementLineDecision {
+  if (line.sign === '+') return { group: 'not_spending', reason: 'income', record: null }
+  const transfer = line.kind === 'transfer'
+  return {
+    group: 'new',
+    ticked: !transfer,
+    note: transfer ? 'transfer' : null,
+    categoryHint: line.kind === 'fee' ? 'other' : null,
   }
 }
 
@@ -620,15 +684,25 @@ function unpostedHolds(
   paired: ReadonlySet<string>,
 ): StatementUnposted[] {
   const account = statement.accountId
-  const days = statement.lines.map((line) => dayNumber(line.day))
-  if (account === null || (statement.period === null && days.length === 0)) return []
-  const first = statement.period ? dayNumber(statement.period.from) : Math.min(...days)
-  const last = statement.period ? dayNumber(statement.period.to) : Math.max(...days)
-  const complete = formKeyIsStable(statement.form) && statement.period !== null
+  if (account === null) return []
+  let first = Infinity
+  let last = -Infinity
+  if (statement.period) {
+    first = dayNumber(statement.period.from)
+    last = dayNumber(statement.period.to)
+  } else
+    for (const line of statement.lines) {
+      // a loop, not Math.min(...days): a long statement overflows the stack (adversarial А7)
+      const day = dayNumber(line.day)
+      if (day < first) first = day
+      if (day > last) last = day
+    }
+  if (first > last) return []
+  const complete = isBankFile(statement.form) && statement.period !== null
   return candidates.flatMap((c) => {
     const link = c.link
     if (link === null || !link.pending || c.removed || paired.has(c.id)) return []
-    if (!c.accounts.includes(account)) return []
+    if (c.account !== account) return []
     const held = dayNumber(link.day)
     if (first > held + 1 || last < held) return []
     const settled = last - held >= STATEMENT_HOLD_POST_DAYS

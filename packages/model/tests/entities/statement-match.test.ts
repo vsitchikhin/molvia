@@ -1,5 +1,6 @@
+import { expectWithin } from '@molvia/model/testing/clock'
 import { describe, expect, it } from 'vitest'
-import { statementLineKeys } from '#model/entities/statement-line'
+import { statementLineKeys, statementLinkOf } from '#model/entities/statement-line'
 import type {
   Statement,
   StatementForm,
@@ -84,18 +85,12 @@ const trip = (
   return c
 }
 
-const transfer = (
-  day: string,
-  amount: string,
-  from: string,
-  to: string,
-  link: StatementLink | null = null,
-) =>
+/** A transfer from an account; where it went the rule never reads (review №2). */
+const transfer = (day: string, amount: string, from: string, link: StatementLink | null = null) =>
   transferCandidate(
     {
       id: nextId(),
       fromAccountId: from,
-      toAccountId: to,
       amount: cash(amount, 'AMD'),
       transferredOn: day,
       note: null,
@@ -157,6 +152,8 @@ const linkTo = (
   o: Partial<StatementLink> & Pick<StatementLink, 'day' | 'form'>,
 ): StatementLink => ({
   key: nextId(),
+  accountId: null,
+  postedOn: null,
   pending: false,
   amount: cash('1.00', 'AMD'),
   payee: '',
@@ -246,7 +243,7 @@ describe('matchStatement — the bench, round 1 (А)', () => {
   })
 
   it('А8: a recorded transfer between one’s own accounts makes the line no spending', () => {
-    const tr = transfer('2026-11-14', '50000.00', ARDSHIN, AMERIA)
+    const tr = transfer('2026-11-14', '50000.00', ARDSHIN)
     expect(
       decide([tr], [line('2026-11-14', '50000.00', 'AMD', 'Amount transfer from card to card')], {
         account: ARDSHIN,
@@ -273,11 +270,11 @@ describe('matchStatement — the bench, round 1 (А)', () => {
 
 describe('matchStatement — round 2 (Б)', () => {
   it('Б1а: a transfer onto the card settles no purchase from it — only a line of the source account', () => {
-    const into = transfer('2026-11-14', '50000.00', AMERIA, ARDSHIN)
+    const into = transfer('2026-11-14', '50000.00', AMERIA)
     expect(
       decide([into], [line('2026-11-15', '50000.00', 'AMD', 'ZOVQ BAR')], { account: ARDSHIN }),
     ).toEqual([NEW])
-    const out = transfer('2026-11-14', '50000.00', ARDSHIN, AMERIA)
+    const out = transfer('2026-11-14', '50000.00', ARDSHIN)
     expect(
       group(
         decide([out], [line('2026-11-14', '50000.00', 'AMD', 'card to card')], {
@@ -288,7 +285,7 @@ describe('matchStatement — round 2 (Б)', () => {
   })
 
   it('Б1б: a tip on a transfer and a transfer with no statement account are doubts', () => {
-    const out = transfer('2026-11-14', '50000.00', ARDSHIN, AMERIA)
+    const out = transfer('2026-11-14', '50000.00', ARDSHIN)
     expect(
       decide([out], [line('2026-11-16', '57500.00', 'AMD', 'VEGA')], { account: ARDSHIN }),
     ).toEqual([recorded(out, 'tip')])
@@ -362,7 +359,7 @@ describe('matchStatement — round 3 (В)', () => {
   })
 
   it('В2б: a transfer settles only a line calling itself a transfer; a purchase of its sum is a doubt', () => {
-    const out = transfer('2026-10-31', '50000.00', ARDSHIN, AMERIA)
+    const out = transfer('2026-10-31', '50000.00', ARDSHIN)
     expect(
       decide([out], [line('2026-11-02', '50000.00', 'AMD', 'AM\\YEREVAN\\VEGA')], {
         account: ARDSHIN,
@@ -409,13 +406,17 @@ describe('matchStatement — round 4 (Г)', () => {
       '2026-10-31',
       '50000.00',
       ARDSHIN,
-      AMERIA,
-      linkTo({ key: keyOf(own, ARDSHIN), day: '2026-10-31', form: 'ardshin-xlsx' }),
+      linkTo({
+        key: keyOf(own, ARDSHIN),
+        accountId: ARDSHIN,
+        day: '2026-10-31',
+        form: 'ardshin-xlsx',
+      }),
     )
     const rent = [line('2026-11-02', '50000.00', 'AMD', card)]
     const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
     expect(decide([linked], rent, o)).toEqual([NEW])
-    const out = transfer('2026-10-31', '50000.00', ARDSHIN, AMERIA)
+    const out = transfer('2026-10-31', '50000.00', ARDSHIN)
     expect(decide([out], rent, o)).toEqual([recorded(out, 'transfer')])
     expect(group(decide([out], [own], o)[0])).toBe('not_spending')
   })
@@ -437,10 +438,12 @@ describe('matchStatement — round 4 (Г)', () => {
         account: ARDSHIN,
         link: linkTo({ day: '2026-11-12', form: 'screenshot', pending }),
       })
-    const post = [line('2026-11-14', '15000.00', 'AMD', 'AM\\YEREVAN\\GAZPROM ARMENIA')]
+    // A file dates the posting by the operation, the hold's day (Д2); a line of it days later is another.
+    const gas = 'AM\\YEREVAN\\GAZPROM ARMENIA'
+    const post = [line('2026-11-12', '15000.00', 'AMD', gas, { postedOn: '2026-11-14' })]
     const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
     expect(group(decide([fuel(true)], post, o)[0])).toBe('recorded')
-    expect(decide([fuel(false)], post, o)).toEqual([NEW])
+    expect(decide([fuel(true)], [line('2026-11-14', '15000.00', 'AMD', gas)], o)).toEqual([NEW])
     const fromLine = spending('2026-10-31', '1200.00', 'AMD', {
       place: 'YANDEX.GO',
       account: ARDSHIN,
@@ -527,7 +530,7 @@ describe('matchStatement — rounds 5–6 (Д, Е)', () => {
     ])
     const posted = match(
       [deposit],
-      [taxi, line('2026-11-14', '40000.00', 'AMD', 'TUFENKIAN HOTEL')],
+      [taxi, line('2026-11-12', '40000.00', 'AMD', 'TUFENKIAN HOTEL', { postedOn: '2026-11-14' })],
       o,
     )
     expect(posted.lines[1]?.decision).toEqual(recorded(deposit))
@@ -564,29 +567,29 @@ describe('matchStatement — rounds 5–6 (Д, Е)', () => {
     expect(group(decide([taxi('tbank-csv')], today, o)[0])).toBe('recorded')
   })
 
-  it('Е3: a hold posted later than a week by its name is a doubt «проводка холда?», and no unposted hold', () => {
+  it('Е3: a hold posted later than a week by its name is a doubt «проводка холда?» on a screenshot; a file says it outright', () => {
     const hotel = spending('2026-11-20', '40000.00', 'AMD', {
       place: 'Tufenkian Hotel',
       account: ARDSHIN,
       link: linkTo({ day: '2026-11-20', form: 'screenshot', pending: true }),
     })
+    const shot = { account: ARDSHIN, form: 'screenshot' } as const
+    const late = match([hotel], [line('2026-11-29', '40000.00', 'AMD', 'Tufenkian Hotel')], shot)
+    expect(late.lines[0]?.decision).toEqual(recorded(hotel, 'late_post'))
+    expect(late.unposted).toEqual([])
+    expect(decide([hotel], [line('2026-11-29', '40000.00', 'AMD', 'Vega')], shot)).toEqual([NEW])
+    // A file prints the hold's own day and its late posting beside it: the operation, no doubt (Д2).
     const o = {
       account: ARDSHIN,
       form: 'ardshin-xlsx',
       period: { from: '2026-11-01', to: '2026-11-30' },
     } as const
-    const late = match(
-      [hotel],
-      [line('2026-11-29', '40000.00', 'AMD', 'AM\\DILIJAN\\TUFENKIAN HOTEL')],
-      o,
-    )
-    expect(late.lines[0]?.decision).toEqual(recorded(hotel, 'late_post'))
-    expect(late.unposted).toEqual([])
-    const other = match([hotel], [line('2026-11-29', '40000.00', 'AMD', 'AM\\DILIJAN\\VEGA')], o)
-    expect(other.lines[0]?.decision).toEqual(NEW)
-    expect(other.unposted).toEqual([
-      { record: { id: hotel.id, what: 'spending' }, settled: true, ticked: true },
-    ])
+    const posted = line('2026-11-20', '40000.00', 'AMD', 'AM\\DILIJAN\\TUFENKIAN HOTEL', {
+      postedOn: '2026-11-29',
+    })
+    const file = match([hotel], [posted], o)
+    expect(file.lines[0]?.decision).toEqual(recorded(hotel))
+    expect(file.unposted).toEqual([])
   })
 
   it('Е4: a file begun later than the day after the hold asks nothing of it', () => {
@@ -782,7 +785,7 @@ describe('matchStatement — the reader’s kind (Р-5) and the owner’s В-2',
   })
 
   it('a transfer met by a recorded transfer of its account is no spending', () => {
-    const tr = transfer('2026-11-03', '50000.00', ARDSHIN, AMERIA)
+    const tr = transfer('2026-11-03', '50000.00', ARDSHIN)
     expect(
       group(
         decide([tr], [line('2026-11-03', '50000.00', 'AMD', 'Перевод', { kind: 'transfer' })], {
@@ -840,7 +843,7 @@ describe('matchStatement — the boundaries', () => {
     expect(one('49.99')).toEqual(NEW)
   })
 
-  it('a hold’s posting is let in a week after it, past the window; then a doubt to day 30; after — new', () => {
+  it('a hold’s posting on a screenshot is let in a week after it, past the window; then a doubt to day 30; after — new', () => {
     const fuel = spending('2026-11-01', '15000.00', 'AMD', {
       place: 'Gazprom',
       account: ARDSHIN,
@@ -849,7 +852,7 @@ describe('matchStatement — the boundaries', () => {
     const one = (day: string) =>
       decide([fuel], [line(day, '15000.00', 'AMD', 'GAZPROM')], {
         account: ARDSHIN,
-        form: 'ardshin-xlsx',
+        form: 'screenshot',
       })[0]
     expect(one('2026-11-08')).toEqual(recorded(fuel))
     expect(one('2026-11-09')).toEqual(recorded(fuel, 'late_post'))
@@ -910,6 +913,196 @@ describe('matchStatement — records and keys', () => {
     expect(
       match([removed], [line('2026-11-30', '1.00', 'AMD', 'x')], { account: ARDSHIN }).unposted,
     ).toEqual([])
+  })
+})
+
+describe('matchStatement — the link across forms and uploads (adversarial, round 1)', () => {
+  it('А1: a screenshot meets a file’s line of its operation by the posting day the file prints, in either order', () => {
+    const sas = 'Ք: SAS SUPERMARKET YEREVAN AM'
+    const onShot = line('2026-11-14', '6400.00', 'AMD', sas, { time: '19:42' })
+    const inFile = line('2026-11-12', '6400.00', 'AMD', sas, { postedOn: '2026-11-14' })
+    const fromShot = spending('2026-11-14', '6400.00', 'AMD', {
+      place: 'SAS',
+      account: AMERIA,
+      link: statementLinkOf(onShot, nextId(), { form: 'screenshot', accountId: AMERIA }),
+    })
+    expect(decide([fromShot], [inFile], { account: AMERIA })).toEqual([recorded(fromShot)])
+    const fromFile = spending('2026-11-12', '6400.00', 'AMD', {
+      place: 'SAS',
+      account: AMERIA,
+      link: statementLinkOf(inFile, keyOf(inFile, AMERIA), {
+        form: 'ameria-csv',
+        accountId: AMERIA,
+      }),
+    })
+    expect(decide([fromFile], [onShot], { account: AMERIA, form: 'screenshot' })).toEqual([
+      recorded(fromFile),
+    ])
+    // A file that prints no posting day meets a screenshot on one day only (Д1, Е2): a named price.
+    const unposted = line('2026-11-12', '6400.00', 'AMD', sas)
+    expect(decide([fromShot], [unposted], { account: AMERIA })).toEqual([NEW])
+  })
+
+  it('А2: a hold’s posting in a file of its bank is on the hold’s day — another sum a doubt «hold», another text the record', () => {
+    const gas = 'AM\\YEREVAN\\GAZPROM ARMENIA'
+    const hold = line('2026-11-12', '15000.00', 'AMD', gas, { status: 'pending' })
+    const fuel = spending('2026-11-12', '15000.00', 'AMD', {
+      place: 'Gazprom Armenia',
+      account: ARDSHIN,
+      link: statementLinkOf(hold, keyOf(hold, ARDSHIN), {
+        form: 'ardshin-xlsx',
+        accountId: ARDSHIN,
+      }),
+    })
+    const o = {
+      account: ARDSHIN,
+      form: 'ardshin-xlsx',
+      period: { from: '2026-11-01', to: '2026-11-30' },
+    } as const
+    const less = match(
+      [fuel],
+      [line('2026-11-12', '14200.00', 'AMD', gas, { postedOn: '2026-11-14' })],
+      o,
+    )
+    expect(less.lines[0]?.decision).toEqual(recorded(fuel, 'hold'))
+    expect(less.unposted).toEqual([])
+    const renamed = line('2026-11-12', '15000.00', 'AMD', `${gas} LLC`, { postedOn: '2026-11-14' })
+    expect(decide([fuel], [renamed], o)).toEqual([recorded(fuel)])
+  })
+
+  it('А3: a hold from a file lets in no other operation of its sum in the days after it', () => {
+    const go = 'AM\\YEREVAN\\YANDEX.GO'
+    const hold = line('2026-11-12', '1200.00', 'AMD', go, { status: 'pending' })
+    const ride = spending('2026-11-12', '1200.00', 'AMD', {
+      place: 'Yandex Go',
+      account: ARDSHIN,
+      link: statementLinkOf(hold, keyOf(hold, ARDSHIN), {
+        form: 'ardshin-xlsx',
+        accountId: ARDSHIN,
+      }),
+    })
+    const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+    expect(decide([ride], [line('2026-11-17', '1200.00', 'AMD', go)], o)).toEqual([NEW])
+    const posted = line('2026-11-12', '1200.00', 'AMD', go, { postedOn: '2026-11-13' })
+    expect(decide([ride], [posted], o)).toEqual([recorded(ride)])
+  })
+
+  it('А4: the same file uploaded again with an account chosen since is the same line; another account — a doubt', () => {
+    const sas = 'Ք: SAS SUPERMARKET YEREVAN AM'
+    const l = line('2026-11-12', '6400.00', 'AMD', sas)
+    const none = spending('2026-11-12', '6400.00', 'AMD', {
+      place: 'SAS',
+      link: statementLinkOf(l, keyOf(l), { form: 'ameria-csv', accountId: null }),
+    })
+    expect(decide([none], [l], { account: AMERIA })).toEqual([recorded(none)])
+    const wrong = spending('2026-11-12', '6400.00', 'AMD', {
+      place: 'SAS',
+      account: ARDSHIN,
+      link: statementLinkOf(l, keyOf(l, ARDSHIN), { form: 'ameria-csv', accountId: ARDSHIN }),
+    })
+    expect(decide([wrong], [l], { account: AMERIA })).toEqual([recorded(wrong, 'other_account')])
+    // Another line of that file is still another key under either account.
+    const next = line('2026-11-13', '6400.00', 'AMD', sas)
+    expect(decide([none], [next], { account: AMERIA })).toEqual([NEW])
+  })
+
+  it('А6: a city in a record’s name meets no line — «Ереван Сити» against a purchase at SAS is a doubt', () => {
+    const sas = line('2026-11-12', '6400.00', 'AMD', 'Ք: SAS SUPERMARKET YEREVAN AM')
+    const city = trip('2026-11-12', '6400.00', 'AMD', { place: 'Ереван Сити' })
+    expect(decide([city], [sas], { account: AMERIA })).toEqual([recorded(city, 'other_name')])
+    const market = trip('2026-11-12', '6400.00', 'AMD', { place: 'Гюмри Маркет' })
+    const gyumri = line('2026-11-12', '6400.00', 'AMD', 'Ք: SAS SUPERMARKET GYUMRI AM')
+    expect(decide([market], [gyumri], { account: AMERIA })).toEqual([
+      recorded(market, 'other_name'),
+    ])
+    const own = trip('2026-11-12', '6400.00', 'AMD', { place: 'Ереван Сити' })
+    const avan = line('2026-11-12', '6400.00', 'AMD', 'Ք: YEREVAN CITY AVAN YEREVAN AM 19')
+    expect(decide([own], [avan], { account: AMERIA })).toEqual([recorded(own)])
+  })
+
+  it('А7: a long statement with no period is read without a stack of its days', () => {
+    const lines = Array.from({ length: 200_000 }, () =>
+      line('2026-11-12', '100.00', 'AMD', 'YEREVAN METRO', { sign: '+' }),
+    )
+    expect(match([], lines, { account: AMERIA }).lines).toHaveLength(200_000)
+  }, 120_000)
+
+  it('gives a record the line it was made from before a like one of the same file', () => {
+    const both = [
+      line('2026-11-12', '1200.00', 'AMD', 'YANDEX.GO'),
+      line('2026-11-12', '1200.00', 'AMD', 'YANDEX.GO'),
+    ]
+    const [, second] = statementLineKeys(PERSON, { accountId: ARDSHIN, lines: both })
+    const ride = spending('2026-11-12', '1200.00', 'AMD', {
+      place: 'Yandex Go',
+      account: ARDSHIN,
+      link: linkTo({
+        key: second ?? '',
+        accountId: ARDSHIN,
+        day: '2026-11-12',
+        form: 'ardshin-xlsx',
+        pending: true,
+      }),
+    })
+    expect(decide([ride], both, { account: ARDSHIN, form: 'ardshin-xlsx' })).toEqual([
+      NEW,
+      recorded(ride),
+    ])
+  })
+})
+
+describe('matchStatement — review, round 1', () => {
+  it('№1: weighs a month of 300 lines against a year of 3 000 records well within a second', () => {
+    const shops = ['SAS SUPERMARKET', 'YEREVAN CITY AVAN', 'YANDEX.GO', 'GAZPROM ARMENIA']
+    const dayOf = (n: number) =>
+      new Date(Date.UTC(2026, 0, 1) + n * 86_400_000).toISOString().slice(0, 10)
+    const lines = Array.from({ length: 300 }, (_, i) =>
+      line(
+        dayOf(300 + (i % 30)),
+        String(1000 + (i % 40) * 5),
+        'AMD',
+        `Ք: ${shops[i % 4] ?? ''} AM`,
+      ),
+    )
+    const records = Array.from({ length: 3000 }, (_, i) =>
+      spending(dayOf(i % 360), String(1000 + (i % 40) * 5), 'AMD', {
+        place: `${shops[i % 4] ?? ''} Ереван`,
+      }),
+    )
+    // Folded a pair at a time, before the sum and the window, it took 8.1 s (review №1).
+    const started = performance.now()
+    const out = match(records, lines, { account: AMERIA })
+    expectWithin(performance.now() - started, 4_000)
+    expect(out.lines).toHaveLength(300)
+  }, 60_000)
+
+  it('№2: asks nothing of a transfer onto the statement’s account: no money of it left there', () => {
+    const o = {
+      account: ARDSHIN,
+      form: 'ardshin-xlsx',
+      period: { from: '2026-11-01', to: '2026-11-30' },
+    } as const
+    const held = () => linkTo({ day: '2026-11-10', form: 'screenshot', pending: true })
+    const into = transfer('2026-11-10', '50000.00', AMERIA, held())
+    expect(match([into], [], o).unposted).toEqual([])
+    const out = transfer('2026-11-10', '50000.00', ARDSHIN, held())
+    expect(match([out], [], o).unposted).toEqual([
+      { record: { id: out.id, what: 'transfer' }, settled: true, ticked: true },
+    ])
+  })
+
+  it('№7: names the nearest recorded spending before a refund, whatever order the records came in', () => {
+    const older = spending('2026-11-01', '2990.00', 'RUB', { place: 'Ozon' })
+    const nearer = spending('2026-11-10', '2990.00', 'RUB', { place: 'Ozon' })
+    const refund = [line('2026-11-12', '2990.00', 'RUB', 'OZON', { sign: '+' })]
+    for (const order of [
+      [older, nearer],
+      [nearer, older],
+    ])
+      expect(decide(order, refund)[0]).toMatchObject({
+        reason: 'refund',
+        record: { id: nearer.id },
+      })
   })
 })
 

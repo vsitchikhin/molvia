@@ -1,29 +1,38 @@
 import { z } from 'zod'
-import { ERROR } from '#model/support/errors'
+import { exchangeDaySchema } from '#model/entities/exchange'
+import { positiveMoneySchema } from '#model/entities/spending'
 import { nameUuid } from '#model/support/md5'
-import { priceSchema } from '#model/values/money'
 import type { Money } from '#model/values/money'
-import { isCalendarDay } from '#model/values/rates'
 
 // A line of a bank's statement (MOL-429, epic MOL-427): the one shape every reader fills — a parser of
 // a bank's file (MOL-430…432) or the model reading a screenshot (MOL-437) — and the duplicates rule
 // (`statement-match.ts`) reads. The rule and its rounds are MOL-409's bench, `research/MOL-409/`.
-
-const daySchema = z.string().refine(isCalendarDay)
-const amountSchema = priceSchema.refine((value) => value.minor > 0n, {
-  error: ERROR.INVALID_AMOUNT,
-})
+// The day and the amount are a spending's own (`spentOn`, `amount`): a line becomes one.
 
 /** A bank's text beside a line — a payee, a category; long enough for any bank's line of a payee. */
 export const STATEMENT_TEXT_MAX = 200
 
+/** A time as printed, «14:35», «2:35 PM», with room for a format's seconds and zone. */
+export const STATEMENT_TIME_MAX = 32
+
+const timeSchema = z.string().max(STATEMENT_TIME_MAX)
+
 /**
  * Where the lines came from (Р-8): a closed list, each parser adding its own format. The domain knows
- * two things of a form: whether its key repeats (`formKeyIsStable`) and whether its day may move from
- * the phone's (`SHIFTED_FORMS`).
+ * three things of a form: whether it is a bank's file (`isBankFile`), whether its key repeats
+ * (`formKeyIsStable`) and whether its day may move from the phone's (`SHIFTED_FORMS`).
  */
 export const statementFormSchema = z.enum(['screenshot', 'tbank-csv', 'ardshin-xlsx', 'ameria-csv'])
 export type StatementForm = z.infer<typeof statementFormSchema>
+
+/**
+ * A bank's file: every line of the account in its period, each dated by its operation (Д2) and posted
+ * as its own day beside it where the format prints one. A screenshot is what the person chose to show,
+ * dated by the day the screen shows — the posting's (MOL-428).
+ */
+export function isBankFile(form: StatementForm): boolean {
+  return form !== 'screenshot'
+}
 
 /**
  * A file parsed by code gives the same line byte for byte, and so the same key. A screenshot does not:
@@ -51,14 +60,14 @@ export type StatementLineKind = z.infer<typeof statementLineKindSchema>
 
 export const statementLineSchema = z.object({
   /** The day of the operation for a file (Д2), the day the screen shows for a screenshot. */
-  day: daySchema,
+  day: exchangeDaySchema,
   /** The day it was posted, where the format prints one beside the operation's. */
-  postedOn: daySchema.nullable(),
+  postedOn: exchangeDaySchema.nullable(),
   /** The time as printed (a screenshot's), never brought to a clock here: `printedClock` does that. */
-  time: z.string().max(32).nullable(),
-  amount: amountSchema,
+  time: timeSchema.nullable(),
+  amount: positiveMoneySchema,
   /** What left the account in its own currency, where the operation's is another. */
-  debited: amountSchema.nullable(),
+  debited: positiveMoneySchema.nullable(),
   /** `-` out, `+` in, none where the reader could not tell (А9). */
   sign: z.enum(['-', '+']).nullable(),
   payee: z.string().max(STATEMENT_TEXT_MAX),
@@ -77,37 +86,43 @@ export type StatementLine = z.infer<typeof statementLineSchema>
 export const statementSchema = z.object({
   form: statementFormSchema,
   accountId: z.uuid().nullable(),
-  period: z.object({ from: daySchema, to: daySchema }).nullable(),
+  period: z.object({ from: exchangeDaySchema, to: exchangeDaySchema }).nullable(),
   lines: z.array(statementLineSchema),
 })
 export type Statement = z.infer<typeof statementSchema>
 
 /**
  * What a spending, a trip or a transfer keeps of the line it was made from or matched (stored by
- * MOL-433): the key and day, so another line is told from it (Г2, Д2); `pending`, so its posting is let
- * in (Г2б); the form, so another form is the same operation and the same file is not (Е1, Е2); and the
- * amount, payee and time, so a relinked record writes that line as a spending of its own (Д1) and two
- * screenshots compare times (Ж2).
+ * MOL-433): the key, and the account of the upload it was keyed under — the same file uploaded again
+ * with an account chosen since is the same line (adversarial А4); the day and the posting day, so the
+ * same operation in another form is told (Г2, Д2: a file's day is the operation's, a screenshot's the
+ * posting's — adversarial А1); `pending`, so its posting is let in (Г2б); the form, so another form is
+ * the same operation and the same file is not (Е1, Е2); and the amount, payee and time, so a relinked
+ * record writes that line as a spending of its own (Д1) and two screenshots compare times (Ж2).
  */
 export const statementLinkSchema = z.object({
   key: z.uuid(),
-  day: daySchema,
+  accountId: z.uuid().nullable(),
+  day: exchangeDaySchema,
+  postedOn: exchangeDaySchema.nullable(),
   pending: z.boolean(),
   form: statementFormSchema,
-  amount: amountSchema,
+  amount: positiveMoneySchema,
   payee: z.string().max(STATEMENT_TEXT_MAX),
-  time: z.string().max(32).nullable(),
+  time: timeSchema.nullable(),
 })
 export type StatementLink = z.infer<typeof statementLinkSchema>
 
 export function statementLinkOf(
   line: StatementLine,
   key: string,
-  form: StatementForm,
+  { form, accountId }: Pick<Statement, 'form' | 'accountId'>,
 ): StatementLink {
   return {
     key,
+    accountId,
     day: line.day,
+    postedOn: line.postedOn,
     pending: line.status === 'pending',
     form,
     amount: line.amount,
@@ -122,17 +137,19 @@ const STATEMENT_LINE_NAMESPACE = '4f2c8e1a-7b3d-4a69-9e05-c1d8b2f6a374'
 const keyMoney = ({ minor, currency }: Money) => `${minor.toString()} ${currency}`
 
 /**
- * The key of each line, a spending's id when one is written from it (Р-2): the same line uploaded again
- * is the same id, so it is not written twice. The person is in it — two people's like lines of statements
- * with no account would be one id, and ids are one primary key for everyone; so are the account, the day,
- * the sign, the amount, the payee as printed with its spaces squeezed, and the turn among equal lines —
- * two rides of one price on one day are two. The form is not: the same text in a bank's CSV and its PDF
- * is the same line.
+ * Each line with its key, a spending's id when one is written from it (Р-2): the same line uploaded
+ * again is the same id, so it is not written twice. The person is in it — two people's like lines of
+ * statements with no account would be one id, and ids are one primary key for everyone; so are the
+ * account, the day, the sign, the amount, the payee as printed with its spaces squeezed, and the turn
+ * among equal lines — two rides of one price on one day are two. The form is not: the same text in a
+ * bank's CSV and its PDF is the same line. A declined line takes no turn of the others — a payment
+ * refused and paid again keeps its key whether the next export prints the refusal or not (adversarial
+ * А5) — and is keyed apart, a spending never.
  */
-export function statementLineKeys(
+export function statementKeyedLines(
   actorId: string,
   statement: Pick<Statement, 'accountId' | 'lines'>,
-): string[] {
+): { readonly line: StatementLine; readonly key: string }[] {
   const seen = new Map<string, number>()
   return statement.lines.map((line) => {
     const parts = JSON.stringify([
@@ -143,8 +160,16 @@ export function statementLineKeys(
       keyMoney(line.amount),
       line.payee.replace(/\s+/g, ' ').trim(),
     ])
-    const turn = seen.get(parts) ?? 0
-    seen.set(parts, turn + 1)
-    return nameUuid(STATEMENT_LINE_NAMESPACE, `${parts}#${String(turn)}`)
+    const name = line.status === 'declined' ? `${parts}#declined` : parts
+    const turn = seen.get(name) ?? 0
+    seen.set(name, turn + 1)
+    return { line, key: nameUuid(STATEMENT_LINE_NAMESPACE, `${name}#${String(turn)}`) }
   })
+}
+
+export function statementLineKeys(
+  actorId: string,
+  statement: Pick<Statement, 'accountId' | 'lines'>,
+): string[] {
+  return statementKeyedLines(actorId, statement).map(({ key }) => key)
 }
