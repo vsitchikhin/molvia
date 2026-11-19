@@ -729,8 +729,9 @@ that are easiest to break; the file holds every rule of the area and the reason 
   `/actors/me` says `receiptsByModel` (a header: grant, share, cap), the digits of the tax and fiscal numbers the
   card's, every item a Georgian line finds «проверьте»; no tax number printed, no shop memory (MOL-438).
 - **Where a person stands with the model is the server's; the phone only says it** (MOL-276): `receiptsClosedBy` over
-  `receiptsAccess` — «Распознавание чеков» in «Настройки», and «Пробные чеки закончились» before the camera at every tap
-  where nobody reads, once while Tesseract does (фф `payments` off); not known is no sheet, the camera as before.
+  `receiptsAccess` — the trial, a paid reading run out (`ended`) or the month's hundred — «Распознавание чеков» in
+  «Настройки», and «Пробные чеки закончились» before the camera at every tap where nobody reads, once while Tesseract does
+  (фф `payments` off), its words those of the tap until it is put away; not known is no sheet, the camera as before.
 - **A model's answer goes through the parse's own gate** (MOL-272): `receiptTextOfModel` into
   `ReceiptText`, then `verifiedReading(text, { byModel: true })` — every number as printed, the layout and
   the total our code's by the card's words, never the model's; a figure in any spelling it writes it, a
