@@ -479,14 +479,18 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   figures — `trial`, nothing paid and none of the ten left; `ended`, the same with a paid reading run out (`ended`, the
   moment the server's clock passed `receipts_model_until`, adversarial А2 — `until` is none for both, and «Вы распознали
   10 чеков» was said after a month of sixty); `month`, the hundred of the phone's month read; the trial or the grant
-  named where they and the hundred close it, since the hundred comes back next month and they never. The phone's clock
+  named where they and the hundred close it, since the hundred comes back next month and they never. **`ended` says
+  both facts, never which closed last** (Б1): a grant bought while trial receipts were left lets the model read them on
+  after it runs out — a paid reading spends no trial — so the trial may close weeks after the grant, and the figures
+  cannot tell the order; «Оплаченный срок кончился 19 декабря, пробных чеков не осталось» is true either way, where
+  «было открыто до 19 декабря» alone named a date three weeks old and not the trial that closed. The phone's clock
   is never asked. `ended` came after the first server that said the rest: an answer without it is none, `trial`. The
   share ($2) and the cap ($200) close nothing here — the server does not say them (MOL-367).
 - **«Распознавание чеков» in «Настройки»**, group «Чеки» over «Бот», a status with no chevron (В-3 «а»: nothing to open
   until MOL-277): the trial left; paid until · the month's count; the trial over, or the paid reading over on its day,
   and who reads now — simple recognition while the фф `payments` is off in a country Tesseract reads, the record by hand
-  otherwise; the month's hundred and the first of the next (`monthWords`, the sheet's words too); «Пока не известно —
-  спросим у сервера» where nothing is said — never blaming a connection that may be there (adversarial А4). Only for a
+  otherwise; the month's hundred and the first of the next — the figures of each reason from `closedWords`, the sheet's
+  words too (review №8); «Пока неизвестно — спросим у сервера» where nothing is said — never blaming a connection that may be there (adversarial А4). Only for a
   country read off the photo (`photoReceiptCountrySchema`): Serbia's receipt is its link, which the model never reads.
   The settings ask `/actors/me` anyway as they open, so the row is as fresh as the form, and again at midnight with the
   row in view (adversarial А3).
@@ -494,7 +498,8 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   every tap where nobody would read the receipt — the фф on, or Georgia — and **once while Tesseract does** (В-1 «а»):
   the trial once ever, a paid reading's end once for each grant that runs out (by its `ended`), the month's hundred once
   a month, remembered on the phone per owner (`molvia.receipts-told`), with «Сфотографировать» first. **`sheetFirst`
-  only asks; the sheet shown is marked by `told`** (review №1), so nothing else that asks spends the one showing. Its
+  only asks, and answers with the sheet as it stands (`ReceiptsShown`); `told` marks that very sheet** (review №1, №9),
+  so nothing else that asks spends the one showing, and what is marked is what was shown. Its
   ways — the camera, «Записать вручную» (`ManualEntryButton bare`, the strip's own «Где вы?» / «Уже записываете»),
   «Написать разработчику» (`from: 'receipts-closed'`; the developer opens the reading by hand until payment) — go once
   the sheet is away (`afterStep`). MOL-277 adds payment to it.
@@ -503,10 +508,13 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   to the developer, the reading opened — pulled it out by its `v-if` in one frame: its history entry stayed with no step
   back, the button stayed «busy», and the next closing of the reading stood it up again with no tap.
 - **Not known is no sheet** (Р-2): a launch offline, a server before MOL-275, the login's own answer — the camera
-  opens, and the server decides who reads. **`/actors/me` is asked again as the app comes back into view and at
-  midnight** on a screen with the camera (`useReconnect` and `useLocalDay` of `CaptureButton`, `askAgain` — `verify`,
-  one request whatever asks), and the settings ask it as they open (Р-3, adversarial А3: the month's hundred opens on
-  the 1st, and an app left on the screen over midnight said «снова с 1 декабря» on the 1st).
+  opens, and the server decides who reads. **A screen with the camera keeps `/actors/me` fresh** (`useAccessKeptFresh`,
+  `askAgain` — `verify`, one request whatever asks; Р-3): as the app comes back into view; at midnight (adversarial А3:
+  the month's hundred opens on the 1st, and an app left on the screen over midnight said «снова с 1 декабря» on the
+  1st); as it comes, where the figures are of a month before the phone's (Б2: an app put away on «Деньги» over
+  midnight and opened on «Покупки» on the 1st asked nobody); and as a paid reading's `until` passes with it in view, a
+  day ahead at most (Б3: Georgia's camera stayed for a receipt nobody would read). The phone only decides to ask; what
+  it says is the answer. The settings ask as they open, and again at midnight with the row in view.
 - **Georgia keeps its camera when the tariff is closed** (В-2 «а»): a tap says why and offers the record by hand, where
   the button gone after the tenth receipt said nothing; a share or the cap spent still takes it away (`receiptsByModel`).
   «Переснять» of the review stays Georgia's only while the model reads: a new shot of a closed tariff is read by nobody.
@@ -520,8 +528,10 @@ beside `receiptsByModel`, and the store keeps both over the settings' answer of 
   is not known until the app is opened again or «Настройки» are, since the login's answer says no figures; the sheet
   told once is not told again on that phone after «Выйти», its memory going with the owner's other keys — a second time,
   at most, per sign-in; a sheet up while the reading opens under it keeps its words until put away, and «Сфотографировать»
-  there is read by whoever the server then decides; and offline over midnight the row still says the month before until
-  the server answers — the phone counts nothing.
+  there is read by whoever the server then decides; offline over midnight, or past a grant's end, the row and the sheet
+  still say what the server last said until it answers — the phone counts nothing; a grant more than a day off is waited
+  for by the next midnight's answer, not by a timer; and a grant run out while trial receipts were left is said with the
+  trial once that trial is spent, by the grant's date.
 
 ## The class code (MOL-226)
 
