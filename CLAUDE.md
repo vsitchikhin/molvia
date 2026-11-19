@@ -380,6 +380,18 @@ that are easiest to break; the file holds every rule of the area and the reason 
   check recounts only once nothing put right still waits in either queue, and a difference above
   zero is written through the income's own sheet, with «сколько было до» (В-5).
 
+### Spendings from a bank's statement — `.claude/rules/statements.md`
+
+- **One line for every reader, one rule in the domain** (MOL-429): a parser of a bank's file and the model on a
+  screenshot fill `StatementLine`, the kind is the reader's; `matchStatement` answers new, recorded or no spending, and
+  the API and the screen repeat no rule.
+- **A line's key is its spending's id**: a uuid v3 of the person, the account, the day, the sign, the amount, the payee
+  and the turn among equal lines — the person always in it, the form never.
+- **An exchange is a candidate, a record on another account a doubt, never filtered** (MOL-428, owner's В-1 «а»); a
+  transfer or an exchange settles a line only exactly, on its day, from its own account, on a line naming itself so.
+- **The payee is folded by its own tables, never `toSearchKey`**; the windows are measured — a file ± 2 days, a
+  screenshot from 2 before to 4 after, the sum exact — and 7, 30, 60 days are named prices.
+
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 
 - **Every write to a trip goes through the queue on the device (MOL-24)**, online or not; storage
