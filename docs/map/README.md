@@ -27,6 +27,7 @@ entry; a data file (`sql`, `json`, fonts, icons) by an entry for a directory abo
 | `money-rates.md`     | official rates and their feeds, exchanges, incomes, the wallet                 |
 | `money-spendings.md` | spendings, categories, the month, the «Деньги» screen and its queue            |
 | `money-accounts.md`  | accounts, balances, «Списано со счёта», the check                              |
+| `statements.md`      | spendings from a bank's statement: the line, its key, the duplicates rule      |
 | `auth.md`            | sessions, the login request, the cookie, the login screen, «Выйти», devices    |
 | `privacy.md`         | erasure, the privacy page, logs                                                |
 | `feedback.md`        | «Написать разработчику»: the message, its sheet and its two ways in            |

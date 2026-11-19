@@ -380,6 +380,27 @@ that are easiest to break; the file holds every rule of the area and the reason 
   check recounts only once nothing put right still waits in either queue, and a difference above
   zero is written through the income's own sheet, with «сколько было до» (В-5).
 
+### Spendings from a bank's statement — `.claude/rules/statements.md`
+
+- **One line for every reader, one rule in the domain** (MOL-429): a parser of a bank's file and the model on a
+  screenshot fill `StatementLine`, the kind is the reader's; `matchStatement` answers new, recorded or no spending, and
+  the API and the screen repeat no rule.
+- **A line's key is its spending's id**: a uuid v3 of the person, the account, the day, the sign, the amount, the payee
+  and the turn among equal lines — the person always in it, the form never, a screenshot's time too (А19).
+- **An exchange is a candidate, a record on another account a doubt, never filtered** (MOL-428, owner's В-1 «а»); a
+  transfer or an exchange settles a line only exactly, on its day, from its own account, on a line naming itself so.
+- **The payee is folded by its own tables, never `toSearchKey`**, a city aside on both sides; the windows are
+  measured — a file ± 2 days, a screenshot from 2 before to 4 after, the sum exact — and 7, 30, 60 days, a tip's fifth
+  and a hold's half are named prices. **A file dates a line by its operation, a screenshot by its posting**: a hold's
+  posting in a file is on the hold's day, a screenshot meets a file's line by the posting day it prints, and one
+  printing none a day to four before a screenshot is a doubt; a line known only by its key under another account is a
+  doubt unless the account in Molvia is one; the key reads the last four digits of the number the bank's head prints
+  before the account chosen in Molvia. **A line weighs only the records that reach its days**, at most
+  `STATEMENT_LINES_MAX` lines, and past `STATEMENT_WEIGHED_MAX` pairs — a key under another upload twenty — the rule
+  answers `too_heavy` and weighs none; the matching skips what a failed search went through (А20), and past
+  `STATEMENT_STEPS_MAX` steps stops with `too_heavy` too (А22) — 1.3 s at worst; a refund weighs the sellers of its
+  sum alone, counted in the pairs (А23), and names weigh by their words, eight at most (А24).
+
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 
 - **Every write to a trip goes through the queue on the device (MOL-24)**, online or not; storage
