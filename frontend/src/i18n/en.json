@@ -1640,6 +1640,7 @@
     },
     "group_money": "Money",
     "group_bot": "Bot",
+    "group_receipts": "Receipts",
     "group_scheme": "Theme",
     "scheme": {
       "system": "System",
@@ -2378,6 +2379,31 @@
       "Нови-Сад": "in Novi Sad"
     }
   },
+  "receipts_access": {
+    "title": "Receipt reading",
+    "status": {
+      "paid": "Open until {until} · {read} of {limit} read in {month}",
+      "trial": "Trial receipts left: {left} of {of}",
+      "trial_over_read": "Trial receipts are used up. Receipts are read by simple recognition — it makes more mistakes",
+      "trial_over_manual": "Trial receipts are used up. Purchases can be recorded by hand",
+      "ended_read": "The paid period ended on {date}, and no trial receipts are left. Receipts are read by simple recognition — it makes more mistakes",
+      "ended_manual": "The paid period ended on {date}, and no trial receipts are left. Purchases can be recorded by hand",
+      "month_read": "{limit} of {limit} read in {month} — again from {next}",
+      "unknown": "Not known yet — we’ll ask the server"
+    },
+    "sheet": {
+      "trial_title": "Trial receipts are used up",
+      "trial_read": "You’ve had {of} receipts read. From now on simple recognition reads them — it makes more mistakes, so check the lines. The developer can open receipt reading; payment comes later.",
+      "trial_manual": "You’ve had {of} receipts read. Purchases can be recorded by hand. Payment for receipt reading comes later; until then the developer opens it.",
+      "ended_title": "Receipt reading has ended",
+      "ended_read": "The paid period ended on {date}, and the trial receipts are used up too. From now on simple recognition reads them — it makes more mistakes, so check the lines. The developer can extend receipt reading; payment comes later.",
+      "ended_manual": "The paid period ended on {date}, and the trial receipts are used up too. Purchases can be recorded by hand. Payment for receipt reading comes later; until then the developer extends it.",
+      "month_title": "This month’s hundred receipts are read",
+      "month_read": "{limit} of {limit} receipts read in {month}. Again from {next}. Until then simple recognition reads them — it makes more mistakes, so check the lines.",
+      "month_manual": "{limit} of {limit} receipts read in {month}. Again from {next}. Until then purchases can be recorded by hand.",
+      "photograph": "Photograph"
+    }
+  },
   "receipt": {
     "edges": {
       "title": "Receipt edges",
@@ -2455,6 +2481,7 @@
       "cashback": "Cashback to the card",
       "redeemed": "Paid with the card’s bonus",
       "service": "Service",
+      "rounding": "Rounding",
       "repaired_note": "Figures corrected — check them against the paper",
       "approx": "≈ {amount} at the {day} rate",
       "diff": "{amount} off — probably in the “{line}” line. You can save it anyway",

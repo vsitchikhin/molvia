@@ -103,10 +103,11 @@ function amountsOf(detail: ReceiptDetail, draft: ReceiptDraft | null) {
     total,
     ...detail.lines.flatMap((line) => [line.price, line.sum, line.discount]),
   ])
-  // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
+  // the lines make the total less what a card sent to the card (MOL-289), less a café's service (MOL-310) and less a
+  // pharmacy's rounding (MOL-421)
   return recordedSums(
     figures,
-    linesTotalOf(total, detail.cashback ?? null, detail.service ?? null),
+    linesTotalOf(total, detail.cashback ?? null, detail.service ?? null, detail.rounding ?? null),
     digits,
   )
 }
@@ -244,6 +245,7 @@ export function reviewBalance(
       draft?.total ?? detail.receipt.total,
       detail.cashback ?? null,
       detail.service ?? null,
+      detail.rounding ?? null,
     ),
     receiptCard(detail.receipt.country).currency,
   )

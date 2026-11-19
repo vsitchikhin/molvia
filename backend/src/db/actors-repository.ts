@@ -80,6 +80,8 @@ export interface ActorRepository {
 export interface ModelAccess {
   /** Until when it is paid; none where nothing is, a moment gone included. */
   readonly until: Date | null
+  /** When a paid reading ran out (MOL-276, adversarial А2): the moment gone `until` is none for; none otherwise. */
+  readonly ended: Date | null
   readonly trialLeft: number
   /**
    * The person's count of the phone's month or a later one — the later of the two, as `readsByModel` counts; nought
@@ -272,6 +274,11 @@ export function createActorRepository(db: Conn): ActorRepository {
           // empty and past are one answer, as `shared_until`'s: nothing paid
           until:
             sql<Date | null>`case when ${PAID_BY_MODEL} then ${actors.receiptsModelUntil} end`.mapWith(
+              actors.receiptsModelUntil,
+            ),
+          // the other half, by the same clock in the same statement: a grant gone from a trial spent
+          ended:
+            sql<Date | null>`case when not ${PAID_BY_MODEL} then ${actors.receiptsModelUntil} end`.mapWith(
               actors.receiptsModelUntil,
             ),
           trialLeft: actors.trialReceiptsLeft,

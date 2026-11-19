@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { z } from 'zod'
-import { actorCodec, actorViewSchema, actorWireSchema } from '#model/contracts/actor'
-import type { ActorWire } from '#model/contracts/actor'
+import {
+  actorCodec,
+  actorViewSchema,
+  actorWireSchema,
+  receiptsClosedBy,
+} from '#model/contracts/actor'
+import type { ActorWire, ReceiptsAccess } from '#model/contracts/actor'
 import { actorSchema } from '#model/entities/actor'
 
 const actor = {
@@ -77,6 +82,7 @@ describe('actorCodec', () => {
     const view = actorViewSchema.parse(actorSchema.parse(actor))
     const status = {
       until: new Date('2026-12-20T08:00:00.000Z'),
+      ended: null,
       trialLeft: 3,
       trialOf: 10 as const,
       month: '2026-11-01',
@@ -89,6 +95,15 @@ describe('actorCodec', () => {
     expect(actorCodec.parse(JSON.parse(JSON.stringify(wire))).receiptsAccess).toEqual(status)
     const unpaid = z.encode(actorCodec, { ...view, receiptsAccess: { ...status, until: null } })
     expect(actorCodec.parse(unpaid).receiptsAccess?.until).toBeNull()
+    // a grant gone, its moment as ISO too (MOL-276, adversarial А2)
+    const lapsed = { ...status, until: null, ended: new Date('2026-11-02T09:30:00.000Z') }
+    const wireLapsed = z.encode(actorCodec, { ...view, receiptsAccess: lapsed })
+    expect(wireLapsed.receiptsAccess?.ended).toBe('2026-11-02T09:30:00.000Z')
+    expect(actorCodec.parse(JSON.parse(JSON.stringify(wireLapsed))).receiptsAccess).toEqual(lapsed)
+    // a server before it says no `ended`: none, never a refusal of the whole answer
+    const before = { ...wire, receiptsAccess: { ...wire.receiptsAccess } }
+    delete (before.receiptsAccess as { ended?: unknown }).ended
+    expect(actorCodec.parse(before).receiptsAccess?.ended).toBeNull()
     expect(z.encode(actorCodec, view)).not.toHaveProperty('receiptsAccess')
     // past the trial's ten, or a limit other than the hundred, is no answer of this server
     expect(
@@ -142,5 +157,49 @@ describe('actorCodec', () => {
 
     expect(wire).not.toHaveProperty('sharedUntil')
     expect(actorWireSchema.safeParse({ ...wire, sharedUntil: null }).success).toBe(false)
+  })
+})
+
+describe('receiptsClosedBy (MOL-276)', () => {
+  const open: ReceiptsAccess = {
+    until: null,
+    ended: null,
+    trialLeft: 6,
+    trialOf: 10,
+    month: '2026-11-01',
+    read: 4,
+    limit: 100,
+  }
+  const paid = new Date('2026-12-18T00:00:00Z')
+
+  it('is open on the trial while one receipt of it is left', () => {
+    expect(receiptsClosedBy({ ...open, trialLeft: 1 })).toBeNull()
+  })
+
+  it('is closed by the trial at its last receipt read, with nothing paid', () => {
+    expect(receiptsClosedBy({ ...open, trialLeft: 0, read: 10 })).toBe('trial')
+  })
+
+  it('is open when paid, the trial spent or not', () => {
+    expect(receiptsClosedBy({ ...open, until: paid, trialLeft: 0, read: 12 })).toBeNull()
+  })
+
+  it('is closed by the month at its hundredth receipt, never at its ninety-ninth', () => {
+    expect(receiptsClosedBy({ ...open, until: paid, read: 99 })).toBeNull()
+    expect(receiptsClosedBy({ ...open, until: paid, read: 100 })).toBe('month')
+    expect(receiptsClosedBy({ ...open, until: paid, read: 101 })).toBe('month')
+  })
+
+  it('names the trial where both close it: the hundred comes back next month, the trial never', () => {
+    expect(receiptsClosedBy({ ...open, trialLeft: 0, read: 100 })).toBe('trial')
+  })
+
+  it('tells one who had paid from one who never did, the trial spent either way (adversarial А2, Б1)', () => {
+    const ended = new Date('2026-11-02T09:30:00Z')
+    expect(receiptsClosedBy({ ...open, ended, trialLeft: 0, read: 60 })).toBe('ended')
+    // and before the month's hundred, which comes back while the payment does not
+    expect(receiptsClosedBy({ ...open, ended, trialLeft: 0, read: 100 })).toBe('ended')
+    // the trial still left after a grant gone keeps it open, as the server's tariff does
+    expect(receiptsClosedBy({ ...open, ended, trialLeft: 2 })).toBeNull()
   })
 })

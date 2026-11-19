@@ -70,3 +70,22 @@ export function md5Hex(bytes: Uint8Array): string {
     '',
   )
 }
+
+/**
+ * A name-based uuid, version 3 (RFC 4122 §4.3): the MD5 of the namespace's sixteen bytes and the
+ * name's UTF-8, its version and variant bits set. The same name in the same namespace is the same id —
+ * a statement's line uploaded twice is the same spending (MOL-429); MD5 is a name here, not a secret.
+ */
+export function nameUuid(namespace: string, name: string): string {
+  const space = namespace.replace(/-/g, '')
+  if (!/^[0-9a-f]{32}$/i.test(space)) throw new Error('nameUuid: the namespace is not a uuid')
+  const text = new TextEncoder().encode(name)
+  const bytes = new Uint8Array(16 + text.length)
+  for (let i = 0; i < 16; i++) bytes[i] = parseInt(space.slice(i * 2, i * 2 + 2), 16)
+  bytes.set(text, 16)
+  const hex = md5Hex(bytes)
+  const version = ((parseInt(hex.slice(12, 14), 16) & 0x0f) | 0x30).toString(16).padStart(2, '0')
+  const variant = ((parseInt(hex.slice(16, 18), 16) & 0x3f) | 0x80).toString(16).padStart(2, '0')
+  const id = hex.slice(0, 12) + version + hex.slice(14, 16) + variant + hex.slice(18)
+  return `${id.slice(0, 8)}-${id.slice(8, 12)}-${id.slice(12, 16)}-${id.slice(16, 20)}-${id.slice(20)}`
+}

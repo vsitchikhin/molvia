@@ -18,7 +18,7 @@ import { newPlaceSchema } from '#model/entities/place'
 import { ERROR } from '#model/support/errors'
 import { LOCALES } from '#model/support/locale'
 import { citySchema } from '#model/values/geo'
-import { moneyCodec } from '#model/values/money'
+import { moneyCodec, signedMoneyCodec } from '#model/values/money'
 import { rateCodec } from '#model/values/rates'
 import { quantityCodec } from '#model/values/units'
 
@@ -249,6 +249,12 @@ export const receiptDetailCodec = z.strictObject({
   service: moneyCodec.nullable().optional(),
   slip: z.literal(true).optional(),
   /**
+   * A pharmacy's rounding (MOL-421, owner's А1 «а»), either sign: its lines met the total as printed, in thousandths,
+   * and rounded half up to the tetri they come to the total less it — `linesTotalOf` — and the trip is the total. Sent
+   * only to a phone that asked by `RECEIPT_ROUNDING_HEADER`: an earlier build is told the lines' total as the receipt's.
+   */
+  rounding: signedMoneyCodec.nullable().optional(),
+  /**
    * How the receipt was paid, as its words of payment say (MOL-312): cash or a card, only where one of
    * them carries the sum — `null` when the receipt does not say, or says both. It suggests an account,
    * never chooses one. Sent only to a phone that asked by `RECEIPT_PAID_BY_HEADER`, as `readTotal`.
@@ -422,6 +428,9 @@ export const RECEIPT_CASHBACK_HEADER = 'X-Molvia-Receipt-Cashback'
 
 /** A phone that knows the detail's `service` and `slip` says so by this header (MOL-310). */
 export const RECEIPT_BILL_HEADER = 'X-Molvia-Receipt-Bill'
+
+/** A phone that knows the detail's `rounding` says so by this header (MOL-421). */
+export const RECEIPT_ROUNDING_HEADER = 'X-Molvia-Receipt-Rounding'
 
 /** A phone that knows a summary's `food` says so by this header on `GET /receipts` (MOL-406). */
 export const RECEIPT_FOOD_HEADER = 'X-Molvia-Receipt-Food'

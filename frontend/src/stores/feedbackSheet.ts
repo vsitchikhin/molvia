@@ -3,13 +3,15 @@ import { ref } from 'vue'
 import type { WireCode } from '@molvia/model'
 
 /**
- * Where «Написать разработчику» was opened from (MOL-147): the settings, an error screen, or a receipt
- * the scanner read badly (MOL-222, В-2) — whose photos go with it, seen before sending.
+ * Where «Написать разработчику» was opened from (MOL-147): the settings, an error screen, a receipt
+ * the scanner read badly (MOL-222, В-2) — whose photos go with it, seen before sending — or the sheet
+ * «Пробные чеки закончились» (MOL-276), nothing attached.
  */
 export type FeedbackEntry =
   | { readonly from: 'settings' }
   | { readonly from: 'error'; readonly code: WireCode | null }
   | { readonly from: 'receipt' }
+  | { readonly from: 'receipts-closed' }
 
 /**
  * The one sheet «Написать разработчику» of the app (MOL-147), opened from either way in. The way in

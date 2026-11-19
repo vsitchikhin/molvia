@@ -454,8 +454,9 @@ MOL-277 and MOL-283, the screen MOL-276.
   Anthropic as the recipient «если вам включено» already; the trial is a reading that is on, so the privacy page took a
   revision, not an edition.
 - **Where a person stands is the server's, to a phone that asks** (`RECEIPTS_ACCESS_HEADER`, `receiptsAccess` of
-  `/actors/me`, `receiptsAccessOf`): until when it is paid — none for a grant gone — the trial left of ten, the phone's
-  month and what was read of a hundred. An earlier build reads the answer strictly, as with `receiptsByModel`.
+  `/actors/me`, `receiptsAccessOf`): until when it is paid — none for a grant gone, whose moment is `ended` (MOL-276,
+  adversarial А2), by the same clock in the same statement — the trial left of ten, the phone's month and what was read
+  of a hundred. An earlier build reads the answer strictly, as with `receiptsByModel`.
 - **The person's**: the three counts on `actors` and a receipt's `sent_month`, `counted` and `retaken_at` go with the
   person and the receipt, into the copy (version 36), and `/privacy` says them under «Чеки» (a revision); not a change
   of the row — `updated_at` does not see them (0089). The 0.3 gate's cohort reads `shared_until` alone, as before.
@@ -466,7 +467,91 @@ MOL-277 and MOL-283, the screen MOL-276.
   lands may make one over — the queue reads one receipt at a time; an account erased and signed in again starts with a
   new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt has no number (MOL-422), so a
   shot of it again after «Удалить» counts; with payment open, the review says «Строки на фото не разобрать» of a receipt
-  nobody read until MOL-276 stands the sheet «пробные чеки закончились» before the shot.
+  nobody read — MOL-276 stands the sheet «Пробные чеки закончились» before the shot, at every tap.
+
+## The status and the sheet on the phone (MOL-276)
+
+**Where a person stands with the model is the server's, said by the phone** (owner's В-1…В-4 «а», 19.11.2026; requirements
+and plan in `.scratch/tasks/{requirements,plans}/MOL-276.md`). `api.me()` asks `receiptsAccess` (`RECEIPTS_ACCESS_HEADER`)
+beside `receiptsByModel`, and the store keeps both over the settings' answer of the same owner, which says neither.
+
+- **The phone counts nothing** (Р-1): why the model reads no more is `receiptsClosedBy` of the domain over the server's
+  figures — `trial`, nothing paid and none of the ten left; `ended`, the same with a paid reading run out (`ended`, the
+  moment the server's clock passed `receipts_model_until`, adversarial А2 — `until` is none for both, and «Вы распознали
+  10 чеков» was said after a month of sixty); `month`, the hundred of the phone's month read; the trial or the grant
+  named where they and the hundred close it, since the hundred comes back next month and they never. **`ended` says
+  both facts, never which closed last** (Б1): a grant bought while trial receipts were left lets the model read them on
+  after it runs out — a paid reading spends no trial — so the trial may close weeks after the grant, and the figures
+  cannot tell the order; «Оплаченный срок кончился 19 декабря, пробных чеков не осталось» is true either way, where
+  «было открыто до 19 декабря» alone named a date three weeks old and not the trial that closed. The phone's clock
+  is never asked. `ended` came after the first server that said the rest: an answer without it is none, `trial`. The
+  share ($2) and the cap ($200) close nothing here — the server does not say them (MOL-367).
+- **«Распознавание чеков» in «Настройки»**, group «Чеки» over «Бот», a status with no chevron (В-3 «а»: nothing to open
+  until MOL-277): the trial left; paid until · the month's count; the trial over, or the paid reading over on its day,
+  and who reads now — simple recognition while the фф `payments` is off in a country Tesseract reads, the record by hand
+  otherwise; the month's hundred and the first of the next — the figures of each reason from `closedWords`, the sheet's
+  words too (review №8); «Пока неизвестно — спросим у сервера» where nothing is said — never blaming a connection that may be there (adversarial А4). Only for a
+  country read off the photo (`photoReceiptCountrySchema`): Serbia's receipt is its link, which the model never reads.
+  The settings ask `/actors/me` anyway as they open, so the row is as fresh as the form, and again at midnight with the
+  row in view (adversarial А3).
+- **«Пробные чеки закончились» stands before the camera** (`ReceiptsClosedSheet`, `useReceiptsAccess.sheetFirst`): at
+  every tap where nobody would read the receipt — the фф on, or Georgia — and **once while Tesseract does** (В-1 «а»):
+  the trial once ever, a paid reading's end once for each grant that runs out (by its `ended`), the month's hundred once
+  a month, remembered on the phone per owner (`molvia.receipts-told`), with «Сфотографировать» first. **`sheetFirst`
+  only asks, and answers with the sheet as it stands (`ReceiptsShown`); `told` marks that very sheet** (review №1, №9),
+  so nothing else that asks spends the one showing, and what is marked is what was shown. Its
+  ways — the camera, «Записать вручную» (`ManualEntryButton bare`, the strip's own «Где вы?» / «Уже записываете»),
+  «Написать разработчику» (`from: 'receipts-closed'`; the developer opens the reading by hand until payment) — go once
+  the sheet is away (`afterStep`). MOL-277 adds payment to it.
+- **The sheet says what it said at the tap, until it is put away** (adversarial А1): its reason and figures are taken
+  then, and it is taken down only from its own `onClosed`. A fresh `/actors/me` under it — the person back from writing
+  to the developer, the reading opened — pulled it out by its `v-if` in one frame: its history entry stayed with no step
+  back, the button stayed «busy», and the next closing of the reading stood it up again with no tap.
+- **Not known is no sheet** (Р-2): a launch offline, a server before MOL-275, the login's own answer — the camera
+  opens, and the server decides who reads. **The screens that hold the camera keep `/actors/me` fresh** — «Что брать»
+  and «Покупки», never the button (`useAccessKeptFresh`, `askAgain` — `verify`, one request whatever asks; Р-3), the
+  one rule of when to ask (review №12): as the app comes back into view; at midnight (adversarial А3: the month's
+  hundred opens on the 1st, and an app left on the screen over midnight said «снова с 1 декабря» on the 1st); as the
+  screen comes, where the figures are of a month before the phone's (Б2: an app put away on «Деньги» over midnight and
+  opened on «Покупки» on the 1st asked nobody); and as a paid reading's `until` passes with it in view, a day ahead at
+  most (Б3: Georgia's camera stayed for a receipt nobody would read) — armed again by every answer, so the one at
+  midnight sets it for a grant a day off (Г1: armed by the moment's change alone, a screen opened more than a day before
+  never caught the end). **The grant's end is the screen's own question** (adversarial Д1, Е1, Е2): `api.me()` taken
+  in by `apply`, as «Что брать» takes its own, never `verify`, which asks nothing while another question is out — an
+  answer to a question asked before the end, heard after it, could not be told from the answer to this one, and each
+  rule of «which answer marks the moment» left one more order of answers that kept the end unheard until midnight
+  (the ask lost, swallowed, a second late answer taking the re-ask away, `verify`'s own late answer taking the retry).
+  So the moment is marked by the answer to this question alone, asked after the moment by the phone's clock: one still
+  naming it is believed — a phone whose clock runs ahead of the server's asks once a moment, never every two seconds
+  (В1) — and another answer heard past the moment asks only where this question is neither out, nor answered, nor
+  armed; a question with no answer is asked again, 5 s doubling to a minute (the identity's `doublingRetry`) — and so
+  is one whose answer the store let go (`apply` says whether it took it, Ж1: a «Сохранить» of «Настройки» answered
+  meanwhile is a row newer) — and the figures the screen came with are no answer. **Not the
+  button, since the button may be gone** (В2): Georgia with its share or the cap spent draws none, and the 1st that gave
+  the share back was heard by nobody until a restart. Only where receipts are read off the photo — nothing else changes
+  with the answer. The phone only decides to ask; what it says is the answer. The settings' form reads `/actors/me` as
+  it opens and as the app comes back, so their row keeps only the midnight and a grant's end (`readByScreen`).
+- **Georgia keeps its camera when the tariff is closed** (В-2 «а»): a tap says why and offers the record by hand, where
+  the button gone after the tenth receipt said nothing; a share or the cap spent still takes it away (`receiptsByModel`).
+  «Переснять» of the review stays Georgia's only while the model reads: a new shot of a closed tariff is read by nobody.
+- **A screen promises a receipt read only where somebody reads it** (`readCountry` of `useReceiptCapture`, adversarial
+  А5): the newcomer's «Сфотографируйте первый чек … прочитает чек», its step «Строки чека прочитаем сами» and the empty
+  «Покупки»'s «строки прочитаем сами» go by it — not with the tariff closed and nobody in the model's place (the фф on,
+  or Georgia); the camera, its strip and «Записать вручную» beside it go by `country`, as before. Whether the tariff is
+  closed is `useReceiptsAccess`'s alone (review №4).
+- **The prices, named:** a receipt shot right after the tenth trial receipt, before the next answer, meets no sheet — the
+  server reads it by Tesseract or fails it `unreadable`, as it decides; right after a login on a second phone the status
+  is not known until the app is opened again or «Настройки» are, since the login's answer says no figures; the sheet
+  told once is not told again on that phone after «Выйти», its memory going with the owner's other keys — a second time,
+  at most, per sign-in; a sheet up while the reading opens under it keeps its words until put away, and «Сфотографировать»
+  there is read by whoever the server then decides; offline over midnight, or past a grant's end, the row and the sheet
+  still say what the server last said until it answers — the phone counts nothing; a grant more than a day off is waited
+  for by the next midnight's answer, not by a timer, and so is the end of one a phone whose clock runs ahead asked about
+  too early — one ask a moment, then midnight or the app's return; an old answer heard after the screen's own one, the
+  server's word from before the end, puts the grant back on the phone, and the screen asks once more two seconds later;
+  with the server silent the grant's end is asked once a minute while the screen is in view, until it answers; the
+  grant's end is one request beside `verify`'s, never folded into it; and a grant run out while trial receipts were left is said with the
+  trial once that trial is spent, by the grant's date.
 
 ## The class code (MOL-226)
 
@@ -553,13 +638,16 @@ receipt comes from is not on the card** (`receiptSourceOf` reads the schemas, `p
 `source` beside them would say it twice, and the card's test holds that `photo` is there exactly for a country
 read by photo.
 
-**A card names only what the parse reads** (owner, В-1 «а»): MOL-229's template also has the words of change,
-subtotal and not-an-item, the codes and the QR, which no rule of Armenia reads; they come with their first
-reader (MOL-248). A field nobody reads is a word nobody checks. **The formats of numbers are a list** — Georgia's
-pharmacies print three decimals beside its shops' two — **and a card may name only a format the parse reads**
-(`PARSED_FRACTION_DIGITS`): the parse counts in hundredths throughout, so it **refuses** a card with no format
-or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals read as
-two would be every sum wrong, and only a refusal makes the field more than a declaration.
+**A card names only what the parse reads** (owner, В-1 «а»): MOL-229's template also has the words of change, subtotal
+and not-an-item, the codes and the QR, which no rule of Armenia reads; they come with their first reader (MOL-248). A
+field nobody reads is a word nobody checks. **The formats of numbers are a list** — Georgia's pharmacies print three
+decimals beside its shops' two — **and a card may name only a format its reader reads**: Tesseract's parse counts in
+hundredths throughout (`fractionDigitsReadBy`, one rule for the parse and its test), so it **refuses** a card it reads
+with no format or with one it does not read (`RangeError` in `lexiconOf`, adversarial А3) — a card of three decimals
+read as two would be every sum wrong, and only a refusal makes the field more than a declaration. A card the model alone
+reads (`tesseractReads` false) may name its three decimals too (`THOUSANDTHS`, MOL-421): `lexiconOf` is asked on the
+model's path as well (`paidByOf`), and refusing there would have failed every Georgian receipt. Tesseract for Georgia
+(MOL-423) inherits the refusal until its parse reads them.
 
 **A card read off no photo doubts no digit** (MOL-270, owner's В-1 «а», 28.10.2026): `priceInDoubt` asks the
 receipt's card (`receiptCard`), and one with no `photo` — Serbia's, from the tax office — is `false`, the server's
@@ -677,16 +765,73 @@ receipt proven whole, and its lines of one piece went empty.
   `model_receipt_days` have no country; `receipt_reason_days` tells the countries apart. **The price, named:** with no
   memory in Georgia the same corrections count on every receipt of a shop, so the share of lines put right leans toward
   the stop by Georgia's memory, not the reading — «Haiku has to cope with it» (owner, 17.11.2026).
-- **The prices, named:** a pharmacy's three decimals («23.868 ლარი») are no figure the parse reads, and such a line's
-  figures stay empty (Р-2, MOL-421); a rollback to a build before this task cannot list a person's receipts once one of
-  them is Georgian (Р-4); Serbia stays its link — a photo where the QR does not read is MOL-424 (В-1 «а»).
+- **A pharmacy's three decimals are read, half up to the tetri** (MOL-421, owner's В-1 «а», 19.11.2026): the till of
+  ge-04 and ge-05 prints «22.368», «23.868 ლარი», and the model copies them as printed. `canonicalAnswer` reads them
+  only where the card names three decimals and **more amounts of the lines print three than not** — a price, a sum, a
+  discount (Р-1, one receipt, one format, by its majority since round 4): a discount the till prints in tetri, «0.50»,
+  is outvoted (adversarial Г2), and a tie is two, so a weight «0.452» copied into the sum of a receipt of two decimals
+  stays no figure. Fewer decimals than two vote for neither — «1.5» is a «1.500» the model cut short, «5» a «5.000»
+  (owner's Е1 «а», round 6: a Georgian till prints tetri always) — nor does a nought, a column of discounts copied «0».
+  The price, named: a till grouping thousands by a point, «499» beside «1.299», read through Georgia's card reads as
+  three decimals — six more figures wrong on the bench's Icelandic set, MOL-426's class, never a Georgian till's; a
+  total beside such lines is read in any of them: a card's payment is in tetri, «ბარათი 23.87» (adversarial А3, round
+  1); **where the lines do not choose three, a total printed with three does** — no line, none of them voting, every
+  amount «5», «2.5» (adversarial Ж1, round 7), or a discount in tetri their only vote (И1, round 9) — beside a payment
+  in tetri, «ბარათი 8.73», or cash rounded to five tetri, «ნაღდი 8.75» (З1, round 8): fewer decimals read the same
+  either way, the total is shown only where two places or the lines vouch for it, and Р-1's weight in a sum comes with a
+  total of two. **The rounding is named of sums read right on a receipt not whole too** (Г1): a line whose quantity was
+  misread keeps its sum, and «Прочитали не всё» measures the lines by the total less the rounding, or it says a line
+  lost of a pharmacy whose every sum was read. **And «Записать» takes it**: on a receipt not whole the lines the person
+  typed and the rounding meeting the total as read are what was paid, that total (`receiptTotal`, Д2) — the lines alone
+  were a tetri off what the review said. **A line's arithmetic is judged as printed, in thousandths**, and then every
+  amount is hundredths, half up, as the rest of the reading counts: rounded first, 3 × 0.255 = 0.765 is 3 × 0,26 against
+  0,77. **The check judges it so too**: the line keeps its money as printed (`thousandths`, read through
+  `printedThousandths` only while it rounds to the line's own figures), or `verifiedReading` took the price of the very
+  line Р-2 settled (adversarial А2, round 1). **Whole is judged as printed, the tetri between its own figure** (owner's
+  А1 «а», adversarial А1 of round 1 — Р-3 «whole in tetri» was the price before): the lines meet a total printed with
+  three decimals in thousandths, one printed in tetri only by a sum that is that tetri to the thousandth
+  (`printedMeets`, adversarial В2 of round 3: «26.70» cannot tell 26.698 from a misread 26.703, so a pharmacy that
+  prints its total in tetri beside lines of three decimals is the price — not seen), and a payment printed with three
+  decimals but a whole tetri, «ბარათი 23.870», is that tetri, no doubt of the total's «23.868» (В1), and rounded each
+  they come to it less a rounding, either sign — 22.364 + 4.334 = 26.698 is 22,36 + 4,33 against 26,70, +0,01; 1.005 +
+  1.005 against 2.010, −0,01. Judged in tetri a quarter of two-line pharmacies and a third of three-line ones were not
+  whole: their lines of one piece empty, Sonnet asked to copy the same paper, «Прочитали не всё» and a notice to the
+  developer of a receipt read right. **Never whole by the tetri alone**: 1.004 + 1.005 against 2.010 is a figure
+  misread, though 1,00 + 1,01 is 2,01. The rounding is a café's service's kin (MOL-310): `roundingHundredths` of the
+  reading, `receipts.rounding_minor` (null or not nought), the lines make the total less it in every comparison
+  (`linesTotalHundredths`, `linesTotalOf` — the check, «Прочитали не всё», the review, «Записать»), the trip is the
+  total; the review says it in a row of its own, «Округление +0,01 ₾», to a phone that asks (`RECEIPT_ROUNDING_HEADER`)
+  — an earlier build is told the lines' total as the receipt's, and its echo of it at «Записать» is the printed total.
+  **The check judges it as printed too** (round 2): the reading hands it the total's thousandths (`totalThousandths`),
+  and `notWhole` and the sums that vouch for themselves (`sumsMeet`) meet it by `printedMeets` — a card's payment in
+  tetri, «ბარათი 26.70», voting for 26,70 beside «ლარი 26.698» proves no misread thousandth whole, where 22,35 + 4,35
+  meet it in tetri (adversarial Б1: a quarter of such misreads were shown as read). **A price that holds only in
+  thousandths is shown on any receipt** (Б3, then В3 «а»): the record keeps the sum shown, 0,77, as a line off by no
+  more than its price's rounding (`lineAddsUp`), never 3 × 0,26 = 0,78. **A total below its lines by a rounding below
+  nought is what was paid** (Б2): the record's «a total below the lines was misread» (`receiptTotal`) allows exactly
+  that far, or 22,37 + 4,34 against 26,70 went down as 26,71. The prompt did not change (Р-4), and the review shows
+  22,37 ₾ against 22.368 on the paper (Р-5).
+- **A total under the currency alone is the total's place** (MOL-421, owner's В-2 «а»): the pharmacy prints «23.868
+  ლარი» with no word, and the model labels it «ლარი» — an amount nothing named, so no total, no receipt proven whole and
+  its lines of one piece empty. The card's `bareTotal` («ლარი», «₾», «GEL», marks around it at most; Armenia's `NEVER`)
+  makes such an amount a place of the total **only where no amount carries the total's word and only one such amount
+  stands** — two are a doubt — and it is shown by MOL-244's rule as any total: the lines that meet it every one as read,
+  or two places; one place the lines do not meet is read (`readTotalHundredths`) and never shown. On the bench ge-04 and
+  ge-05 come whole, 23,87 and 3,50, nothing made up (`.scratch/tasks/research/MOL-421.md`).
+- **The prices, named:** a cash payment in Georgia is rounded to 5 tetri (the National Bank, since 2019), so a cash line
+  of a pharmacy never meets its total — nor did it vote before; a receipt whose every amount is thousands grouped by a
+  point with no tetri — «31.000» for 31 000 — reads as three decimals, 31,00: no Georgian till was seen printing so
+  (ge-01…05 print tetri always), and the bench's Indonesian set read through Georgia's card shows it (5 fields, 3
+  totals; MOL-426 is such a country's card); a rollback to a build before this task cannot list a person's receipts once
+  one of them is Georgian (Р-4); Serbia stays its link — a photo where the QR does not read is MOL-424 (В-1 «а»).
 
 **The bench** (`.scratch/tasks/research/MOL-408.md`, `tasks/status/MOL-408/`: the product's reader on 273 receipts of
 nine sets, $0,37): **the model copies any script about as well as Armenian** — Georgian 50 fields right of 51, Serbian
 126 of 132, Russian 374 of 391, Icelandic 1 175 of 1 195, the total copied right in 5 of 5, 38 of 39, 38 of 40 — and
 **our code is what loses it**: Georgia shows 12 fields right and none wrong, sums on 6 lines of 35 — a line lost leaves
 the total in one place (MOL-244), a till of sums alone had no arithmetic for MOL-290's repair to try (31 fields right
-since MOL-420 — «A line of a sum alone, put right by the total»), the pharmacies' three decimals. Russia with a card of
+since MOL-420 — «A line of a sum alone, put right by the total»; 40 and the pharmacies whole since MOL-421), the
+pharmacies' three decimals. Russia with a card of
 the bench: totals 33 right and none wrong of 40, 28 proven whole, dates 37 of 37 (MOL-414). A tax on top, a total
 rounded to 5 sen and thousands with a point in a currency with no cents showed wrong totals or none (Malaysia,
 Indonesia, Iceland) — none of today's countries, MOL-426; two receipts on one photo, a total of the other one (MOL-425);
@@ -1265,6 +1410,11 @@ every look at a receipt reads its seller's place off them.
 line that adds up — what was paid; one that does not — the printed sum where the printed total confirms
 it, else quantity × price. Quantity × price is rounded half up to the digits the receipt prints — none
 when every amount on it is whole — once: 0,742 kg × 1 290 = 957,18 is 957 on a receipt of whole drams.
+**A line off its sum by no more than its price's own rounding adds up** (MOL-421, owner's В3 «а», 19.11.2026): the
+price is itself a figure rounded to those digits, so quantity × price may stand off what was paid by half the last digit
+a unit of the quantity — a pharmacy's 3 × 0.255 = 0.765 reads 3 × 0,26 against 0,77, and 0,77 is recorded, a total the
+person corrects included (adversarial В3: it moved to 0,78). In every country, and only such lines: «Ереван Сити»'s
+419,98 for a piece at 420 is two luma off a bound of half, and a weight's bound is under a luma.
 The phone calls these very functions on the review (В-6 of MOL-124).
 
 **The place is found by the receipts of its seller recorded in a city** (Р-6; review В4). **The city is the

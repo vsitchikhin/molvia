@@ -31,10 +31,15 @@ export function receiptDigits(currency: Currency, amounts: readonly (Money | nul
     : MINOR_EXPONENT[currency]
 }
 
+/** The step of the last digit a receipt prints, in the currency's minor units: a whole dram is 100. */
+function printedStep(currency: Currency, digits: number): bigint {
+  return 10n ** BigInt(Math.max(0, MINOR_EXPONENT[currency] - digits))
+}
+
 /** Quantity × price, rounded half up to the digits the receipt prints (П-2). */
 export function lineProduct(quantity: Quantity, price: Money, digits: number): Money {
   // one rounding, never two: 0,4995 rounded to hundredths and then to units would be 1
-  const step = 10n ** BigInt(Math.max(0, MINOR_EXPONENT[price.currency] - digits))
+  const step = printedStep(price.currency, digits)
   return {
     minor: divideRounded(quantity.milli * price.minor, 1000n * step) * step,
     currency: price.currency,
@@ -43,7 +48,10 @@ export function lineProduct(quantity: Quantity, price: Money, digits: number): M
 
 /**
  * The line's own arithmetic holds: quantity × price = paid + discount, the product rounded to the
- * receipt's digits. A line missing a figure, or with one in another currency, does not add up.
+ * receipt's digits — or off it by no more than the price's own rounding, half the receipt's last digit a unit of the
+ * quantity (MOL-421, owner's В3 «а»): a price is itself a figure rounded to those digits, and a pharmacy's 3 × 0.255 =
+ * 0.765 is printed back as 3 × 0,26 against 0,77 — 0,77 is what was paid. A line missing a figure, or with one in
+ * another currency, does not add up.
  */
 export function lineAddsUp(line: ReceiptFigures, digits: number): boolean {
   const { quantity, price, sum } = line
@@ -51,7 +59,11 @@ export function lineAddsUp(line: ReceiptFigures, digits: number): boolean {
   const discount = line.discount?.minor ?? 0n
   if (sum.currency !== price.currency) return false
   if (line.discount !== null && line.discount.currency !== price.currency) return false
-  return lineProduct(quantity, price, digits).minor === sum.minor + discount
+  if (lineProduct(quantity, price, digits).minor === sum.minor + discount) return true
+  // |quantity × price − paid − discount| ≤ quantity × half a step, in thousandths of the minor unit
+  const step = printedStep(price.currency, digits)
+  const off = quantity.milli * price.minor - (sum.minor + discount) * 1000n
+  return 2n * (off < 0n ? -off : off) <= quantity.milli * step
 }
 
 /** What the line comes to by its quantity and price: quantity × price less its discount. */
@@ -65,16 +77,18 @@ function computedSum(line: ReceiptFigures, digits: number): Money | null {
 /**
  * What the lines of a receipt come to by its total (MOL-289): the total less what a card sent to the card
  * as a bonus — «Ереван Сити» prints the total without the card's discount, what left the card, and the
- * lines with it («Զեղչ գործարքից») — and less a café's service, no dish of the bill (MOL-310). Every
- * comparison of the lines with the total goes through it — the sums recorded, the difference on the review,
+ * lines with it («Զեղչ գործարքից») — less a café's service, no dish of the bill (MOL-310), and less a pharmacy's
+ * rounding, either sign: its lines met the total as printed in thousandths, and rounded to the tetri apart (MOL-421).
+ * Every comparison of the lines with the total goes through it — the sums recorded, the difference on the review,
  * «Прочитали не всё» — and the trip's money never does.
  */
 export function linesTotalOf(
   total: Money | null,
   cashback: Money | null,
   service: Money | null = null,
+  rounding: Money | null = null,
 ): Money | null {
-  return less(less(total, cashback), service)
+  return less(less(less(total, cashback), service), rounding)
 }
 
 /**

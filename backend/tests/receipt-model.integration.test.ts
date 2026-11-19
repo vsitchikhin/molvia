@@ -2842,6 +2842,7 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
     const newcomer = await person(null, MODEL_CONSENT_EDITION, 10)
     expect((await status(newcomer, { [RECEIPTS_ACCESS_HEADER]: '1' })).receiptsAccess).toEqual({
       until: null,
+      ended: null,
       trialLeft: 10,
       trialOf: 10,
       month: `${day.slice(0, 7)}-01`,
@@ -2861,10 +2862,12 @@ describe('the trial and the month’s hundred (MOL-275, MOL-271)', () => {
       trialLeft: 3,
       read: 42,
     })
-    // a grant run out is none: nothing is paid
-    const gone = await person(new Date(Date.now() - 1_000))
+    // a grant run out is none: nothing is paid — and said as ended, apart from a trial spent (MOL-276, А2)
+    const ran = new Date(Date.now() - 1_000)
+    const gone = await person(ran)
     expect((await status(gone, { [RECEIPTS_ACCESS_HEADER]: '1' })).receiptsAccess).toMatchObject({
       until: null,
+      ended: ran.toISOString(),
     })
   }, 10_000)
 })

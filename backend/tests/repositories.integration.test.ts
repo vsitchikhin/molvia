@@ -488,20 +488,37 @@ describe('вердикты', () => {
 })
 
 describe('where a person stands with the model (MOL-275)', () => {
-  it('says until when it is paid, the trial left and the month’s count — a grant gone is none', async () => {
+  it('says until when it is paid, the trial left and the month’s count — a grant gone is none, said as ended', async () => {
     const until = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
     const paid = await insertActor(db, { receiptsModelUntil: until, trialReceiptsLeft: 4 })
     await db
       .update(actorsTable)
       .set({ modelReceiptsMonth: '2026-10-01', modelReceiptsRead: 7 })
       .where(sql`${actorsTable.id} = ${paid}`)
-    expect(await actors.modelAccess(paid, '2026-10-01')).toEqual({ until, trialLeft: 4, read: 7 })
-    expect(await actors.modelAccess(paid, '2026-11-01')).toEqual({ until, trialLeft: 4, read: 0 })
-    const gone = await insertActor(db, { receiptsModelUntil: new Date(Date.now() - 1_000) })
+    expect(await actors.modelAccess(paid, '2026-10-01')).toEqual({
+      until,
+      ended: null,
+      trialLeft: 4,
+      read: 7,
+    })
+    expect(await actors.modelAccess(paid, '2026-11-01')).toEqual({
+      until,
+      ended: null,
+      trialLeft: 4,
+      read: 0,
+    })
+    const ran = new Date(Date.now() - 1_000)
+    const gone = await insertActor(db, { receiptsModelUntil: ran })
     expect(await actors.modelAccess(gone, '2026-10-01')).toEqual({
       until: null,
+      ended: ran,
       trialLeft: 10,
       read: 0,
+    })
+    const never = await insertActor(db, {})
+    expect(await actors.modelAccess(never, '2026-10-01')).toMatchObject({
+      until: null,
+      ended: null,
     })
     expect(
       await actors.modelAccess('00000000-0000-4000-8000-000000000275', '2026-10-01'),

@@ -139,6 +139,8 @@ describe('словарь: повторяющиеся тексты', () => {
         'trip.history.title',
       ],
       'Что брать': ['advice.title', 'nav.advice'],
+      // Группа настроек о чеках и пункт страницы приватности о том же (MOL-276).
+      Чеки: ['privacy.stored.receipts.term', 'settings.group_receipts'],
       Оценки: ['nav.verdicts', 'verdict.title'],
       Настройки: ['nav.settings', 'settings.title'],
       // Таб и его экран — разные роли одного слова, как у «Покупки».
@@ -368,6 +370,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Finish: ['trip.finish', 'trip.finish_confirm.ok'],
       // The receipt's sum of a record and the total of a receipt are one phrase in English (MOL-127).
       'Receipt total': ['receipt.review.total', 'trip.receipt.sheet.title'],
+      Receipts: ['privacy.stored.receipts.term', 'settings.group_receipts'],
       'Photograph a receipt': ['purchases.capture', 'receipt.capture.title'],
       When: ['receipt.place.when', 'spending.sheet.date'],
       // «Товар» of a receipt line and a purchase not named yet: one word in English.

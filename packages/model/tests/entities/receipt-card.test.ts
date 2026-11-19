@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import {
-  PARSED_FRACTION_DIGITS,
+  ARMENIAN_RECEIPTS,
+  GEORGIAN_RECEIPTS,
   RECEIPT_CARDS,
   findsAreGuesses,
+  fractionDigitsReadBy,
   modelAlone,
   receiptCard,
 } from '#model/entities/receipt-card'
@@ -68,13 +70,17 @@ describe('a country’s card (MOL-247)', () => {
     expect(findsAreGuesses(receiptCard('AM'))).toBe(false)
   })
 
-  it('names only formats of numbers the parse reads', () => {
+  it('names only formats of numbers its reader reads: Tesseract’s hundredths, the model’s three decimals too', () => {
     for (const { country, photo } of photoCards) {
       expect(photo.numbers.length, country).toBeGreaterThan(0)
-      for (const format of photo.numbers) {
-        expect(PARSED_FRACTION_DIGITS, country).toContain(format.fractionDigits)
-      }
+      const read = fractionDigitsReadBy(photo)
+      for (const format of photo.numbers) expect(read, country).toContain(format.fractionDigits)
     }
+    // Tesseract reads hundredths alone, the model thousandths too
+    expect(fractionDigitsReadBy(ARMENIAN_RECEIPTS)).toEqual([2])
+    expect(fractionDigitsReadBy(GEORGIAN_RECEIPTS)).toEqual([2, 3])
+    // Georgia's pharmacies print three decimals, its shops two (MOL-421)
+    expect(receiptCard('GE').photo?.numbers.map((f) => f.fractionDigits)).toEqual([2, 3])
   })
 
   it('swaps a digit for a digit, and back', () => {

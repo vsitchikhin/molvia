@@ -9,6 +9,7 @@ import {
   modelHeadRows,
   modelPaidBy,
   moneyOfHundredths,
+  signedMoneyOfHundredths,
   needsReshoot,
   readPartly,
   receiptPaidBy,
@@ -289,6 +290,8 @@ function headOf(
     readTotalMinor: moneyOfHundredths(text.readTotalHundredths, currency)?.minor ?? null,
     cashbackMinor: moneyOfHundredths(text.cashbackHundredths ?? null, currency)?.minor ?? null,
     serviceMinor: moneyOfHundredths(text.serviceHundredths ?? null, currency)?.minor ?? null,
+    roundingMinor:
+      signedMoneyOfHundredths(text.roundingHundredths ?? null, currency)?.minor ?? null,
     redeemedMinor: moneyOfHundredths(text.redeemedHundredths ?? null, currency)?.minor ?? null,
     paidBy,
     balanced: text.balanced,
@@ -365,8 +368,9 @@ export function readsReceiptsByModel(
 }
 
 /**
- * Where the person stands with the model in the phone's month (MOL-275), for MOL-276's screen: until when it is paid, the
- * trial's receipts left of ten, the month's read of a hundred — every figure the server's. None for nobody.
+ * Where the person stands with the model in the phone's month (MOL-275), for MOL-276's screen: until when it is paid, or
+ * when a paid reading ran out, the trial's receipts left of ten, the month's read of a hundred — every figure the
+ * server's. None for nobody.
  */
 export async function receiptsAccessOf(
   actors: Pick<ActorRepository, 'modelAccess'>,
@@ -378,6 +382,7 @@ export async function receiptsAccessOf(
   if (access === null) return null
   return {
     until: access.until,
+    ended: access.ended,
     trialLeft: access.trialLeft,
     trialOf: RECEIPT_TRIAL,
     month,
@@ -898,11 +903,14 @@ async function parsed(
   const measured = head.totalMinor ?? head.readTotalMinor
   const cashback = head.cashbackMinor ?? null
   const service = head.serviceMinor ?? null
-  // the lines make the total less what a card sent to the card (MOL-289), and less a café's service (MOL-310)
+  const rounding = head.roundingMinor ?? null
+  // the lines make the total less what a card sent to the card (MOL-289), less a café's service (MOL-310) and less a
+  // pharmacy's rounding (MOL-421)
   const total = linesTotalOf(
     measured === null ? null : { minor: measured, currency },
     cashback === null ? null : { minor: cashback, currency },
     service === null ? null : { minor: service, currency },
+    rounding === null ? null : { minor: rounding, currency },
   )
   return {
     kind: 'parsed',

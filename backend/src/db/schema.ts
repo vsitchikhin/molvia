@@ -2919,6 +2919,9 @@ export const receipts = pgTable(
     // A café's service, «Հավելավճար 10%» (MOL-310): no dish, the lines make the total less it, and the total is
     // what was paid. Only a model's reading names it.
     serviceMinor: bigint('service_minor', { mode: 'bigint' }),
+    // A pharmacy's rounding (MOL-421, А1 «а»): its lines met the total as printed, in thousandths, and rounded to the
+    // tetri they come to it less this — either sign, never nought. Only a model's reading of three decimals names it.
+    roundingMinor: bigint('rounding_minor', { mode: 'bigint' }),
     // Read in part (MOL-222's `readPartly`), of the lines as read, before the check emptied any (MOL-255,
     // А6 «а»): what the phone, which sees only the lines shown, says «Прочитали не всё» by. Null — read
     // before it, or not read.
@@ -3055,6 +3058,10 @@ export const receipts = pgTable(
     check(
       'receipts_service_positive',
       sql`${table.serviceMinor} is null or ${table.serviceMinor} > 0`,
+    ),
+    check(
+      'receipts_rounding_not_nought',
+      sql`${table.roundingMinor} is null or ${table.roundingMinor} <> 0`,
     ),
     check(
       'receipts_redeemed_positive',
