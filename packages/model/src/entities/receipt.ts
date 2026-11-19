@@ -547,6 +547,18 @@ export function moneyOfHundredths(hundredths: number | null, currency: Currency)
   return { minor, currency }
 }
 
+/** A till's hundredths of either sign — a pharmacy's rounding (MOL-421) — as the currency's minor units; nought is none. */
+export function signedMoneyOfHundredths(
+  hundredths: number | null,
+  currency: Currency,
+): Money | null {
+  if (hundredths === null || hundredths === 0) return null
+  const size = moneyOfHundredths(Math.abs(hundredths), currency)
+  return size === null || size.minor === 0n
+    ? null
+    : { minor: hundredths < 0 ? -size.minor : size.minor, currency }
+}
+
 /** An amount as a till's hundredths, by its currency's exponent: what the parse counts in (MOL-291). */
 export function hundredthsOfMoney(money: Money): number {
   const exponent = MINOR_EXPONENT[money.currency]

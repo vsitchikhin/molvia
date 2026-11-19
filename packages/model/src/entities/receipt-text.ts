@@ -50,6 +50,33 @@ export function printedThousandths(line: ReceiptTextLine): LineThousandths | nul
     : null
 }
 
+/** The lines' sums as printed in thousandths (MOL-421), or none where a line has no such sum. */
+export function printedSum(lines: readonly ReceiptTextLine[]): number | null {
+  let milli = 0
+  for (const line of lines) {
+    const sum = printedThousandths(line)?.sum ?? null
+    if (sum === null) return null
+    milli += sum
+  }
+  return milli
+}
+
+/**
+ * Whether a pharmacy's lines, their sums as printed in thousandths, meet a total as printed (MOL-421): one printed with
+ * three decimals to the thousandth, one printed in tetri (`undefined`) by their sum half up; one printed twice apart
+ * (`null`), never. Never by the tetri alone: 1.004 + 1.005 against 2.010 is a figure misread, though 1,00 + 1,01 is
+ * 2,01 (adversarial Б1).
+ */
+export function printedMeets(
+  milli: number,
+  totalHundredths: number,
+  totalThousandths: number | null | undefined,
+): boolean {
+  return totalThousandths === undefined
+    ? halfUpHundredths(milli) === totalHundredths
+    : milli === totalThousandths
+}
+
 /** One row of a reading: its text and where it stands on the photo of its part. */
 export interface TextRow {
   readonly text: string
@@ -172,6 +199,12 @@ export interface ReceiptText {
    * paid. Only a model's reading of three decimals names it.
    */
   readonly roundingHundredths?: number | null
+  /**
+   * A pharmacy's total as printed with three decimals, in thousandths (MOL-421): what its lines are judged against as
+   * printed, by the reading and by the check alike (`printedMeets`); `null` — two printed apart round to the total;
+   * none — printed in tetri, or no pharmacy.
+   */
+  readonly totalThousandths?: number | null
   readonly lines: readonly ReceiptTextLine[]
 }
 

@@ -2,6 +2,8 @@ import { THOUSANDTHS } from '#model/entities/receipt-card'
 import {
   TOLERANCE_HUNDREDTHS,
   linesTotalHundredths,
+  printedMeets,
+  printedSum,
   printedThousandths,
 } from '#model/entities/receipt-text'
 import type { ReceiptLayout, ReceiptText, ReceiptTextLine } from '#model/entities/receipt-text'
@@ -273,15 +275,31 @@ function notWhole(text: ReceiptText): ReceiptReason | null {
   // a card that sends its discount to the card prints the total without it (MOL-289)
   const total = linesTotalHundredths(text, text.totalHundredths)
   const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
-  if (sum === total) return null
-  return sum < total ? 'lines_lost' : 'lines_over'
+  if (sum !== total) return sum < total ? 'lines_lost' : 'lines_over'
+  const milli = pharmacySum(text)
+  if (milli === null || printedMeets(milli, text.totalHundredths, text.totalThousandths))
+    return null
+  return milli < (text.totalThousandths ?? text.totalHundredths * 10) ? 'lines_lost' : 'lines_over'
+}
+
+/**
+ * A pharmacy's lines' sums as printed, in thousandths (MOL-421): what they meet its total by, never the tetri alone — a
+ * total two places vouch for in tetri, «ლარი 26.698» and «ბარათი 26.70», proves no thousandth misread (adversarial
+ * Б1). None where a line has none, or a card's cashback or a café's service stands between the lines and the total.
+ */
+function pharmacySum(text: ReceiptText): number | null {
+  return (text.cashbackHundredths ?? null) === null && (text.serviceHundredths ?? null) === null
+    ? printedSum(text.lines)
+    : null
 }
 
 function sumsMeet(text: ReceiptText): boolean {
   if (text.totalHundredths === null || !sumsCopied(text.lines)) return false
   if (text.lines.some((line) => line.remembered === 'doubted')) return false
   const sum = text.lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
-  return sum === linesTotalHundredths(text, text.totalHundredths)
+  if (sum !== linesTotalHundredths(text, text.totalHundredths)) return false
+  const milli = pharmacySum(text)
+  return milli === null || printedMeets(milli, text.totalHundredths, text.totalThousandths)
 }
 
 interface CheckedLine {
@@ -348,26 +366,32 @@ function verifiedLine(
       ? { line: { ...line, priceHundredths: null, discountHundredths: null }, reason: null }
       : emptied('one_alike_unproven')
   }
-  const rounding = layout === 'card' ? TOLERANCE_HUNDREDTHS : 0
-  // within the rounding a price and a sum hold either way round: OCR takes the columns from the paper,
+  // the till's tolerance by the layout — a card's till rounds what was paid off its shelf price — where the reading's
+  // own `holds` reads it off the line's discount
+  const tolerance = layout === 'card' ? TOLERANCE_HUNDREDTHS : 0
+  // within the tolerance a price and a sum hold either way round: OCR takes the columns from the paper,
   // a model names them itself — «389,99 390» answered as price 389,99 and sum 390 (MOL-272)
-  const apart = byModel ? rounding : 0
+  const apart = byModel ? tolerance : 0
   const oneAlike =
     qty === 1_000 && discount === 0 && price !== null && Math.abs(price - sum) <= apart
   // the memory's price is the second source of one number printed twice (MOL-291)
   if (oneAlike && !proven && !byMemory) return emptied('one_alike_unproven')
+  // quantity × price = sum + discount, the money in one scale: tetri, or a pharmacy's thousandths (`scale` 10)
+  const arithmetic = (p: number | null, s: number | null, d: number, scale: number): boolean =>
+    p !== null &&
+    s !== null &&
+    Math.abs(Math.round((qty * p) / 1_000) - (s + d)) <= tolerance * scale
+  const inTetri = arithmetic(price, sum, discount, 1)
   // a pharmacy's line is judged as printed, in thousandths, as the reading judged it (MOL-421, Р-2, adversarial А2):
-  // 3 × 0.255 = 0.765 holds, 3 × 0,26 against 0,77 would not
+  // 3 × 0.255 = 0.765 holds, 3 × 0,26 against 0,77 would not. Its price stays where it holds so in tetri too, or on a
+  // receipt proven whole: the sum recorded is quantity × price unless the total confirms the lines (`recordedSums`),
+  // and 3 × 0,26 is 0,78, not the 0,77 shown (adversarial Б3)
   const printed = printedThousandths(line)
   const holds =
     printed === null
-      ? price !== null && Math.abs(Math.round((qty * price) / 1_000) - (sum + discount)) <= rounding
-      : printed.price !== null &&
-        printed.sum !== null &&
-        Math.abs(
-          Math.round((qty * printed.price) / 1_000) - (printed.sum + (printed.discount ?? 0)),
-        ) <=
-          rounding * 10 ** (THOUSANDTHS - 2)
+      ? inTetri
+      : arithmetic(printed.price, printed.sum, printed.discount ?? 0, 10 ** (THOUSANDTHS - 2)) &&
+        (inTetri || proven)
   return holds
     ? { line, reason: null }
     : {

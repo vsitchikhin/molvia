@@ -57,6 +57,7 @@ import IconChevronRight from '~icons/mdi/chevron-right'
 import { convertMoney, formatEstimate, formatMoney, receiptPaidOf } from '@molvia/model'
 import type { ExchangeRate, Money, ReceiptBalance } from '@molvia/model'
 import AppCard from '@/components/AppCard.vue'
+import { signedAmount } from '@/components/accounts'
 import { figureChars } from '@/components/figure'
 import { calendarDayOfAnyYear } from '@/days'
 
@@ -129,15 +130,11 @@ export default defineComponent({
       cashbackText: computed(() => (props.noItems ? null : money(props.cashback))),
       serviceText: computed(() => (props.noItems ? null : money(props.service))),
       // signed: what the total adds to the lines, or takes off them
-      roundingText: computed(() => {
-        const { rounding } = props
-        if (props.noItems || !rounding || rounding.minor === 0n) return null
-        const size = money({
-          ...rounding,
-          minor: rounding.minor < 0n ? -rounding.minor : rounding.minor,
-        })
-        return `${rounding.minor < 0n ? '−' : '+'}${size ?? ''}`
-      }),
+      roundingText: computed(() =>
+        props.noItems || !props.rounding
+          ? null
+          : signedAmount(props.rounding, locale.value, { plus: true }),
+      ),
       redeemedText: computed(() => money(props.redeemed)),
       approx,
       difference,

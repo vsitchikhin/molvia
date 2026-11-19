@@ -13,7 +13,8 @@ import {
   linesTotalHundredths,
   paidByOf,
   printedDayOf,
-  printedThousandths,
+  printedMeets,
+  printedSum,
 } from '#model/entities/receipt-text'
 import type { ReceiptPaidBy } from '#model/entities/receipt'
 import { THOUSANDTHS, digitCounts } from '#model/entities/receipt-card'
@@ -101,6 +102,10 @@ type ModelLine = ModelReceipt['lines'][number]
  */
 type PrintedTotals = ReadonlyMap<number, number | null>
 
+/** A total's thousandths as printed — `undefined` where it was printed in tetri, as `printedMeets` reads it. */
+const thousandthsOf = (totals: PrintedTotals, total: number): number | null | undefined =>
+  totals.has(total) ? (totals.get(total) ?? null) : undefined
+
 /**
  * Whether a line's arithmetic holds: quantity × price = sum + discount — the quantity in thousandths of its unit; the
  * price, the sum and the discount in one scale of money, `digits` decimals. To the last digit, or where the line prints
@@ -113,12 +118,12 @@ function holds(
   discount: number | null,
   digits: number,
 ): boolean {
-  const rounding = discount === null ? 0 : TOLERANCE_HUNDREDTHS * 10 ** (digits - 2)
+  const tolerance = discount === null ? 0 : TOLERANCE_HUNDREDTHS * 10 ** (digits - 2)
   return (
     quantityMilli !== null &&
     price !== null &&
     sum !== null &&
-    Math.abs(Math.round((quantityMilli * price) / 1_000) - (sum + (discount ?? 0))) <= rounding
+    Math.abs(Math.round((quantityMilli * price) / 1_000) - (sum + (discount ?? 0))) <= tolerance
   )
 }
 
@@ -161,7 +166,7 @@ function canonicalAnswer(
   answer: ModelReceipt
   unparsed: number
   printed: ReadonlyMap<ModelLine, LineThousandths>
-  totals: PrintedTotals
+  printedTotals: PrintedTotals
 } {
   const discount = new RegExp(`(?:${reading.words.discountKept})`, 'u')
   const spelt = answer.lines.map((line) => ({
@@ -209,12 +214,14 @@ function canonicalAnswer(
     : amounts
   // each total in tetri with what it printed in thousandths; two that round alike, a doubt
   const printedTotals = new Map<number, number | null>()
-  for (const { amount } of thousandths ? amounts : []) {
-    const milli = figureOf(amount, THOUSANDTHS)
-    if (milli === null || decimalsOf(amount) !== THOUSANDTHS) continue
-    const tetri = halfUpHundredths(milli)
-    const known = printedTotals.get(tetri)
-    printedTotals.set(tetri, known === undefined || known === milli ? milli : null)
+  if (thousandths) {
+    for (const { amount } of amounts) {
+      const milli = figureOf(amount, THOUSANDTHS)
+      if (milli === null || decimalsOf(amount) !== THOUSANDTHS) continue
+      const tetri = halfUpHundredths(milli)
+      const known = printedTotals.get(tetri)
+      printedTotals.set(tetri, known === undefined || known === milli ? milli : null)
+    }
   }
   let unparsed = 0
   const count = (figure: string | null, digits: number): void => {
@@ -225,7 +232,7 @@ function canonicalAnswer(
     for (const figure of [line.unit_price, line.discount, line.sum]) count(figure, 2)
   }
   for (const { amount } of totals) count(amount, 2)
-  return { answer: { ...answer, lines, totals }, unparsed, printed, totals: printedTotals }
+  return { answer: { ...answer, lines, totals }, unparsed, printed, printedTotals }
 }
 
 /** How many of the model's figures no rule reads (MOL-294): the count the log of a reading carries. */
@@ -595,11 +602,7 @@ function totalOf(
     // 2.010 is a figure misread, though 1,00 + 1,01 is 2,01
     const milli = asPrinted ? printedSum(lines) : null
     const meets = (one: number): boolean =>
-      milli === null
-        ? one === sum
-        : printedTotals.has(one)
-          ? printedTotals.get(one) === milli
-          : halfUpHundredths(milli) === one
+      milli === null ? one === sum : printedMeets(milli, one, thousandthsOf(printedTotals, one))
     const shown = asPrinted ? totals.find(meets) : undefined
     const met = shown !== undefined
     if (met) {
@@ -658,17 +661,6 @@ function totalOf(
       : null
   // a card's discount and a café's service on one paper are no receipt seen: the cashback's rule alone
   return { total: shown, read, met, owed: lined, cashback, redeemed, service: null, rounding: null }
-}
-
-/** The lines' sums as printed in thousandths (MOL-421), or none where a line has no such sum. */
-function printedSum(lines: readonly ReceiptTextLine[]): number | null {
-  let milli = 0
-  for (const line of lines) {
-    const sum = printedThousandths(line)?.sum ?? null
-    if (sum === null) return null
-    milli += sum
-  }
-  return milli
 }
 
 /** The most swaps in one figure: «550» copied as «660» is two (owner, В-2 of MOL-290). */
@@ -1102,7 +1094,7 @@ export function receiptTextOfModel(
   written: ModelReceipt,
   prices: RememberedPrices = new Map(),
 ): ReceiptText {
-  const { answer: whole, printed, totals: printedTotals } = canonicalAnswer(reading, written)
+  const { answer: whole, printed, printedTotals } = canonicalAnswer(reading, written)
   const apart = serviceApart(reading, whole)
   const apartLines = apart.answer.lines.map((line) => lineOf(line, printed))
   const tried = totalOf(reading, apart.answer, apartLines, apart.served, printedTotals)
@@ -1168,6 +1160,9 @@ export function receiptTextOfModel(
           ? 'card'
           : 'class'
   const { tin, number } = keyOf(reading, answer)
+  // a pharmacy's lines and total as printed (MOL-421): what they are judged by, here and by the check
+  const totalThousandths = total === null ? undefined : thousandthsOf(printedTotals, total)
+  const milli = cashback === null && service === null ? printedSum(lines) : null
   return {
     layout,
     tin,
@@ -1179,15 +1174,19 @@ export function receiptTextOfModel(
     readTotalHundredths: read ?? slip,
     balanced:
       met ||
-      // every line settled: a sum alone the total chose is none, its quantity never printed (MOL-420)
+      // every line settled: a sum alone the total chose is none, its quantity never printed (MOL-420); a pharmacy's
+      // lines meeting it as printed — a total two places vouch for in tetri proves no misread thousandth (adversarial Б1)
       (owed !== null &&
+        total !== null &&
         lines.length > 0 &&
         lines.every((line) => line.settled) &&
-        lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0) === owed),
+        lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0) === owed &&
+        (milli === null || printedMeets(milli, total, totalThousandths))),
     cashbackHundredths: cashback,
     redeemedHundredths: redeemed,
     serviceHundredths: service,
     roundingHundredths: rounding,
+    ...(totalThousandths === undefined ? {} : { totalThousandths }),
     lines,
   }
 }

@@ -13,6 +13,7 @@ import {
   unparsedFigures,
 } from '#model/entities/receipt-model'
 import { betterReading, explainedReading, verifiedReading } from '#model/entities/receipt-verify'
+import { recordedSums } from '#model/entities/receipt-sum'
 import type { ModelReceipt } from '#model/entities/receipt-model'
 
 // a made-up head: the repository is public, and a receipt's own carries a customer's name
@@ -1793,6 +1794,53 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
     // must not: a receipt of two decimals has no rounding — its lines meet the total to the tetri, or not
     const shop = readGe(pharmacy([piece('ა', '22.36'), piece('ბ', '4.33')], '26.70', 'ლარი'))
     expect([shop.totalHundredths, shop.roundingHundredths]).toEqual([null, null])
+  })
+
+  it('proves no misread thousandth whole by a payment in tetri that votes for the total (adversarial Б1)', () => {
+    // the paper 22.354 + 4.344 = 26.698, paid «ბარათი 26.70»; 4.344 copied as 4.349 — 22,35 + 4,35 is 26,70 in tetri
+    const paid = (second: string) => ({
+      ...pharmacy([piece('ა', '22.354'), piece('ბ', second)], '26.698', 'ლარი'),
+      totals: [
+        { label: 'ლარი', amount: '26.698' },
+        { label: 'ბარათი', amount: '26.70' },
+      ],
+    })
+    const misread = readGe(paid('4.349'))
+    const explained = explainedReading(misread, { byModel: true })
+    expect([misread.balanced, explained.receipt]).toEqual([false, 'lines_over'])
+    // must not: 4,35 shown as read where the paper says 4,34
+    expect(explained.shown.lines.map((l) => l.sumHundredths)).toEqual([null, null])
+    // read right, the same paper is whole with its rounding
+    const right = readGe(paid('4.344'))
+    expect([right.balanced, right.roundingHundredths]).toEqual([true, 1])
+    expect(explainedReading(right, { byModel: true }).receipt).toBeNull()
+  })
+
+  it('keeps a price that holds as printed alone only where the record keeps the sum it shows (adversarial Б3)', () => {
+    // 3 × 0.255 = 0.765 on a receipt whose total was not read: 3 × 0,26 is 0,78, and `recordedSums` would record it
+    const text = readGe({
+      ...pharmacy([piece('ა', '0.255', '0.765', '3.000')], '0.765'),
+      totals: [],
+    })
+    const explained = explainedReading(text, { byModel: true })
+    expect(explained.lines).toEqual(['price_dropped'])
+    const [shown] = explained.shown.lines
+    expect([shown?.priceHundredths, shown?.sumHundredths]).toEqual([null, 77])
+    const gel = (minor: number | null) =>
+      minor === null ? null : { minor: BigInt(minor), currency: 'GEL' as const }
+    const figures = explained.shown.lines.map((l) => ({
+      quantity: { milli: BigInt(l.quantityMilli ?? 0), unit: 'piece' as const },
+      price: gel(l.priceHundredths),
+      sum: gel(l.sumHundredths),
+      discount: gel(l.discountHundredths),
+    }))
+    expect(recordedSums(figures, null, 2).map((one) => one?.minor)).toEqual([77n])
+    // must not: one that holds in tetri as well keeps its price on any receipt — 2 × 0.250 = 0.500
+    const even = readGe({
+      ...pharmacy([piece('ა', '0.250', '0.500', '2.000')], '0.500'),
+      totals: [],
+    })
+    expect(explainedReading(even, { byModel: true }).lines).toEqual([null])
   })
 
   it('reads three decimals only where every amount has three: one receipt, one format (Р-1)', () => {

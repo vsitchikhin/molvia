@@ -9,6 +9,7 @@ import {
   modelHeadRows,
   modelPaidBy,
   moneyOfHundredths,
+  signedMoneyOfHundredths,
   needsReshoot,
   readPartly,
   receiptPaidBy,
@@ -193,12 +194,6 @@ export interface ReadReceiptsDeps {
   readonly now?: () => Date
 }
 
-/** A pharmacy's rounding in the currency's minor units, its sign kept (MOL-421); nought is none. */
-function signedMinorOf(hundredths: number | null, currency: Currency): bigint | null {
-  if (hundredths === null) return null
-  const size = moneyOfHundredths(Math.abs(hundredths), currency)?.minor ?? null
-  return size === null || size === 0n ? null : hundredths < 0 ? -size : size
-}
 /** How many lines the shop's memory confirmed, put right and doubted on a reading (MOL-291). */
 export interface RememberedVoice {
   readonly confirmed: number
@@ -295,7 +290,8 @@ function headOf(
     readTotalMinor: moneyOfHundredths(text.readTotalHundredths, currency)?.minor ?? null,
     cashbackMinor: moneyOfHundredths(text.cashbackHundredths ?? null, currency)?.minor ?? null,
     serviceMinor: moneyOfHundredths(text.serviceHundredths ?? null, currency)?.minor ?? null,
-    roundingMinor: signedMinorOf(text.roundingHundredths ?? null, currency),
+    roundingMinor:
+      signedMoneyOfHundredths(text.roundingHundredths ?? null, currency)?.minor ?? null,
     redeemedMinor: moneyOfHundredths(text.redeemedHundredths ?? null, currency)?.minor ?? null,
     paidBy,
     balanced: text.balanced,

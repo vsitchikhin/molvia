@@ -184,7 +184,8 @@ function receiptMoney(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
  * The receipt's total for its trip (MOL-126 Т-10, В-3; В-5 of the review): the total the phone sent — the
  * printed one, or the person's correction of what OCR misread; without it the printed total where it is
  * not below the lines — what was paid, the lines left out and those OCR lost included, while a lost line
- * only ever raises a total, so one below the lines was misread — else the sum of every line: a recorded
+ * only ever raises a total, so one below the lines was misread; a pharmacy's rounding below nought prints it as far
+ * below them, as paid (MOL-421, adversarial Б2) — else the sum of every line: a recorded
  * one at what the person settled on, one left out at what it would have been recorded at (В-5), and what a card
  * sent to the card (MOL-289). `null`
  * when nothing is known: the trip then counts its prices (MOL-78).
@@ -219,7 +220,12 @@ function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
     sum = sum === null || amount?.currency !== currency ? null : addMoney(sum, amount)
   }
   const lines = sum !== null && sum.minor > 0n ? sum : null
-  if (printed !== null && printed.minor > 0n && (lines === null || printed.minor >= lines.minor)) {
+  const below = held.rounding !== null && held.rounding.minor < 0n ? -held.rounding.minor : 0n
+  if (
+    printed !== null &&
+    printed.minor > 0n &&
+    (lines === null || printed.minor + below >= lines.minor)
+  ) {
     return printed
   }
   // what a card sent to the card left it too: the lines and it, where no total was vouched for (review round 1,

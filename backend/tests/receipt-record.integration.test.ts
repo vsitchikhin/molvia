@@ -1329,6 +1329,19 @@ describe('«Записать»', () => {
     // must not: another figure is the person's word
     const typed = await parsedReceipt(me, LINES.slice(0, 2), { ...pharmacy, receiptNo: '3' })
     expect(await moneyOf(typed, body({ total: amount(2_300) }))).toBe(230_000n)
+    // a rounding below nought prints the total below its lines, as paid: 2 189 recorded, not the lines' 2 190
+    // (adversarial Б2)
+    const below = { totalMinor: 218_900n, roundingMinor: -100n, layout: 'class' as const }
+    const over = await parsedReceipt(me, LINES.slice(0, 2), { ...below, receiptNo: '4' })
+    expect(await moneyOf(over, body())).toBe(218_900n)
+    // must not: two below with no rounding is a total misread — the lines, as before
+    const misread = await parsedReceipt(me, LINES.slice(0, 2), {
+      totalMinor: 218_800n,
+      roundingMinor: -100n,
+      layout: 'class',
+      receiptNo: '5',
+    })
+    expect(await moneyOf(misread, body())).toBe(219_000n)
   }, 10_000)
 
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard
