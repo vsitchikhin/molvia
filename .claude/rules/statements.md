@@ -132,7 +132,10 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   with a period in its head; a screenshot is what the person chose to show.
 - **The rule's ceiling is held by its work** (review №1, А13, А16): it runs in the API's process. A line weighs only
   the records whose window or link reaches its day or its posting day — a link at most a late posting's thirty days
-  either way, so the index spares pairs and decides nothing (review №20) — the sum first, a name folded once a line
+  either way, so the index spares pairs and decides nothing (review №20); a record is indexed under its windows, never
+  the span between them (adversarial А26: a link posted «9999-12-31» put one record under 2.9 million days, 1 s and
+  280 MB a call; the schemas take any posting day, as a hotel posted weeks late is one, and the windows make its
+  distance cost nothing) — the sum first, a name folded once a line
   and once a record; a statement holds `STATEMENT_LINES_MAX` lines (3 000, five years of the samples' 30–50 a month).
   **The rule counts its work on its own index before weighing any of it, and past `STATEMENT_WEIGHED_MAX` (2 000 000)
   answers `too_heavy`** (А16, review №23): no caller weighs past it, and MOL-433 only says so on the screen. It counts,
