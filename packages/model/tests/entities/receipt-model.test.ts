@@ -1754,6 +1754,16 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
     expect(grouped.lines.map((l) => l.sumHundredths)).toEqual([null, 49_900])
   })
 
+  it('reads three where the vote does not, by the lines’ sums meeting a total printed with three (adversarial Д1)', () => {
+    // «5» for «5.000», cut by the model: the vote ties, the paper's own sum decides — 22.368 + 5 = 27.368
+    const cut = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5')], '27.368', 'ლარი'))
+    expect([cut.totalHundredths, cut.balanced]).toEqual([2_737, true])
+    expect(cut.lines.map((l) => l.sumHundredths)).toEqual([2_237, 500])
+    // must not: the sums meet no total printed with three — two, as the vote says
+    const off = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5')], '27.369', 'ლარი'))
+    expect(off.lines.map((l) => l.sumHundredths)).toEqual([null, 500])
+  })
+
   it('keeps the thousandths of a line the service was set apart from (`serviceApart` passes it on as it is)', () => {
     const served = {
       ...GEORGIAN_RECEIPTS,

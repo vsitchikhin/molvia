@@ -337,6 +337,8 @@ export interface ReceiptToRecord {
   readonly service: Money | null
   /** A pharmacy's rounding, either sign (MOL-421). */
   readonly rounding: Money | null
+  /** The total as read in one place (MOL-244): what a pharmacy's rounding on a receipt not whole is against (MOL-421). */
+  readonly readTotal: Money | null
   readonly city: ReceiptCity | null
   /** The trip it was recorded as; `null` — not recorded: a trip removed for good takes it (MOL-240). */
   readonly tripId: string | null
@@ -1336,6 +1338,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
         redeemed: cashOf(row.redeemedMinor, row.currency),
         service: cashOf(row.serviceMinor, row.currency),
         rounding: cashOf(row.roundingMinor, row.currency),
+        readTotal: cashOf(row.readTotalMinor, row.currency),
         city: row.city,
         tripId: row.tripId,
         tripAlive,

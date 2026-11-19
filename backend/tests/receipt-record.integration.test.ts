@@ -1350,6 +1350,23 @@ describe('«Записать»', () => {
       receiptNo: '6',
     })
     expect(await moneyOf(short, body())).toBe(219_000n)
+    // a rounding named on a receipt not whole, its total read in one place: the lines typed and it meet that total —
+    // what was paid (adversarial Д2)
+    const unproven = {
+      totalMinor: null,
+      readTotalMinor: 219_100n,
+      roundingMinor: 100n,
+      layout: 'class' as const,
+    }
+    const read = await parsedReceipt(me, LINES.slice(0, 2), { ...unproven, receiptNo: '7' })
+    expect(await moneyOf(read, body())).toBe(219_100n)
+    // must not: lines typed apart from it are the lines, the total read in one place vouching for nothing
+    const apart = await parsedReceipt(me, LINES.slice(0, 2), {
+      ...unproven,
+      readTotalMinor: 219_300n,
+      receiptNo: '8',
+    })
+    expect(await moneyOf(apart, body())).toBe(219_000n)
   }, 10_000)
 
   // review 1, В1, В2: the receipt row holds the trip's date on the accounts, «из чека» and the guard

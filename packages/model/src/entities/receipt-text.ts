@@ -225,7 +225,8 @@ export interface ReceiptText {
    * A pharmacy's rounding (MOL-421, owner's А1 «а»): its lines meet its total as printed, in thousandths, and each
    * rounded half up to the tetri they come to the total less this — 22.364 + 4.334 = 26.698 is 22,36 + 4,33 against
    * 26,70, a rounding of +0,01; either sign, never nought. The lines make the total less it, and the total is what was
-   * paid. Only a model's reading of three decimals names it.
+   * paid. On a receipt not whole it is the rounding against the total as read (`readTotalHundredths`), which «Прочитали
+   * не всё» measures the lines by (adversarial Г1). Only a model's reading of three decimals names it.
    */
   readonly roundingHundredths?: number | null
   /**

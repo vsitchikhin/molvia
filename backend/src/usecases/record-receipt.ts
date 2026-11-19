@@ -229,6 +229,18 @@ function receiptTotal(held: ReceiptToRecord, body: ReceiptRecordBody): Money | n
   ) {
     return printed
   }
+  // a pharmacy's rounding named on a receipt not whole, its total read in one place (MOL-421, adversarial Д2): the lines
+  // the person typed and it meeting that total, it is what was paid — the lines alone are a tetri off it
+  const { rounding, readTotal } = held
+  if (
+    printed === null &&
+    lines !== null &&
+    rounding?.currency === lines.currency &&
+    readTotal?.currency === lines.currency &&
+    lines.minor + rounding.minor === readTotal.minor
+  ) {
+    return readTotal
+  }
   // what a card sent to the card left it too: the lines and it, where no total was vouched for (review round 1,
   // А3; owner's В-5 «а» of MOL-289 — «записывать, сколько списалось»). A total vouched for below the lines — a
   // till that takes the discount off on the spot among them — is the lines alone, as before (review round 2, Б4)

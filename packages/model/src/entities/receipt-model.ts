@@ -189,14 +189,28 @@ function canonicalAnswer(
   // the lines decide by what most of their amounts print (adversarial Г2, round 4): a discount the till prints in tetri,
   // «0.50», is outvoted by the thousandths beside it, and a tie is two — a weight «0.452» copied into the sum of a
   // receipt of two decimals stays no figure (Р-1). One decimal votes for neither: «1.5» is a «1.500» the model cut short,
-  // and thousands grouped by a point never print one. A whole number votes for two: «499» beside «1.299» is a till
-  // grouping thousands by a point (MOL-426), never a pharmacy. With no line, every total of two or three decides
+  // and thousands grouped by a point never print one; nor do four and more, no figure either way. Two decimals and a
+  // whole number vote for two: «499» beside «1.299» is a till grouping thousands by a point (MOL-426)
   const three = ofLines.filter((count) => count === THOUSANDTHS).length
-  const two = ofLines.filter((count) => count !== THOUSANDTHS && count !== 1).length
+  const two = ofLines.filter((count) => count === 2 || count === 0).length
+  // where the vote does not choose three, the paper's own arithmetic does: the lines' sums as thousandths meeting a total
+  // printed with three to the thousandth — 22.368 + «5», a «5.000» the model cut, is «27.368»; «1.299» + «499» meets no
+  // «1.798» (adversarial Д1, round 5)
+  const lineSums = spelt.map((line) => figureOf(line.sum, THOUSANDTHS))
+  const sumMilli = lineSums.every((one) => one !== null)
+    ? lineSums.reduce((all, one) => all + one, 0)
+    : null
+  const meetsPrinted =
+    sumMilli !== null &&
+    amounts.some(
+      ({ amount }) =>
+        decimalsOf(amount) === THOUSANDTHS && figureOf(amount, THOUSANDTHS) === sumMilli,
+    )
+  // with no line, every total of two or three decides
   const thousandths =
     reading.numbers.some((format) => format.fractionDigits === THOUSANDTHS) &&
     (ofLines.length > 0
-      ? three > two
+      ? three > two || meetsPrinted
       : ofTotals.length > 0 && ofTotals.every((count) => count === THOUSANDTHS))
   const printed = new Map<ModelLine, LineThousandths>()
   const lines = thousandths
@@ -505,7 +519,6 @@ function totalOf(
   cashback: number | null
   redeemed: number | null
   service: number | null
-  rounding: number | null
 } {
   const w = reading.words
   // a summary's words are printed in capitals as often as not — «ՎՃԱՐՄԱՆ» (MOL-310), «ԸՆԴԱՄԵՆԸ» of a café's or a
@@ -609,7 +622,6 @@ function totalOf(
         cashback,
         redeemed: null,
         service: surcharge,
-        rounding: null,
       }
     }
     // a pharmacy's lines meet its total as printed, in thousandths — one printed in tetri by their sum half up — and
@@ -630,7 +642,6 @@ function totalOf(
         cashback,
         redeemed: null,
         service: null,
-        rounding: shown === sum ? null : shown - sum,
       }
     }
     // a total voted by its places took the service: every bill seen prints it so — ZERO, Bakery, Аракс (owner's В-7
@@ -651,7 +662,7 @@ function totalOf(
       voted === null
         ? null
         : linesTotalHundredths({ cashbackHundredths: null, serviceHundredths: service }, voted)
-    return { total: voted, read, met, owed, cashback, redeemed: null, service, rounding: null }
+    return { total: voted, read, met, owed, cashback, redeemed: null, service }
   }
   // what the lines make: a total less what went to the card
   const owed = new Set(totals.map((one) => one - cashback).filter((one) => one > 0))
@@ -676,7 +687,7 @@ function totalOf(
       ? bonus
       : null
   // a card's discount and a café's service on one paper are no receipt seen: the cashback's rule alone
-  return { total: shown, read, met, owed: lined, cashback, redeemed, service: null, rounding: null }
+  return { total: shown, read, met, owed: lined, cashback, redeemed, service: null }
 }
 
 /** The most swaps in one figure: «550» copied as «660» is two (owner, В-2 of MOL-290). */
@@ -1131,7 +1142,7 @@ export function receiptTextOfModel(
       )
   // the service decided against stays decided: its line a line, no service taken by a label or a vote — taken, it was
   // counted twice, as a line and as the surcharge (review №9, adversarial В2)
-  const { total, read, met, owed, cashback, redeemed, service, rounding } = keptApart
+  const { total, read, met, owed, cashback, redeemed, service } = keptApart
     ? tried
     : totalOf(reading, whole, copied, null, printedTotals)
   const discounted = answer.lines.some((line) => figureOf(line.discount, 2) !== null)
@@ -1179,19 +1190,19 @@ export function receiptTextOfModel(
   // a pharmacy's lines and total as printed (MOL-421): what they are judged by, here and by the check
   const totalThousandths = total === null ? undefined : printedTotals.get(total)
   const milli = pharmacySum({ cashbackHundredths: cashback, serviceHundredths: service, lines })
-  // the lines' sums as read meeting the total as printed round apart from it whole or not: a line whose quantity was
-  // misread keeps its sum, and «Прочитали не всё» measures the lines by the total less the rounding, or it says a line
-  // lost of a pharmacy whose every sum was read (adversarial Г1, round 4)
+  // a pharmacy's rounding, named here alone (review №28): the lines' sums as read meet the total as printed — the one
+  // shown, else the one read — and rounded each they come to it less this, either sign, never nought (owner's А1 «а»).
+  // Whole or not: a line whose quantity was misread keeps its sum, and «Прочитали не всё» measures the lines by the total
+  // less the rounding, or it says a line lost of a pharmacy whose every sum was read (adversarial Г1, round 4)
   const against = total ?? read
   const sums = lines.reduce((all, line) => all + (line.sumHundredths ?? 0), 0)
   const rounded =
-    rounding ??
-    (milli !== null &&
+    milli !== null &&
     against !== null &&
     against !== sums &&
     printedMeets(milli, against, printedTotals.get(against))
       ? against - sums
-      : null)
+      : null
   return {
     layout,
     tin,
