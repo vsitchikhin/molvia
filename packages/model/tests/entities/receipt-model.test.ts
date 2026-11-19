@@ -1749,11 +1749,24 @@ describe('a Georgian pharmacy’s three decimals (MOL-421)', () => {
     // must not: as many of two decimals as of three is two — Р-1's weight «0.452» copied into a sum stays no figure
     const tie = readGe(pharmacy([piece('ა', '1.50'), piece('ბ', '0.452')], '1.95'))
     expect(tie.lines.map((l) => l.sumHundredths)).toEqual([150, null])
-    // a whole number votes for neither: «5» is a «5.000» the model cut — beside a line lost, the line in thousandths and
-    // the total still read (owner's Е1 «а»)
+    // a whole number votes for neither: «5» is a «5.000» the model cut — beside a line lost, the line in thousandths
+    // and the total still read (owner's Е1 «а»)
     const lost = readGe(pharmacy([piece('ა', '22.368'), piece('ბ', '5')], '28.602', 'ლარი'))
     expect(lost.lines.map((l) => l.sumHundredths)).toEqual([2_237, 500])
     expect([lost.balanced, lost.readTotalHundredths]).toEqual([false, 2_860])
+  })
+
+  it('lets the totals decide where no amount of the lines votes, as with no line (adversarial Ж1)', () => {
+    // «5.000», «2.500», «1.234», «ლარი 8.734»: the model cuts the round ones and loses the third — the total still read
+    const cut = readGe(pharmacy([piece('ა', '5'), piece('ბ', '2.5')], '8.734', 'ლარი'))
+    expect([cut.balanced, cut.readTotalHundredths]).toEqual([false, 873])
+    expect(cut.lines.map((l) => l.sumHundredths)).toEqual([500, 250])
+    // must not: a total of two decimals among them is two, as with no line
+    const shop = readGe(pharmacy([piece('ა', '5'), piece('ბ', '2.5')], '8.73', 'ლარი'))
+    expect([shop.readTotalHundredths, shop.lines.map((l) => l.sumHundredths)]).toEqual([
+      873,
+      [500, 250],
+    ])
   })
 
   it('reads three where the vote does not, by the lines’ sums meeting a total printed with three (adversarial Д1)', () => {

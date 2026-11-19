@@ -186,32 +186,34 @@ function canonicalAnswer(
       .filter((count) => count !== null)
   const ofLines = decimalsIn(spelt.flatMap((line) => [line.unit_price, line.discount, line.sum]))
   const ofTotals = decimalsIn(amounts.map(({ amount }) => amount))
-  // the lines decide by what most of their amounts print (adversarial Г2, round 4): a discount the till prints in tetri,
-  // «0.50», is outvoted by the thousandths beside it, and a tie is two — a weight «0.452» copied into the sum of a
-  // receipt of two decimals stays no figure (Р-1). Fewer decimals than two vote for neither: «1.5» is a «1.500» the model cut
-  // short, «5» a «5.000» (owner's Е1 «а», round 6) — a Georgian till prints tetri always, and a country grouping
-  // thousands by a point, «499» beside «1.299», is its own card's (MOL-426); nor do four and more, no figure either way
+  // the lines decide by what most of their amounts print (adversarial Г2, round 4): a discount the till prints in
+  // tetri, «0.50», is outvoted by the thousandths beside it, and a tie is two — a weight «0.452» copied into the sum of
+  // a receipt of two decimals stays no figure (Р-1). Fewer decimals than two vote for neither: «1.5» is a «1.500» the
+  // model cut short, «5» a «5.000» (owner's Е1 «а», round 6) — a Georgian till prints tetri always, and a country
+  // grouping thousands by a point, «499» beside «1.299», is its own card's (MOL-426); nor do four and more, no figure
+  // either way
   const three = ofLines.filter((count) => count === THOUSANDTHS).length
   const two = ofLines.filter((count) => count === 2).length
   // where the vote does not choose three, the paper's own arithmetic does: the lines' sums as thousandths meeting a total
-  // printed with three to the thousandth — 22.368 + «5», a «5.000» the model cut, is «27.368»; «1.299» + «499» meets no
-  // «1.798» (adversarial Д1, round 5)
+  // printed with three to the thousandth — 22.368 + «5.00» is «27.368»; «1.299» + «499» meets no «1.798» (adversarial
+  // Д1, round 5)
   const lineSums = spelt.map((line) => figureOf(line.sum, THOUSANDTHS))
-  const sumMilli = lineSums.every((one) => one !== null)
-    ? lineSums.reduce((all, one) => all + one, 0)
-    : null
-  // the totals printed with three decimals, in thousandths: what the lines' sums meet, and what each total is printed
+  const sumMilli =
+    lineSums.length > 0 && lineSums.every((one) => one !== null)
+      ? lineSums.reduce((all, one) => all + one, 0)
+      : null
+  // the totals printed with three decimals, in thousandths: what the lines' sums meet, and what `printedTotals` folds
   const totalsMilli = amounts.flatMap(({ amount }) => {
     const milli = decimalsOf(amount) === THOUSANDTHS ? figureOf(amount, THOUSANDTHS) : null
     return milli === null ? [] : [milli]
   })
   const meetsPrinted = sumMilli !== null && totalsMilli.includes(sumMilli)
-  // with no line, every total of two or three decides
+  // with no vote of the lines — none, or every amount of fewer decimals than two, «5», «2.5» — every total of two or
+  // three decides, as with no line at all (adversarial Ж1, round 7)
+  const totalsDecide = ofTotals.length > 0 && ofTotals.every((count) => count === THOUSANDTHS)
   const thousandths =
     reading.numbers.some((format) => format.fractionDigits === THOUSANDTHS) &&
-    (ofLines.length > 0
-      ? three > two || meetsPrinted
-      : ofTotals.length > 0 && ofTotals.every((count) => count === THOUSANDTHS))
+    (three + two > 0 ? three > two || meetsPrinted : totalsDecide || meetsPrinted)
   const printed = new Map<ModelLine, LineThousandths>()
   const lines = thousandths
     ? spelt.map((line) => {
