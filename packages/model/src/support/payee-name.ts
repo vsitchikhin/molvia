@@ -189,25 +189,24 @@ function isPlaceWord(word: string): boolean {
 }
 
 /**
- * The words of a seller's name, folded, the place's aside: «Ереван Сити» is «siti» — every card line of
- * Yerevan prints «YEREVAN», and the city would meet them all (adversarial А6).
+ * The words of a seller's name, folded, the place's aside — in a bank's line and a record's name alike:
+ * «Ереван Сити» is «siti», since every card line of Yerevan prints «YEREVAN» and the city would meet them
+ * all (adversarial А6). A name that is nothing but a city's word — the restaurant «Казан», the cinema
+ * «Москва» — keeps it: with none it would be no name, and met by any line (А10).
  */
 export function sellerWords(text: string): string[] {
-  return payeeWords(text).filter((word) => !isPlaceWord(word))
-}
-
-/** The share of a record's seller words (`sellerWords`) the payee's words have; none is 0. */
-export function wordsShare(payee: readonly string[], seller: readonly string[]): number {
-  if (seller.length === 0) return 0
-  return seller.filter((v) => payee.some((w) => payeeWordsNear(w, v))).length / seller.length
+  const words = payeeWords(text)
+  const seller = words.filter((word) => !isPlaceWord(word))
+  return seller.length > 0 ? seller : words
 }
 
 /**
- * The share of a record's name the payee has: a city in the bank's line («YANDEX.GO YEREVAN») does not
- * outweigh the name, nor one in the record's («Ереван Сити»). A record with no words but places is 0.
+ * The share of a record's seller words a line's seller words have (`sellerWords` of both): «YANDEX.GO
+ * YEREVAN» against «Yandex Taxi» is a half. A record with no words is 0.
  */
-export function payeeNameShare(payee: string, name: string): number {
-  return wordsShare(payeeWords(payee), sellerWords(name))
+export function wordsShare(payee: readonly string[], seller: readonly string[]): number {
+  if (seller.length === 0) return 0
+  return seller.filter((v) => payee.some((w) => payeeWordsNear(w, v))).length / seller.length
 }
 
 /**
