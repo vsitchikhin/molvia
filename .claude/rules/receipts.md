@@ -688,21 +688,19 @@ receipt proven whole, and its lines of one piece went empty.
   stays no figure. Fewer decimals than two vote for neither — «1.5» is a «1.500» the model cut short, «5» a «5.000»
   (owner's Е1 «а», round 6: a Georgian till prints tetri always) — nor does a nought, a column of discounts copied «0».
   The price, named: a till grouping thousands by a point, «499» beside «1.299», read through Georgia's card reads as
-  three decimals — six more figures wrong on the bench's Icelandic set, MOL-426's class, never a Georgian till's;
-  **where the vote does not choose three, the paper's own sum does** (adversarial Д1, round 5): the lines' sums as
-  thousandths meeting a total printed with three — 22.368 + «5», a «5.000» the model cut, is «27.368», where «1.299» +
-  «499» meets no «1.798»; a total beside such lines is read in any of them: a card's payment is in tetri, «ბარათი 23.87»
-  (adversarial А3, round 1); **where the lines do not choose three, a total printed with three does** — no line, none of
-  them voting, every amount «5», «2.5» (adversarial Ж1, round 7), or a discount in tetri their only vote (И1, round 9) —
-  beside a payment in tetri, «ბარათი 8.73», or cash rounded to five tetri, «ნაღდი 8.75» (З1, round 8): fewer decimals
-  read the same either way, the total is shown only where two places or the lines vouch for it, and Р-1's weight in a
-  sum comes with a total of two. **The rounding is named of sums read right on a receipt not whole too** (Г1): a line
-  whose quantity was misread keeps its sum, and «Прочитали не всё» measures the lines by the total less the rounding, or
-  it says a line lost of a pharmacy whose every sum was read. **And «Записать» takes it**: on a receipt not whole the
-  lines the person typed and the rounding meeting the total as read are what was paid, that total (`receiptTotal`, Д2) —
-  the lines alone were a tetri off what the review said. **A line's arithmetic is judged as printed, in thousandths**,
-  and then every amount is hundredths, half up, as the rest of the reading counts: rounded first, 3 × 0.255 = 0.765 is 3
-  × 0,26 against 0,77. **The check judges it so too**: the line keeps its money as printed (`thousandths`, read through
+  three decimals — six more figures wrong on the bench's Icelandic set, MOL-426's class, never a Georgian till's; a
+  total beside such lines is read in any of them: a card's payment is in tetri, «ბარათი 23.87» (adversarial А3, round
+  1); **where the lines do not choose three, a total printed with three does** — no line, none of them voting, every
+  amount «5», «2.5» (adversarial Ж1, round 7), or a discount in tetri their only vote (И1, round 9) — beside a payment
+  in tetri, «ბარათი 8.73», or cash rounded to five tetri, «ნაღდი 8.75» (З1, round 8): fewer decimals read the same
+  either way, the total is shown only where two places or the lines vouch for it, and Р-1's weight in a sum comes with a
+  total of two. **The rounding is named of sums read right on a receipt not whole too** (Г1): a line whose quantity was
+  misread keeps its sum, and «Прочитали не всё» measures the lines by the total less the rounding, or it says a line
+  lost of a pharmacy whose every sum was read. **And «Записать» takes it**: on a receipt not whole the lines the person
+  typed and the rounding meeting the total as read are what was paid, that total (`receiptTotal`, Д2) — the lines alone
+  were a tetri off what the review said. **A line's arithmetic is judged as printed, in thousandths**, and then every
+  amount is hundredths, half up, as the rest of the reading counts: rounded first, 3 × 0.255 = 0.765 is 3 × 0,26 against
+  0,77. **The check judges it so too**: the line keeps its money as printed (`thousandths`, read through
   `printedThousandths` only while it rounds to the line's own figures), or `verifiedReading` took the price of the very
   line Р-2 settled (adversarial А2, round 1). **Whole is judged as printed, the tetri between its own figure** (owner's
   А1 «а», adversarial А1 of round 1 — Р-3 «whole in tetri» was the price before): the lines meet a total printed with
