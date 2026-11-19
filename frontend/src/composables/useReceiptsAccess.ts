@@ -8,6 +8,7 @@ import {
   receiptsClosedBy,
 } from '@molvia/model'
 import type { PhotoReceiptCountry, ReceiptsAccess, ReceiptsClosed } from '@molvia/model'
+import { api } from '@/api'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { useReconnect } from '@/composables/useReconnect'
 import { calendarDay, dateOfAnyYear } from '@/days'
@@ -187,7 +188,8 @@ const GRANT_END_SLACK_MS = 2_000
 export function useAccessKeptFresh({
   readByScreen = false,
 }: { readByScreen?: boolean } = {}): void {
-  const { access, askAgain } = useReceiptsAccess()
+  const { country, access, askAgain } = useReceiptsAccess()
+  const actor = useActorStore()
   const today = useLocalDay()
   watch(today, askAgain)
   if (!readByScreen) {
@@ -198,43 +200,85 @@ export function useAccessKeptFresh({
     })
   }
 
-  // Armed again by every answer — the one at midnight sets the timer for a grant a day off (adversarial Г1). A moment
-  // the phone's clock finds over is asked about once more only until an answer that came after it still names it: a
-  // phone whose clock runs ahead of the server's finds its grant over while the server's goes on, and re-armed by each
-  // such answer it asked every two seconds (В1). Marked by an answer, never by the ask (Д1): an ask lost by the network
-  // or swallowed by `verify` while another question was out learnt nothing — that one is asked again with a doubling
-  // pause, the identity's rhythm, until any answer comes; and the figures the screen came with are no answer after it.
-  // A second such answer keeps the ask the first one armed (Е1): two questions out at the end — the return's and «Что
-  // брать»'s on a city moved — answered before it and heard after it, and the later one took the re-ask away.
+  // A grant's end is asked by the screen's own question, `api.me()` taken in by `apply` as «Что брать» takes its own —
+  // never `verify`, which asks nothing while another question is out (adversarial Д1, Е1, Е2): an answer to a question
+  // asked before the end, heard after it, could not be told from the answer to this one, and every order of answers
+  // that let one stand for the other left the end unheard until midnight. So the moment is marked by the answer to
+  // this question alone, asked after the moment by the phone's clock: an answer still naming it is believed — a phone
+  // whose clock runs ahead of the server's asks once a moment, never every two seconds (В1) — and another answer heard
+  // past the moment asks only where this question is neither out, nor answered, nor on its way. Armed again by every
+  // answer — the one at midnight sets the timer for a grant a day off (Г1). A question with no answer is asked again
+  // with a doubling pause, the identity's rhythm, until it is answered or another answer says the grant is over.
   let grantEnds: ReturnType<typeof setTimeout> | undefined
+  /** The moment `grantEnds` waits for, until it fires. */
+  let armedFor: number | undefined
+  /** The `until` the answer to this screen's own question named. */
   let heardPast: number | undefined
+  let out = false
+  let gone = false
+  /** Read after an `await`: the screen may have gone while the question was out. */
+  const alive = (): boolean => !gone
   let cameWith = true
-  /** Asks, and asks again with a doubling pause until an answer comes. */
-  function askAboutEnd(): void {
-    askAgain()
-    unheard.later()
+  const unheard = doublingRetry(
+    () => void askAboutEnd(),
+    IDENTITY_RETRY_FIRST_MS,
+    IDENTITY_RETRY_LAST_MS,
+  )
+
+  async function askAboutEnd(): Promise<void> {
+    if (out || gone) return
+    if (!country.value || actor.state !== 'ready' || !navigator.onLine) {
+      unheard.later()
+      return
+    }
+    out = true
+    try {
+      const loaded = await api.me()
+      heardPast = loaded.receiptsAccess?.until?.getTime()
+      unheard.reset()
+      actor.apply(loaded)
+    } catch {
+      // A refusal of the session goes to `verify` through the API's seam; any other failure is asked again.
+      if (alive()) unheard.later()
+    } finally {
+      out = false
+    }
   }
-  const unheard = doublingRetry(askAboutEnd, IDENTITY_RETRY_FIRST_MS, IDENTITY_RETRY_LAST_MS)
+
+  function stop(): void {
+    clearTimeout(grantEnds)
+    armedFor = undefined
+    unheard.cancel()
+    unheard.reset()
+  }
+
   watch(
     access,
     (figures) => {
-      unheard.cancel()
-      unheard.reset()
       const fromServer = !cameWith
       cameWith = false
       const until = figures?.until?.getTime()
-      const left = until === undefined ? 0 : until - Date.now()
-      const past = fromServer && until !== undefined && left <= 0
-      if (past && heardPast === until) return
-      clearTimeout(grantEnds)
-      if (until === undefined || left > GRANT_WAIT_MAX_MS) return
-      if (past) heardPast = until
-      grantEnds = setTimeout(askAboutEnd, Math.max(0, left) + GRANT_END_SLACK_MS)
+      if (until === undefined) {
+        stop()
+        return
+      }
+      const left = until - Date.now()
+      if (fromServer && left <= 0 && (out || heardPast === until || armedFor === until)) return
+      stop()
+      if (left > GRANT_WAIT_MAX_MS) return
+      armedFor = until
+      grantEnds = setTimeout(
+        () => {
+          armedFor = undefined
+          void askAboutEnd()
+        },
+        Math.max(0, left) + GRANT_END_SLACK_MS,
+      )
     },
     { immediate: true },
   )
   onUnmounted(() => {
-    clearTimeout(grantEnds)
-    unheard.cancel()
+    gone = true
+    stop()
   })
 }

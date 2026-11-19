@@ -117,15 +117,15 @@ describe('where the person stands, kept fresh by the screen that holds the camer
     expect(me).toHaveBeenCalledTimes(1)
   })
 
-  it('asks twice at most, never every two seconds, where the phone’s clock runs ahead of the server’s (adversarial В1)', async () => {
+  it('asks once, never every two seconds, where the phone’s clock runs ahead of the server’s (adversarial В1)', async () => {
     // the phone says 10:00, the server 09:00: for it the grant goes on, and every answer brings its `until` anew —
-    // the first answer after the moment asks once more (Д1), the second is believed
+    // the answer to the screen's own question after the moment is believed
     clockAt(new Date('2026-12-19T10:00:00Z'))
     const paid = () => ({ ...OPEN, month: '2026-12-01', until: new Date('2026-12-19T10:00:00Z') })
     me.mockImplementation(() => Promise.resolve({ ...GEORGIA, receiptsAccess: paid() }))
     await screen({ ...GEORGIA, receiptsAccess: paid() })
     await vi.advanceTimersByTimeAsync(60_000)
-    expect(me).toHaveBeenCalledTimes(2)
+    expect(me).toHaveBeenCalledTimes(1)
   })
 
   it('arms the grant’s end by the answer at midnight, the screen open more than a day before it (adversarial Г1)', async () => {
@@ -158,8 +158,8 @@ describe('where the person stands, kept fresh by the screen that holds the camer
     cameBack()
     await flushPromises()
     await vi.advanceTimersByTimeAsync(60_000)
-    // two for the grant's end, one for the return — and no timer armed again by the answers after
-    expect(me).toHaveBeenCalledTimes(3)
+    // one for the grant's end, one for the return — and no timer armed again by the answer to the return
+    expect(me).toHaveBeenCalledTimes(2)
   })
 
   it('asks again about a grant’s end whose one ask the network lost (adversarial Д1)', async () => {
@@ -206,12 +206,17 @@ describe('where the person stands, kept fresh by the screen that holds the camer
     expect(useActorStore().actor?.receiptsAccess?.ended).toEqual(until)
   })
 
-  it('keeps the re-ask of one late answer through a second late answer (adversarial Е1)', async () => {
+  /**
+   * Georgia, «Что брать» in view, a grant until 10:00, the city just moved on another phone (adversarial Е1, Е2): the
+   * app comes back at 09:59:58 and `verify` asks — its answer, the server's word before the end, takes `verifyTakes`
+   * to come; at 10:00:01.5 «Что брать»'s own `/actors/me`, asked before the end, is heard after it.
+   */
+  async function twoLateAnswers(verifyTakes: number): Promise<number[]> {
     clockAt(new Date('2026-12-19T09:59:50Z'))
     const until = new Date('2026-12-19T10:00:00Z')
     const goesOn = () => ({ ...OPEN, month: '2026-12-01', until: new Date(until) })
     const asked: number[] = []
-    // the server answers by its clock, the phone's, as the question reaches it: the return's takes five seconds back
+    // the server answers by its clock, the phone's, as the question reaches it
     me.mockImplementation(() => {
       asked.push(Date.now())
       const access =
@@ -223,20 +228,29 @@ describe('where the person stands, kept fresh by the screen that holds the camer
           () => {
             resolve({ ...GEORGIA, receiptsAccess: access })
           },
-          asked.length === 1 ? 5_000 : 1_000,
+          asked.length === 1 ? verifyTakes : 1_500,
         )
       })
     })
     await screen({ ...GEORGIA, receiptsAccess: goesOn() })
-    await vi.advanceTimersByTimeAsync(8_000) // 09:59:58: the return asks
+    await vi.advanceTimersByTimeAsync(8_000)
     cameBack()
-    // 10:00:01.5: «Что брать»'s own `/actors/me`, asked before the end on a city moved, is heard after it
     await vi.advanceTimersByTimeAsync(3_500)
     useActorStore().apply({ ...GEORGIA, receiptsAccess: goesOn() })
-    // 10:00:03: the return's answer, as old, comes in the two seconds of the re-ask
     await vi.advanceTimersByTimeAsync(10 * 60_000)
-    expect(asked.filter((at) => at >= until.getTime())).toEqual([until.getTime() + 3_500])
     expect(useActorStore().actor?.receiptsAccess?.ended).toEqual(until)
+    return asked.filter((at) => at >= until.getTime()).map((at) => at - until.getTime())
+  }
+
+  it('asks at the grant’s end while the return’s question is out, and two late answers take nothing away (adversarial Е1)', async () => {
+    // the return's answer comes at 10:00:03, while the screen's own question is out: it waits for that one
+    expect(await twoLateAnswers(5_000)).toEqual([2_000])
+  })
+
+  it('asks again where the return’s old answer comes after the screen’s own and puts the grant back (adversarial Е2)', async () => {
+    // the screen's own answer says the end at 10:00:03.5; the return's, of 09:59:58, puts the grant back at 10:00:05
+    // — one more question two seconds later, and the end is known again
+    expect(await twoLateAnswers(7_000)).toEqual([2_000, 7_000])
   })
 
   it('must not ask where receipts are not read off the photo: Serbia’s are their link', async () => {
