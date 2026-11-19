@@ -486,24 +486,35 @@ function lateFit(
 }
 
 /**
- * The days of lines a record can meet: its window around each of its days, and around its link's days
- * as far as a link reaches — a late posting's thirty days either way bound them all (review №1, А13). A
- * line is looked up by its day and its posting day both (`reaching`): a screenshot meets a file's line by
- * the posting day it prints, however long after the operation (review №20). So the index decides
- * nothing; it only spares the pairs no path could join.
+ * The days of lines a record can meet: its window around each of its days, and around its link's day and
+ * posting day as far as a link reaches — a late posting's thirty days either way (review №1, А13). A line
+ * is looked up by its day and its posting day both (`reaching`): a screenshot meets a file's line by the
+ * posting day it prints, however long after the operation (review №20). So the index decides nothing; it
+ * only spares the pairs no path could join. The windows, never the span between them: no path needs a day
+ * between a record's and its link's posting, and a link posted «9999-12-31» put one record under 2.9
+ * million days, 1 s and 280 MB a call (adversarial А26). Ranges that meet are joined, so no day twice.
  */
-function reachOf(form: StatementForm, days: readonly number[], link: Linked | null) {
+function reachOf(
+  form: StatementForm,
+  days: readonly number[],
+  link: Linked | null,
+): { readonly from: number; readonly to: number }[] {
   const before =
     form === 'screenshot' ? STATEMENT_SCREENSHOT_DAYS_BEFORE : STATEMENT_FILE_WINDOW_DAYS
   const after = form === 'screenshot' ? STATEMENT_SCREENSHOT_DAYS_AFTER : STATEMENT_FILE_WINDOW_DAYS
-  let from = Math.min(...days) - before
-  let to = Math.max(...days) + after
-  if (link !== null) {
-    const far = STATEMENT_LATE_POST_DAYS + 1
-    from = Math.min(from, link.onDay - far, (link.postedDay ?? link.onDay) - far)
-    to = Math.max(to, link.onDay + far, (link.postedDay ?? link.onDay) + far)
+  const far = STATEMENT_LATE_POST_DAYS + 1
+  const windows = days.map((day) => ({ from: day - before, to: day + after }))
+  if (link !== null)
+    for (const day of link.postedDay === null ? [link.onDay] : [link.onDay, link.postedDay])
+      windows.push({ from: day - far, to: day + far })
+  windows.sort((a, b) => a.from - b.from)
+  const joined: { from: number; to: number }[] = []
+  for (const w of windows) {
+    const last = joined.at(-1)
+    if (last !== undefined && w.from <= last.to + 1) last.to = Math.max(last.to, w.to)
+    else joined.push({ ...w })
   }
-  return { from, to }
+  return joined
 }
 
 /** Each record under every day of a line it can meet (`reachOf`). */
@@ -512,14 +523,13 @@ function dayIndex<T extends { readonly days: readonly number[]; readonly link: L
   records: readonly T[],
 ): Map<number, T[]> {
   const byDay = new Map<number, T[]>()
-  for (const r of records) {
-    const { from, to } = reachOf(form, r.days, r.link)
-    for (let day = from; day <= to; day++) {
-      const there = byDay.get(day)
-      if (there) there.push(r)
-      else byDay.set(day, [r])
-    }
-  }
+  for (const r of records)
+    for (const { from, to } of reachOf(form, r.days, r.link))
+      for (let day = from; day <= to; day++) {
+        const there = byDay.get(day)
+        if (there) there.push(r)
+        else byDay.set(day, [r])
+      }
   return byDay
 }
 

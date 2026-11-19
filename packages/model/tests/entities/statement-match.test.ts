@@ -1637,6 +1637,31 @@ describe('matchStatement — adversarial, round 9', () => {
   }, 60_000)
 })
 
+describe('matchStatement — adversarial, round 10', () => {
+  it('А26: a record is indexed by its windows — a link posted «9999-12-31» costs no span of days', () => {
+    const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+    const shop = line('2026-11-12', '6400.00', 'AMD', 'Ք: SAS SUPERMARKET YEREVAN AM')
+    const posted = (postedOn: string) =>
+      Array.from({ length: 5 }, () =>
+        spending('2026-11-12', '6400.00', 'AMD', {
+          place: 'SAS',
+          account: ARDSHIN,
+          link: statementLinkOf({ ...shop, postedOn }, keyOf(shop, ARDSHIN, 'ardshin-xlsx'), {
+            form: 'ardshin-xlsx',
+            accountId: ARDSHIN,
+            accountNumber: null,
+          }),
+        }),
+      )
+    // Under every day from the link's to its posting: 2.9 million days a record, 2.6 s and 430 MB.
+    const started = performance.now()
+    const far = match(posted('9999-12-31'), [shop], o)
+    expectWithin(performance.now() - started, 1_000)
+    expect(far.lines.map((l) => l.decision.group)).toEqual(['recorded'])
+    expect(far.pairs).toBe(5)
+  })
+})
+
 describe('tripCandidate', () => {
   const base = {
     id: '00000000-0000-4000-8000-0000000000aa',
