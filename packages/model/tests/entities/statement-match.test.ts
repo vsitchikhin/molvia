@@ -17,6 +17,7 @@ import {
   matchStatement,
   spendingCandidate,
   STATEMENT_KEY_WEIGHT,
+  STATEMENT_STEPS_MAX,
   STATEMENT_WEIGHED_MAX,
   transferCandidate,
   tripCandidate,
@@ -1316,6 +1317,7 @@ describe('matchStatement — review, round 1', () => {
     expect(matchStatement(PERSON, month.s, month.records)).toEqual({
       outcome: 'too_heavy',
       pairs: every + STATEMENT_LINES_MAX * STATEMENT_KEY_WEIGHT,
+      steps: 0,
     })
     expect(every).toBeGreaterThan(STATEMENT_WEIGHED_MAX)
   }, 60_000)
@@ -1483,6 +1485,30 @@ describe('matchStatement — review and adversarial, round 5', () => {
       { group: 'not_spending', reason: 'refund', record: null },
     ])
   })
+})
+
+describe('matchStatement — adversarial, round 6', () => {
+  it('А22: a crowd of one sum on two days, its free records a rank worse, stops at STATEMENT_STEPS_MAX', () => {
+    const o = { account: ARDSHIN, form: 'ardshin-xlsx' } as const
+    const rides = Array.from({ length: 1414 }, () =>
+      line('2026-11-12', '1200.00', 'AMD', 'Ք: YANDEX.GO YEREVAN AM'),
+    )
+    const byHand = (day: string, n: number) =>
+      Array.from({ length: n }, () =>
+        spending(day, '1200.00', 'AMD', { place: 'Yandex', account: ARDSHIN }),
+      )
+    // Each of the 471 lines left over went through all 943 holders of the 12th: 856 642 712 steps, 25 s.
+    const out = matchStatement(PERSON, statementOf(rides, o), [
+      ...byHand('2026-11-12', 943),
+      ...byHand('2026-11-13', 471),
+    ])
+    expect(out.outcome).toBe('too_heavy')
+    expect(out.pairs).toBeLessThanOrEqual(STATEMENT_WEIGHED_MAX)
+    expect(out.steps).toBeGreaterThan(STATEMENT_STEPS_MAX)
+    // One rank, the same records on one day: matched in steps of the order of the pairs.
+    const one = match(byHand('2026-11-12', 1414), rides, o)
+    expect(one.steps).toBeLessThanOrEqual(3 * one.pairs)
+  }, 120_000)
 })
 
 describe('tripCandidate', () => {

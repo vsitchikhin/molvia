@@ -253,8 +253,10 @@ export interface StatementUnposted {
 /**
  * The answer over one statement: `matched` — a decision for every line and the holds with no posting;
  * `too_heavy` — the statement weighs more than `STATEMENT_WEIGHED_MAX`, and the rule weighed none (А16,
- * review №23). `pairs` — what it weighs, the pairs of line and record and the keys under other uploads
- * (`STATEMENT_KEY_WEIGHT`); `steps` — the candidates the matching looked at (А20): both for the log.
+ * review №23), or its matching took more than `STATEMENT_STEPS_MAX` steps, and the rule stopped there
+ * (А22). `pairs` — what it weighs, the pairs of line and record and the keys under other uploads
+ * (`STATEMENT_KEY_WEIGHT`); `steps` — the candidates the matching looked at (А20), none when refused
+ * before it: both for the log.
  */
 export type StatementMatch =
   | {
@@ -264,7 +266,7 @@ export type StatementMatch =
       readonly lines: readonly { readonly key: string; readonly decision: StatementLineDecision }[]
       readonly unposted: readonly StatementUnposted[]
     }
-  | { readonly outcome: 'too_heavy'; readonly pairs: number }
+  | { readonly outcome: 'too_heavy'; readonly pairs: number; readonly steps: number }
 
 type Fit = 'exact' | 'unsure' | 'posting' | 'elsewhere' | 'tip' | 'hold' | 'late' | 'relink'
 
@@ -535,10 +537,18 @@ export const STATEMENT_WEIGHED_MAX = 2_000_000
 
 /**
  * A line's key under another upload, in pairs (adversarial А21): a link keyed under another account's
- * number asks every line's key under it once — an md5 each, some 7 µs here, as long as twenty pairs weighed at their worst — a
- * pair whose sum fits and whose name is weighed, some 0.33 µs (А16).
+ * number asks every line's key under it once — an md5 each, some 7 µs here, as long as twenty pairs
+ * weighed at their worst — a pair whose sum fits and whose name is weighed, some 0.33 µs (А16).
  */
 export const STATEMENT_KEY_WEIGHT = 20
+
+/**
+ * The steps of the matching at most (adversarial А22): the candidates its searches look at. A crowd of
+ * one sum on two days — a line's best taken, its free record a rank worse — sends every line left over
+ * through the whole crowd: 856 642 712 steps, 25 s here under the ceiling of pairs, some 0.03 µs a step.
+ * Twenty million are some 0.6 s, the pairs' own; past them the rule stops and answers `too_heavy`.
+ */
+export const STATEMENT_STEPS_MAX = 20_000_000
 
 /**
  * A record on the statement's account, or either of them with none. For a transfer or an exchange the
@@ -598,7 +608,10 @@ const sameRank = (p: Pair, q: Pair) =>
  * line's search skips them: a crowd of one sum, more lines than records, searched again every record for
  * every line left over — some 10⁹ steps under the ceiling of pairs (adversarial А20).
  */
-function matchPairs(pairs: readonly Pair[]): { choice: Map<number, Pair>; steps: number } {
+function matchPairs(pairs: readonly Pair[]): {
+  readonly choice: Map<number, Pair> | null
+  readonly steps: number
+} {
   const owner = new Map<string, number>()
   const choice = new Map<number, Pair>()
   let steps = 0
@@ -619,12 +632,12 @@ function matchPairs(pairs: readonly Pair[]): { choice: Map<number, Pair>; steps:
       const mine = options.get(row) ?? []
       const best = mine[0]
       for (const p of mine) {
-        steps++
+        if (++steps > STATEMENT_STEPS_MAX) return false
         if (best === undefined || !sameRank(p, best)) break
         if (!owner.has(p.c.id)) return take(row, p)
       }
       for (const p of mine) {
-        steps++
+        if (++steps > STATEMENT_STEPS_MAX) return false
         if (seen.has(p.c.id)) continue
         seen.add(p.c.id)
         const holder = owner.get(p.c.id)
@@ -634,7 +647,10 @@ function matchPairs(pairs: readonly Pair[]): { choice: Map<number, Pair>; steps:
       return false
     }
     let seen = new Set<string>()
-    for (const row of options.keys()) if (!choice.has(row) && claim(row, seen)) seen = new Set()
+    for (const row of options.keys()) {
+      if (!choice.has(row) && claim(row, seen)) seen = new Set()
+      if (steps > STATEMENT_STEPS_MAX) return { choice: null, steps }
+    }
   }
   return { choice, steps }
 }
@@ -704,7 +720,7 @@ export function matchStatement(
     for (const { under } of records) if (under !== null && under !== ours) uploads.add(under)
   }
   weight += uploads.size * rows.length * STATEMENT_KEY_WEIGHT
-  if (weight > STATEMENT_WEIGHED_MAX) return { outcome: 'too_heavy', pairs: weight }
+  if (weight > STATEMENT_WEIGHED_MAX) return { outcome: 'too_heavy', pairs: weight, steps: 0 }
 
   // Every pair whose sum fits, then one to one: met before doubts, the line a record was made from
   // first, then by the share of the name (А4), the nearer day, the order of the lines.
@@ -762,6 +778,7 @@ export function matchStatement(
       p.row - q.row,
   )
   const { choice, steps } = matchPairs(pairs)
+  if (choice === null) return { outcome: 'too_heavy', pairs: weight, steps }
   for (const [index, p] of choice) {
     const row = rows[index]
     if (row === undefined) continue
