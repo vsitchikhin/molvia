@@ -129,6 +129,8 @@ export function useReceiptsAccess(): {
    * (adversarial А3) — a month's hundred opens again on the 1st. `verify` asks once for everyone who asks with it.
    */
   readonly askAgain: () => void
+  /** Whether a question may go now (review №20): a country read off the photo, the identity settled, a connection. */
+  readonly canAsk: () => boolean
 } {
   const actor = useActorStore()
   const payments = useFf('payments')
@@ -161,11 +163,15 @@ export function useReceiptsAccess(): {
   }
 
   // only where receipts are read off the photo: nothing here would change what anyone else sees
-  function askAgain(): void {
-    if (country.value && actor.state === 'ready' && navigator.onLine) void actor.verify()
+  function canAsk(): boolean {
+    return country.value !== null && actor.state === 'ready' && navigator.onLine
   }
 
-  return { country, access, closed, othersRead, sheetFirst, told, askAgain }
+  function askAgain(): void {
+    if (canAsk()) void actor.verify()
+  }
+
+  return { country, access, closed, othersRead, sheetFirst, told, canAsk, askAgain }
 }
 
 /** A grant a day or less from running out is waited for; a later one by the next midnight's answer. */
@@ -188,7 +194,7 @@ const GRANT_END_SLACK_MS = 2_000
 export function useAccessKeptFresh({
   readByScreen = false,
 }: { readByScreen?: boolean } = {}): void {
-  const { country, access, askAgain } = useReceiptsAccess()
+  const { access, canAsk, askAgain } = useReceiptsAccess()
   const actor = useActorStore()
   const today = useLocalDay()
   watch(today, askAgain)
@@ -227,16 +233,18 @@ export function useAccessKeptFresh({
 
   async function askAboutEnd(): Promise<void> {
     if (out || gone) return
-    if (!country.value || actor.state !== 'ready' || !navigator.onLine) {
+    if (!canAsk()) {
       unheard.later()
       return
     }
     out = true
     try {
       const loaded = await api.me()
-      heardPast = loaded.receiptsAccess?.until?.getTime()
-      unheard.reset()
-      actor.apply(loaded)
+      // An answer the store let go — a row newer came meanwhile, «Сохранить» in «Настройки» — is none (adversarial Ж1)
+      if (actor.apply(loaded)) {
+        heardPast = loaded.receiptsAccess?.until?.getTime()
+        unheard.reset()
+      } else if (alive()) unheard.later()
     } catch {
       // A refusal of the session goes to `verify` through the API's seam; any other failure is asked again.
       if (alive()) unheard.later()

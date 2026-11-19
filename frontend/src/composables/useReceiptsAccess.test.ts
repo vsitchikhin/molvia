@@ -253,6 +253,38 @@ describe('where the person stands, kept fresh by the screen that holds the camer
     expect(await twoLateAnswers(7_000)).toEqual([2_000, 7_000])
   })
 
+  it('asks again where the store let the answer about the grant’s end go, a «Сохранить» newer (adversarial Ж1)', async () => {
+    clockAt(new Date('2026-12-19T09:59:00Z'))
+    const until = new Date('2026-12-19T10:00:00Z')
+    const asked: number[] = []
+    let row = new Date('2026-12-19T09:00:00Z')
+    // the server answers the grant over as it is asked, with the row as it stands then; the answer takes 1.5 s back
+    me.mockImplementation(() => {
+      asked.push(Date.now())
+      const view = {
+        ...GEORGIA,
+        updatedAt: row,
+        receiptsAccess: { ...OPEN, month: '2026-12-01', trialLeft: 0, ended: new Date(until) },
+      }
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          resolve(view)
+        }, 1_500)
+      })
+    })
+    await screen({
+      ...GEORGIA,
+      updatedAt: row,
+      receiptsAccess: { ...OPEN, month: '2026-12-01', until },
+    })
+    await vi.advanceTimersByTimeAsync(62_500) // 10:00:02.5: the question is out, and «Сохранить» is answered
+    row = new Date('2026-12-19T10:00:02.400Z')
+    expect(useActorStore().apply({ ...GEORGIA, city: 'Батуми', updatedAt: row })).toBe(true)
+    await vi.advanceTimersByTimeAsync(10 * 60_000)
+    expect(asked.map((at) => at - until.getTime())).toEqual([2_000, 8_500])
+    expect(useActorStore().actor?.receiptsAccess?.ended).toEqual(until)
+  })
+
   it('must not ask where receipts are not read off the photo: Serbia’s are their link', async () => {
     await screen({
       ...GEORGIA,

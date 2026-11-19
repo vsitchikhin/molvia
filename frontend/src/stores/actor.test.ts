@@ -682,10 +682,11 @@ describe('when the server last said the settings (MOL-215)', () => {
 
     const later = new Date('2026-10-31T11:00:00.000Z')
     vi.setSystemTime(later)
-    store.apply({ ...FIRST, updatedAt: new Date('2026-09-01T00:00:00.000Z') })
+    // and says so: a screen that asked for the answer asks again when it was let go (MOL-276, Ж1)
+    expect(store.apply({ ...FIRST, updatedAt: new Date('2026-09-01T00:00:00.000Z') })).toBe(false)
     expect(store.settingsReadAt).toEqual(READ)
 
-    store.apply({ ...FIRST, city: 'Ереван' })
+    expect(store.apply({ ...FIRST, city: 'Ереван' })).toBe(true)
     expect(store.settingsReadAt).toEqual(later)
   })
 

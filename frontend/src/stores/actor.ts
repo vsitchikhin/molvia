@@ -426,15 +426,20 @@ export const useActorStore = defineStore('actor', () => {
     forgetOwner(owner)
   })
 
-  function apply(loaded: ActorView): void {
+  /**
+   * Takes an answer a screen asked for itself, and says whether it took it: another owner's, or a row older than the
+   * one held — a «Сохранить» answered meanwhile — is let go, and a screen waiting on it asks again (MOL-276, Ж1).
+   */
+  function apply(loaded: ActorView): boolean {
     if (
       loaded.id !== id.value ||
       (actor.value?.id === loaded.id && actor.value.updatedAt > loaded.updatedAt)
     )
-      return
+      return false
     settingsReadAt.value = new Date()
     actor.value = withModel(loaded)
     state.value = 'ready'
+    return true
   }
 
   return {
