@@ -1474,6 +1474,10 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   `import()` fails on its type; a second window after the first took the version is one, its precache cleaned by
   the activation. So **`warmScreens` loads every screen once the first is drawn** (В-1 «а»), after the identity's
   request, one at a time with a pause before each; a failure there is left to the move that needs the screen.
+  **The dev server loads every screen before the first paint** (`loadScreens`, all at once): it has no precache,
+  so a screen not yet loaded was out of reach once the connection went — CI's first run had a spec go offline and
+  tap «Покупки» before its chunk came, and the move failed; loaded first, the dev server's start and every spec
+  that goes offline are what the one bundle gave.
   **A screen whose code did not come all the same** — the seconds before the warming ends — **is opened by a
   full load of its address** (`reloadOnStaleChunk`, В-2 «а»): it brings the new version and its chunks, and the
   person tapped, so nothing is reloaded that they did not ask for (MOL-132's rule); once a tab in 30 s
@@ -1503,9 +1507,8 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   launch is not smaller; the precache is 165 files and 3,137 KiB for 27 and 2,991, the same code in pieces;
   keeping the order costs 13 KB gzip of wrappers at the start; on a very first visit whose dictionary does not
   come the page stays blank until the retry; a full load to a screen loses what the screen left held in memory —
-  its queues and drafts are on the device; the dev server compiles a screen at its first request, so a spec's
-  first tap there is slower, and a dependency found then would reload the page (MOL-217) — Vite's scan follows
-  `import()`, and none was seen.
+  its queues and drafts are on the device; the dev server and its e2e do not see the warming after the paint
+  — only the build's specs do (`offline-built`).
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
