@@ -186,16 +186,21 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
 - **Columns by their names, never their places; a header no layout knows is refused, never guessed** — T-Bank's
   format changed twice in five years, silently (b-russia.md, 1.4). Names are compared without case, «ё», hyphens and
   spaces; a column not read may come and go. **Exports glued together** repeat their header, each part beginning with
-  it — a byte order mark of its own too — and **a record a part repeats of an earlier part, cell for cell, is read
-  once** (adversarial А4): two exports sharing their edge day gave each line of it twice, both ticked new; two like
-  records of one part stay two operations. **A CSV is read by `csv.ts`** for every bank: UTF-8 where it is valid, its
+  it — a byte order mark of its own too — and **an operation a part repeats of an earlier part is read once, the
+  later export's** (adversarial А4: two exports sharing their edge day gave each line of it twice, both ticked new).
+  It is known by what the bank printed of it and never sets later — the account, the moment to the second, the
+  operation's sum and currency, the payee, the MCC — **never cell for cell** (Б1: between two exports a bonus is added,
+  a hold posts at another rate, the person changes a category). Like records are counted by part: the n-th of a part
+  is the n-th of the parts before, one more than any of them held another operation (review №10). **The price,
+  named:** two operations of one second alike in all of these, in different parts and not in one, are one. **A CSV is read by `csv.ts`** for every bank: UTF-8 where it is valid, its
   byte order mark dropped, else Windows-1251; quotes by RFC 4180; a quote never closed refuses the file.
 - **Wrong is worse than unread** — a sum with more digits than its currency has, signs of the two sums that disagree,
   one sum zero beside the other not, a day no calendar has or before the rates' epoch refuse the file, decided once
   the whole record has read (review №4); a line of zero is left out, and so is a declined one whose sums disagree —
   it moved nothing. **An operation in a currency Molvia has not got is the money that left the account**, `debited`
   none (research §6): the sum is right, the currency it was spent in lost. «Списано» only where the two currencies
-  differ. A bank's text is cut as the schema counts it — UTF-16, never a pair of surrogates in two (review №2).
+  differ. A bank's text is cut as the schema counts it — UTF-16, never a pair of surrogates in two (`cutText` of `csv.ts`,
+  review №2).
 - **T-Bank's CSV** (MOL-430, owner's В-1 «а» — no XLSX: the same rows, and a zip of a stranger's unpacked by JSZip
   with no ceiling): the layout of 2026 and the one before it; **its Moscow time is a day on the phone's calendar**
   (`ZONE_HEADER`, MOL-121) — a dinner in Yerevan at 00:30 is 23:30 in Moscow the day before; `SHIFTED_FORMS` keeps
@@ -203,10 +208,11 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   А6: a night's line was posted the day before it was made). Each zone's clock is made once a file (`daysIn`,
   `midnightsIn`) — never kept in the model's module, where every spelling of a zone a request names would stay for
   good (review №1, adversarial А3: +240 MB for 20 000 spellings).
-- **The kind: a line with no MCC is an own transfer where the bank says so** — «Учёт в аналитике: Нет» in the layout
-  of 2026, its words in the one before, which has no such column. **A line with an MCC is never one**: «Нет» is the
-  person's to set on any line (adversarial А2: a purchase in a supermarket taken out of the bank's analytics was «не
-  трата», silently). **«Внутренний перевод» is no own word**: T-Bank names so a transfer to any of its contracts,
+- **The kind: an own transfer is a line with no MCC the bank's words call one** — «Между своими счетами», «Перевод
+  себе», a deposit's — **and, in the layout of 2026, «Учёт в аналитике: Нет» beside them**; the layout before it has no
+  such column. **«Нет» alone is no sign**: the person switches it off on any line (adversarial А2: a purchase in a
+  supermarket taken out of the bank's analytics was «не трата», silently; Б2: so was a transfer to somebody by phone
+  number). **«Внутренний перевод» is no own word**: T-Bank names so a transfer to any of its contracts,
   another person's too (А1: the owner's PDF holds such transfers to contracts not his) — a transfer, «перевод — трата ли
   это?», a tap rather than a spending lost. The rest by the bank's category, its words and the MCC, padded to four
   digits. The payee is «Описание»; **«Сообщение» — a person's words to a person — is never read**, nor «Ваша
