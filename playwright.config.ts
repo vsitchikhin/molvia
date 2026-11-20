@@ -59,6 +59,10 @@ const readerPort = String(Number(apiPort) + 3)
 // it answers a receipt's link with a journal under a head that names nobody.
 const pursPort = String(Number(apiPort) + 4)
 
+// Ameriabank's vPOS is a fake too (MOL-277), on the port after the tax office's: with every фф on the API needs a bank
+// to start (`VPOS_STAND`), and a run asks the real one nothing.
+const vposPort = String(Number(apiPort) + 5)
+
 // The scanner's camera is a file (MOL-98): Chromium films the barcode `globalSetup` draws, and a
 // spec that wants the camera grants it — without the grant Chromium refuses, which is the case of
 // «no permission». The full Chromium, not the headless shell every other spec runs in: the shell
@@ -186,6 +190,13 @@ export default defineConfig({
       stdout: 'pipe',
     },
     {
+      command: 'node bin/fake-vpos.mjs',
+      url: `http://127.0.0.1:${vposPort}/health`,
+      env: { VPOS_PORT: vposPort },
+      reuseExistingServer: false,
+      stdout: 'pipe',
+    },
+    {
       command: 'node bin/fake-receipt-reader.mjs',
       url: `http://127.0.0.1:${readerPort}/health`,
       env: { READER_PORT: readerPort },
@@ -219,6 +230,13 @@ export default defineConfig({
         PURS_URL: `http://127.0.0.1:${pursPort}`,
         PURS_CONTACT: 'e2e@molvia.test',
         PURS_PER_MINUTE: '600',
+        // The fake bank (MOL-277), on the local stand no production starts with; the values name nobody.
+        VPOS_STAND: 'local',
+        VPOS_LOCAL_URL: `http://127.0.0.1:${vposPort}`,
+        VPOS_CLIENT_ID: 'e2e-client',
+        VPOS_USERNAME: 'e2e-user',
+        VPOS_PASSWORD: 'e2e-password',
+        APP_BASE_URL: baseURL,
         // Every «фф» on (MOL-382, В-2 «а»): a feature runs here as people will meet it once it is
         // turned on, and its «off» on the phone is `ffOff` of `e2e/session.ts`; the server's «off» —
         // no route at all — is held by the integration tests.

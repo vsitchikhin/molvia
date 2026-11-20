@@ -20,6 +20,7 @@ import type {
   PicksMeasured,
   ReceiptsInWindow,
   RemindersInWindow,
+  RfCardsInWindow,
   TaxReceiptsInWindow,
 } from '@/db/gates-reader'
 
@@ -167,6 +168,8 @@ function formatReport(parsed: ParsedWindow, report: GatesReport): string[] {
     '',
     ...reminderLines(report.reminders),
     '',
+    ...rfCardLines(report.rfCards),
+    '',
     ...receiptLines(report.receipts, '0.2r', 'does the scanner spare typing?'),
     '',
     ...receiptLines(report.modelReceipts, '0.2r', '· read by the model (MOL-272)'),
@@ -278,6 +281,20 @@ function taxReceiptLines(tax: TaxReceiptsInWindow): string[] {
     row('  1 hour', [String(tax.within1h), '']),
     row('  1 day', [String(tax.within1d), '']),
     row('  later', [String(tax.later), '']),
+  ]
+}
+
+/**
+ * «У меня только карта РФ» on the screen of payment (MOL-277, Р-8): how often people with a Russian card alone came to
+ * pay, by the day — whether to look for a way to take such cards (MOL-282). No line to cross, no verdict: the counts.
+ */
+function rfCardLines(cards: RfCardsInWindow): string[] {
+  const { firstDay, lastDay } = cards
+  const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`
+  return [
+    `rfcard ${'only a Russian card to pay with?'.padEnd(45)}no stop`,
+    row('taps of «У меня только карта РФ»', [String(cards.taps), `${span} in Yerevan`]),
+    row('  of them the same device again', [String(cards.again), 'within a day']),
   ]
 }
 

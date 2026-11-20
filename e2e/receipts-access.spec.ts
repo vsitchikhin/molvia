@@ -53,7 +53,9 @@ test('the trial spent, payment open: the sheet at every tap, and «Add by hand»
 
   await capture.click()
   await expect(sheet(page)).toContainText('Trial receipts are used up')
-  await expect(sheet(page)).toContainText('Purchases can be recorded by hand')
+  // Payment open (MOL-277, В-7 «а»): its price said, and its way first.
+  await expect(sheet(page)).toContainText('Recognition for 30 days is $2')
+  await expect(sheet(page).getByRole('button').nth(1)).toHaveText('Open for $2')
   // Nobody would read the receipt: no camera is offered.
   await expect(sheet(page).getByRole('button', { name: 'Photograph', exact: true })).toHaveCount(0)
   await risen(page)

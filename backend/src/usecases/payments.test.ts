@@ -3,7 +3,16 @@ import { DomainError, ERROR } from '@molvia/model'
 import type { CachedRate } from '@molvia/model'
 import type { PaymentRow, PaymentsRepository } from '@/db/payments-repository'
 import type { RateRepository } from '@/db/rates-repository'
-import { openPayment, refundPayment, settlePayment } from './payments'
+import {
+  confirmPayment,
+  offerPayments,
+  openPayment,
+  paymentAskLimiter,
+  refundPayment,
+  rfCardRepeats,
+  settlePayment,
+  startPayment,
+} from './payments'
 import type { PaymentChannelAdapter } from './payments'
 
 const now = new Date('2026-12-01T12:00:00Z')
@@ -35,7 +44,21 @@ function journal(row: Partial<PaymentRow> = {}) {
     ...row,
   }
   return {
-    create: vi.fn<PaymentsRepository['create']>(() => Promise.resolve({ orderNo: 1042n })),
+    createWithin: vi.fn<PaymentsRepository['createWithin']>((written) =>
+      Promise.resolve({
+        ...payment,
+        id: written.id,
+        orderNo: 1042n,
+        tariff: written.tariff,
+        amount: written.amount,
+        refundedMinor: 0n,
+        channelRef: null,
+        state: 'created',
+      }),
+    ),
+    paidUntil: vi.fn<PaymentsRepository['paidUntil']>(() =>
+      Promise.resolve({ sharedUntil: null, receiptsModelUntil: null }),
+    ),
     named: vi.fn<PaymentsRepository['named']>(() => Promise.resolve()),
     get: vi.fn<PaymentsRepository['get']>(() => Promise.resolve(payment)),
     markPaid: vi.fn<PaymentsRepository['markPaid']>(() =>
@@ -48,8 +71,14 @@ function journal(row: Partial<PaymentRow> = {}) {
       Promise.resolve({ state: 'refunded', moved: true, access: {} }),
     ),
     sweep: vi.fn<PaymentsRepository['sweep']>(() => Promise.resolve(0)),
+    pending: vi.fn<PaymentsRepository['pending']>(() => Promise.resolve([])),
+    byOrders: vi.fn<PaymentsRepository['byOrders']>(() => Promise.resolve([])),
+    paidWithin: vi.fn<PaymentsRepository['paidWithin']>(() => Promise.resolve([])),
+    tapRfCard: vi.fn<PaymentsRepository['tapRfCard']>(() => Promise.resolve()),
   } satisfies PaymentsRepository
 }
+
+const AMD = (minor: bigint) => ({ minor, currency: 'AMD' as const })
 
 const rates = (rows: readonly CachedRate[]): Pick<RateRepository, 'latestOnOrBefore'> => ({
   latestOnOrBefore: vi.fn(() => Promise.resolve(rows)),
@@ -57,13 +86,14 @@ const rates = (rows: readonly CachedRate[]): Pick<RateRepository, 'latestOnOrBef
 
 function bank() {
   const refund = vi.fn<PaymentChannelAdapter['refund']>(() => Promise.resolve())
-  const channel: PaymentChannelAdapter = {
-    channel: 'ameriabank',
-    start: vi.fn(),
-    check: vi.fn(),
-    refund,
-  }
-  return { channel, refund }
+  const start = vi.fn<PaymentChannelAdapter['start']>(() =>
+    Promise.resolve({ ref: 'A1B2', url: 'https://bank.test/Pay?id=A1B2&lang=ru' }),
+  )
+  const check = vi.fn<PaymentChannelAdapter['check']>(() =>
+    Promise.resolve({ said: 'waiting' } as const),
+  )
+  const channel: PaymentChannelAdapter = { channel: 'ameriabank', start, check, refund }
+  return { channel, refund, start, check }
 }
 
 describe('openPayment — the price fixed at creation (MOL-283)', () => {
@@ -78,7 +108,7 @@ describe('openPayment — the price fixed at creation (MOL-283)', () => {
 
     expect(opened).toMatchObject({ orderNo: 1042n, amount: { minor: 96_000n, currency: 'AMD' } })
     expect(rows.latestOnOrBefore).toHaveBeenCalledWith(['USD'], '2026-12-01')
-    expect(payments.create.mock.calls[0]?.[0]).toMatchObject({
+    expect(payments.createWithin.mock.calls[0]?.[0]).toMatchObject({
       actorId: 'anna',
       tariff: 'both',
       anchor: { minor: 250n, currency: 'USD' },
@@ -116,7 +146,7 @@ describe('openPayment — the price fixed at creation (MOL-283)', () => {
     )
 
     expect(opened).toBeNull()
-    expect(payments.create).not.toHaveBeenCalled()
+    expect(payments.createWithin).not.toHaveBeenCalled()
   })
 
   it('never takes another provider’s rate while the CBA is silent (А3)', async () => {
@@ -131,7 +161,7 @@ describe('openPayment — the price fixed at creation (MOL-283)', () => {
     )
 
     expect(opened).toBeNull()
-    expect(payments.create).not.toHaveBeenCalled()
+    expect(payments.createWithin).not.toHaveBeenCalled()
   })
 
   it('refuses a tip of an amount not offered', async () => {
@@ -143,7 +173,7 @@ describe('openPayment — the price fixed at creation (MOL-283)', () => {
         { actorId: 'anna', tariff: 'tip', tipCents: 200n, channel: 'ameriabank', now },
       ),
     ).rejects.toThrow(expect.objectContaining({ code: ERROR.INVALID_AMOUNT }))
-    expect(payments.create).not.toHaveBeenCalled()
+    expect(payments.createWithin).not.toHaveBeenCalled()
   })
 })
 
@@ -217,5 +247,272 @@ describe('refundPayment — the bank first, the journal after', () => {
 
     await expect(refused).rejects.toThrow('the bank refunded 77000 of p1')
     await expect(refused).rejects.not.toBeInstanceOf(DomainError)
+  })
+})
+
+describe('the quota of payments a day (Р-12)', () => {
+  it('counts a rolling day of the person’s payments, and refuses past ten with nothing written', async () => {
+    const payments = journal()
+    await openPayment(
+      { payments, rates: rates([usd('2026-11-30')]) },
+      { actorId: 'anna', tariff: 'data', channel: 'ameriabank', now },
+    )
+    // a payment the bank never named counts only while its page may still be open (adversarial А5)
+    expect(payments.createWithin.mock.calls[0]?.[1]).toEqual({
+      max: 10,
+      since: new Date('2026-11-30T12:00:00Z'),
+      unnamedSince: new Date('2026-12-01T11:35:00Z'),
+    })
+
+    payments.createWithin.mockResolvedValueOnce(null)
+    await expect(
+      openPayment(
+        { payments, rates: rates([usd('2026-11-30')]) },
+        { actorId: 'anna', tariff: 'data', channel: 'ameriabank', now },
+      ),
+    ).rejects.toThrow(expect.objectContaining({ code: ERROR.PAYMENTS_DAY_LIMITED }))
+  })
+})
+
+describe('offerPayments — the prices today and where each term would end (MOL-277)', () => {
+  it('prices every tariff and tip, each term thirty days on from its own end or from now', async () => {
+    const payments = journal()
+    const running = new Date('2026-12-11T12:00:00Z')
+    payments.paidUntil.mockResolvedValueOnce({ sharedUntil: running, receiptsModelUntil: null })
+
+    const offer = await offerPayments({ payments, rates: rates([usd('2026-11-30')]) }, 'anna', now)
+
+    expect(offer.access).toEqual({ shared: running, receipts: null })
+    expect(offer.tariffs).toEqual([
+      {
+        tariff: 'data',
+        cents: 100,
+        amount: { minor: 39_000n, currency: 'AMD' },
+        after: { shared: new Date('2027-01-10T12:00:00Z'), receipts: null },
+      },
+      {
+        tariff: 'receipts',
+        cents: 200,
+        amount: { minor: 77_000n, currency: 'AMD' },
+        after: { shared: running, receipts: new Date('2026-12-31T12:00:00Z') },
+      },
+      {
+        tariff: 'both',
+        cents: 250,
+        amount: { minor: 96_000n, currency: 'AMD' },
+        after: {
+          shared: new Date('2027-01-10T12:00:00Z'),
+          receipts: new Date('2026-12-31T12:00:00Z'),
+        },
+      },
+    ])
+    expect(offer.tips?.map((tip) => [tip.cents, tip.amount.minor])).toEqual([
+      [100, 39_000n],
+      [300, 115_000n],
+      [500, 192_000n],
+    ])
+  })
+
+  it('says a term over as none where the tariff leaves it as it is (review №3)', async () => {
+    const payments = journal()
+    payments.paidUntil.mockResolvedValueOnce({
+      sharedUntil: null,
+      receiptsModelUntil: new Date('2026-11-20T12:00:00Z'),
+    })
+    const offer = await offerPayments({ payments, rates: rates([usd('2026-11-30')]) }, 'anna', now)
+    expect(offer.access.receipts).toBeNull()
+    expect(offer.tariffs?.find((t) => t.tariff === 'data')?.after.receipts).toBeNull()
+  })
+
+  it('offers no price while the CBA is silent, and still says the access', async () => {
+    const offer = await offerPayments(
+      { payments: journal(), rates: rates([usd('2026-11-01')]) },
+      'anna',
+      now,
+    )
+    expect(offer).toEqual({ access: { shared: null, receipts: null }, tariffs: null, tips: null })
+  })
+})
+
+describe('startPayment — written, then registered with the bank (requirement 3)', () => {
+  const deps = (payments = journal(), channel = bank()) => ({
+    payments,
+    rates: rates([usd('2026-11-30')]),
+    channel: channel.channel,
+    failed: vi.fn(),
+  })
+
+  it('writes the payment, names it by the bank’s id and sends the person to the bank’s page', async () => {
+    const payments = journal({ state: 'created', channelRef: null })
+    const channel = bank()
+
+    const started = await startPayment(deps(payments, channel), {
+      actorId: 'anna',
+      tariff: 'receipts',
+      lang: 'en',
+      now,
+      expected: AMD(77_000n),
+    })
+
+    expect(started.url).toBe('https://bank.test/Pay?id=A1B2&lang=ru')
+    // the row written is the row started: no second read (review №8)
+    expect(payments.get).not.toHaveBeenCalled()
+    expect(channel.start).toHaveBeenCalledWith(
+      expect.objectContaining({ id: started.id, orderNo: 1042n, state: 'created' }),
+      'en',
+    )
+    expect(payments.named).toHaveBeenCalledWith(started.id, 'A1B2')
+  })
+
+  it('a bank away or refusing is «try later» to the person and a failure to the owner, nothing named', async () => {
+    const payments = journal({ state: 'created', channelRef: null })
+    const channel = bank()
+    const away = new Error('ameriabank down')
+    channel.start.mockRejectedValueOnce(away)
+    const all = deps(payments, channel)
+
+    await expect(
+      startPayment(all, {
+        actorId: 'anna',
+        tariff: 'data',
+        lang: 'ru',
+        now,
+        expected: AMD(39_000n),
+      }),
+    ).rejects.toThrow(expect.objectContaining({ code: ERROR.PAYMENT_CHANNEL_UNAVAILABLE }))
+    expect(all.failed).toHaveBeenCalledWith(away)
+    expect(payments.named).not.toHaveBeenCalled()
+  })
+
+  it('a price other than the screen showed is refused before anything is written (adversarial А4)', async () => {
+    const payments = journal()
+    const channel = bank()
+    await expect(
+      startPayment(deps(payments, channel), {
+        actorId: 'anna',
+        tariff: 'receipts',
+        lang: 'ru',
+        now,
+        expected: AMD(76_000n),
+      }),
+    ).rejects.toThrow(expect.objectContaining({ code: ERROR.PAYMENT_PRICE_CHANGED }))
+    expect(payments.createWithin).not.toHaveBeenCalled()
+    expect(channel.start).not.toHaveBeenCalled()
+  })
+
+  it('no price today is refused before the bank', async () => {
+    const channel = bank()
+    await expect(
+      startPayment(
+        { ...deps(journal(), channel), rates: rates([]) },
+        { actorId: 'anna', tariff: 'data', lang: 'ru', now, expected: AMD(39_000n) },
+      ),
+    ).rejects.toThrow(expect.objectContaining({ code: ERROR.PAYMENT_UNPRICED }))
+    expect(channel.start).not.toHaveBeenCalled()
+  })
+})
+
+describe('confirmPayment — the return page asks what became of it (requirement 5)', () => {
+  const facts = { rrn: '626301234567', approvalCode: '123456' }
+
+  it('asks the bank of a payment still «created» and writes its word', async () => {
+    const payments = journal({ state: 'created' })
+    const { channel, check } = bank()
+    check.mockResolvedValueOnce({ said: 'paid', facts })
+    const until = new Date('2026-12-31T12:00:00Z')
+    payments.paidUntil.mockResolvedValueOnce({ sharedUntil: null, receiptsModelUntil: until })
+
+    const status = await confirmPayment(
+      { payments, channel, mayAsk: () => true, failed: vi.fn() },
+      'anna',
+      'p1',
+      now,
+    )
+
+    expect(payments.markPaid).toHaveBeenCalledWith('p1', facts, now)
+    expect(status).toEqual({
+      state: 'paid',
+      tariff: 'receipts',
+      amount: { minor: 77_000n, currency: 'AMD' },
+      access: { shared: null, receipts: until },
+    })
+  })
+
+  it('someone else’s payment and a missing one are one 404, the bank never asked', async () => {
+    const { channel, check } = bank()
+    const notMine = journal({ actorId: 'boris', state: 'created' })
+    const missing = journal()
+    missing.get.mockResolvedValueOnce(null)
+    for (const payments of [notMine, missing]) {
+      await expect(
+        confirmPayment(
+          { payments, channel, mayAsk: () => true, failed: vi.fn() },
+          'anna',
+          'p1',
+          now,
+        ),
+      ).rejects.toThrow(expect.objectContaining({ code: ERROR.NOT_FOUND }))
+    }
+    expect(check).not.toHaveBeenCalled()
+  })
+
+  it('asks nothing of a payment moved, or asked within five seconds', async () => {
+    const { channel, check } = bank()
+    await confirmPayment(
+      { payments: journal({ state: 'paid' }), channel, mayAsk: () => true, failed: vi.fn() },
+      'anna',
+      'p1',
+      now,
+    )
+    await confirmPayment(
+      { payments: journal({ state: 'created' }), channel, mayAsk: () => false, failed: vi.fn() },
+      'anna',
+      'p1',
+      now,
+    )
+    expect(check).not.toHaveBeenCalled()
+  })
+
+  it('a bank away answers the state as it stands, and the owner hears of it', async () => {
+    const { channel, check } = bank()
+    const away = new Error('down')
+    check.mockRejectedValueOnce(away)
+    const failed = vi.fn()
+
+    const status = await confirmPayment(
+      { payments: journal({ state: 'created' }), channel, mayAsk: () => true, failed },
+      'anna',
+      'p1',
+      now,
+    )
+
+    expect(status.state).toBe('created')
+    expect(failed).toHaveBeenCalledWith(away)
+  })
+})
+
+describe('paymentAskLimiter — once in five seconds a payment', () => {
+  it('lets a payment be asked again only after its five seconds, others at once', () => {
+    let clock = 0
+    const mayAsk = paymentAskLimiter(5_000, () => clock)
+    expect(mayAsk('p1')).toBe(true)
+    expect(mayAsk('p1')).toBe(false)
+    expect(mayAsk('p2')).toBe(true)
+    clock = 4_999
+    expect(mayAsk('p1')).toBe(false)
+    clock = 5_000
+    expect(mayAsk('p1')).toBe(true)
+  })
+})
+
+describe('rfCardRepeats — «У меня только карта РФ» counts people (adversarial А3)', () => {
+  it('takes an account’s second tap of the day as a repeat, the phone’s word too, and starts over each day', () => {
+    const again = rfCardRepeats()
+    expect(again('anna', false, now)).toBe(false)
+    expect(again('anna', false, now)).toBe(true)
+    expect(again('boris', false, now)).toBe(false)
+    expect(again('boris', true, now)).toBe(true)
+    // Yerevan's next day: 20:00 UTC
+    expect(again('anna', false, new Date('2026-12-01T20:00:00Z'))).toBe(false)
   })
 })

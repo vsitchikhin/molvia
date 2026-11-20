@@ -14,6 +14,7 @@ import {
   actors,
   items,
   loginDays,
+  rfCardDays,
   modelReceiptDays,
   receiptDays,
   reminderDays,
@@ -38,6 +39,8 @@ export interface GatesReport {
   readonly erased: ErasedInWindow
   readonly logins: LoginsInWindow
   readonly reminders: RemindersInWindow
+  /** «У меня только карта РФ» (MOL-277, Р-8): read beside the gates, no stop. */
+  readonly rfCards: RfCardsInWindow
   readonly receipts: ReceiptsInWindow
   /** The same of the receipts the model read (MOL-272, В-6): `model_receipt_days`. */
   readonly modelReceipts: ReceiptsInWindow
@@ -100,6 +103,14 @@ export interface LoginsInWindow {
   readonly lastDay: string
   /** The days that counted anything, in order. */
   readonly days: readonly LoginDay[]
+}
+
+/** «У меня только карта РФ» in the window (MOL-277, Р-8): taps, and of them a device's own again within a day. */
+export interface RfCardsInWindow {
+  readonly firstDay: string
+  readonly lastDay: string
+  readonly taps: number
+  readonly again: number
 }
 
 /**
@@ -197,6 +208,7 @@ export function createGatesReader(db: Db): GatesReader {
             erased: await erasedIn(tx, from, to),
             logins: await loginsIn(tx, from, to),
             reminders: await remindersIn(tx, from, to),
+            rfCards: await rfCardsIn(tx, from, to),
             receipts: await receiptsIn(tx, from, to, receiptDays),
             modelReceipts: await receiptsIn(tx, from, to, modelReceiptDays),
             taxReceipts: await taxReceiptsIn(tx, from, to),
@@ -262,6 +274,18 @@ async function loginsIn(tx: Conn, from: Date, to: Date): Promise<LoginsInWindow>
     .where(sql`${loginDays.day} between ${firstDay}::date and ${lastDay}::date`)
     .orderBy(loginDays.day)
   return { firstDay, lastDay, days: rows }
+}
+
+async function rfCardsIn(tx: Conn, from: Date, to: Date): Promise<RfCardsInWindow> {
+  const { firstDay, lastDay } = await daysOf(tx, from, to)
+  const [sums] = await tx
+    .select({
+      taps: sql<number>`coalesce(sum(${rfCardDays.taps}), 0)::int`,
+      again: sql<number>`coalesce(sum(${rfCardDays.again}), 0)::int`,
+    })
+    .from(rfCardDays)
+    .where(sql`${rfCardDays.day} between ${firstDay}::date and ${lastDay}::date`)
+  return { firstDay, lastDay, taps: sums?.taps ?? 0, again: sums?.again ?? 0 }
 }
 
 async function remindersIn(tx: Conn, from: Date, to: Date): Promise<RemindersInWindow> {

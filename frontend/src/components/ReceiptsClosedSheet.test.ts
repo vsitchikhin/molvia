@@ -6,6 +6,7 @@ import type { ReceiptsAccess, ReceiptsClosed } from '@molvia/model'
 import ReceiptsClosedSheet from '@/components/ReceiptsClosedSheet.vue'
 import { createAppI18n } from '@/i18n'
 import ru from '@/i18n/ru.json'
+import { hearFf } from '@/stores/ff'
 
 /** The sheet's frame drawn flat — its title, body and footer — since what is tested is the words and the ways. */
 const BottomSheet = defineComponent({
@@ -43,6 +44,7 @@ function render(reason: ReceiptsClosed, othersRead: boolean, access = TRIAL_OVER
 const buttons = (view: VueWrapper) => view.findAll('footer button').map((button) => button.text())
 
 afterEach(() => {
+  hearFf(new Set())
   for (const view of views.splice(0)) view.unmount()
   vi.useRealTimers()
 })
@@ -106,5 +108,28 @@ describe('«Пробные чеки закончились» (MOL-276)', () => {
     const footer = view.findAll('footer button')
     for (const button of footer) await button.trigger('click')
     expect(view.emitted('choose')).toEqual([['photo'], ['manual'], ['developer']])
+  })
+})
+
+describe('with payment open (MOL-277, В-7 «а»)', () => {
+  it('offers «Открыть за $2» first, says the price, and chooses the way of payment', async () => {
+    hearFf(new Set(['payments']))
+    const view = render('trial', false)
+
+    expect(buttons(view)[0]?.replace(/\u00a0/g, ' ')).toBe('Открыть за 2 $')
+    expect(
+      view
+        .get('.body')
+        .text()
+        .replace(/\u00a0/g, ' '),
+    ).toContain('Распознавание на 30 дней — 2 $, до 100 чеков в месяц')
+    await view.get('footer button').trigger('click')
+    expect(view.emitted('choose')).toEqual([['pay']])
+  })
+
+  it('offers no payment for the month’s hundred, which a payment does not lift', () => {
+    hearFf(new Set(['payments']))
+    const view = render('month', false)
+    expect(buttons(view)).not.toContain(expect.stringContaining('Открыть за'))
   })
 })

@@ -21,6 +21,7 @@ import {
   catalogueMerges,
   erasures,
   loginDays,
+  rfCardDays,
   payments,
   receiptDays,
   modelReceiptDays,
@@ -49,6 +50,8 @@ import {
   verdicts,
 } from '@/db/schema'
 import { onlyRow } from './rows'
+import type { PaymentChannelAdapter } from '@/usecases/payments'
+import { VposError } from '@/vpos/client'
 
 /**
  * The minimal rows a foreign key demands, so a test states only what it is actually about.
@@ -265,6 +268,7 @@ export async function clearAll(db: Db): Promise<void> {
   await db.delete(actors)
   await db.delete(erasures)
   await db.delete(loginDays)
+  await db.delete(rfCardDays)
   await db.delete(reminderDays)
   await db.delete(receiptDays)
   await db.delete(taxReceiptDays)
@@ -338,4 +342,21 @@ export function aScreenshot(width = 1179, height = 2556, { gps = false, seed = 0
     0xff,
     0xd9,
   ]).toString('base64')
+}
+
+/** A quota no test of the journal reaches: payments written as the application writes them (`createWithin`). */
+export const NO_QUOTA = { max: 1_000_000, since: new Date(0), unnamedSince: new Date(0) } as const
+
+/**
+ * A channel with no bank behind it, every call refused as a bank away (MOL-277, review №9): for a server a test turns
+ * `payments` on in and never pays through — production's channel comes from `VPOS_CONFIG`, which the фф requires.
+ */
+export function awayChannel(): PaymentChannelAdapter {
+  const away = (method: string) => () => Promise.reject(new VposError('unreachable', method))
+  return {
+    channel: 'ameriabank',
+    start: away('InitPayment'),
+    check: away('GetPaymentDetails'),
+    refund: away('RefundPayment'),
+  }
 }

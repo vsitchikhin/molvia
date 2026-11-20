@@ -8,6 +8,7 @@ import { createAppI18n } from '@/i18n'
 import ru from '@/i18n/ru.json'
 import { useActorStore } from '@/stores/actor'
 import { hearFf } from '@/stores/ff'
+import { createMemoryHistory, createRouter } from 'vue-router'
 
 const me = vi.fn()
 vi.mock('@/api', () => ({ api: { me: (...args: unknown[]) => me(...args) } }))
@@ -40,7 +41,17 @@ function render(actor: ActorView): VueWrapper {
   store.id = actor.id
   store.actor = actor
   store.state = 'ready'
-  const view = mount(ReceiptsAccessGroup, { global: { plugins: [pinia, createAppI18n('ru')] } })
+  // a router of the two places the row may lead: with payment open it is a link (MOL-277)
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [
+      { path: '/', name: 'settings', component: { render: () => null } },
+      { path: '/pay', name: 'pay', component: { render: () => null } },
+    ],
+  })
+  const view = mount(ReceiptsAccessGroup, {
+    global: { plugins: [pinia, router, createAppI18n('ru')] },
+  })
   views.push(view)
   return view
 }
@@ -92,6 +103,15 @@ describe('«Распознавание чеков» (MOL-276)', () => {
     expect(status(render({ ...ARMENIA, receiptsAccess: over }))).toContain(
       ru.receipts_access.status.trial_over_manual,
     )
+  })
+
+  it('opens the screen of payment, receipts chosen, while payment is open — a status with no chevron while not (MOL-277, В-7)', () => {
+    const over = { ...TRIAL, trialLeft: 0, read: 10 }
+    const closed = render({ ...ARMENIA, receiptsAccess: over })
+    expect(closed.find('a').exists()).toBe(false)
+    hearFf(new Set(['payments']))
+    const open = render({ ...ARMENIA, receiptsAccess: over })
+    expect(open.get('a.list-row').attributes('href')).toBe('/pay?tariff=receipts')
   })
 
   it('never promises Tesseract in Georgia, which it does not read', () => {

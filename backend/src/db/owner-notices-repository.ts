@@ -78,6 +78,12 @@ export interface OwnerNoticeRepository {
 
   /** One notice queued by itself, not with a failure: the phone's held back, told (MOL-144). */
   queue(notice: OwnerNotice, at: Date): Promise<void>
+
+  /**
+   * A notice queued unless the same one is in the table already (MOL-277): the reconciliation of payments looks at
+   * the same days again after every restart, and a mismatch is told once while its notice is kept.
+   */
+  queueOnce(notice: OwnerNotice, at: Date): Promise<void>
 }
 
 /**
@@ -122,6 +128,16 @@ export function createOwnerNoticeRepository(db: Conn): OwnerNoticeRepository {
 
     async queue(notice, at) {
       await db.insert(ownerNotices).values({ kind: notice.kind, payload: notice, createdAt: at })
+    },
+
+    async queueOnce(notice, at) {
+      const payload = JSON.stringify(notice)
+      await db.execute(sql`
+        insert into ${ownerNotices} (kind, payload, created_at)
+        select ${notice.kind}, ${payload}::jsonb, ${at.toISOString()}::timestamptz
+        where not exists (
+          select 1 from ${ownerNotices}
+          where ${ownerNotices.kind} = ${notice.kind} and ${ownerNotices.payload} = ${payload}::jsonb)`)
     },
 
     async markSent(messages, at, missed = []) {

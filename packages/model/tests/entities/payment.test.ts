@@ -9,6 +9,7 @@ import {
   refundSum,
   refundedUntil,
   unlivedMs,
+  wholeMajor,
 } from '#model/entities/payment'
 import { DomainError, ERROR } from '#model/support/errors'
 import { parseRate } from '#model/values/rates'
@@ -174,5 +175,13 @@ describe('refundedUntil — a whole refund takes back the days not lived (owner�
     expect(refundedUntil(past, days(now, 30), now)).toEqual(past)
     expect(refundedUntil(now, days(now, 30), now)).toEqual(now)
     expect(refundedUntil(days(now, 10), null, now)).toEqual(days(now, 10))
+  })
+})
+
+describe('wholeMajor — whole drams for the bank, or none (MOL-277, review №7)', () => {
+  it('is the major units of a whole sum, none of one with a fraction', () => {
+    expect(wholeMajor({ minor: 77_000n, currency: 'AMD' })).toBe(770n)
+    expect(wholeMajor({ minor: 10_050n, currency: 'AMD' })).toBeNull()
+    expect(wholeMajor({ minor: 0n, currency: 'AMD' })).toBe(0n)
   })
 })

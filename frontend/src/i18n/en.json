@@ -1540,6 +1540,10 @@
     "receipts_day_limited": "You’ve sent a lot of receipts today. Send this one tomorrow",
     "receipts_unrecorded_limited": "A lot of receipts are waiting to be recorded. Record or delete them first",
     "items_day_limited": "You’ve added a lot of items today. You can add more tomorrow",
+    "payments_day_limited": "You’ve started a lot of payments today. Try again tomorrow",
+    "payment_unpriced": "The Central Bank of Armenia hasn’t published today’s rate yet — payment opens as soon as it does",
+    "payment_channel_unavailable": "The bank isn’t answering right now. Nothing was charged — try again later",
+    "payment_price_changed": "The price changed: the Central Bank of Armenia updated its rate. Check the new price and tap again",
     "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow",
     "feedback_picture_invalid": "This picture can’t be used — choose another one",
     "feedback_picture_too_large": "The picture is too large — choose another one",
@@ -2379,6 +2383,83 @@
       "Нови-Сад": "in Novi Sad"
     }
   },
+  "pay": {
+    "title": "Payment",
+    "group_tariffs": "For 30 days",
+    "group_tip": "Support the developer",
+    "tariff": {
+      "data": "Other people’s ratings and prices",
+      "receipts": "Receipt recognition",
+      "both": "Both"
+    },
+    "meta": {
+      "opens": "closed now → until {after}",
+      "extends": "open until {now} → extends to {after}",
+      "receipts": "Up to 100 receipts a month",
+      "both": "Each from its own term"
+    },
+    "note": "Charged in drams at today’s Central Bank of Armenia rate. No automatic renewals.",
+    "pay": "Pay by card {amount}",
+    "starting": "Opening the bank…",
+    "rf_card": "I only have a Russian card",
+    "refused": {
+      "offline": "No connection — the bank can’t open. Nothing was charged",
+      "error": "Couldn’t open the bank. Nothing was charged — try again"
+    },
+    "load_error": {
+      "title": "Couldn’t load the prices",
+      "body": "The server didn’t answer — the prices didn’t load. Try again"
+    },
+    "offline": {
+      "title": "No connection",
+      "body": "Prices are today’s and come from the server. We’ll open them as soon as you’re back online"
+    },
+    "unpriced": {
+      "title": "Payment is closed for now",
+      "body": "The Central Bank of Armenia hasn’t published today’s dollar rate yet — the price in drams is counted by it alone. We’ll open as soon as it’s out"
+    },
+    "rf": {
+      "title": "Cards of Russian banks",
+      "body": "For now we accept only cards issued outside Russia. We’ve noted that you need one — taps like this decide whether we look for a way.",
+      "ok": "Got it"
+    },
+    "done": {
+      "ok": "Done",
+      "paid": {
+        "title": "Paid",
+        "receipts": "Receipt recognition is open until {until}.",
+        "data": "Other people’s ratings and prices are open until {until}.",
+        "both": "Other people’s ratings and prices are open until {shared}, receipt recognition until {receipts}.",
+        "tip": "Thank you for supporting the developer.",
+        "plain": "The payment went through."
+      },
+      "refunded": {
+        "title": "Money refunded",
+        "body": "The payment went back to your card."
+      },
+      "waiting": {
+        "title": "The bank hasn’t confirmed the payment yet",
+        "body": "We’ll check it ourselves within a minute — you can close this screen."
+      },
+      "failed": {
+        "title": "The payment didn’t go through",
+        "body": "Nothing was charged.",
+        "again": "Try again"
+      },
+      "missing": {
+        "title": "No such payment",
+        "body": "This link leads to none of your payments."
+      },
+      "error": {
+        "title": "Couldn’t check the payment",
+        "body": "The server didn’t answer. If you were charged, the payment won’t be lost — we check it with the bank ourselves"
+      },
+      "offline": {
+        "title": "No connection",
+        "body": "We’ll check the payment as soon as you’re back online. If you were charged, it won’t be lost"
+      }
+    }
+  },
   "receipts_access": {
     "title": "Receipt reading",
     "status": {
@@ -2401,7 +2482,10 @@
       "month_title": "This month’s hundred receipts are read",
       "month_read": "{limit} of {limit} receipts read in {month}. Again from {next}. Until then simple recognition reads them — it makes more mistakes, so check the lines.",
       "month_manual": "{limit} of {limit} receipts read in {month}. Again from {next}. Until then purchases can be recorded by hand.",
-      "photograph": "Photograph"
+      "photograph": "Photograph",
+      "pay": "Open for {price}",
+      "trial_pay": "You’ve recognised {of} receipts. Recognition for 30 days is {price}, up to 100 receipts a month. Or record your purchases by hand.",
+      "ended_pay": "Your paid term ended on {date}, and the trial receipts are spent too. Recognition for 30 more days is {price}, up to 100 receipts a month. Or record your purchases by hand."
     }
   },
   "receipt": {

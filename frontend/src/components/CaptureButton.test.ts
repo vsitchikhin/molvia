@@ -103,6 +103,7 @@ async function rendered(actor: ActorView, country: ReceiptCountry = 'AM') {
     routes: [
       { path: '/', name: 'advice', component: blank },
       { path: '/purchases', name: 'purchases', component: blank },
+      { path: '/pay', name: 'pay', component: blank },
     ],
   })
   await router.push('/purchases')
@@ -114,7 +115,7 @@ async function rendered(actor: ActorView, country: ReceiptCountry = 'AM') {
     },
   })
   views.push(view)
-  return { view, store }
+  return { view, store, router }
 }
 
 /** An answer of `/actors/me` landing while the screen is open (`verify` as the app comes back). */
@@ -129,7 +130,10 @@ async function tap(view: VueWrapper): Promise<void> {
 }
 
 /** The sheet put away with one of its ways chosen, as `BottomSheet` tells it once it is down. */
-async function choose(view: VueWrapper, way: 'photo' | 'manual' | 'developer'): Promise<void> {
+async function choose(
+  view: VueWrapper,
+  way: 'photo' | 'manual' | 'developer' | 'pay',
+): Promise<void> {
   const sheet = view.findComponent(ReceiptsClosedSheet)
   sheet.vm.$emit('choose', way)
   await flushPromises()
@@ -279,6 +283,15 @@ describe('«Сфотографировать чек» where the model reads no m
     expect(feedback.shown).toBe(true)
     // never «the settings» it is not (review №5)
     expect(feedback.entry).toEqual({ from: 'receipts-closed' })
+    expect(begin).not.toHaveBeenCalled()
+  })
+
+  it('«Открыть за $2» opens the screen of payment, receipts chosen, once the sheet is away (MOL-277)', async () => {
+    hearFf(new Set(['payments']))
+    const { view, router } = await rendered({ ...ARMENIA, receiptsAccess: TRIAL_OVER })
+    await tap(view)
+    await choose(view, 'pay')
+    expect(router.currentRoute.value.fullPath).toBe('/pay?tariff=receipts')
     expect(begin).not.toHaveBeenCalled()
   })
 

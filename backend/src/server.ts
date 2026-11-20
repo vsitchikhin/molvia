@@ -22,7 +22,7 @@ import {
 } from '@molvia/model'
 import type { ErrorCode, ErrorResponse, FfName, TelegramUserId } from '@molvia/model'
 import { InvalidBody } from '@/parse'
-import { FF_ON, VERSION, env, loginConfig } from '@/env'
+import { FF_ON, VERSION, VPOS_CONFIG, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
@@ -72,7 +72,26 @@ import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
 import { claimLoginNotices, endSessionFromBot, loginNoticesTold } from '@/usecases/tell-logins'
 import { SILENCE_ERASE_EVERY_MS, claimSilenceNotices, eraseSilent } from '@/usecases/silence'
-import { PAYMENT_SWEEP_EVERY_MS } from '@/usecases/payments'
+import {
+  PAYMENT_SWEEP_EVERY_MS,
+  confirmPayment,
+  offerPayments,
+  paymentAskLimiter,
+  rfCardRepeats,
+  startPayment,
+} from '@/usecases/payments'
+import type { PaymentChannelAdapter } from '@/usecases/payments'
+import {
+  PAYMENT_LIST_EVERY_MS,
+  PAYMENT_RECONCILE_EVERY_MS,
+  reconcilePending,
+  reconcileWithList,
+} from '@/usecases/reconcile-payments'
+import { createRateRepository } from '@/db/rates-repository'
+import { paymentRoutes } from '@/routes/payments'
+import { vposClient } from '@/vpos/client'
+import type { VposClient } from '@/vpos/client'
+import { ameriabankChannel } from '@/vpos/ameriabank'
 import { exportMine } from '@/usecases/export-mine'
 import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
 import { feedbackFromBot } from '@/usecases/feedback-from-bot'
@@ -247,6 +266,12 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.CLIENT_ERRORS_RATE_LIMITED]: 429,
   [ERROR.RECEIPTS_DAY_LIMITED]: 429,
   [ERROR.ITEMS_DAY_LIMITED]: 429,
+  [ERROR.PAYMENTS_DAY_LIMITED]: 429,
+  // The CBA silent today: the state of the world refuses it, the request is well formed.
+  [ERROR.PAYMENT_UNPRICED]: 409,
+  // The price moved under the button: the world's state, the request well formed (adversarial А4).
+  [ERROR.PAYMENT_PRICE_CHANGED]: 409,
+  [ERROR.PAYMENT_CHANNEL_UNAVAILABLE]: 503,
   [ERROR.RECEIPTS_UNRECORDED_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
@@ -434,6 +459,11 @@ export interface ServerOptions {
    * API does not have — the same 404, before any session.
    */
   readonly ff?: ReadonlySet<FfName>
+  /**
+   * The channel of payment by card (MOL-277), used only while the фф `payments` is on. Absent, Ameriabank's by
+   * `VPOS_CONFIG`; a test names its own.
+   */
+  readonly paymentChannel?: PaymentChannelAdapter
 }
 
 /**
@@ -545,6 +575,30 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   // A sweep that failed after an erasure committed (MOL-374): the minute timer takes the items left.
   const sweepFailed = (error: unknown): void => {
     failures.report(error, job('released-items'), 'released items sweep failed')
+  }
+
+  // Payment by card (MOL-277): the channel exists only while the фф is on; a server a test turns it on in with no
+  // bank configured has one that refuses, as a bank away does.
+  // Payment by card (MOL-277), only while its фф is on: a test's channel, or Ameriabank's by `VPOS_CONFIG` — which
+  // the environment requires with the фф on (review №9), so a server with neither is a test that named no channel.
+  let bankClient: VposClient | null = null
+  let paymentChannel: PaymentChannelAdapter | null = null
+  if (ff.has('payments')) {
+    if (options.paymentChannel !== undefined) {
+      paymentChannel = options.paymentChannel
+    } else if (VPOS_CONFIG === null) {
+      throw new Error('payments on with no bank: VPOS_CONFIG, or a paymentChannel of the test')
+    } else {
+      bankClient = vposClient(VPOS_CONFIG)
+      paymentChannel = ameriabankChannel({
+        client: bankClient,
+        stand: VPOS_CONFIG.stand,
+        appBaseUrl: VPOS_CONFIG.appBaseUrl,
+        strange: (error) => {
+          failures.report(error, job('payment-bank'), 'bank said what the journal leaves')
+        },
+      })
+    }
   }
 
   // The auth scopes set `no-store` on what their routes answer, but a path no route matches
@@ -709,6 +763,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopMergeTwins: (() => Promise<void>) | undefined
     let stopSilence: (() => Promise<void>) | undefined
     let stopPaymentSweep: (() => Promise<void>) | undefined
+    let stopPaymentReconcile: (() => Promise<void>) | undefined
+    let stopPaymentList: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
     let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
     instance.addHook('onReady', (ready) => {
@@ -890,6 +946,47 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         },
         PAYMENT_SWEEP_EVERY_MS,
       )
+      // Payment by card (MOL-277), only while its фф is on: the bank sends no word of its own, so each page still
+      // open is asked every minute, and the bank's list of the days before once a day (В-5 «а»).
+      if (paymentChannel !== null) {
+        const payments = createPaymentsRepository(db)
+        const paymentFailed = (name: string) => (error: unknown) => {
+          failures.report(error, job(name), 'payment reconciliation failed')
+        }
+        stopPaymentReconcile = startLoginCleanup(
+          async () => {
+            await reconcilePending(
+              { payments, channel: paymentChannel, failed: paymentFailed('payment-reconcile') },
+              new Date(),
+            )
+          },
+          paymentFailed('payment-reconcile'),
+          PAYMENT_RECONCILE_EVERY_MS,
+        )
+        if (bankClient !== null) {
+          const notices = createOwnerNoticeRepository(db)
+          stopPaymentList = startLoginCleanup(
+            async () => {
+              await reconcileWithList(
+                {
+                  payments,
+                  channel: paymentChannel,
+                  operations: (from, to) => bankClient.operations(from, to),
+                  // a copy has no owner to tell: the mismatch is the log's
+                  tell: async (notice) => {
+                    if (owner !== null) return notices.queueOnce(notice, new Date())
+                    instance.log.warn({ notice }, 'payment mismatch')
+                  },
+                  failed: paymentFailed('payment-list'),
+                },
+                new Date(),
+              )
+            },
+            paymentFailed('payment-list'),
+            PAYMENT_LIST_EVERY_MS,
+          )
+        }
+      }
       // Receipts (MOL-125): a removal final after its ten minutes, a receipt not recorded after its
       // 28 days, a line cut out for training 28 days after it was confirmed.
       stopReceiptCleanup = startLoginCleanup(
@@ -1123,6 +1220,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopMergeTwins?.()
       await stopSilence?.()
       await stopPaymentSweep?.()
+      await stopPaymentReconcile?.()
+      await stopPaymentList?.()
       await itemEmbedding?.stop()
       await stopReceiptCleanup?.()
       await receiptQueue?.stop()
@@ -1315,6 +1414,44 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         setting: (owner) => analyticsOf(events, owner),
         choose: (owner, body) => chooseAnalytics(events, owner, body),
       })
+      if (paymentChannel !== null) {
+        const payments = createPaymentsRepository(db)
+        const rates = createRateRepository(db)
+        const mayAsk = paymentAskLimiter()
+        const rfCardAgain = rfCardRepeats()
+        const failedAt = (route: string) => (error: unknown) => {
+          failures.report(error, { source: 'api', route }, 'bank did not answer a payment')
+        }
+        paymentRoutes(guarded, {
+          offer: (actorId) => offerPayments({ payments, rates }, actorId, new Date()),
+          start: (actorId, body) =>
+            startPayment(
+              { payments, rates, channel: paymentChannel, failed: failedAt('POST /payments') },
+              {
+                actorId,
+                lang: body.lang,
+                now: new Date(),
+                expected: body.amount,
+                ...(body.tariff === 'tip'
+                  ? { tariff: 'tip', tipCents: BigInt(body.tipCents) }
+                  : { tariff: body.tariff }),
+              },
+            ),
+          status: (actorId, id) =>
+            confirmPayment(
+              {
+                payments,
+                channel: paymentChannel,
+                mayAsk,
+                failed: failedAt('GET /payments/:paymentId'),
+              },
+              actorId,
+              id,
+              new Date(),
+            ),
+          rfCard: (actorId, again) => payments.tapRfCard(rfCardAgain(actorId, again, new Date())),
+        })
+      }
       consentRoutes(guarded, {
         consent: (owner) => consentOf(actors, { id: owner }),
         accept: (owner, body) => acceptConsent(actors, { id: owner }, body),

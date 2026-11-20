@@ -759,6 +759,13 @@ describe('ownerText — траты на чтение чеков моделью (
 })
 
 describe('ownerText — доля человека в тратах модели (MOL-367, В-3 «а»)', () => {
+  it('says a payment that disagrees with the bank by its order and the two states, nothing of the person (MOL-277)', () => {
+    expect(
+      ownerText({ kind: 'payment_mismatch', orderNo: '1042', bank: '2', journal: 'declined' }),
+    ).toBe(
+      '💳 Платёж №1042 расходится с банком: у банка 2, в журнале declined. Сверьте в кабинете банка.',
+    )
+  })
   it('называет месяц и долю в долларах до цента, никого не называя', () => {
     expect(ownerText({ kind: 'model_share', month: '2026-11-01', shareMicroUsd: 2_000_000 })).toBe(
       '✋ Чеки моделью за 2026-11: один человек выбрал свою долю $2.00. Дальше модель читает ему только то, что ещё влезает в долю, остальное — Tesseract; остальным — как прежде.',

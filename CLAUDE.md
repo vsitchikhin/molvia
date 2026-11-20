@@ -551,6 +551,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Erasure lets the person go and keeps the payment** (`set null`, Ameriabank's three years); every payment goes three
   years after its last movement — a paid one after its days too — one unnamed and unpaid goes with the person; the
   holder's name, email and card are never kept.
+- **Ameriabank's «paid» is the bank's word on our own saved id, never the address it sends the browser back to**
+  (MOL-277): `00`, state `2`, our order, sum and dram; a `5` or a mismatch is the owner's to hear, never acted on. The
+  bank sends no word of its own, so the minute asks each open page up to 25 minutes and the day's list is reconciled.
+- **Payment by card is the фф `payments`, and with it on the bank is required** (`VPOS_STAND` and the merchant's three
+  values — the API does not start without them); the merchant's values go in a call's body and nowhere else.
 
 ### Feedback: «Написать разработчику» — `.claude/rules/feedback.md`
 

@@ -5,6 +5,16 @@ paths:
   - 'backend/src/usecases/payments*.ts'
   - 'backend/src/db/payments-repository.ts'
   - 'backend/tests/payments.integration.test.ts'
+  - 'backend/tests/payments-*.integration.test.ts'
+  - 'backend/src/vpos/**'
+  - 'backend/src/routes/payments.ts'
+  - 'backend/src/usecases/reconcile-payments*.ts'
+  - 'backend/src/refund*.ts'
+  - 'packages/model/src/contracts/payment.ts'
+  - 'frontend/src/views/Pay*.vue'
+  - 'frontend/src/composables/usePaymentOffer.ts'
+  - 'frontend/src/components/RfCardSheet.vue'
+  - 'bin/fake-vpos.mjs'
 ---
 
 # Payments: the journal, tariffs, access paid for
@@ -99,10 +109,107 @@ MOL-283 (В-1), 20.11.2026; rounds 1–2 of its review and adversarial (`.scratc
 - **The privacy page names payments in MOL-277's edition**, with Ameriabank as a recipient: without a channel no row
   is ever written. The record of processing (Confluence 12091393) names the journal as row 17 (v42).
 
+## Ameriabank vPOS, the first channel (MOL-277)
+
+Owner's lavish of 20.11.2026, В-1…В-7 and Р-1…Р-13 (`.scratch/tasks/plans/MOL-277.md`); the bank's API as it was read —
+`.scratch/tasks/research/MOL-281.md`.
+
+- **Behind the фф `payments`, off until the bank is connected** (MOL-382; on not before 01.01.2027, MOL-282): off, its
+  routes, its timers and its entries on the phone are not there at all. **On, the bank is required** (`vposConfiguration`):
+  `VPOS_STAND` (`test`, `live`; `local` is end-to-end's fake and never production) and the merchant's three values —
+  missing, the API does not start, naming the variable and never its value. The test stand takes 10 ֏ whatever the
+  tariff (`chargedDrams`). **The bank takes whole drams** (`wholeMajor`, review №7): a sum with a fraction is refused
+  before the bank — by the channel and by `make refund` alike — never sent for the bank to refuse.
+- **The host is the code's by the stand, never a request's** (`VPOS_HOSTS`, SSRF), every answer through `boundedBody`,
+  15 s a call. **The merchant's values are in every body and nowhere else**: a failed call keeps no cause — the cause
+  carried the request — and an error names the method and the bank's code alone (`VposError`).
+- **The bank's codes are read whatever their type** — `1` an integer, `"00"` a string, `OrderStatus` either — **and never
+  by the HTTP status**: a wrong password is a 200 with `20`, and **a 500 of `GetPaymentDetails` is «not paid yet»**, no
+  failure (MOL-281 §1).
+- **«Paid» only by the bank's word on our own saved id** (`judged`, requirement 4): `ResponseCode "00"`, `OrderStatus "2"`,
+  our `OrderID`, `"051"`, `ApprovedAmount` the sum charged. The address the bank sends the browser back to is a hint of
+  which payment to open, never a word of what became of it — `resposneCode=00` is typed by hand. `6` and `3` are
+  declined; nothing tried and the page's time out are waiting, for the reconciliation. **A `5`, a «paid» of another
+  order, sum or currency, and a refund we never made are told to the owner and never acted on** (`VposStrangeAnswer`,
+  `job:payment-bank`, Р-2).
+- **A lost answer of `InitPayment` is found by our order's number** (`GetPaymentId`), else the same body again — never a
+  new one: a repeat with another body rewrites the order (MOL-281 §4). A new tap of the person is a new order.
+- **An order number the bank already holds is never registered** (adversarial А2): before `InitPayment` the channel asks
+  `GetPaymentId`, and an id there is `order_number_taken` — a 503 to the person, a failure to the owner. A journal
+  restored from a copy, or a copy of development on the test stand, counts from numbers the bank has seen; registered,
+  the bank's «paid» of the other order would open this one's access. **`VPOS_ORDER_OFFSET` moves our numbers into a range
+  of their own** (0 on the live stand): added on the way to the bank, taken off on the way back, and a listed number below
+  it is none of ours. **`GetPaymentId` judges its code** (review №11): no id with `06`, no code or a nil id is «the bank
+  has no such order»; no id with any other code — a wrong password's `20` among them — is a refusal.
+- **The bank sends the browser back to the PWA, never the API** (`BackURL` = `APP_BASE_URL/pay/done/<payment>`): a
+  navigation from another site is a 404 at the API (MOL-368), so the page opens from the worker and asks by its own
+  `fetch`. The payment's id is in the path: the bank adds its own query to the address it was given.
+- **The return page asks the bank at most once in five seconds a payment** (`paymentAskLimiter`, in the API's memory),
+  however often it is asked; a bank away answers the state as it stands. The page asks again every five seconds for a
+  minute, then the server's minute is the one that asks.
+- **The minute's reconciliation** (`reconcilePending`, Р-4): every «created» from its first minute to 25 — the page's
+  1200 s and five minutes more — is asked, its word written as the return page's; at 25 the last answer that is not
+  «paid» abandons it. A bank away leaves it for the next minute, and each failure is told. At most a hundred a minute.
+- **The day's reconciliation by the bank's list** (`reconcileWithList`, В-5 «а»): the SOAP `GetTransactionList` of the
+  two days before today in Yerevan against the journal — `from` is `to` less two days, Yerevan keeping no summer time.
+  The states are read as digits and as the manual's words (`payment_deposited`, `payment_refunded`, `payment_void`):
+  which of them the list sends, only the stand will say. An order the bank took money for (`2`, `4`) that the journal has
+  not as paid is asked by its own id and settled; what still disagrees — either way round — is a `payment_mismatch`
+  notice to the owner by the order's number and the two states, nothing of the person, queued once (`queueOnce`): every
+  restart looks at the same days again. **A journal's «refunded» and the bank's void (`3`) are one fact** (adversarial
+  А1): a whole refund within 72 hours is `CancelPayment`, which the bank lists as void, not refunded — told as a
+  mismatch, the owner heard of every whole refund of its first three days. A void the journal holds as paid is still
+  told. An order the bank lists that is no number of ours is a failure, never a notice.
+  A copy with no owner logs it. Only with a real bank: a channel a test names has no list.
+- **The price is today's and the screen's figures are the server's** (Р-1): `GET /payments/tariffs` says the access as
+  it stands — a term already over is none, so the phone keeps no clock — each tariff's price and where its terms would
+  end once paid now, and the tips; no CBA rate fresh for today, no prices, and the screen says it as attention, never an
+  error. `POST /payments` with no price is `409 error.payment_unpriced`. **The start names the price the screen showed**
+  (`amount`, adversarial А4): the rate the API refreshes hourly may move while the screen stands open, and the bank was
+  asked 790 ֏ of a person who tapped «770 ֏». Another price than today's is `409 error.payment_price_changed`, nothing
+  written; the screen reads the offer again and says so.
+- **A payment is started at most ten times a rolling day a person** (`PAYMENTS_DAY_MAX`, Р-12, MOL-287's rule of a new
+  write path): counted from the journal under the person's row lock (`createWithin`), past it `429
+error.payments_day_limited`, nothing written. **A payment the bank never named counts only while its page may still be
+  open** (`PAYMENT_PAGE_MS`, 25 minutes, adversarial А5): ten taps with the bank away used the day up, and the bank back,
+  the person was refused for 24 hours for money never charged. Not at once: a bank that did not answer may have
+  registered the order, and its page lives that long. **A bank that did not register the order is `503
+error.payment_channel_unavailable`**: nothing charged, the owner hears the failure, and the row the bank never named is
+  abandoned by the minute.
+- **«Оплата» on the phone** (`PayView`, В-6 «а»: the kit, by the lavish's mockups): three tariffs, one chosen — `?tariff=`
+  from the receipts' sheet and the settings' row, receipts by default — a price in dollars and drams, «открыто до → продлит
+  до», one button «Оплатить картой N ֏», the tips at the bottom (В-4 «а»). The bank's page is left by a full navigation
+  (`openBankPage`), never the router. Nothing kept: a price is today's.
+- **The entries are payment's only while the фф is on** (В-7 «а»): «Открыть за $2» first in «Пробные чеки закончились»
+  and «Распознавание закончилось» — never in «Сотня чеков месяца прочитана», which a payment does not lift — and a chevron
+  on «Распознавание чеков» of «Настройки». «Чужие данные» is MOL-395's.
+- **«У меня только карта РФ»** (Р-8): a sheet that says the bank takes no card a Russian bank issued (MOL-282), and a tap
+  counted by Yerevan's day with no id (`rf_card_days`) — the device's own repeat within a day apart, as the login's — read
+  in `make gates` with no stop. **An account's second tap of the day is a repeat whatever the phone says** (adversarial
+  А3, `rfCardRepeats`): one account's three hundred taps were three hundred people. The accounts of today are kept in
+  the API's memory, never a table — a count is nobody's.
+- **The owner refunds by `make refund ORDER= [AMOUNT=] [YES=1]`** (Р-9; `dist/refund.js` on production): a dry run
+  without `YES=1`, the bank first, the journal after; the whole sum within 72 hours is `CancelPayment`, else
+  `RefundPayment` — «whole» there is `untouched`, nothing refunded before; the journal's «the rest given back», which
+  returns the days, is another rule (review №13). The bank's values are read for a real refund only, whether the фф is
+  on or not, and without `APP_BASE_URL` (`vposBank`): a refund sends nobody to the bank's page. A refusal says the
+  rule's own reason (`refundSum`).
+- **The bot says nothing of payment** (Р-11): Telegram's rules for digital goods.
+
 ## The price, named
 
-- **Nothing writes a row before MOL-277**: the journal ships unused — no route, no screen, no фф needed, since no person
-  can reach it.
+- **End-to-end starts no payment**: its database keeps no CBA rate (`money.spec` holds dollars «не посчитано» on that),
+  so the screen says «no price» there; the way to the bank and back is held by the integration test with a channel of
+  its own and the components'. The fake bank (`bin/fake-vpos.mjs`) is there so the API starts with every фф on.
+- **The minute reads the «created» payments with no index of their own**: a few dozen payers a month (MOL-271); an
+  index comes when the table says it needs one.
+- **The ask limiter and the bank's answers live in the API's process** — there is one; a restart forgets which payment
+  was asked a second ago, and asks it once more. **So do today's taps of «У меня только карта РФ»**: a restart counts an
+  account's next tap of the day as a first.
+- **A payment the bank was away for counts in the day for its 25 minutes** (А5): ten taps in a row with the bank away
+  still refuse the eleventh until the first of them is past its page.
+- **What the bank's list and `GetPaymentId` answer is read from the manual, not the stand** (MOL-281 §1): the states as
+  digits or as words, and `GetPaymentId`'s code beside an empty id — the first answers of the test stand settle them.
 - **«Paid» locks the person's row**: a payment confirmed while that person records a receipt waits for it, a moment.
 - **No index waits for a reader** (review №7): the sweep of payments abandoned by time, and its index, come with
   MOL-277, which reads them.

@@ -118,6 +118,8 @@ describe('словарь: повторяющиеся тексты', () => {
       Готово: [
         'accounts.done',
         'feedback.done',
+        // экран возврата из банка (MOL-277)
+        'pay.done.ok',
         'receipt.added.done',
         'receipt.edges.done',
         'receipt.place.done',
@@ -198,6 +200,10 @@ describe('словарь: повторяющиеся тексты', () => {
       // Выход с экрана чека, которого больше нет, и с шторки покупки без записи — одни слова о
       // том же месте (MOL-127). И из пустых «Оценок» новичка (MOL-214, 7b).
       'К покупкам': ['item.no_trip.action', 'receipt.gone.action', 'verdict.none.action'],
+      // Тариф чеков называется так же, как его статус в «Настройках» (MOL-277).
+      'Распознавание чеков': ['pay.tariff.receipts', 'receipts_access.title'],
+      // Шторка, которая только говорит, закрывается одним словом (MOL-163, MOL-277).
+      Понятно: ['pay.rf.ok', 'scanner.camera_hint_ok'],
       // Та же цена у офлайна: у настроек, у обменов, у доходов и у устройств своё состояние
       // (MOL-40, MOL-57, MOL-66).
       'Нет связи': [
@@ -206,6 +212,9 @@ describe('словарь: повторяющиеся тексты', () => {
         'devices.offline.title',
         'exchange.offline.title',
         'income.offline.title',
+        // экран оплаты и возврата из банка (MOL-277)
+        'pay.done.offline.title',
+        'pay.offline.title',
         'settings.offline.title',
         'spending.categories.offline.title',
         'spending.offline.title',
@@ -352,6 +361,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Done: [
         'accounts.done',
         'feedback.done',
+        'pay.done.ok',
         'receipt.added.done',
         'receipt.edges.done',
         'receipt.place.done',
@@ -447,6 +457,8 @@ describe('словарь: повторяющиеся тексты', () => {
         'devices.offline.title',
         'exchange.offline.title',
         'income.offline.title',
+        'pay.done.offline.title',
+        'pay.offline.title',
         'settings.offline.title',
         'spending.categories.offline.title',
         'spending.offline.title',
@@ -509,6 +521,7 @@ describe('словарь: повторяющиеся тексты', () => {
       Exchange: ['accounts.account.exchange', 'exchange.sheet.title'],
       Gave: ['exchange.card_given', 'exchange.sheet.given'],
       Got: ['exchange.card_received', 'exchange.sheet.received'],
+      'Got it': ['pay.rf.ok', 'scanner.camera_hint_ok'],
       'open.er-api.com': ['exchange.card_source_erapi', 'trip.rate.source_erapi'],
       // One English word for a trip's total and the accounts' (MOL-123); Russian says «Итого».
       Total: ['accounts.total', 'trip.total'],
@@ -533,7 +546,7 @@ describe('словарь: повторяющиеся тексты', () => {
       // «Переснять» of a receipt's part and of the QR code: one verb in English (MOL-398).
       Retake: ['receipt.capture.retake', 'receipt.qr.retake'],
       Transfer: ['accounts.account.transfer', 'transfer.row_meta', 'transfer.title'],
-      'Try again': ['state.retry', 'transfer.failed_retry'],
+      'Try again': ['pay.done.failed.again', 'state.retry', 'transfer.failed_retry'],
     })
   })
 })

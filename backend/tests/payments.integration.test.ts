@@ -7,7 +7,7 @@ import { createErasureRepository } from '@/db/erasure-repository'
 import { createPaymentsRepository } from '@/db/payments-repository'
 import { actors, payments } from '@/db/schema'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, telegramId } from './fixtures'
+import { NO_QUOTA, clearAll, insertActor, telegramId } from './fixtures'
 import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
@@ -25,21 +25,24 @@ const conflict = { code: ERROR.CONFLICT }
 
 async function aPayment(actorId: string, tariff: PaymentTariff = 'receipts', minor = 77_000n) {
   const id = randomUUID()
-  await journal.create({
-    id,
-    actorId,
-    tariff,
-    anchor: { minor: 200n, currency: 'USD' },
-    rate: {
-      base: 'USD',
-      quote: 'AMD',
-      scaled: 383_120_000n,
-      source: 'official',
-      asOf: new Date('2026-11-30T00:00:00+04:00'),
+  await journal.createWithin(
+    {
+      id,
+      actorId,
+      tariff,
+      anchor: { minor: 200n, currency: 'USD' },
+      rate: {
+        base: 'USD',
+        quote: 'AMD',
+        scaled: 383_120_000n,
+        source: 'official',
+        asOf: new Date('2026-11-30T00:00:00+04:00'),
+      },
+      amount: { minor, currency: 'AMD' },
+      channel: 'ameriabank',
     },
-    amount: { minor, currency: 'AMD' },
-    channel: 'ameriabank',
-  })
+    NO_QUOTA,
+  )
   return id
 }
 
@@ -59,18 +62,21 @@ async function rowOf(id: string) {
 describe('журнал платежей: создание (MOL-283)', () => {
   it('выдаёт номера заказов по порядку, целыми числами', async () => {
     const anna = await insertActor(db)
-    const first = await journal.create({
-      id: randomUUID(),
-      actorId: anna,
-      tariff: 'data',
-      anchor: { minor: 100n, currency: 'USD' },
-      rate: { base: 'USD', quote: 'AMD', scaled: 383_120_000n, source: 'official', asOf: now },
-      amount: { minor: 39_000n, currency: 'AMD' },
-      channel: 'ameriabank',
-    })
+    const first = await journal.createWithin(
+      {
+        id: randomUUID(),
+        actorId: anna,
+        tariff: 'data',
+        anchor: { minor: 100n, currency: 'USD' },
+        rate: { base: 'USD', quote: 'AMD', scaled: 383_120_000n, source: 'official', asOf: now },
+        amount: { minor: 39_000n, currency: 'AMD' },
+        channel: 'ameriabank',
+      },
+      NO_QUOTA,
+    )
     const second = await aPayment(anna)
 
-    expect((await rowOf(second))?.orderNo).toBe(first.orderNo + 1n)
+    expect((await rowOf(second))?.orderNo).toBe((first?.orderNo ?? 0n) + 1n)
     expect((await rowOf(second))?.state).toBe('created')
   })
 

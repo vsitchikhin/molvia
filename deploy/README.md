@@ -482,6 +482,12 @@ should not see yet — venues until their chain is whole, payment until the bank
   and a link into the feature opened before its first answer opens with that answer — unless the person
   has touched the app meanwhile.
 
+- **`payments` needs the bank before it is turned on** (MOL-277): with `FF_PAYMENTS=on` the API does not start
+  without `VPOS_STAND` (`test` while the bank's stand is tried, `live` after) and the merchant's three values,
+  `VPOS_CLIENT_ID`, `VPOS_USERNAME`, `VPOS_PASSWORD` (`.env.prod.example`, «Rotating the secrets»). So the lines go in
+  first, then `./ff.sh payments on` and the restart; a start that fails names the missing variable in the API's log and
+  the previous container keeps running. The owner gives money back by `exec backend node dist/refund.js --order <n>`
+  (`make refund` in a copy), a dry run without `--yes`.
 - **Off again is `./ff.sh venues off` and the same restart**: the routes are gone at once, the phone's
   entries with its next answer; a screen of the feature already open stays until it is left.
 - **Taken off by its task** (`removedBy`): once the feature has been on, a task removes the flag from
@@ -1051,6 +1057,7 @@ written as their documentation has them and not drilled.
 | `CLOUDFLARE_TUNNEL_TOKEN`              | `.env.prod`, Cloudflare (`cloudflared tunnel`)     | Grafana from outside; never the site         |
 | the shared dashboard's link            | Grafana's volume, the owner's bookmark             | Grafana from outside                         |
 | `CLAUDE_API_KEY`                       | `.env.prod`, Anthropic console                     | none — Tesseract reads a refused key's reads |
+| `VPOS_PASSWORD`, `VPOS_USERNAME`       | `.env.prod`, Ameriabank's vPOS team                | card payments, until the bank's new values   |
 | `BOT_PULSE_URL`, `ALERTS_PULSE_URL`    | `.env.prod`, healthchecks.io                       | none                                         |
 | `HC_URL` (the copies' ping)            | `backup.env`, healthchecks.io                      | none                                         |
 | `HC_UP_URL`, `HC_LOCK_URL`             | the Worker's secrets, healthchecks.io              | none                                         |
@@ -1132,6 +1139,13 @@ written as their documentation has them and not drilled.
   receipt goes to Tesseract at once, for good — never asked of the model again — each one a
   `job:receipt-model` failure to the owner (`receipts.md`). The ten minutes of waiting are for the
   model away (`429`, `5xx`, no connection), not for a wrong key.
+- **`VPOS_PASSWORD` and `VPOS_USERNAME`** (MOL-277): whoever holds them can register, read and **refund** the
+  merchant's operations. A leak is, by the bank's terms §7.9, a call to the bank at once and **card payments
+  stopped until it says otherwise**: `./ff.sh payments off`, `$C up -d backend` — the screens go and nothing
+  starts a payment; the payments already on the bank's page are asked again after the new values. Then the
+  values the bank gives, the lines, `./ff.sh payments on`, `$C up -d backend`. `VPOS_CLIENT_ID` names the
+  merchant and is no secret alone. `VPOS_STAND` is `live` in production, `test` only while the bank's stand is
+  tried (10 ֏ any tariff).
 - **The ping URLs**: a check's URL cannot be changed, so a leaked one means a new check in
   healthchecks.io with the Telegram integration, its URL where the old one was — `.env.prod` and
   `$C up -d bot` / `grafana`; `HC_URL` of `backup.env`, seen by
