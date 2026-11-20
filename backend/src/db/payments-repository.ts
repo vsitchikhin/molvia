@@ -1,10 +1,9 @@
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, inArray, sql } from 'drizzle-orm'
 import {
-  DomainError,
-  ERROR,
   PAYMENT_KEEP_YEARS,
   accessOf,
   extendedUntil,
+  refundSum,
   refundedUntil,
 } from '@molvia/model'
 import type {
@@ -39,9 +38,8 @@ export interface NewPayment {
   readonly tariff: PaymentTariff
   /** The dollar anchor, in cents. */
   readonly anchor: Money
-  /** Drams per dollar, the official rate the price was made at. */
+  /** Drams per dollar, the CBA's rate the price was made at — kept with the moment it is of. */
   readonly rate: ExchangeRate
-  readonly rateDay: string
   readonly amount: Money
   readonly channel: PaymentChannel
 }
@@ -52,10 +50,10 @@ export interface PaidFacts {
   readonly approvalCode: string | null
 }
 
-/** Where a person's access stands after a payment moved it; absent — not moved. */
+/** Where a person's access stands after a payment moved it, by the columns of `actors`; absent — not moved. */
 export interface AccessMoved {
   readonly sharedUntil?: Date | null
-  readonly receiptsUntil?: Date | null
+  readonly receiptsModelUntil?: Date | null
 }
 
 /** What a word of the channel did: `moved` only for the one word that changed the payment. */
@@ -67,12 +65,14 @@ export interface Settled {
 
 export interface PaymentsRepository {
   create(payment: NewPayment): Promise<{ orderNo: bigint }>
-  /** The channel's name of the payment, once it gave one; a repeat of the same name is no change. */
+  /** The channel's name of the payment: given once, a later name — the same or another — changes nothing. */
   named(id: string, channelRef: string): Promise<void>
   get(id: string): Promise<PaymentRow | null>
   /**
    * Created → paid, and the access its tariff extends, in one transaction — exactly once (owner, 12.11.2026):
    * whichever word comes first, the return page or a reconciliation, the others find it paid and move nothing.
+   * Abandoned is our judgement of a page outlived, never the bank's, so the bank's «paid» after it is paid
+   * too (adversarial А2); declined is the bank's own word and stays.
    */
   markPaid(id: string, facts: PaidFacts, now: Date): Promise<Settled | null>
   /** Created → declined or abandoned; anything else is left as it is. */
@@ -87,6 +87,10 @@ export interface PaymentsRepository {
 }
 
 const COLUMN = { shared: 'sharedUntil', receipts: 'receiptsModelUntil' } as const
+type Column = (typeof COLUMN)[PaidAccess]
+
+/** The states «paid» may come to: the bank's word over our «abandoned» (adversarial А2). */
+const PAYABLE: readonly PaymentState[] = ['created', 'abandoned']
 
 const at = (now: Date) => sql`${now.toISOString()}::timestamptz`
 
@@ -116,16 +120,13 @@ async function moveAccess(
   tx: Conn,
   owner: Owner,
   opens: readonly PaidAccess[],
-  move: (until: Date | null) => Date | null,
+  move: (until: Date | null, column: Column) => Date | null,
 ): Promise<AccessMoved> {
   if (opens.length === 0) return {}
-  const set: { sharedUntil?: Date | null; receiptsModelUntil?: Date | null } = {}
-  for (const access of opens) set[COLUMN[access]] = move(owner[COLUMN[access]])
+  const set: Partial<Record<Column, Date | null>> = {}
+  for (const access of opens) set[COLUMN[access]] = move(owner[COLUMN[access]], COLUMN[access])
   await tx.update(actors).set(set).where(eq(actors.id, owner.id))
-  return {
-    ...('sharedUntil' in set ? { sharedUntil: set.sharedUntil } : {}),
-    ...('receiptsModelUntil' in set ? { receiptsUntil: set.receiptsModelUntil } : {}),
-  }
+  return set
 }
 
 async function stateOf(tx: Conn, id: string): Promise<PaymentState | null> {
@@ -145,7 +146,7 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
           anchorMinor: payment.anchor.minor,
           anchorCurrency: payment.anchor.currency,
           rateScaled: payment.rate.scaled,
-          rateDay: payment.rateDay,
+          rateAsOf: payment.rate.asOf,
           amountMinor: payment.amount.minor,
           currency: payment.amount.currency,
           channel: payment.channel,
@@ -158,7 +159,7 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
       await db
         .update(payments)
         .set({ channelRef })
-        .where(and(eq(payments.id, id), sql`${payments.channelRef} is distinct from ${channelRef}`))
+        .where(and(eq(payments.id, id), sql`${payments.channelRef} is null`))
     },
 
     async get(id) {
@@ -186,11 +187,12 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
           .set({
             state: 'paid',
             paidAt: now,
+            closedAt: null,
             movedAt: now,
             rrn: facts.rrn,
             approvalCode: facts.approvalCode,
           })
-          .where(and(eq(payments.id, id), eq(payments.state, 'created')))
+          .where(and(eq(payments.id, id), inArray(payments.state, PAYABLE)))
           .returning({ tariff: payments.tariff })
         if (paid === undefined) {
           const state = await stateOf(tx, id)
@@ -202,6 +204,10 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
             : await moveAccess(tx, owner, accessOf(paid.tariff), (until) =>
                 extendedUntil(until, now),
               )
+        // The payment keeps where its days end, so a whole refund knows which are still to come (А1).
+        if (Object.keys(access).length > 0) {
+          await tx.update(payments).set(access).where(eq(payments.id, id))
+        }
         return { state: 'paid', moved: true, access }
       })
     },
@@ -224,10 +230,7 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
         const owner = await lockedOwner(tx, id)
         const [payment] = await tx.select().from(payments).where(eq(payments.id, id)).for('update')
         if (payment === undefined) return null
-        const refunded = payment.refundedMinor + minor
-        if (payment.state !== 'paid' || minor <= 0n || refunded > payment.amountMinor) {
-          throw new DomainError(ERROR.CONFLICT, `refund ${String(minor)} of ${payment.state}`)
-        }
+        const refunded = payment.refundedMinor + refundSum(payment, minor)
         const whole = refunded === payment.amountMinor
         await tx
           .update(payments)
@@ -239,8 +242,8 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
           .where(eq(payments.id, id))
         const access =
           whole && owner !== null
-            ? await moveAccess(tx, owner, accessOf(payment.tariff), (until) =>
-                refundedUntil(until, now),
+            ? await moveAccess(tx, owner, accessOf(payment.tariff), (until, column) =>
+                refundedUntil(until, payment[column], now),
               )
             : {}
         return { state: whole ? 'refunded' : 'paid', moved: true, access }

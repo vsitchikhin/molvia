@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { eq } from 'drizzle-orm'
 import { afterAll, beforeEach, describe, expect, it } from 'vitest'
-import { DomainError } from '@molvia/model'
+import { ERROR } from '@molvia/model'
 import type { PaymentTariff } from '@molvia/model'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { createPaymentsRepository } from '@/db/payments-repository'
@@ -21,6 +21,7 @@ const DAY = 24 * 60 * 60 * 1000
 const now = new Date('2026-12-01T12:00:00.000Z')
 const days = (count: number, from = now) => new Date(from.getTime() + count * DAY)
 const facts = { rrn: '626301234567', approvalCode: '123456' }
+const conflict = { code: ERROR.CONFLICT }
 
 async function aPayment(actorId: string, tariff: PaymentTariff = 'receipts', minor = 77_000n) {
   const id = randomUUID()
@@ -36,7 +37,6 @@ async function aPayment(actorId: string, tariff: PaymentTariff = 'receipts', min
       source: 'official',
       asOf: new Date('2026-11-30T00:00:00+04:00'),
     },
-    rateDay: '2026-11-30',
     amount: { minor, currency: 'AMD' },
     channel: 'ameriabank',
   })
@@ -65,7 +65,6 @@ describe('журнал платежей: создание (MOL-283)', () => {
       tariff: 'data',
       anchor: { minor: 100n, currency: 'USD' },
       rate: { base: 'USD', quote: 'AMD', scaled: 383_120_000n, source: 'official', asOf: now },
-      rateDay: '2026-12-01',
       amount: { minor: 39_000n, currency: 'AMD' },
       channel: 'ameriabank',
     })
@@ -80,10 +79,22 @@ describe('журнал платежей: создание (MOL-283)', () => {
     const one = await aPayment(anna)
     const two = await aPayment(anna)
     await journal.named(one, 'F3A9')
-    await journal.named(one, 'F3A9')
 
-    await expect(journal.named(two, 'F3A9')).rejects.toThrow()
-    expect((await rowOf(one))?.channelRef).toBe('F3A9')
+    await expect(journal.named(two, 'F3A9')).rejects.toMatchObject({
+      cause: { constraint_name: 'payments_channel_ref_key' },
+    })
+    expect((await rowOf(two))?.channelRef).toBeNull()
+  })
+
+  it('номер канал даёт один раз: повтор и другой номер не меняют ничего', async () => {
+    const anna = await insertActor(db)
+    const id = await aPayment(anna)
+    await journal.named(id, 'F3A9')
+
+    await journal.named(id, 'F3A9')
+    await journal.named(id, 'B7D0')
+
+    expect((await rowOf(id))?.channelRef).toBe('F3A9')
   })
 })
 
@@ -94,9 +105,20 @@ describe('«оплачен» — ровно один раз, с продлени
 
     const settled = await journal.markPaid(id, facts, now)
 
-    expect(settled).toEqual({ state: 'paid', moved: true, access: { receiptsUntil: days(35) } })
+    expect(settled).toEqual({
+      state: 'paid',
+      moved: true,
+      access: { receiptsModelUntil: days(35) },
+    })
     expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(35) })
-    expect(await rowOf(id)).toMatchObject({ state: 'paid', paidAt: now, movedAt: now, ...facts })
+    expect(await rowOf(id)).toMatchObject({
+      state: 'paid',
+      paidAt: now,
+      movedAt: now,
+      sharedUntil: null,
+      receiptsModelUntil: days(35),
+      ...facts,
+    })
   })
 
   it('«оба» продлевает каждый срок от своего конца, кончившийся — от «сейчас»', async () => {
@@ -106,6 +128,7 @@ describe('«оплачен» — ровно один раз, с продлени
     await journal.markPaid(id, facts, now)
 
     expect(await accessOf(anna)).toEqual({ shared: days(30), receipts: days(40) })
+    expect(await rowOf(id)).toMatchObject({ sharedUntil: days(30), receiptsModelUntil: days(40) })
   })
 
   it('чаевые не продлевают ничего', async () => {
@@ -144,21 +167,38 @@ describe('«оплачен» — ровно один раз, с продлени
     expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(60) })
   })
 
-  it('«оплачен» после «отклонён» или «брошен» не меняет ничего', async () => {
+  it('«оплачен» после «отклонён» не меняет ничего — отказ банка окончателен', async () => {
     const anna = await insertActor(db)
     const declined = await aPayment(anna)
-    const abandoned = await aPayment(anna)
     await journal.markClosed(declined, 'declined', now)
-    await journal.markClosed(abandoned, 'abandoned', now)
 
     expect(await journal.markPaid(declined, facts, days(1))).toEqual({
       state: 'declined',
       moved: false,
       access: {},
     })
-    expect((await journal.markPaid(abandoned, facts, days(1)))?.state).toBe('abandoned')
     expect(await accessOf(anna)).toEqual({ shared: null, receipts: null })
-    expect(await rowOf(declined)).toMatchObject({ closedAt: now, paidAt: null })
+    expect(await rowOf(declined)).toMatchObject({ closedAt: now, paidAt: null, rrn: null })
+  })
+
+  it('«оплачен» после «брошен» — оплачен: «брошен» наше суждение, не банка (адверсариал А2)', async () => {
+    const anna = await insertActor(db)
+    const abandoned = await aPayment(anna)
+    await journal.markClosed(abandoned, 'abandoned', now)
+
+    expect(await journal.markPaid(abandoned, facts, days(1))).toEqual({
+      state: 'paid',
+      moved: true,
+      access: { receiptsModelUntil: days(31) },
+    })
+    expect(await rowOf(abandoned)).toMatchObject({
+      state: 'paid',
+      paidAt: days(1),
+      closedAt: null,
+      ...facts,
+    })
+    await journal.refund(abandoned, 77_000n, days(2))
+    expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(2) })
   })
 
   it('«отклонён» после «оплачен» не меняет ничего', async () => {
@@ -174,6 +214,7 @@ describe('«оплачен» — ровно один раз, с продлени
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     const id = await aPayment(anna)
+    await journal.named(id, 'F3A9')
     await erasure.erase(tg, { dryRun: false })
 
     expect(await journal.markPaid(id, facts, now)).toEqual({
@@ -206,7 +247,7 @@ describe('возврат (В-2 «а»): полный забирает 30 сут�
     expect(await journal.refund(id, 70_000n, days(2))).toEqual({
       state: 'refunded',
       moved: true,
-      access: { receiptsUntil: days(2) },
+      access: { receiptsModelUntil: days(2) },
     })
     expect(await rowOf(id)).toMatchObject({
       state: 'refunded',
@@ -216,7 +257,7 @@ describe('возврат (В-2 «а»): полный забирает 30 сут�
     })
   })
 
-  it('возврат после второго платежа оставляет его 30 суток', async () => {
+  it('возврат после второго платежа забирает только непрожитые дни первого', async () => {
     const anna = await insertActor(db)
     const one = await aPayment(anna)
     const two = await aPayment(anna)
@@ -225,7 +266,33 @@ describe('возврат (В-2 «а»): полный забирает 30 сут�
 
     await journal.refund(one, 77_000n, days(10))
 
-    expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(30) })
+    // Ten of the first payment's days lived, twenty taken back; the second's thirty stay from day 10.
+    expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(40) })
+  })
+
+  it('возврат прожитого платежа не трогает дни выдачи руками (адверсариал А1)', async () => {
+    const anna = await insertActor(db)
+    const spent = await aPayment(anna)
+    await journal.markPaid(spent, facts, now)
+    await db
+      .update(actors)
+      .set({ receiptsModelUntil: days(100) })
+      .where(eq(actors.id, anna))
+
+    await journal.refund(spent, 77_000n, days(41))
+
+    expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(100) })
+  })
+
+  it('возврат прожитого платежа не трогает дни следующего (адверсариал А1)', async () => {
+    const anna = await insertActor(db)
+    const spent = await aPayment(anna)
+    const later = await aPayment(anna)
+    await journal.markPaid(spent, facts, now)
+    await journal.markPaid(later, facts, days(40))
+
+    await journal.refund(spent, 77_000n, days(45))
+    expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(70) })
   })
 
   it('сверх суммы, у неоплаченного и у возвращённого — отказ, ничего не записано', async () => {
@@ -234,23 +301,23 @@ describe('возврат (В-2 «а»): полный забирает 30 сут�
     const created = await aPayment(anna)
     await journal.markPaid(paid, facts, now)
 
-    await expect(journal.refund(paid, 77_001n, now)).rejects.toBeInstanceOf(DomainError)
-    await expect(journal.refund(paid, 0n, now)).rejects.toBeInstanceOf(DomainError)
-    await expect(journal.refund(created, 1_000n, now)).rejects.toBeInstanceOf(DomainError)
+    await expect(journal.refund(paid, 77_001n, now)).rejects.toMatchObject(conflict)
+    await expect(journal.refund(paid, 0n, now)).rejects.toMatchObject(conflict)
+    await expect(journal.refund(created, 1_000n, now)).rejects.toMatchObject(conflict)
     await journal.refund(paid, 77_000n, now)
-    await expect(journal.refund(paid, 1n, now)).rejects.toBeInstanceOf(DomainError)
+    await expect(journal.refund(paid, 1n, now)).rejects.toMatchObject(conflict)
     expect((await rowOf(paid))?.refundedMinor).toBe(77_000n)
     expect((await rowOf(created))?.refundedMinor).toBe(0n)
   })
 })
 
 describe('три года: платёж уходит через три года после последнего движения', () => {
-  it('уходит ровно в срок, ни днём раньше — живого человека тоже', async () => {
+  it('уходит ровно в срок, ни мгновением раньше — живого человека тоже', async () => {
     const anna = await insertActor(db)
     const old = await aPayment(anna)
     const young = await aPayment(anna)
     await journal.markPaid(old, facts, new Date('2023-12-01T12:00:00.000Z'))
-    await journal.markPaid(young, facts, new Date('2023-12-02T12:00:00.000Z'))
+    await journal.markPaid(young, facts, new Date('2023-12-01T12:00:00.001Z'))
 
     expect(await journal.sweep(now)).toBe(1)
     expect(await rowOf(old)).toBeUndefined()

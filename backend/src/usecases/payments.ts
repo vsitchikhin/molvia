@@ -6,8 +6,10 @@ import {
   PAYMENT_CURRENCY,
   anchorCentsOf,
   paymentPrice,
+  refundSum,
+  yerevanDate,
 } from '@molvia/model'
-import type { Money, PaymentChannel, PaymentTariff } from '@molvia/model'
+import type { Money, PaymentChannel, PaymentOrder } from '@molvia/model'
 import type { RateRepository } from '@/db/rates-repository'
 import type { PaidFacts, PaymentRow, PaymentsRepository, Settled } from '@/db/payments-repository'
 import { freshOfficialRate } from './exchanges'
@@ -45,27 +47,28 @@ export interface OpenedPayment {
 }
 
 /**
- * Opens a payment of `tariff` in the journal at today's price (MOL-271): the dollar anchor at the official rate
- * fresh for `day`, rounded up to 10 ֏. Null without such a rate — no price is made up. A tip names one of its
- * amounts; any other is refused.
+ * Opens a payment of the order in the journal at today's price (MOL-271): the dollar anchor at the CBA's rate
+ * fresh for today in Yerevan, rounded up to 10 ֏. Null without such a rate — no price is made up, nor made of
+ * another provider's rate (requirement 2; adversarial А3) — and the day is the server's, never the caller's
+ * (А5). A tip names one of its amounts; any other is refused.
  */
 export async function openPayment(
   deps: {
     readonly payments: PaymentsRepository
     readonly rates: Pick<RateRepository, 'latestOnOrBefore'>
   },
-  input: {
+  input: PaymentOrder & {
     readonly actorId: string
-    readonly tariff: PaymentTariff
-    readonly tipCents?: bigint
     readonly channel: PaymentChannel
-    readonly day: string
+    readonly now: Date
   },
 ): Promise<OpenedPayment | null> {
-  const cents = anchorCentsOf(input.tariff, input.tipCents)
-  if (cents === null) throw new DomainError(ERROR.INVALID_AMOUNT, String(input.tipCents))
-  const rows = await deps.rates.latestOnOrBefore([PAYMENT_ANCHOR_CURRENCY], input.day)
-  const rate = freshOfficialRate(PAYMENT_ANCHOR_CURRENCY, PAYMENT_CURRENCY, rows, input.day)
+  const cents = anchorCentsOf(input)
+  if (cents === null) throw new DomainError(ERROR.INVALID_AMOUNT, input.tariff)
+  const day = yerevanDate(input.now)
+  const rows = await deps.rates.latestOnOrBefore([PAYMENT_ANCHOR_CURRENCY], day)
+  const cba = rows.filter((row) => row.provider === 'cba')
+  const rate = freshOfficialRate(PAYMENT_ANCHOR_CURRENCY, PAYMENT_CURRENCY, cba, day)
   if (rate === null) return null
   const amount = paymentPrice(cents, rate)
   const id = randomUUID()
@@ -75,7 +78,6 @@ export async function openPayment(
     tariff: input.tariff,
     anchor: { minor: cents, currency: PAYMENT_ANCHOR_CURRENCY },
     rate,
-    rateDay: input.day,
     amount,
     channel: input.channel,
   })
@@ -107,7 +109,10 @@ export async function settlePayment(
 
 /**
  * The owner gives money back (MOL-277, Р-9): `minor` of it, or all that is left. The channel first — the journal
- * says what the bank did, never what it was asked to do; a failure there leaves the journal as it was.
+ * says what the bank did, never what it was asked to do; a failure there leaves the journal as it was. The check
+ * before the bank reads without a lock, so a second refund of the same payment between the two is refused by the
+ * journal after the bank gave the money: that is no conflict but a defect, said so (review №3) — refunds are one
+ * command of the owner, one at a time.
  */
 export async function refundPayment(
   deps: { readonly payments: PaymentsRepository; readonly channel: PaymentChannelAdapter },
@@ -117,13 +122,15 @@ export async function refundPayment(
 ): Promise<Settled> {
   const payment = await deps.payments.get(id)
   if (payment === null) throw new DomainError(ERROR.NOT_FOUND, id)
-  const left = payment.amount.minor - payment.refundedMinor
-  const sum = minor ?? left
-  if (payment.state !== 'paid' || sum <= 0n || sum > left) {
-    throw new DomainError(ERROR.CONFLICT, `refund ${String(sum)} of ${payment.state}`)
-  }
+  const sum = refundSum({ ...payment, amountMinor: payment.amount.minor }, minor)
   await deps.channel.refund(payment, sum)
-  const settled = await deps.payments.refund(id, sum, now)
-  if (settled === null) throw new DomainError(ERROR.NOT_FOUND, id)
+  const settled = await deps.payments.refund(id, sum, now).catch((error: unknown) => {
+    throw new Error(`the bank refunded ${String(sum)} of ${id}, the journal did not record it`, {
+      cause: error,
+    })
+  })
+  if (settled === null) {
+    throw new Error(`the bank refunded ${String(sum)} of ${id}, the journal has no such payment`)
+  }
   return settled
 }
