@@ -1,7 +1,7 @@
-import { yerevanDate } from '@molvia/model'
+import { bankStateSchema, orderNoSchema, yerevanDate } from '@molvia/model'
 import type { PaymentMismatchNotice, PaymentState } from '@molvia/model'
 import type { PaymentRow, PaymentsRepository } from '@/db/payments-repository'
-import { settlePayment } from './payments'
+import { PAYMENT_PAGE_MS, settlePayment } from './payments'
 import type { PaymentChannelAdapter } from './payments'
 
 /** The minute's reconciliation (MOL-277, Р-4): the bank sends no word of its own, so it is asked. */
@@ -11,21 +11,27 @@ export const PAYMENT_RECONCILE_EVERY_MS = 60_000
 export const PAYMENT_FIRST_ASK_MS = 60_000
 
 /**
- * The bank's page lives 1200 s (`Timeout`); five minutes more for a slow bank and a late return. Past them the
- * last answer that is not «paid» abandons the payment — the bank's «paid» after it is still paid (adversarial А2 of
- * MOL-283).
+ * The page's life and five minutes (`PAYMENT_PAGE_MS`): past it the last answer that is not «paid» abandons the
+ * payment — the bank's «paid» after it is still paid (adversarial А2 of MOL-283).
  */
-export const PAYMENT_LAST_ASK_MS = 25 * 60_000
+export const PAYMENT_LAST_ASK_MS = PAYMENT_PAGE_MS
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 /** At most this many payments a minute: a few dozen payers a month (MOL-271) never come near it. */
 export const PAYMENT_RECONCILE_BATCH = 100
 
 /** The day's reconciliation by the bank's list (В-5 «а»): once a day, the two days before today in Yerevan. */
-export const PAYMENT_LIST_EVERY_MS = 24 * 60 * 60 * 1000
+export const PAYMENT_LIST_EVERY_MS = DAY_MS
 export const PAYMENT_LIST_DAYS = 2
 
-/** The bank's states that mean the money was taken: deposited, and refunded after it. */
-const TAKEN = new Set(['2', '4'])
+/**
+ * The bank's states that mean the money was taken — deposited, and refunded after it — and the one of a payment
+ * cancelled whole within its 72 hours, which a journal's «refunded» agrees with (adversarial А1). As digits or as the
+ * words of the manual's table 2: which of them the list sends, only the bank's stand will say.
+ */
+const TAKEN = new Set(['2', '4', 'payment_deposited', 'payment_refunded'])
+const VOIDED = new Set(['3', 'payment_void'])
 
 /** Our states that mean the money was taken. */
 const KEPT: ReadonlySet<PaymentState> = new Set(['paid', 'refunded'])
@@ -95,9 +101,7 @@ export async function reconcileWithList(
   now: Date,
 ): Promise<number> {
   const to = yerevanMidnight(yerevanDate(now))
-  const from = yerevanMidnight(
-    yerevanDate(new Date(to.getTime() - PAYMENT_LIST_DAYS * 24 * 60 * 60 * 1000 + 1)),
-  )
+  const from = new Date(to.getTime() - PAYMENT_LIST_DAYS * DAY_MS)
   const operations = await deps.operations(from, to)
   const bankState = new Map<string, string>()
   for (const operation of operations) {
@@ -112,13 +116,13 @@ export async function reconcileWithList(
     (
       await deps.payments.byOrders(
         deps.channel.channel,
-        taken.filter((order) => /^\d{1,19}$/.test(order)).map(BigInt),
+        taken.filter((order) => orderNoSchema.safeParse(order).success).map(BigInt),
       )
     ).map((payment) => [String(payment.orderNo), payment]),
   )
   const notices: PaymentMismatchNotice[] = []
   for (const order of taken) {
-    if (!/^\d{1,19}$/.test(order)) {
+    if (!orderNoSchema.safeParse(order).success) {
       deps.failed(new Error('the bank listed an order that is no number of ours'))
       continue
     }
@@ -146,9 +150,10 @@ export async function reconcileWithList(
   for (const payment of await deps.payments.paidWithin(deps.channel.channel, from, to)) {
     const order = String(payment.orderNo)
     const state = bankState.get(order)
-    if (state === undefined || !TAKEN.has(state)) {
-      notices.push(mismatch(order, state, payment.state))
-    }
+    if (state !== undefined && TAKEN.has(state)) continue
+    // a whole refund within 72 hours is the bank's cancel: «refunded» and void are one fact (adversarial А1)
+    if (state !== undefined && VOIDED.has(state) && payment.state === 'refunded') continue
+    notices.push(mismatch(order, state, payment.state))
   }
   for (const notice of notices) await deps.tell(notice)
   return notices.length
@@ -159,6 +164,6 @@ function mismatch(
   bank: string | undefined,
   journal: PaymentState | 'none',
 ): PaymentMismatchNotice {
-  const said = bank === undefined || !/^[\w-]{1,8}$/.test(bank) ? 'none' : bank
+  const said = bank !== undefined && bankStateSchema.safeParse(bank).success ? bank : 'none'
   return { kind: 'payment_mismatch', orderNo, bank: said, journal }
 }

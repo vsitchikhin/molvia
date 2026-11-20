@@ -37,7 +37,7 @@ const paid: VposDetails = {
   rrn: '626301234567',
 }
 
-const expected = { orderNo: 2350301n, drams: 770 }
+const expected = { orderNo: 2350301n, drams: 770n }
 
 describe('judged — «paid» only by the bank’s own word for our order (requirement 4)', () => {
   it('is paid with the bank’s numbers when all five hold', () => {
@@ -84,7 +84,7 @@ describe('judged — «paid» only by the bank’s own word for our order (requi
 
 describe('what is charged and how it is described', () => {
   it('charges the journal’s drams, 10 ֏ on the test stand', () => {
-    expect(chargedDrams(payment, 'live')).toBe(770)
+    expect(chargedDrams(payment, 'live')).toBe(770n)
     expect(chargedDrams(payment, 'test')).toBe(VPOS_TEST_DRAMS)
   })
 
@@ -126,7 +126,7 @@ describe('the channel: the page, the word, the money back', () => {
     })
     expect(client.initPayment).toHaveBeenCalledWith({
       orderId: 2350301n,
-      amount: 770,
+      amount: 770n,
       description: 'Molvia, 30 days, receipts',
       backUrl: 'https://molvia.net/pay/done/p1',
     })
@@ -135,7 +135,7 @@ describe('the channel: the page, the word, the money back', () => {
   it('an answer lost finds the order by its number, else registers it again with the same body', async () => {
     const lost = bank()
     lost.client.initPayment.mockRejectedValueOnce(new VposError('unreachable', 'InitPayment'))
-    lost.client.paymentId.mockResolvedValueOnce('FOUND-1')
+    lost.client.paymentId.mockResolvedValueOnce(null).mockResolvedValueOnce('FOUND-1')
     expect((await lost.channel.start(payment, 'ru')).ref).toBe('FOUND-1')
     expect(lost.client.initPayment).toHaveBeenCalledTimes(1)
 
@@ -150,7 +150,32 @@ describe('the channel: the page, the word, the money back', () => {
     const { client, channel } = bank()
     client.initPayment.mockRejectedValueOnce(new VposError('refused', 'InitPayment', '05'))
     await expect(channel.start(payment, 'ru')).rejects.toMatchObject({ bankCode: '05' })
-    expect(client.paymentId).not.toHaveBeenCalled()
+    // asked once, before the order, never after a refusal
+    expect(client.paymentId).toHaveBeenCalledTimes(1)
+  })
+
+  it('never registers an order number the bank already has — a database restored, or two on one stand (А2)', async () => {
+    const { client, channel } = bank()
+    client.paymentId.mockResolvedValueOnce('SOMEONE-ELSES')
+    await expect(channel.start(payment, 'ru')).rejects.toMatchObject({
+      kind: 'refused',
+      bankCode: 'order_number_taken',
+    })
+    expect(client.initPayment).not.toHaveBeenCalled()
+  })
+
+  it('refuses a sum of no whole drams before the bank (review №7)', async () => {
+    const { client, channel } = bank()
+    await expect(
+      channel.start({ ...payment, amount: { minor: 77_050n, currency: 'AMD' } }, 'ru'),
+    ).rejects.toMatchObject({ bankCode: 'not_whole_drams' })
+    const late = bank()
+    late.later(VPOS_CANCEL_WITHIN_MS)
+    await expect(late.channel.refund(payment, 30_050n)).rejects.toMatchObject({
+      bankCode: 'not_whole_drams',
+    })
+    expect(client.initPayment).not.toHaveBeenCalled()
+    expect(late.client.refund).not.toHaveBeenCalled()
   })
 
   it('asks by its own saved id — by our number where the start lost it — and tells the owner what it does not act on', async () => {
@@ -180,14 +205,14 @@ describe('the channel: the page, the word, the money back', () => {
     late.later(VPOS_CANCEL_WITHIN_MS)
     await late.channel.refund(payment, 77_000n)
     expect(late.client.cancel).not.toHaveBeenCalled()
-    expect(late.client.refund).toHaveBeenCalledWith('A1B2-C3', 770)
+    expect(late.client.refund).toHaveBeenCalledWith('A1B2-C3', 770n)
 
     const part = bank()
     await part.channel.refund(payment, 30_000n)
-    expect(part.client.refund).toHaveBeenCalledWith('A1B2-C3', 300)
+    expect(part.client.refund).toHaveBeenCalledWith('A1B2-C3', 300n)
     await part.channel.refund({ ...payment, refundedMinor: 30_000n }, 47_000n)
     expect(part.client.cancel).not.toHaveBeenCalled()
-    expect(part.client.refund).toHaveBeenLastCalledWith('A1B2-C3', 470)
+    expect(part.client.refund).toHaveBeenLastCalledWith('A1B2-C3', 470n)
   })
 
   it('on the test stand a whole sum is its 10 ֏, and a part is refused before the bank', async () => {

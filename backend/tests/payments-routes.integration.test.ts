@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { eq } from 'drizzle-orm'
+import { eq, isNull, sql } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PAYMENTS_DAY_MAX, yerevanDate } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
@@ -8,7 +8,7 @@ import { buildServer } from '@/server'
 import type { ChannelWord, PaymentChannelAdapter } from '@/usecases/payments'
 import { connectDrizzle } from './db'
 import { clearAll, insertActor, signIn } from './fixtures'
-import { onlyRow } from './rows'
+import { onlyRow, sum } from './rows'
 
 const { db, close } = connectDrizzle()
 
@@ -37,6 +37,8 @@ beforeEach(async () => {
   await clearAll(db)
   word = { said: 'waiting' }
   vi.clearAllMocks()
+  // a test that replaced the channel's answer leaves the next one the channel as written
+  for (const call of [channel.start, channel.check, channel.refund]) call.mockReset()
 })
 afterAll(async () => {
   await Promise.all([on.close(), off.close()])
@@ -59,8 +61,25 @@ async function signedIn() {
   return { id, cookie: await signIn(db, id) }
 }
 
-const start = (app: FastifyInstance, cookie: string, payload: Record<string, unknown>) =>
-  app.inject({ method: 'POST', url: '/payments', headers: { cookie }, payload })
+/** The prices the screen shows at the test's rate, 383.12 ֏: the start sends the one it showed (adversarial А4). */
+const SHOWN: Readonly<Record<string, string>> = {
+  data: '390',
+  receipts: '770',
+  both: '960',
+  'tip:100': '390',
+  'tip:300': '1150',
+  'tip:500': '1920',
+}
+
+function start(app: FastifyInstance, cookie: string, payload: Record<string, unknown>) {
+  const key = payload.tariff === 'tip' ? `tip:${String(payload.tipCents)}` : String(payload.tariff)
+  const shown = SHOWN[key]
+  const body =
+    'amount' in payload || shown === undefined
+      ? payload
+      : { ...payload, amount: { amount: shown, currency: 'AMD' } }
+  return app.inject({ method: 'POST', url: '/payments', headers: { cookie }, payload: body })
+}
 
 describe('payment by card — the routes (MOL-277)', () => {
   it('offers the three tariffs and the tips at today’s CBA rate, with the access as it stands', async () => {
@@ -219,12 +238,60 @@ describe('payment by card — the routes (MOL-277)', () => {
     expect((await tap('/payments/rf-card?again=1')).statusCode).toBe(204)
     expect((await tap('/payments/rf-card?again=yes')).statusCode).toBe(400)
 
-    expect(onlyRow(await db.select().from(rfCardDays))).toEqual({
-      day: yerevanDate(new Date()),
-      taps: 2,
-      again: 1,
-    })
+    // summed over the rows, never one day read off the test's clock: the server counts by the database's (review №16)
+    const rows = await db.select().from(rfCardDays)
+    expect([sum(rows.map((row) => row.taps)), sum(rows.map((row) => row.again))]).toEqual([2, 1])
   })
+
+  it('counts an account’s second tap of the day as a repeat, whatever the phone says (adversarial А3)', async () => {
+    const anna = await signedIn()
+    const boris = await signedIn()
+    const tap = (cookie: string) =>
+      on.inject({ method: 'POST', url: '/payments/rf-card', headers: { cookie } })
+
+    for (let i = 0; i < 5; i += 1) await tap(anna.cookie)
+    await tap(boris.cookie)
+
+    const rows = await db.select().from(rfCardDays)
+    const taps = sum(rows.map((row) => row.taps))
+    expect([taps, taps - sum(rows.map((row) => row.again))]).toEqual([6, 2])
+  })
+
+  it('refuses a price other than the screen showed, nothing written (adversarial А4)', async () => {
+    await dollarToday()
+    const { cookie } = await signedIn()
+
+    const response = await start(on, cookie, {
+      tariff: 'receipts',
+      amount: { amount: '760', currency: 'AMD' },
+      lang: 'ru',
+    })
+
+    expect(response.statusCode).toBe(409)
+    expect(response.json()).toMatchObject({ code: 'error.payment_price_changed' })
+    expect(await db.select({ id: payments.id }).from(payments)).toEqual([])
+    expect(channel.start).not.toHaveBeenCalled()
+  })
+
+  it('a payment the bank never named stops counting in the day once its page is gone (adversarial А5)', async () => {
+    await dollarToday()
+    const { cookie } = await signedIn()
+    channel.start.mockRejectedValue(new Error('bank away'))
+    for (let i = 0; i < PAYMENTS_DAY_MAX; i += 1) {
+      expect((await start(on, cookie, { tariff: 'data', lang: 'ru' })).statusCode).toBe(503)
+    }
+    expect((await start(on, cookie, { tariff: 'data', lang: 'ru' })).statusCode).toBe(429)
+
+    // half an hour on: the pages the bank never registered are gone, the bank is back
+    await db
+      .update(payments)
+      .set({ createdAt: sql`created_at - interval '30 minutes'` })
+      .where(isNull(payments.channelRef))
+    channel.start.mockReset()
+    channel.start.mockResolvedValue({ ref: 'BANK-X', url: 'https://bank.test/Pay?id=BANK-X' })
+
+    expect((await start(on, cookie, { tariff: 'data', lang: 'ru' })).statusCode).toBe(201)
+  }, 30_000)
 
   it('off, every route of payment is an address the API has not got — no 401 before the session', async () => {
     for (const [method, url] of [

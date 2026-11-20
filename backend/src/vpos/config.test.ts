@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { VPOS_HOSTS } from './client'
-import { vposConfiguration } from './config'
+import { vposBank, vposConfiguration } from './config'
 
 const SECRET = 'secret-value-never-named'
 const full = {
@@ -21,8 +21,24 @@ describe('the bank’s configuration (MOL-277, Р-7)', () => {
       stand: 'test',
       hosts: VPOS_HOSTS.test,
       credentials: { clientId: 'client-1', username: 'user-1', password: SECRET },
+      orderOffset: 0n,
       appBaseUrl: 'https://molvia.net',
     })
+  })
+
+  it('takes the stand’s range of order numbers as an offset, digits only (adversarial А2)', () => {
+    expect(vposConfiguration({ ...full, VPOS_ORDER_OFFSET: '2350300' }, true)?.orderOffset).toBe(
+      2350300n,
+    )
+    expect(() => vposConfiguration({ ...full, VPOS_ORDER_OFFSET: '-5' }, true)).toThrow(
+      'VPOS_ORDER_OFFSET',
+    )
+  })
+
+  it('the bank alone, for the owner’s refund, wants no page to send anybody back to (review №13)', () => {
+    const bankOnly = { ...full, APP_BASE_URL: undefined }
+    expect(vposBank(bankOnly).credentials.password).toBe(SECRET)
+    expect(() => vposBank({ ...bankOnly, VPOS_PASSWORD: '' })).toThrow('VPOS_PASSWORD')
   })
 
   it('stops the start naming what is missing — empty is missing — and never a value', () => {

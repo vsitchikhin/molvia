@@ -195,6 +195,32 @@ describe('reconcileWithList — the bank’s list of the days before against the
     ])
   })
 
+  it('a whole refund within 72 hours — the bank’s cancel, «3» — agrees with «refunded» (adversarial А1)', async () => {
+    const { all, told, payments } = deps([], [{ orderId: '1042', state: '3' }])
+    payments.paidWithin.mockResolvedValueOnce([payment({ state: 'refunded' })])
+    expect(await reconcileWithList(all, now)).toBe(0)
+    expect(told).toEqual([])
+  })
+
+  it('a cancel the journal does not know is still said', async () => {
+    const { all, told, payments } = deps([], [{ orderId: '1042', state: '3' }])
+    payments.paidWithin.mockResolvedValueOnce([payment({ state: 'paid' })])
+    await reconcileWithList(all, now)
+    expect(told).toEqual([
+      { kind: 'payment_mismatch', orderNo: '1042', bank: '3', journal: 'paid' },
+    ])
+  })
+
+  it('reads the bank’s states as words too, as the manual’s table 2 writes them', async () => {
+    const { all, told, payments } = deps(
+      [payment({ state: 'paid' })],
+      [{ orderId: '1042', state: 'payment_deposited' }],
+    )
+    payments.paidWithin.mockResolvedValueOnce([payment({ state: 'paid' })])
+    expect(await reconcileWithList(all, now)).toBe(0)
+    expect(told).toEqual([])
+  })
+
   it('an order the bank lists that is no number of ours is a failure, never a notice', async () => {
     const { all, told } = deps([], [{ orderId: 'abc', state: '2' }])
     await reconcileWithList(all, now)

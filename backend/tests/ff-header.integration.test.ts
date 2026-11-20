@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import type { FastifyInstance, InjectOptions } from 'fastify'
 import { FF_HEADER, FF_NAMES, type FfName } from '@molvia/model'
 import { buildServer } from '@/server'
+import { awayChannel } from './fixtures'
 
 const FF = FF_HEADER.toLowerCase()
 
@@ -15,7 +16,8 @@ const FF = FF_HEADER.toLowerCase()
  * meant to be (MOL-382, requirement 5); the routes the фф add in `buildServer` are asked below.
  */
 async function serverWith(ff: ReadonlySet<FfName>): Promise<FastifyInstance> {
-  const app = buildServer({ ff })
+  // payment on needs a channel (review №9): one with no bank behind it, as nothing here pays
+  const app = buildServer({ ff, paymentChannel: awayChannel() })
   if (ff.has('venues')) app.get('/probe/venues', () => ({ venues: [] }))
   app.get('/probe/ok', () => ({ ok: true }))
   app.post('/probe/body', () => ({ ok: true }))
@@ -31,7 +33,7 @@ let all: FastifyInstance
 let bare: FastifyInstance
 
 beforeAll(async () => {
-  all = buildServer({ ff: new Set(FF_NAMES) })
+  all = buildServer({ ff: new Set(FF_NAMES), paymentChannel: awayChannel() })
   bare = buildServer({ ff: new Set() })
   ;[none, venues, both] = await Promise.all([
     serverWith(new Set()),

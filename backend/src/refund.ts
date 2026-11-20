@@ -1,4 +1,11 @@
-import { DomainError, MINOR_EXPONENT, formatMoney, parseMoney, refundSum } from '@molvia/model'
+import {
+  DomainError,
+  formatMoney,
+  orderNoSchema,
+  parseMoney,
+  refundSum,
+  wholeMajor,
+} from '@molvia/model'
 import type { PaymentsRepository } from '@/db/payments-repository'
 import { refundPayment } from '@/usecases/payments'
 import type { PaymentChannelAdapter } from '@/usecases/payments'
@@ -38,7 +45,7 @@ export async function refund(
       return 2
     }
   }
-  if (order === undefined || !/^\d{1,19}$/.test(order)) {
+  if (!orderNoSchema.safeParse(order).success || order === undefined) {
     say(USAGE)
     return 2
   }
@@ -49,12 +56,18 @@ export async function refund(
   }
   let minor: bigint | undefined
   if (amount !== undefined && amount !== '') {
+    let asked: bigint | undefined
     try {
-      minor = parseMoney(amount, payment.amount.currency).minor
+      asked = parseMoney(amount, payment.amount.currency).minor
     } catch {
-      say(`--amount ${amount} is no sum in ${payment.amount.currency}`)
+      asked = undefined
+    }
+    // the bank takes whole drams (review №7): a fraction is refused here, never by the bank
+    if (asked === undefined || wholeMajor({ ...payment.amount, minor: asked }) === null) {
+      say(`--amount ${amount} is no whole sum in ${payment.amount.currency}`)
       return 2
     }
+    minor = asked
   }
   const money = (value: bigint) => formatMoney({ minor: value, currency: payment.amount.currency })
   say(
@@ -65,22 +78,21 @@ export async function refund(
     sum = refundSum({ ...payment, amountMinor: payment.amount.minor }, minor)
   } catch (error) {
     if (!(error instanceof DomainError)) throw error
-    say(`refused: ${payment.state === 'paid' ? 'past what is left' : 'not paid'}`)
+    // the rule's own reason (review №13): not paid, nothing, or past what is left
+    say(`refused: ${error.message.replace(`${error.code}: `, '')}`)
     return 1
   }
-  const whole = payment.refundedMinor + sum === payment.amount.minor
-  const exponent = MINOR_EXPONENT[payment.amount.currency]
+  // the journal's «whole»: what is left given back, so the payment's days go back too (MOL-283, В-2 «а»)
+  const rest = payment.refundedMinor + sum === payment.amount.minor
   say(
-    `${yes ? 'refunding' : 'would refund'} ${money(sum)} (${String(Number(sum) / 10 ** exponent)})${whole ? ' — whole: the days not lived go back' : ' — a part: money only'}`,
+    `${yes ? 'refunding' : 'would refund'} ${money(sum)}${rest ? ' — the rest: the days not lived go back' : ' — a part: money only'}`,
   )
   if (!yes) {
     say('a dry run: nothing asked of the bank; --yes (make refund … YES=1) to refund')
     return 0
   }
   if (deps.channel === null) {
-    say(
-      'no bank: VPOS_STAND, VPOS_CLIENT_ID, VPOS_USERNAME, VPOS_PASSWORD and APP_BASE_URL are needed',
-    )
+    say('no bank: VPOS_STAND, VPOS_CLIENT_ID, VPOS_USERNAME and VPOS_PASSWORD are needed')
     return 1
   }
   const settled = await refundPayment(

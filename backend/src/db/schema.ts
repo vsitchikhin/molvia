@@ -2211,6 +2211,17 @@ export const erasures = pgTable(
 )
 
 /**
+ * «У меня только карта РФ» on the screen of payment (MOL-277, Р-8): the taps of a Yerevan day and, of them, a device's
+ * own again within a day — the phone remembers its tap, as the login's repeat (MOL-68). No id, no person: whether to
+ * look for a way to take Russian cards is decided by these counts, read in `make gates` with no stop.
+ */
+export const rfCardDays = pgTable('rf_card_days', {
+  day: date('day').primaryKey(),
+  taps: integer('taps').notNull().default(0),
+  again: integer('again').notNull().default(0),
+})
+
+/**
  * The login's funnel, counted by the day a login began (MOL-68): how many were started, confirmed
  * in the bot, declined there, collected into a session, and how many ran out — and nothing else.
  *
@@ -2224,17 +2235,6 @@ export const erasures = pgTable(
  * reads as a funnel of its own. `refused` is the exception — a start the quota turned away makes
  * no request, and it counts on the day it was refused.
  */
-/**
- * «У меня только карта РФ» on the screen of payment (MOL-277, Р-8): the taps of a Yerevan day and, of them, a device's
- * own again within a day — the phone remembers its tap, as the login's repeat (MOL-68). No id, no person: whether to
- * look for a way to take Russian cards is decided by these counts, read in `make gates` with no stop.
- */
-export const rfCardDays = pgTable('rf_card_days', {
-  day: date('day').primaryKey(),
-  taps: integer('taps').notNull().default(0),
-  again: integer('again').notNull().default(0),
-})
-
 export const loginDays = pgTable(
   'login_days',
   {

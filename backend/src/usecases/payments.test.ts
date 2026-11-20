@@ -9,6 +9,7 @@ import {
   openPayment,
   paymentAskLimiter,
   refundPayment,
+  rfCardRepeats,
   settlePayment,
   startPayment,
 } from './payments'
@@ -43,9 +44,17 @@ function journal(row: Partial<PaymentRow> = {}) {
     ...row,
   }
   return {
-    create: vi.fn<PaymentsRepository['create']>(() => Promise.resolve({ orderNo: 1042n })),
-    createWithin: vi.fn<PaymentsRepository['createWithin']>(() =>
-      Promise.resolve({ orderNo: 1042n }),
+    createWithin: vi.fn<PaymentsRepository['createWithin']>((written) =>
+      Promise.resolve({
+        ...payment,
+        id: written.id,
+        orderNo: 1042n,
+        tariff: written.tariff,
+        amount: written.amount,
+        refundedMinor: 0n,
+        channelRef: null,
+        state: 'created',
+      }),
     ),
     paidUntil: vi.fn<PaymentsRepository['paidUntil']>(() =>
       Promise.resolve({ sharedUntil: null, receiptsModelUntil: null }),
@@ -68,6 +77,8 @@ function journal(row: Partial<PaymentRow> = {}) {
     tapRfCard: vi.fn<PaymentsRepository['tapRfCard']>(() => Promise.resolve()),
   } satisfies PaymentsRepository
 }
+
+const AMD = (minor: bigint) => ({ minor, currency: 'AMD' as const })
 
 const rates = (rows: readonly CachedRate[]): Pick<RateRepository, 'latestOnOrBefore'> => ({
   latestOnOrBefore: vi.fn(() => Promise.resolve(rows)),
@@ -246,10 +257,12 @@ describe('the quota of payments a day (Р-12)', () => {
       { payments, rates: rates([usd('2026-11-30')]) },
       { actorId: 'anna', tariff: 'data', channel: 'ameriabank', now },
     )
-    expect(payments.createWithin.mock.calls[0]?.slice(1)).toEqual([
-      10,
-      new Date('2026-11-30T12:00:00Z'),
-    ])
+    // a payment the bank never named counts only while its page may still be open (adversarial А5)
+    expect(payments.createWithin.mock.calls[0]?.[1]).toEqual({
+      max: 10,
+      since: new Date('2026-11-30T12:00:00Z'),
+      unnamedSince: new Date('2026-12-01T11:35:00Z'),
+    })
 
     payments.createWithin.mockResolvedValueOnce(null)
     await expect(
@@ -300,6 +313,17 @@ describe('offerPayments — the prices today and where each term would end (MOL-
     ])
   })
 
+  it('says a term over as none where the tariff leaves it as it is (review №3)', async () => {
+    const payments = journal()
+    payments.paidUntil.mockResolvedValueOnce({
+      sharedUntil: null,
+      receiptsModelUntil: new Date('2026-11-20T12:00:00Z'),
+    })
+    const offer = await offerPayments({ payments, rates: rates([usd('2026-11-30')]) }, 'anna', now)
+    expect(offer.access.receipts).toBeNull()
+    expect(offer.tariffs?.find((t) => t.tariff === 'data')?.after.receipts).toBeNull()
+  })
+
   it('offers no price while the CBA is silent, and still says the access', async () => {
     const offer = await offerPayments(
       { payments: journal(), rates: rates([usd('2026-11-01')]) },
@@ -327,11 +351,16 @@ describe('startPayment — written, then registered with the bank (requirement 3
       tariff: 'receipts',
       lang: 'en',
       now,
+      expected: AMD(77_000n),
     })
 
     expect(started.url).toBe('https://bank.test/Pay?id=A1B2&lang=ru')
-    expect(typeof started.id).toBe('string')
-    expect(channel.start).toHaveBeenCalledWith(expect.objectContaining({ id: 'p1' }), 'en')
+    // the row written is the row started: no second read (review №8)
+    expect(payments.get).not.toHaveBeenCalled()
+    expect(channel.start).toHaveBeenCalledWith(
+      expect.objectContaining({ id: started.id, orderNo: 1042n, state: 'created' }),
+      'en',
+    )
     expect(payments.named).toHaveBeenCalledWith(started.id, 'A1B2')
   })
 
@@ -343,10 +372,32 @@ describe('startPayment — written, then registered with the bank (requirement 3
     const all = deps(payments, channel)
 
     await expect(
-      startPayment(all, { actorId: 'anna', tariff: 'data', lang: 'ru', now }),
+      startPayment(all, {
+        actorId: 'anna',
+        tariff: 'data',
+        lang: 'ru',
+        now,
+        expected: AMD(39_000n),
+      }),
     ).rejects.toThrow(expect.objectContaining({ code: ERROR.PAYMENT_CHANNEL_UNAVAILABLE }))
     expect(all.failed).toHaveBeenCalledWith(away)
     expect(payments.named).not.toHaveBeenCalled()
+  })
+
+  it('a price other than the screen showed is refused before anything is written (adversarial А4)', async () => {
+    const payments = journal()
+    const channel = bank()
+    await expect(
+      startPayment(deps(payments, channel), {
+        actorId: 'anna',
+        tariff: 'receipts',
+        lang: 'ru',
+        now,
+        expected: AMD(76_000n),
+      }),
+    ).rejects.toThrow(expect.objectContaining({ code: ERROR.PAYMENT_PRICE_CHANGED }))
+    expect(payments.createWithin).not.toHaveBeenCalled()
+    expect(channel.start).not.toHaveBeenCalled()
   })
 
   it('no price today is refused before the bank', async () => {
@@ -354,7 +405,7 @@ describe('startPayment — written, then registered with the bank (requirement 3
     await expect(
       startPayment(
         { ...deps(journal(), channel), rates: rates([]) },
-        { actorId: 'anna', tariff: 'data', lang: 'ru', now },
+        { actorId: 'anna', tariff: 'data', lang: 'ru', now, expected: AMD(39_000n) },
       ),
     ).rejects.toThrow(expect.objectContaining({ code: ERROR.PAYMENT_UNPRICED }))
     expect(channel.start).not.toHaveBeenCalled()
@@ -451,5 +502,17 @@ describe('paymentAskLimiter — once in five seconds a payment', () => {
     expect(mayAsk('p1')).toBe(false)
     clock = 5_000
     expect(mayAsk('p1')).toBe(true)
+  })
+})
+
+describe('rfCardRepeats — «У меня только карта РФ» counts people (adversarial А3)', () => {
+  it('takes an account’s second tap of the day as a repeat, the phone’s word too, and starts over each day', () => {
+    const again = rfCardRepeats()
+    expect(again('anna', false, now)).toBe(false)
+    expect(again('anna', false, now)).toBe(true)
+    expect(again('boris', false, now)).toBe(false)
+    expect(again('boris', true, now)).toBe(true)
+    // Yerevan's next day: 20:00 UTC
+    expect(again('anna', false, new Date('2026-12-01T20:00:00Z'))).toBe(false)
   })
 })

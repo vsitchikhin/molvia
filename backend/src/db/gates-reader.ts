@@ -105,13 +105,6 @@ export interface LoginsInWindow {
   readonly days: readonly LoginDay[]
 }
 
-/**
- * The rating reminder's lever (MOL-101, В-4) over the days the window touches, in Yerevan, summed
- * from `reminder_days`: how many people got each step, how many items the messages asked about,
- * how many verdicts a press in the bot gave, and how many people turned the reminders off — under a
- * reminder, in the settings, by blocking the bot (MOL-103). Not the gate's cohort — the reminders of those
- * days, whoever they went to.
- */
 /** «У меня только карта РФ» in the window (MOL-277, Р-8): taps, and of them a device's own again within a day. */
 export interface RfCardsInWindow {
   readonly firstDay: string
@@ -120,6 +113,13 @@ export interface RfCardsInWindow {
   readonly again: number
 }
 
+/**
+ * The rating reminder's lever (MOL-101, В-4) over the days the window touches, in Yerevan, summed
+ * from `reminder_days`: how many people got each step, how many items the messages asked about,
+ * how many verdicts a press in the bot gave, and how many people turned the reminders off — under a
+ * reminder, in the settings, by blocking the bot (MOL-103). Not the gate's cohort — the reminders of those
+ * days, whoever they went to.
+ */
 export interface RemindersInWindow {
   readonly firstDay: string
   readonly lastDay: string

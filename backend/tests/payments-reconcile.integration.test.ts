@@ -5,7 +5,7 @@ import type { PaymentMismatchNotice } from '@molvia/model'
 import { createOwnerNoticeRepository } from '@/db/owner-notices-repository'
 import { createPaymentsRepository } from '@/db/payments-repository'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor } from './fixtures'
+import { NO_QUOTA, clearAll, insertActor } from './fixtures'
 import { sorted } from './rows'
 
 const { db, close } = connectDrizzle()
@@ -19,22 +19,25 @@ const facts = { rrn: '626301234567', approvalCode: '123456' }
 
 async function aPayment(actorId: string) {
   const id = randomUUID()
-  const { orderNo } = await journal.create({
-    id,
-    actorId,
-    tariff: 'receipts',
-    anchor: { minor: 200n, currency: 'USD' },
-    rate: {
-      base: 'USD',
-      quote: 'AMD',
-      scaled: 383_120_000n,
-      source: 'official',
-      asOf: new Date('2026-11-30T00:00:00+04:00'),
+  const written = await journal.createWithin(
+    {
+      id,
+      actorId,
+      tariff: 'receipts',
+      anchor: { minor: 200n, currency: 'USD' },
+      rate: {
+        base: 'USD',
+        quote: 'AMD',
+        scaled: 383_120_000n,
+        source: 'official',
+        asOf: new Date('2026-11-30T00:00:00+04:00'),
+      },
+      amount: { minor: 77_000n, currency: 'AMD' },
+      channel: 'ameriabank',
     },
-    amount: { minor: 77_000n, currency: 'AMD' },
-    channel: 'ameriabank',
-  })
-  return { id, orderNo }
+    NO_QUOTA,
+  )
+  return { id, orderNo: written?.orderNo ?? 0n }
 }
 
 describe('what the reconciliation reads of the journal (MOL-277)', () => {

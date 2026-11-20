@@ -5,6 +5,7 @@ import {
   PAYMENTS_DAY_MAX,
   PAYMENT_ANCHOR_CURRENCY,
   PAYMENT_CURRENCY,
+  PAID_TARIFFS,
   PAYMENT_TARIFFS,
   TIP_CENTS,
   accessOf,
@@ -58,20 +59,20 @@ export interface PaymentChannelAdapter {
   /** The channel's page for the payment, in the person's language; its name of the payment is `ref`. */
   start(
     payment: PaymentRow,
-    lang: 'ru' | 'en',
+    lang: PaymentLang,
   ): Promise<{ readonly ref: string; readonly url: string }>
   check(payment: PaymentRow): Promise<ChannelWord>
   refund(payment: PaymentRow, minor: bigint): Promise<void>
 }
 
-/** A payment opened: its journal row, at the price fixed now. */
-export interface OpenedPayment {
-  readonly id: string
-  readonly orderNo: bigint
-  readonly amount: Money
-}
-
 const DAY_MS = 24 * 60 * 60 * 1000
+
+/**
+ * The bank's page lives 1200 s (`Timeout`); five minutes more for a slow bank and a late return (MOL-277, Р-4). Past
+ * it a payment the bank never named reached no bank: the minute abandons it, and the day's quota no longer counts it
+ * (adversarial А5) — a bank away eats the person's day otherwise.
+ */
+export const PAYMENT_PAGE_MS = 25 * 60_000
 
 /**
  * The CBA's dollar fresh for today in Yerevan — the one rate a price is made at; null while the CBA is silent, never
@@ -90,7 +91,9 @@ async function rateOfToday(
 /**
  * Opens a payment of the order in the journal at today's price (MOL-271): the dollar anchor at the CBA's rate
  * fresh for today in Yerevan, rounded up to 10 ֏. Null without such a rate — no price is made up. A tip names one
- * of its amounts; any other is refused. At most `PAYMENTS_DAY_MAX` a person's rolling day (MOL-277, Р-12).
+ * of its amounts; any other is refused. A price other than the one the screen showed (`expected`) is refused before
+ * anything is written (MOL-277, adversarial А4). At most `PAYMENTS_DAY_MAX` a person's rolling day (Р-12), a payment
+ * the bank never named counting only while its page may still be open (А5).
  */
 export async function openPayment(
   deps: {
@@ -101,17 +104,21 @@ export async function openPayment(
     readonly actorId: string
     readonly channel: PaymentChannel
     readonly now: Date
+    readonly expected?: Money
   },
-): Promise<OpenedPayment | null> {
+): Promise<PaymentRow | null> {
   const cents = anchorCentsOf(input)
   if (cents === null) throw new DomainError(ERROR.INVALID_AMOUNT, input.tariff)
   const rate = await rateOfToday(deps.rates, input.now)
   if (rate === null) return null
   const amount = paymentPrice(cents, rate)
-  const id = randomUUID()
+  const shown = input.expected
+  if (shown && (shown.minor !== amount.minor || shown.currency !== amount.currency)) {
+    throw new DomainError(ERROR.PAYMENT_PRICE_CHANGED, input.tariff)
+  }
   const created = await deps.payments.createWithin(
     {
-      id,
+      id: randomUUID(),
       actorId: input.actorId,
       tariff: input.tariff,
       anchor: { minor: cents, currency: PAYMENT_ANCHOR_CURRENCY },
@@ -119,27 +126,41 @@ export async function openPayment(
       amount,
       channel: input.channel,
     },
-    PAYMENTS_DAY_MAX,
-    new Date(input.now.getTime() - DAY_MS),
+    {
+      max: PAYMENTS_DAY_MAX,
+      since: new Date(input.now.getTime() - DAY_MS),
+      unnamedSince: new Date(input.now.getTime() - PAYMENT_PAGE_MS),
+    },
   )
   if (created === null) throw new DomainError(ERROR.PAYMENTS_DAY_LIMITED, input.actorId)
-  return { id, orderNo: created.orderNo, amount }
+  return created
 }
 
-/** Until when each term is open, none for one never open or already over — the phone keeps no clock for it. */
+/** A term still running at `now`, or none — never or over: the phone keeps no clock for it (`PaidAccessView`). */
+function running(until: Date | null, now: Date): Date | null {
+  return until !== null && until > now ? until : null
+}
+
 function viewOf(access: PaidUntil, now: Date): PaidAccessView {
-  const running = (until: Date | null) => (until !== null && until > now ? until : null)
-  return { shared: running(access.sharedUntil), receipts: running(access.receiptsModelUntil) }
+  return {
+    shared: running(access.sharedUntil, now),
+    receipts: running(access.receiptsModelUntil, now),
+  }
 }
 
-/** Where a tariff paid now would leave the access: each term it opens thirty days on (MOL-271). */
+/**
+ * Where a tariff paid now would leave the access: each term it opens thirty days on (MOL-271), the other as it runs —
+ * none where it is over, as `viewOf` says it (review №3).
+ */
 function after(access: PaidUntil, tariff: PaymentTariff, now: Date): PaidAccessView {
   const opens = accessOf(tariff)
   return {
-    shared: opens.includes('shared') ? extendedUntil(access.sharedUntil, now) : access.sharedUntil,
+    shared: opens.includes('shared')
+      ? extendedUntil(access.sharedUntil, now)
+      : running(access.sharedUntil, now),
     receipts: opens.includes('receipts')
       ? extendedUntil(access.receiptsModelUntil, now)
-      : access.receiptsModelUntil,
+      : running(access.receiptsModelUntil, now),
   }
 }
 
@@ -161,7 +182,7 @@ export async function offerPayments(
   if (rate === null) return { access: viewOf(access, now), tariffs: null, tips: null }
   return {
     access: viewOf(access, now),
-    tariffs: (['data', 'receipts', 'both'] as const).map((tariff) => {
+    tariffs: PAID_TARIFFS.map((tariff) => {
       const { cents } = PAYMENT_TARIFFS[tariff]
       return {
         tariff,
@@ -190,21 +211,21 @@ export async function startPayment(
     readonly actorId: string
     readonly lang: PaymentLang
     readonly now: Date
+    /** The price the screen showed: another made now is refused (adversarial А4). */
+    readonly expected: Money
   },
 ): Promise<{ readonly id: string; readonly url: string }> {
-  const opened = await openPayment(deps, { ...input, channel: deps.channel.channel })
-  if (opened === null) throw new DomainError(ERROR.PAYMENT_UNPRICED, input.tariff)
-  const payment = await deps.payments.get(opened.id)
-  if (payment === null) throw new Error(`payment ${opened.id} written and gone`)
+  const payment = await openPayment(deps, { ...input, channel: deps.channel.channel })
+  if (payment === null) throw new DomainError(ERROR.PAYMENT_UNPRICED, input.tariff)
   let started: { readonly ref: string; readonly url: string }
   try {
     started = await deps.channel.start(payment, input.lang)
   } catch (error) {
     deps.failed(error)
-    throw new DomainError(ERROR.PAYMENT_CHANNEL_UNAVAILABLE, opened.id)
+    throw new DomainError(ERROR.PAYMENT_CHANNEL_UNAVAILABLE, payment.id)
   }
-  await deps.payments.named(opened.id, started.ref)
-  return { id: opened.id, url: started.url }
+  await deps.payments.named(payment.id, started.ref)
+  return { id: payment.id, url: started.url }
 }
 
 /** The bank is asked of one payment at most once in this long, however often its page asks (Р-3). */
@@ -310,4 +331,25 @@ export async function refundPayment(
     throw new Error(`the bank refunded ${String(sum)} of ${id}, the journal has no such payment`)
   }
   return settled
+}
+
+/**
+ * Whether a tap of «У меня только карта РФ» is a repeat (MOL-277, Р-8; adversarial А3): the phone's word that it tapped
+ * within a day, or the account's tap counted already today in Yerevan — so one account's three hundred taps are one
+ * tap and 299 repeats, and the measure of `make gates` (taps less repeats) counts people. Kept in the API's process,
+ * today's accounts alone, never in a table: a count is nobody's. The price, named: a restart forgets today's.
+ */
+export function rfCardRepeats(): (actorId: string, phoneSaid: boolean, now: Date) => boolean {
+  let day = ''
+  let tapped = new Set<string>()
+  return (actorId, phoneSaid, now) => {
+    const today = yerevanDate(now)
+    if (today !== day) {
+      day = today
+      tapped = new Set()
+    }
+    const repeat = phoneSaid || tapped.has(actorId)
+    tapped.add(actorId)
+    return repeat
+  }
 }

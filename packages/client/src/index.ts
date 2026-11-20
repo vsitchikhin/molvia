@@ -1050,7 +1050,7 @@ export function createClient(options: ClientOptions): MolviaClient {
 
     paymentOffer: () => request('/payments/tariffs', paymentOfferCodec),
 
-    startPayment: async (body) =>
+    startPayment: (body) =>
       request('/payments', paymentStartedSchema, {
         method: 'POST',
         body: encode(startPaymentSchema, body),

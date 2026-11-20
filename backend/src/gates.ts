@@ -285,14 +285,6 @@ function taxReceiptLines(tax: TaxReceiptsInWindow): string[] {
 }
 
 /**
- * The rating reminder's lever (MOL-101, В-4) under the login: if gate 0.2 says stop, whether the
- * reminders did not go out, went out and were not pressed, or were pressed and there was little to
- * ask about — and whether it annoys: how many turned it off, and how (MOL-103, В-4). No line of its
- * own to cross, so no verdict — only the counts and the share with its n.
- * A press is counted on its own day, so the share of a window is of the items asked in it and the
- * presses made in it; at its edges the two need not be the same days.
- */
-/**
  * «У меня только карта РФ» on the screen of payment (MOL-277, Р-8): how often people with a Russian card alone came to
  * pay, by the day — whether to look for a way to take such cards (MOL-282). No line to cross, no verdict: the counts.
  */
@@ -306,6 +298,14 @@ function rfCardLines(cards: RfCardsInWindow): string[] {
   ]
 }
 
+/**
+ * The rating reminder's lever (MOL-101, В-4) under the login: if gate 0.2 says stop, whether the
+ * reminders did not go out, went out and were not pressed, or were pressed and there was little to
+ * ask about — and whether it annoys: how many turned it off, and how (MOL-103, В-4). No line of its
+ * own to cross, so no verdict — only the counts and the share with its n.
+ * A press is counted on its own day, so the share of a window is of the items asked in it and the
+ * presses made in it; at its edges the two need not be the same days.
+ */
 function reminderLines(reminders: RemindersInWindow): string[] {
   const { firstDay, lastDay } = reminders
   const span = firstDay === lastDay ? `the day ${firstDay}` : `days ${firstDay} … ${lastDay}`

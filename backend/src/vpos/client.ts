@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { PaymentLang } from '@molvia/model'
 import { boundedText } from '@/bounded-body'
 
 /**
@@ -71,19 +72,18 @@ const code = z.union([z.string(), z.number()]).transform(String)
 const initAnswer = z.object({
   PaymentID: z.string().nullish(),
   ResponseCode: code,
-  ResponseMessage: z.string().nullish(),
 })
 
 /**
- * What `GetPaymentDetails` says that we read — the state, the sums, the currency, our order and the bank's numbers.
- * The holder's name, email, card, its term and issuer come too and are never read (MOL-281 §8).
+ * What `GetPaymentDetails` says that we read — the state, the sum approved, the currency, our order and the bank's
+ * numbers — and nothing else: the holder's name, email, card, its term and issuer come too and are never read (MOL-281
+ * §8), nor a field nobody reads, whose type the bank may change under us (review №10).
  */
 const detailsAnswer = z.object({
   ResponseCode: code,
   OrderStatus: code.nullish(),
   OrderID: code.nullish(),
   Currency: z.string().nullish(),
-  Amount: z.number().nullish(),
   ApprovedAmount: z.number().nullish(),
   ApprovalCode: z.string().nullish(),
   rrn: z.string().nullish(),
@@ -92,6 +92,7 @@ const detailsAnswer = z.object({
 export interface VposDetails {
   readonly responseCode: string
   readonly orderStatus: string | null
+  /** Our order's number, the bank's less the stand's offset; `null` where it is none of ours. */
   readonly orderId: string | null
   readonly currency: string | null
   readonly approvedAmount: number | null
@@ -101,25 +102,30 @@ export interface VposDetails {
 
 const idAnswer = z.object({
   PaymentId: z.string().nullish(),
-  ResponseMessage: z.string().nullish(),
+  ResponseCode: code.nullish(),
 })
 
-const moneyAnswer = z.object({ ResponseCode: code, ResponseMessage: z.string().nullish() })
+/**
+ * `GetPaymentId` of an order the bank has not got: its help names `ResponseCode` and no table says which; `06` is
+ * «unknown OrderID» in the manual's table 1, and a nil uuid is what other merchants' drivers saw. Any other code with
+ * no id is a refusal — a wrong password is a 200 with `20` (review №11). The price, named: an answer of another shape
+ * the stand gives for «none» reads as a refusal, and the payment waits for the day's list.
+ */
+const NO_SUCH_ORDER = new Set(['06'])
+const NIL_ID = /^0{8}-0{4}-0{4}-0{4}-0{12}$/
 
-/** One operation of the list, as the bank keeps it — the card's mask and the holder's name are not read. */
+const moneyAnswer = z.object({ ResponseCode: code })
+
+/** One operation of the bank's list, as the reconciliation reads it: our order and the bank's state — nothing else. */
 export interface VposOperation {
   readonly orderId: string
-  readonly paymentId: string
   readonly state: string
-  readonly respCode: string
-  readonly currency: string
-  readonly amount: number
 }
 
 export interface InitRequest {
   readonly orderId: bigint
   /** In whole drams: the bank takes the major unit, and a fraction was refused on its stand (MOL-281 §1). */
-  readonly amount: number
+  readonly amount: bigint
   readonly description: string
   readonly backUrl: string
 }
@@ -131,17 +137,23 @@ export interface VposClient {
   paymentDetails(paymentId: string): Promise<VposDetails | null>
   /** The bank's id of our order, `null` where it has none — the answer of a lost `InitPayment`. */
   paymentId(orderId: bigint): Promise<string | null>
-  refund(paymentId: string, amount: number): Promise<void>
+  refund(paymentId: string, amount: bigint): Promise<void>
   cancel(paymentId: string): Promise<void>
   /** Every operation of the period, by the SOAP service of the administration page. */
   operations(from: Date, to: Date): Promise<readonly VposOperation[]>
   /** The page a person pays on, in their language. */
-  pageUrl(paymentId: string, lang: 'ru' | 'en'): string
+  pageUrl(paymentId: string, lang: PaymentLang): string
 }
 
 export interface VposClientOptions {
   readonly hosts: { api: string; page: string; list: string }
   readonly credentials: VposCredentials
+  /**
+   * Added to our order's number on its way to the bank and taken off on its way back (adversarial А2): the test stand
+   * takes orders only of the range the bank gives with the access (MOL-281 §4), and two databases on one stand must
+   * not share numbers. 0 on the live stand.
+   */
+  readonly orderOffset?: bigint
   readonly timeoutMs?: number
 }
 
@@ -181,8 +193,8 @@ const LIST_ACTION =
   'http://payments.ameriabank.am/ITransactionsInformationService/ITransactionsInformationService/GetTransactionList'
 
 /**
- * The fields of every `PaymentFields` of the list's answer, whatever prefix the namespace is given. The answer is
- * flat — no field holds another — so a pattern reads it, and no XML library comes in for one call a day.
+ * The order and state of every `PaymentFields` of the list's answer, whatever prefix the namespace is given. The answer
+ * is flat — no field holds another — so a pattern reads it, and no XML library comes in for one call a day.
  */
 export function operationsOf(xml: string): readonly VposOperation[] {
   const rows: VposOperation[] = []
@@ -195,16 +207,7 @@ export function operationsOf(xml: string): readonly VposOperation[] {
       ).exec(body)
       return unescapeXml(found?.[1] ?? '').trim()
     }
-    const amount = Number(field('Amount'))
-    rows.push({
-      orderId: field('OrderID'),
-      paymentId: field('PaymentID'),
-      state: field('PaymentState'),
-      // «00 : Payment Successfully Completed» — the code before its words
-      respCode: field('RespCode').split(':')[0]?.trim() ?? '',
-      currency: field('Currency'),
-      amount: Number.isFinite(amount) ? amount : Number.NaN,
-    })
+    rows.push({ orderId: field('OrderID'), state: field('PaymentState') })
   }
   return rows
 }
@@ -212,29 +215,45 @@ export function operationsOf(xml: string): readonly VposOperation[] {
 export function vposClient(options: VposClientOptions): VposClient {
   const { hosts, credentials } = options
   const timeoutMs = options.timeoutMs ?? VPOS_TIMEOUT_MS
+  const offset = options.orderOffset ?? 0n
 
-  async function call(method: string, body: Record<string, unknown>): Promise<Response> {
+  /** Our order's number as the bank names it. */
+  const toBank = (orderId: bigint): number => Number(orderId + offset)
+  /** The bank's order as ours, or none: a number below the offset, or no number, is no order of ours. */
+  function fromBank(order: string): string | null {
+    if (!/^\d{1,19}$/.test(order)) return null
+    const ours = BigInt(order) - offset
+    return ours > 0n ? String(ours) : null
+  }
+
+  /** One request to the bank: a connection that failed keeps no cause — the request held the password. */
+  async function call(method: string, url: string, init: RequestInit): Promise<Response> {
     try {
-      return await fetch(`${hosts.api}/${method}`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs),
-      })
+      return await fetch(url, { ...init, signal: AbortSignal.timeout(timeoutMs) })
     } catch {
-      // the cause may hold the request — the body with the password in it — so it is not kept
       throw new VposError('unreachable', method)
     }
   }
 
-  async function read<T>(method: string, response: Response, schema: z.ZodType<T>): Promise<T> {
-    let text: string
+  async function textOf(method: string, response: Response): Promise<string> {
     try {
-      text = await boundedText(response, VPOS_MAX_BYTES, () => new VposError('unreadable', method))
+      return await boundedText(response, VPOS_MAX_BYTES, () => new VposError('unreadable', method))
     } catch (error) {
       if (error instanceof VposError) throw error
       throw new VposError('unreachable', method)
     }
+  }
+
+  async function post(method: string, body: Record<string, unknown>): Promise<Response> {
+    return call(method, `${hosts.api}/${method}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', accept: 'application/json' },
+      body: JSON.stringify(body),
+    })
+  }
+
+  async function read<T>(method: string, response: Response, schema: z.ZodType<T>): Promise<T> {
+    const text = await textOf(method, response)
     let json: unknown
     try {
       json = JSON.parse(text)
@@ -255,11 +274,11 @@ export function vposClient(options: VposClientOptions): VposClient {
 
   return {
     async initPayment(request) {
-      const response = await call('InitPayment', {
+      const response = await post('InitPayment', {
         ...merchant(),
         // the bank's integer: a bigint of the journal, far below 2^53
-        OrderID: Number(request.orderId),
-        Amount: request.amount,
+        OrderID: toBank(request.orderId),
+        Amount: Number(request.amount),
         Currency: '051',
         Description: request.description,
         BackURL: request.backUrl,
@@ -275,7 +294,7 @@ export function vposClient(options: VposClientOptions): VposClient {
     },
 
     async paymentDetails(paymentId) {
-      const response = await call('GetPaymentDetails', { PaymentID: paymentId, ...user() })
+      const response = await post('GetPaymentDetails', { PaymentID: paymentId, ...user() })
       if (response.status >= 500) {
         await response.body?.cancel()
         return null
@@ -284,7 +303,7 @@ export function vposClient(options: VposClientOptions): VposClient {
       return {
         responseCode: answer.ResponseCode,
         orderStatus: answer.OrderStatus ?? null,
-        orderId: answer.OrderID ?? null,
+        orderId: answer.OrderID == null ? null : fromBank(answer.OrderID),
         currency: answer.Currency ?? null,
         approvedAmount: answer.ApprovedAmount ?? null,
         approvalCode: answer.ApprovalCode ?? null,
@@ -293,20 +312,24 @@ export function vposClient(options: VposClientOptions): VposClient {
     },
 
     async paymentId(orderId) {
-      const response = await call('GetPaymentId', { ...merchant(), OrderID: Number(orderId) })
+      const response = await post('GetPaymentId', { ...merchant(), OrderID: toBank(orderId) })
       if (response.status >= 500) {
         await response.body?.cancel()
         return null
       }
       const answer = await read('GetPaymentId', response, idAnswer)
-      return answer.PaymentId === '' ? null : (answer.PaymentId ?? null)
+      const id = answer.PaymentId ?? ''
+      if (id !== '' && !NIL_ID.test(id)) return id
+      const said = answer.ResponseCode ?? null
+      if (said === null || NO_SUCH_ORDER.has(said) || NIL_ID.test(id)) return null
+      throw new VposError('refused', 'GetPaymentId', said)
     },
 
     async refund(paymentId, amount) {
-      const response = await call('RefundPayment', {
+      const response = await post('RefundPayment', {
         PaymentID: paymentId,
         ...user(),
-        Amount: amount,
+        Amount: Number(amount),
       })
       const answer = await read('RefundPayment', response, moneyAnswer)
       if (answer.ResponseCode !== '00') {
@@ -315,7 +338,7 @@ export function vposClient(options: VposClientOptions): VposClient {
     },
 
     async cancel(paymentId) {
-      const response = await call('CancelPayment', { PaymentID: paymentId, ...user() })
+      const response = await post('CancelPayment', { PaymentID: paymentId, ...user() })
       const answer = await read('CancelPayment', response, moneyAnswer)
       if (answer.ResponseCode !== '00') {
         throw new VposError('refused', 'CancelPayment', answer.ResponseCode)
@@ -323,37 +346,24 @@ export function vposClient(options: VposClientOptions): VposClient {
     },
 
     async operations(from, to) {
+      const method = 'GetTransactionList'
       const envelope = `<s:Envelope xmlns:s="http://schemas.xmlsoap.org/soap/envelope/"><s:Header><Action s:mustUnderstand="1" xmlns="http://schemas.microsoft.com/ws/2005/05/addressing/none">${LIST_ACTION}</Action></s:Header><s:Body><GetTransactionList xmlns="http://payments.ameriabank.am/ITransactionsInformationService"><transclient xmlns:d4p1="payments.ameriabank.am/TransactionClient" xmlns:i="http://www.w3.org/2001/XMLSchema-instance"><d4p1:ClientID>${escapeXml(credentials.clientId)}</d4p1:ClientID><d4p1:EndDate>${vposMoment(to)}</d4p1:EndDate><d4p1:Password>${escapeXml(credentials.password)}</d4p1:Password><d4p1:StartDate>${vposMoment(from)}</d4p1:StartDate><d4p1:Username>${escapeXml(credentials.username)}</d4p1:Username></transclient></GetTransactionList></s:Body></s:Envelope>`
-      let response: Response
-      try {
-        response = await fetch(hosts.list, {
-          method: 'POST',
-          headers: { 'content-type': 'text/xml; charset=utf-8', soapaction: LIST_ACTION },
-          body: envelope,
-          signal: AbortSignal.timeout(timeoutMs),
-        })
-      } catch {
-        throw new VposError('unreachable', 'GetTransactionList')
-      }
+      const response = await call(method, hosts.list, {
+        method: 'POST',
+        headers: { 'content-type': 'text/xml; charset=utf-8', soapaction: LIST_ACTION },
+        body: envelope,
+      })
       if (!response.ok) {
         await response.body?.cancel()
-        throw new VposError('refused', 'GetTransactionList', String(response.status))
+        throw new VposError('refused', method, String(response.status))
       }
-      let xml: string
-      try {
-        xml = await boundedText(
-          response,
-          VPOS_MAX_BYTES,
-          () => new VposError('unreadable', 'GetTransactionList'),
-        )
-      } catch (error) {
-        if (error instanceof VposError) throw error
-        throw new VposError('unreachable', 'GetTransactionList')
-      }
-      if (!xml.includes('GetTransactionListResult')) {
-        throw new VposError('unreadable', 'GetTransactionList')
-      }
-      return operationsOf(xml)
+      const xml = await textOf(method, response)
+      if (!xml.includes('GetTransactionListResult')) throw new VposError('unreadable', method)
+      // the bank's numbers taken back to ours; one that is none of ours is marked so, never read as one of ours
+      return operationsOf(xml).map((operation) => ({
+        ...operation,
+        orderId: fromBank(operation.orderId) ?? `none-of-ours:${operation.orderId}`,
+      }))
     },
 
     pageUrl(paymentId, lang) {

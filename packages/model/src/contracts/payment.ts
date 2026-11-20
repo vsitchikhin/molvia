@@ -1,6 +1,13 @@
 import { z } from 'zod'
-import { TIP_CENTS, paymentStateSchema, paymentTariffSchema } from '#model/entities/payment'
-import type { PaymentState, PaymentTariff } from '#model/entities/payment'
+import {
+  TIP_CENTS,
+  bankStateSchema,
+  orderNoSchema,
+  paidTariffSchema,
+  paymentStateSchema,
+  paymentTariffSchema,
+} from '#model/entities/payment'
+import type { PaidTariff, PaymentState, PaymentTariff } from '#model/entities/payment'
 import { moneyCodec } from '#model/values/money'
 import type { Money } from '#model/values/money'
 
@@ -21,17 +28,26 @@ const tipCentsSchema = z
   .int()
   .refine((cents) => TIP_CENTS.includes(BigInt(cents)))
 
-/** `POST /payments`: a tariff of thirty days, or a tip of one of its three sums. */
+/**
+ * `POST /payments`: a tariff of thirty days, or a tip of one of its three sums — with the price the screen showed
+ * (adversarial А4): the server makes the price again at the tap, and a rate that moved meanwhile refuses rather
+ * than charge what the button did not say.
+ */
 export const startPaymentSchema = z.discriminatedUnion('tariff', [
+  z.strictObject({ tariff: paidTariffSchema, amount: moneyCodec, lang: paymentLangSchema }),
   z.strictObject({
-    tariff: z.enum(['data', 'receipts', 'both']),
+    tariff: z.literal('tip'),
+    tipCents: tipCentsSchema,
+    amount: moneyCodec,
     lang: paymentLangSchema,
   }),
-  z.strictObject({ tariff: z.literal('tip'), tipCents: tipCentsSchema, lang: paymentLangSchema }),
 ])
 export type StartPayment = z.infer<typeof startPaymentSchema>
 
-/** The bank's page of the payment started — `https` only, as the phone opens it — and the payment's id. */
+/**
+ * The bank's page of the payment started, and the payment's id. `https`, and `http` only for end-to-end's fake bank on
+ * the loopback, the stand `local` the API refuses in production.
+ */
 export const paymentStartedSchema = z.strictObject({
   id: z.uuid(),
   url: z.url({ protocol: /^https?$/ }),
@@ -56,7 +72,7 @@ export const paidAccessCodec = z.codec(accessWire, z.custom<PaidAccessView>(), {
 
 /** One tariff offered: its price today and where each term it opens would end once paid now. */
 export interface TariffOffer {
-  readonly tariff: Exclude<PaymentTariff, 'tip'>
+  readonly tariff: PaidTariff
   readonly cents: number
   readonly amount: Money
   readonly after: PaidAccessView
@@ -74,7 +90,7 @@ const offerWire = z.strictObject({
   tariffs: z
     .array(
       z.strictObject({
-        tariff: z.enum(['data', 'receipts', 'both']),
+        tariff: paidTariffSchema,
         cents: z.number().int().positive(),
         amount: moneyCodec,
         after: accessWire,
@@ -137,8 +153,8 @@ export const paymentStatusCodec = z.codec(statusWire, z.custom<PaymentStatus>(),
  */
 export const paymentMismatchNoticeSchema = z.strictObject({
   kind: z.literal('payment_mismatch'),
-  orderNo: z.string().regex(/^\d{1,19}$/),
-  bank: z.string().regex(/^[\w-]{1,8}$/),
+  orderNo: orderNoSchema,
+  bank: bankStateSchema,
   journal: z.union([paymentStateSchema, z.literal('none')]),
 })
 export type PaymentMismatchNotice = z.infer<typeof paymentMismatchNoticeSchema>

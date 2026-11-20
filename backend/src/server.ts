@@ -77,6 +77,7 @@ import {
   confirmPayment,
   offerPayments,
   paymentAskLimiter,
+  rfCardRepeats,
   startPayment,
 } from '@/usecases/payments'
 import type { PaymentChannelAdapter } from '@/usecases/payments'
@@ -88,7 +89,8 @@ import {
 } from '@/usecases/reconcile-payments'
 import { createRateRepository } from '@/db/rates-repository'
 import { paymentRoutes } from '@/routes/payments'
-import { VposError, vposClient } from '@/vpos/client'
+import { vposClient } from '@/vpos/client'
+import type { VposClient } from '@/vpos/client'
 import { ameriabankChannel } from '@/vpos/ameriabank'
 import { exportMine } from '@/usecases/export-mine'
 import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
@@ -267,6 +269,8 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.PAYMENTS_DAY_LIMITED]: 429,
   // The CBA silent today: the state of the world refuses it, the request is well formed.
   [ERROR.PAYMENT_UNPRICED]: 409,
+  // The price moved under the button: the world's state, the request well formed (adversarial А4).
+  [ERROR.PAYMENT_PRICE_CHANGED]: 409,
   [ERROR.PAYMENT_CHANNEL_UNAVAILABLE]: 503,
   [ERROR.RECEIPTS_UNRECORDED_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
@@ -376,17 +380,6 @@ function routeOf(request: FastifyRequest): { method: string; route: string | und
 /** A job of the API's own timers, by its name (В-1). */
 function job(name: string): FailurePlace {
   return { source: 'api', route: `job:${name}` }
-}
-
-/** A channel with no bank behind it: every call refused as a bank away (a test's server with the фф on). */
-function unconfiguredChannel(): PaymentChannelAdapter {
-  const away = (method: string) => () => Promise.reject(new VposError('unreachable', method))
-  return {
-    channel: 'ameriabank',
-    start: away('InitPayment'),
-    check: away('GetPaymentDetails'),
-    refund: away('RefundPayment'),
-  }
 }
 
 function decodedPath(url: string): string {
@@ -586,23 +579,27 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
   // Payment by card (MOL-277): the channel exists only while the фф is on; a server a test turns it on in with no
   // bank configured has one that refuses, as a bank away does.
-  const bankClient =
-    ff.has('payments') && options.paymentChannel === undefined && VPOS_CONFIG !== null
-      ? vposClient(VPOS_CONFIG)
-      : null
-  const paymentChannel: PaymentChannelAdapter | null = !ff.has('payments')
-    ? null
-    : (options.paymentChannel ??
-      (bankClient === null || VPOS_CONFIG === null
-        ? unconfiguredChannel()
-        : ameriabankChannel({
-            client: bankClient,
-            stand: VPOS_CONFIG.stand,
-            appBaseUrl: VPOS_CONFIG.appBaseUrl,
-            strange: (error) => {
-              failures.report(error, job('payment-bank'), 'bank said what the journal leaves')
-            },
-          })))
+  // Payment by card (MOL-277), only while its фф is on: a test's channel, or Ameriabank's by `VPOS_CONFIG` — which
+  // the environment requires with the фф on (review №9), so a server with neither is a test that named no channel.
+  let bankClient: VposClient | null = null
+  let paymentChannel: PaymentChannelAdapter | null = null
+  if (ff.has('payments')) {
+    if (options.paymentChannel !== undefined) {
+      paymentChannel = options.paymentChannel
+    } else if (VPOS_CONFIG === null) {
+      throw new Error('payments on with no bank: VPOS_CONFIG, or a paymentChannel of the test')
+    } else {
+      bankClient = vposClient(VPOS_CONFIG)
+      paymentChannel = ameriabankChannel({
+        client: bankClient,
+        stand: VPOS_CONFIG.stand,
+        appBaseUrl: VPOS_CONFIG.appBaseUrl,
+        strange: (error) => {
+          failures.report(error, job('payment-bank'), 'bank said what the journal leaves')
+        },
+      })
+    }
+  }
 
   // The auth scopes set `no-store` on what their routes answer, but a path no route matches
   // and a URL Fastify cannot decode are answered before any scope is entered (adversarial А4).
@@ -1421,6 +1418,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         const payments = createPaymentsRepository(db)
         const rates = createRateRepository(db)
         const mayAsk = paymentAskLimiter()
+        const rfCardAgain = rfCardRepeats()
         const failedAt = (route: string) => (error: unknown) => {
           failures.report(error, { source: 'api', route }, 'bank did not answer a payment')
         }
@@ -1433,6 +1431,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
                 actorId,
                 lang: body.lang,
                 now: new Date(),
+                expected: body.amount,
                 ...(body.tariff === 'tip'
                   ? { tariff: 'tip', tipCents: BigInt(body.tipCents) }
                   : { tariff: body.tariff }),
@@ -1450,7 +1449,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               id,
               new Date(),
             ),
-          rfCard: (again) => payments.tapRfCard(again),
+          rfCard: (actorId, again) => payments.tapRfCard(rfCardAgain(actorId, again, new Date())),
         })
       }
       consentRoutes(guarded, {

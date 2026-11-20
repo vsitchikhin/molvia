@@ -56,7 +56,7 @@ describe('make refund — the owner gives money back (MOL-277, Р-9)', () => {
     expect(bank).not.toHaveBeenCalled()
     expect(lines.join('\n')).toContain('payment №1042: receipts, paid')
     expect(lines.join('\n')).toContain('would refund')
-    expect(lines.join('\n')).toContain('whole: the days not lived go back')
+    expect(lines.join('\n')).toContain('the rest: the days not lived go back')
   })
 
   it('refunds all that is left with --yes — the bank first, then the journal', async () => {
@@ -92,6 +92,25 @@ describe('make refund — the owner gives money back (MOL-277, Р-9)', () => {
       expect(await run([...args])).toBe(code)
       expect(bank).not.toHaveBeenCalled()
     }
+  })
+
+  it('says the rule’s own reason of a refusal — never its guess (review №13)', async () => {
+    for (const [row, args, said] of [
+      [PAID, ['--order', '1042', '--amount', '0'], 'refused: nothing to refund'],
+      [PAID, ['--order', '1042', '--amount', '771'], 'refused: 77100 past the 77000 left'],
+      [{ ...PAID, state: 'created' as const }, ['--order', '1042'], 'refused: a payment created'],
+    ] as const) {
+      const { lines, run } = setup(row)
+      await run([...args])
+      expect(lines.at(-1)).toBe(said)
+    }
+  })
+
+  it('refuses a sum of no whole drams before the bank (review №7)', async () => {
+    const { bank, lines, run } = setup()
+    expect(await run(['--order', '1042', '--amount', '100.5', '--yes'])).toBe(2)
+    expect(bank).not.toHaveBeenCalled()
+    expect(lines.at(-1)).toContain('no whole sum')
   })
 
   it('without the bank configured says what is needed and refunds nothing', async () => {

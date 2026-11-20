@@ -1,11 +1,12 @@
-import { MINOR_EXPONENT } from '@molvia/model'
+import { wholeMajor } from '@molvia/model'
+import type { Money } from '@molvia/model'
 import type { PaymentRow } from '@/db/payments-repository'
 import type { ChannelWord, PaymentChannelAdapter } from '@/usecases/payments'
 import { VposError } from './client'
 import type { VposClient, VposDetails, VposStand } from './client'
 
 /** The test stand takes 10 ֏ and nothing else (code 560, MOL-281 §6): every tariff is 10 ֏ there. */
-export const VPOS_TEST_DRAMS = 10
+export const VPOS_TEST_DRAMS = 10n
 
 /** `CancelPayment` gives the whole sum back within 72 hours of the order's registration (MOL-281 §1, Р-9). */
 export const VPOS_CANCEL_WITHIN_MS = 72 * 60 * 60 * 1000
@@ -38,10 +39,19 @@ function blankless(value: string | null): string | null {
   return value === '' ? null : value
 }
 
+/**
+ * Whole drams for the bank, or a refusal before it (review №7): the bank takes the major unit and refused a fraction
+ * on its stand (MOL-281 §1). Counted in `bigint`, never a float.
+ */
+export function drams(money: Money, method: string): bigint {
+  const whole = wholeMajor(money)
+  if (whole === null) throw new VposError('refused', method, 'not_whole_drams')
+  return whole
+}
+
 /** What is charged for a payment, in whole drams: its amount, or 10 ֏ on the test stand. */
-export function chargedDrams(payment: Pick<PaymentRow, 'amount'>, stand: VposStand): number {
-  if (stand === 'test') return VPOS_TEST_DRAMS
-  return Number(payment.amount.minor) / 10 ** MINOR_EXPONENT[payment.amount.currency]
+export function chargedDrams(payment: Pick<PaymentRow, 'amount'>, stand: VposStand): bigint {
+  return stand === 'test' ? VPOS_TEST_DRAMS : drams(payment.amount, 'InitPayment')
 }
 
 /**
@@ -51,7 +61,7 @@ export function chargedDrams(payment: Pick<PaymentRow, 'amount'>, stand: VposSta
  */
 export function judged(
   details: VposDetails | null,
-  expected: { readonly orderNo: bigint; readonly drams: number },
+  expected: { readonly orderNo: bigint; readonly drams: bigint },
 ): { readonly word: ChannelWord; readonly strange: VposStrange | null } {
   const waiting = { said: 'waiting' } as const
   if (details === null) return { word: waiting, strange: null }
@@ -61,7 +71,7 @@ export function judged(
         details.responseCode === '00' &&
         details.orderId === String(expected.orderNo) &&
         details.currency === DRAM &&
-        details.approvedAmount === expected.drams
+        details.approvedAmount === Number(expected.drams)
       if (!ours) return { word: waiting, strange: 'paid_mismatch' }
       return {
         word: {
@@ -117,6 +127,12 @@ export function ameriabankChannel(options: AmeriabankOptions): PaymentChannelAda
         description: vposDescription(payment.tariff),
         backUrl: `${options.appBaseUrl}/pay/done/${payment.id}`,
       }
+      // A number the bank knows already is never ours to register (adversarial А2): a database restored from its copy
+      // gives numbers out again, and two databases on one stand share them — and a repeat of `InitPayment` with an
+      // order the bank has answers that order's id, paid or not.
+      if ((await client.paymentId(payment.orderNo)) !== null) {
+        throw new VposError('refused', 'InitPayment', 'order_number_taken')
+      }
       let id: string
       try {
         id = await client.initPayment(request)
@@ -142,19 +158,19 @@ export function ameriabankChannel(options: AmeriabankOptions): PaymentChannelAda
     async refund(payment, minor) {
       const ref = await refOf(payment)
       if (ref === null) throw new VposError('refused', 'RefundPayment', 'no_payment_id')
-      const whole = payment.refundedMinor === 0n && minor === payment.amount.minor
-      if (whole && now() - payment.createdAt.getTime() < VPOS_CANCEL_WITHIN_MS) {
+      // nothing given back before and all of it now: what `CancelPayment` takes, within its 72 hours (review №13)
+      const untouched = payment.refundedMinor === 0n && minor === payment.amount.minor
+      if (untouched && now() - payment.createdAt.getTime() < VPOS_CANCEL_WITHIN_MS) {
         await client.cancel(ref)
         return
       }
-      if (stand === 'test' && !whole) {
-        // the stand charged 10 ֏ for any tariff: a part of the journal's sum is no sum it holds
-        throw new VposError('refused', 'RefundPayment', 'test_stand_partial')
+      if (stand === 'test') {
+        // the stand charged 10 ֏ for any tariff: only that whole sum is a sum it holds
+        if (!untouched) throw new VposError('refused', 'RefundPayment', 'test_stand_partial')
+        await client.refund(ref, VPOS_TEST_DRAMS)
+        return
       }
-      const drams = whole
-        ? chargedDrams(payment, stand)
-        : Number(minor) / 10 ** MINOR_EXPONENT[payment.amount.currency]
-      await client.refund(ref, drams)
+      await client.refund(ref, drams({ ...payment.amount, minor }, 'RefundPayment'))
     },
   }
 }

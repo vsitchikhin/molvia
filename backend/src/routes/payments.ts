@@ -19,7 +19,7 @@ export interface PaymentsApi {
   start(actorId: string, body: StartPayment): Promise<PaymentStarted>
   status(actorId: string, paymentId: string): Promise<PaymentStatus>
   /** A tap of «У меня только карта РФ» counted (Р-8): nobody's, by the day. */
-  rfCard(again: boolean): Promise<void>
+  rfCard(actorId: string, again: boolean): Promise<void>
 }
 
 /**
@@ -47,7 +47,7 @@ export function paymentRoutes(app: FastifyInstance, api: PaymentsApi): void {
    */
   app.post('/payments/rf-card', async (request, reply) => {
     const { again } = parseQuery(rfCardQuerySchema, request.query)
-    await api.rfCard(again === '1')
+    await api.rfCard(request.actorId, again === '1')
     return reply.header('cache-control', 'no-store').code(204).send()
   })
 

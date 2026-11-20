@@ -12,6 +12,32 @@ import { DomainError, ERROR } from '#model/support/errors'
 export const paymentTariffSchema = z.enum(['data', 'receipts', 'both', 'tip'])
 export type PaymentTariff = z.infer<typeof paymentTariffSchema>
 
+/** The tariffs that open thirty days of access — every one but a tip. One list for the wire, the offer and the screen. */
+export const paidTariffSchema = paymentTariffSchema.exclude(['tip'])
+export type PaidTariff = z.infer<typeof paidTariffSchema>
+export const PAID_TARIFFS = paidTariffSchema.options
+
+/**
+ * A payment's order number where it crosses the journal's border as text — the bank's list, a notice to the owner, the
+ * owner's command: digits, a `bigint` of the journal's identity.
+ */
+export const orderNoSchema = z.string().regex(/^\d{1,19}$/)
+
+/**
+ * A state of an order as the bank's list spells it (MOL-277): a digit, or a word of the manual's table 2
+ * (`payment_deposited`) — which of the two the list sends is not known until the bank's stand answers.
+ */
+export const bankStateSchema = z.string().regex(/^[\w-]{1,32}$/)
+
+/**
+ * The money in whole units of its currency, or none where it has a fraction (MOL-277): Ameriabank takes drams whole
+ * — its stand refused a fraction (MOL-281 §1) — so a sum that is not whole is refused before the bank.
+ */
+export function wholeMajor(money: Money): bigint | null {
+  const per = minorPerMajor(money.currency)
+  return money.minor % per === 0n ? money.minor / per : null
+}
+
 /** An access a payment extends: a column of `actors`, by its meaning. */
 export type PaidAccess = 'shared' | 'receipts'
 
@@ -36,10 +62,7 @@ export const PAYMENT_PRICE_STEP_MAJOR = 10n
 
 /** A tariff's price in cents of the anchor and the access it extends. */
 export const PAYMENT_TARIFFS: Readonly<
-  Record<
-    Exclude<PaymentTariff, 'tip'>,
-    { readonly cents: bigint; readonly opens: readonly PaidAccess[] }
-  >
+  Record<PaidTariff, { readonly cents: bigint; readonly opens: readonly PaidAccess[] }>
 > = Object.freeze({
   data: { cents: 100n, opens: ['shared'] },
   receipts: { cents: 200n, opens: ['receipts'] },
@@ -54,8 +77,7 @@ export const TIP_CENTS: readonly bigint[] = Object.freeze([100n, 300n, 500n])
  * a tariff, is no order the type lets be written (MOL-283, review №5).
  */
 export type PaymentOrder =
-  | { readonly tariff: Exclude<PaymentTariff, 'tip'> }
-  | { readonly tariff: 'tip'; readonly tipCents: bigint }
+  { readonly tariff: PaidTariff } | { readonly tariff: 'tip'; readonly tipCents: bigint }
 
 /** The anchor in cents an order names: the tariff's, or a tip's own — one of `TIP_CENTS` or none. */
 export function anchorCentsOf(order: PaymentOrder): bigint | null {
@@ -119,8 +141,10 @@ export function refundSum(
 ): bigint {
   const left = payment.amountMinor - payment.refundedMinor
   const sum = minor ?? left
-  if (payment.state !== 'paid' || sum <= 0n || sum > left) {
-    throw new DomainError(ERROR.CONFLICT, `refund ${String(sum)} of ${payment.state}`)
+  if (payment.state !== 'paid') throw new DomainError(ERROR.CONFLICT, `a payment ${payment.state}`)
+  if (sum <= 0n) throw new DomainError(ERROR.CONFLICT, 'nothing to refund')
+  if (sum > left) {
+    throw new DomainError(ERROR.CONFLICT, `${String(sum)} past the ${String(left)} left`)
   }
   return sum
 }

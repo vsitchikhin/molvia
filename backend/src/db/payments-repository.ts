@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, lte, sql } from 'drizzle-orm'
+import { and, eq, gt, gte, inArray, isNotNull, lt, lte, or, sql } from 'drizzle-orm'
 import {
   PAYMENT_KEEP_YEARS,
   accessOf,
@@ -70,14 +70,22 @@ export interface PaidUntil {
   readonly receiptsModelUntil: Date | null
 }
 
+/** The day's quota of payments a person starts (MOL-277, Р-12). */
+export interface PaymentQuota {
+  readonly max: number
+  /** The rolling day: payments started after it count. */
+  readonly since: Date
+  /** A payment the bank never named counts only after this — while its page may still be open (adversarial А5). */
+  readonly unnamedSince: Date
+}
+
 export interface PaymentsRepository {
-  create(payment: NewPayment): Promise<{ orderNo: bigint }>
   /**
-   * The payment written only while the person started fewer than `max` since `since` (MOL-277, Р-12) — counted under
-   * their row's lock, so two at once never both pass the last place; `null` past it, nothing written. An erased
-   * person has no row and starts nothing.
+   * The payment written, and its row, only while the person started fewer than the quota's `max` (MOL-277, Р-12) —
+   * counted under their row's lock, so two at once never both pass the last place; `null` past it, nothing written.
+   * An erased person has no row and starts nothing.
    */
-  createWithin(payment: NewPayment, max: number, since: Date): Promise<{ orderNo: bigint } | null>
+  createWithin(payment: NewPayment, quota: PaymentQuota): Promise<PaymentRow | null>
   /** Where the person's paid access ends now; `null` — no such person. */
   paidUntil(actorId: string): Promise<PaidUntil | null>
   /**
@@ -217,15 +225,7 @@ function rowOf(payment: NewPayment) {
 
 export function createPaymentsRepository(db: Db): PaymentsRepository {
   return {
-    async create(payment) {
-      const [created] = await db
-        .insert(payments)
-        .values(rowOf(payment))
-        .returning({ orderNo: payments.orderNo })
-      return theRow(created, 'payments')
-    },
-
-    async createWithin(payment, max, since) {
+    async createWithin(payment, quota) {
       return db.transaction(async (tx) => {
         const [person] = await tx
           .select({ id: actors.id })
@@ -236,13 +236,16 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
         const [{ started } = { started: 0 }] = await tx
           .select({ started: sql<number>`count(*)::int` })
           .from(payments)
-          .where(and(eq(payments.actorId, payment.actorId), gt(payments.createdAt, since)))
-        if (started >= max) return null
-        const [created] = await tx
-          .insert(payments)
-          .values(rowOf(payment))
-          .returning({ orderNo: payments.orderNo })
-        return theRow(created, 'payments')
+          .where(
+            and(
+              eq(payments.actorId, payment.actorId),
+              gt(payments.createdAt, quota.since),
+              or(isNotNull(payments.channelRef), gt(payments.createdAt, quota.unnamedSince)),
+            ),
+          )
+        if (started >= quota.max) return null
+        const [created] = await tx.insert(payments).values(rowOf(payment)).returning()
+        return paymentRowOf(theRow(created, 'payments'))
       })
     },
 
@@ -286,11 +289,7 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
         .select()
         .from(payments)
         .where(
-          and(
-            eq(payments.channel, channel),
-            sql`${payments.paidAt} >= ${at(from)}`,
-            sql`${payments.paidAt} < ${at(to)}`,
-          ),
+          and(eq(payments.channel, channel), gte(payments.paidAt, from), lt(payments.paidAt, to)),
         )
         .orderBy(payments.orderNo)
       return rows.map(paymentRowOf)

@@ -9,20 +9,23 @@ import {
 const until = new Date('2026-12-31T12:00:00.000Z')
 
 describe('the wire of payment by card (MOL-277)', () => {
-  it('takes a tariff in the page’s language, or a tip of its three sums — and nothing else', () => {
-    expect(startPaymentSchema.parse({ tariff: 'both', lang: 'en' })).toEqual({
+  it('takes a tariff with the price shown, in the page’s language, or a tip of its three sums — nothing else', () => {
+    const amount = { amount: '960', currency: 'AMD' }
+    expect(startPaymentSchema.parse({ tariff: 'both', amount, lang: 'en' })).toEqual({
       tariff: 'both',
+      amount: { minor: 96_000n, currency: 'AMD' },
       lang: 'en',
     })
-    expect(startPaymentSchema.parse({ tariff: 'tip', tipCents: 500, lang: 'ru' })).toMatchObject({
-      tipCents: 500,
-    })
+    expect(
+      startPaymentSchema.parse({ tariff: 'tip', tipCents: 500, amount, lang: 'ru' }),
+    ).toMatchObject({ tipCents: 500 })
     for (const body of [
-      { tariff: 'tip', tipCents: 200, lang: 'ru' },
-      { tariff: 'tip', tipCents: 1.5, lang: 'ru' },
-      { tariff: 'data', tipCents: 100, lang: 'ru' },
-      { tariff: 'data', lang: 'hy' },
-      { tariff: 'data' },
+      { tariff: 'tip', tipCents: 200, amount, lang: 'ru' },
+      { tariff: 'tip', tipCents: 1.5, amount, lang: 'ru' },
+      { tariff: 'data', tipCents: 100, amount, lang: 'ru' },
+      { tariff: 'data', amount, lang: 'hy' },
+      // the price the screen showed is required (adversarial А4)
+      { tariff: 'data', lang: 'ru' },
     ]) {
       expect(startPaymentSchema.safeParse(body).success).toBe(false)
     }

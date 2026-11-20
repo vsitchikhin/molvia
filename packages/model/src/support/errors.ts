@@ -162,6 +162,11 @@ export const ERROR = {
    */
   PAYMENT_CHANNEL_UNAVAILABLE: 'error.payment_channel_unavailable',
   /**
+   * The price made at the tap is not the one the screen showed (MOL-277, adversarial А4): the CBA published, or a day
+   * turned, meanwhile. Nothing is written; the screen reads the offer again and says the new price.
+   */
+  PAYMENT_PRICE_CHANGED: 'error.payment_price_changed',
+  /**
    * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
    * the text and says to send it tomorrow.
    */
