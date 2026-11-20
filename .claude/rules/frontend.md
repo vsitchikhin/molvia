@@ -1542,7 +1542,8 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   keeping the order costs 13 KB gzip of wrappers at the start; on a very first visit whose dictionary does not
   come the page stays blank until the retry; a full load to a screen loses what the screen left held in memory —
   its queues and drafts are on the device; the dev server and its e2e do not see the warming after the paint
-  — only the build's specs do (`offline-built`). **Once a tab, not once an address** (review №6, adversarial А5): a
+  — only the build's specs do (`offline-built`). These two accepted by the owner as prices (20.11.2026, before the
+  merge). **Once a tab, not once an address** (review №6, adversarial А5): a
   second screen whose code did not come in the 30 s after a full load — a version without its own chunks, the very
   loop the mark guards — is not loaded again, and the tap does nothing, saying nothing. **A dictionary's request
   that neither answers nor fails** holds the start until the browser gives it up (adversarial А8): the same
