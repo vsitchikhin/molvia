@@ -17,26 +17,37 @@ export function decodeStatementText(bytes: Uint8Array): string {
   }
 }
 
+/** A record of a CSV text: its fields, and the line of the file it begins on, the first 1. */
+export interface CsvRecord {
+  readonly cells: readonly string[]
+  readonly line: number
+}
+
 /**
  * The records of a CSV text by RFC 4180, with the bank's separator: a field in quotes may hold the
  * separator, a line break and a quote doubled; a quote inside a field not opened by one is a letter.
- * A record of one empty field — a blank line — is no record. `null` where a quote is never closed: the
- * rest of the file would be one field, and nothing read from it could be trusted.
+ * A record of one empty field — a blank line — is no record. Each knows the line it begins on, as an
+ * editor counts them — a field over two lines and a blank line count (adversarial А7): a refusal names
+ * the line a person finds. `null` where a quote is never closed: the rest of the file would be one
+ * field, and nothing read from it could be trusted.
  */
-export function readCsvRecords(text: string, separator: string): string[][] | null {
-  const records: string[][] = []
-  let record: string[] = []
+export function readCsvRecords(text: string, separator: string): CsvRecord[] | null {
+  const records: CsvRecord[] = []
+  let cells: string[] = []
   let field = ''
   let quoted = false
+  let line = 1
+  let begins = 1
   let at = 0
   const endRecord = () => {
-    record.push(field)
-    if (record.length > 1 || record[0] !== '') records.push(record)
-    record = []
+    cells.push(field)
+    if (cells.length > 1 || cells[0] !== '') records.push({ cells, line: begins })
+    cells = []
     field = ''
   }
   while (at < text.length) {
     const char = text.charAt(at)
+    const breaks = char === '\n' || (char === '\r' && text[at + 1] !== '\n')
     if (quoted) {
       if (char === '"') {
         if (text[at + 1] === '"') {
@@ -46,21 +57,22 @@ export function readCsvRecords(text: string, separator: string): string[][] | nu
         }
         quoted = false
       } else field += char
+      if (breaks) line += 1
       at += 1
       continue
     }
     if (char === '"' && field === '') quoted = true
     else if (char === separator) {
-      record.push(field)
+      cells.push(field)
       field = ''
-    } else if (char === '\r' && text[at + 1] === '\n') {
+    } else if (breaks) {
       endRecord()
-      at += 1
-    } else if (char === '\n' || char === '\r') endRecord()
-    else field += char
+      line += 1
+      begins = line
+    } else if (char !== '\r') field += char // a CR before LF: the LF ends the record
     at += 1
   }
   if (quoted) return null
-  if (field !== '' || record.length > 0) endRecord()
+  if (field !== '' || cells.length > 0) endRecord()
   return records
 }

@@ -112,6 +112,7 @@ describe('readTbankCsv — the layout of 2026', () => {
     )
     const [account] = accountsOf(read)
     expect(account?.name).toBe('Black')
+    expect(account?.currency).toBe('RUB')
     expect(account?.statement).toMatchObject({
       form: 'tbank-csv',
       accountId: null,
@@ -171,9 +172,14 @@ describe('readTbankCsv — the layout of 2026', () => {
     expect(one({ amount: '−1 040,50', debited: '−1 040,50' }).amount.minor).toBe(104_050n)
   })
 
-  it('leaves a line of zero out', () => {
+  it('leaves a line of zero out, and a declined one whose two sums disagree', () => {
     const read = readTbankCsv(
-      utf8File(HEADER_2026, row2026({ amount: '0,00', debited: '0,00' }), row2026()),
+      utf8File(
+        HEADER_2026,
+        row2026({ amount: '0,00', debited: '0,00' }),
+        row2026({ status: 'FAILED', amount: '-10,00', currency: 'USD', debited: '0,00' }),
+        row2026(),
+      ),
     )
     expect(accountsOf(read)[0]?.statement.lines).toHaveLength(1)
   })
@@ -185,9 +191,19 @@ describe('readTbankCsv — the layout of 2026', () => {
       'own_transfer',
     ],
     [
-      'the words of an own transfer',
+      'the words of an own transfer the bank counts — no sign of 2026’s, a transfer',
       { payee: 'Перевод себе', category: 'Переводы', mcc: '' },
-      'own_transfer',
+      'transfer',
+    ],
+    [
+      '«Внутренний перевод» to a contract — another person’s too, a transfer (adversarial А1)',
+      { payee: 'Внутренний перевод на договор 5000000001', category: 'Переводы', mcc: '' },
+      'transfer',
+    ],
+    [
+      'a purchase taken out of the bank’s analytics — a purchase still (adversarial А2)',
+      { analytics: 'Нет', mcc: '5411' },
+      'purchase',
     ],
     ['MCC 6011', { mcc: '6011', category: 'Другое' }, 'cash'],
     ['the category «Наличные»', { mcc: '', category: 'Наличные' }, 'cash'],
@@ -226,6 +242,11 @@ describe('readTbankCsv — the layout of 2026', () => {
     expect(one({ message: 'Тайное слово' }).payee).toBe('Пятёрочка')
   })
 
+  it('cuts a payee of emoji as the schema counts, never a pair of surrogates in two (review №2)', () => {
+    expect(one({ payee: '🍕'.repeat(150) }).payee).toBe('🍕'.repeat(100))
+    expect(one({ payee: `x${'🍕'.repeat(150)}` }).payee).toBe(`x${'🍕'.repeat(99)}`)
+  })
+
   it('reads «FAILED» as declined and «OK» in Latin as posted', () => {
     expect(one({ status: 'FAILED' }).status).toBe('declined')
     expect(one({ status: 'OK' }).status).toBe('posted')
@@ -251,11 +272,49 @@ describe('readTbankCsv — the layout of 2026', () => {
     ])
   })
 
-  it('skips the header of a second export glued into the file', () => {
+  it('splits one name by the account’s currency: a product’s accounts may share it (adversarial А5)', () => {
     const read = readTbankCsv(
-      utf8File(HEADER_2026, row2026({ payee: 'A' }), HEADER_2026, row2026({ payee: 'B' })),
+      utf8File(
+        HEADER_2026,
+        row2026(),
+        row2026({ amount: '-12,00', currency: 'USD', debited: '-12,00', debitedCurrency: 'USD' }),
+        row2026({ amount: '-12,00', currency: 'USD', debited: '-1 000,00' }),
+      ),
+    )
+    expect(
+      accountsOf(read).map(({ name, currency, statement }) => [
+        name,
+        currency,
+        statement.lines.length,
+      ]),
+    ).toEqual([
+      ['Black', 'RUB', 2],
+      ['Black', 'USD', 1],
+    ])
+  })
+
+  it('skips the header of a second export glued into the file, its byte order mark too', () => {
+    const read = readTbankCsv(
+      utf8File(
+        HEADER_2026,
+        row2026({ payee: 'A' }),
+        `\uFEFF${HEADER_2026}`,
+        row2026({ payee: 'B' }),
+      ),
     )
     expect(accountsOf(read)[0]?.statement.lines.map(({ payee }) => payee)).toEqual(['A', 'B'])
+  })
+
+  it('reads once a record two glued exports share, and twice two like records of one (adversarial А4)', () => {
+    const edge = row2026({ date: '15.11.2026 12:34:56', payee: 'Edge' })
+    const read = readTbankCsv(
+      utf8File(HEADER_2026, row2026({ payee: 'A' }), edge, edge, HEADER_2026, edge, edge, edge),
+    )
+    expect(accountsOf(read)[0]?.statement.lines.map(({ payee }) => payee)).toEqual([
+      'A',
+      'Edge',
+      'Edge',
+    ])
   })
 
   it('finds the columns by name: another order, another spelling of «ё», an unknown column', () => {
@@ -308,6 +367,37 @@ describe('readTbankCsv — the layout before 2026', () => {
       expect.objectContaining({ postedOn: null, kind: 'own_transfer', debited: null }),
     ])
   })
+
+  it('moves the posting day with its operation onto the phone’s calendar (adversarial А6)', () => {
+    const read = readTbankCsv(
+      cp1251File(
+        HEADER_OLD,
+        '13.11.2026 23:17:00;13.11.2026;*5958;OK;-500,00;RUB;-500,00;RUB;0;Переводы;;Перевод;0;0;-500,00',
+        '13.11.2026 15:00:00;14.11.2026;*5958;OK;-500,00;RUB;-500,00;RUB;0;Переводы;;Перевод;0;0;-500,00',
+      ),
+      'Asia/Yerevan',
+    )
+    expect(
+      accountsOf(read)[0]?.statement.lines.map(({ day, postedOn }) => [day, postedOn]),
+    ).toEqual([
+      ['2026-11-14', '2026-11-14'],
+      ['2026-11-13', '2026-11-14'],
+    ])
+  })
+
+  it('reads «Внутренний перевод» as no own word, «Между своими счетами» as one only with no MCC', () => {
+    const read = readTbankCsv(
+      cp1251File(
+        HEADER_OLD,
+        '14.11.2026 19:00:00;;*5958;OK;-500,00;RUB;-500,00;RUB;0;Переводы;;Внутренний перевод на договор 5000000001;0;0;-500,00',
+        '14.11.2026 19:00:00;;*5958;OK;-500,00;RUB;-500,00;RUB;0;Другое;5411;Между своими счетами;0;0;-500,00',
+      ),
+    )
+    expect(accountsOf(read)[0]?.statement.lines.map(({ kind }) => kind)).toEqual([
+      'transfer',
+      'purchase',
+    ])
+  })
 })
 
 describe('readTbankCsv — refusals', () => {
@@ -351,6 +441,13 @@ describe('readTbankCsv — refusals', () => {
 
   it.each([
     ['signs that disagree', { amount: '-6 241,00', currency: 'AMD', debited: '1 478,24' }],
+    ['nothing left the account', { amount: '-6 241,00', currency: 'AMD', debited: '0,00' }],
+    ['nothing spent of what left it', { amount: '0,00', currency: 'AMD', debited: '-1 478,24' }],
+    [
+      'a sum of zero on a day no calendar has',
+      { amount: '0,00', debited: '0,00', date: '31.02.2026' },
+    ],
+    ['a day before the rates’ epoch', { date: '14.11.1999 12:00:00' }],
     ['more digits than the currency has', { amount: '-350,005', debited: '-350,005' }],
     ['an amount that is no number', { amount: 'много', debited: 'много' }],
     ['a day no calendar has', { date: '31.02.2026 12:00:00' }],
@@ -358,6 +455,19 @@ describe('readTbankCsv — refusals', () => {
     ['a date in another order', { date: '2026-11-14 12:00:00' }],
   ] as const)('refuses a line of %s, naming its record', (_, row) => {
     expect(refusalOf(readTbankCsv(utf8File(HEADER_2026, row2026(), row2026(row))))).toEqual({
+      reason: 'row_unreadable',
+      row: 3,
+    })
+  })
+
+  it('names the line of the file, past a payee of two lines and a blank line (adversarial А7)', () => {
+    const bad = row2026({ date: '31.02.2026 12:00:00' })
+    expect(
+      refusalOf(
+        readTbankCsv(utf8File(HEADER_2026, row2026({ payee: 'Оплата\nв Multitransfer' }), bad)),
+      ),
+    ).toEqual({ reason: 'row_unreadable', row: 4 })
+    expect(refusalOf(readTbankCsv(utf8File(HEADER_2026, '', bad)))).toEqual({
       reason: 'row_unreadable',
       row: 3,
     })

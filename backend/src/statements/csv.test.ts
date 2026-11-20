@@ -29,17 +29,19 @@ describe('decodeStatementText', () => {
   })
 })
 
+const cellsOf = (text: string) => readCsvRecords(text, ';')?.map(({ cells }) => cells)
+
 describe('readCsvRecords', () => {
   it('reads quoted fields holding the separator, a line break and a doubled quote', () => {
     const text = 'a;"b;c";"d\r\ne";"say ""hi"""\r\n1;2;3;4'
-    expect(readCsvRecords(text, ';')).toEqual([
+    expect(cellsOf(text)).toEqual([
       ['a', 'b;c', 'd\r\ne', 'say "hi"'],
       ['1', '2', '3', '4'],
     ])
   })
 
   it('takes CRLF, LF and CR alike, drops blank lines, and keeps a last line with no break', () => {
-    expect(readCsvRecords('a;b\r\n\r\nc;d\n\ne;f\rg;h', ';')).toEqual([
+    expect(cellsOf('a;b\r\n\r\nc;d\n\ne;f\rg;h')).toEqual([
       ['a', 'b'],
       ['c', 'd'],
       ['e', 'f'],
@@ -47,12 +49,17 @@ describe('readCsvRecords', () => {
     ])
   })
 
+  it('names the line of the file a record begins on, past a field of two lines and a blank line', () => {
+    const text = 'head;x\r\n"two\r\nlines";1\r\n\r\nnext;2\n"three\n\nlines";3\rlast;4'
+    expect(readCsvRecords(text, ';')?.map(({ line }) => line)).toEqual([1, 2, 5, 6, 9])
+  })
+
   it('keeps empty fields, the last one too', () => {
-    expect(readCsvRecords(';a;;\n', ';')).toEqual([['', 'a', '', '']])
+    expect(cellsOf(';a;;\n')).toEqual([['', 'a', '', '']])
   })
 
   it('reads a quote inside a field not opened by one as a letter', () => {
-    expect(readCsvRecords('ООО "Ромашка";1', ';')).toEqual([['ООО "Ромашка"', '1']])
+    expect(cellsOf('ООО "Ромашка";1')).toEqual([['ООО "Ромашка"', '1']])
   })
 
   it('refuses a quote never closed', () => {

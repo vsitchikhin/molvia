@@ -12,5 +12,6 @@ Rules: `.claude/rules/statements.md`. A test beside its source, or mirroring it 
 
 ## backend · statements
 
-- `backend/src/statements/csv.ts` — A bank's CSV export as text and records: UTF-8 or Windows-1251, quotes by RFC 4180 (MOL-430).
-- `backend/src/statements/tbank.ts` — T-Bank's CSV as statement lines, one statement an account, or the refusal of the file (MOL-430).
+- `backend/src/statements/csv.ts` — A bank's CSV export as text and records: UTF-8 or Windows-1251, quotes by RFC 4180, each record with its line in the file (MOL-430).
+- `backend/src/statements/refusal.ts` — What every parser of a bank's file answers: its accounts or the refusal named, `StatementRead`, `StatementRefusal` (MOL-430).
+- `backend/src/statements/tbank.ts` — T-Bank's CSV as statement lines, one statement an account by its name and currency, or the refusal of the file (MOL-430).
