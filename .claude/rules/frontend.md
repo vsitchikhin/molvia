@@ -1463,7 +1463,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
 - **Every screen but home is a chunk of its own, and every one is loaded after the first paint** (MOL-337,
   finding A-1 of the audit MOL-302, owner's В-1…В-3 «а»). The app was one script of 1,535 KB, gzip 456, both
   dictionaries in it — all of it fetched and parsed before a phone at the shelf drew anything. Now a cold start
-  takes 892 KB, gzip 287 (Russian; 830 and 279 English). **A screen is `lazyScreen(() => import(…))` in
+  takes 886 KB, gzip 285 (Russian; 824 and 277 English). **A screen is `lazyScreen(() => import(…))` in
   `router.ts`**; «Что брать» stays in the bundle — where the app opens and «back» leads — and so does the login
   screen, which `App.vue` puts before any screen; `router.test.ts` refuses a screen imported eagerly again.
   **MOL-17's reason holds, not overruled**: it kept the screens in one bundle so that a tap on a tab would never
@@ -1495,7 +1495,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   `ScreenNotLoaded`**, the weather, never the phone's defect (`phoneDefect`), as no answer is: `lazyScreen` tells it
   by the engine's own words — «Failed to fetch dynamically imported module» (Chromium), «Importing a module script
   failed» and «…is not a valid JavaScript MIME type…» (WebKit), «error loading dynamically imported module»
-  (Firefox), Vite's «Unable to preload CSS» — probed on Chromium and WebKit for a cut, a 404, an HTML page and the
+  (Firefox) — probed on Chromium and WebKit for a cut, a 404, an HTML page and the
   connection off. **A module that came and threw as it ran is our defect** (adversarial А1), as it was in the
   bundle: it goes on as thrown, `reloadOnStaleChunk` reports it and every other failure of a move — a guard's —
   since `RouterLink` swallows the refusal and nothing else would tell the owner, and nothing is reloaded. **One dictionary at the start** (В-3 «а»):
@@ -1506,7 +1506,8 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   written only then, by whichever turn speaks it — a language overtaken by a tap of the order of the day is written
   with it (adversarial А10): a tap or another window's choice whose dictionary did not come gives the choice shown
   back — the segments stand on what is asked for, at once (А3, А11) — and writes nothing, another window's staying on
-  this window's own shelf for its next start; of two asked while a dictionary was coming, the later is spoken and
+  this window's own shelf for its next start, its key no tap of this window writes any more (review №11), and the
+  system's language the same (№12); of two asked while a dictionary was coming, the later is spoken and
   written, whatever came first (А2); another window's language or order of the day keeps this window's other half
   (А7); the start asks again only after a failure, and asks first whether a choice was spoken
   meanwhile (review №2). The tests' `createAppI18n` keeps both dictionaries — no module of the app calls it, so
@@ -1516,7 +1517,14 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   `accounts.ts` did, on every screen of money and at every warming, and `CategorySheet` asked `t` for the other
   language and got keys, so «Groceries» passed as one's own on a Russian phone (MOL-398, А3, back). A test holds
   them equal to both dictionaries, and `offline-built` holds that a page with every screen loaded asked for the
-  phone's dictionary alone. **Modules run in the source's order across chunks**
+  phone's dictionary alone. **A screen is its `import()` alone, nothing preloaded beside it** (adversarial А14):
+  Vite's helper remembers a preload that failed and asks for it no more — a screen's stylesheet missed once, the
+  screen opened unstyled on Chromium, silently; and WebKit remembers a failed `modulepreload`, so the screen's
+  next `import()` failed without asking. So **the app has one stylesheet, as before the screens were chunks**
+  (`cssCodeSplit: false`), named by `index.html` and precached, and a dynamic import preloads nothing
+  (`modulePreload.resolveDependencies`, the preloads of `index.html` kept); `offline-built` holds both. The price:
+  a screen's shared modules come one after another behind its `import()`, not side by side — from the precache,
+  or before any tap once warmed. **Modules run in the source's order across chunks**
   (`strictExecutionOrder` of `vite.config.ts`): the entry's own body runs after the chunks it imports, so
   `zodJitless` came after the schemas it must precede — the policy's violation at every load, which the e2e of
   the build caught — and `catchers` after the modules it must hear (MOL-144, Б3). **The build is the name of the
@@ -1528,7 +1536,7 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   `@molvia/frontend/testing/screens`**: the route's `import()` otherwise waits on that screen's first transform,
   longer than `flushPromises`. **The prices, named:** a first visit downloads as much as before, only after the
   first paint, and every launch parses the other screens in the background — the start is faster, the work of a
-  launch is not smaller; the precache is 165 files and 3,137 KiB for 27 and 2,991, the same code in pieces;
+  launch is not smaller; the precache is 121 files and 3,131 KiB for 27 and 2,991, the same code in pieces;
   keeping the order costs 13 KB gzip of wrappers at the start; on a very first visit whose dictionary does not
   come the page stays blank until the retry; a full load to a screen loses what the screen left held in memory —
   its queues and drafts are on the device; the dev server and its e2e do not see the warming after the paint
