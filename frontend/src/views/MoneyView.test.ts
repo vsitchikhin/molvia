@@ -428,7 +428,8 @@ describe('MoneyView: the month', () => {
       ).toBe('−100% vs the same day of August')
     })
 
-    // Adversarial А4: «−100 %» says nothing was spent, and the ring beside it says something was.
+    // Adversarial А4: «−100 %» says nothing was spent, and the ring beside it says something was. Its own
+    // timeout (MOL-243): it took 544 ms on CI (run 44724326764), ten times that rounded up.
     it('must not fire: «−100 %» over a spending on its way or one waiting a rate', async () => {
       const zero = {
         ...empty(),
@@ -451,7 +452,7 @@ describe('MoneyView: the month', () => {
       await flushPromises()
       expect(view.text()).toContain('Not counted yet: 1 expense is being sent')
       expect(view.find('.change').exists()).toBe(false)
-    })
+    }, 15_000)
 
     // Adversarial Б2: a closed month says «−100 %» no more than the running one over what waits.
     it('must not fire: a closed month’s «−100 %» over a spending waiting a rate', async () => {
