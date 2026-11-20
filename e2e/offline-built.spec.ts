@@ -94,6 +94,16 @@ test.describe('no worker', () => {
       )
     // Every screen loaded, and the phone's one language: no screen pulls the other dictionary in (review №1).
     expect(named(await files(), /\/assets\/(ru|en)-[\w-]+\.js$/)).toEqual(['en'])
+    // One stylesheet, the one `index.html` names, and no screen preloaded beside its `import()`: Vite's helper
+    // remembers a preload that failed and asks no more (adversarial А14).
+    expect((await files()).filter((path) => path.endsWith('.css'))).toHaveLength(1)
+    expect(
+      await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLLinkElement>('link[rel="modulepreload"]')]
+          .map((link) => link.href)
+          .filter((href) => /View-[\w-]+\.js$/.test(href)),
+      ),
+    ).toEqual([])
 
     await page.context().setOffline(true)
     const tabs = page.getByRole('navigation', { name: 'Sections' })

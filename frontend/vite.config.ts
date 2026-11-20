@@ -209,6 +209,16 @@ export default defineConfig(({ mode }) => {
       // entry's own body runs after the chunks it imports, so `zodJitless` came after the schemas it must
       // precede — a violation of the policy at every start — and `catchers` after the modules it must hear.
       rolldownOptions: { output: { strictExecutionOrder: true } },
+      // A lazy screen is its `import()` alone, nothing preloaded beside it (MOL-337, adversarial А14): Vite's
+      // helper remembers a stylesheet that failed and never asks for it again — the screen opened unstyled on
+      // Chromium, silently — and WebKit remembers a failed `modulepreload`, so the next `import()` of the screen
+      // failed without asking. One stylesheet for the app, as before the screens were chunks, loaded by
+      // `index.html` and precached; and the preloads of `index.html` itself stay.
+      cssCodeSplit: false,
+      modulePreload: {
+        resolveDependencies: (_file, dependencies, { hostType }) =>
+          hostType === 'html' ? dependencies : [],
+      },
     },
     // What only a worker imports: the dev server's first crawl never reads a worker, so the package
     // was found when the scanner first opened and optimized in the middle of a run, every page asking

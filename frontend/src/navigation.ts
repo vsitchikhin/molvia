@@ -219,8 +219,8 @@ export function lazyScreen<T>(load: () => Promise<T>): () => Promise<T> {
  * Whether a failed `import()` is a chunk that did not come — cut, missing, answered with a page — rather than a
  * module that came and threw: an engine says so in its own words, probed on Chromium and WebKit (MOL-337,
  * adversarial А1), Firefox by its source. A throw of the module is its own error — `TypeError … is not a
- * function`, a `SyntaxError` — and Vite's `Unable to preload CSS` is a stylesheet of the chunk that did not
- * come. **The price, named:** an engine that words it otherwise has its chunk counted as our defect — heard by
+ * function`, a `SyntaxError`. Nothing is preloaded beside a screen's `import()` (`vite.config.ts`, adversarial
+ * А14), so Vite's own words of a preload are not among them. **The price, named:** an engine that words it otherwise has its chunk counted as our defect — heard by
  * the owner, and the screen not reloaded.
  */
 const CHUNK_NOT_LOADED = [
@@ -228,7 +228,6 @@ const CHUNK_NOT_LOADED = [
   /^Importing a module script failed/,
   /is not a valid JavaScript MIME type/,
   /^error loading dynamically imported module/,
-  /^Unable to preload CSS/,
 ]
 
 function chunkNotLoaded(error: unknown): boolean {
