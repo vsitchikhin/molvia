@@ -76,6 +76,7 @@ services:
       VPOS_CLIENT_ID: ${VPOS_CLIENT_ID:-}
       VPOS_USERNAME: ${VPOS_USERNAME:-}
       VPOS_PASSWORD: ${VPOS_PASSWORD:-}
+      VPOS_ORDER_OFFSET: ${VPOS_ORDER_OFFSET:-}
       # Optional: empty leaves the Open Food Facts hint off (MOL-162).
       OPEN_FOOD_FACTS_CONTACT: ${OPEN_FOOD_FACTS_CONTACT:-}
       PURS_CONTACT: ${PURS_CONTACT:-}
