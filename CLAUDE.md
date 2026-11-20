@@ -400,6 +400,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
   answers `too_heavy` and weighs none; the matching skips what a failed search went through (А20), and past
   `STATEMENT_STEPS_MAX` steps stops with `too_heavy` too (А22) — 1.3 s at worst; a refund weighs the sellers of its
   sum alone, counted in the pairs (А23), and names weigh by their words, eight at most (А24).
+- **A bank's file is parsed by its columns' names, and what the parser does not know refuses the file** (MOL-430,
+  `backend/src/statements/`): a header, a status, a sum wider than its currency — named in the answer, never guessed;
+  T-Bank's Moscow time is a day on the phone's calendar, «Сообщение» is never read, «Учёт в аналитике: Нет» is an own
+  transfer.
 
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 
