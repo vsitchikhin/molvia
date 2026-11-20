@@ -79,6 +79,15 @@ export interface PaymentsRepository {
   createWithin(payment: NewPayment, max: number, since: Date): Promise<{ orderNo: bigint } | null>
   /** Where the person's paid access ends now; `null` — no such person. */
   paidUntil(actorId: string): Promise<PaidUntil | null>
+  /**
+   * The channel's payments still «created» since `upTo` or longer, the oldest first, at most `limit` — what the
+   * minute's reconciliation asks the bank of (MOL-277, requirement 6).
+   */
+  pending(channel: PaymentChannel, upTo: Date, limit: number): Promise<readonly PaymentRow[]>
+  /** The channel's payments of these order numbers. */
+  byOrders(channel: PaymentChannel, orderNos: readonly bigint[]): Promise<readonly PaymentRow[]>
+  /** The channel's payments paid within `[from, to)` — what the bank's list of the period must hold. */
+  paidWithin(channel: PaymentChannel, from: Date, to: Date): Promise<readonly PaymentRow[]>
   /** The channel's name of the payment: given once, a later name — the same or another — changes nothing. */
   named(id: string, channelRef: string): Promise<void>
   get(id: string): Promise<PaymentRow | null>
@@ -173,6 +182,21 @@ async function stateOf(tx: Conn, id: string): Promise<PaymentState | null> {
   return row?.state ?? null
 }
 
+function paymentRowOf(row: typeof payments.$inferSelect): PaymentRow {
+  return {
+    id: row.id,
+    orderNo: row.orderNo,
+    actorId: row.actorId,
+    tariff: row.tariff,
+    amount: { minor: row.amountMinor, currency: row.currency },
+    refundedMinor: row.refundedMinor,
+    channel: row.channel,
+    channelRef: row.channelRef,
+    state: row.state,
+    createdAt: row.createdAt,
+  }
+}
+
 function rowOf(payment: NewPayment) {
   return {
     id: payment.id,
@@ -219,6 +243,47 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
       })
     },
 
+    async pending(channel, upTo, limit) {
+      const rows = await db
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.channel, channel),
+            eq(payments.state, 'created'),
+            lte(payments.createdAt, upTo),
+          ),
+        )
+        .orderBy(payments.orderNo)
+        .limit(limit)
+      return rows.map(paymentRowOf)
+    },
+
+    async byOrders(channel, orderNos) {
+      if (orderNos.length === 0) return []
+      const rows = await db
+        .select()
+        .from(payments)
+        .where(and(eq(payments.channel, channel), inArray(payments.orderNo, [...orderNos])))
+        .orderBy(payments.orderNo)
+      return rows.map(paymentRowOf)
+    },
+
+    async paidWithin(channel, from, to) {
+      const rows = await db
+        .select()
+        .from(payments)
+        .where(
+          and(
+            eq(payments.channel, channel),
+            sql`${payments.paidAt} >= ${at(from)}`,
+            sql`${payments.paidAt} < ${at(to)}`,
+          ),
+        )
+        .orderBy(payments.orderNo)
+      return rows.map(paymentRowOf)
+    },
+
     async paidUntil(actorId) {
       const [person] = await db
         .select({
@@ -239,19 +304,7 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
 
     async get(id) {
       const [row] = await db.select().from(payments).where(eq(payments.id, id))
-      if (row === undefined) return null
-      return {
-        id: row.id,
-        orderNo: row.orderNo,
-        actorId: row.actorId,
-        tariff: row.tariff,
-        amount: { minor: row.amountMinor, currency: row.currency },
-        refundedMinor: row.refundedMinor,
-        channel: row.channel,
-        channelRef: row.channelRef,
-        state: row.state,
-        createdAt: row.createdAt,
-      }
+      return row === undefined ? null : paymentRowOf(row)
     },
 
     async markPaid(id, facts, now) {

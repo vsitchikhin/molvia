@@ -10,6 +10,7 @@ import { catalogueMergedNoticeSchema } from './merge'
 import { modelShareNoticeSchema, modelSpendNoticeSchema } from './model-spend'
 import { receiptPartialMutedNoticeSchema, receiptPartialNoticeSchema } from './receipt-miss'
 import { silenceNoticeToOwnerSchema } from './silence'
+import { paymentMismatchNoticeSchema } from './payment'
 import { telegramUserIdSchema } from '#model/entities/actor'
 import { FAILURE_FRAMES, PHONE_SCRIPT_PATH } from '#model/support/failure'
 
@@ -209,6 +210,7 @@ export const ownerNoticeSchema = z.discriminatedUnion('kind', [
   receiptPartialNoticeSchema,
   receiptPartialMutedNoticeSchema,
   silenceNoticeToOwnerSchema,
+  paymentMismatchNoticeSchema,
 ])
 export type OwnerNotice = z.infer<typeof ownerNoticeSchema>
 export type OwnerNoticeKind = OwnerNotice['kind']
@@ -224,6 +226,7 @@ export const OWNER_NOTICE_KINDS = [
   'receipt_partial',
   'receipt_partial_muted',
   'silence',
+  'payment_mismatch',
 ] as const satisfies readonly OwnerNoticeKind[]
 
 /** The notices about a message to the developer: they name it, and go with it (MOL-148, Р-5). */

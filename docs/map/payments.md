@@ -23,12 +23,15 @@ Rules: `.claude/rules/payments.md`. A test beside its source, or mirroring it un
 - `backend/src/vpos/config.ts` — The bank's stand and the merchant's three values, read only while the фф `payments` is on and then each required — the API does not start without them, naming the variable and never its value; end-to-end's fake bank (`local`) never in production.
 - `backend/src/vpos/ameriabank.ts` — Ameriabank as a channel of the journal: the page in the person's language with its way back to `/pay/done`, a lost answer found by our order's number, «paid» only by the bank's `00` and `2` for our order, sum and dram — a `5`, a mismatch or a refund we never made said to the owner, never acted on — and the money back by `CancelPayment` within 72 hours or `RefundPayment`; 10 ֏ on the test stand.
 
+- `backend/src/usecases/reconcile-payments.ts` — The reconciliation of payments by card (MOL-277): every minute each page still open asked of the bank from its first minute to 25 — then the last answer not «paid» abandons it — and once a day the bank's list of the two days before against the journal, an order the bank took money for settled by its own id, what still disagrees told to the owner by the order and the two states.
+
 ## backend · db
 
 - `backend/src/db/payments-repository.ts` — Repository of the journal: a payment written with its order number, the channel's name of it given once, «paid» set once with the access it extends under the person's lock — after our «abandoned» too — and where the payment's days end, declined or abandoned, refunds adding up with the whole one taking back the days not lived and moving the later payments' ends, and the payments three years past their last movement and their days deleted. Tests: `backend/tests/payments.integration.test.ts`.
 
 ## backend · tests
 
+- `backend/tests/payments-reconcile.integration.test.ts` — Integration test of what the reconciliation reads: the payments still «created» a minute old and more in order, the payments of orders, the paid ones of a period by when they were paid, and a mismatch queued once however many runs see it, read back by the contract.
 - `backend/tests/payments-routes.integration.test.ts` — Integration test of the routes with a channel of the test's: the offer at today's CBA rate and none without it, a payment started and named, a tip of its three sums only, a bank away a 503 with the row left, ten a rolling day and the eleventh refused, the return page opening the access on «paid», someone else's payment a 404, and off every route an address the API has not got.
 
 - `backend/tests/payments.integration.test.ts` — Integration test: order numbers in order, the channel's name unique and given once, «paid» extending once however many times it is said, «paid» after «abandoned» and never after «declined», «both» each term from its own end, a tip extending nothing, an erased payer's payment paid with nothing extended, refunds up to the sum, a whole refund leaving a later payment's and a grant's days, three years to the moment, a paid one kept while its days are less than three years over.

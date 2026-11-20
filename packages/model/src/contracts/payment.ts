@@ -129,3 +129,16 @@ export const paymentStatusCodec = z.codec(statusWire, z.custom<PaymentStatus>(),
     access: paidAccessCodec.encode(status.access),
   }),
 })
+
+/**
+ * The bank and the journal disagree about a payment, after the reconciliation settled what it could (MOL-277, В-5
+ * «а»): the order's number, the bank's state of it — `none` where the bank lists no such operation — and the
+ * journal's — `none` where we have no such order. Nothing of the person: the order finds the rest in the journal.
+ */
+export const paymentMismatchNoticeSchema = z.strictObject({
+  kind: z.literal('payment_mismatch'),
+  orderNo: z.string().regex(/^\d{1,19}$/),
+  bank: z.string().regex(/^[\w-]{1,8}$/),
+  journal: z.union([paymentStateSchema, z.literal('none')]),
+})
+export type PaymentMismatchNotice = z.infer<typeof paymentMismatchNoticeSchema>

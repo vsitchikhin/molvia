@@ -80,6 +80,12 @@ import {
   startPayment,
 } from '@/usecases/payments'
 import type { PaymentChannelAdapter } from '@/usecases/payments'
+import {
+  PAYMENT_LIST_EVERY_MS,
+  PAYMENT_RECONCILE_EVERY_MS,
+  reconcilePending,
+  reconcileWithList,
+} from '@/usecases/reconcile-payments'
 import { createRateRepository } from '@/db/rates-repository'
 import { paymentRoutes } from '@/routes/payments'
 import { VposError, vposClient } from '@/vpos/client'
@@ -580,13 +586,17 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
 
   // Payment by card (MOL-277): the channel exists only while the фф is on; a server a test turns it on in with no
   // bank configured has one that refuses, as a bank away does.
+  const bankClient =
+    ff.has('payments') && options.paymentChannel === undefined && VPOS_CONFIG !== null
+      ? vposClient(VPOS_CONFIG)
+      : null
   const paymentChannel: PaymentChannelAdapter | null = !ff.has('payments')
     ? null
     : (options.paymentChannel ??
-      (VPOS_CONFIG === null
+      (bankClient === null || VPOS_CONFIG === null
         ? unconfiguredChannel()
         : ameriabankChannel({
-            client: vposClient(VPOS_CONFIG),
+            client: bankClient,
             stand: VPOS_CONFIG.stand,
             appBaseUrl: VPOS_CONFIG.appBaseUrl,
             strange: (error) => {
@@ -756,6 +766,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     let stopMergeTwins: (() => Promise<void>) | undefined
     let stopSilence: (() => Promise<void>) | undefined
     let stopPaymentSweep: (() => Promise<void>) | undefined
+    let stopPaymentReconcile: (() => Promise<void>) | undefined
+    let stopPaymentList: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
     let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
     instance.addHook('onReady', (ready) => {
@@ -937,6 +949,47 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         },
         PAYMENT_SWEEP_EVERY_MS,
       )
+      // Payment by card (MOL-277), only while its фф is on: the bank sends no word of its own, so each page still
+      // open is asked every minute, and the bank's list of the days before once a day (В-5 «а»).
+      if (paymentChannel !== null) {
+        const payments = createPaymentsRepository(db)
+        const paymentFailed = (name: string) => (error: unknown) => {
+          failures.report(error, job(name), 'payment reconciliation failed')
+        }
+        stopPaymentReconcile = startLoginCleanup(
+          async () => {
+            await reconcilePending(
+              { payments, channel: paymentChannel, failed: paymentFailed('payment-reconcile') },
+              new Date(),
+            )
+          },
+          paymentFailed('payment-reconcile'),
+          PAYMENT_RECONCILE_EVERY_MS,
+        )
+        if (bankClient !== null) {
+          const notices = createOwnerNoticeRepository(db)
+          stopPaymentList = startLoginCleanup(
+            async () => {
+              await reconcileWithList(
+                {
+                  payments,
+                  channel: paymentChannel,
+                  operations: (from, to) => bankClient.operations(from, to),
+                  // a copy has no owner to tell: the mismatch is the log's
+                  tell: async (notice) => {
+                    if (owner !== null) return notices.queueOnce(notice, new Date())
+                    instance.log.warn({ notice }, 'payment mismatch')
+                  },
+                  failed: paymentFailed('payment-list'),
+                },
+                new Date(),
+              )
+            },
+            paymentFailed('payment-list'),
+            PAYMENT_LIST_EVERY_MS,
+          )
+        }
+      }
       // Receipts (MOL-125): a removal final after its ten minutes, a receipt not recorded after its
       // 28 days, a line cut out for training 28 days after it was confirmed.
       stopReceiptCleanup = startLoginCleanup(
@@ -1170,6 +1223,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopMergeTwins?.()
       await stopSilence?.()
       await stopPaymentSweep?.()
+      await stopPaymentReconcile?.()
+      await stopPaymentList?.()
       await itemEmbedding?.stop()
       await stopReceiptCleanup?.()
       await receiptQueue?.stop()

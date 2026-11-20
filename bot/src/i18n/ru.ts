@@ -275,6 +275,13 @@ export const ru = {
    * and why by kind — no name, no sum, no shop. Russian always, as every notice to the owner.
    */
   'owner.receipt.partial': '🧾 Чек не целиком · {receipt} · модель · {country}',
+  /**
+   * The bank and the journal disagree about a payment after the reconciliation settled what it could (MOL-277, В-5
+   * «а»): the order and the two states — the bank's code (2 — оплачен, 4 — возвращён, 6 — отклонён), `none` where a
+   * side has nothing. Nothing of the person: the order finds the rest in the journal.
+   */
+  'owner.payment.mismatch':
+    '💳 Платёж №{order} расходится с банком: у банка {bank}, в журнале {journal}. Сверьте в кабинете банка.',
   'owner.receipt.partialUnkept':
     '🧾 Чек не целиком · модель · {country} · не хранится: редакция 4 не принята',
   'owner.receipt.lines': 'Строк {lines}: с цифрами {shown}, без цифр {empty}',

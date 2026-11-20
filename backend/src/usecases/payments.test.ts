@@ -62,6 +62,9 @@ function journal(row: Partial<PaymentRow> = {}) {
       Promise.resolve({ state: 'refunded', moved: true, access: {} }),
     ),
     sweep: vi.fn<PaymentsRepository['sweep']>(() => Promise.resolve(0)),
+    pending: vi.fn<PaymentsRepository['pending']>(() => Promise.resolve([])),
+    byOrders: vi.fn<PaymentsRepository['byOrders']>(() => Promise.resolve([])),
+    paidWithin: vi.fn<PaymentsRepository['paidWithin']>(() => Promise.resolve([])),
   } satisfies PaymentsRepository
 }
 

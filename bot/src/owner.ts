@@ -32,6 +32,12 @@ export function ownerText(notice: OwnerNotice): string {
       share: dollars(notice.shareMicroUsd),
     })
   if (notice.kind === 'receipt_partial') return partialText(notice)
+  if (notice.kind === 'payment_mismatch')
+    return t(undefined, 'owner.payment.mismatch', {
+      order: notice.orderNo,
+      bank: notice.bank,
+      journal: notice.journal,
+    })
   if (notice.kind === 'receipt_partial_muted')
     return t(undefined, 'owner.receipt.muted', { count: notice.count })
   if (notice.kind === 'silence') {

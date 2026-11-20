@@ -153,6 +153,8 @@ export const en: Dictionary = {
   'owner.model.share':
     '✋ Receipts by the model in {month}: one person reached their ${share} share. From now on the model reads theirs only while it still fits the share, Tesseract the rest; everyone else’s as before.',
   'owner.receipt.partial': '🧾 A receipt not read whole · {receipt} · model · {country}',
+  'owner.payment.mismatch':
+    '💳 Payment No. {order} disagrees with the bank: the bank says {bank}, the journal {journal}. Check it in the bank’s office.',
   'owner.receipt.partialUnkept':
     '🧾 A receipt not read whole · model · {country} · not kept: edition 4 not accepted',
   'owner.receipt.lines': 'Lines {lines}: with figures {shown}, without {empty}',
