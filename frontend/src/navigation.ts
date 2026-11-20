@@ -1,5 +1,11 @@
 import { useRoute, useRouter } from 'vue-router'
-import type { LocationQuery, RouteLocationNormalizedLoaded, RouteParams, Router } from 'vue-router'
+import type {
+  LocationQuery,
+  RouteComponent,
+  RouteLocationNormalizedLoaded,
+  RouteParams,
+  Router,
+} from 'vue-router'
 import type { RouteName, Tab } from '@/router'
 import { ScreenNotLoaded } from '@/failures'
 import { useLoginStore } from '@/stores/login'
@@ -236,11 +242,27 @@ export async function loadScreens(router: Router): Promise<void> {
   await Promise.allSettled(screenLoads(router).map((load) => load()))
 }
 
-/** The loaders of the screens loaded when first opened: a record whose component is still a function. */
-function screenLoads(router: Router): (() => Promise<unknown>)[] {
-  return router.getRoutes().flatMap((record) => {
-    const load: unknown = record.components?.default
-    return typeof load === 'function' ? [load as () => Promise<unknown>] : []
+/**
+ * The loads of the screens not loaded yet: a record whose component is still a function. Each keeps the
+ * screen it loaded in its record, as the router keeps one it resolved (MOL-337): a move to it then waits for
+ * nothing — a dynamic `import()` settles a task later even for a module loaded already, and a screen mounted
+ * that much after the tap let another move to it in first, the record's «Записали N покупок» lost to the
+ * re-read's (`ReceiptView`), and its first request go after the connection did.
+ */
+function screenLoads(router: Router): (() => Promise<void>)[] {
+  return router.getRoutes().flatMap(({ components }) => {
+    const load: unknown = components?.default
+    if (components === undefined || components === null || typeof load !== 'function') return []
+    return [
+      async () => {
+        const loaded: unknown = await (load as () => Promise<unknown>)()
+        components.default = (
+          typeof loaded === 'object' && loaded !== null && 'default' in loaded
+            ? loaded.default
+            : loaded
+        ) as RouteComponent
+      },
+    ]
   })
 }
 

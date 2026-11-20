@@ -579,6 +579,17 @@ describe('a screen loaded when first opened', () => {
       for (const one of Object.values(loads)) expect(one).toHaveBeenCalledTimes(1)
     })
 
+    it('keeps each screen it loaded in its record, so a move to it waits on no import', async () => {
+      const load = vi.fn(() => Promise.resolve({ default: SCREEN }))
+      const router = screens({ a: load })
+      await warmScreens(router, () => Promise.resolve())
+      expect(router.getRoutes().find((record) => record.name === 'a')?.components?.default).toBe(
+        SCREEN,
+      )
+      await router.push('/a')
+      expect(load).toHaveBeenCalledTimes(1)
+    })
+
     it('must not fire: a screen that does not come stops none after it and throws nothing', async () => {
       const after = vi.fn(() => Promise.resolve(SCREEN))
       const router = screens({
