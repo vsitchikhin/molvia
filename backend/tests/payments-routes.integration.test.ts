@@ -3,7 +3,7 @@ import { eq } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PAYMENTS_DAY_MAX, yerevanDate } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { actors, officialRates, payments } from '@/db/schema'
+import { actors, officialRates, payments, rfCardDays } from '@/db/schema'
 import { buildServer } from '@/server'
 import type { ChannelWord, PaymentChannelAdapter } from '@/usecases/payments'
 import { connectDrizzle } from './db'
@@ -211,10 +211,26 @@ describe('payment by card — the routes (MOL-277)', () => {
     expect(channel.check).not.toHaveBeenCalled()
   })
 
+  it('counts «only a Russian card» by the day, nobody named, the device’s own repeat apart (Р-8)', async () => {
+    const { cookie } = await signedIn()
+    const tap = (url: string) => on.inject({ method: 'POST', url, headers: { cookie } })
+
+    expect((await tap('/payments/rf-card')).statusCode).toBe(204)
+    expect((await tap('/payments/rf-card?again=1')).statusCode).toBe(204)
+    expect((await tap('/payments/rf-card?again=yes')).statusCode).toBe(400)
+
+    expect(onlyRow(await db.select().from(rfCardDays))).toEqual({
+      day: yerevanDate(new Date()),
+      taps: 2,
+      again: 1,
+    })
+  })
+
   it('off, every route of payment is an address the API has not got — no 401 before the session', async () => {
     for (const [method, url] of [
       ['GET', '/payments/tariffs'],
       ['POST', '/payments'],
+      ['POST', '/payments/rf-card'],
       ['GET', `/payments/${randomUUID()}`],
     ] as const) {
       expect((await off.inject({ method, url })).statusCode).toBe(404)

@@ -15,7 +15,8 @@ import type {
   PaymentTariff,
 } from '@molvia/model'
 import type { Conn, Db } from './index'
-import { actors, payments } from './schema'
+import { actors, payments, rfCardDays } from './schema'
+import { yerevanDay } from './yerevan-week'
 import { theRow } from './rows'
 
 /** A payment as the journal keeps it: what a channel needs to ask about it, and its state. */
@@ -84,6 +85,8 @@ export interface PaymentsRepository {
    * minute's reconciliation asks the bank of (MOL-277, requirement 6).
    */
   pending(channel: PaymentChannel, upTo: Date, limit: number): Promise<readonly PaymentRow[]>
+  /** A tap of «У меня только карта РФ» counted on today's Yerevan day — `again`, the device's own repeat (Р-8). */
+  tapRfCard(again: boolean): Promise<void>
   /** The channel's payments of these order numbers. */
   byOrders(channel: PaymentChannel, orderNos: readonly bigint[]): Promise<readonly PaymentRow[]>
   /** The channel's payments paid within `[from, to)` — what the bank's list of the period must hold. */
@@ -257,6 +260,15 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
         .orderBy(payments.orderNo)
         .limit(limit)
       return rows.map(paymentRowOf)
+    },
+
+    async tapRfCard(again) {
+      const day = yerevanDay(sql`now()`)
+      await db.execute(sql`
+        insert into ${rfCardDays} (day, taps, again) values (${day}, 1, ${again ? 1 : 0})
+        on conflict (day) do update set
+          taps = ${rfCardDays.taps} + 1,
+          again = ${rfCardDays.again} + ${again ? 1 : 0}`)
     },
 
     async byOrders(channel, orderNos) {

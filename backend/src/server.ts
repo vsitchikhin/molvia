@@ -1450,6 +1450,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
               id,
               new Date(),
             ),
+          rfCard: (again) => payments.tapRfCard(again),
         })
       }
       consentRoutes(guarded, {

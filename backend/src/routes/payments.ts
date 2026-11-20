@@ -9,12 +9,17 @@ import {
 } from '@molvia/model'
 import type { PaymentOffer, PaymentStarted, PaymentStatus, StartPayment } from '@molvia/model'
 import type { FastifyInstance } from 'fastify'
-import { parseBody } from '@/parse'
+import { z } from 'zod'
+import { parseBody, parseQuery } from '@/parse'
+
+const rfCardQuerySchema = z.strictObject({ again: z.literal('1').optional() })
 
 export interface PaymentsApi {
   offer(actorId: string): Promise<PaymentOffer>
   start(actorId: string, body: StartPayment): Promise<PaymentStarted>
   status(actorId: string, paymentId: string): Promise<PaymentStatus>
+  /** A tap of «У меня только карта РФ» counted (Р-8): nobody's, by the day. */
+  rfCard(again: boolean): Promise<void>
 }
 
 /**
@@ -34,6 +39,16 @@ export function paymentRoutes(app: FastifyInstance, api: PaymentsApi): void {
       .header('cache-control', 'no-store')
       .code(201)
       .send(paymentStartedSchema.parse(started))
+  })
+
+  /**
+   * «У меня только карта РФ» (Р-8): a count of the day and nothing of who — `?again=1` is the phone's word that it
+   * tapped within a day, as the login's repeat. Before `/payments/:paymentId` would take it: a static path first.
+   */
+  app.post('/payments/rf-card', async (request, reply) => {
+    const { again } = parseQuery(rfCardQuerySchema, request.query)
+    await api.rfCard(again === '1')
+    return reply.header('cache-control', 'no-store').code(204).send()
   })
 
   /** Someone else's, a missing one and an address that could never be one: one 404 (MOL-25). */

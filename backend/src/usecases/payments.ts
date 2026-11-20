@@ -126,8 +126,10 @@ export async function openPayment(
   return { id, orderNo: created.orderNo, amount }
 }
 
-function viewOf(access: PaidUntil): PaidAccessView {
-  return { shared: access.sharedUntil, receipts: access.receiptsModelUntil }
+/** Until when each term is open, none for one never open or already over — the phone keeps no clock for it. */
+function viewOf(access: PaidUntil, now: Date): PaidAccessView {
+  const running = (until: Date | null) => (until !== null && until > now ? until : null)
+  return { shared: running(access.sharedUntil), receipts: running(access.receiptsModelUntil) }
 }
 
 /** Where a tariff paid now would leave the access: each term it opens thirty days on (MOL-271). */
@@ -156,9 +158,9 @@ export async function offerPayments(
   const access = await deps.payments.paidUntil(actorId)
   if (access === null) throw new DomainError(ERROR.NOT_FOUND, actorId)
   const rate = await rateOfToday(deps.rates, now)
-  if (rate === null) return { access: viewOf(access), tariffs: null, tips: null }
+  if (rate === null) return { access: viewOf(access, now), tariffs: null, tips: null }
   return {
-    access: viewOf(access),
+    access: viewOf(access, now),
     tariffs: (['data', 'receipts', 'both'] as const).map((tariff) => {
       const { cents } = PAYMENT_TARIFFS[tariff]
       return {
@@ -256,7 +258,7 @@ export async function confirmPayment(
   }
   const access = await deps.payments.paidUntil(actorId)
   if (access === null) throw new DomainError(ERROR.NOT_FOUND, id)
-  return { state, tariff: payment.tariff, amount: payment.amount, access: viewOf(access) }
+  return { state, tariff: payment.tariff, amount: payment.amount, access: viewOf(access, now) }
 }
 
 /**

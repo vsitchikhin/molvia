@@ -65,6 +65,7 @@ function journal(row: Partial<PaymentRow> = {}) {
     pending: vi.fn<PaymentsRepository['pending']>(() => Promise.resolve([])),
     byOrders: vi.fn<PaymentsRepository['byOrders']>(() => Promise.resolve([])),
     paidWithin: vi.fn<PaymentsRepository['paidWithin']>(() => Promise.resolve([])),
+    tapRfCard: vi.fn<PaymentsRepository['tapRfCard']>(() => Promise.resolve()),
   } satisfies PaymentsRepository
 }
 

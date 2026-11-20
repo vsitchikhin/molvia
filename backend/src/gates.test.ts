@@ -67,6 +67,7 @@ const REPORT: GatesReport = {
     offSettings: 1,
     offBlocked: 0,
   },
+  rfCards: { firstDay: '2026-10-05', lastDay: '2026-11-20', taps: 7, again: 2 },
   receipts: {
     firstDay: '2026-10-05',
     lastDay: '2026-11-20',
@@ -415,6 +416,10 @@ describe('gates — чтение ворот вручную', () => {
       '     turned off under a reminder         2          people',
       '     turned off in the settings          1          people',
       '     blocked the bot                     0          people, reminders off by it',
+      '',
+      'rfcard only a Russian card to pay with?             no stop',
+      '     taps of «У меня только карта РФ»    7          days 2026-10-05 … 2026-11-20 in Yerevan',
+      '       of them the same device again     2          within a day',
       '',
       '0.2r does the scanner spare typing?                 stop above 33.3 % after 4 weeks',
       '     receipts read                       43         days 2026-10-05 … 2026-11-20 in Yerevan',
