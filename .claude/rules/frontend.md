@@ -1460,6 +1460,52 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   count for good, and the strip stood until the next request (review №2). **The words keep 7rem**: narrower, the count and «Вернуть» go under them together, at the
   right, and «Вернуть» wraps its own words — held on one line, the hidden «Возвращаем…» under
   «Вернуть» left the words 33 px at 320, a letter a line (MOL-189, `exchange.spec`).
+- **Every screen but home is a chunk of its own, and every one is loaded after the first paint** (MOL-337,
+  finding A-1 of the audit MOL-302, owner's В-1…В-3 «а»). The app was one script of 1,535 KB, gzip 456, both
+  dictionaries in it — all of it fetched and parsed before a phone at the shelf drew anything. Now a cold start
+  takes 892 KB, gzip 287 (Russian; 830 and 279 English). **A screen is `lazyScreen(() => import(…))` in
+  `router.ts`**; «Что брать» stays in the bundle — where the app opens and «back» leads — and so does the login
+  screen, which `App.vue` puts before any screen; `router.test.ts` refuses a screen imported eagerly again.
+  **MOL-17's reason holds, not overruled**: it kept the screens in one bundle so that a tap on a tab would never
+  go to the network where the connection drops. The precache holds every chunk (`globPatterns` takes every
+  `*.js`), but two pages are not under it: **the first visit, which nothing claims to its end** (no
+  `clientsClaim`, `pwaUpdate.ts`) — a stranger of 0.2 opening the link in a shop — **and an old page after a
+  release**, which took its chunks off the server: Caddy answers a path it has not got with `index.html`, and the
+  `import()` fails on its type; a second window after the first took the version is one, its precache cleaned by
+  the activation. So **`warmScreens` loads every screen once the first is drawn** (В-1 «а»), after the identity's
+  request, one at a time with a pause before each; a failure there is left to the move that needs the screen.
+  **A screen whose code did not come all the same** — the seconds before the warming ends — **is opened by a
+  full load of its address** (`reloadOnStaleChunk`, В-2 «а»): it brings the new version and its chunks, and the
+  person tapped, so nothing is reloaded that they did not ask for (MOL-132's rule); once a tab in 30 s
+  (`molvia.screen-reload`, this tab's own shelf, a moment and nothing of a person), so a chunk missing from the
+  new version too cannot loop; offline the move is cancelled and the page stays, the strip already saying so.
+  Only `ScreenNotLoaded`, which `lazyScreen` throws, does it — a guard's error is no stale chunk — and it is the
+  weather, never the phone's defect (`phoneDefect`), as no answer is. **One dictionary at the start** (В-3 «а»):
+  `ru` and `en` are chunks of their own, `loadDictionary` gives the app's i18n the one its tag speaks, English
+  under its three tags; the app is mounted once it is here and the first route has settled, asked in parallel; a
+  dictionary that did not come is asked again on `online` or every 5 s (`DICTIONARY_RETRY_MS`). **A choice is
+  spoken once its dictionary is here** — the words never change before the words to change to have come — and
+  written only then: one that did not come leaves the language and writes no choice; of two choices made while a
+  dictionary was coming, the later is spoken. The tests' `createAppI18n` keeps both dictionaries — no module of
+  the app calls it, so the build leaves them out; `accounts.ts` takes the `accounts` section of each by name
+  (named exports of JSON), never the whole dictionary. **Modules run in the source's order across chunks**
+  (`strictExecutionOrder` of `vite.config.ts`): the entry's own body runs after the chunks it imports, so
+  `zodJitless` came after the schemas it must precede — the policy's violation at every load, which the e2e of
+  the build caught — and `catchers` after the modules it must hear (MOL-144, Б3). **The build is the name of the
+  entry script `index.html` names** (`pageScript` of `catchers.ts`), no longer the module's own URL, which is a
+  shared chunk's now; frames stand in any chunk, and `make failures` fetches each one's map. `e2e/offline-built`
+  (`pwa-offline`, after `pwa` for `csp-built`'s reason) holds both: an installed app opens every kind of screen
+  with no connection in both languages, and a page with no worker opens the tabs offline once the first is
+  drawn. **A component test that taps into another screen of `routes` imports
+  `@molvia/frontend/testing/screens`**: the route's `import()` otherwise waits on that screen's first transform,
+  longer than `flushPromises`. **The prices, named:** a first visit downloads as much as before, only after the
+  first paint, and every launch parses the other screens in the background — the start is faster, the work of a
+  launch is not smaller; the precache is 165 files and 3,137 KiB for 27 and 2,991, the same code in pieces;
+  keeping the order costs 13 KB gzip of wrappers at the start; on a very first visit whose dictionary does not
+  come the page stays blank until the retry; a full load to a screen loses what the screen left held in memory —
+  its queues and drafts are on the device; the dev server compiles a screen at its first request, so a spec's
+  first tap there is slower, and a dependency found then would reload the page (MOL-217) — Vite's scan follows
+  `import()`, and none was seen.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and

@@ -695,6 +695,10 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`),
   **or by «Обновить»** (MOL-132): never reloaded without the tap; the strip is the top row over the
   tab bar, and an error while a version waits offers it first.
+- **Every screen but home is a chunk, all loaded once the first is drawn; one dictionary at the start**
+  (MOL-337): `lazyScreen` in `router.ts`, `warmScreens` after the paint — a first visit and an old page after a
+  release are under no precache — a screen whose code did not come opened by a full load, once in 30 s; a
+  language spoken once its dictionary is here; modules run in the source's order (`strictExecutionOrder`).
 - **The bars are opaque `--surface`; the docked strip's margins and column are `AppScreen`'s, and
   «Вернуть» is its `#undo`, 8 over the strip** (MOL-179): never in `#docked`, never a wrapper's
   padding in a screen; a sheet's «Вернуть» stays in its footer.
