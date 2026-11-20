@@ -52,7 +52,8 @@ MOL-283 (В-1), 20.11.2026; rounds 1–2 of its review and adversarial (`.scratc
   «Declined» is the bank's own final word.
 - **A payment keeps where its days end** (`shared_until`, `receipts_model_until` of `payments`, adversarial А1): the
   end each access reached by its extension, for the refund below — **and moves it when its days move**: a whole
-  refund of an earlier payment brings every later paid payment's end that much earlier (`shiftLater`, adversarial Б1),
+  refund of an earlier payment brings every later paid payment's end earlier by what the access moved — one shift,
+  decided once (`shiftLater`, adversarial Б1, review №11),
   or the next refund reads an end that is gone and takes a later payment's days. Later is an end past the refunded
   one: while any of a payment's days is to come, every payment after it extended from the end of a running term, so
   none is apart from it.

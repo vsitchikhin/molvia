@@ -5,7 +5,6 @@ import {
   extendedUntil,
   refundSum,
   refundedUntil,
-  unlivedMs,
 } from '@molvia/model'
 import type {
   ExchangeRate,
@@ -131,7 +130,7 @@ async function moveAccess(
 }
 
 /**
- * After a whole refund took `unlived` of `column` out of the person's access, the days of every later payment of
+ * After a whole refund took `shift` of `column` out of the person's access, the days of every later payment of
  * theirs come that much earlier: their stored ends move with them, or the next refund reads an end that is gone and
  * takes a later payment's days (adversarial Б1). Later is an end past the refunded one — an extension from the end
  * of a running term is never apart from it while any of its days is to come.
@@ -141,9 +140,9 @@ async function shiftLater(
   actorId: string,
   column: Column,
   end: Date,
-  unlived: number,
+  shift: number,
 ): Promise<void> {
-  const moved = sql`${payments[column]} - make_interval(secs => ${unlived / 1000}::double precision)`
+  const moved = sql`${payments[column]} - make_interval(secs => ${shift / 1000}::double precision)`
   await tx
     .update(payments)
     .set(column === 'sharedUntil' ? { sharedUntil: moved } : { receiptsModelUntil: moved })
@@ -266,14 +265,17 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
         if (!whole || owner === null) {
           return { state: whole ? 'refunded' : 'paid', moved: true, access: {} }
         }
-        const opens = accessOf(payment.tariff)
-        const access = await moveAccess(tx, owner, opens, (until, column) =>
+        const access = await moveAccess(tx, owner, accessOf(payment.tariff), (until, column) =>
           refundedUntil(until, payment[column], now),
         )
-        for (const column of opens.map((open) => COLUMN[open])) {
+        // The later payments' ends move by what the access moved — one shift, decided once (review №11).
+        for (const column of Object.keys(access) as Column[]) {
+          const before = owner[column]
+          const after = access[column]
           const end = payment[column]
-          const unlived = unlivedMs(end, now)
-          if (end !== null && unlived > 0) await shiftLater(tx, owner.id, column, end, unlived)
+          if (before && after && end && before > after) {
+            await shiftLater(tx, owner.id, column, end, before.getTime() - after.getTime())
+          }
         }
         return { state: 'refunded', moved: true, access }
       })
