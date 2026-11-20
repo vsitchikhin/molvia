@@ -3,6 +3,7 @@ import {
   PAYMENT_TARIFFS,
   TIP_CENTS,
   accessOf,
+  anchorCentsOf,
   extendedUntil,
   paymentPrice,
   refundedUntil,
@@ -65,6 +66,19 @@ describe('paymentPrice — dollars into drams, up to 10 ֏ (MOL-271)', () => {
       DomainError,
     )
     expect(() => paymentPrice(100n, { ...drams('383.12'), base: 'EUR' })).toThrow(DomainError)
+  })
+})
+
+describe('anchorCentsOf — the dollar a payment names', () => {
+  it('is the tariff’s own, whatever tip is named beside it', () => {
+    expect(anchorCentsOf('both')).toBe(250n)
+    expect(anchorCentsOf('data', 500n)).toBe(100n)
+  })
+
+  it('takes a tip only of the three amounts', () => {
+    expect(anchorCentsOf('tip', 300n)).toBe(300n)
+    expect(anchorCentsOf('tip', 200n)).toBeNull()
+    expect(anchorCentsOf('tip')).toBeNull()
   })
 })
 

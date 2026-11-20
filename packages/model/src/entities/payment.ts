@@ -49,6 +49,12 @@ export const PAYMENT_TARIFFS: Readonly<
 /** A tip's amounts in cents (MOL-277, owner's В-4 «а»): it extends nothing. */
 export const TIP_CENTS: readonly bigint[] = Object.freeze([100n, 300n, 500n])
 
+/** The anchor in cents a payment of `tariff` names: the tariff's, or a tip's own — one of `TIP_CENTS` or none. */
+export function anchorCentsOf(tariff: PaymentTariff, tipCents?: bigint): bigint | null {
+  if (tariff !== 'tip') return PAYMENT_TARIFFS[tariff].cents
+  return tipCents !== undefined && TIP_CENTS.includes(tipCents) ? tipCents : null
+}
+
 /** The access a tariff extends; a tip extends none. */
 export function accessOf(tariff: PaymentTariff): readonly PaidAccess[] {
   return tariff === 'tip' ? [] : PAYMENT_TARIFFS[tariff].opens
