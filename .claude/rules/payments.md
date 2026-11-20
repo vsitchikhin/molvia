@@ -11,7 +11,7 @@ paths:
 
 The detail behind the payments lines of `CLAUDE.md`. The journal is MOL-283; its first channel, Ameriabank vPOS, is
 MOL-277 (its research: `.scratch/tasks/research/MOL-281.md`). Decisions: owner's lavish of MOL-277 (В-1…В-7) and of
-MOL-283 (В-1), 20.11.2026; round 1 of its review and adversarial (`.scratch/tasks/selfreviews/MOL-283.md`,
+MOL-283 (В-1), 20.11.2026; rounds 1–2 of its review and adversarial (`.scratch/tasks/selfreviews/MOL-283.md`,
 `selftests/MOL-283-adversarial.md`).
 
 ## One journal, channels as adapters
@@ -51,7 +51,11 @@ MOL-283 (В-1), 20.11.2026; round 1 of its review and adversarial (`.scratch/tas
   hearing it, and the journal left «abandoned» would keep neither access nor the bank's numbers nor a way to refund.
   «Declined» is the bank's own final word.
 - **A payment keeps where its days end** (`shared_until`, `receipts_model_until` of `payments`, adversarial А1): the
-  end each access reached by its extension, for the refund below.
+  end each access reached by its extension, for the refund below — **and moves it when its days move**: a whole
+  refund of an earlier payment brings every later paid payment's end that much earlier (`shiftLater`, adversarial Б1),
+  or the next refund reads an end that is gone and takes a later payment's days. Later is an end past the refunded
+  one: while any of a payment's days is to come, every payment after it extended from the end of a running term, so
+  none is apart from it.
 - **A payer erased before the bank's word**: the payment is paid and extends nothing — there is nobody.
 - **Extending moves `actors.updated_at`**: a change of access is a change of the row, as a grant by hand is.
 
@@ -68,7 +72,8 @@ MOL-283 (В-1), 20.11.2026; round 1 of its review and adversarial (`.scratch/tas
 - **The refund that makes it whole takes back the days the payment gave and the person has not lived, never earlier
   than now** (`refundedUntil`, MOL-277 В-2 «а», adversarial А1): its days are the thirty before the end it stored; those
   lived stay, and so do a later payment's and a grant's by hand — a refund months after the payment takes nothing, one
-  the day it was paid takes the thirty. An access already over is left as it is; a partial refund is money only.
+  the day it was paid takes the thirty (`unlivedMs`). The price, named: a grant by hand that lowers a term is not
+  followed into the payments' ends — `psql` is the owner's, and only until MOL-277. An access already over is left as it is; a partial refund is money only.
 - **The owner refunds by a command** (MOL-277 Р-9), never a screen.
 
 ## Keeping
@@ -76,9 +81,10 @@ MOL-283 (В-1), 20.11.2026; round 1 of its review and adversarial (`.scratch/tas
 - **Erasure lets the person go and keeps the payment** (MOL-283 В-1 «а»): `payments.actor_id` is `on delete set null`,
   as the shops' memory and the catalogue's codes are, since Ameriabank's terms §3.9 keep card records three years and
   hand them to the bank within three banking days. What stays names nobody: an order number, the sums, the bank's
-  numbers. The report counts it (`paymentsReleased`), `make forget` prints it. **A payment the channel never named goes
-  with the person** (adversarial А6): it reached no bank, so there is no card record to keep, and «no data is kept
-  without a reason». The price, named: a payment erased between the bank's taking the order and its name written —
+  numbers. The report counts it (`paymentsReleased`), `make forget` prints it. **A payment the channel never named and
+  nobody paid goes with the person** (adversarial А6): it reached no bank, so there is no card record to keep, and «no
+  data is kept without a reason». A paid one stays however it is named (review №10): nothing ties a name to the
+  money. The price, named: a payment erased between the bank's taking the order and its name written —
   the moment of one request — is unknown to the journal when the bank speaks of it.
 - **Every payment goes three years after its last movement** (`PAYMENT_KEEP_YEARS`, `moved_at`), a living person's too:
   no data is kept without a reason. A daily timer (`PAYMENT_SWEEP_EVERY_MS`), at start too, `job:payment-sweep`.
