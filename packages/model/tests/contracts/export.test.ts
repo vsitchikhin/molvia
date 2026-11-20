@@ -255,6 +255,7 @@ const file: ExportFile = {
       printedOn: '2026-09-30',
       printedTime: '15:03',
       receiptNo: '21410811',
+      till: null,
       total: money(74_000n, 'AMD'),
       readTotal: money(74_000n, 'AMD'),
       cashback: money(740n, 'AMD'),

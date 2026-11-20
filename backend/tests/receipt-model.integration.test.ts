@@ -1185,13 +1185,9 @@ describe('the key against a second record (Т-11, adversarial А5, А6, review �
       codesWritten: 0,
     })
   }
-  const twinOf = async (id: string, actorId: string) => {
-    const row = await receiptOf(id)
-    if (row?.tin == null || row.receiptNo == null) return 'no key'
-    return (await repository.recordedTwin(actorId, row.tin, row.receiptNo, id)) === null
-      ? 'none'
-      : 'found'
-  }
+  // the rule alone says whether a key matches (`sameReceiptKey`): no caller spells it
+  const twinOf = async (id: string, actorId: string) =>
+    (await repository.recordedTwin(actorId, id)) === null ? 'none' : 'found'
 
   it('is one for one paper read by Tesseract and by the model', async () => {
     const me = await person(LATER)
@@ -1220,7 +1216,20 @@ describe('the key against a second record (Т-11, adversarial А5, А6, review �
       benchReader(),
       as([...mixed, 'Ֆիսկալ համար 99784818'], { date: '2026-10-09', time: '10:05' }),
     )
-    expect(await twinOf(second, me.id)).toBe('no key')
+    expect(await twinOf(second, me.id)).toBe('none')
+  }, 30_000)
+
+  it('is none for the same number with no tax number on either: nothing matches nothing', async () => {
+    const me = await person(LATER)
+    // must not: a seller missing on both sides is no seller in common (MOL-422, review №1)
+    const unsold = ['ԳՀ:55512345', 'ԿՀ: 90264', 'Ֆիսկալ համար 43542455']
+    const first = await queued(me)
+    await readAll(benchReader(), as(unsold))
+    expect(await receiptOf(first)).toMatchObject({ tin: null, till: null, receiptNo: '43542455' })
+    await record(first, me.id)
+    const second = await queued(me)
+    await readAll(benchReader(), as(unsold, { date: '2026-10-09', time: '10:05' }))
+    expect(await twinOf(second, me.id)).toBe('none')
   }, 30_000)
 
   it('is none where the model put the till’s registration under «Ֆիսկալ» and lost the fiscal row: the next receipt of the till is recorded', async () => {
@@ -1233,7 +1242,7 @@ describe('the key against a second record (Т-11, adversarial А5, А6, review �
     await record(first, me.id)
     const second = await queued(me)
     await readAll(benchReader(), as(moved, { date: '2026-10-09', time: '10:05' }))
-    expect(await twinOf(second, me.id)).toBe('no key')
+    expect(await twinOf(second, me.id)).toBe('none')
   }, 30_000)
 })
 

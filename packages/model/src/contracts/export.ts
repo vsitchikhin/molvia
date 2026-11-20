@@ -69,9 +69,10 @@ export const EXPORT_FORMAT = 'molvia-export'
 // `trialReceiptsLeft`, `modelReceiptsMonth` and `modelReceiptsRead`, the trial's receipts left and the receipts the
 // model read in the person's month, and a receipt's `sentMonth`, `counted` and `retakenAt`, the month it counts in, how
 // it was counted and when «Переснять» gave that back (MOL-275). 37: a receipt's `rounding`, a pharmacy's rounding the
-// lines make the total less, either sign (MOL-421). 38: `payments`, the person's payments — the tariff, the dollar
-// anchor, the CBA's rate and its moment, the drams charged and refunded, the channel's numbers, where its days of
-// access end and the moments (MOL-283).
+// lines make the total less, either sign (MOL-421). 38: a receipt's `till`, the till's serial that keys a receipt with
+// no tax number against a second record, Georgia's «Fsmd» (MOL-422); `payments`, the person's payments — the tariff,
+// the dollar anchor, the CBA's rate and its moment, the drams charged and refunded, the channel's numbers, where its
+// days of access end and the moments (MOL-283).
 export const EXPORT_VERSION = 38
 
 const day = z.iso.date()
@@ -408,6 +409,7 @@ const receiptSchema = z.strictObject({
   printedOn: day.nullable(),
   printedTime: z.string().nullable(),
   receiptNo: z.string().nullable(),
+  till: z.string().nullable(),
   total: signedMoneyCodec.nullable(),
   readTotal: signedMoneyCodec.nullable(),
   cashback: signedMoneyCodec.nullable(),
