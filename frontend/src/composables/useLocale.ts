@@ -45,8 +45,9 @@ export function tagOf(
 
 /**
  * What is asked for: the person's last choice, or the device's, shown at once — a group of segments stands on
- * it — and spoken once its dictionary is here (MOL-337). A dictionary that did not come gives back what was
- * spoken, the choice shown with it (adversarial А3).
+ * it — and spoken once its dictionary is here (MOL-337). A dictionary that did not come for a tap or another
+ * window's choice gives back what was spoken, the choice shown with it (adversarial А3, А11); the start keeps
+ * asking for its own.
  */
 const choice = ref<LocaleChoice>('device')
 const style = ref<DateStyle>('gb')
@@ -57,6 +58,11 @@ export const DICTIONARY_RETRY_MS = 5 * 1000
 /** What the screens speak; none before the first dictionary came. */
 let spoken: { choice: LocaleChoice; style: DateStyle } | null = null
 let turn = 0
+/**
+ * The keys a tap of this window chose and nothing spoken has written yet: whichever turn speaks them writes them,
+ * as a tap of the order of the day speaks the language tapped before it (adversarial А10).
+ */
+const unwritten = new Set<typeof LOCALE_KEY | typeof DATE_STYLE_KEY>()
 /** The turn of the last choice spoken. */
 let spokenTurn = 0
 
@@ -78,22 +84,23 @@ async function speak(): Promise<'spoken' | 'failed' | 'superseded'> {
   if (mine !== turn) return 'superseded'
   spoken = asked
   spokenTurn = mine
+  for (const key of unwritten) writeEverywhere(key, key === LOCALE_KEY ? asked.choice : asked.style)
+  unwritten.clear()
   i18n.global.locale.value = tag
   applyDocumentLang(tag)
   return 'spoken'
 }
 
 /**
- * A tap whose dictionary did not come gives back the choice spoken: the group of segments stands on what is
- * asked for, and «English» stayed chosen over Russian words (adversarial А3).
+ * A choice — a tap, another window's — whose dictionary did not come gives back the choice spoken, and writes
+ * nothing: the group of segments stands on what is asked for, and «English» stayed chosen over Russian words,
+ * its tap dead (adversarial А3, А11). Another window's stays on this window's own shelf, for the next start.
  */
-async function speakChosen(): Promise<boolean> {
-  const outcome = await speak()
-  if (outcome === 'failed' && spoken !== null) {
-    choice.value = spoken.choice
-    style.value = spoken.style
-  }
-  return outcome === 'spoken'
+async function speakChosen(): Promise<void> {
+  if ((await speak()) !== 'failed' || spoken === null) return
+  choice.value = spoken.choice
+  style.value = spoken.style
+  unwritten.clear()
 }
 
 /** The next try at the start's dictionary: the connection back, or a while — whichever comes first. */
@@ -141,7 +148,7 @@ export async function installLocale(): Promise<void> {
       style.value = styleOf(event.newValue)
       writeOwn(DATE_STYLE_KEY, style.value)
     } else return
-    void speak()
+    void speakChosen()
   })
   window.addEventListener('languagechange', () => {
     if (choice.value === 'device') void speak()
@@ -164,18 +171,21 @@ export function useLocale(): {
 } {
   /**
    * Every choice is written, «Как на устройстве» too, and on both shelves — for the scheme's reasons
-   * (`useColorScheme.ts`) — once it is spoken: one whose dictionary did not come is no choice, and one made
-   * after it takes its place (MOL-337). Spoken whether or not it could be kept: until the page is reloaded.
+   * (`useColorScheme.ts`) — once it is spoken, by whichever turn speaks it: one whose dictionary did not come is
+   * no choice, and one made after it takes its place (MOL-337). Spoken whether or not it could be kept: until the
+   * page is reloaded.
    */
   async function choose(next: LocaleChoice): Promise<void> {
     if (next === choice.value) return
     choice.value = next
-    if (await speakChosen()) writeEverywhere(LOCALE_KEY, next)
+    unwritten.add(LOCALE_KEY)
+    await speakChosen()
   }
   async function chooseStyle(next: DateStyle): Promise<void> {
     if (next === style.value) return
     style.value = next
-    if (await speakChosen()) writeEverywhere(DATE_STYLE_KEY, next)
+    unwritten.add(DATE_STYLE_KEY)
+    await speakChosen()
   }
   return {
     choice: readonly(choice),

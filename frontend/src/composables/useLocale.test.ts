@@ -303,4 +303,34 @@ describe('the dictionary a language needs', () => {
       vi.useRealTimers()
     }
   })
+
+  it('a language overtaken by a tap of the order of the day is spoken and written all the same (adversarial А10)', async () => {
+    let arrive: () => void = () => undefined
+    vi.mocked(loadDictionary).mockImplementationOnce(
+      () => new Promise<void>((resolve) => (arrive = resolve)),
+    )
+    const language = useLocale().choose('en')
+    const order = useLocale().chooseStyle('us')
+    arrive()
+    await Promise.all([language, order])
+    expect(i18n.global.locale.value).toBe('en-US')
+    expect(localStorage.getItem(LOCALE_KEY)).toBe('en')
+    expect(localStorage.getItem(DATE_STYLE_KEY)).toBe('us')
+  })
+
+  it('another window’s language whose dictionary did not come is given back here, and the tap on it lives (adversarial А11)', async () => {
+    await installLocale()
+    // Every turn the event starts fails: the windows of the tests before left their listeners of `storage`.
+    vi.mocked(loadDictionary).mockRejectedValue(new TypeError('Failed to fetch'))
+    window.dispatchEvent(new StorageEvent('storage', { key: LOCALE_KEY, newValue: 'en' }))
+    await vi.waitFor(() => {
+      expect(useLocale().choice.value).toBe('device')
+    })
+    vi.mocked(loadDictionary).mockReset()
+    expect(i18n.global.locale.value).toBe('ru')
+    // Kept on this window's own shelf, for its next start.
+    expect(sessionStorage.getItem(LOCALE_KEY)).toBe('en')
+    await useLocale().choose('en')
+    expect(i18n.global.locale.value).toBe('en-GB')
+  })
 })
