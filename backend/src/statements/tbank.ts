@@ -10,9 +10,9 @@ import {
   statementLineSchema,
 } from '@molvia/model'
 import type { Currency, Statement, StatementLine, StatementLineKind } from '@molvia/model'
-import { decodeStatementText, readCsvRecords } from './csv'
+import { cutText, decodeStatementText, readCsvRecords } from './csv'
 import type { CsvRecord } from './csv'
-import { REFUSAL_CURRENCY_MAX, REFUSAL_STATUS_MAX, cutText } from './refusal'
+import { REFUSAL_CURRENCY_MAX, REFUSAL_STATUS_MAX } from './refusal'
 import type { StatementRead, StatementRefusal } from './refusal'
 
 // T-Bank's export of operations, CSV from the web cabinet (MOL-430, epic MOL-427): its lines as the
@@ -191,12 +191,12 @@ const FEE_WORDS = /комисси|услуги банка/iu
 const EXCHANGE_WORDS = /обмен валют|покупка валюты|продажа валюты|конвертаци/iu
 
 /**
- * What the line is, by the format (MOL-429 Р-5). A line with no MCC is an own transfer where the bank says so:
- * «Учёт в аналитике: Нет» in the layout of 2026, its words in the one before, which has no such column. A line
- * with an MCC is a card's, never an own transfer — «Нет» is the person's to set on any line (adversarial А2). And
- * «Внутренний перевод» is no own word: T-Bank names so a transfer to any of its contracts, another person's too
- * (А1) — a transfer, «перевод — трата ли это?», a tap rather than a spending lost. The rest by the bank's
- * category, its words and the MCC. `analytics` is `null` for a layout without the column.
+ * What the line is, by the format (MOL-429 Р-5). An own transfer is a line with no MCC the bank's words call one —
+ * and, in the layout of 2026, «Учёт в аналитике: Нет» beside them. «Нет» alone is no sign: the person switches it
+ * off on any line, a card's purchase or a transfer to somebody (adversarial А2, Б2). Nor is «Внутренний перевод» an
+ * own word: T-Bank names so a transfer to any of its contracts, another person's too (А1). Either is a tap — a
+ * transfer asks «перевод — трата ли это?» — rather than a spending lost. The rest by the bank's category, its words
+ * and the MCC. `analytics` is `null` for a layout without the column.
  */
 function kindOf(
   category: string,
@@ -207,16 +207,16 @@ function kindOf(
   const said = `${category} ${payee}`
   const word = folded(category)
   if ((mcc !== null && CASH_MCC.has(mcc)) || word === 'наличные') return 'cash'
-  const own = analytics === null ? OWN_WORDS.test(payee) : folded(analytics) === 'нет'
-  if (mcc === null && own) return 'own_transfer'
+  const counted = analytics !== null && folded(analytics) !== 'нет'
+  if (mcc === null && !counted && OWN_WORDS.test(payee)) return 'own_transfer'
   if (EXCHANGE_WORDS.test(said)) return 'exchange'
   if (FEE_WORDS.test(said)) return 'fee'
   if (word === 'переводы') return 'transfer'
   return mcc === null ? 'unknown' : 'purchase'
 }
 
-/** A record's line, `'none'` where no money moved, or why the file is refused. */
-type Read = StatementLine | 'none' | StatementRefusal
+/** A record's line and its account's currency, `'none'` where no money moved, or why the file is refused. */
+type Read = { line: StatementLine; accountCurrency: Currency } | 'none' | StatementRefusal
 
 function lineOf(
   cell: (column: Column) => string,
@@ -283,39 +283,55 @@ function lineOf(
     status,
     kind: kindOf(category, payee, mcc, hasAnalytics ? cell('analytics') : null),
   })
-  return line.success ? line.data : unreadable
+  return line.success ? { line: line.data, accountCurrency } : unreadable
 }
 
+/** The columns an operation is known again by in a later export: what the bank prints of it, never set later. */
+const OPERATION: readonly Column[] = ['account', 'date', 'amount', 'currency', 'payee', 'mcc']
+
 /**
- * The records after the header, read once: exports glued into one file repeat their header, each part
- * beginning with it, and a record a part repeats of an earlier part, cell for cell, is one operation of two
- * exports sharing their edge (adversarial А4) — two like records of one part are two operations.
+ * The records after the header, read once. Exports glued into one file repeat their header, each part beginning
+ * with it, and a part repeats the operations of the edge it shares with an earlier one (adversarial А4) — known
+ * by the account, the moment to the second, the operation's sum and currency, the payee and the MCC, never by
+ * every cell: between two exports the bank adds a bonus, a hold posts at another rate, the person changes a
+ * category or «Учёт в аналитике» (Б1). The n-th like record of a part is the n-th of the parts before, the later
+ * export's in its place; one more than any part before held is another operation (review №10). **The price,
+ * named:** two operations of one second alike in all of these, in different parts and not in one, are one.
  */
-function recordsOf(records: readonly CsvRecord[], header: readonly string[]): CsvRecord[] {
+function recordsOf(
+  records: readonly CsvRecord[],
+  header: readonly string[],
+  cellOf: (cells: readonly string[], column: Column) => string,
+): CsvRecord[] {
   // A part glued on keeps its byte order mark: only the file's first is dropped by the decoder.
   const isHeader = (cells: readonly string[]) =>
     cells.length === header.length &&
     cells.every((cell, at) => (at === 0 ? cell.replace(/^\uFEFF/u, '') : cell) === header[at])
-  const partOf = new Map<string, number>()
-  let part = 0
   const rows: CsvRecord[] = []
+  const slots = new Map<string, number[]>()
+  let seen = new Map<string, number>()
   for (const record of records) {
     if (isHeader(record.cells)) {
-      part += 1
+      seen = new Map()
       continue
     }
-    const key = record.cells.join('\u0000')
-    const first = partOf.get(key)
-    if (first !== undefined && first < part) continue
-    if (first === undefined) partOf.set(key, part)
-    rows.push(record)
+    const key = OPERATION.map((column) => cellOf(record.cells, column)).join('\u0000')
+    const turn = seen.get(key) ?? 0
+    seen.set(key, turn + 1)
+    const taken = slots.get(key) ?? []
+    const slot = taken[turn]
+    if (slot === undefined) {
+      taken.push(rows.length)
+      slots.set(key, taken)
+      rows.push(record)
+    } else rows[slot] = record
   }
   return rows
 }
 
 /**
  * T-Bank's CSV as statements, one an account, in the order the file first names them; `zone` is the
- * phone's (`ZONE_HEADER`), Yerevan's where it named none. A line of zero is left out: no money moved.
+ * phone's (`ZONE_HEADER`), Yerevan's where it named none. A line where no money moved is left out.
  */
 export function readTbankCsv(bytes: Uint8Array, zone?: string): TbankRead {
   const refuse = (refusal: StatementRefusal): TbankRead => ({ ok: false, refusal })
@@ -325,7 +341,11 @@ export function readTbankCsv(bytes: Uint8Array, zone?: string): TbankRead {
   if (records === null || header === undefined || columns === null)
     return refuse({ reason: 'format_unknown' })
 
-  const rows = recordsOf(records.slice(1), header)
+  const cellOf = (cells: readonly string[], column: Column) => {
+    const at = columns.get(column)
+    return at === undefined ? '' : (cells[at] ?? '')
+  }
+  const rows = recordsOf(records.slice(1), header, cellOf)
   if (rows.length > STATEMENT_LINES_MAX) return refuse({ reason: 'too_long' })
 
   const width = Math.max(...columns.values()) + 1
@@ -337,19 +357,15 @@ export function readTbankCsv(bytes: Uint8Array, zone?: string): TbankRead {
   >()
   for (const { cells, line: row } of rows) {
     if (cells.length < width) return refuse({ reason: 'row_unreadable', row })
-    const cell = (column: Column) => {
-      const at = columns.get(column)
-      return at === undefined ? '' : (cells[at] ?? '')
-    }
+    const cell = (column: Column) => cellOf(cells, column)
     const read = lineOf(cell, row, hasAnalytics, phoneDay)
     if (read === 'none') continue
     if ('reason' in read) return refuse(read)
     const name = bankText(cell('account')) || null
-    // The account's currency: what left it where the operation's was another, else the amount's own.
-    const currency = read.debited?.currency ?? read.amount.currency
+    const currency = read.accountCurrency
     const key = `${name ?? ''}\u0000${currency}`
     const account = accounts.get(key) ?? { name, currency, lines: [] }
-    account.lines.push(read)
+    account.lines.push(read.line)
     accounts.set(key, account)
   }
   return {

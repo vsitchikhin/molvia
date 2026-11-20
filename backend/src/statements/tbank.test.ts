@@ -31,6 +31,7 @@ interface Row2026 {
   mcc?: string
   payee?: string
   message?: string
+  bonus?: string
   analytics?: string
 }
 
@@ -51,7 +52,7 @@ function row2026(row: Row2026 = {}): string {
     row.message ?? '',
     '0,00',
     row.amount ?? '-350,00',
-    '0,00',
+    row.bonus ?? '0,00',
     row.analytics ?? 'Да',
   ]
     .map((cell) => `"${cell}"`)
@@ -186,9 +187,19 @@ describe('readTbankCsv — the layout of 2026', () => {
 
   it.each([
     [
-      '«Учёт в аналитике: Нет»',
-      { analytics: 'Нет', category: 'Переводы', mcc: '' },
+      '«Учёт в аналитике: Нет» beside the words of an own transfer',
+      { analytics: 'Нет', category: 'Переводы', mcc: '', payee: 'Между своими счетами' },
       'own_transfer',
+    ],
+    [
+      '«Нет» on a transfer to somebody — a transfer still (adversarial Б2)',
+      { analytics: 'Нет', category: 'Переводы', mcc: '', payee: 'Иван И.' },
+      'transfer',
+    ],
+    [
+      '«Нет» on a payment with no MCC — no own transfer (adversarial Б2)',
+      { analytics: 'Нет', category: 'Мобильная связь', mcc: '', payee: 'МТС' },
+      'unknown',
     ],
     [
       'the words of an own transfer the bank counts — no sign of 2026’s, a transfer',
@@ -305,15 +316,47 @@ describe('readTbankCsv — the layout of 2026', () => {
     expect(accountsOf(read)[0]?.statement.lines.map(({ payee }) => payee)).toEqual(['A', 'B'])
   })
 
+  it('knows an operation of two glued exports by what the bank printed of it, the later export’s kept (Б1)', () => {
+    const usd = { amount: '-10,00', currency: 'USD', payee: 'STEAMGAMES', mcc: '5816' }
+    const read = readTbankCsv(
+      utf8File(
+        HEADER_2026,
+        row2026({ bonus: '0,00' }),
+        row2026({ ...usd, debited: '-950,00' }),
+        HEADER_2026,
+        row2026({ bonus: '3,50' }),
+        row2026({ ...usd, debited: '-962,40', analytics: 'Нет' }),
+      ),
+    )
+    expect(
+      accountsOf(read)[0]?.statement.lines.map(({ debited }) => debited?.minor ?? null),
+    ).toEqual([null, 96_240n])
+  })
+
+  it('reads a like record a later export holds more of than any before as another (review №10)', () => {
+    const read = readTbankCsv(utf8File(HEADER_2026, row2026(), HEADER_2026, row2026(), row2026()))
+    expect(accountsOf(read)[0]?.statement.lines).toHaveLength(2)
+  })
+
   it('reads once a record two glued exports share, and twice two like records of one (adversarial А4)', () => {
     const edge = row2026({ date: '15.11.2026 12:34:56', payee: 'Edge' })
     const read = readTbankCsv(
-      utf8File(HEADER_2026, row2026({ payee: 'A' }), edge, edge, HEADER_2026, edge, edge, edge),
+      utf8File(
+        HEADER_2026,
+        row2026({ payee: 'A' }),
+        edge,
+        edge,
+        HEADER_2026,
+        edge,
+        edge,
+        row2026({ payee: 'B' }),
+      ),
     )
     expect(accountsOf(read)[0]?.statement.lines.map(({ payee }) => payee)).toEqual([
       'A',
       'Edge',
       'Edge',
+      'B',
     ])
   })
 

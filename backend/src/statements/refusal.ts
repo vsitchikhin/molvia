@@ -22,13 +22,3 @@ export type StatementRead<Account> =
 /** The longest a status or a currency is named in a refusal: as printed, never a line of the file whole. */
 export const REFUSAL_STATUS_MAX = 32
 export const REFUSAL_CURRENCY_MAX = 8
-
-/**
- * `text` no longer than `max` UTF-16 units — the unit a schema's `max` counts — a pair of surrogates never cut in
- * two (review №2: cut by code points, a payee of emoji passed the cut and failed the schema).
- */
-export function cutText(text: string, max: number): string {
-  if (text.length <= max) return text
-  const last = text.charCodeAt(max - 1)
-  return text.slice(0, last >= 0xd800 && last <= 0xdbff ? max - 1 : max)
-}

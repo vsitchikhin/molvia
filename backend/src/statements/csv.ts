@@ -17,6 +17,16 @@ export function decodeStatementText(bytes: Uint8Array): string {
   }
 }
 
+/**
+ * `text` no longer than `max` UTF-16 units — the unit a schema's `max` counts — a pair of surrogates never cut in
+ * two (review №2: cut by code points, a payee of emoji passed the cut and failed the schema).
+ */
+export function cutText(text: string, max: number): string {
+  if (text.length <= max) return text
+  const last = text.charCodeAt(max - 1)
+  return text.slice(0, last >= 0xd800 && last <= 0xdbff ? max - 1 : max)
+}
+
 /** A record of a CSV text: its fields, and the line of the file it begins on, the first 1. */
 export interface CsvRecord {
   readonly cells: readonly string[]
