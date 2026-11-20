@@ -2,7 +2,7 @@ import { readonly, ref } from 'vue'
 import type { Ref } from 'vue'
 import { pickLocale } from '@molvia/model'
 import type { AppLocale } from '@molvia/model'
-import { applyDocumentLang, i18n } from '@/i18n'
+import { applyDocumentLang, i18n, loadDictionary } from '@/i18n'
 import type { EnglishTag } from '@/i18n'
 import { read, writeEverywhere, writeOwn } from '@/stores/storage'
 
@@ -46,59 +46,97 @@ export function tagOf(
 const choice = ref<LocaleChoice>('device')
 const style = ref<DateStyle>('gb')
 
-function apply(): void {
-  const tag = tagOf(choice.value, style.value)
+/** How long the start waits before it asks for its dictionary again, with no `online` to wait for. */
+export const DICTIONARY_RETRY_MS = 5 * 1000
+
+let turn = 0
+/** The turn of the last choice spoken. */
+let spokenTurn = 0
+
+/**
+ * Speaks the choice once its dictionary is here (MOL-337): the words never change before the words to
+ * change to have come. Says whether it was spoken — a dictionary that did not come leaves the language
+ * before, and of two choices made while one was coming only the later one is spoken.
+ */
+async function speak(nextChoice: LocaleChoice, nextStyle: DateStyle): Promise<boolean> {
+  const mine = ++turn
+  const tag = tagOf(nextChoice, nextStyle)
+  try {
+    await loadDictionary(tag)
+  } catch {
+    return false
+  }
+  if (mine !== turn) return false
+  spokenTurn = mine
+  choice.value = nextChoice
+  style.value = nextStyle
   i18n.global.locale.value = tag
   applyDocumentLang(tag)
+  return true
 }
 
 /**
- * Takes the stored choice before the app is mounted and follows the other windows of the app, as the
- * scheme does: the value is the event's, only this window's own shelf is brought in line with it, and
- * a key gone is no choice (`useColorScheme.ts`, adversarial А, Б′ of MOL-111). «Как на устройстве»
- * follows the device too: a language changed in the system reaches a page left open.
+ * Takes the stored choice and its dictionary before the app is mounted, and follows the other windows of
+ * the app, as the scheme does: the value is the event's, only this window's own shelf is brought in line
+ * with it, and a key gone is no choice (`useColorScheme.ts`, adversarial А, Б′ of MOL-111). «Как на
+ * устройстве» follows the device too: a language changed in the system reaches a page left open.
+ *
+ * The promise is the start's: it settles once the first dictionary is here. Without it nothing can be
+ * said, so it is asked for again — when the connection comes back, or every `DICTIONARY_RETRY_MS`.
  */
-export function installLocale(): void {
-  choice.value = choiceOf(read(LOCALE_KEY))
-  style.value = styleOf(read(DATE_STYLE_KEY))
-  apply()
+export async function installLocale(): Promise<void> {
+  const stored = choiceOf(read(LOCALE_KEY))
+  const storedStyle = styleOf(read(DATE_STYLE_KEY))
   window.addEventListener('storage', (event) => {
     if (event.newValue === null) return
     if (event.key === LOCALE_KEY) {
-      choice.value = choiceOf(event.newValue)
-      writeOwn(LOCALE_KEY, choice.value)
+      const next = choiceOf(event.newValue)
+      writeOwn(LOCALE_KEY, next)
+      void speak(next, style.value)
     } else if (event.key === DATE_STYLE_KEY) {
-      style.value = styleOf(event.newValue)
-      writeOwn(DATE_STYLE_KEY, style.value)
-    } else return
-    apply()
+      const next = styleOf(event.newValue)
+      writeOwn(DATE_STYLE_KEY, next)
+      void speak(choice.value, next)
+    }
   })
   window.addEventListener('languagechange', () => {
-    if (choice.value === 'device') apply()
+    if (choice.value === 'device') void speak('device', style.value)
   })
+  // A choice made meanwhile — here or in another window — is spoken instead, and the start is over.
+  const since = turn
+  while (!(await speak(stored, storedStyle)) && spokenTurn <= since) {
+    await new Promise<void>((retry) => {
+      const timer = setTimeout(retry, DICTIONARY_RETRY_MS)
+      window.addEventListener(
+        'online',
+        () => {
+          clearTimeout(timer)
+          retry()
+        },
+        { once: true },
+      )
+    })
+  }
 }
 
 export function useLocale(): {
   choice: Readonly<Ref<LocaleChoice>>
   style: Readonly<Ref<DateStyle>>
-  choose: (next: LocaleChoice) => void
-  chooseStyle: (next: DateStyle) => void
+  choose: (next: LocaleChoice) => Promise<void>
+  chooseStyle: (next: DateStyle) => Promise<void>
 } {
   /**
    * Every choice is written, «Как на устройстве» too, and on both shelves — for the scheme's reasons
-   * (`useColorScheme.ts`). Applied whether or not it could be kept: until the page is reloaded.
+   * (`useColorScheme.ts`) — once its dictionary is here: one that did not come is no choice, and the
+   * language stays (MOL-337). Spoken whether or not it could be kept: until the page is reloaded.
    */
-  function choose(next: LocaleChoice): void {
+  async function choose(next: LocaleChoice): Promise<void> {
     if (next === choice.value) return
-    writeEverywhere(LOCALE_KEY, next)
-    choice.value = next
-    apply()
+    if (await speak(next, style.value)) writeEverywhere(LOCALE_KEY, next)
   }
-  function chooseStyle(next: DateStyle): void {
+  async function chooseStyle(next: DateStyle): Promise<void> {
     if (next === style.value) return
-    writeEverywhere(DATE_STYLE_KEY, next)
-    style.value = next
-    apply()
+    if (await speak(choice.value, next)) writeEverywhere(DATE_STYLE_KEY, next)
   }
   return {
     choice: readonly(choice),

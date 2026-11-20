@@ -11,8 +11,8 @@ import type {
   MoneyAccountView,
   SpendingCategoryView,
 } from '@molvia/model'
-import en from '@/i18n/en.json'
-import ru from '@/i18n/ru.json'
+import { accounts as enAccounts } from '@/i18n/en.json'
+import { accounts as ruAccounts } from '@/i18n/ru.json'
 import { spendingLook, tripCategoryName, tripLook, unbroken } from '@/components/spending'
 import type { OperationRowProps, Translate } from '@/components/spending'
 import { calendarDayOfAnyYear } from '@/days'
@@ -124,7 +124,7 @@ export function pickerGroups(
  * The note «Записать разницу» writes, in every language the app speaks: written on a Russian screen
  * and read on an English one it is still «Прочее · сверка» (review 29).
  */
-const RECONCILE_NOTES = new Set([ru.accounts.reconcile.note, en.accounts.reconcile.note])
+const RECONCILE_NOTES = new Set([ruAccounts.reconcile.note, enAccounts.reconcile.note])
 
 /** A size of money with no sign — the words around it say which way it went. */
 function unsigned(value: Money, locale: string): string {

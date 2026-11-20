@@ -39,7 +39,7 @@ export default defineComponent({
     )
     function pick(value: string): void {
       const chosen = CHOICES.find((known) => known === value)
-      if (chosen) choose(chosen)
+      if (chosen) void choose(chosen)
     }
     return { t, choice, languages, pick }
   },

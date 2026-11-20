@@ -24,8 +24,10 @@ import { pluralRu } from '@/i18n/plural-ru'
  * `createAppI18n(...).global.t(...)` stops compiling. Naming `I18n<…, false>` picks the branch
  * the options actually select, and satisfies the linter's demand for an explicit return type.
  */
+type Messages = Record<'en' | 'en-GB' | 'en-US', typeof en> & Record<'ru', typeof ru>
+
 type AppI18n = I18n<
-  { en: typeof en; 'en-GB': typeof en; 'en-US': typeof en; ru: typeof ru },
+  Messages,
   Record<string, unknown>,
   Record<string, unknown>,
   // `string`, not `AppLocale`: `createI18n` widens the locale it was handed, and narrowing it
@@ -37,15 +39,24 @@ type AppI18n = I18n<
 export function createAppI18n(
   locale: AppLocale | EnglishTag = pickLocale(navigator.languages),
 ): AppI18n {
+  // English is one dictionary under three tags (MOL-398): the tag is also what every `Intl` of a
+  // screen formats by — `locale.value` — so the order of a day is the tag's, never a second
+  // setting passed around. `en` stays for tests and for the moment before `installLocale`.
+  return i18nOf(locale, { en, 'en-GB': en, 'en-US': en, ru })
+}
+
+/**
+ * The one configuration, for the tests' i18n with both dictionaries and for the app's, which starts
+ * with none and is given the one it speaks (`loadDictionary`, MOL-337). Only the tests call
+ * `createAppI18n`, so the bundle holds neither dictionary: each is a chunk of its own.
+ */
+function i18nOf(locale: string, messages: Partial<Messages>): AppI18n {
   return createI18n({
     legacy: false,
     locale,
     // About a key that is missing, never about a person: whoever gets Russian above keeps it.
     fallbackLocale: 'en',
-    // English is one dictionary under three tags (MOL-398): the tag is also what every `Intl` of a
-    // screen formats by — `locale.value` — so the order of a day is the tag's, never a second
-    // setting passed around. `en` stays for tests and for the moment before `installLocale`.
-    messages: { en, 'en-GB': en, 'en-US': en, ru },
+    messages: messages as Messages,
     pluralRules: { ru: pluralRu },
   })
 }
@@ -55,8 +66,35 @@ export type EnglishTag = 'en-GB' | 'en-US'
 
 // Not a single string lives in the markup. The plan is to reach other languages without
 // rebranding, and hardcoded text is the cheapest mistake today and the dearest one later.
-// The device's language until `installLocale` (`useLocale.ts`) puts the person's choice over it.
-export const i18n = createAppI18n()
+// The device's language until `installLocale` (`useLocale.ts`) puts the person's choice over it — and
+// no words at all until it has loaded the dictionary of that choice (MOL-337).
+export const i18n = i18nOf(pickLocale(navigator.languages), {})
+
+/** Each language's dictionary, a chunk of its own: one device speaks one (MOL-337, owner's В-3 «а»). */
+const DICTIONARIES = {
+  ru: () => import('@/i18n/ru.json'),
+  en: () => import('@/i18n/en.json'),
+} satisfies Record<AppLocale, () => Promise<{ default: unknown }>>
+
+const loaded = new Set<AppLocale>()
+
+/**
+ * Gives the app's i18n the dictionary its tag speaks — English under every tag English is spoken under —
+ * once; the next time it is there already. A failure is thrown to the caller: the words stay those of
+ * the language before.
+ */
+export async function loadDictionary(tag: AppLocale | EnglishTag): Promise<void> {
+  const language = pickLocale(tag)
+  if (loaded.has(language)) return
+  if (language === 'ru') {
+    i18n.global.setLocaleMessage('ru', (await DICTIONARIES.ru()).default)
+  } else {
+    const { default: messages } = await DICTIONARIES.en()
+    for (const name of ['en', 'en-GB', 'en-US'] as const)
+      i18n.global.setLocaleMessage(name, messages)
+  }
+  loaded.add(language)
+}
 
 /**
  * The `lang` attribute is not cosmetic: hyphenation, the voice a screen reader picks and the
