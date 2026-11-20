@@ -162,6 +162,17 @@ describe('routes', () => {
   )
 })
 
+// MOL-337: a cold start parses home and nothing else; a screen imported here directly would go back into
+// the one bundle without a word.
+describe('which screens are in the bundle', () => {
+  it('home alone: every other screen is loaded when first opened', () => {
+    const eager = routes.flatMap((route) =>
+      'component' in route && typeof route.component !== 'function' ? [route.name] : [],
+    )
+    expect(eager).toEqual(['advice'])
+  })
+})
+
 // The kit is a page for development; a production build must not carry it.
 describe('the kit page', () => {
   afterEach(() => {

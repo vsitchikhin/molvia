@@ -2,17 +2,23 @@ import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { defineComponent, h } from 'vue'
-import { createRouter, createWebHistory, RouterView } from 'vue-router'
+import { createMemoryHistory, createRouter, createWebHistory, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import { POLICY_VERSION } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
+import { ScreenNotLoaded } from '@/failures'
 import {
+  SCREEN_RELOAD_GAP_MS,
+  SCREEN_RELOAD_KEY,
   afterStep,
   backTarget,
+  lazyScreen,
+  reloadOnStaleChunk,
   settleColdStart,
   stepBack as step,
   tabMove,
   upTarget,
+  warmScreens,
 } from '@/navigation'
 import type { TabMove } from '@/navigation'
 import type { RouteName, Tab } from '@/router'
@@ -530,5 +536,127 @@ describe('the tab bar walks the history as В-2 decided', () => {
     view.unmount()
     expect(takenOver).toBe(false)
     expect(push).not.toHaveBeenCalled()
+  })
+})
+
+// MOL-337: every screen but home is a chunk of its own.
+describe('a screen loaded when first opened', () => {
+  const HOME_SCREEN = defineComponent({ render: () => h('p', 'home') })
+  const SCREEN = defineComponent({ render: () => h('p', 'screen') })
+
+  function screens(loads: Record<string, () => Promise<unknown>>): Router {
+    return createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'home', component: HOME_SCREEN },
+        ...Object.entries(loads).map(([name, load]) => ({
+          path: `/${name}`,
+          name,
+          component: load as () => Promise<typeof SCREEN>,
+        })),
+        { path: '/old', redirect: '/' },
+      ],
+    })
+  }
+
+  describe('warmScreens', () => {
+    it('loads every lazy screen once, one after another, and nothing else', async () => {
+      const order: string[] = []
+      let running = 0
+      const load = (name: string) =>
+        vi.fn(async () => {
+          running += 1
+          expect(running).toBe(1)
+          order.push(name)
+          await Promise.resolve()
+          running -= 1
+          return SCREEN
+        })
+      const loads = { a: load('a'), b: load('b'), c: load('c') }
+      await warmScreens(screens(loads), () => Promise.resolve())
+      expect(order).toEqual(['a', 'b', 'c'])
+      for (const one of Object.values(loads)) expect(one).toHaveBeenCalledTimes(1)
+    })
+
+    it('must not fire: a screen that does not come stops none after it and throws nothing', async () => {
+      const after = vi.fn(() => Promise.resolve(SCREEN))
+      const router = screens({
+        gone: lazyScreen(() => Promise.reject(new TypeError('Failed to fetch'))),
+        after,
+      })
+      await expect(warmScreens(router, () => Promise.resolve())).resolves.toBeUndefined()
+      expect(after).toHaveBeenCalledTimes(1)
+    })
+
+    it('pauses before each screen, so the page draws in between', async () => {
+      const pause = vi.fn(() => Promise.resolve())
+      await warmScreens(
+        screens({ a: () => Promise.resolve(SCREEN), b: () => Promise.resolve(SCREEN) }),
+        pause,
+      )
+      expect(pause).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('reloadOnStaleChunk (owner’s В-2 «а»)', () => {
+    function stale(online = true, now = 1_000_000) {
+      const assign = vi.fn()
+      const router = screens({
+        gone: lazyScreen(() => Promise.reject(new TypeError('Failed to fetch'))),
+        here: () => Promise.resolve(SCREEN),
+      })
+      reloadOnStaleChunk(router, { online: () => online, assign, now: () => now })
+      return { router, assign }
+    }
+
+    afterEach(() => {
+      sessionStorage.clear()
+      localStorage.clear()
+    })
+
+    it('with a connection, opens the screen by a full load of its address, query and all', async () => {
+      const { router, assign } = stale()
+      await router.push('/').catch(() => undefined)
+      await router.push('/gone?month=2026-10').catch(() => undefined)
+      expect(assign).toHaveBeenCalledWith('/gone?month=2026-10')
+      expect(router.currentRoute.value.name).toBe('home')
+    })
+
+    it('must not fire offline: the move is cancelled and the page stays', async () => {
+      const { router, assign } = stale(false)
+      await router.push('/')
+      await expect(router.push('/gone')).rejects.toBeInstanceOf(ScreenNotLoaded)
+      expect(assign).not.toHaveBeenCalled()
+      expect(router.currentRoute.value.name).toBe('home')
+    })
+
+    it('must not fire twice within the gap, so a chunk missing from the new version too cannot loop', async () => {
+      sessionStorage.setItem(SCREEN_RELOAD_KEY, String(1_000_000 - SCREEN_RELOAD_GAP_MS + 1))
+      const { router, assign } = stale(true, 1_000_000)
+      await router.push('/').catch(() => undefined)
+      await router.push('/gone').catch(() => undefined)
+      expect(assign).not.toHaveBeenCalled()
+    })
+
+    it('loads again once the gap is over, and marks the moment on this tab alone', async () => {
+      sessionStorage.setItem(SCREEN_RELOAD_KEY, String(1_000_000 - SCREEN_RELOAD_GAP_MS))
+      const { router, assign } = stale(true, 1_000_000)
+      await router.push('/').catch(() => undefined)
+      await router.push('/gone').catch(() => undefined)
+      expect(assign).toHaveBeenCalledTimes(1)
+      expect(sessionStorage.getItem(SCREEN_RELOAD_KEY)).toBe('1000000')
+      expect(localStorage.getItem(SCREEN_RELOAD_KEY)).toBeNull()
+    })
+
+    it('must not fire for any other failure of a move: a guard’s error is no stale chunk', async () => {
+      const { router, assign } = stale()
+      router.beforeEach((to) => {
+        if (to.name === 'here')
+          throw new TypeError("Cannot read properties of undefined (reading 'meta')")
+      })
+      await router.push('/').catch(() => undefined)
+      await router.push('/here').catch(() => undefined)
+      expect(assign).not.toHaveBeenCalled()
+    })
   })
 })

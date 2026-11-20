@@ -7,7 +7,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from '@/App.vue'
 import { i18n } from '@/i18n'
-import { settleColdStart } from '@/navigation'
+import { reloadOnStaleChunk, settleColdStart, warmScreens } from '@/navigation'
 import { router } from '@/router'
 import { installArrival, installHeightHold, installViewTransitions } from '@/transitions'
 import { installSheetEntryGuard } from '@/composables/useSheetHistory'
@@ -65,8 +65,10 @@ function start(): void {
   // `index.html` ships `lang="ru"`, which is right until the app boots and wrong the moment the
   // locale is anything else. Done here rather than as a side effect of importing i18n: a module that
   // rewrites the document on import makes import order matter where it should not. The language is
-  // this device's choice, else its own (MOL-398), and follows the other windows of the app.
-  installLocale()
+  // this device's choice, else its own (MOL-398), and follows the other windows of the app. Its
+  // dictionary is a chunk of its own (MOL-337), asked for now, beside the first screen's, and the app
+  // is mounted once both are here.
+  const speaking = installLocale()
 
   // The script in `index.html` has drawn the stored scheme already; this keeps it, and follows the
   // other windows of the app when one of them changes it (MOL-111).
@@ -80,6 +82,8 @@ function start(): void {
     failures.report(error, 'vue')
   }
 
+  // Before the router's first move: the first screen's code may fail to come as well (MOL-337).
+  reloadOnStaleChunk(router)
   app.use(createPinia()).use(router).use(i18n)
   app.provide(pwaUpdateKey, update)
 
@@ -91,38 +95,44 @@ function start(): void {
   // underneath first, so the first paint is already the screen and not a flash of the parent.
   // Transitions and focus are installed after that, so neither step counts as a move.
   // Behind the door a public screen has home laid underneath, where the door stands (MOL-216).
-  void settleColdStart(router, () => useLoginStore().closed)
-    // Settling the route is a nicety; the app is not. Vue is not running yet, so its error
-    // handler would never see this — logged here, and the app is mounted either way instead of
-    // leaving a blank screen at the shelf.
-    .catch((error: unknown) => {
-      console.error('[molvia]', 'first route', error)
-      // A guard, a route's meta, a screen that cannot load: the start's, and the owner's to hear
-      // (adversarial Б2).
-      failures.report(error, 'start')
+  void Promise.all([
+    settleColdStart(router, () => useLoginStore().closed)
+      // Settling the route is a nicety; the app is not. Vue is not running yet, so its error
+      // handler would never see this — logged here, and the app is mounted either way instead of
+      // leaving a blank screen at the shelf.
+      .catch((error: unknown) => {
+        console.error('[molvia]', 'first route', error)
+        // A guard, a route's meta, a screen that cannot load: the start's, and the owner's to hear
+        // (adversarial Б2) — a screen whose code did not come is the weather (`ScreenNotLoaded`).
+        failures.report(error, 'start')
+      }),
+    speaking,
+  ]).finally(() => {
+    installViewTransitions(router)
+    installArrival(router, (key) => i18n.global.t(key))
+    installHeightHold(router)
+    installSheetEntryGuard(router)
+    app.mount('#app')
+    // The screen is a route's name — `login` behind the door — from now on: before, the door's
+    // store must not be raised by a failure.
+    placeFailures(() => {
+      const route = router.currentRoute.value
+      if (useLoginStore().closed && route.meta.public !== true) return 'login'
+      return typeof route.name === 'string' ? route.name : 'start'
     })
-    .finally(() => {
-      installViewTransitions(router)
-      installArrival(router, (key) => i18n.global.t(key))
-      installHeightHold(router)
-      installSheetEntryGuard(router)
-      app.mount('#app')
-      // The screen is a route's name — `login` behind the door — from now on: before, the door's
-      // store must not be raised by a failure.
-      placeFailures(() => {
-        const route = router.currentRoute.value
-        if (useLoginStore().closed && route.meta.public !== true) return 'login'
-        return typeof route.name === 'string' ? route.name : 'start'
-      })
-      // What an earlier launch caught with no connection goes now.
-      void failures.flush()
+    // What an earlier launch caught with no connection goes now.
+    void failures.flush()
 
-      // Raised right after the first paint rather than before it: the store carries the four
-      // states a screen shows, so a person gets «loading» instead of a blank page while the
-      // identity is being fetched. Every request after this one carries the identifier, and the
-      // screen that explains a lost identity is drawn from the same state.
-      void useActorStore().start()
-    })
+    // Raised right after the first paint rather than before it: the store carries the four
+    // states a screen shows, so a person gets «loading» instead of a blank page while the
+    // identity is being fetched. Every request after this one carries the identifier, and the
+    // screen that explains a lost identity is drawn from the same state.
+    void useActorStore().start()
+
+    // Every other screen's code, now that this one is drawn (MOL-337, owner's В-1 «а»): after the
+    // identity's request, which the screen waits for.
+    void warmScreens(router)
+  })
 }
 
 // Below the floor of the build the script in `index.html` has drawn its line in place of the app,

@@ -1,7 +1,9 @@
 import { useRoute, useRouter } from 'vue-router'
 import type { LocationQuery, RouteLocationNormalizedLoaded, RouteParams, Router } from 'vue-router'
 import type { RouteName, Tab } from '@/router'
+import { ScreenNotLoaded } from '@/failures'
 import { useLoginStore } from '@/stores/login'
+import { read, writeOwn } from '@/stores/storage'
 
 /**
  * How a tap on a tab is written into the history.
@@ -186,6 +188,86 @@ export async function settleColdStart(router: Router, door = () => false): Promi
   await router.replace(root)
   for (const path of ancestors) await router.push(path)
   await router.push(route.fullPath)
+}
+
+/**
+ * A screen's code, loaded when the screen is first opened (MOL-337). Its failure is told apart from any
+ * other failure of a move: it is the connection's or a release's, never a defect of the phone, and
+ * `reloadOnStaleChunk` opens the screen by a full load.
+ */
+export function lazyScreen<T>(load: () => Promise<T>): () => Promise<T> {
+  return () =>
+    load().catch((cause: unknown) => {
+      throw new ScreenNotLoaded('screen not loaded', { cause })
+    })
+}
+
+/**
+ * Every screen's code, loaded one at a time once the first screen is drawn (MOL-337, owner's В-1 «а»), so
+ * that no tap waits for the network — the reason MOL-17 kept them in one bundle. The precache holds them
+ * all, but not for the page that installed the worker, which nothing claims (`pwaUpdate.ts`), nor for an
+ * old page after a release that took its chunks off the server: such a page keeps its screens in memory
+ * once this has run. A failure is left to the move that needs the screen; a pause before each screen lets
+ * the page draw what it is doing meanwhile.
+ */
+export async function warmScreens(
+  router: Router,
+  pause: () => Promise<void> = () =>
+    new Promise((done) => {
+      setTimeout(done, 0)
+    }),
+): Promise<void> {
+  for (const record of router.getRoutes()) {
+    const load: unknown = record.components?.default
+    if (typeof load !== 'function') continue
+    await pause()
+    try {
+      await (load as () => Promise<unknown>)()
+    } catch {
+      // The weather; the move that opens this screen asks again.
+    }
+  }
+}
+
+/** When this tab last opened a screen by a full load, so that a failure does not load in a loop. */
+export const SCREEN_RELOAD_KEY = 'molvia.screen-reload'
+/** How long after a full load of a screen another one is not tried. */
+export const SCREEN_RELOAD_GAP_MS = 30 * 1000
+
+export interface ScreenReloadEnvironment {
+  online(): boolean
+  assign(href: string): void
+  now(): number
+}
+
+const BROWSER: ScreenReloadEnvironment = {
+  online: () => navigator.onLine,
+  assign: (href) => {
+    window.location.assign(href)
+  },
+  now: () => Date.now(),
+}
+
+/**
+ * A screen whose code did not come is opened by a full load of its address (MOL-337, owner's В-2 «а»):
+ * the page asked for a chunk a release took off the server, and the load brings the new version and its
+ * chunks. The person tapped, so nothing is reloaded under them that they did not ask for. Without a
+ * connection the move is cancelled and the page stays — the strip says it is offline; and once a tab has
+ * loaded a screen so, it does not again for `SCREEN_RELOAD_GAP_MS`, so a chunk missing from the new
+ * version too cannot load in a loop.
+ */
+export function reloadOnStaleChunk(
+  router: Router,
+  environment: ScreenReloadEnvironment = BROWSER,
+): void {
+  router.onError((error, to) => {
+    if (!(error instanceof ScreenNotLoaded) || !environment.online()) return
+    const at = environment.now()
+    const last = Number(read(SCREEN_RELOAD_KEY, true))
+    if (Number.isFinite(last) && last > 0 && at - last < SCREEN_RELOAD_GAP_MS) return
+    writeOwn(SCREEN_RELOAD_KEY, String(at))
+    environment.assign(router.resolve(to.fullPath).href)
+  })
 }
 
 function prefersReducedMotion(): boolean {

@@ -172,7 +172,8 @@ export default defineConfig(({ mode }) => {
           // And the barcode reader's wasm (MOL-98, owner's decision В-1): the scanner is needed at
           // the shelf, where the connection drops, and fetched on first use it would fail exactly
           // there. Downloaded once — its hashed name changes only with the library, not with a
-          // deploy of ours.
+          // deploy of ours. Every chunk of a screen and both dictionaries are here too (MOL-337): an
+          // installed app opens with no connection a screen it has not opened yet (`offline-built.spec`).
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2,wasm}'],
         },
         manifest: {
@@ -201,7 +202,14 @@ export default defineConfig(({ mode }) => {
     // The maps lie beside the build, for `make failures` to read a phone's frames (MOL-144, Р-7 of
     // MOL-149): the repository is public, so they disclose nothing. Not precached — `globPatterns`
     // has no `map` — and a browser fetches one only with its tools open.
-    build: { target: BROWSER_FLOOR, sourcemap: true },
+    build: {
+      target: BROWSER_FLOOR,
+      sourcemap: true,
+      // Modules run in the order the source imports them, whatever chunk each lands in (MOL-337): the
+      // entry's own body runs after the chunks it imports, so `zodJitless` came after the schemas it must
+      // precede — a violation of the policy at every start — and `catchers` after the modules it must hear.
+      rolldownOptions: { output: { strictExecutionOrder: true } },
+    },
     // What only a worker imports: the dev server's first crawl never reads a worker, so the package
     // was found when the scanner first opened and optimized in the middle of a run, every page asking
     // for a module then waiting on it (MOL-217). Held by `optimizeDeps.test.ts`; the build does not
