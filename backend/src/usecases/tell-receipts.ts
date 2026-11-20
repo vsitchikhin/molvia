@@ -68,10 +68,8 @@ async function recordedBefore(
   receipts: Pick<ReceiptRepository, 'recordedTwin'>,
   { receipt, actor }: UntoldReceipt,
 ): Promise<boolean> {
-  const tin = receipt.header?.tin ?? null
-  const number = receipt.header?.receiptNo ?? null
-  if (tin === null || number === null || receipt.tripId !== null) return false
-  return (await receipts.recordedTwin(actor.id, tin, number, receipt.id)) !== null
+  if (receipt.tripId !== null) return false
+  return (await receipts.recordedTwin(actor.id, receipt.id)) !== null
 }
 
 function noticeOf(told: UntoldReceipt, placeName: string | null, duplicate: boolean, now: Date) {

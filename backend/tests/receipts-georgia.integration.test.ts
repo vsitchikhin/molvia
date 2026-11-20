@@ -8,6 +8,7 @@ import { randomUUID } from 'node:crypto'
 import { and, eq, isNotNull } from 'drizzle-orm'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import {
+  ERROR,
   MODEL_CONSENT_EDITION,
   RECEIPTS_BY_MODEL_HEADER,
   RECEIPT_MODEL,
@@ -17,7 +18,7 @@ import {
   worstCallMicroUsd,
 } from '@molvia/model'
 import type { ModelReceipt } from '@molvia/model'
-import type { FastifyInstance } from 'fastify'
+import type { FastifyInstance, LightMyRequestResponse } from 'fastify'
 import { createItemRepository } from '@/db/items-repository'
 import { createModelSpendRepository } from '@/db/model-spend-repository'
 import { createReceiptRepository } from '@/db/receipts-repository'
@@ -30,11 +31,12 @@ import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import {
   RECEIPT_MODEL_ALONE_WAIT_MS,
   RECEIPT_MODEL_WAIT_MS,
+  modelRest,
   readQueuedReceipts,
 } from '@/usecases/read-receipts'
 import { buildServer } from '@/server'
 import { connectDrizzle } from './db'
-import { clearAll, insertActor, signIn } from './fixtures'
+import { clearAll, insertActor, insertItem, insertPlace, signIn } from './fixtures'
 import { onlyRow } from './rows'
 
 const { db, close } = connectDrizzle()
@@ -184,7 +186,11 @@ async function queued(me: Person, country: 'GE' | 'AM' = 'GE'): Promise<string> 
   return id
 }
 
-async function readAll(model: ReceiptModel, now: () => Date): Promise<void> {
+async function readAll(
+  model: ReceiptModel,
+  now: () => Date,
+  second: ReceiptModel | null = null,
+): Promise<void> {
   await readQueuedReceipts({
     receipts: repository,
     reader: tesseract,
@@ -199,7 +205,13 @@ async function readAll(model: ReceiptModel, now: () => Date): Promise<void> {
         [],
         { byModel: read.byModel },
       ),
-    model: { reader: model, spend, capMicroUsd: CAP, shareMicroUsd: CAP },
+    model: {
+      reader: model,
+      second: second === null ? null : { reader: second, rest: modelRest() },
+      spend,
+      capMicroUsd: CAP,
+      shareMicroUsd: CAP,
+    },
     now,
   })
 }
@@ -561,4 +573,130 @@ describe('whether the model reads for the person now (MOL-408, adversarial А3, 
       await keyless.close()
     }
   }, 10_000)
+})
+
+// MOL-422: one Georgian paper is one record — its number «ქვითარი» with the till's «Fsmd», Nikora printing no tax number
+describe('the same Georgian receipt shot twice (MOL-422, owner’s В-1 «б»)', () => {
+  const copying = (id_rows: string[]): ReceiptModel =>
+    fakeModel(() => Promise.resolve({ ...NIKORA_READ, answer: { ...NIKORA, id_rows } }))
+  const shotOf = async (me: Person, id_rows: string[]) => {
+    const id = await queued(me)
+    await readAll(copying(id_rows), () => new Date())
+    return id
+  }
+  const shot = (me: Person, number: string, till = 'DY00185692') =>
+    shotOf(me, ['სალარო № 1713', `ქვითარი ${number}`, `Fsmd: ${till}:FM00561079:146682`])
+  const record = async (me: Person, id: string) => {
+    const place = await insertPlace(db, {
+      name: `Nikora ${randomUUID()}`,
+      country: 'GE',
+      city: 'Тбилиси',
+    })
+    const item = await insertItem(db)
+    return app.inject({
+      method: 'POST',
+      url: `/receipts/${id}/record`,
+      headers: { cookie: me.cookie },
+      payload: {
+        tripId: randomUUID(),
+        place: { id: place },
+        purchasedOn: '2026-11-15',
+        lines: [{ position: 0, skip: false, item: { id: item }, quantity: null, amount: null }],
+      },
+    })
+  }
+  const codeOf = (response: LightMyRequestResponse) => response.json<{ code?: string }>().code
+
+  it('keeps the till and the number the reading found, and no tax number', async () => {
+    const me = await granted()
+    const id = await shot(me, '1687592')
+    expect(await receiptOf(id)).toMatchObject({
+      status: 'parsed',
+      tin: null,
+      till: 'DY00185692',
+      receiptNo: '1687592',
+    })
+  })
+
+  it('refuses the second «Записать» of the paper, says so on its review and counts it once', async () => {
+    const me = await granted()
+    const first = await shot(me, '1687592')
+    expect((await record(me, first)).statusCode).toBe(200)
+    const second = await shot(me, '1687592')
+
+    const review = await app.inject({
+      method: 'GET',
+      url: `/receipts/${second}`,
+      headers: { cookie: me.cookie },
+    })
+    expect(review.json<{ duplicateOf: unknown }>().duplicateOf).not.toBeNull()
+    const refused = await record(me, second)
+    expect([refused.statusCode, codeOf(refused)]).toEqual([409, ERROR.RECEIPT_RECORDED_BEFORE])
+    // a repeat of the paper costs no place in the month (MOL-275): the first counted, the second not
+    expect([(await receiptOf(first))?.counted, (await receiptOf(second))?.counted]).toEqual([
+      'month',
+      null,
+    ])
+  }, 15_000)
+
+  it('must not take another number of the same till, nor the same number of another till, for the paper', async () => {
+    const me = await granted()
+    expect((await record(me, await shot(me, '1687592'))).statusCode).toBe(200)
+    // must not: the till's next receipt, and a number another till printed too, are other papers
+    expect((await record(me, await shot(me, '1687593'))).statusCode).toBe(200)
+    expect((await record(me, await shot(me, '1687592', 'DY00185693'))).statusCode).toBe(200)
+  }, 15_000)
+
+  it('must not take a paper of another till of the chain for this one by the chain’s «ს/კ» (adversarial А1)', async () => {
+    const me = await granted()
+    const chain = (till: string) => ['ს/კ 204429137', 'ქვითარი 1687592', `Fsmd: ${till}`]
+    const first = await shotOf(me, chain('DY00185692'))
+    expect((await record(me, first)).statusCode).toBe(200)
+    // must not: «ქვითარი» is each till's own count, «ს/კ» the same on all of them
+    const second = await shotOf(me, chain('DY00231457'))
+    expect(await receiptOf(second)).toMatchObject({ tin: '204429137', receiptNo: '1687592' })
+    expect((await record(me, second)).statusCode).toBe(200)
+  }, 15_000)
+
+  it('keys the paper whose till one reading copied and number the other (adversarial Б1)', async () => {
+    const me = await granted()
+    const first = await shot(me, '1687592')
+    expect((await record(me, first)).statusCode).toBe(200)
+    // a paper read not whole — no total — is read again by the second model (MOL-405), each copying one half of the key
+    const crumpled = (id_rows: string[]) =>
+      fakeModel(() =>
+        Promise.resolve({ ...NIKORA_READ, answer: { ...NIKORA, id_rows, totals: [] } }),
+      )
+    const halves = [
+      ['სალარო № 1713', 'Fsmd: DY00185692'],
+      ['სალარო № 1713', 'ქვითარი 1687592'],
+    ]
+    for (const [kept = [], witness = []] of [halves, [...halves].reverse()]) {
+      const second = await queued(me)
+      const sonnet = crumpled(witness)
+      await readAll(crumpled(kept), () => new Date(), sonnet)
+      expect(sonnet.asked).toBe(1)
+      expect(await receiptOf(second)).toMatchObject({ till: 'DY00185692', receiptNo: '1687592' })
+      const refused = await record(me, second)
+      expect([refused.statusCode, codeOf(refused)]).toEqual([409, ERROR.RECEIPT_RECORDED_BEFORE])
+    }
+  }, 15_000)
+
+  it('keys no number read without its till: the paper shot twice so is recorded twice', async () => {
+    const me = await granted()
+    // must not: «ს/კ» and «ქვითარი» alone name no till, and a number of no till is no key
+    for (const rows of [['ს/კ 204429137', 'ქვითარი 1687592'], ['ქვითარი 1687592']]) {
+      const first = await shotOf(me, rows)
+      expect(await receiptOf(first)).toMatchObject({ till: null, receiptNo: null })
+      expect((await record(me, first)).statusCode).toBe(200)
+      expect((await record(me, await shotOf(me, rows))).statusCode).toBe(200)
+    }
+  }, 15_000)
+
+  it('must not take another person’s record of the same paper for theirs', async () => {
+    const me = await granted()
+    const other = await granted()
+    expect((await record(other, await shot(other, '1687592'))).statusCode).toBe(200)
+    expect((await record(me, await shot(me, '1687592'))).statusCode).toBe(200)
+  }, 15_000)
 })
