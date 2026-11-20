@@ -3,7 +3,7 @@ import IconCashPlus from '~icons/mdi/cash-plus'
 import IconSwap from '~icons/mdi/swap-horizontal'
 import IconTransferIn from '~icons/mdi/bank-transfer-in'
 import IconTransferOut from '~icons/mdi/bank-transfer-out'
-import { formatEstimate, formatMoney, parseMoney } from '@molvia/model'
+import { LOCALES, formatEstimate, formatMoney, parseMoney } from '@molvia/model'
 import type {
   AccountOperationView,
   Currency,
@@ -11,8 +11,7 @@ import type {
   MoneyAccountView,
   SpendingCategoryView,
 } from '@molvia/model'
-import { accounts as enAccounts } from '@/i18n/en.json'
-import { accounts as ruAccounts } from '@/i18n/ru.json'
+import { BOTH_LANGUAGES } from '@/i18n/bothLanguages'
 import { spendingLook, tripCategoryName, tripLook, unbroken } from '@/components/spending'
 import type { OperationRowProps, Translate } from '@/components/spending'
 import { calendarDayOfAnyYear } from '@/days'
@@ -124,7 +123,9 @@ export function pickerGroups(
  * The note «Записать разницу» writes, in every language the app speaks: written on a Russian screen
  * and read on an English one it is still «Прочее · сверка» (review 29).
  */
-const RECONCILE_NOTES = new Set([ruAccounts.reconcile.note, enAccounts.reconcile.note])
+const RECONCILE_NOTES = new Set<string>(
+  LOCALES.map((locale) => BOTH_LANGUAGES[locale].reconcileNote),
+)
 
 /** A size of money with no sign — the words around it say which way it went. */
 function unsigned(value: Money, locale: string): string {

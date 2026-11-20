@@ -542,6 +542,11 @@ describe('the tab bar walks the history as В-2 decided', () => {
 
 // MOL-337: every screen but home is a chunk of its own.
 describe('a screen loaded when first opened', () => {
+  /** A chunk that did not come, as Chromium says it (MOL-337, adversarial А1 — probed). */
+  const notCome = () =>
+    Promise.reject(
+      new TypeError('Failed to fetch dynamically imported module: http://127.0.0.1/assets/a.js'),
+    )
   const HOME_SCREEN = defineComponent({ render: () => h('p', 'home') })
   const SCREEN = defineComponent({ render: () => h('p', 'screen') })
 
@@ -593,7 +598,7 @@ describe('a screen loaded when first opened', () => {
     it('must not fire: a screen that does not come stops none after it and throws nothing', async () => {
       const after = vi.fn(() => Promise.resolve(SCREEN))
       const router = screens({
-        gone: lazyScreen(() => Promise.reject(new TypeError('Failed to fetch'))),
+        gone: lazyScreen(notCome),
         after,
       })
       await expect(warmScreens(router, () => Promise.resolve())).resolves.toBeUndefined()
@@ -626,7 +631,7 @@ describe('a screen loaded when first opened', () => {
       )
       const router = screens({
         slow,
-        gone: lazyScreen(() => Promise.reject(new TypeError('Failed to fetch'))),
+        gone: lazyScreen(notCome),
         after,
       })
       await expect(loadScreens(router)).resolves.toBeUndefined()
@@ -639,12 +644,14 @@ describe('a screen loaded when first opened', () => {
   describe('reloadOnStaleChunk (owner’s В-2 «а»)', () => {
     function stale(online = true, now = 1_000_000) {
       const assign = vi.fn()
+      const report = vi.fn()
       const router = screens({
-        gone: lazyScreen(() => Promise.reject(new TypeError('Failed to fetch'))),
+        gone: lazyScreen(notCome),
         here: () => Promise.resolve(SCREEN),
+        throws: lazyScreen(() => Promise.reject(new TypeError('Object.hasOwn is not a function'))),
       })
-      reloadOnStaleChunk(router, { online: () => online, assign, now: () => now })
-      return { router, assign }
+      reloadOnStaleChunk(router, { online: () => online, assign, now: () => now, report })
+      return { router, assign, report }
     }
 
     afterEach(() => {
@@ -686,15 +693,92 @@ describe('a screen loaded when first opened', () => {
       expect(localStorage.getItem(SCREEN_RELOAD_KEY)).toBeNull()
     })
 
-    it('must not fire for any other failure of a move: a guard’s error is no stale chunk', async () => {
-      const { router, assign } = stale()
+    it('must not fire for any other failure of a move: a guard’s error is no stale chunk, and is heard', async () => {
+      const { router, assign, report } = stale()
+      const thrown = new TypeError("Cannot read properties of undefined (reading 'meta')")
       router.beforeEach((to) => {
-        if (to.name === 'here')
-          throw new TypeError("Cannot read properties of undefined (reading 'meta')")
+        if (to.name === 'here') throw thrown
       })
       await router.push('/').catch(() => undefined)
       await router.push('/here').catch(() => undefined)
       expect(assign).not.toHaveBeenCalled()
+      expect(report).toHaveBeenCalledWith(thrown)
+    })
+
+    it('a screen whose module came and threw as it ran is our defect: heard, never reloaded (adversarial А1)', async () => {
+      const { router, assign, report } = stale()
+      await router.push('/')
+      const failure: unknown = await router.push('/throws').catch((error: unknown) => error)
+      expect(failure).not.toBeInstanceOf(ScreenNotLoaded)
+      expect(failure).toBeInstanceOf(TypeError)
+      expect(report).toHaveBeenCalledWith(failure)
+      expect(assign).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      'Failed to fetch dynamically imported module: http://127.0.0.1/assets/a.js',
+      'Importing a module script failed.',
+      "'text/html' is not a valid JavaScript MIME type for module script 'http://127.0.0.1/assets/a.js'.",
+      'error loading dynamically imported module: http://127.0.0.1/assets/a.js',
+    ])('an engine’s «%s» is a chunk that did not come', async (message) => {
+      await expect(
+        lazyScreen(() => Promise.reject(new TypeError(message)))(),
+      ).rejects.toBeInstanceOf(ScreenNotLoaded)
+    })
+
+    it('must not fire where the tab cannot keep its mark: no load rather than a loop (adversarial А6)', async () => {
+      const { router, assign } = stale()
+      // On the instance, as `useLocale.test.ts` does: happy-dom's storages carry their own methods.
+      const original = sessionStorage.setItem.bind(sessionStorage)
+      Object.defineProperty(sessionStorage, 'setItem', {
+        configurable: true,
+        writable: true,
+        value: (): never => {
+          throw new DOMException('quota', 'QuotaExceededError')
+        },
+      })
+      try {
+        await router.push('/').catch(() => undefined)
+        await router.push('/gone').catch(() => undefined)
+        expect(assign).not.toHaveBeenCalled()
+      } finally {
+        Object.defineProperty(sessionStorage, 'setItem', {
+          configurable: true,
+          writable: true,
+          value: original,
+        })
+      }
+    })
+
+    it('a cold start whose parent did not come loads the screen opened, never the parent (adversarial А4)', async () => {
+      const assign = vi.fn()
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: '/', name: 'advice', component: HOME_SCREEN },
+          {
+            path: '/money',
+            name: 'money',
+            component: lazyScreen(notCome),
+            meta: { titleKey: 'x', tab: 'money' },
+          },
+          {
+            path: '/money/accounts/:accountId',
+            name: 'money-account',
+            component: SCREEN,
+            meta: { titleKey: 'x', parent: 'money' },
+          },
+        ],
+      })
+      reloadOnStaleChunk(router, {
+        online: () => true,
+        assign,
+        now: () => 1_000_000,
+        report: vi.fn(),
+      })
+      await router.push('/money/accounts/a1')
+      await settleColdStart(router).catch(() => undefined)
+      expect(assign).toHaveBeenCalledWith('/money/accounts/a1')
     })
   })
 })

@@ -1,13 +1,13 @@
-import { useRoute, useRouter } from 'vue-router'
+import { loadRouteLocation, useRoute, useRouter } from 'vue-router'
 import type {
   LocationQuery,
-  RouteComponent,
+  RouteLocationNormalized,
   RouteLocationNormalizedLoaded,
   RouteParams,
   Router,
 } from 'vue-router'
 import type { RouteName, Tab } from '@/router'
-import { ScreenNotLoaded } from '@/failures'
+import { ScreenNotLoaded, reportFailure } from '@/failures'
 import { useLoginStore } from '@/stores/login'
 import { read, writeOwn } from '@/stores/storage'
 
@@ -173,39 +173,66 @@ export async function settleColdStart(router: Router, door = () => false): Promi
   const parent = parentName(route)
   if (!parent || router.options.history.state.back) return
 
-  // A public screen behind the door leads back to it, and the door stands at home (MOL-216, В-1 «а»):
-  // with «Настройки» underneath, a stranger who read the privacy page signed in onto the settings.
-  if (route.meta.public && door()) {
-    await router.replace({ name: HOME })
-    await router.push(route.fullPath)
-    return
-  }
+  // The address a parent's code that did not come is to load in its place (`reloadOnStaleChunk`).
+  settling = route.fullPath
+  try {
+    // A public screen behind the door leads back to it, and the door stands at home (MOL-216, В-1 «а»):
+    // with «Настройки» underneath, a stranger who read the privacy page signed in onto the settings.
+    if (route.meta.public && door()) {
+      await router.replace({ name: HOME })
+      await router.push(route.fullPath)
+      return
+    }
 
-  const ancestors: string[] = []
-  let cursor = router.resolve(route.fullPath)
-  let ancestor = parentOf(router, cursor)
-  while (ancestor) {
-    ancestors.unshift(ancestor.fullPath)
-    cursor = ancestor
-    ancestor = parentOf(router, cursor)
+    const ancestors: string[] = []
+    let cursor = router.resolve(route.fullPath)
+    let ancestor = parentOf(router, cursor)
+    while (ancestor) {
+      ancestors.unshift(ancestor.fullPath)
+      cursor = ancestor
+      ancestor = parentOf(router, cursor)
+    }
+    const root = ancestors.shift()
+    if (!root) return
+    await router.replace(root)
+    for (const path of ancestors) await router.push(path)
+    await router.push(route.fullPath)
+  } finally {
+    settling = null
   }
-  const root = ancestors.shift()
-  if (!root) return
-  await router.replace(root)
-  for (const path of ancestors) await router.push(path)
-  await router.push(route.fullPath)
 }
 
 /**
- * A screen's code, loaded when the screen is first opened (MOL-337). Its failure is told apart from any
- * other failure of a move: it is the connection's or a release's, never a defect of the phone, and
- * `reloadOnStaleChunk` opens the screen by a full load.
+ * A screen's code, loaded when the screen is first opened (MOL-337). A failure to load it is told apart
+ * from any other failure of a move: it is the connection's or a release's, never a defect of the phone,
+ * and `reloadOnStaleChunk` opens the screen by a full load. A module that came and threw as it ran is our
+ * defect, and goes on as it was thrown (adversarial А1).
  */
 export function lazyScreen<T>(load: () => Promise<T>): () => Promise<T> {
   return () =>
     load().catch((cause: unknown) => {
-      throw new ScreenNotLoaded('screen not loaded', { cause })
+      throw chunkNotLoaded(cause) ? new ScreenNotLoaded('screen not loaded', { cause }) : cause
     })
+}
+
+/**
+ * Whether a failed `import()` is a chunk that did not come — cut, missing, answered with a page — rather than a
+ * module that came and threw: an engine says so in its own words, probed on Chromium and WebKit (MOL-337,
+ * adversarial А1), Firefox by its source. A throw of the module is its own error — `TypeError … is not a
+ * function`, a `SyntaxError` — and Vite's `Unable to preload CSS` is a stylesheet of the chunk that did not
+ * come. **The price, named:** an engine that words it otherwise has its chunk counted as our defect — heard by
+ * the owner, and the screen not reloaded.
+ */
+const CHUNK_NOT_LOADED = [
+  /^Failed to fetch dynamically imported module/,
+  /^Importing a module script failed/,
+  /is not a valid JavaScript MIME type/,
+  /^error loading dynamically imported module/,
+  /^Unable to preload CSS/,
+]
+
+function chunkNotLoaded(error: unknown): boolean {
+  return error instanceof Error && CHUNK_NOT_LOADED.some((words) => words.test(error.message))
 }
 
 /**
@@ -243,27 +270,24 @@ export async function loadScreens(router: Router): Promise<void> {
 }
 
 /**
- * The loads of the screens not loaded yet: a record whose component is still a function. Each keeps the
- * screen it loaded in its record, as the router keeps one it resolved (MOL-337): a move to it then waits for
- * nothing — a dynamic `import()` settles a task later even for a module loaded already, and a screen mounted
- * that much after the tap let another move to it in first, the record's «Записали N покупок» lost to the
- * re-read's (`ReceiptView`), and its first request go after the connection did.
+ * The loads of the screens not loaded yet, each by the router's own `loadRouteLocation`, which keeps the screen
+ * it loaded in its record as a move does (MOL-337): a move to it then waits for nothing — a dynamic `import()`
+ * settles a task later even for a module loaded already, and a screen mounted that much after the tap let
+ * another move to it in first, the record's «Записали N покупок» lost to the re-read's (`ReceiptView`), and its
+ * first request go after the connection did. The function reads the location's `matched` alone.
  */
-function screenLoads(router: Router): (() => Promise<void>)[] {
-  return router.getRoutes().flatMap(({ components }) => {
-    const load: unknown = components?.default
-    if (components === undefined || components === null || typeof load !== 'function') return []
-    return [
-      async () => {
-        const loaded: unknown = await (load as () => Promise<unknown>)()
-        components.default = (
-          typeof loaded === 'object' && loaded !== null && 'default' in loaded
-            ? loaded.default
-            : loaded
-        ) as RouteComponent
-      },
-    ]
-  })
+function screenLoads(router: Router): (() => Promise<unknown>)[] {
+  return router
+    .getRoutes()
+    .filter(({ components }) =>
+      Object.values(components ?? {}).some(
+        (component) => typeof component === 'function' && !('displayName' in component),
+      ),
+    )
+    .map(
+      (record) => () =>
+        loadRouteLocation({ matched: [record] } as unknown as RouteLocationNormalized),
+    )
 }
 
 /** When this tab last opened a screen by a full load, so that a failure does not load in a loop. */
@@ -275,6 +299,8 @@ export interface ScreenReloadEnvironment {
   online(): boolean
   assign(href: string): void
   now(): number
+  /** Any other failure of a move: the phone's defect, for the owner to hear. */
+  report(error: unknown): void
 }
 
 const BROWSER: ScreenReloadEnvironment = {
@@ -283,7 +309,16 @@ const BROWSER: ScreenReloadEnvironment = {
     window.location.assign(href)
   },
   now: () => Date.now(),
+  report: (error) => {
+    reportFailure(error, 'screen')
+  },
 }
+
+/**
+ * The address a cold start is laying its parents under (`settleColdStart`): a parent whose code did not come
+ * is no reason to lose the screen opened, so the full load goes there (MOL-337, adversarial А4).
+ */
+let settling: string | null = null
 
 /**
  * A screen whose code did not come is opened by a full load of its address (MOL-337, owner's В-2 «а»):
@@ -298,12 +333,19 @@ export function reloadOnStaleChunk(
   environment: ScreenReloadEnvironment = BROWSER,
 ): void {
   router.onError((error, to) => {
-    if (!(error instanceof ScreenNotLoaded) || !environment.online()) return
+    // A guard that threw, a screen's module that threw as it ran: `RouterLink` swallows the move's refusal,
+    // and nothing else would tell the owner (adversarial А1).
+    if (!(error instanceof ScreenNotLoaded)) {
+      environment.report(error)
+      return
+    }
+    if (!environment.online()) return
     const at = environment.now()
     const last = Number(read(SCREEN_RELOAD_KEY, true))
     if (Number.isFinite(last) && last > 0 && at - last < SCREEN_RELOAD_GAP_MS) return
-    writeOwn(SCREEN_RELOAD_KEY, String(at))
-    environment.assign(router.resolve(to.fullPath).href)
+    // A mark the tab cannot keep guards nothing: no load at all rather than one in a loop (adversarial А6).
+    if (!writeOwn(SCREEN_RELOAD_KEY, String(at))) return
+    environment.assign(router.resolve(settling ?? to.fullPath).href)
   })
 }
 

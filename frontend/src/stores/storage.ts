@@ -101,13 +101,16 @@ export function write(key: string, value: string): boolean {
 /**
  * Writes to this window's shelf alone, for a note about this window only: another window of the app
  * must not find it — the moment «Обновить» reloaded this one is not the other's (MOL-132, review
- * С-9). `read(key, true)` finds it first; nothing is written where it would be shared.
+ * С-9). `read(key, true)` finds it first; nothing is written where it would be shared. Says whether the
+ * shelf took it: a note that guards a reload against a loop is no guard unkept (MOL-337, adversarial А6).
  */
-export function writeOwn(key: string, value: string): void {
+export function writeOwn(key: string, value: string): boolean {
   try {
     window.sessionStorage.setItem(key, value)
+    return true
   } catch {
     // Nothing to keep it in: the page brought up by the reload simply finds no note.
+    return false
   }
 }
 

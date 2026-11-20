@@ -63,19 +63,24 @@ test.describe('no worker', () => {
     browserName,
   }) => {
     test.setTimeout(60_000)
-    // What the page now on the screen loaded: a page gone took its modules with it.
-    const loaded = new Set<string>()
-    page.on('framenavigated', (frame) => {
-      if (frame === page.mainFrame()) loaded.clear()
+    // What the document on the screen loaded, by its own record: a page gone took its modules with it, and a
+    // move inside the app is no new page. Room for every file of the build in the record.
+    await page.addInitScript(() => {
+      performance.setResourceTimingBufferSize(1000)
     })
-    page.on('response', (response) => {
-      const name = /\/assets\/(\w+View)-[\w-]+\.js$/.exec(new URL(response.url()).pathname)?.[1]
-      if (name !== undefined && response.ok()) loaded.add(name)
-    })
+    const files = () =>
+      page.evaluate(() =>
+        performance
+          .getEntriesByType('resource')
+          .map((entry) => new URL(entry.name).pathname)
+          .filter((path) => path.startsWith('/assets/')),
+      )
+    const named = (paths: string[], pattern: RegExp) =>
+      paths.flatMap((path) => pattern.exec(path)?.slice(1, 2) ?? [])
     await signInBuilt(page, browserName)
     // The sections and the nested screens below, loaded with no tap: the bundle holds home alone.
     await expect
-      .poll(() => [...loaded].sort())
+      .poll(async () => named(await files(), /\/assets\/(\w+View)-[\w-]+\.js$/))
       .toEqual(
         expect.arrayContaining([
           'AccountsView',
@@ -85,6 +90,8 @@ test.describe('no worker', () => {
           'DevicesView',
         ]),
       )
+    // Every screen loaded, and the phone's one language: no screen pulls the other dictionary in (review №1).
+    expect(named(await files(), /\/assets\/(ru|en)-[\w-]+\.js$/)).toEqual(['en'])
 
     await page.context().setOffline(true)
     const tabs = page.getByRole('navigation', { name: 'Sections' })
