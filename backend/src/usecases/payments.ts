@@ -34,7 +34,11 @@ export type ChannelWord =
  */
 export interface PaymentChannelAdapter {
   readonly channel: PaymentChannel
-  start(payment: PaymentRow): Promise<{ readonly ref: string; readonly url: string }>
+  /** The channel's page for the payment, in the person's language; its name of the payment is `ref`. */
+  start(
+    payment: PaymentRow,
+    lang: 'ru' | 'en',
+  ): Promise<{ readonly ref: string; readonly url: string }>
   check(payment: PaymentRow): Promise<ChannelWord>
   refund(payment: PaymentRow, minor: bigint): Promise<void>
 }
