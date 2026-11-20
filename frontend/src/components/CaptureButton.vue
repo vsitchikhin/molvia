@@ -36,7 +36,7 @@
 import { computed, defineComponent, ref, watch } from 'vue'
 import type { PropType } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import IconCamera from '~icons/mdi/camera-outline'
 import { photoReceiptCountrySchema } from '@molvia/model'
 import type { ReceiptCountry } from '@molvia/model'
@@ -83,6 +83,7 @@ export default defineComponent({
   setup(props, { emit }) {
     const { t } = useI18n()
     const route = useRoute()
+    const router = useRouter()
     const { goTab } = useNavigation()
     const announce = useAnnouncer()
     const open = ref(false)
@@ -126,6 +127,8 @@ export default defineComponent({
         }
         // Today the developer opens the reading by hand.
         else if (way === 'developer') feedback.open({ from: 'receipts-closed' })
+        // Payment open (MOL-277, В-7 «а»): the tariff of receipts chosen on its screen.
+        else if (way === 'pay') void router.push({ name: 'pay', query: { tariff: 'receipts' } })
       })
     }
 

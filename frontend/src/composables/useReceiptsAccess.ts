@@ -18,7 +18,7 @@ import { doublingRetry } from '@/stores/queueing'
 import { read, write } from '@/stores/storage'
 
 /** What the person chose in «Пробные чеки закончились»: the camera all the same, the record by hand, a word to the developer. */
-export type ReceiptsClosedWay = 'photo' | 'manual' | 'developer'
+export type ReceiptsClosedWay = 'photo' | 'manual' | 'developer' | 'pay'
 
 /** What the sheet says, as it stands at the tap: the reason, the server's figures, whether Tesseract reads. */
 export interface ReceiptsShown {

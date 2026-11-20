@@ -81,6 +81,10 @@ import {
   chooseAnalyticsSchema,
   receiptNoticesSettingSchema,
   acceptConsentSchema,
+  paymentOfferCodec,
+  paymentStartedSchema,
+  paymentStatusCodec,
+  startPaymentSchema,
   consentSchema,
   remindersSettingSchema,
   receiptBodySchema,
@@ -167,6 +171,10 @@ import type {
   RemindersSetting,
   AnalyticsSetting,
   Consent,
+  PaymentOffer,
+  PaymentStarted,
+  PaymentStatus,
+  StartPayment,
   SalaryShift,
   ReceiptBody,
   ReceiptDetail,
@@ -458,6 +466,17 @@ export interface MolviaClient {
   analyticsSetting(): Promise<AnalyticsSetting>
   /** Saved on the tap; off erases the person's log. Safe to repeat. */
   chooseAnalytics(on: boolean): Promise<AnalyticsSetting>
+  /** Payment by card (MOL-277), behind the фф `payments`: the access as it stands and today's prices. */
+  paymentOffer(): Promise<PaymentOffer>
+  /**
+   * A payment started: the bank's page to go to. **Never repeated by itself** — each call is a new order, so a
+   * lost answer is a new tap, and the payment it may have made is abandoned by the server's reconciliation.
+   */
+  startPayment(body: StartPayment): Promise<PaymentStarted>
+  /** What became of the person's payment — the server asks the bank of one still waiting. */
+  paymentStatus(id: string): Promise<PaymentStatus>
+  /** «У меня только карта РФ» tapped (Р-8): counted by the day; `again` — this device tapped within a day. */
+  rfCardTap(again: boolean): Promise<void>
   /** The edition of the terms and the privacy page accepted (MOL-95): `version` null is none. */
   consent(): Promise<Consent>
   /** The edition the screen showed, accepted now. Safe to repeat: the row only ever goes up. */
@@ -1028,6 +1047,24 @@ export function createClient(options: ClientOptions): MolviaClient {
         method: 'PUT',
         body: encode(chooseAnalyticsSchema, { on }),
       }),
+
+    paymentOffer: () => request('/payments/tariffs', paymentOfferCodec),
+
+    startPayment: async (body) =>
+      request('/payments', paymentStartedSchema, {
+        method: 'POST',
+        body: encode(startPaymentSchema, body),
+      }),
+
+    paymentStatus: (id) => request(`/payments/${segment(id)}`, paymentStatusCodec),
+
+    rfCardTap: async (again) => {
+      noContent(
+        await exchange(`/payments/rf-card${again ? '?again=1' : ''}`, z.undefined(), {
+          method: 'POST',
+        }),
+      )
+    },
 
     consent: () => request('/actors/me/consent', consentSchema),
 

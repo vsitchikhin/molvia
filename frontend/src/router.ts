@@ -37,6 +37,8 @@ export type RouteName =
   | 'privacy'
   | 'terms'
   | 'kit'
+  | 'pay'
+  | 'pay-done'
 
 declare module 'vue-router' {
   interface RouteMeta {
@@ -96,6 +98,20 @@ export const routes = [
     name: 'bot',
     component: lazyScreen(() => import('@/views/BotView.vue')),
     meta: { titleKey: 'bot.title', parent: 'settings' },
+  },
+  // Payment by card (MOL-277), while the фф `payments` is on: the screen, and the page the bank sends the browser
+  // back to — the payment's id in the path, since the bank adds its own query to whatever address it was given.
+  {
+    path: '/pay',
+    name: 'pay',
+    component: lazyScreen(() => import('@/views/PayView.vue')),
+    meta: { titleKey: 'pay.title', parent: 'settings', ff: 'payments' },
+  },
+  {
+    path: '/pay/done/:paymentId',
+    name: 'pay-done',
+    component: lazyScreen(() => import('@/views/PayDoneView.vue')),
+    meta: { titleKey: 'pay.title', parent: 'settings', ff: 'payments' },
   },
   {
     path: '/',

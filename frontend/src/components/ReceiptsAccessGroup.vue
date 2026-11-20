@@ -3,8 +3,20 @@
     <SectionCaption>{{ t('settings.group_receipts') }}</SectionCaption>
     <AppCard as="ul" list>
       <li>
-        <!-- A status, no chevron (owner's В-3 «а»): nothing to open until payment comes (MOL-277). -->
+        <!-- With payment open (MOL-277, В-7 «а») the row opens its screen, receipts chosen; else a status, no
+             chevron (MOL-276, В-3 «а»). The tag is the row's for its life, so two rows, never a bound `as`. -->
         <ListRow
+          v-if="paying"
+          as="router-link"
+          :to="{ name: 'pay', query: { tariff: 'receipts' } }"
+          :icon="IconReceipt"
+          :title="t('receipts_access.title')"
+          :meta="status"
+          whole
+          next
+        />
+        <ListRow
+          v-else
           as="div"
           :icon="IconReceipt"
           :title="t('receipts_access.title')"
@@ -32,6 +44,7 @@ import {
   useReceiptsAccess,
 } from '@/composables/useReceiptsAccess'
 import { dateOfAnyYear } from '@/days'
+import { useFf } from '@/stores/ff'
 
 /** The status of each reason, by whether Tesseract reads meanwhile: the month's hundred says only when it opens again. */
 const STATUS: Record<ReceiptsClosed, { readonly read: string; readonly manual: string }> = {
@@ -59,6 +72,7 @@ export default defineComponent({
     const { t, locale } = useI18n()
     const today = useLocalDay()
     const { access, closed, othersRead } = useReceiptsAccess()
+    const paying = useFf('payments')
     // the settings' form reads `/actors/me` as it opens and as the app comes back (review №12)
     useAccessKeptFresh({ readByScreen: true })
 
@@ -82,7 +96,7 @@ export default defineComponent({
       return t('receipts_access.status.trial', { left: figures.trialLeft, of: figures.trialOf })
     })
 
-    return { t, IconReceipt, status }
+    return { t, IconReceipt, status, paying }
   },
 })
 </script>
