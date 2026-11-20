@@ -72,6 +72,7 @@ import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
 import { claimLoginNotices, endSessionFromBot, loginNoticesTold } from '@/usecases/tell-logins'
 import { SILENCE_ERASE_EVERY_MS, claimSilenceNotices, eraseSilent } from '@/usecases/silence'
+import { PAYMENT_SWEEP_EVERY_MS } from '@/usecases/payments'
 import { exportMine } from '@/usecases/export-mine'
 import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
 import { feedbackFromBot } from '@/usecases/feedback-from-bot'
@@ -222,6 +223,7 @@ import { createLoginRequestRepository } from '@/db/login-requests-repository'
 import { createSessionRepository } from '@/db/sessions-repository'
 import { createErasureRepository } from '@/db/erasure-repository'
 import { createSilenceRepository } from '@/db/silence-repository'
+import { createPaymentsRepository } from '@/db/payments-repository'
 import { createExportRepository } from '@/db/export-repository'
 import { createFeedbackRepository } from '@/db/feedback-repository'
 import { createReminderRepository } from '@/db/reminders-repository'
@@ -706,6 +708,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
     const loginLimit = addressMinute(LOGIN_ADDRESS_LIMIT, LOGIN_WINDOW_LIMIT)
     let stopMergeTwins: (() => Promise<void>) | undefined
     let stopSilence: (() => Promise<void>) | undefined
+    let stopPaymentSweep: (() => Promise<void>) | undefined
     const embedder = options.embedder?.(instance.log) ?? NO_EMBEDDER
     let itemEmbedding: ReturnType<typeof startItemEmbedding> | undefined
     instance.addHook('onReady', (ready) => {
@@ -874,6 +877,18 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         },
         silenceFailed,
         SILENCE_ERASE_EVERY_MS,
+      )
+      // The payment journal (MOL-283): a payment goes three years after its last movement — the bank's term
+      // for card records — whoever's it was. Once a day and at start, as the silence's run.
+      stopPaymentSweep = startLoginCleanup(
+        async () => {
+          const gone = await createPaymentsRepository(db).sweep(new Date())
+          if (gone > 0) instance.log.info({ gone }, 'payments past their three years deleted')
+        },
+        (error) => {
+          failures.report(error, job('payment-sweep'), 'payment sweep failed')
+        },
+        PAYMENT_SWEEP_EVERY_MS,
       )
       // Receipts (MOL-125): a removal final after its ten minutes, a receipt not recorded after its
       // 28 days, a line cut out for training 28 days after it was confirmed.
@@ -1107,6 +1122,7 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
       await stopSenderForget?.()
       await stopMergeTwins?.()
       await stopSilence?.()
+      await stopPaymentSweep?.()
       await itemEmbedding?.stop()
       await stopReceiptCleanup?.()
       await receiptQueue?.stop()

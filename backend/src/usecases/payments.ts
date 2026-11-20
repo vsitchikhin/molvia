@@ -12,6 +12,9 @@ import type { RateRepository } from '@/db/rates-repository'
 import type { PaidFacts, PaymentRow, PaymentsRepository, Settled } from '@/db/payments-repository'
 import { freshOfficialRate } from './exchanges'
 
+/** The journal's three years are swept once a day: a day late is nothing against three years. */
+export const PAYMENT_SWEEP_EVERY_MS = 24 * 60 * 60 * 1000
+
 /**
  * What a channel said of a payment when asked: paid with its numbers, declined, its page outlived with nothing
  * paid, or nothing yet.
