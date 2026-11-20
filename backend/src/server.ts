@@ -878,8 +878,8 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         silenceFailed,
         SILENCE_ERASE_EVERY_MS,
       )
-      // The payment journal (MOL-283): a payment goes three years after its last movement — the bank's term
-      // for card records — whoever's it was. Once a day and at start, as the silence's run.
+      // The payment journal (MOL-283): a payment goes three years after its last movement and its days — the
+      // bank's term for card records — whoever's it was. Once a day and at start, as the silence's run.
       stopPaymentSweep = startLoginCleanup(
         async () => {
           const gone = await createPaymentsRepository(db).sweep(new Date())

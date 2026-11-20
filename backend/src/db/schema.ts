@@ -3426,7 +3426,8 @@ export const brandSpellings = pgTable(
  * The price is fixed at creation: the dollar anchor, the official rate of its day and the drams charged.
  * Of the channel's answer only the state, the sums and its own numbers are kept — no holder's name, email or
  * card (research MOL-281 §8). Erasure lets the person go and keeps the row (`set null`): Ameriabank's terms
- * §3.9 keep card records three years, and a payment goes three years after its last movement anyway.
+ * §3.9 keep card records three years, and a payment goes three years after its last movement — a paid one
+ * after the end of its days too — anyway.
  */
 export const payments = pgTable(
   'payments',
@@ -3460,7 +3461,8 @@ export const payments = pgTable(
     receiptsModelUntil: timestamp('receipts_model_until', { withTimezone: true }),
     // declined, abandoned or refunded whole
     closedAt: timestamp('closed_at', { withTimezone: true }),
-    // the last movement: created, paid, closed or a refund — three years from it the row goes
+    // the last movement: created, paid, closed or a refund — three years from it, and from a paid one's days,
+    // the row goes
     movedAt: timestamp('moved_at', { withTimezone: true })
       .notNull()
       .default(sql`clock_timestamp()`),

@@ -123,7 +123,8 @@ export interface ErasureReport {
   readonly memoryReleased: number
   /**
    * Payments this person made (MOL-283): they stay, with `actor_id` nulled — Ameriabank's terms §3.9 keep card
-   * records three years, and the journal's own timer deletes a payment three years after its last movement. One
+   * records three years, and the journal's own timer deletes a payment three years after its last movement and its
+   * days. One
    * the channel never named and nobody paid reached no bank and has no card record to keep: it goes, uncounted
    * (adversarial А6). A paid one stays however it is named — nothing ties a name to the money (review №10).
    */

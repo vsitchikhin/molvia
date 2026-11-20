@@ -358,16 +358,46 @@ describe('возврат (В-2 «а»): полный забирает 30 сут�
   })
 })
 
-describe('три года: платёж уходит через три года после последнего движения', () => {
-  it('уходит ровно в срок, ни мгновением раньше — живого человека тоже', async () => {
+describe('три года: платёж уходит через три года после последнего движения и своих дней', () => {
+  it('без дней уходит ровно в срок, ни мгновением раньше — живого человека тоже', async () => {
     const anna = await insertActor(db)
-    const old = await aPayment(anna)
-    const young = await aPayment(anna)
+    const old = await aPayment(anna, 'tip')
+    const young = await aPayment(anna, 'tip')
     await journal.markPaid(old, facts, new Date('2023-12-01T12:00:00.000Z'))
     await journal.markPaid(young, facts, new Date('2023-12-01T12:00:00.001Z'))
 
     expect(await journal.sweep(now)).toBe(1)
     expect(await rowOf(old)).toBeUndefined()
     expect(await rowOf(young)).toBeDefined()
+  })
+
+  it('оплаченный остаётся, пока его дни не кончились три года назад (адверсариал Д1)', async () => {
+    const anna = await insertActor(db)
+    const first = await aPayment(anna)
+    const second = await aPayment(anna)
+    const paidAt = new Date('2023-11-01T12:00:00.000Z')
+    await journal.markPaid(first, facts, paidAt)
+    await journal.markPaid(second, facts, paidAt)
+
+    // Both moved three years and a month ago; the first's days ended exactly three years ago, the second's later.
+    expect((await rowOf(first))?.receiptsModelUntil).toEqual(new Date('2023-12-01T12:00:00.000Z'))
+    expect(await journal.sweep(now)).toBe(1)
+    expect(await rowOf(first)).toBeUndefined()
+    expect(await rowOf(second)).toBeDefined()
+    expect(await journal.refund(second, 77_000n, now)).toMatchObject({ state: 'refunded' })
+  })
+
+  it('возвращённый целиком уходит через три года после возврата, какой бы конец ни помнила строка', async () => {
+    const anna = await insertActor(db)
+    const first = await aPayment(anna)
+    const second = await aPayment(anna)
+    const paidAt = new Date('2023-11-01T12:00:00.000Z')
+    await journal.markPaid(first, facts, paidAt)
+    await journal.markPaid(second, facts, paidAt)
+    await journal.refund(second, 77_000n, new Date('2023-11-15T12:00:00.000Z'))
+
+    expect((await rowOf(second))?.receiptsModelUntil).toEqual(new Date('2023-12-31T12:00:00.000Z'))
+    expect(await journal.sweep(now)).toBe(2)
+    expect(await rowOf(second)).toBeUndefined()
   })
 })

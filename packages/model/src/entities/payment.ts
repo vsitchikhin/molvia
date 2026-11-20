@@ -73,8 +73,9 @@ export const PAYMENT_TERM_DAYS = 30
 const TERM_MS = PAYMENT_TERM_DAYS * 24 * 60 * 60 * 1000
 
 /**
- * A payment row lives this long after its last movement (MOL-283, Р-5): Ameriabank's terms §3.9 keep card
- * records three years; past them nothing is kept without a reason — a living person's payment included.
+ * A payment row lives this long after its last movement, and a paid one after the end of its days (MOL-283, Р-5,
+ * adversarial Д1): Ameriabank's terms §3.9 keep card records three years; past them nothing is kept without a
+ * reason — a living person's payment included.
  */
 export const PAYMENT_KEEP_YEARS = 3
 

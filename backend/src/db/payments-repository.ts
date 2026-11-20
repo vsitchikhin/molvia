@@ -82,7 +82,10 @@ export interface PaymentsRepository {
    * that makes it whole takes back the thirty days, never earlier than `now`.
    */
   refund(id: string, minor: bigint, now: Date): Promise<Settled | null>
-  /** Deletes every payment whose last movement is three years old (`PAYMENT_KEEP_YEARS`); how many went. */
+  /**
+   * Deletes every payment three years (`PAYMENT_KEEP_YEARS`) past its last movement — and a paid one past the end of
+   * its days too; how many went.
+   */
   sweep(now: Date): Promise<number>
 }
 
@@ -282,11 +285,13 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
     },
 
     async sweep(now) {
+      // A paid payment's days count as its movement: while any of them is to come a refund takes them back and the
+      // journal is what the access was paid by (adversarial Д1). A refunded one's ends are gone with its days.
+      const last = sql`greatest(${payments.movedAt}, case when ${payments.state} = 'paid'
+        then greatest(${payments.sharedUntil}, ${payments.receiptsModelUntil}) end)`
       const gone = await db
         .delete(payments)
-        .where(
-          sql`${payments.movedAt} <= ${at(now)} - make_interval(years => ${PAYMENT_KEEP_YEARS})`,
-        )
+        .where(sql`${last} <= ${at(now)} - make_interval(years => ${PAYMENT_KEEP_YEARS})`)
         .returning({ id: payments.id })
       return gone.length
     },
