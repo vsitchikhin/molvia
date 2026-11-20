@@ -354,7 +354,8 @@ minute, and paid again, until the reader is back.
 **The key against a second record is Tesseract's, read by its words** (Т-11, adversarial А5, А6, review №10):
 the model copies every row that prints a number after its label, as printed (`id_rows`, prompt v5), and our
 code takes the tax number after «ՀՎՀՀ» and the fiscal number, eight digits after «Ֆիսկալ», each only where the
-rows give one — two fiscal numbers, a prepayment slip or two receipts on a photo, are none. Asked for the
+rows give one — two fiscal numbers, a prepayment slip or two receipts on a photo, are none; Georgia's by its own
+words, below (MOL-422). Asked for the
 fields themselves (v4), the model put «Ереван Сити»'s till registration «ԳՀ» in the tax number on 26 answers
 of 94 and the shop's tax number in the fiscal one — two constants of the till, the key of every receipt there,
 and the next one «recorded before»: copying, it moves a label too, mostly onto another label («ԳՀ:01282006»,
@@ -465,8 +466,8 @@ MOL-277 and MOL-283, the screen MOL-276.
   and «Вернуть» counting it again — bounded by forty receipts a day and the $2 share; a receipt «Удалить» removed, shot
   again later than ten minutes after, counts again, its row gone; a reading in flight as the hundredth or the tenth
   lands may make one over — the queue reads one receipt at a time; an account erased and signed in again starts with a
-  new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt has no number (MOL-422), so a
-  shot of it again after «Удалить» counts; with payment open, the review says «Строки на фото не разобрать» of a receipt
+  new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt with no key — no «ქვითარი», or
+  neither «ს/კ» nor «Fsmd» (MOL-422) — shot again after «Удалить» counts; with payment open, the review says «Строки на фото не разобрать» of a receipt
   nobody read — MOL-276 stands the sheet «Пробные чеки закончились» before the shot, at every tap.
 
 ## The status and the sheet on the phone (MOL-276)
@@ -695,9 +696,22 @@ receipt proven whole, and its lines of one piece went empty.
   doubts by, stays empty — nobody measured it there.
 - **The digits of the tax number and the fiscal number are the card's** (`tinDigits`, `fiscalDigits`, `digitCounts`),
   for the model's rows and Tesseract's layouts alike (review 1, №4): Armenia's eight and eight, Georgia's nine of a
-  company and eleven of a sole trader after «ს/კ», and no fiscal number. **No receipt number yet** (Р-5): with no
-  key a Georgian receipt is held by its id alone, and the same paper recorded twice is not caught — Nikora prints
-  «ქვითარი 1687592»; its word joins with a measure (MOL-422).
+  company and eleven of a sole trader after «ს/კ», and the receipt's number seven after «ქვითარი» (MOL-422).
+- **A Georgian paper is keyed by «ქვითარი» and its seller — «ს/კ», or the till's «Fsmd»** (MOL-422, owner's В-1 «б»,
+  20.11.2026): none of the five photos prints «ს/კ», so the number alone, as Т-11 keyed Armenia, caught no repeat at
+  all. Nikora prints «Fsmd: DY00185692:FM00561079:146682», its fiscal module's serial — one module is one till of one
+  shop, so a till's number of a receipt is no other seller's — and the model copied it as printed. **The till is the
+  key's seller, never the place's nor the memory's** (`receipts.till`, migration 0091): `tin` opens a seller's place and
+  the shop's memory, and a till's serial there would give Georgia a memory per till — MOL-438's ground. The serial's
+  first part only, `DY` and eight digits (`till` of the card): what «FM» and the third number are nobody knows. **One rule
+  of the key, in SQL** (`sameReceiptKey`): the same number, and the same tax number or the same till — for «Записать»,
+  the review's `duplicateOf`, the bot's notice, «Вернуть» (`recordedTwinOf`, read off the receipt's own row, so no
+  caller spells the key), MOL-275's count and the heir of «Переснять». The А6 guard holds the number as it does Armenia's;
+  the till, a constant of the till as a tax number is, keeps none, and two serials on a photo are none. **The prices,
+  named:** a shot whose reading caught «ს/კ» and another that caught only the till are one paper by the till where both
+  read it, two otherwise — a repeat missed, never a false one; a till that prints neither «ს/კ» nor «Fsmd» — Carrefour,
+  the pharmacies of the five photos — has no key, and its paper recorded twice is not caught; the 2008 till's «ქვთ N:»,
+  copied by the model as «ჟმო», is not read (owner's В-3 «а»).
 - **The shop's memory learns only from a receipt that prints its tax number** (adversarial А1, owner's В-6 «а»): none of
   the five photos prints «ს/კ» — the law's abbreviation is kept for the receipt that does — so a Georgian receipt has no
   key, «Записать» writes no word, and the next receipt of the shop starts from nothing: every line «проверьте» every
@@ -1370,8 +1384,8 @@ café's receipt stands in «Продукты» there while its review says «К�
 
 **The same trip sent again is the same answer, another trip a 409** — the phone names the trip, as every
 write offline (MOL-24). **The same receipt recorded before is refused** (Т-11,
-`error.receipt_recorded_before`): its seller's tax number and number, the person's, while its purchases
-are there — a trip removed lets a new shot of it be recorded. A receipt with no number is held by its id
+`error.receipt_recorded_before`): its number and its seller — the tax number, or the till's serial where none is
+printed (MOL-422, `sameReceiptKey`) — the person's, while its purchases are there — a trip removed lets a new shot of it be recorded. A receipt with no number is held by its id
 alone. **A trip only marked removed holds no new shot, and a new shot holds its «Вернуть»** (MOL-254,
 owner's decision Р-1 «б»): the commonest reason to shoot a receipt again is having just removed its record
 — the wrong shop, the wrong day — and that falls whole inside the ten minutes, while the phone offers
