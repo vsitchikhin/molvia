@@ -57,12 +57,16 @@ export const DICTIONARY_RETRY_MS = 5 * 1000
 
 /** What the screens speak; none before the first dictionary came. */
 let spoken: { choice: LocaleChoice; style: DateStyle } | null = null
+/** The tag the screens speak: «Как на устройстве» is a tag only with the device's language of its moment. */
+let spokenTag: string | null = null
 let turn = 0
 /**
  * The keys a tap of this window chose and nothing spoken has written yet: whichever turn speaks them writes them,
  * as a tap of the order of the day speaks the language tapped before it (adversarial А10).
  */
 const unwritten = new Set<typeof LOCALE_KEY | typeof DATE_STYLE_KEY>()
+/** A start is asking for its dictionary: it asks again by itself (`nextTry`). */
+let starting = false
 /** The turn of the last choice spoken. */
 let spokenTurn = 0
 
@@ -83,6 +87,7 @@ async function speak(): Promise<'spoken' | 'failed' | 'superseded'> {
   }
   if (mine !== turn) return 'superseded'
   spoken = asked
+  spokenTag = tag
   spokenTurn = mine
   for (const key of unwritten) writeEverywhere(key, key === LOCALE_KEY ? asked.choice : asked.style)
   unwritten.clear()
@@ -92,10 +97,10 @@ async function speak(): Promise<'spoken' | 'failed' | 'superseded'> {
 }
 
 /**
- * A choice — a tap, another window's, the system's language — whose dictionary did not come gives back the choice
- * spoken, and writes
- * nothing: the group of segments stands on what is asked for, and «English» stayed chosen over Russian words,
- * its tap dead (adversarial А3, А11). Another window's stays on this window's own shelf, for the next start.
+ * A choice — a tap, another window's, the system's language — whose dictionary did not come gives back the
+ * choice spoken, and writes nothing: the group of segments stands on what is asked for, and «English» stayed
+ * chosen over Russian words, its tap dead (adversarial А3, А11). Another window's stays on this window's own
+ * shelf, for the next start.
  */
 async function speakChosen(): Promise<void> {
   if ((await speak()) !== 'failed' || spoken === null) return
@@ -157,13 +162,26 @@ export async function installLocale(): Promise<void> {
   window.addEventListener('languagechange', () => {
     if (choice.value === 'device') void speakChosen()
   })
+  // What is asked for and not spoken — the system's language, whose dictionary did not come, kept under «Как на
+  // устройстве», which nothing gives back — is asked for again with the connection: its segment is chosen already,
+  // and a tap on it says nothing (adversarial А15). The start asks again by itself.
+  window.addEventListener('online', () => {
+    if (!starting && spokenTag !== null && tagOf(choice.value, style.value) !== spokenTag) {
+      void speakChosen()
+    }
+  })
   // A choice spoken meanwhile — here or in another window — ends the start: asked before each try, never after;
   // only a dictionary that did not come waits for the next try, one overtaken asks again at once.
   const since = turn
-  while (spokenTurn <= since) {
-    const outcome = await speak()
-    if (outcome === 'spoken') return
-    if (outcome === 'failed') await nextTry()
+  starting = true
+  try {
+    while (spokenTurn <= since) {
+      const outcome = await speak()
+      if (outcome === 'spoken') return
+      if (outcome === 'failed') await nextTry()
+    }
+  } finally {
+    starting = false
   }
 }
 

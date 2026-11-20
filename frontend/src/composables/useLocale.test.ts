@@ -367,4 +367,35 @@ describe('the dictionary a language needs', () => {
     expect(i18n.global.locale.value).toBe('ru')
     expect(localStorage.getItem(DATE_STYLE_KEY)).toBeNull()
   })
+
+  it('«Как на устройстве» kept over a system language whose dictionary did not come: asked again with the connection (adversarial А15)', async () => {
+    await installLocale()
+    // Every turn the event starts fails: the windows of the tests before left their listeners.
+    vi.mocked(loadDictionary).mockRejectedValue(new TypeError('Failed to fetch'))
+    phoneSpeaks('en-GB')
+    window.dispatchEvent(new Event('languagechange'))
+    await vi.waitFor(() => {
+      expect(vi.mocked(loadDictionary)).toHaveBeenCalledWith('en-GB')
+    })
+    await new Promise((settle) => {
+      setTimeout(settle, 0)
+    })
+    vi.mocked(loadDictionary).mockReset()
+    expect(i18n.global.locale.value).toBe('ru')
+    expect(useLocale().choice.value).toBe('device')
+    window.dispatchEvent(new Event('online'))
+    await vi.waitFor(() => {
+      expect(i18n.global.locale.value).toBe('en-GB')
+    })
+  })
+
+  it('must not fire: the connection back asks nothing when what is asked for is spoken', async () => {
+    await installLocale()
+    vi.mocked(loadDictionary).mockClear()
+    window.dispatchEvent(new Event('online'))
+    await new Promise((settle) => {
+      setTimeout(settle, 0)
+    })
+    expect(loadDictionary).not.toHaveBeenCalled()
+  })
 })
