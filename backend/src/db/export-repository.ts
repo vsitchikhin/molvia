@@ -24,6 +24,7 @@ import {
   moneyAccountChecks,
   moneyAccounts,
   moneyMonthRates,
+  payments,
   places,
   ratingReminders,
   receiptLines,
@@ -87,6 +88,7 @@ export const EXPORT_COLUMNS: Readonly<
     | 'items'
     | 'item_barcodes'
     | 'store_memory'
+    | 'payments'
     | 'receipt_lines'
     | 'receipt_links'
     | 'receipt_parts'
@@ -632,6 +634,31 @@ export const EXPORT_COLUMNS: Readonly<
     exported: ['tin', 'kind', 'key', 'item_id', 'price_minor', 'price_currency', 'written_at'],
     omitted: { id: 'a key of the row, of no meaning to the person', actor_id: OWNER },
   },
+  // Kept past erasure without its person (MOL-283), so listed by hand as `store_memory` is.
+  payments: {
+    exported: [
+      'id',
+      'order_no',
+      'tariff',
+      'anchor_minor',
+      'anchor_currency',
+      'rate_scaled',
+      'rate_day',
+      'amount_minor',
+      'currency',
+      'refunded_minor',
+      'channel',
+      'channel_ref',
+      'state',
+      'rrn',
+      'approval_code',
+      'created_at',
+      'paid_at',
+      'closed_at',
+      'moved_at',
+    ],
+    omitted: { actor_id: OWNER },
+  },
 }
 
 export interface ExportRepository {
@@ -885,6 +912,11 @@ export function createExportRepository(db: Db): ExportRepository {
             .from(storeMemory)
             .where(eq(storeMemory.actorId, actorId))
             .orderBy(asc(storeMemory.writtenAt), asc(storeMemory.id))
+          const paymentRows = await tx
+            .select()
+            .from(payments)
+            .where(eq(payments.actorId, actorId))
+            .orderBy(asc(payments.orderNo))
           const namedItems = await tx
             .select({ id: items.id, kind: items.kind, name: items.name })
             .from(items)
@@ -1376,6 +1408,25 @@ export function createExportRepository(db: Db): ExportRepository {
               itemId: row.itemId,
               price: cash(row.priceMinor, row.priceCurrency),
               writtenAt: row.writtenAt,
+            })),
+            payments: paymentRows.map((row) => ({
+              id: row.id,
+              orderNo: String(row.orderNo),
+              tariff: row.tariff,
+              anchor: { minor: row.anchorMinor, currency: row.anchorCurrency },
+              rate: row.rateScaled,
+              rateDay: row.rateDay,
+              amount: { minor: row.amountMinor, currency: row.currency },
+              refunded: { minor: row.refundedMinor, currency: row.currency },
+              channel: row.channel,
+              channelRef: row.channelRef,
+              state: row.state,
+              rrn: row.rrn,
+              approvalCode: row.approvalCode,
+              createdAt: row.createdAt,
+              paidAt: row.paidAt,
+              closedAt: row.closedAt,
+              movedAt: row.movedAt,
             })),
             feedback: feedbackRows.map((row) => ({
               number: row.id,

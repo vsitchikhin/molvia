@@ -69,8 +69,9 @@ export const EXPORT_FORMAT = 'molvia-export'
 // `trialReceiptsLeft`, `modelReceiptsMonth` and `modelReceiptsRead`, the trial's receipts left and the receipts the
 // model read in the person's month, and a receipt's `sentMonth`, `counted` and `retakenAt`, the month it counts in, how
 // it was counted and when «Переснять» gave that back (MOL-275). 37: a receipt's `rounding`, a pharmacy's rounding the
-// lines make the total less, either sign (MOL-421).
-export const EXPORT_VERSION = 37
+// lines make the total less, either sign (MOL-421). 38: `payments`, the person's payments — the tariff, the dollar
+// anchor, the rate of its day, the drams charged and refunded, the channel's numbers and the moments (MOL-283).
+export const EXPORT_VERSION = 38
 
 const day = z.iso.date()
 
@@ -553,6 +554,30 @@ const storeMemorySchema = z.strictObject({
 })
 
 /**
+ * A payment (MOL-283): what it bought, its price as fixed at creation, and the channel's numbers the bank finds the
+ * rest by. Read loosely, as every section: a stored row may predate a tariff or a state taken away.
+ */
+const paymentSchema = z.strictObject({
+  id: z.uuid(),
+  orderNo: z.string(),
+  tariff: z.string(),
+  anchor: signedMoneyCodec,
+  rate: rateNumber,
+  rateDay: day,
+  amount: signedMoneyCodec,
+  refunded: signedMoneyCodec,
+  channel: z.string(),
+  channelRef: z.string().nullable(),
+  state: z.string(),
+  rrn: z.string().nullable(),
+  approvalCode: z.string().nullable(),
+  createdAt: isoDate,
+  paidAt: isoDate.nullable(),
+  closedAt: isoDate.nullable(),
+  movedAt: isoDate,
+})
+
+/**
  * A message to the developer (MOL-147), a thread's continuation too, with the owner's replies to it.
  * `thread` is the number of the thread's first message, `inReplyTo` the reply a continuation answers.
  */
@@ -636,6 +661,7 @@ export const exportContentCodec = z.strictObject({
   proposedItems: z.array(proposedItemSchema),
   addedBarcodes: z.array(addedBarcodeSchema),
   storeMemory: z.array(storeMemorySchema),
+  payments: z.array(paymentSchema),
   feedback: z.array(feedbackSchema),
   catalogue: catalogueSchema,
 })

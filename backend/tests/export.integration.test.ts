@@ -27,6 +27,7 @@ import {
   moneyAccountChecks,
   moneyAccounts,
   moneyMonthRates,
+  payments,
   ratingReminders,
   receiptMissParts,
   receiptMisses,
@@ -474,6 +475,28 @@ async function aFullLife(actorId: string, telegramUserId: number) {
     threadId: message.id,
     inReplyTo: reply?.id,
     createdAt: at(27),
+  })
+  // A month of receipts paid and refunded whole (MOL-283): every column of the row filled.
+  await db.insert(payments).values({
+    id: randomUUID(),
+    actorId,
+    tariff: 'receipts',
+    anchorMinor: 200n,
+    anchorCurrency: 'USD',
+    rateScaled: 383_120_000n,
+    rateDay: '2026-09-18',
+    amountMinor: 77_000n,
+    currency: 'AMD',
+    channel: 'ameriabank',
+    channelRef: randomUUID(),
+    state: 'refunded',
+    refundedMinor: 77_000n,
+    rrn: '626301234567',
+    approvalCode: '123456',
+    createdAt: at(28),
+    paidAt: at(29),
+    closedAt: at(30),
+    movedAt: at(30),
   })
 }
 

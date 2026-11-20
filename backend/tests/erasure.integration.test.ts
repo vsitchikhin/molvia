@@ -30,6 +30,7 @@ import {
   moneyAccountChecks,
   moneyAccounts,
   moneyMonthRates,
+  payments,
   budgetPlans,
   feedback,
   places,
@@ -206,6 +207,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
       itemsReleased: 0,
       barcodesReleased: 1,
       memoryReleased: 0,
+      paymentsReleased: 1,
       counted: true,
     })
     expect(await rowsMentioning(anna)).toEqual([])
@@ -230,6 +232,23 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const codes = await db.select().from(itemBarcodes).where(eq(itemBarcodes.itemId, itemId))
     expect(codes).toHaveLength(1)
     expect(onlyRow(codes)?.addedBy).toBeNull()
+  })
+
+  it('платёж остаётся без человека — три года договора банка (MOL-283)', async () => {
+    const tg = telegramId()
+    const anna = await insertActor(db, { telegramUserId: tg })
+    await aLife(db, anna, tg, { itemId: await insertSeedItem(db), placeId: await insertPlace(db) })
+    const before = onlyRow(await db.select().from(payments).where(eq(payments.actorId, anna)))
+
+    await erasure.erase(tg, { dryRun: false })
+
+    const after = onlyRow(
+      await db
+        .select()
+        .from(payments)
+        .where(eq(payments.id, before?.id ?? '')),
+    )
+    expect(after).toEqual({ ...before, actorId: null })
   })
 
   it('места остаются все — и то, где бывал только он (решение Q4)', async () => {

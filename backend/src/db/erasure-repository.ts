@@ -27,6 +27,7 @@ export const ACTOR_REFERENCES = [
   'money_account_checks.actor_id',
   'money_accounts.actor_id',
   'money_month_rates.actor_id',
+  'payments.actor_id',
   'rating_reminders.actor_id',
   'receipt_misses.actor_id',
   'receipts.actor_id',
@@ -121,6 +122,11 @@ export interface ErasureReport {
   /** Words this person gave the shops' memory about items that stay (MOL-126): `actor_id` nulled. */
   readonly memoryReleased: number
   /**
+   * Payments this person made (MOL-283): they stay, with `actor_id` nulled — Ameriabank's terms §3.9 keep card
+   * records three years, and the journal's own timer deletes a payment three years after its last movement.
+   */
+  readonly paymentsReleased: number
+  /**
    * Whether the person was added to `erasures`, the count by week of arrival the gates print
    * (MOL-91) — the one thing erasure leaves, and no more than a number.
    */
@@ -199,6 +205,7 @@ function nobody(): ErasureReport {
     itemsReleased: 0,
     barcodesReleased: 0,
     memoryReleased: 0,
+    paymentsReleased: 0,
     counted: false,
   }
 }
@@ -391,6 +398,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
           let leavingItems: readonly string[] = []
           let barcodesReleased = 0
           let memoryReleased = 0
+          let paymentsReleased = 0
           if (actorId !== null) {
             // The items released before on which this person still stands (MOL-374, adversarial А1):
             // read before their rows go, so the report can say which the sweep will take. The person's
@@ -515,19 +523,26 @@ export function createErasureRepository(db: Db): ErasureRepository {
                 and ${groupGoes(actorId)}
               order by i.id`)
             leavingItems = going.map((row) => row.id)
-            const [counts] = await tx.execute<{ own: number; codes: number; words: number }>(sql`
+            const [counts] = await tx.execute<{
+              own: number
+              codes: number
+              words: number
+              payments: number
+            }>(sql`
               select
                 (select count(*) from items where created_by = ${actorId})::int as own,
                 (select count(*) from item_barcodes
                   where added_by = ${actorId} and item_id not in ${idsIn(leavingItems)})::int as codes,
                 (select count(*) from store_memory
-                  where actor_id = ${actorId} and item_id not in ${idsIn(leavingItems)})::int as words`)
+                  where actor_id = ${actorId} and item_id not in ${idsIn(leavingItems)})::int as words,
+                (select count(*) from payments where actor_id = ${actorId})::int as payments`)
             items = {
               itemsLeaving: leavingItems.length,
               itemsReleased: (counts?.own ?? 0) - going.filter((row) => row.own).length,
             }
             barcodesReleased = counts?.codes ?? 0
             memoryReleased = counts?.words ?? 0
+            paymentsReleased = counts?.payments ?? 0
           }
           // No foreign key reaches these — on a first login the owner does not exist yet — so
           // no cascade does either. A person who began a login and never finished has only this.
@@ -571,6 +586,7 @@ export function createErasureRepository(db: Db): ErasureRepository {
             leavingItems,
             barcodesReleased,
             memoryReleased,
+            paymentsReleased,
             counted,
           }
           if (dryRun) throw new DryRun(report)
