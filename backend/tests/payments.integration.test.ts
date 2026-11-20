@@ -44,11 +44,12 @@ async function aPayment(actorId: string, tariff: PaymentTariff = 'receipts', min
 }
 
 async function accessOf(actorId: string) {
-  const [row] = await db
-    .select({ shared: actors.sharedUntil, receipts: actors.receiptsModelUntil })
-    .from(actors)
-    .where(eq(actors.id, actorId))
-  return row
+  return onlyRow(
+    await db
+      .select({ shared: actors.sharedUntil, receipts: actors.receiptsModelUntil })
+      .from(actors)
+      .where(eq(actors.id, actorId)),
+  )
 }
 
 async function rowOf(id: string) {

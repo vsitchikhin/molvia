@@ -375,6 +375,27 @@ const file: ExportFile = {
       writtenAt: at,
     },
   ],
+  payments: [
+    {
+      id: id(9),
+      orderNo: '1042',
+      tariff: 'receipts',
+      anchor: money(200n, 'USD'),
+      rate: 383_120_000n,
+      rateDay: '2026-09-18',
+      amount: money(77_000n, 'AMD'),
+      refunded: money(0n, 'AMD'),
+      channel: 'ameriabank',
+      channelRef: 'F3A9C1E2',
+      state: 'paid',
+      rrn: '626301234567',
+      approvalCode: '123456',
+      createdAt: at,
+      paidAt: at,
+      closedAt: null,
+      movedAt: at,
+    },
+  ],
   feedback: [
     {
       number: 41,
@@ -446,7 +467,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(37)
+    expect(wire.version).toBe(38)
     expect(wire.account.locale).toBe('en')
     expect(wire.account.lastSeenAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.silenceWarning).toBe(7)
