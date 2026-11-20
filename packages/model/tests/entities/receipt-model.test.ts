@@ -5,6 +5,7 @@ import {
   MODEL_RECEIPT_LINES_MAX,
   REPAIR_ASSIGNMENTS_MAX,
   REPAIR_SHIFTS_MAX,
+  keyNumberOf,
   repairTries,
   modelHeadRows,
   modelPaidBy,
@@ -1644,9 +1645,16 @@ describe('a Georgian receipt the model read (MOL-408)', () => {
   })
 
   it('keys no Georgian number without its till: «ქვითარი» is the till’s own count, «ს/კ» the chain’s (adversarial А1)', () => {
+    // a reading keeps what it copied; the key is judged over the paper's head, both readings joined (adversarial Б1)
+    expect(key('ს/კ: 405123456', 'ქვითარი: 1287592')).toEqual(['405123456', null, '1287592'])
     // must not: two tills of one chain print the same «ქვითარი» under the same «ს/კ»
-    expect(key('ს/კ: 405123456', 'ქვითარი: 1287592')).toEqual(['405123456', null, null])
-    expect(key('ქვითარი 1287592')).toEqual([null, null, null])
+    expect(keyNumberOf(GEORGIAN_RECEIPTS, { till: null, receiptNo: '1287592' })).toBeNull()
+    expect(keyNumberOf(GEORGIAN_RECEIPTS, { receiptNo: '1287592' })).toBeNull()
+    expect(keyNumberOf(GEORGIAN_RECEIPTS, { till: 'DY00135692', receiptNo: '1287592' })).toBe(
+      '1287592',
+    )
+    // Armenia names no till: its number keys with its tax number, as before
+    expect(keyNumberOf(ARMENIAN_RECEIPTS, { till: null, receiptNo: '00410811' })).toBe('00410811')
   })
 
   it('takes «ქვითარი» of one to ten digits, a till’s count however far it went (owner’s В-4 «а», adversarial А2)', () => {
@@ -1670,6 +1678,13 @@ describe('a Georgian receipt the model read (MOL-408)', () => {
     for (const row of ['Fsmd: DY0013569', 'Fsmd: XDY00135692', 'Fsmd: DY001356921', 'DY00135692']) {
       expect(key(row)[1], row).toBeNull()
     }
+  })
+
+  it('reads the till’s serial by its digits and in any case, kept in capitals (review №9)', () => {
+    // «FM» with its «:» lost is no other serial: the serial's form is its length
+    expect(key('Fsmd: DY00135692FM00561079:146682')[1]).toBe('DY00135692')
+    // one till, one key, however the model cased it
+    expect(key('fsmd: dy00135692')[1]).toBe('DY00135692')
   })
 
   it('leaves Armenia’s key as it was: no till, whatever its rows print (MOL-422)', () => {

@@ -18,6 +18,7 @@ import {
   receiptDateOf,
   receiptDateWindow,
   receiptTextOfModel,
+  keyNumberOf,
   rememberedReading,
   unparsedFigures,
   receiptTimeOf,
@@ -489,10 +490,12 @@ async function readByModel(
       datesOf(claimed),
     )
   // of the witness's head only what the check never touches is taken (`filledHead`): its text as read will do
-  const head =
+  const head = keyedHead(
+    photoReading,
     witness === null
       ? headOfModel(kept, shown)
-      : filledHead(headOfModel(kept, shown), headOfModel(witness, witness.text))
+      : filledHead(headOfModel(kept, shown), headOfModel(witness, witness.text)),
+  )
   if (needsReshoot(text)) {
     const outcome: ReadOutcome = {
       kind: 'failed',
@@ -618,6 +621,15 @@ function filledHead(head: ReceiptHead, other: ReceiptHead): ReceiptHead {
     city: head.city ?? other.city,
   }
 }
+
+/**
+ * The paper's head with its number as the key (`keyNumberOf`, MOL-422): judged once both readings are joined, so a
+ * till one copied and a number the other did are one key (adversarial Б1).
+ */
+const keyedHead = (reading: PhotoReading, head: ReceiptHead): ReceiptHead => ({
+  ...head,
+  receiptNo: keyNumberOf(reading, head),
+})
 
 /** What came of asking a model: what it answered, or why there is nothing to take. */
 type Asked =
@@ -762,12 +774,9 @@ async function readByOcr(
   // a figure goes to the review as read only where it is verified, the rest is left empty (MOL-255)
   const explained = explainedReading(text)
   const { shown } = explained
-  const head = headOf(
-    shown,
-    currency,
-    readings,
-    receiptPaidBy(photoReading, readings),
-    datesOf(claimed),
+  const head = keyedHead(
+    photoReading,
+    headOf(shown, currency, readings, receiptPaidBy(photoReading, readings), datesOf(claimed)),
   )
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }

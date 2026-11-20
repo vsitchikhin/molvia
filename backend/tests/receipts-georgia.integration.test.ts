@@ -31,6 +31,7 @@ import { bindReceiptLines } from '@/usecases/bind-receipt-lines'
 import {
   RECEIPT_MODEL_ALONE_WAIT_MS,
   RECEIPT_MODEL_WAIT_MS,
+  modelRest,
   readQueuedReceipts,
 } from '@/usecases/read-receipts'
 import { buildServer } from '@/server'
@@ -185,7 +186,11 @@ async function queued(me: Person, country: 'GE' | 'AM' = 'GE'): Promise<string> 
   return id
 }
 
-async function readAll(model: ReceiptModel, now: () => Date): Promise<void> {
+async function readAll(
+  model: ReceiptModel,
+  now: () => Date,
+  second: ReceiptModel | null = null,
+): Promise<void> {
   await readQueuedReceipts({
     receipts: repository,
     reader: tesseract,
@@ -200,7 +205,13 @@ async function readAll(model: ReceiptModel, now: () => Date): Promise<void> {
         [],
         { byModel: read.byModel },
       ),
-    model: { reader: model, spend, capMicroUsd: CAP, shareMicroUsd: CAP },
+    model: {
+      reader: model,
+      second: second === null ? null : { reader: second, rest: modelRest() },
+      spend,
+      capMicroUsd: CAP,
+      shareMicroUsd: CAP,
+    },
     now,
   })
 }
@@ -645,6 +656,30 @@ describe('the same Georgian receipt shot twice (MOL-422, owner’s В-1 «б»)'
     const second = await shotOf(me, chain('DY00231457'))
     expect(await receiptOf(second)).toMatchObject({ tin: '204429137', receiptNo: '1687592' })
     expect((await record(me, second)).statusCode).toBe(200)
+  }, 15_000)
+
+  it('keys the paper whose till one reading copied and number the other (adversarial Б1)', async () => {
+    const me = await granted()
+    const first = await shot(me, '1687592')
+    expect((await record(me, first)).statusCode).toBe(200)
+    // a paper read not whole — no total — is read again by the second model (MOL-405), each copying one half of the key
+    const crumpled = (id_rows: string[]) =>
+      fakeModel(() =>
+        Promise.resolve({ ...NIKORA_READ, answer: { ...NIKORA, id_rows, totals: [] } }),
+      )
+    const halves = [
+      ['სალარო № 1713', 'Fsmd: DY00185692'],
+      ['სალარო № 1713', 'ქვითარი 1687592'],
+    ]
+    for (const [kept = [], witness = []] of [halves, [...halves].reverse()]) {
+      const second = await queued(me)
+      const sonnet = crumpled(witness)
+      await readAll(crumpled(kept), () => new Date(), sonnet)
+      expect(sonnet.asked).toBe(1)
+      expect(await receiptOf(second)).toMatchObject({ till: 'DY00185692', receiptNo: '1687592' })
+      const refused = await record(me, second)
+      expect([refused.statusCode, codeOf(refused)]).toEqual([409, ERROR.RECEIPT_RECORDED_BEFORE])
+    }
   }, 15_000)
 
   it('keys no number read without its till: the paper shot twice so is recorded twice', async () => {
