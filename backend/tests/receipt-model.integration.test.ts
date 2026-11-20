@@ -1188,9 +1188,7 @@ describe('the key against a second record (Т-11, adversarial А5, А6, review �
   const twinOf = async (id: string, actorId: string) => {
     const row = await receiptOf(id)
     if (row?.tin == null || row.receiptNo == null) return 'no key'
-    return (await repository.recordedTwin(actorId, row.tin, row.receiptNo, id)) === null
-      ? 'none'
-      : 'found'
+    return (await repository.recordedTwin(actorId, id)) === null ? 'none' : 'found'
   }
 
   it('is one for one paper read by Tesseract and by the model', async () => {

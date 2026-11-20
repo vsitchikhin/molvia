@@ -301,9 +301,8 @@ export async function recordReceipt(
       throw new DomainError(ERROR.CONFLICT)
     }
     if (held.status !== 'parsed') throw new DomainError(ERROR.RECEIPT_NOT_READY)
-    if (held.tin !== null && held.receiptNo !== null) {
-      const twin = await receipts.recordedTwin(actor.id, held.tin, held.receiptNo, held.id)
-      if (twin !== null) throw new DomainError(ERROR.RECEIPT_RECORDED_BEFORE)
+    if ((await receipts.recordedTwin(actor.id, held.id)) !== null) {
+      throw new DomainError(ERROR.RECEIPT_RECORDED_BEFORE)
     }
 
     // every line of the receipt once: a phone holding another reading of it is told so

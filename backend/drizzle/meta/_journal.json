@@ -638,6 +638,13 @@
       "when": 1795085667917,
       "tag": "0090_receipt_rounding",
       "breakpoints": true
+    },
+    {
+      "idx": 91,
+      "version": "7",
+      "when": 1795162321864,
+      "tag": "0091_receipt_till",
+      "breakpoints": true
     }
   ]
 }
