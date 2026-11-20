@@ -544,8 +544,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A whole refund takes back the payment's days not lived yet, never earlier than now; refunds add up, the bank asked
   first.**
 - **Erasure lets the person go and keeps the payment** (`set null`, Ameriabank's three years); every payment goes three
-  years after its last movement, one unnamed and unpaid goes with the person; the holder's name, email and card are never
-  kept.
+  years after its last movement — a paid one after its days too — one unnamed and unpaid goes with the person; the
+  holder's name, email and card are never kept.
 
 ### Feedback: «Написать разработчику» — `.claude/rules/feedback.md`
 

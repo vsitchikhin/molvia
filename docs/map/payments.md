@@ -13,8 +13,8 @@ Rules: `.claude/rules/payments.md`. A test beside its source, or mirroring it un
 
 ## backend · db
 
-- `backend/src/db/payments-repository.ts` — Repository of the journal: a payment written with its order number, the channel's name of it given once, «paid» set once with the access it extends under the person's lock — after our «abandoned» too — and where the payment's days end, declined or abandoned, refunds adding up with the whole one taking back the days not lived and moving the later payments' ends, and the payments three years old deleted. Tests: `backend/tests/payments.integration.test.ts`.
+- `backend/src/db/payments-repository.ts` — Repository of the journal: a payment written with its order number, the channel's name of it given once, «paid» set once with the access it extends under the person's lock — after our «abandoned» too — and where the payment's days end, declined or abandoned, refunds adding up with the whole one taking back the days not lived and moving the later payments' ends, and the payments three years past their last movement and their days deleted. Tests: `backend/tests/payments.integration.test.ts`.
 
 ## backend · tests
 
-- `backend/tests/payments.integration.test.ts` — Integration test: order numbers in order, the channel's name unique and given once, «paid» extending once however many times it is said, «paid» after «abandoned» and never after «declined», «both» each term from its own end, a tip extending nothing, an erased payer's payment paid with nothing extended, refunds up to the sum, a whole refund leaving a later payment's and a grant's days, three years to the moment.
+- `backend/tests/payments.integration.test.ts` — Integration test: order numbers in order, the channel's name unique and given once, «paid» extending once however many times it is said, «paid» after «abandoned» and never after «declined», «both» each term from its own end, a tip extending nothing, an erased payer's payment paid with nothing extended, refunds up to the sum, a whole refund leaving a later payment's and a grant's days, three years to the moment, a paid one kept while its days are less than three years over.

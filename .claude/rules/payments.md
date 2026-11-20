@@ -88,7 +88,11 @@ MOL-283 (В-1), 20.11.2026; rounds 1–2 of its review and adversarial (`.scratc
   money. The price, named: a payment erased between the bank's taking the order and its name written —
   the moment of one request — is unknown to the journal when the bank speaks of it.
 - **Every payment goes three years after its last movement** (`PAYMENT_KEEP_YEARS`, `moved_at`), a living person's too:
-  no data is kept without a reason. A daily timer (`PAYMENT_SWEEP_EVERY_MS`), at start too, `job:payment-sweep`.
+  no data is kept without a reason. **A paid one, three years after the end of its days too** (adversarial Д1): a term
+  paid years ahead (37 months at once) moved its rows on the day it was paid, and the sweep took them while their days
+  were still to come — a refund of them answered «not found» and nothing said what the access was paid by. A refunded
+  one's ends went with its days, so it goes by its movement alone. A daily timer (`PAYMENT_SWEEP_EVERY_MS`), at start
+  too, `job:payment-sweep`.
 - **Of the channel's answer only the state, the sums and its numbers are kept** — `rrn`, the approval code, the
   channel's id. The holder's name, email, card mask, its term and issuer the bank sends are never written (MOL-281 §8).
 - **The copy carries every payment** (`payments`, version 38), every column but the owner's key.
