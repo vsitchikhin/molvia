@@ -466,8 +466,8 @@ MOL-277 and MOL-283, the screen MOL-276.
   and «Вернуть» counting it again — bounded by forty receipts a day and the $2 share; a receipt «Удалить» removed, shot
   again later than ten minutes after, counts again, its row gone; a reading in flight as the hundredth or the tenth
   lands may make one over — the queue reads one receipt at a time; an account erased and signed in again starts with a
-  new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt with no key — no «ქვითარი»
-  or no «Fsmd» (MOL-422) — shot again after «Удалить» counts; with payment open, the review says «Строки на фото не
+  new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt with no key — no «ქვითარი»,
+  no «Fsmd», or read before MOL-422 — shot again after «Удалить» counts; with payment open, the review says «Строки на фото не
   разобрать» of a receipt nobody read — MOL-276 stands the sheet «Пробные чеки закончились» before the shot, at every
   tap.
 
@@ -725,7 +725,13 @@ receipt proven whole, and its lines of one piece went empty.
   serials on a photo are none.
   **The prices, named:** a paper that prints «ს/კ» and no «Fsmd», and one that prints neither — Carrefour, the
   pharmacies of the six photos — has no key, and its paper recorded twice is not caught; the 2008 till's «ქვთ N:»,
-  copied by the model as «ჟმო», is not read (owner's В-3 «а»).
+  copied by the model as «ჟმო», is not read (owner's В-3 «а»). **A paper read before MOL-422 has no key for good**
+  (adversarial Б2, round 3): the build before read no «ქვითარი» and kept no till, the model's answer is not kept past
+  the review (MOL-309's 21 days aside), so nothing can key it again — a shot of it after the rollout, recorded or still
+  on its review, is recorded beside it and counts again, once a paper. **A rollback to a build before MOL-422** keys a
+  Georgian paper by «ს/კ» and the number again (`tin = tin`), so while it stands two papers of two tills of a chain that
+  prints «ს/კ», both read by this build, are one paper (adversarial А1's false repeat) — none of the six photos prints
+  «ს/კ», and a rollback stands for hours.
 - **The shop's memory learns only from a receipt that prints its tax number** (adversarial А1, owner's В-6 «а»): none of
   the six photos prints «ს/კ» — the law's abbreviation is kept for the receipt that does — so a Georgian receipt has no
   tax number, the memory's key, «Записать» writes no word, and the next receipt of the shop starts from nothing: every
