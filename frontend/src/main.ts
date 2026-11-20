@@ -7,7 +7,7 @@ import { createApp } from 'vue'
 import { createPinia } from 'pinia'
 import App from '@/App.vue'
 import { i18n } from '@/i18n'
-import { reloadOnStaleChunk, settleColdStart, warmScreens } from '@/navigation'
+import { loadScreens, reloadOnStaleChunk, settleColdStart, warmScreens } from '@/navigation'
 import { router } from '@/router'
 import { installArrival, installHeightHold, installViewTransitions } from '@/transitions'
 import { installSheetEntryGuard } from '@/composables/useSheetHistory'
@@ -107,6 +107,8 @@ function start(): void {
         failures.report(error, 'start')
       }),
     speaking,
+    // The dev server has no precache: every screen there before the first paint (MOL-337).
+    import.meta.env.DEV ? loadScreens(router) : undefined,
   ]).finally(() => {
     installViewTransitions(router)
     installArrival(router, (key) => i18n.global.t(key))

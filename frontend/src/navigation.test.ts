@@ -13,6 +13,7 @@ import {
   afterStep,
   backTarget,
   lazyScreen,
+  loadScreens,
   reloadOnStaleChunk,
   settleColdStart,
   stepBack as step,
@@ -595,6 +596,32 @@ describe('a screen loaded when first opened', () => {
         pause,
       )
       expect(pause).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('loadScreens — the dev server’s start, which has no precache', () => {
+    it('asks for every screen at once, and a screen that does not come holds back none', async () => {
+      const after = vi.fn(() => Promise.resolve(SCREEN))
+      // How many times the screen after it was asked for by the moment the slow one came.
+      let askedMeanwhile = -1
+      const slow = vi.fn(
+        () =>
+          new Promise<typeof SCREEN>((resolve) => {
+            setTimeout(() => {
+              askedMeanwhile = after.mock.calls.length
+              resolve(SCREEN)
+            }, 0)
+          }),
+      )
+      const router = screens({
+        slow,
+        gone: lazyScreen(() => Promise.reject(new TypeError('Failed to fetch'))),
+        after,
+      })
+      await expect(loadScreens(router)).resolves.toBeUndefined()
+      expect(slow).toHaveBeenCalledTimes(1)
+      expect(after).toHaveBeenCalledTimes(1)
+      expect(askedMeanwhile).toBe(1)
     })
   })
 

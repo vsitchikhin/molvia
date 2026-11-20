@@ -23,10 +23,12 @@ vi.mock('@/i18n', async (original) => ({
   loadDictionary: () => dictionary.coming,
 }))
 
-// The screens are not loaded after the mount: that work would go on past the file's end.
+// The screens are not loaded, before the mount or after it: the app is not what is tested, and the work would
+// go on past the file's end.
 vi.mock('@/navigation', async (original) => ({
   ...(await original<typeof Navigation>()),
   warmScreens: () => Promise.resolve(),
+  loadScreens: () => Promise.resolve(),
 }))
 
 // The app itself is not what is tested: an empty root, so mounting it renders nothing.

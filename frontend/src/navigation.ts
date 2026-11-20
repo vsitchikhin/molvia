@@ -217,16 +217,31 @@ export async function warmScreens(
       setTimeout(done, 0)
     }),
 ): Promise<void> {
-  for (const record of router.getRoutes()) {
-    const load: unknown = record.components?.default
-    if (typeof load !== 'function') continue
+  for (const load of screenLoads(router)) {
     await pause()
     try {
-      await (load as () => Promise<unknown>)()
+      await load()
     } catch {
       // The weather; the move that opens this screen asks again.
     }
   }
+}
+
+/**
+ * Every screen's code at once, waited for before the first paint — on the dev server alone (MOL-337), which
+ * has no precache: there a screen not yet loaded is out of reach with the connection gone, and a spec that
+ * goes offline and taps a tab found it so. Loaded first, the dev server's start is what the one bundle was.
+ */
+export async function loadScreens(router: Router): Promise<void> {
+  await Promise.allSettled(screenLoads(router).map((load) => load()))
+}
+
+/** The loaders of the screens loaded when first opened: a record whose component is still a function. */
+function screenLoads(router: Router): (() => Promise<unknown>)[] {
+  return router.getRoutes().flatMap((record) => {
+    const load: unknown = record.components?.default
+    return typeof load === 'function' ? [load as () => Promise<unknown>] : []
+  })
 }
 
 /** When this tab last opened a screen by a full load, so that a failure does not load in a loop. */
