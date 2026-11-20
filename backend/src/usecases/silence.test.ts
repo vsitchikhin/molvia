@@ -65,6 +65,7 @@ describe('eraseSilent (MOL-239, Р-8)', () => {
     itemsReleased: 0,
     barcodesReleased: 0,
     memoryReleased: 0,
+    paymentsReleased: 0,
     counted: found,
   })
 

@@ -51,6 +51,9 @@ export async function forget(
   write(`  ${'items kept'.padEnd(20)}${String(report.itemsReleased)} (author removed)`)
   write(`  ${'codes kept'.padEnd(20)}${String(report.barcodesReleased)} (author removed)`)
   write(`  ${'shop memory kept'.padEnd(20)}${String(report.memoryReleased)} (author removed)`)
+  write(
+    `  ${'payments kept'.padEnd(20)}${String(report.paymentsReleased)} (payer removed, 3 years)`,
+  )
   if (report.counted)
     write(`  ${'erasures'.padEnd(20)}+1 (a count by week of arrival, no id — the gates read it)`)
   if (dryRun) {

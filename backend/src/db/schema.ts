@@ -55,6 +55,9 @@ import {
   itemOriginSchema,
   marketChannelSchema,
   marketSideSchema,
+  paymentChannelSchema,
+  paymentStateSchema,
+  paymentTariffSchema,
   placeKindSchema,
   rateChoiceSchema,
   MARKET_CURRENCIES,
@@ -99,6 +102,9 @@ import type {
   ItemOrigin,
   MarketChannel,
   MarketSide,
+  PaymentChannel,
+  PaymentState,
+  PaymentTariff,
   PlaceKind,
   AmdRate,
   RateChoice,
@@ -3413,5 +3419,85 @@ export const brandSpellings = pgTable(
   (table) => [
     check('brand_spellings_brand_armenian', sql`${table.brand} ~ '[ա-ֆ]'`),
     check('brand_spellings_spelling_short', sql`char_length(${table.spelling}) <= 40`),
+  ],
+)
+
+/**
+ * The payment journal (MOL-283): one row a payment, whatever the channel — a channel is an adapter that
+ * creates its row, reads the channel's word and refunds (MOL-277 the first). `order_no` is the integer a
+ * channel's order is named by (Ameriabank wants one). «Paid» is set once, with the access it extends, in one
+ * transaction (`PaymentsRepository.markPaid`); a second word of the channel finds it paid and extends nothing.
+ * The price is fixed at creation: the dollar anchor, the official rate of its day and the drams charged.
+ * Of the channel's answer only the state, the sums and its own numbers are kept — no holder's name, email or
+ * card (research MOL-281 §8). Erasure lets the person go and keeps the row (`set null`): Ameriabank's terms
+ * §3.9 keep card records three years, and a payment goes three years after its last movement — a paid one
+ * after the end of its days too — anyway.
+ */
+export const payments = pgTable(
+  'payments',
+  {
+    id: uuid('id').primaryKey(),
+    orderNo: bigint('order_no', { mode: 'bigint' }).generatedAlwaysAsIdentity().notNull(),
+    actorId: uuid('actor_id').references((): AnyPgColumn => actors.id, { onDelete: 'set null' }),
+    tariff: text('tariff').$type<PaymentTariff>().notNull(),
+    anchorMinor: bigint('anchor_minor', { mode: 'bigint' }).notNull(),
+    anchorCurrency: char('anchor_currency', { length: 3 }).$type<Currency>().notNull(),
+    // drams per dollar at six digits, the CBA's rate the price was made at, and the moment it is of
+    rateScaled: bigint('rate_scaled', { mode: 'bigint' }).notNull(),
+    rateAsOf: timestamp('rate_as_of', { withTimezone: true }).notNull(),
+    amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
+    currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
+    channel: text('channel').$type<PaymentChannel>().notNull(),
+    // the channel's own name of the payment, once the channel gave one
+    channelRef: text('channel_ref'),
+    state: text('state').$type<PaymentState>().notNull().default('created'),
+    refundedMinor: bigint('refunded_minor', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    rrn: text('rrn'),
+    approvalCode: text('approval_code'),
+    createdAt: timestamp('created_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+    paidAt: timestamp('paid_at', { withTimezone: true }),
+    // where the payment's days of each access it extended end — a whole refund takes back the unlived ones
+    sharedUntil: timestamp('shared_until', { withTimezone: true }),
+    receiptsModelUntil: timestamp('receipts_model_until', { withTimezone: true }),
+    // declined, abandoned or refunded whole
+    closedAt: timestamp('closed_at', { withTimezone: true }),
+    // the last movement: created, paid, closed or a refund — three years from it, and from a paid one's days,
+    // the row goes
+    movedAt: timestamp('moved_at', { withTimezone: true })
+      .notNull()
+      .default(sql`clock_timestamp()`),
+  },
+  (table) => [
+    uniqueIndex('payments_order_no_key').on(table.orderNo),
+    uniqueIndex('payments_channel_ref_key').on(table.channel, table.channelRef),
+    index('payments_actor_idx').on(table.actorId),
+    index('payments_moved_idx').on(table.movedAt),
+    check('payments_tariff_known', oneOf(table.tariff, paymentTariffSchema.options)),
+    check('payments_state_known', oneOf(table.state, paymentStateSchema.options)),
+    check('payments_channel_known', oneOf(table.channel, paymentChannelSchema.options)),
+    check('payments_currency_known', oneOf(table.currency, currencySchema.options)),
+    check('payments_anchor_currency_known', oneOf(table.anchorCurrency, currencySchema.options)),
+    check('payments_amount_positive', sql`${table.amountMinor} > 0 and ${table.anchorMinor} > 0`),
+    check('payments_rate_positive', sql`${table.rateScaled} > 0`),
+    check(
+      'payments_refunded_within',
+      sql`${table.refundedMinor} between 0 and ${table.amountMinor}`,
+    ),
+    check(
+      'payments_paid_at_whole',
+      sql`(${table.paidAt} is not null) = (${table.state} in ('paid', 'refunded'))`,
+    ),
+    check(
+      'payments_closed_at_whole',
+      sql`(${table.closedAt} is not null) = (${table.state} in ('declined', 'abandoned', 'refunded'))`,
+    ),
+    check(
+      'payments_refunded_whole',
+      sql`(${table.state} = 'refunded') = (${table.refundedMinor} = ${table.amountMinor})`,
+    ),
   ],
 )

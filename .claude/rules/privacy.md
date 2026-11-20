@@ -206,6 +206,12 @@ The detail behind the privacy lines of `CLAUDE.md`.
   (adversarial Б).
   `/privacy` says what the copy holds — the removed and the withdrawn included — under «Копия ваших
   данных», and names the row by its words.
+- **A payment outlives its payer's erasure, without them** (MOL-283, owner's В-1 «а»): `payments.actor_id` is `on delete
+set null` — Ameriabank's terms §3.9 keep card records three years — and every payment goes three years after its last
+  movement — a paid one after the end of its days too; one the channel never named and nobody paid reached no bank
+  and goes with the person. Listed by hand in `EXPORT_COLUMNS`,
+  as `store_memory` is; the report counts what stays (`paymentsReleased`).
+  `payments.md`.
 - **The account's last visit is kept to erase the silent** (MOL-238, `auth.md`): `actors.last_seen_at`,
   a term of keeping rather than a statistic — never the visit of «Что брать», which is one — written
   with the switch off and with no edition accepted, in the copy (version 24), gone with the row, a line

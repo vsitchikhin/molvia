@@ -30,6 +30,7 @@ import {
   moneyAccountChecks,
   moneyAccounts,
   moneyMonthRates,
+  payments,
   budgetPlans,
   feedback,
   places,
@@ -206,6 +207,7 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
       itemsReleased: 0,
       barcodesReleased: 1,
       memoryReleased: 0,
+      paymentsReleased: 1,
       counted: true,
     })
     expect(await rowsMentioning(anna)).toEqual([])
@@ -230,6 +232,53 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     const codes = await db.select().from(itemBarcodes).where(eq(itemBarcodes.itemId, itemId))
     expect(codes).toHaveLength(1)
     expect(onlyRow(codes)?.addedBy).toBeNull()
+  })
+
+  it('платёж остаётся без человека — три года договора банка (MOL-283)', async () => {
+    const tg = telegramId()
+    const anna = await insertActor(db, { telegramUserId: tg })
+    await aLife(db, anna, tg, { itemId: await insertSeedItem(db), placeId: await insertPlace(db) })
+    const before = onlyRow(await db.select().from(payments).where(eq(payments.actorId, anna)))
+
+    await erasure.erase(tg, { dryRun: false })
+
+    const after = onlyRow(
+      await db
+        .select()
+        .from(payments)
+        .where(eq(payments.id, before?.id ?? '')),
+    )
+    expect(after).toEqual({ ...before, actorId: null })
+  })
+
+  it('платёж, не дошедший до банка, уходит с человеком, оплаченный — остаётся без имени тоже (MOL-283, А6, №10)', async () => {
+    const tg = telegramId()
+    const anna = await insertActor(db, { telegramUserId: tg })
+    await aLife(db, anna, tg, { itemId: await insertSeedItem(db), placeId: await insertPlace(db) })
+    const named = onlyRow(await db.select().from(payments).where(eq(payments.actorId, anna)))
+    const unnamed = {
+      actorId: anna,
+      tariff: 'receipts' as const,
+      anchorMinor: 200n,
+      anchorCurrency: 'USD' as const,
+      rateScaled: 383_120_000n,
+      rateAsOf: new Date('2026-09-18T00:00:00+04:00'),
+      amountMinor: 77_000n,
+      currency: 'AMD' as const,
+      channel: 'ameriabank' as const,
+    }
+    const paidId = randomUUID()
+    await db.insert(payments).values([
+      { ...unnamed, id: randomUUID() },
+      { ...unnamed, id: paidId, state: 'paid', paidAt: new Date('2026-09-19T00:00:00+04:00') },
+    ])
+
+    const report = await erasure.erase(tg, { dryRun: false })
+
+    expect(report.paymentsReleased).toBe(2)
+    expect(
+      sorted((await db.select({ id: payments.id }).from(payments)).map((row) => row.id)),
+    ).toEqual(sorted([named?.id, paidId]))
   })
 
   it('места остаются все — и то, где бывал только он (решение Q4)', async () => {

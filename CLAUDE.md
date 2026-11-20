@@ -538,6 +538,20 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **Logs live fourteen days and carry no address and no query**; a failure is logged by its kind
   through `describeFailure`, never by its message.
 
+### Payments: the journal, tariffs, access paid for — `.claude/rules/payments.md`
+
+- **One journal for every channel** (MOL-283): `payments`, a channel is a `PaymentChannelAdapter`; the price is fixed
+  at creation — the dollar anchor at the CBA's rate fresh for today in Yerevan, rounded up to 10 ֏ — and none without
+  it, never another provider's.
+- **«Paid» is set once, the access with it**: the person's row locked, `update … where state = 'created'`, thirty days
+  from the end of a running term or from now in the same transaction; any later word moves nothing — but the bank's
+  «paid» over our «abandoned».
+- **A whole refund takes back the payment's days not lived yet, never earlier than now; refunds add up, the bank asked
+  first.**
+- **Erasure lets the person go and keeps the payment** (`set null`, Ameriabank's three years); every payment goes three
+  years after its last movement — a paid one after its days too — one unnamed and unpaid goes with the person; the
+  holder's name, email and card are never kept.
+
 ### Feedback: «Написать разработчику» — `.claude/rules/feedback.md`
 
 - **A message to the developer is never a review** (MOL-141): it feeds nothing, and the word «отзыв»
