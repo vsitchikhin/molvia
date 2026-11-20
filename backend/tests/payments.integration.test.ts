@@ -295,6 +295,53 @@ describe('возврат (В-2 «а»): полный забирает 30 сут�
     expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(70) })
   })
 
+  it('возврат раннего платежа сдвигает концы следующих: второй возврат берёт только свои дни (адверсариал Б1)', async () => {
+    const anna = await insertActor(db)
+    const [a, b, c] = [await aPayment(anna), await aPayment(anna), await aPayment(anna)]
+    for (const id of [a, b, c]) await journal.markPaid(id, facts, now)
+
+    await journal.refund(a, 77_000n, now)
+    expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(60) })
+    expect(await rowOf(b)).toMatchObject({ receiptsModelUntil: days(30) })
+    expect(await rowOf(c)).toMatchObject({ receiptsModelUntil: days(60) })
+
+    // B's days are 0…30 now, ten of them left on day 20; C's thirty stay.
+    await journal.refund(b, 77_000n, days(20))
+    expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(50) })
+    expect(await rowOf(c)).toMatchObject({ receiptsModelUntil: days(50) })
+  })
+
+  it('и с выдачей руками после: возврат второго берёт только его дни (адверсариал Б1)', async () => {
+    const anna = await insertActor(db)
+    const [a, b] = [await aPayment(anna), await aPayment(anna)]
+    await journal.markPaid(a, facts, now)
+    await journal.markPaid(b, facts, now)
+    await journal.refund(a, 77_000n, now)
+    await db
+      .update(actors)
+      .set({ receiptsModelUntil: days(100) })
+      .where(eq(actors.id, anna))
+
+    await journal.refund(b, 77_000n, days(20))
+
+    expect(await accessOf(anna)).toEqual({ shared: null, receipts: days(90) })
+  })
+
+  it('полный возврат платежа стёртого человека — возвращён, доступа нет', async () => {
+    const tg = telegramId()
+    const anna = await insertActor(db, { telegramUserId: tg })
+    const id = await aPayment(anna)
+    await journal.named(id, 'F3A9')
+    await journal.markPaid(id, facts, now)
+    await erasure.erase(tg, { dryRun: false })
+
+    expect(await journal.refund(id, 77_000n, days(1))).toEqual({
+      state: 'refunded',
+      moved: true,
+      access: {},
+    })
+  })
+
   it('сверх суммы, у неоплаченного и у возвращённого — отказ, ничего не записано', async () => {
     const anna = await insertActor(db)
     const paid = await aPayment(anna)

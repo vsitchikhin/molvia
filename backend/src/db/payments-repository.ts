@@ -1,10 +1,11 @@
-import { and, eq, inArray, sql } from 'drizzle-orm'
+import { and, eq, gt, inArray, sql } from 'drizzle-orm'
 import {
   PAYMENT_KEEP_YEARS,
   accessOf,
   extendedUntil,
   refundSum,
   refundedUntil,
+  unlivedMs,
 } from '@molvia/model'
 import type {
   ExchangeRate,
@@ -129,6 +130,28 @@ async function moveAccess(
   return set
 }
 
+/**
+ * After a whole refund took `unlived` of `column` out of the person's access, the days of every later payment of
+ * theirs come that much earlier: their stored ends move with them, or the next refund reads an end that is gone and
+ * takes a later payment's days (adversarial Б1). Later is an end past the refunded one — an extension from the end
+ * of a running term is never apart from it while any of its days is to come.
+ */
+async function shiftLater(
+  tx: Conn,
+  actorId: string,
+  column: Column,
+  end: Date,
+  unlived: number,
+): Promise<void> {
+  const moved = sql`${payments[column]} - make_interval(secs => ${unlived / 1000}::double precision)`
+  await tx
+    .update(payments)
+    .set(column === 'sharedUntil' ? { sharedUntil: moved } : { receiptsModelUntil: moved })
+    .where(
+      and(eq(payments.actorId, actorId), eq(payments.state, 'paid'), gt(payments[column], end)),
+    )
+}
+
 async function stateOf(tx: Conn, id: string): Promise<PaymentState | null> {
   const [row] = await tx.select({ state: payments.state }).from(payments).where(eq(payments.id, id))
   return row?.state ?? null
@@ -240,13 +263,19 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
             ...(whole ? { state: 'refunded' as const, closedAt: now } : {}),
           })
           .where(eq(payments.id, id))
-        const access =
-          whole && owner !== null
-            ? await moveAccess(tx, owner, accessOf(payment.tariff), (until, column) =>
-                refundedUntil(until, payment[column], now),
-              )
-            : {}
-        return { state: whole ? 'refunded' : 'paid', moved: true, access }
+        if (!whole || owner === null) {
+          return { state: whole ? 'refunded' : 'paid', moved: true, access: {} }
+        }
+        const opens = accessOf(payment.tariff)
+        const access = await moveAccess(tx, owner, opens, (until, column) =>
+          refundedUntil(until, payment[column], now),
+        )
+        for (const column of opens.map((open) => COLUMN[open])) {
+          const end = payment[column]
+          const unlived = unlivedMs(end, now)
+          if (end !== null && unlived > 0) await shiftLater(tx, owner.id, column, end, unlived)
+        }
+        return { state: 'refunded', moved: true, access }
       })
     },
 

@@ -125,14 +125,21 @@ export function refundSum(
 }
 
 /**
+ * How much of a payment's days is still to come at `now`, in milliseconds: its days are the thirty before
+ * `paidUntil`, the end its extension reached — none once lived, none for a payment that extended nothing.
+ */
+export function unlivedMs(paidUntil: Date | null, now: Date): number {
+  if (paidUntil === null) return 0
+  return Math.min(TERM_MS, Math.max(0, paidUntil.getTime() - now.getTime()))
+}
+
+/**
  * Where a whole refund leaves an access (MOL-277, owner's В-2 «а»): the days the payment gave and the person has
- * not lived yet taken back, never earlier than `now`. Its days are the thirty before `paidUntil`, the end its
- * extension reached: those already lived stay, and so do a later payment's and a grant's (MOL-283, adversarial
- * А1). An access already over, or a payment that extended nothing, is left as it is.
+ * not lived yet (`unlivedMs`) taken back, never earlier than `now` — those already lived stay, and so do a later
+ * payment's and a grant's (MOL-283, adversarial А1). An access already over is left as it is.
  */
 export function refundedUntil(until: Date | null, paidUntil: Date | null, now: Date): Date | null {
-  if (until === null || paidUntil === null || until <= now) return until
-  const unlived = Math.min(TERM_MS, Math.max(0, paidUntil.getTime() - now.getTime()))
-  const back = new Date(until.getTime() - unlived)
+  if (until === null || until <= now) return until
+  const back = new Date(until.getTime() - unlivedMs(paidUntil, now))
   return back > now ? back : now
 }

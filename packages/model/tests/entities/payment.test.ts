@@ -8,6 +8,7 @@ import {
   paymentPrice,
   refundSum,
   refundedUntil,
+  unlivedMs,
 } from '#model/entities/payment'
 import { DomainError, ERROR } from '#model/support/errors'
 import { parseRate } from '#model/values/rates'
@@ -129,6 +130,20 @@ describe('refundSum — refunds add up, never past the amount (MOL-281 §1)', ()
         expect.objectContaining({ code: ERROR.CONFLICT }),
       )
     }
+  })
+})
+
+describe('unlivedMs — what of a payment’s days is still to come', () => {
+  it('is the thirty days before the end, less what is lived', () => {
+    expect(unlivedMs(days(now, 30), now)).toBe(30 * DAY)
+    expect(unlivedMs(days(now, 45), now)).toBe(30 * DAY)
+    expect(unlivedMs(days(now, 10), now)).toBe(10 * DAY)
+  })
+
+  it('is none once lived, or for a payment that extended nothing', () => {
+    expect(unlivedMs(now, now)).toBe(0)
+    expect(unlivedMs(days(now, -3), now)).toBe(0)
+    expect(unlivedMs(null, now)).toBe(0)
   })
 })
 
