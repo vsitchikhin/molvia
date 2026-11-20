@@ -1477,7 +1477,11 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   **The dev server loads every screen before the first paint** (`loadScreens`, all at once): it has no precache,
   so a screen not yet loaded was out of reach once the connection went — CI's first run had a spec go offline and
   tap «Покупки» before its chunk came, and the move failed; loaded first, the dev server's start and every spec
-  that goes offline are what the one bundle gave.
+  that goes offline are what the one bundle gave. **Both keep each screen in its route's record**, as the router
+  keeps one it resolved: a dynamic `import()` settles a task later even for a module loaded already, and in CI's
+  second run a screen mounted that much after the tap — the record's «Записали N покупок», handed over in the
+  history's state, was lost to the re-read's move to the same record (`ReceiptView`, MOL-169), and an account's
+  first request went after the connection did. Kept, a move to a screen warmed waits for nothing, as before.
   **A screen whose code did not come all the same** — the seconds before the warming ends — **is opened by a
   full load of its address** (`reloadOnStaleChunk`, В-2 «а»): it brings the new version and its chunks, and the
   person tapped, so nothing is reloaded that they did not ask for (MOL-132's rule); once a tab in 30 s
