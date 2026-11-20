@@ -41,7 +41,7 @@ export function createAppI18n(
 ): AppI18n {
   // English is one dictionary under three tags (MOL-398): the tag is also what every `Intl` of a
   // screen formats by — `locale.value` — so the order of a day is the tag's, never a second
-  // setting passed around. `en` stays for tests and for the moment before `installLocale`.
+  // setting passed around. `en` stays for tests.
   return i18nOf(locale, { en, 'en-GB': en, 'en-US': en, ru })
 }
 

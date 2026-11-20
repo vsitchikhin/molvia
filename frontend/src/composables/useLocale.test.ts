@@ -223,4 +223,84 @@ describe('the dictionary a language needs', () => {
       vi.useRealTimers()
     }
   })
+
+  it('«English», then back «Как на устройстве» while English is coming: the later is spoken and kept (adversarial А2)', async () => {
+    let arrive: () => void = () => undefined
+    vi.mocked(loadDictionary).mockImplementationOnce(
+      () => new Promise<void>((resolve) => (arrive = resolve)),
+    )
+    const first = useLocale().choose('en')
+    expect(useLocale().choice.value).toBe('en')
+    await useLocale().choose('device')
+    arrive()
+    await first
+    expect(i18n.global.locale.value).toBe('ru')
+    expect(useLocale().choice.value).toBe('device')
+    expect(localStorage.getItem(LOCALE_KEY)).toBe('device')
+  })
+
+  it('a tap whose dictionary did not come gives the choice shown back (adversarial А3)', async () => {
+    vi.mocked(loadDictionary).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    const tapped = useLocale().choose('en')
+    expect(useLocale().choice.value).toBe('en')
+    await tapped
+    expect(useLocale().choice.value).toBe('device')
+  })
+
+  it('another window’s order of the day during the start keeps the language kept here (adversarial А7)', async () => {
+    localStorage.setItem(LOCALE_KEY, 'en')
+    localStorage.setItem(DATE_STYLE_KEY, 'us')
+    let arrive: () => void = () => undefined
+    vi.mocked(loadDictionary).mockImplementationOnce(
+      () => new Promise<void>((resolve) => (arrive = resolve)),
+    )
+    const start = installLocale()
+    window.dispatchEvent(new StorageEvent('storage', { key: DATE_STYLE_KEY, newValue: 'gb' }))
+    arrive()
+    await start
+    await vi.waitFor(() => {
+      expect(i18n.global.locale.value).toBe('en-GB')
+    })
+    expect(useLocale().choice.value).toBe('en')
+  })
+
+  it('must not fire: the start’s retry never speaks over a choice another window made meanwhile (review №2)', async () => {
+    vi.useFakeTimers()
+    try {
+      localStorage.setItem(LOCALE_KEY, 'en')
+      vi.mocked(loadDictionary).mockRejectedValueOnce(new TypeError('Failed to fetch'))
+      const start = installLocale()
+      await vi.advanceTimersByTimeAsync(0)
+      window.dispatchEvent(new StorageEvent('storage', { key: LOCALE_KEY, newValue: 'ru' }))
+      await vi.advanceTimersByTimeAsync(0)
+      expect(i18n.global.locale.value).toBe('ru')
+      await vi.advanceTimersByTimeAsync(DICTIONARY_RETRY_MS)
+      await start
+      expect(i18n.global.locale.value).toBe('ru')
+      expect(useLocale().choice.value).toBe('ru')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a retry by the clock lets its `online` go: one `online` asks once, however long it was down (review №4)', async () => {
+    vi.useFakeTimers()
+    try {
+      localStorage.setItem(LOCALE_KEY, 'en')
+      const failing = new TypeError('Failed to fetch')
+      vi.mocked(loadDictionary)
+        .mockRejectedValueOnce(failing)
+        .mockRejectedValueOnce(failing)
+        .mockRejectedValueOnce(failing)
+      const asked = vi.mocked(loadDictionary).mock.calls.length
+      const start = installLocale()
+      await vi.advanceTimersByTimeAsync(DICTIONARY_RETRY_MS * 2)
+      expect(vi.mocked(loadDictionary).mock.calls.length - asked).toBe(3)
+      window.dispatchEvent(new Event('online'))
+      await start
+      expect(vi.mocked(loadDictionary).mock.calls.length - asked).toBe(4)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
 })
