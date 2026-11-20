@@ -85,7 +85,7 @@
       >
         {{ t('pay.pay', { amount: chosenAmount }) }}
       </AppButton>
-      <AppButton variant="ghost" block @click="rfCardOpen = true">
+      <AppButton variant="ghost" block @click="openRfCard">
         {{ t('pay.rf_card') }}
       </AppButton>
     </template>
@@ -101,8 +101,8 @@ import { useRoute } from 'vue-router'
 import IconBoth from '~icons/mdi/check-all'
 import IconData from '~icons/mdi/account-group-outline'
 import IconReceipt from '~icons/mdi/receipt-text-outline'
-import { formatMoney, pickLocale } from '@molvia/model'
-import type { Money, TariffOffer } from '@molvia/model'
+import { formatMoney, paidTariffSchema, pickLocale } from '@molvia/model'
+import type { Money, PaidTariff, TariffOffer } from '@molvia/model'
 import AppButton from '@/components/AppButton.vue'
 import AppCard from '@/components/AppCard.vue'
 import AppScreen from '@/components/AppScreen.vue'
@@ -116,23 +116,13 @@ import { openBankPage } from '@/bankPage'
 import { useAnnouncer } from '@/composables/useAnnouncer'
 import { useLocalDay } from '@/composables/useLocalDay'
 import { usePaymentOffer } from '@/composables/usePaymentOffer'
+import { useRfCardTap } from '@/composables/useRfCardTap'
 import type { StartRefusal } from '@/composables/usePaymentOffer'
 import { dateOfAnyYear } from '@/days'
 
-type Tariff = TariffOffer['tariff']
-
-/** The server's refusal says it in the error's own words, the connection's in the screen's. */
+/** The server's refusal is its code, which is its words' key; the connection's are the screen's words. */
 function refusalKey(refusal: StartRefusal): string {
-  switch (refusal) {
-    case 'day_limited':
-      return 'error.payments_day_limited'
-    case 'unpriced':
-      return 'error.payment_unpriced'
-    case 'bank':
-      return 'error.payment_channel_unavailable'
-    default:
-      return `pay.refused.${refusal}`
-  }
+  return refusal === 'offline' || refusal === 'error' ? `pay.refused.${refusal}` : refusal
 }
 
 const ICONS = { data: IconData, receipts: IconReceipt, both: IconBoth } as const
@@ -162,9 +152,10 @@ export default defineComponent({
     const route = useRoute()
     const today = useLocalDay()
     const announce = useAnnouncer()
-    const asked = route.query.tariff
-    const chosen = ref<Tariff>(asked === 'data' || asked === 'both' ? asked : 'receipts')
+    const asked = paidTariffSchema.safeParse(route.query.tariff)
+    const chosen = ref<PaidTariff>(asked.success ? asked.data : 'receipts')
     const rfCardOpen = ref(false)
+    const tapRfCard = useRfCardTap()
     const state = usePaymentOffer(openBankPage)
     const lang = computed(() => pickLocale(locale.value))
 
@@ -202,6 +193,10 @@ export default defineComponent({
     async function payTip(cents: number): Promise<void> {
       await state.start({ tariff: 'tip', tipCents: cents }, lang.value)
     }
+    function openRfCard(): void {
+      tapRfCard()
+      rfCardOpen.value = true
+    }
     watch(state.refused, (refusal) => {
       if (refusal) announce?.(t(refusalKey(refusal)))
     })
@@ -220,6 +215,7 @@ export default defineComponent({
       chosenAmount,
       payTariff,
       payTip,
+      openRfCard,
     }
   },
 })

@@ -9,7 +9,7 @@ import { createAppI18n } from '@/i18n'
 import ru from '@/i18n/ru.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
-import { PAY_DONE_ASKS, PAY_DONE_ASK_MS } from '@/bankPage'
+import { PAY_DONE_ASKS, PAY_DONE_ASK_MS } from '@/composables/usePaymentStatus'
 import PayDoneView from './PayDoneView.vue'
 
 const status = vi.fn<(id: string) => Promise<PaymentStatus>>()

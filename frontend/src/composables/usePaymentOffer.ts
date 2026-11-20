@@ -1,7 +1,8 @@
 import { computed, onMounted, ref } from 'vue'
 import type { ComputedRef, Ref } from 'vue'
 import { ApiError } from '@molvia/client'
-import type { PaymentLang, PaymentOffer, StartPayment } from '@molvia/model'
+import { ERROR } from '@molvia/model'
+import type { Money, PaymentLang, PaymentOffer, StartPayment, WireCode } from '@molvia/model'
 import { api } from '@/api'
 import { useReconnect } from '@/composables/useReconnect'
 import { reportFailure } from '@/failures'
@@ -9,13 +10,27 @@ import { reportFailure } from '@/failures'
 /** `unpriced` — the CBA has published no rate fresh for today: no price, in words, not an error (Р-1). */
 export type PaymentOfferPhase = 'loading' | 'ready' | 'unpriced' | 'error' | 'offline'
 
-/** Why a payment did not start, by the server's word or the connection: what the screen says under the button. */
-export type StartRefusal = 'day_limited' | 'unpriced' | 'bank' | 'offline' | 'error'
+/**
+ * Why a payment did not start (review №4): the server's own code, which is its words' key too, or the connection's
+ * — what the screen says under the button.
+ */
+export type StartRefusal = WireCode | 'offline' | 'error'
 
-/** What the person chose to pay for: a tariff, or a tip of its cents — the start's body less the page's language. */
-export type PaymentChoice =
-  | { readonly tariff: 'data' | 'receipts' | 'both' }
-  | { readonly tariff: 'tip'; readonly tipCents: number }
+/** The server's refusals the screen says in their own words; any other is the screen's «error». */
+const SAID_REFUSALS: readonly WireCode[] = [
+  ERROR.PAYMENTS_DAY_LIMITED,
+  ERROR.PAYMENT_UNPRICED,
+  ERROR.PAYMENT_CHANNEL_UNAVAILABLE,
+  ERROR.PAYMENT_PRICE_CHANGED,
+]
+
+/** After these the offer on the screen is no longer today's: it is read again (adversarial А4). */
+const STALE_OFFER: readonly WireCode[] = [ERROR.PAYMENT_UNPRICED, ERROR.PAYMENT_PRICE_CHANGED]
+
+type Without<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
+
+/** What the person chose to pay for: a tariff, or a tip of its cents — the start's body less the price and language. */
+export type PaymentChoice = Without<StartPayment, 'amount' | 'lang'>
 
 export interface PaymentOfferState {
   readonly phase: ComputedRef<PaymentOfferPhase>
@@ -28,10 +43,11 @@ export interface PaymentOfferState {
   start(order: PaymentChoice, lang: PaymentLang): Promise<boolean>
 }
 
-const REFUSALS: Readonly<Record<string, StartRefusal>> = {
-  'error.payments_day_limited': 'day_limited',
-  'error.payment_unpriced': 'unpriced',
-  'error.payment_channel_unavailable': 'bank',
+/** The price the screen shows for the choice: the start names it, so the bank is never asked another (А4). */
+function shownPrice(offer: PaymentOffer | null, choice: PaymentChoice): Money | undefined {
+  return choice.tariff === 'tip'
+    ? offer?.tips?.find((tip) => tip.cents === choice.tipCents)?.amount
+    : offer?.tariffs?.find((tariff) => tariff.tariff === choice.tariff)?.amount
 }
 
 /**
@@ -77,20 +93,25 @@ export function usePaymentOffer(go: (url: string) => void): PaymentOfferState {
     refused,
     retry: load,
     async start(order, lang) {
-      if (starting.value !== null) return false
+      const amount = shownPrice(offer.value, order)
+      if (starting.value !== null || amount === undefined) return false
       starting.value = order.tariff === 'tip' ? String(order.tipCents) : order.tariff
       refused.value = null
       try {
-        const body: StartPayment = { ...order, lang }
+        const body: StartPayment = { ...order, amount, lang }
         const started = await api.startPayment(body)
         go(started.url)
         return true
       } catch (error) {
-        const said = error instanceof ApiError && error.answered ? REFUSALS[error.code] : undefined
+        const said =
+          error instanceof ApiError && error.answered && SAID_REFUSALS.includes(error.code)
+            ? error.code
+            : undefined
         if (said === undefined) reportFailure(error, 'screen')
         refused.value = said ?? (navigator.onLine ? 'error' : 'offline')
-        // Unpriced since the screen was drawn: the offer is read again, and the screen says it in its place.
-        if (said === 'unpriced') void load()
+        // The price moved or went since the screen was drawn: the offer is read again — the new price on the button,
+        // or «no price» in its place — and the refusal says why.
+        if (said !== undefined && STALE_OFFER.includes(said)) void load()
         starting.value = null
         return false
       }

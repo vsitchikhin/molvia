@@ -1543,6 +1543,7 @@
     "payments_day_limited": "You’ve started a lot of payments today. Try again tomorrow",
     "payment_unpriced": "The Central Bank of Armenia hasn’t published today’s rate yet — payment opens as soon as it does",
     "payment_channel_unavailable": "The bank isn’t answering right now. Nothing was charged — try again later",
+    "payment_price_changed": "The price changed: the Central Bank of Armenia updated its rate. Check the new price and tap again",
     "feedback_rate_limited": "That is a lot of messages for today. Your text is saved — send it tomorrow",
     "feedback_picture_invalid": "This picture can’t be used — choose another one",
     "feedback_picture_too_large": "The picture is too large — choose another one",

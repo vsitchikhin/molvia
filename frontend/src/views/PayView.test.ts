@@ -134,7 +134,8 @@ describe('«Оплата» (MOL-277)', () => {
     await payButton(view)?.trigger('click')
     await flushPromises()
 
-    expect(start).toHaveBeenCalledWith({ tariff: 'receipts', lang: 'ru' })
+    // with the price the screen showed (adversarial А4)
+    expect(start).toHaveBeenCalledWith({ tariff: 'receipts', amount: AMD(770), lang: 'ru' })
     expect(opened).toHaveBeenCalledWith('https://bank.test/Pay?id=A1&lang=ru')
   })
 
@@ -146,7 +147,12 @@ describe('«Оплата» (MOL-277)', () => {
     await tip?.trigger('click')
     await flushPromises()
 
-    expect(start).toHaveBeenCalledWith({ tariff: 'tip', tipCents: 300, lang: 'ru' })
+    expect(start).toHaveBeenCalledWith({
+      tariff: 'tip',
+      tipCents: 300,
+      amount: AMD(1150),
+      lang: 'ru',
+    })
   })
 
   it('says the server’s refusal under the button in the error’s own words, and stays', async () => {
@@ -159,6 +165,25 @@ describe('«Оплата» (MOL-277)', () => {
     expect(view.text()).toContain(ru.error.payments_day_limited)
     expect(opened).not.toHaveBeenCalled()
     expect(payButton(view)?.attributes('aria-describedby')).toBeTruthy()
+  })
+
+  it('a price changed under the button: says so, reads the offer again and shows the new price (А4)', async () => {
+    start.mockRejectedValue(new ApiError('error.payment_price_changed', undefined, true, 409))
+    const view = await render()
+    offer.mockResolvedValue({
+      ...OFFER,
+      tariffs: (OFFER.tariffs ?? []).map((tariff) =>
+        tariff.tariff === 'receipts' ? { ...tariff, amount: AMD(790) } : tariff,
+      ),
+    })
+
+    await payButton(view)?.trigger('click')
+    await flushPromises()
+
+    expect(view.text()).toContain(ru.error.payment_price_changed)
+    expect(offer).toHaveBeenCalledTimes(2)
+    expect(spaced(payButton(view)?.text())).toContain('790')
+    expect(opened).not.toHaveBeenCalled()
   })
 
   it('says no price while the CBA is silent — attention, never an error', async () => {
