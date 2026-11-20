@@ -482,6 +482,12 @@ should not see yet — venues until their chain is whole, payment until the bank
   and a link into the feature opened before its first answer opens with that answer — unless the person
   has touched the app meanwhile.
 
+- **`payments` needs the bank before it is turned on** (MOL-277): with `FF_PAYMENTS=on` the API does not start
+  without `VPOS_STAND` (`test` while the bank's stand is tried, `live` after) and the merchant's three values,
+  `VPOS_CLIENT_ID`, `VPOS_USERNAME`, `VPOS_PASSWORD` (`.env.prod.example`, «Rotating the secrets»). So the lines go in
+  first, then `./ff.sh payments on` and the restart; a start that fails names the missing variable in the API's log and
+  the previous container keeps running. The owner gives money back by `exec backend node dist/refund.js --order <n>`
+  (`make refund` in a copy), a dry run without `--yes`.
 - **Off again is `./ff.sh venues off` and the same restart**: the routes are gone at once, the phone's
   entries with its next answer; a screen of the feature already open stays until it is left.
 - **Taken off by its task** (`removedBy`): once the feature has been on, a task removes the flag from
