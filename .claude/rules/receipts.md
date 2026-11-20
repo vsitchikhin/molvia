@@ -466,9 +466,9 @@ MOL-277 and MOL-283, the screen MOL-276.
   and «Вернуть» counting it again — bounded by forty receipts a day and the $2 share; a receipt «Удалить» removed, shot
   again later than ten minutes after, counts again, its row gone; a reading in flight as the hundredth or the tenth
   lands may make one over — the queue reads one receipt at a time; an account erased and signed in again starts with a
-  new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt with no key — no «ქვითარი»,
-  no «Fsmd», or read before MOL-422 — shot again after «Удалить» counts; with payment open, the review says «Строки на фото не
-  разобрать» of a receipt nobody read — MOL-276 stands the sheet «Пробные чеки закончились» before the shot, at every
+  new ten (~$0,03, held by the login's quota and a Telegram account); a Georgian receipt with no key — no «ქვითარი», no
+  «Fsmd», or read before MOL-422 — shot again after «Удалить» counts; with payment open, the review says «Строки на фото
+  не разобрать» of a receipt nobody read — MOL-276 stands the sheet «Пробные чеки закончились» before the shot, at every
   tap.
 
 ## The status and the sheet on the phone (MOL-276)
