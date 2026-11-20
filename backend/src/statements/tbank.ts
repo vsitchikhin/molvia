@@ -195,8 +195,9 @@ const EXCHANGE_WORDS = /обмен валют|покупка валюты|про
  * and, in the layout of 2026, «Учёт в аналитике: Нет» beside them. «Нет» alone is no sign: the person switches it
  * off on any line, a card's purchase or a transfer to somebody (adversarial А2, Б2). Nor is «Внутренний перевод» an
  * own word: T-Bank names so a transfer to any of its contracts, another person's too (А1). Either is a tap — a
- * transfer asks «перевод — трата ли это?» — rather than a spending lost. The rest by the bank's category, its words
- * and the MCC. `analytics` is `null` for a layout without the column.
+ * transfer asks «перевод — трата ли это?» — rather than a spending lost. A fee is the bank's category, or its words
+ * on a line with no MCC: a line with one is a card's, and «Комиссионный магазин» is a shop (adversarial Г1). The rest
+ * by the bank's category, its words and the MCC. `analytics` is `null` for a layout without the column.
  */
 function kindOf(
   category: string,
@@ -210,7 +211,7 @@ function kindOf(
   const counted = analytics !== null && folded(analytics) !== 'нет'
   if (mcc === null && !counted && OWN_WORDS.test(payee)) return 'own_transfer'
   if (EXCHANGE_WORDS.test(said)) return 'exchange'
-  if (FEE_WORDS.test(said)) return 'fee'
+  if (FEE_WORDS.test(mcc === null ? said : category)) return 'fee'
   if (word === 'переводы') return 'transfer'
   return mcc === null ? 'unknown' : 'purchase'
 }

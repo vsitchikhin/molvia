@@ -219,8 +219,9 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   supermarket taken out of the bank's analytics was «не трата», silently; Б2: so was a transfer to somebody by phone
   number). **«Внутренний перевод» is no own word**: T-Bank names so a transfer to any of its contracts,
   another person's too (А1: the owner's PDF holds such transfers to contracts not his) — a transfer, «перевод — трата ли
-  это?», a tap rather than a spending lost. The rest by the bank's category, its words and the MCC, padded to four
-  digits. The payee is «Описание»; **«Сообщение» — a person's words to a person — is never read**, nor «Ваша
+  это?», a tap rather than a spending lost. **A fee is the bank's category, or its words on a line with no MCC**: a
+  line with one is a card's (adversarial Г1: «Комиссионный магазин», a second-hand shop, was a fee with the hint
+  «Прочее»). The rest by the bank's category, its words and the MCC, padded to four digits. The payee is «Описание»; **«Сообщение» — a person's words to a person — is never read**, nor «Ваша
   категория». **A file of several accounts is a statement each, by «Имя счёта» and the account's currency**
   (adversarial А5: a product's accounts in two currencies may share a name). «В обработке» the format does not mark:
   every line is posted, the price of section 7 of the research. **Unknown status refuses the file** (owner's В-4 «а»):

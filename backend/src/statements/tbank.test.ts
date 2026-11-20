@@ -228,6 +228,16 @@ describe('readTbankCsv — the layout of 2026', () => {
       { mcc: '', category: 'Услуги банка', payee: 'Плата за обслуживание' },
       'fee',
     ],
+    [
+      'a fee by the bank’s category, an MCC beside it',
+      { mcc: '5999', category: 'Услуги банка', payee: 'Т-Банк' },
+      'fee',
+    ],
+    [
+      'a shop named «Комиссионный» — a purchase, its MCC a card’s (adversarial Г1)',
+      { mcc: '5931', category: 'Одежда и обувь', payee: 'Комиссионный магазин' },
+      'purchase',
+    ],
     ['a currency exchange', { mcc: '', category: 'Другое', payee: 'Покупка валюты' }, 'exchange'],
     [
       'a transfer to somebody',
