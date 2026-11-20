@@ -251,30 +251,34 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     expect(after).toEqual({ ...before, actorId: null })
   })
 
-  it('платёж, не дошедший до банка, уходит с человеком (MOL-283, адверсариал А6)', async () => {
+  it('платёж, не дошедший до банка, уходит с человеком, оплаченный — остаётся без имени тоже (MOL-283, А6, №10)', async () => {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })
     await aLife(db, anna, tg, { itemId: await insertSeedItem(db), placeId: await insertPlace(db) })
     const named = onlyRow(await db.select().from(payments).where(eq(payments.actorId, anna)))
-    await db.insert(payments).values({
-      id: randomUUID(),
+    const unnamed = {
       actorId: anna,
-      tariff: 'receipts',
+      tariff: 'receipts' as const,
       anchorMinor: 200n,
-      anchorCurrency: 'USD',
+      anchorCurrency: 'USD' as const,
       rateScaled: 383_120_000n,
       rateAsOf: new Date('2026-09-18T00:00:00+04:00'),
       amountMinor: 77_000n,
-      currency: 'AMD',
-      channel: 'ameriabank',
-    })
+      currency: 'AMD' as const,
+      channel: 'ameriabank' as const,
+    }
+    const paidId = randomUUID()
+    await db.insert(payments).values([
+      { ...unnamed, id: randomUUID() },
+      { ...unnamed, id: paidId, state: 'paid', paidAt: new Date('2026-09-19T00:00:00+04:00') },
+    ])
 
     const report = await erasure.erase(tg, { dryRun: false })
 
-    expect(report.paymentsReleased).toBe(1)
+    expect(report.paymentsReleased).toBe(2)
     expect(
       sorted((await db.select({ id: payments.id }).from(payments)).map((row) => row.id)),
-    ).toEqual([named?.id])
+    ).toEqual(sorted([named?.id, paidId]))
   })
 
   it('места остаются все — и то, где бывал только он (решение Q4)', async () => {
