@@ -308,10 +308,27 @@ const timesPrinted = (answer: ModelReceipt, number: string): number =>
     .length
 
 /**
+ * The till's serial after its word, where the card names one (MOL-422, owner's В-1 «б»): Georgia's «Fsmd: DY00185692»,
+ * the seller of the key on a receipt that prints no tax number. A constant of the till, as the tax number is, so no
+ * guard of А6; two serials are two tills, and none.
+ */
+function tillOf(reading: PhotoReading, answer: ModelReceipt): string | null {
+  if (reading.till === null) return null
+  const pattern = new RegExp(
+    `(?:${reading.till.word})[\\s:]*(?<![\\p{L}\\d])(${reading.till.serial})(?![\\p{L}\\d])`,
+    'gu',
+  )
+  return oneOf(
+    answer.id_rows.flatMap((row) => [...row.matchAll(pattern)].map((found) => found[1] ?? '')),
+  )
+}
+
+/**
  * The seller's tax number and the receipt's number, the key against a second record (Т-11), in Tesseract's
  * form and by its words — or one paper read by the two readers is two keys and recorded twice (adversarial
  * А5, А6): the card's digits after its word — Armenia's eight after «ՀՎՀՀ», Georgia's nine or eleven after «ს/კ»
- * (MOL-408) — and the fiscal number, the card's digits after «Ֆիսկալ», leading zeros kept. **Never «ԿՀ»**: a
+ * (MOL-408), or where none is printed the till's serial (`tillOf`, MOL-422) — and the fiscal number, the card's digits
+ * after its word, «Ֆիսկալ», Georgia's «ქვითარი» (MOL-422), leading zeros kept. **Never «ԿՀ»**: a
  * till's own count, repeated by the shop's other tills. **Never a number the rows
  * print under another label too** — the shop's tax number, the till's registration: the same on every
  * receipt of the till, and every one after the first «recorded before» (adversarial А6, round 4). The tax
@@ -322,7 +339,7 @@ const timesPrinted = (answer: ModelReceipt, number: string): number =>
 function keyOf(
   reading: PhotoReading,
   answer: ModelReceipt,
-): { tin: string | null; number: string | null } {
+): { tin: string | null; till: string | null; number: string | null } {
   const fiscals = labelled(
     answer,
     reading.words.fiscal,
@@ -336,6 +353,7 @@ function keyOf(
   )
   return {
     tin: oneOf(labelled(answer, reading.words.tin, '\\S{0,2}\\s*', reading.tinDigits)),
+    till: tillOf(reading, answer),
     // a prepayment slip printed over «Ереван Сити»'s receipt has a fiscal number of its own, and the model
     // copies the two in either order: the pair is the paper's key, as either alone would be (MOL-293, В-3 «а»)
     number: !own || distinct.length === 0 || distinct.length > 2 ? null : distinct.join('+'),
@@ -1180,7 +1198,7 @@ export function receiptTextOfModel(
         : discounted
           ? 'card'
           : 'class'
-  const { tin, number } = keyOf(reading, answer)
+  const { tin, till, number } = keyOf(reading, answer)
   // a pharmacy's lines and total as printed (MOL-421): what they are judged by, here and by the check
   const totalThousandths = total === null ? undefined : printedTotals.get(total)
   const milli = pharmacySum({ cashbackHundredths: cashback, serviceHundredths: service, lines })
@@ -1204,6 +1222,7 @@ export function receiptTextOfModel(
     date: printedDayOf(answer.date, reading),
     time: clockOf(answer.time),
     receiptNo: number,
+    till,
     totalHundredths: total ?? slip,
     readTotalHundredths: read ?? slip,
     balanced:

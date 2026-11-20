@@ -1624,10 +1624,47 @@ describe('a Georgian receipt the model read (MOL-408)', () => {
     expect(read(answer({ id_rows: ['ՀՎՀՀ: 012345678'] })).tin).toBeNull()
   })
 
-  it('names no receipt number: Georgia’s word for it is not known yet (Р-5)', () => {
-    expect(
-      readGe(georgian({ id_rows: ['ს/კ: 405123456', 'ჩეკი № 00012345'] })).receiptNo,
-    ).toBeNull()
+  // MOL-422: Nikora's rows as the model copied them on the bench (ge-02 of MOL-229), the numbers made up
+  const nikora = [
+    'სალარო № 1713',
+    'ცვლა № 6205',
+    'რეალ. № 017130101604784',
+    'ქვითარი 1287592',
+    'Fsmd: DY00135692:FM00561079:146682',
+  ]
+  const key = (...id_rows: string[]) => {
+    const text = readGe(georgian({ id_rows }))
+    return [text.tin, text.till, text.receiptNo]
+  }
+
+  it('keys a Georgian receipt by «ქვითარი» and the till’s «Fsmd» where no tax number is printed (MOL-422)', () => {
+    expect(key(...nikora)).toEqual([null, 'DY00135692', '1287592'])
+    expect(key('ს/კ: 405123456', 'ქვითარი: 1287592')).toEqual(['405123456', null, '1287592'])
+    expect(key('Fsmd:DY00135692')).toEqual([null, 'DY00135692', null])
+  })
+
+  it('takes no number but seven digits after «ქვითარი», nor «ჩეკი», nor the 2008 till’s «ქვთ» (В-3 «а»)', () => {
+    for (const row of ['ქვითარი 128759', 'ქვითარი 12875920', 'ჩეკი № 1287592', 'ქვთ N:1287592']) {
+      expect(key('Fsmd: DY00135692', row)[2], row).toBeNull()
+    }
+  })
+
+  it('takes no number printed under another label too, nor two serials of the till (А6)', () => {
+    // must not: a constant of the till moved under «ქვითარი» would be every receipt's key there
+    expect(key('Fsmd: DY00135692', 'სალარო № 1287592', 'ქვითარი 1287592')[2]).toBeNull()
+    // must not: two serials are two tills, and neither is the seller
+    expect(key('Fsmd: DY00135692', 'Fsmd: DY00135693', 'ქვითარი 1287592')[1]).toBeNull()
+    // must not: a serial of another form, glued to letters, or with no word before it
+    for (const row of ['Fsmd: DY0013569', 'Fsmd: XDY00135692', 'Fsmd: DY001356921', 'DY00135692']) {
+      expect(key(row)[1], row).toBeNull()
+    }
+  })
+
+  it('leaves Armenia’s key as it was: no till, whatever its rows print (MOL-422)', () => {
+    const text = read(
+      answer({ id_rows: ['ՀՎՀՀ:01234567', 'Ֆիսկալ համար 00410811', 'Fsmd: DY00135692'] }),
+    )
+    expect([text.tin, text.till, text.receiptNo]).toEqual(['01234567', null, '00410811'])
   })
 
   it('says how it was paid by the card’s words: a bank’s «Cards» is a card, «ნაღდი» cash', () => {

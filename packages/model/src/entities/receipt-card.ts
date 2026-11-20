@@ -148,8 +148,17 @@ export interface PhotoReading {
    * company and eleven of a sole trader — the model's rows and Tesseract's layouts are read by it alike.
    */
   readonly tinDigits: readonly number[]
-  /** How many digits the receipt's fiscal number has after its word: Armenia's eight; none read, none (MOL-408). */
+  /**
+   * How many digits the receipt's number of the key has after its word `fiscal`: Armenia's fiscal number of eight,
+   * Georgia's «ქვითარი» of seven (MOL-422); none read, none.
+   */
   readonly fiscalDigits: readonly number[]
+  /**
+   * The till's own serial, the seller of the key where the receipt prints no tax number (MOL-422, owner's В-1 «б»): one
+   * fiscal module is one till of one shop, so its number of a receipt is no other seller's. Its word and the serial's
+   * form, a fragment of a regular expression that captures nothing; none — a country whose key is its tax number alone.
+   */
+  readonly till: { readonly word: string; readonly serial: string } | null
   readonly numbers: readonly NumberFormat[]
   /** Digits OCR confuses in the tills' font: a figure is tried with each of them swapped in. */
   readonly swaps: Readonly<Record<string, string>>
@@ -210,6 +219,7 @@ export const ARMENIAN_RECEIPTS: PhotoReading = {
   languages: 'hye+rus+eng',
   tinDigits: [8],
   fiscalDigits: [8],
+  till: null,
   // «5 403,12 ֏», «688.09դրամ»: a point or a comma before the hundredths, thousands apart by a space
   numbers: [{ fractionDigits: 2 }],
   swaps: { 5: '6', 6: '5', 1: '4', 4: '1', 3: '8', 8: '3', 0: '9', 9: '0' },
@@ -293,8 +303,12 @@ export const GEORGIAN_RECEIPTS: PhotoReading = {
   // «ს/კ» — the identification code the law has a seller print; none of the five photos prints it, so the shop's
   // memory learns only from a receipt that does (owner's В-6 «а»): nine digits of a company, eleven of a sole trader
   tinDigits: [9, 11],
-  // the receipt's number «ქვითარი 1687592» (ge-02) is not read yet (Р-5, MOL-422)
-  fiscalDigits: [],
+  // the receipt's number «ქვითარი 1687592» (ge-02, MOL-422): seven digits; the 2008 till's «ქვთ N:10625770» (ge-01)
+  // waits for a paper of today's (owner's В-3 «а») — the model copied its word as «ჟმო»
+  fiscalDigits: [7],
+  // Nikora's «Fsmd: DY00185692:FM00561079:146682» (ge-02): the fiscal module's serial alone — what «FM» and the third
+  // number are, nobody knows (MOL-422)
+  till: { word: 'Fsmd', serial: 'DY\\d{8}' },
   // «23.868 ლარი» of the pharmacies (ge-04, ge-05)
   numbers: [{ fractionDigits: 2 }, { fractionDigits: 3 }],
   swaps: {},
@@ -330,7 +344,8 @@ export const GEORGIAN_RECEIPTS: PhotoReading = {
     fiscalSign: NEVER,
     tin: 'ს[/.]\\s?კ\\.?',
     tinMisread: [],
-    fiscal: NEVER,
+    // «ქვითარი» — a receipt (ge-02): its number is the key's (MOL-422)
+    fiscal: 'ქვითარი',
     fiscalNumber: NEVER,
     receiptNumber: NEVER,
     head: [NEVER],
