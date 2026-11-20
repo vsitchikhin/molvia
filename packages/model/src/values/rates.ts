@@ -398,17 +398,30 @@ export function midnightIn(day: string, zone?: string): Date {
   return new Date(wall - offsetOf(new Date(first), zone))
 }
 
+// One format a zone, made once: making it is some 0.4 ms, and a statement's three thousand lines are a day
+// each (MOL-430). A zone that does not exist throws before it is kept, so the map holds real zones only.
+const WALL_CLOCKS = new Map<string, Intl.DateTimeFormat>()
+
+function wallClockFormat(zone: string): Intl.DateTimeFormat {
+  let format = WALL_CLOCKS.get(zone)
+  if (format === undefined) {
+    format = new Intl.DateTimeFormat('en-US', {
+      timeZone: zone,
+      hourCycle: 'h23',
+      year: 'numeric',
+      month: 'numeric',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+    })
+    WALL_CLOCKS.set(zone, format)
+  }
+  return format
+}
+
 function wallClock(instant: Date, zone: string) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: zone,
-    hourCycle: 'h23',
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
-  }).formatToParts(instant)
+  const parts = wallClockFormat(zone).formatToParts(instant)
   const part = (type: string) => Number(parts.find((one) => one.type === type)?.value ?? 0)
   return {
     year: part('year'),
