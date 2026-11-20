@@ -748,8 +748,8 @@ that are easiest to break; the file holds every rule of the area and the reason 
   did not read fails `unreadable`, the model away waited for a day, asked hourly at most, a person's receipts of the
   country resting together through an outage, the round going on past them — the camera there only for whom `/actors/me`
   says `receiptsByModel` (a header: grant, share, cap), the digits of the tax and fiscal numbers the card's, every item
-  a Georgian line finds «проверьте»; no tax number printed, no shop memory (MOL-438); a paper keyed by «ქვითარი» with
-  «ს/კ» or the till's «Fsmd» (`receipts.till`, MOL-422). A pharmacy's three decimals are
+  a Georgian line finds «проверьте»; no tax number printed, no shop memory (MOL-438); a paper keyed by «ქვითარი», the till's
+  own count, with the till's «Fsmd» alone, never the chain's «ს/კ» (`receipts.till`, MOL-422). A pharmacy's three decimals are
   read where most amounts of its lines print three, or else where a total is printed with three, its lines judged as
   printed by the reading and the check alike, then half up to the tetri; lines that meet the total as printed are whole,
   the tetri they round apart a row of its own, «Округление» (`rounding_minor`, А1 «а»), named of sums read right on a
