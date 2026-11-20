@@ -78,7 +78,8 @@ test.describe('no worker', () => {
     const named = (paths: string[], pattern: RegExp) =>
       paths.flatMap((path) => pattern.exec(path)?.slice(1, 2) ?? [])
     await signInBuilt(page, browserName)
-    // The sections and the nested screens below, loaded with no tap: the bundle holds home alone.
+    // The sections and the nested screens below, loaded with no tap: the bundle holds home alone. «Terms of use»
+    // is the last of the routes the warming walks, so every screen is in by then (review №9).
     await expect
       .poll(async () => named(await files(), /\/assets\/(\w+View)-[\w-]+\.js$/))
       .toEqual(
@@ -88,6 +89,7 @@ test.describe('no worker', () => {
           'SettingsView',
           'VerdictsView',
           'DevicesView',
+          'TermsView',
         ]),
       )
     // Every screen loaded, and the phone's one language: no screen pulls the other dictionary in (review №1).
