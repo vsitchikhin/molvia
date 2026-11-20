@@ -97,7 +97,7 @@ MOL-283 (В-1), 20.11.2026; rounds 1–2 of its review and adversarial (`.scratc
   channel's id. The holder's name, email, card mask, its term and issuer the bank sends are never written (MOL-281 §8).
 - **The copy carries every payment** (`payments`, version 38), every column but the owner's key.
 - **The privacy page names payments in MOL-277's edition**, with Ameriabank as a recipient: without a channel no row
-  is ever written. The record of processing (Confluence 12091393) gains the journal's row on the owner's word.
+  is ever written. The record of processing (Confluence 12091393) names the journal as row 17 (v42).
 
 ## The price, named
 
