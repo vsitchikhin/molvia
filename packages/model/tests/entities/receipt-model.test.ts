@@ -1685,6 +1685,8 @@ describe('a Georgian receipt the model read (MOL-408)', () => {
     expect(key('Fsmd: DY00135692FM00561079:146682')[1]).toBe('DY00135692')
     // one till, one key, however the model cased it
     expect(key('fsmd: dy00135692')[1]).toBe('DY00135692')
+    // one till copied twice in two cases is one till, never two
+    expect(key('Fsmd: DY00135692', 'fsmd: dy00135692')[1]).toBe('DY00135692')
   })
 
   it('leaves Armenia’s key as it was: no till, whatever its rows print (MOL-422)', () => {

@@ -311,8 +311,11 @@ const timesPrinted = (answer: ModelReceipt, number: string): number =>
 const tillOf = (reading: PhotoReading, answer: ModelReceipt): string | null =>
   reading.till === null
     ? null
-    : (oneOf(labelled(answer, reading.till.word, '[\\s:]*', reading.till.serial))?.toUpperCase() ??
-      null)
+    : oneOf(
+        labelled(answer, reading.till.word, '[\\s:]*', reading.till.serial).map((serial) =>
+          serial.toUpperCase(),
+        ),
+      )
 
 /**
  * The seller's tax number and the receipt's number, the key against a second record (Т-11), in Tesseract's
