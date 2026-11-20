@@ -383,59 +383,78 @@ export function isTimeZone(zone: string): boolean {
  * setting changed — is a day of, beside the days the phone names.
  */
 export function dayIn(instant: Date, zone?: string): string {
-  if (zone === undefined) return yerevanDate(instant)
-  const parts = wallClock(instant, zone)
-  const pad = (value: number, width = 2) => String(value).padStart(width, '0')
-  return `${pad(parts.year, 4)}-${pad(parts.month)}-${pad(parts.day)}`
+  return daysIn(zone)(instant)
 }
 
 /** The instant `day` begins in `zone` — Yerevan's midnight without one. Summer time included. */
 export function midnightIn(day: string, zone?: string): Date {
-  if (zone === undefined) return yerevanMidnight(day)
-  const wall = Date.parse(`${day}T00:00:00.000Z`)
-  // Twice: the offset at the first guess may be the other side of a change of the clocks.
-  const first = wall - offsetOf(new Date(wall), zone)
-  return new Date(wall - offsetOf(new Date(first), zone))
+  return midnightsIn(zone)(day)
 }
 
-// One format a zone, made once: making it is some 0.4 ms, and a statement's three thousand lines are a day
-// each (MOL-430). A zone that does not exist throws before it is kept, so the map holds real zones only.
-const WALL_CLOCKS = new Map<string, Intl.DateTimeFormat>()
-
-function wallClockFormat(zone: string): Intl.DateTimeFormat {
-  let format = WALL_CLOCKS.get(zone)
-  if (format === undefined) {
-    format = new Intl.DateTimeFormat('en-US', {
-      timeZone: zone,
-      hourCycle: 'h23',
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: 'numeric',
-      second: 'numeric',
-    })
-    WALL_CLOCKS.set(zone, format)
-  }
-  return format
-}
-
-function wallClock(instant: Date, zone: string) {
-  const parts = wallClockFormat(zone).formatToParts(instant)
-  const part = (type: string) => Number(parts.find((one) => one.type === type)?.value ?? 0)
-  return {
-    year: part('year'),
-    month: part('month'),
-    day: part('day'),
-    hour: part('hour'),
-    minute: part('minute'),
-    second: part('second'),
+/**
+ * `dayIn` of one zone for many instants (MOL-430): making a zone's clock is some 0.4 ms, and a statement's
+ * three thousand lines are a day each. The clock lives as long as the function the caller holds — never in
+ * the module, where every spelling of a zone a request names would stay for good (review №1, adversarial А3).
+ */
+export function daysIn(zone?: string): (instant: Date) => string {
+  if (zone === undefined) return yerevanDate
+  const clock = wallClockOf(zone)
+  const pad = (value: number, width = 2) => String(value).padStart(width, '0')
+  return (instant) => {
+    const parts = clock(instant)
+    return `${pad(parts.year, 4)}-${pad(parts.month)}-${pad(parts.day)}`
   }
 }
 
-/** How far the clocks of `zone` stand ahead of UTC at `instant`, in milliseconds. */
-function offsetOf(instant: Date, zone: string): number {
-  const at = wallClock(instant, zone)
+/** `midnightIn` of one zone for many days, its clock made once as `daysIn`'s. */
+export function midnightsIn(zone?: string): (day: string) => Date {
+  if (zone === undefined) return yerevanMidnight
+  const clock = wallClockOf(zone)
+  return (day) => {
+    const wall = Date.parse(`${day}T00:00:00.000Z`)
+    // Twice: the offset at the first guess may be the other side of a change of the clocks.
+    const first = wall - offsetOf(new Date(wall), clock)
+    return new Date(wall - offsetOf(new Date(first), clock))
+  }
+}
+
+type WallClock = (instant: Date) => {
+  year: number
+  month: number
+  day: number
+  hour: number
+  minute: number
+  second: number
+}
+
+function wallClockOf(zone: string): WallClock {
+  const format = new Intl.DateTimeFormat('en-US', {
+    timeZone: zone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+  })
+  return (instant) => {
+    const parts = format.formatToParts(instant)
+    const part = (type: string) => Number(parts.find((one) => one.type === type)?.value ?? 0)
+    return {
+      year: part('year'),
+      month: part('month'),
+      day: part('day'),
+      hour: part('hour'),
+      minute: part('minute'),
+      second: part('second'),
+    }
+  }
+}
+
+/** How far the clocks of a zone stand ahead of UTC at `instant`, in milliseconds. */
+function offsetOf(instant: Date, clock: WallClock): number {
+  const at = clock(instant)
   const wall = Date.UTC(at.year, at.month - 1, at.day, at.hour, at.minute, at.second)
   return wall - (instant.getTime() - instant.getUTCMilliseconds())
 }
