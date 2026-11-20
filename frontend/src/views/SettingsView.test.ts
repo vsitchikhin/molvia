@@ -17,6 +17,8 @@ import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import SettingsView from './SettingsView.vue'
+// A tap here leads to another screen, loaded when first opened (MOL-337): imported up front, it is there.
+import '@molvia/frontend/testing/screens'
 
 const me = vi.fn<() => Promise<ActorView>>()
 const save = vi.fn<(input: SettingsUpdate) => Promise<ActorView>>()

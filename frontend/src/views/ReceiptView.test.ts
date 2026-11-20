@@ -31,6 +31,8 @@ import { useActorStore } from '@/stores/actor'
 import { useFeedbackSheetStore } from '@/stores/feedbackSheet'
 import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
+// A tap here leads to another screen, loaded when first opened (MOL-337): imported up front, it is there.
+import '@molvia/frontend/testing/screens'
 
 const receipt = vi.fn<(id: string) => Promise<ReceiptDetail>>()
 const recordReceipt = vi.fn<(id: string, body: ReceiptRecordBody) => Promise<{ tripId: string }>>()

@@ -28,14 +28,24 @@ export function pageBuild(url: string, production: boolean): string {
 }
 
 /**
+ * A screen's code that did not come (MOL-337): the connection, or a release that took the chunk an old
+ * page asks for off the server — the weather too, never the phone's code. `lazyScreen` throws it.
+ */
+export class ScreenNotLoaded extends Error {
+  override readonly name = 'ScreenNotLoaded'
+}
+
+/**
  * Whether a failure is the phone's own (MOL-144, Р-4, owner's В-3). An API's word — a refusal or its
  * 500 — the API has recorded itself; no answer is the connection, the weather at a shelf, and so is a
  * body cut off after its headers (adversarial А1); a page not of the API's — a portal, a proxy's
  * 502 — is not ours either, a portal's `200` included: only our API names its build. The API's `2xx`
  * that came whole and the contract could not read is (`offContract`): the phone's code against the
- * server's answer. Everything that is not an answer of the API is the phone's code.
+ * server's answer. A screen whose code did not come is the weather as well (`ScreenNotLoaded`). Everything
+ * else that is not an answer of the API is the phone's code.
  */
 export function phoneDefect(error: unknown): boolean {
+  if (error instanceof ScreenNotLoaded) return false
   return !(error instanceof ApiError) || error.offContract
 }
 

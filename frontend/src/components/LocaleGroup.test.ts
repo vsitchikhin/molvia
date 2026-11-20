@@ -1,10 +1,10 @@
-import { mount } from '@vue/test-utils'
+import { flushPromises, mount } from '@vue/test-utils'
 import type { VueWrapper } from '@vue/test-utils'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Component } from 'vue'
 import LocaleGroup from '@/components/LocaleGroup.vue'
 import { LOCALE_KEY, installLocale, useLocale } from '@/composables/useLocale'
-import { i18n } from '@/i18n'
+import { i18n, loadDictionary } from '@/i18n'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 
@@ -23,14 +23,17 @@ function checked(view: VueWrapper): string[] {
     .map((input) => input.attributes('value') ?? '')
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Both dictionaries here before a tap (MOL-337): a choice is then spoken within one flush, as on a phone
+  // whose precache holds them.
+  await Promise.all([loadDictionary('ru'), loadDictionary('en')])
   vi.spyOn(navigator, 'languages', 'get').mockReturnValue(['ru-RU'])
-  useLocale().choose('device')
-  useLocale().chooseStyle('gb')
+  await useLocale().choose('device')
+  await useLocale().chooseStyle('gb')
   localStorage.clear()
   sessionStorage.clear()
   // Spoken as the app starts: the device's language, which the module took before the phone was set.
-  installLocale()
+  await installLocale()
 })
 
 afterEach(() => {
@@ -54,21 +57,24 @@ describe('LocaleGroup', () => {
     expect(view.get('fieldset').attributes('aria-describedby')).toBe(hint.attributes('id'))
   })
 
-  it('shows what this device keeps', () => {
+  it('shows what this device keeps', async () => {
     localStorage.setItem(LOCALE_KEY, 'en')
-    installLocale()
+    await installLocale()
     expect(checked(render(LocaleGroup))).toEqual(['en'])
   })
 
   it('a tap speaks the language at once, with nothing to save, and «как на устройстве» gives it back', async () => {
     const view = render(LocaleGroup)
     await view.get('input[value="en"]').setValue(true)
+    // Spoken once its dictionary is here (MOL-337).
+    await flushPromises()
     expect(view.get('h2').text()).toBe(en.settings.group_locale)
     expect(document.documentElement.lang).toBe('en-GB')
     expect(localStorage.getItem(LOCALE_KEY)).toBe('en')
     expect(view.find('button').exists()).toBe(false)
 
     await view.get('input[value="device"]').setValue(true)
+    await flushPromises()
     expect(view.get('h2').text()).toBe(ru.settings.group_locale)
     expect(localStorage.getItem(LOCALE_KEY)).toBe('device')
   })

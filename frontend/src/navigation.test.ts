@@ -2,17 +2,24 @@ import { mount } from '@vue/test-utils'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { createPinia } from 'pinia'
 import { defineComponent, h } from 'vue'
-import { createRouter, createWebHistory, RouterView } from 'vue-router'
+import { createMemoryHistory, createRouter, createWebHistory, RouterView } from 'vue-router'
 import type { Router } from 'vue-router'
 import { POLICY_VERSION } from '@molvia/model'
 import { createAppI18n } from '@/i18n'
+import { ScreenNotLoaded } from '@/failures'
 import {
+  SCREEN_RELOAD_GAP_MS,
+  SCREEN_RELOAD_KEY,
   afterStep,
   backTarget,
+  lazyScreen,
+  loadScreens,
+  reloadOnStaleChunk,
   settleColdStart,
   stepBack as step,
   tabMove,
   upTarget,
+  warmScreens,
 } from '@/navigation'
 import type { TabMove } from '@/navigation'
 import type { RouteName, Tab } from '@/router'
@@ -530,5 +537,270 @@ describe('the tab bar walks the history as В-2 decided', () => {
     view.unmount()
     expect(takenOver).toBe(false)
     expect(push).not.toHaveBeenCalled()
+  })
+})
+
+// MOL-337: every screen but home is a chunk of its own.
+describe('a screen loaded when first opened', () => {
+  /** A chunk that did not come, as Chromium says it (MOL-337, adversarial А1 — probed). */
+  const notCome = () =>
+    Promise.reject(
+      new TypeError('Failed to fetch dynamically imported module: http://127.0.0.1/assets/a.js'),
+    )
+  const HOME_SCREEN = defineComponent({ render: () => h('p', 'home') })
+  const SCREEN = defineComponent({ render: () => h('p', 'screen') })
+
+  function screens(loads: Record<string, () => Promise<unknown>>): Router {
+    return createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/', name: 'home', component: HOME_SCREEN },
+        ...Object.entries(loads).map(([name, load]) => ({
+          path: `/${name}`,
+          name,
+          component: load as () => Promise<typeof SCREEN>,
+        })),
+        { path: '/old', redirect: '/' },
+      ],
+    })
+  }
+
+  describe('warmScreens', () => {
+    it('loads every lazy screen once, one after another, and nothing else', async () => {
+      const order: string[] = []
+      let running = 0
+      const load = (name: string) =>
+        vi.fn(async () => {
+          running += 1
+          expect(running).toBe(1)
+          order.push(name)
+          await Promise.resolve()
+          running -= 1
+          return SCREEN
+        })
+      const loads = { a: load('a'), b: load('b'), c: load('c') }
+      await warmScreens(screens(loads), () => Promise.resolve())
+      expect(order).toEqual(['a', 'b', 'c'])
+      for (const one of Object.values(loads)) expect(one).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps each screen it loaded in its record, so a move to it waits on no import', async () => {
+      const load = vi.fn(() => Promise.resolve({ default: SCREEN }))
+      const router = screens({ a: load })
+      await warmScreens(router, () => Promise.resolve())
+      expect(router.getRoutes().find((record) => record.name === 'a')?.components?.default).toBe(
+        SCREEN,
+      )
+      await router.push('/a')
+      expect(load).toHaveBeenCalledTimes(1)
+    })
+
+    it('must not fire: a screen that does not come stops none after it and throws nothing', async () => {
+      const after = vi.fn(() => Promise.resolve(SCREEN))
+      const router = screens({
+        gone: lazyScreen(notCome),
+        after,
+      })
+      await expect(warmScreens(router, () => Promise.resolve())).resolves.toBeUndefined()
+      expect(after).toHaveBeenCalledTimes(1)
+    })
+
+    it('a module that came and threw is reported, and the warming goes on; a chunk that did not come is not (adversarial А12)', async () => {
+      const report = vi.fn()
+      const thrown = new TypeError('Object.hasOwn is not a function')
+      const after = vi.fn(() => Promise.resolve(SCREEN))
+      const router = screens({
+        threw: lazyScreen(() => Promise.reject(thrown)),
+        gone: lazyScreen(notCome),
+        after,
+      })
+      await warmScreens(router, () => Promise.resolve(), report)
+      expect(report.mock.calls).toEqual([[thrown]])
+      expect(after).toHaveBeenCalledTimes(1)
+    })
+
+    it('pauses before each screen, so the page draws in between', async () => {
+      const pause = vi.fn(() => Promise.resolve())
+      await warmScreens(
+        screens({ a: () => Promise.resolve(SCREEN), b: () => Promise.resolve(SCREEN) }),
+        pause,
+      )
+      expect(pause).toHaveBeenCalledTimes(2)
+    })
+  })
+
+  describe('loadScreens — the dev server’s start, which has no precache', () => {
+    it('asks for every screen at once, and a screen that does not come holds back none', async () => {
+      const after = vi.fn(() => Promise.resolve(SCREEN))
+      // How many times the screen after it was asked for by the moment the slow one came.
+      let askedMeanwhile = -1
+      const slow = vi.fn(
+        () =>
+          new Promise<typeof SCREEN>((resolve) => {
+            setTimeout(() => {
+              askedMeanwhile = after.mock.calls.length
+              resolve(SCREEN)
+            }, 0)
+          }),
+      )
+      const router = screens({
+        slow,
+        gone: lazyScreen(notCome),
+        after,
+      })
+      await expect(loadScreens(router)).resolves.toBeUndefined()
+      expect(slow).toHaveBeenCalledTimes(1)
+      expect(after).toHaveBeenCalledTimes(1)
+      expect(askedMeanwhile).toBe(1)
+    })
+  })
+
+  describe('reloadOnStaleChunk (owner’s В-2 «а»)', () => {
+    function stale(online = true, now = 1_000_000) {
+      const assign = vi.fn()
+      const report = vi.fn()
+      const router = screens({
+        gone: lazyScreen(notCome),
+        here: () => Promise.resolve(SCREEN),
+        throws: lazyScreen(() => Promise.reject(new TypeError('Object.hasOwn is not a function'))),
+      })
+      reloadOnStaleChunk(router, { online: () => online, assign, now: () => now, report })
+      return { router, assign, report }
+    }
+
+    afterEach(() => {
+      sessionStorage.clear()
+      localStorage.clear()
+    })
+
+    it('with a connection, opens the screen by a full load of its address, query and all', async () => {
+      const { router, assign } = stale()
+      await router.push('/').catch(() => undefined)
+      await router.push('/gone?month=2026-10').catch(() => undefined)
+      expect(assign).toHaveBeenCalledWith('/gone?month=2026-10')
+      expect(router.currentRoute.value.name).toBe('home')
+    })
+
+    it('must not fire offline: the move is cancelled and the page stays', async () => {
+      const { router, assign } = stale(false)
+      await router.push('/')
+      await expect(router.push('/gone')).rejects.toBeInstanceOf(ScreenNotLoaded)
+      expect(assign).not.toHaveBeenCalled()
+      expect(router.currentRoute.value.name).toBe('home')
+    })
+
+    it('must not fire twice within the gap, so a chunk missing from the new version too cannot loop', async () => {
+      sessionStorage.setItem(SCREEN_RELOAD_KEY, String(1_000_000 - SCREEN_RELOAD_GAP_MS + 1))
+      const { router, assign } = stale(true, 1_000_000)
+      await router.push('/').catch(() => undefined)
+      await router.push('/gone').catch(() => undefined)
+      expect(assign).not.toHaveBeenCalled()
+    })
+
+    it('a mark ahead of the clock — a clock set back since — guards nothing (adversarial А13)', async () => {
+      sessionStorage.setItem(SCREEN_RELOAD_KEY, String(1_000_000 + 60 * 60 * 1000))
+      const { router, assign } = stale(true, 1_000_000)
+      await router.push('/').catch(() => undefined)
+      await router.push('/gone').catch(() => undefined)
+      expect(assign).toHaveBeenCalledTimes(1)
+    })
+
+    it('loads again once the gap is over, and marks the moment on this tab alone', async () => {
+      sessionStorage.setItem(SCREEN_RELOAD_KEY, String(1_000_000 - SCREEN_RELOAD_GAP_MS))
+      const { router, assign } = stale(true, 1_000_000)
+      await router.push('/').catch(() => undefined)
+      await router.push('/gone').catch(() => undefined)
+      expect(assign).toHaveBeenCalledTimes(1)
+      expect(sessionStorage.getItem(SCREEN_RELOAD_KEY)).toBe('1000000')
+      expect(localStorage.getItem(SCREEN_RELOAD_KEY)).toBeNull()
+    })
+
+    it('must not fire for any other failure of a move: a guard’s error is no stale chunk, and is heard', async () => {
+      const { router, assign, report } = stale()
+      const thrown = new TypeError("Cannot read properties of undefined (reading 'meta')")
+      router.beforeEach((to) => {
+        if (to.name === 'here') throw thrown
+      })
+      await router.push('/').catch(() => undefined)
+      await router.push('/here').catch(() => undefined)
+      expect(assign).not.toHaveBeenCalled()
+      expect(report).toHaveBeenCalledWith(thrown)
+    })
+
+    it('a screen whose module came and threw as it ran is our defect: heard, never reloaded (adversarial А1)', async () => {
+      const { router, assign, report } = stale()
+      await router.push('/')
+      const failure: unknown = await router.push('/throws').catch((error: unknown) => error)
+      expect(failure).not.toBeInstanceOf(ScreenNotLoaded)
+      expect(failure).toBeInstanceOf(TypeError)
+      expect(report).toHaveBeenCalledWith(failure)
+      expect(assign).not.toHaveBeenCalled()
+    })
+
+    it.each([
+      'Failed to fetch dynamically imported module: http://127.0.0.1/assets/a.js',
+      'Importing a module script failed.',
+      "'text/html' is not a valid JavaScript MIME type for module script 'http://127.0.0.1/assets/a.js'.",
+      'error loading dynamically imported module: http://127.0.0.1/assets/a.js',
+    ])('an engine’s «%s» is a chunk that did not come', async (message) => {
+      await expect(
+        lazyScreen(() => Promise.reject(new TypeError(message)))(),
+      ).rejects.toBeInstanceOf(ScreenNotLoaded)
+    })
+
+    it('must not fire where the tab cannot keep its mark: no load rather than a loop (adversarial А6)', async () => {
+      const { router, assign } = stale()
+      // On the instance, as `useLocale.test.ts` does: happy-dom's storages carry their own methods.
+      const original = sessionStorage.setItem.bind(sessionStorage)
+      Object.defineProperty(sessionStorage, 'setItem', {
+        configurable: true,
+        writable: true,
+        value: (): never => {
+          throw new DOMException('quota', 'QuotaExceededError')
+        },
+      })
+      try {
+        await router.push('/').catch(() => undefined)
+        await router.push('/gone').catch(() => undefined)
+        expect(assign).not.toHaveBeenCalled()
+      } finally {
+        Object.defineProperty(sessionStorage, 'setItem', {
+          configurable: true,
+          writable: true,
+          value: original,
+        })
+      }
+    })
+
+    it('a cold start whose parent did not come loads the screen opened, never the parent (adversarial А4)', async () => {
+      const assign = vi.fn()
+      const router = createRouter({
+        history: createMemoryHistory(),
+        routes: [
+          { path: '/', name: 'advice', component: HOME_SCREEN },
+          {
+            path: '/money',
+            name: 'money',
+            component: lazyScreen(notCome),
+            meta: { titleKey: 'x', tab: 'money' },
+          },
+          {
+            path: '/money/accounts/:accountId',
+            name: 'money-account',
+            component: SCREEN,
+            meta: { titleKey: 'x', parent: 'money' },
+          },
+        ],
+      })
+      reloadOnStaleChunk(router, {
+        online: () => true,
+        assign,
+        now: () => 1_000_000,
+        report: vi.fn(),
+      })
+      await router.push('/money/accounts/a1')
+      await settleColdStart(router).catch(() => undefined)
+      expect(assign).toHaveBeenCalledWith('/money/accounts/a1')
+    })
   })
 })

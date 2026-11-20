@@ -24,11 +24,19 @@ let screen: () => string = () => 'start'
  */
 const SILENT: FailureReports = { report: () => undefined, flush: () => Promise.resolve() }
 
+/**
+ * The page's script, the entry `index.html` names (MOL-337): the screens are chunks of their own, and this
+ * module stands in a chunk shared with them, whose name is not the page's build.
+ */
+function pageScript(): string {
+  return document.querySelector<HTMLScriptElement>('script[type="module"][src]')?.src ?? ''
+}
+
 export const failures = belowFloor()
   ? SILENT
   : installFailureReports({
       origin: window.location.origin,
-      build: pageBuild(import.meta.url, import.meta.env.PROD),
+      build: pageBuild(pageScript(), import.meta.env.PROD),
       platform: () => platformLine(),
       screen: () => screen(),
       send: (body) => api.reportClientErrors(body),

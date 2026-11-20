@@ -118,7 +118,8 @@ export default defineConfig({
     {
       name: 'phone',
       use: { ...devices['Pixel 7'] },
-      testIgnore: /(pwa-update|client-errors-built|outdated-built|csp-built|scanner)\.spec\.ts$/,
+      testIgnore:
+        /(pwa-update|client-errors-built|outdated-built|csp-built|offline-built|scanner)\.spec\.ts$/,
     },
     {
       name: 'camera',
@@ -147,6 +148,14 @@ export default defineConfig({
         launchOptions: { args: FAKE_CAMERA },
       },
       testMatch: /csp-built\.spec\.ts$/,
+    },
+    // Every screen opened with no connection from the precache, and with no worker after the first paint
+    // (MOL-337). After `pwa` for `csp-built`'s reason: its pages are opened by `goto`, which hides them.
+    {
+      name: 'pwa-offline',
+      dependencies: ['pwa'],
+      use: { ...devices['Pixel 7'], baseURL: `http://127.0.0.1:${previewPort}` },
+      testMatch: /offline-built\.spec\.ts$/,
     },
     {
       name: 'pwa-iphone',

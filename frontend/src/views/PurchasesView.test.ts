@@ -32,6 +32,8 @@ import { useReceiptDraftsStore } from '@/stores/receiptDrafts'
 import { useTripHistoryStore } from '@/stores/tripHistory'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
+// A tap here leads to another screen, loaded when first opened (MOL-337): imported up front, it is there.
+import '@molvia/frontend/testing/screens'
 
 const tripHistory = vi.fn<() => Promise<TripHistory>>()
 const pendingVerdicts = vi.fn<() => Promise<PendingVerdicts>>()

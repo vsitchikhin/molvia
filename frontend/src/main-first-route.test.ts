@@ -9,10 +9,14 @@ import type * as Navigation from '@/navigation'
 // time reporter names a test at ten times, and a busy runner sets a new worst up to twice the last.
 
 // The first route of the start throws: a guard with a bug, a route that cannot load (adversarial Б2).
+// The screens are not loaded, before the mount or after it (MOL-337): the app is not what is tested, and the
+// work would go on past the file's end.
 vi.mock('@/navigation', async (original) => ({
   ...(await original<typeof Navigation>()),
   settleColdStart: () =>
     Promise.reject(new TypeError("Cannot read properties of undefined (reading 'meta')")),
+  warmScreens: () => Promise.resolve(),
+  loadScreens: () => Promise.resolve(),
 }))
 
 // The app itself is not what is tested: an empty root, so mounting it renders nothing.
