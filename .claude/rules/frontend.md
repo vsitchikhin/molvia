@@ -1507,7 +1507,9 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   with it (adversarial А10): a tap or another window's choice whose dictionary did not come gives the choice shown
   back — the segments stand on what is asked for, at once (А3, А11) — and writes nothing, another window's staying on
   this window's own shelf for its next start, its key no tap of this window writes any more (review №11), and the
-  system's language the same (№12); of two asked while a dictionary was coming, the later is spoken and
+  system's language the same (№12) — and a language asked for and not spoken, the system's under «Как на
+  устройстве», which no give-back can change, is asked for again when the connection comes back: its segment is
+  chosen already, and a tap on it says nothing (adversarial А15); of two asked while a dictionary was coming, the later is spoken and
   written, whatever came first (А2); another window's language or order of the day keeps this window's other half
   (А7); the start asks again only after a failure, and asks first whether a choice was spoken
   meanwhile (review №2). The tests' `createAppI18n` keeps both dictionaries — no module of the app calls it, so
