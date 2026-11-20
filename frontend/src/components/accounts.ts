@@ -11,10 +11,10 @@ import type {
   MoneyAccountView,
   SpendingCategoryView,
 } from '@molvia/model'
-import { BOTH_LANGUAGES } from '@/i18n/bothLanguages'
 import { spendingLook, tripCategoryName, tripLook, unbroken } from '@/components/spending'
 import type { OperationRowProps, Translate } from '@/components/spending'
 import { calendarDayOfAnyYear } from '@/days'
+import { BOTH_LANGUAGES } from '@/i18n/bothLanguages'
 
 /** The minus of a figure — U+2212, never the hyphen `Intl` prints (handoff 01, 08). */
 const MINUS = '\u2212'
