@@ -92,7 +92,8 @@ async function speak(): Promise<'spoken' | 'failed' | 'superseded'> {
 }
 
 /**
- * A choice — a tap, another window's — whose dictionary did not come gives back the choice spoken, and writes
+ * A choice — a tap, another window's, the system's language — whose dictionary did not come gives back the choice
+ * spoken, and writes
  * nothing: the group of segments stands on what is asked for, and «English» stayed chosen over Russian words,
  * its tap dead (adversarial А3, А11). Another window's stays on this window's own shelf, for the next start.
  */
@@ -141,17 +142,20 @@ export async function installLocale(): Promise<void> {
   style.value = styleOf(read(DATE_STYLE_KEY))
   window.addEventListener('storage', (event) => {
     if (event.newValue === null) return
+    // Its key is the other window's now: a tap of this one waiting for it writes it no more (review №11).
     if (event.key === LOCALE_KEY) {
       choice.value = choiceOf(event.newValue)
       writeOwn(LOCALE_KEY, choice.value)
+      unwritten.delete(LOCALE_KEY)
     } else if (event.key === DATE_STYLE_KEY) {
       style.value = styleOf(event.newValue)
       writeOwn(DATE_STYLE_KEY, style.value)
+      unwritten.delete(DATE_STYLE_KEY)
     } else return
     void speakChosen()
   })
   window.addEventListener('languagechange', () => {
-    if (choice.value === 'device') void speak()
+    if (choice.value === 'device') void speakChosen()
   })
   // A choice spoken meanwhile — here or in another window — ends the start: asked before each try, never after;
   // only a dictionary that did not come waits for the next try, one overtaken asks again at once.

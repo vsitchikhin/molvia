@@ -333,4 +333,38 @@ describe('the dictionary a language needs', () => {
     await useLocale().choose('en')
     expect(i18n.global.locale.value).toBe('en-GB')
   })
+
+  it('must not fire: another window’s language over a tap waiting here is not written to the shared shelf by this one (review №11)', async () => {
+    await installLocale()
+    let arrive: () => void = () => undefined
+    vi.mocked(loadDictionary).mockImplementationOnce(
+      () => new Promise<void>((resolve) => (arrive = resolve)),
+    )
+    const tapped = useLocale().choose('en')
+    window.dispatchEvent(new StorageEvent('storage', { key: LOCALE_KEY, newValue: 'ru' }))
+    await vi.waitFor(() => {
+      expect(i18n.global.locale.value).toBe('ru')
+    })
+    arrive()
+    await tapped
+    // The shared shelf is the other window's to write; this one's keeps what it heard.
+    expect(localStorage.getItem(LOCALE_KEY)).toBeNull()
+    expect(sessionStorage.getItem(LOCALE_KEY)).toBe('ru')
+  })
+
+  it('a language of the system whose dictionary did not come is given back too (review №12)', async () => {
+    await installLocale()
+    // Every turn the event starts fails: the windows of the tests before left their listeners.
+    vi.mocked(loadDictionary).mockRejectedValue(new TypeError('Failed to fetch'))
+    const tapped = useLocale().chooseStyle('us')
+    phoneSpeaks('en-GB')
+    window.dispatchEvent(new Event('languagechange'))
+    await tapped
+    await vi.waitFor(() => {
+      expect(useLocale().style.value).toBe('gb')
+    })
+    vi.mocked(loadDictionary).mockReset()
+    expect(i18n.global.locale.value).toBe('ru')
+    expect(localStorage.getItem(DATE_STYLE_KEY)).toBeNull()
+  })
 })
