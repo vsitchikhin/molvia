@@ -18,6 +18,7 @@ import {
   receiptDateOf,
   receiptDateWindow,
   receiptTextOfModel,
+  keyNumberOf,
   rememberedReading,
   unparsedFigures,
   receiptTimeOf,
@@ -286,6 +287,7 @@ function headOf(
     // a time without its day dates nothing: the purchases go to the day it was sent, never at its time (MOL-305)
     printedTime: printedOn === null ? null : receiptTimeOf(text),
     receiptNo: text.receiptNo,
+    till: text.till ?? null,
     totalMinor: moneyOfHundredths(text.totalHundredths, currency)?.minor ?? null,
     readTotalMinor: moneyOfHundredths(text.readTotalHundredths, currency)?.minor ?? null,
     cashbackMinor: moneyOfHundredths(text.cashbackHundredths ?? null, currency)?.minor ?? null,
@@ -488,10 +490,12 @@ async function readByModel(
       datesOf(claimed),
     )
   // of the witness's head only what the check never touches is taken (`filledHead`): its text as read will do
-  const head =
+  const head = keyedHead(
+    photoReading,
     witness === null
       ? headOfModel(kept, shown)
-      : filledHead(headOfModel(kept, shown), headOfModel(witness, witness.text))
+      : filledHead(headOfModel(kept, shown), headOfModel(witness, witness.text)),
+  )
   if (needsReshoot(text)) {
     const outcome: ReadOutcome = {
       kind: 'failed',
@@ -599,10 +603,11 @@ function chosen(
 
 /**
  * The head of the reading kept, what it did not read taken from the other reading of the same paper (MOL-405,
- * adversarial Б3): the tax number, the day with its time, the receipt's number, the city — fields whose none is «not
- * found» — a day out of the window is none for either (MOL-305). Never a sum: the total goes with the lines it was
- * judged by. Never how it was paid: none there is the word of every payment row the reading found — two ways, or a
- * mixed payment, say nothing (MOL-312) — and a reading that lost one would suggest the wrong account (adversarial В1).
+ * adversarial Б3): the tax number, the day with its time, the receipt's number, the till (MOL-422), the city — fields
+ * whose none is «not found» — a day out of the window is none for either (MOL-305). Never a sum: the total goes with
+ * the lines it was judged by. Never how it was paid: none there is the word of every payment row the reading found —
+ * two ways, or a mixed payment, say nothing (MOL-312) — and a reading that lost one would suggest the wrong account
+ * (adversarial В1).
  */
 function filledHead(head: ReceiptHead, other: ReceiptHead): ReceiptHead {
   return {
@@ -612,9 +617,19 @@ function filledHead(head: ReceiptHead, other: ReceiptHead): ReceiptHead {
       : {}),
     tin: head.tin ?? other.tin,
     receiptNo: head.receiptNo ?? other.receiptNo,
+    till: head.till ?? other.till ?? null,
     city: head.city ?? other.city,
   }
 }
+
+/**
+ * The paper's head with its number as the key (`keyNumberOf`, MOL-422): judged once both readings are joined, so a
+ * till one copied and a number the other did are one key (adversarial Б1).
+ */
+const keyedHead = (reading: PhotoReading, head: ReceiptHead): ReceiptHead => ({
+  ...head,
+  receiptNo: keyNumberOf(reading, head),
+})
 
 /** What came of asking a model: what it answered, or why there is nothing to take. */
 type Asked =
@@ -759,12 +774,9 @@ async function readByOcr(
   // a figure goes to the review as read only where it is verified, the rest is left empty (MOL-255)
   const explained = explainedReading(text)
   const { shown } = explained
-  const head = headOf(
-    shown,
-    currency,
-    readings,
-    receiptPaidBy(photoReading, readings),
-    datesOf(claimed),
+  const head = keyedHead(
+    photoReading,
+    headOf(shown, currency, readings, receiptPaidBy(photoReading, readings), datesOf(claimed)),
   )
   if (needsReshoot(text))
     return { kind: 'failed', failure: 'reshoot', readerVersion: version, head }

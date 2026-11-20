@@ -255,6 +255,7 @@ const file: ExportFile = {
       printedOn: '2026-09-30',
       printedTime: '15:03',
       receiptNo: '21410811',
+      till: null,
       total: money(74_000n, 'AMD'),
       readTotal: money(74_000n, 'AMD'),
       cashback: money(740n, 'AMD'),
@@ -446,7 +447,7 @@ describe('exportFileCodec', () => {
     })
     expect(wire.trips[0]?.receipt).toEqual({ amount: '12400.00', currency: 'AMD' })
     expect(wire.format).toBe('molvia-export')
-    expect(wire.version).toBe(37)
+    expect(wire.version).toBe(38)
     expect(wire.account.locale).toBe('en')
     expect(wire.account.lastSeenAt).toBe('2026-09-20T10:00:00.000Z')
     expect(wire.account.silenceWarning).toBe(7)
