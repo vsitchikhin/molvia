@@ -52,7 +52,7 @@ Rules: `.claude/rules/money-accounts.md`. A test beside its source, or mirroring
 - `frontend/src/components/TransferSheet.vue` — «Перевод» sheet (MOL-253): sum, «Откуда», «Куда» of the same currency, optional fee in «Прочее», day and note; written with a connection, amended and removed with its fee.
 - `frontend/src/components/ReconcileSheet.vue` — «Сверка» sheet: the fact first, then the server's difference and its reasons, each fixed in its sheet, and «Записать разницу».
 - `frontend/src/components/UnassignedSheet.vue` — «Не попали в остатки» sheet: the server's list of operations with no account; a row opens its sheet to choose one.
-- `frontend/src/components/accounts.ts` — Helpers of the account screens: signed amounts with U+2212, short days, «на 14:05», page order, the default account, picker groups, whether a transfer can be made, the words of a journal row; the note of «Записать разницу» from the `accounts` section of each dictionary alone (MOL-337).
+- `frontend/src/components/accounts.ts` — Helpers of the account screens: signed amounts with U+2212, short days, «на 14:05», page order, the default account, picker groups, whether a transfer can be made, the words of a journal row; the note of «Записать разницу» in either language from `BOTH_LANGUAGES` (MOL-337).
 
 ## frontend · composables
 

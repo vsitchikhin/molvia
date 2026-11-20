@@ -1477,8 +1477,8 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   **The dev server loads every screen before the first paint** (`loadScreens`, all at once): it has no precache,
   so a screen not yet loaded was out of reach once the connection went — CI's first run had a spec go offline and
   tap «Покупки» before its chunk came, and the move failed; loaded first, the dev server's start and every spec
-  that goes offline are what the one bundle gave. **Both keep each screen in its route's record**, as the router
-  keeps one it resolved: a dynamic `import()` settles a task later even for a module loaded already, and in CI's
+  that goes offline are what the one bundle gave. **Both keep each screen in its route's record** — by the
+  router's own `loadRouteLocation`, so as a move keeps it (review №3): a dynamic `import()` settles a task later even for a module loaded already, and in CI's
   second run a screen mounted that much after the tap — the record's «Записали N покупок», handed over in the
   history's state, was lost to the re-read's move to the same record (`ReceiptView`, MOL-169), and an account's
   first request went after the connection did. Kept, a move to a screen warmed waits for nothing, as before.
@@ -1486,17 +1486,32 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   full load of its address** (`reloadOnStaleChunk`, В-2 «а»): it brings the new version and its chunks, and the
   person tapped, so nothing is reloaded that they did not ask for (MOL-132's rule); once a tab in 30 s
   (`molvia.screen-reload`, this tab's own shelf, a moment and nothing of a person), so a chunk missing from the
-  new version too cannot loop; offline the move is cancelled and the page stays, the strip already saying so.
-  Only `ScreenNotLoaded`, which `lazyScreen` throws, does it — a guard's error is no stale chunk — and it is the
-  weather, never the phone's defect (`phoneDefect`), as no answer is. **One dictionary at the start** (В-3 «а»):
+  new version too cannot loop — and a tab that cannot keep the mark is not reloaded at all (adversarial А6); offline
+  the move is cancelled and the page stays, the strip already saying so. A cold start whose parent did not come
+  loads the screen opened, never the parent (`settling`, А4). **Only a chunk that did not come is
+  `ScreenNotLoaded`**, the weather, never the phone's defect (`phoneDefect`), as no answer is: `lazyScreen` tells it
+  by the engine's own words — «Failed to fetch dynamically imported module» (Chromium), «Importing a module script
+  failed» and «…is not a valid JavaScript MIME type…» (WebKit), «error loading dynamically imported module»
+  (Firefox), Vite's «Unable to preload CSS» — probed on Chromium and WebKit for a cut, a 404, an HTML page and the
+  connection off. **A module that came and threw as it ran is our defect** (adversarial А1), as it was in the
+  bundle: it goes on as thrown, `reloadOnStaleChunk` reports it and every other failure of a move — a guard's —
+  since `RouterLink` swallows the refusal and nothing else would tell the owner, and nothing is reloaded. **One dictionary at the start** (В-3 «а»):
   `ru` and `en` are chunks of their own, `loadDictionary` gives the app's i18n the one its tag speaks, English
   under its three tags; the app is mounted once it is here and the first route has settled, asked in parallel; a
   dictionary that did not come is asked again on `online` or every 5 s (`DICTIONARY_RETRY_MS`). **A choice is
   spoken once its dictionary is here** — the words never change before the words to change to have come — and
-  written only then: one that did not come leaves the language and writes no choice; of two choices made while a
-  dictionary was coming, the later is spoken. The tests' `createAppI18n` keeps both dictionaries — no module of
-  the app calls it, so the build leaves them out; `accounts.ts` takes the `accounts` section of each by name
-  (named exports of JSON), never the whole dictionary. **Modules run in the source's order across chunks**
+  written only then: a tap whose dictionary did not come gives the choice shown back — the segments stand on what
+  is asked for, at once (adversarial А3) — and writes nothing; of two asked while a dictionary was coming, the
+  later is spoken and written, whatever came first (А2); another window's language or order of the day keeps this
+  window's other half (А7); the start asks again only after a failure, and asks first whether a choice was spoken
+  meanwhile (review №2). The tests' `createAppI18n` keeps both dictionaries — no module of the app calls it, so
+  the build leaves them out. **Words the app reads back from data in either language — the note of a check, the
+  ready-made categories' names — are `BOTH_LANGUAGES` of `i18n/bothLanguages.ts`, never a dictionary** (review
+  №1, adversarial А9): a module that imports one, by its name or a section of it, pulls the whole chunk in —
+  `accounts.ts` did, on every screen of money and at every warming, and `CategorySheet` asked `t` for the other
+  language and got keys, so «Groceries» passed as one's own on a Russian phone (MOL-398, А3, back). A test holds
+  them equal to both dictionaries, and `offline-built` holds that a page with every screen loaded asked for the
+  phone's dictionary alone. **Modules run in the source's order across chunks**
   (`strictExecutionOrder` of `vite.config.ts`): the entry's own body runs after the chunks it imports, so
   `zodJitless` came after the schemas it must precede — the policy's violation at every load, which the e2e of
   the build caught — and `catchers` after the modules it must hear (MOL-144, Б3). **The build is the name of the
@@ -1512,7 +1527,11 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   keeping the order costs 13 KB gzip of wrappers at the start; on a very first visit whose dictionary does not
   come the page stays blank until the retry; a full load to a screen loses what the screen left held in memory —
   its queues and drafts are on the device; the dev server and its e2e do not see the warming after the paint
-  — only the build's specs do (`offline-built`).
+  — only the build's specs do (`offline-built`). **Once a tab, not once an address** (review №6, adversarial А5): a
+  second screen whose code did not come in the 30 s after a full load — a version without its own chunks, the very
+  loop the mark guards — is not loaded again, and the tap does nothing, saying nothing. **A dictionary's request
+  that neither answers nor fails** holds the start until the browser gives it up (adversarial А8): the same
+  `import()` asked again would wait on that same request, so a retry by the clock would be one in name only.
 - **Every screen sits in `AppScreen`, and every move goes through the router** (MOL-17). The
   frame — pinned row, large title that collapses past 24px, back chevron, room under the tab
   bar — is drawn once; a screen fills its slots. A nested route names its `meta.parent` and
