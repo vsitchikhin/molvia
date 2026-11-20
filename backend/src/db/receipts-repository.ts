@@ -1,5 +1,5 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
-import type { SQL } from 'drizzle-orm'
+import type { Column, SQL } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
@@ -896,24 +896,24 @@ function sentColumn(row: { via: ReceiptVia | null; qrMissed: boolean | null }) {
 
 /** One side of the key against a second record: a row's columns, or a receipt's values. */
 interface KeySide {
-  readonly tin: unknown
-  readonly till: unknown
-  readonly receiptNo: unknown
+  readonly tin: Column | SQL | string | null
+  readonly till: Column | SQL | string | null
+  readonly receiptNo: Column | SQL | string | null
 }
 
 /**
- * Two receipts of one paper (Т-11): the same number of the same seller — its tax number, or where none is printed the
- * till's serial, Georgia's «Fsmd» (MOL-422, owner's В-1 «б»): one fiscal module is one till of one shop. Either side
- * columns or values. A null is SQL's own and matches nothing, so a receipt with no number, or with neither seller, is
- * held by its id alone; one shot that read the tax number and another that read only the till are one paper by the
- * till where both read it, and two otherwise — a repeat missed, never a false one.
+ * Two receipts of one paper (Т-11): the same number of the same till where either names its till — Georgia's «Fsmd»,
+ * whose number is the till's own count (MOL-422, adversarial А1) — else of the same tax number. Either side columns or
+ * values; `coalesce` gives a value the column's type. A null is SQL's own and matches nothing, so a receipt with no
+ * number, or with no seller, is held by its id alone; a Georgian number read without its till is none (`keyOf`).
  */
-export function sameReceiptKey(row: KeySide, key: KeySide): SQL {
-  return sql`(${row.receiptNo} = ${key.receiptNo} and (${row.tin} = ${key.tin} or ${row.till} = ${key.till}))`
+function sameReceiptKey(row: KeySide, key: KeySide): SQL {
+  return sql`(${row.receiptNo} = ${key.receiptNo} and (${row.till} = ${key.till}
+    or (coalesce(${row.till}, ${key.till}) is null and ${row.tin} = ${key.tin})))`
 }
 
 /** The key's columns of a table under an alias of raw SQL. */
-const keyColumnsOf = (table: string): KeySide => ({
+const keyColumnsOf = (table: 'twin' | 'r'): KeySide => ({
   tin: sql.raw(`${table}.tin`),
   till: sql.raw(`${table}.till`),
   receiptNo: sql.raw(`${table}.receipt_no`),
@@ -992,10 +992,10 @@ async function takeCount(
 
 /**
  * A receipt the model read to the review counts among its person's (MOL-275): once, and never where a receipt of
- * theirs of the same paper (`sameReceiptKey`: the number with the tax number, or the till's serial — MOL-422) counted
- * before and was not given back by «Переснять» — a removed one still in the table too; a receipt with no key is its own. A trial receipt while nothing is paid and one is left, else a
- * place alone — a reading in flight past the trial too — and the receipt keeps which (`counted`), so «Переснять» gives
- * back what it took (В-4 «а»).
+ * theirs of the same paper (`sameReceiptKey`: the number with the till's serial or the tax number — MOL-422) counted
+ * before and was not given back by «Переснять» — a removed one still in the table too; a receipt with no key is its
+ * own. A trial receipt while nothing is paid and one is left, else a place alone — a reading in flight past the trial
+ * too — and the receipt keeps which (`counted`), so «Переснять» gives back what it took (В-4 «а»).
  */
 async function countModelReceipt(tx: Conn, id: string): Promise<void> {
   const [receipt] = await tx.execute<{ actorId: string; month: string }>(sql`
