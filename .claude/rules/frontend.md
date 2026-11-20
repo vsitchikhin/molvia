@@ -1473,7 +1473,9 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   release**, which took its chunks off the server: Caddy answers a path it has not got with `index.html`, and the
   `import()` fails on its type; a second window after the first took the version is one, its precache cleaned by
   the activation. So **`warmScreens` loads every screen once the first is drawn** (В-1 «а»), after the identity's
-  request, one at a time with a pause before each; a failure there is left to the move that needs the screen.
+  request, one at a time with a pause before each; a chunk that did not come there is left to the move that needs
+  the screen, and a module that came and threw is reported at the launch that loaded it, as in the bundle
+  (adversarial А12).
   **The dev server loads every screen before the first paint** (`loadScreens`, all at once): it has no precache,
   so a screen not yet loaded was out of reach once the connection went — CI's first run had a spec go offline and
   tap «Покупки» before its chunk came, and the move failed; loaded first, the dev server's start and every spec
@@ -1486,7 +1488,8 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   full load of its address** (`reloadOnStaleChunk`, В-2 «а»): it brings the new version and its chunks, and the
   person tapped, so nothing is reloaded that they did not ask for (MOL-132's rule); once a tab in 30 s
   (`molvia.screen-reload`, this tab's own shelf, a moment and nothing of a person), so a chunk missing from the
-  new version too cannot loop — and a tab that cannot keep the mark is not reloaded at all (adversarial А6); offline
+  new version too cannot loop — and a tab that cannot keep the mark is not reloaded at all (adversarial А6), while a
+  mark ahead of the clock, a clock set back since, guards nothing (А13); offline
   the move is cancelled and the page stays, the strip already saying so. A cold start whose parent did not come
   loads the screen opened, never the parent (`settling`, А4). **Only a chunk that did not come is
   `ScreenNotLoaded`**, the weather, never the phone's defect (`phoneDefect`), as no answer is: `lazyScreen` tells it
@@ -1500,10 +1503,12 @@ min-content` — the day's head and the total of «Траты», a line of an ex
   under its three tags; the app is mounted once it is here and the first route has settled, asked in parallel; a
   dictionary that did not come is asked again on `online` or every 5 s (`DICTIONARY_RETRY_MS`). **A choice is
   spoken once its dictionary is here** — the words never change before the words to change to have come — and
-  written only then: a tap whose dictionary did not come gives the choice shown back — the segments stand on what
-  is asked for, at once (adversarial А3) — and writes nothing; of two asked while a dictionary was coming, the
-  later is spoken and written, whatever came first (А2); another window's language or order of the day keeps this
-  window's other half (А7); the start asks again only after a failure, and asks first whether a choice was spoken
+  written only then, by whichever turn speaks it — a language overtaken by a tap of the order of the day is written
+  with it (adversarial А10): a tap or another window's choice whose dictionary did not come gives the choice shown
+  back — the segments stand on what is asked for, at once (А3, А11) — and writes nothing, another window's staying on
+  this window's own shelf for its next start; of two asked while a dictionary was coming, the later is spoken and
+  written, whatever came first (А2); another window's language or order of the day keeps this window's other half
+  (А7); the start asks again only after a failure, and asks first whether a choice was spoken
   meanwhile (review №2). The tests' `createAppI18n` keeps both dictionaries — no module of the app calls it, so
   the build leaves them out. **Words the app reads back from data in either language — the note of a check, the
   ready-made categories' names — are `BOTH_LANGUAGES` of `i18n/bothLanguages.ts`, never a dictionary** (review
