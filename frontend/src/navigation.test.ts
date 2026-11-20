@@ -605,6 +605,20 @@ describe('a screen loaded when first opened', () => {
       expect(after).toHaveBeenCalledTimes(1)
     })
 
+    it('a module that came and threw is reported, and the warming goes on; a chunk that did not come is not (adversarial А12)', async () => {
+      const report = vi.fn()
+      const thrown = new TypeError('Object.hasOwn is not a function')
+      const after = vi.fn(() => Promise.resolve(SCREEN))
+      const router = screens({
+        threw: lazyScreen(() => Promise.reject(thrown)),
+        gone: lazyScreen(notCome),
+        after,
+      })
+      await warmScreens(router, () => Promise.resolve(), report)
+      expect(report.mock.calls).toEqual([[thrown]])
+      expect(after).toHaveBeenCalledTimes(1)
+    })
+
     it('pauses before each screen, so the page draws in between', async () => {
       const pause = vi.fn(() => Promise.resolve())
       await warmScreens(
@@ -681,6 +695,14 @@ describe('a screen loaded when first opened', () => {
       await router.push('/').catch(() => undefined)
       await router.push('/gone').catch(() => undefined)
       expect(assign).not.toHaveBeenCalled()
+    })
+
+    it('a mark ahead of the clock — a clock set back since — guards nothing (adversarial А13)', async () => {
+      sessionStorage.setItem(SCREEN_RELOAD_KEY, String(1_000_000 + 60 * 60 * 1000))
+      const { router, assign } = stale(true, 1_000_000)
+      await router.push('/').catch(() => undefined)
+      await router.push('/gone').catch(() => undefined)
+      expect(assign).toHaveBeenCalledTimes(1)
     })
 
     it('loads again once the gap is over, and marks the moment on this tab alone', async () => {

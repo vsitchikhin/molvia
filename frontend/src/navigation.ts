@@ -240,8 +240,8 @@ function chunkNotLoaded(error: unknown): boolean {
  * that no tap waits for the network — the reason MOL-17 kept them in one bundle. The precache holds them
  * all, but not for the page that installed the worker, which nothing claims (`pwaUpdate.ts`), nor for an
  * old page after a release that took its chunks off the server: such a page keeps its screens in memory
- * once this has run. A failure is left to the move that needs the screen; a pause before each screen lets
- * the page draw what it is doing meanwhile.
+ * once this has run. A chunk that did not come is left to the move that needs the screen, a module that threw is
+ * reported; a pause before each screen lets the page draw what it is doing meanwhile.
  */
 export async function warmScreens(
   router: Router,
@@ -249,13 +249,18 @@ export async function warmScreens(
     new Promise((done) => {
       setTimeout(done, 0)
     }),
+  report: (error: unknown) => void = (error) => {
+    reportFailure(error, 'screen')
+  },
 ): Promise<void> {
   for (const load of screenLoads(router)) {
     await pause()
     try {
       await load()
-    } catch {
-      // The weather; the move that opens this screen asks again.
+    } catch (error) {
+      // A chunk that did not come is the weather, and the move that opens the screen asks again; a module that
+      // came and threw is our defect, heard at the launch that loaded it, as in the bundle (adversarial А12).
+      if (!(error instanceof ScreenNotLoaded)) report(error)
     }
   }
 }
@@ -342,7 +347,8 @@ export function reloadOnStaleChunk(
     if (!environment.online()) return
     const at = environment.now()
     const last = Number(read(SCREEN_RELOAD_KEY, true))
-    if (Number.isFinite(last) && last > 0 && at - last < SCREEN_RELOAD_GAP_MS) return
+    // A mark ahead of the clock is a clock set back since, and guards nothing (adversarial А13).
+    if (Number.isFinite(last) && last > 0 && last <= at && at - last < SCREEN_RELOAD_GAP_MS) return
     // A mark the tab cannot keep guards nothing: no load at all rather than one in a loop (adversarial А6).
     if (!writeOwn(SCREEN_RELOAD_KEY, String(at))) return
     environment.assign(router.resolve(settling ?? to.fullPath).href)
