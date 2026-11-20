@@ -63,8 +63,22 @@ export interface Settled {
   readonly access: AccessMoved
 }
 
+/** Where a person's paid access ends, by the columns of `actors`. */
+export interface PaidUntil {
+  readonly sharedUntil: Date | null
+  readonly receiptsModelUntil: Date | null
+}
+
 export interface PaymentsRepository {
   create(payment: NewPayment): Promise<{ orderNo: bigint }>
+  /**
+   * The payment written only while the person started fewer than `max` since `since` (MOL-277, Р-12) — counted under
+   * their row's lock, so two at once never both pass the last place; `null` past it, nothing written. An erased
+   * person has no row and starts nothing.
+   */
+  createWithin(payment: NewPayment, max: number, since: Date): Promise<{ orderNo: bigint } | null>
+  /** Where the person's paid access ends now; `null` — no such person. */
+  paidUntil(actorId: string): Promise<PaidUntil | null>
   /** The channel's name of the payment: given once, a later name — the same or another — changes nothing. */
   named(id: string, channelRef: string): Promise<void>
   get(id: string): Promise<PaymentRow | null>
@@ -159,25 +173,61 @@ async function stateOf(tx: Conn, id: string): Promise<PaymentState | null> {
   return row?.state ?? null
 }
 
+function rowOf(payment: NewPayment) {
+  return {
+    id: payment.id,
+    actorId: payment.actorId,
+    tariff: payment.tariff,
+    anchorMinor: payment.anchor.minor,
+    anchorCurrency: payment.anchor.currency,
+    rateScaled: payment.rate.scaled,
+    rateAsOf: payment.rate.asOf,
+    amountMinor: payment.amount.minor,
+    currency: payment.amount.currency,
+    channel: payment.channel,
+  }
+}
+
 export function createPaymentsRepository(db: Db): PaymentsRepository {
   return {
     async create(payment) {
       const [created] = await db
         .insert(payments)
-        .values({
-          id: payment.id,
-          actorId: payment.actorId,
-          tariff: payment.tariff,
-          anchorMinor: payment.anchor.minor,
-          anchorCurrency: payment.anchor.currency,
-          rateScaled: payment.rate.scaled,
-          rateAsOf: payment.rate.asOf,
-          amountMinor: payment.amount.minor,
-          currency: payment.amount.currency,
-          channel: payment.channel,
-        })
+        .values(rowOf(payment))
         .returning({ orderNo: payments.orderNo })
       return theRow(created, 'payments')
+    },
+
+    async createWithin(payment, max, since) {
+      return db.transaction(async (tx) => {
+        const [person] = await tx
+          .select({ id: actors.id })
+          .from(actors)
+          .where(eq(actors.id, payment.actorId))
+          .for('no key update')
+        if (person === undefined) return null
+        const [{ started } = { started: 0 }] = await tx
+          .select({ started: sql<number>`count(*)::int` })
+          .from(payments)
+          .where(and(eq(payments.actorId, payment.actorId), gt(payments.createdAt, since)))
+        if (started >= max) return null
+        const [created] = await tx
+          .insert(payments)
+          .values(rowOf(payment))
+          .returning({ orderNo: payments.orderNo })
+        return theRow(created, 'payments')
+      })
+    },
+
+    async paidUntil(actorId) {
+      const [person] = await db
+        .select({
+          sharedUntil: actors.sharedUntil,
+          receiptsModelUntil: actors.receiptsModelUntil,
+        })
+        .from(actors)
+        .where(eq(actors.id, actorId))
+      return person ?? null
     },
 
     async named(id, channelRef) {

@@ -1051,6 +1051,7 @@ written as their documentation has them and not drilled.
 | `CLOUDFLARE_TUNNEL_TOKEN`              | `.env.prod`, Cloudflare (`cloudflared tunnel`)     | Grafana from outside; never the site         |
 | the shared dashboard's link            | Grafana's volume, the owner's bookmark             | Grafana from outside                         |
 | `CLAUDE_API_KEY`                       | `.env.prod`, Anthropic console                     | none — Tesseract reads a refused key's reads |
+| `VPOS_PASSWORD`, `VPOS_USERNAME`       | `.env.prod`, Ameriabank's vPOS team                | card payments, until the bank's new values   |
 | `BOT_PULSE_URL`, `ALERTS_PULSE_URL`    | `.env.prod`, healthchecks.io                       | none                                         |
 | `HC_URL` (the copies' ping)            | `backup.env`, healthchecks.io                      | none                                         |
 | `HC_UP_URL`, `HC_LOCK_URL`             | the Worker's secrets, healthchecks.io              | none                                         |
@@ -1132,6 +1133,13 @@ written as their documentation has them and not drilled.
   receipt goes to Tesseract at once, for good — never asked of the model again — each one a
   `job:receipt-model` failure to the owner (`receipts.md`). The ten minutes of waiting are for the
   model away (`429`, `5xx`, no connection), not for a wrong key.
+- **`VPOS_PASSWORD` and `VPOS_USERNAME`** (MOL-277): whoever holds them can register, read and **refund** the
+  merchant's operations. A leak is, by the bank's terms §7.9, a call to the bank at once and **card payments
+  stopped until it says otherwise**: `./ff.sh payments off`, `$C up -d backend` — the screens go and nothing
+  starts a payment; the payments already on the bank's page are asked again after the new values. Then the
+  values the bank gives, the lines, `./ff.sh payments on`, `$C up -d backend`. `VPOS_CLIENT_ID` names the
+  merchant and is no secret alone. `VPOS_STAND` is `live` in production, `test` only while the bank's stand is
+  tried (10 ֏ any tariff).
 - **The ping URLs**: a check's URL cannot be changed, so a leaked one means a new check in
   healthchecks.io with the Telegram integration, its URL where the old one was — `.env.prod` and
   `$C up -d bot` / `grafana`; `HC_URL` of `backup.env`, seen by

@@ -71,6 +71,11 @@ services:
       # value stops the API's start, a name not passed here never reaches it (deploy/README.md).
       FF_VENUES: ${FF_VENUES:-off}
       FF_PAYMENTS: ${FF_PAYMENTS:-off}
+      # Ameriabank vPOS (MOL-277): read while FF_PAYMENTS is on, then required.
+      VPOS_STAND: ${VPOS_STAND:-}
+      VPOS_CLIENT_ID: ${VPOS_CLIENT_ID:-}
+      VPOS_USERNAME: ${VPOS_USERNAME:-}
+      VPOS_PASSWORD: ${VPOS_PASSWORD:-}
       # Optional: empty leaves the Open Food Facts hint off (MOL-162).
       OPEN_FOOD_FACTS_CONTACT: ${OPEN_FOOD_FACTS_CONTACT:-}
       PURS_CONTACT: ${PURS_CONTACT:-}

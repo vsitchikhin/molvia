@@ -22,7 +22,7 @@ import {
 } from '@molvia/model'
 import type { ErrorCode, ErrorResponse, FfName, TelegramUserId } from '@molvia/model'
 import { InvalidBody } from '@/parse'
-import { FF_ON, VERSION, env, loginConfig } from '@/env'
+import { FF_ON, VERSION, VPOS_CONFIG, env, loginConfig } from '@/env'
 import type { LoginConfiguration } from '@/login-config'
 import { startLoginCleanup } from '@/login-cleanup'
 import { apiFailureReporter } from '@/failure-reporter'
@@ -72,7 +72,18 @@ import { previewLogin, confirmLogin, declineLogin } from '@/usecases/bot-login'
 import { eraseMe } from '@/usecases/erase-me'
 import { claimLoginNotices, endSessionFromBot, loginNoticesTold } from '@/usecases/tell-logins'
 import { SILENCE_ERASE_EVERY_MS, claimSilenceNotices, eraseSilent } from '@/usecases/silence'
-import { PAYMENT_SWEEP_EVERY_MS } from '@/usecases/payments'
+import {
+  PAYMENT_SWEEP_EVERY_MS,
+  confirmPayment,
+  offerPayments,
+  paymentAskLimiter,
+  startPayment,
+} from '@/usecases/payments'
+import type { PaymentChannelAdapter } from '@/usecases/payments'
+import { createRateRepository } from '@/db/rates-repository'
+import { paymentRoutes } from '@/routes/payments'
+import { VposError, vposClient } from '@/vpos/client'
+import { ameriabankChannel } from '@/vpos/ameriabank'
 import { exportMine } from '@/usecases/export-mine'
 import { heavyFeedbackLimit, sendFeedback } from '@/usecases/send-feedback'
 import { feedbackFromBot } from '@/usecases/feedback-from-bot'
@@ -247,6 +258,10 @@ const STATUS_BY_CODE: Partial<Record<ErrorCode, number>> = {
   [ERROR.CLIENT_ERRORS_RATE_LIMITED]: 429,
   [ERROR.RECEIPTS_DAY_LIMITED]: 429,
   [ERROR.ITEMS_DAY_LIMITED]: 429,
+  [ERROR.PAYMENTS_DAY_LIMITED]: 429,
+  // The CBA silent today: the state of the world refuses it, the request is well formed.
+  [ERROR.PAYMENT_UNPRICED]: 409,
+  [ERROR.PAYMENT_CHANNEL_UNAVAILABLE]: 503,
   [ERROR.RECEIPTS_UNRECORDED_LIMITED]: 429,
   [ERROR.LOGIN_DISABLED]: 503,
   [ERROR.BOT_UNAUTHORIZED]: 401,
@@ -357,6 +372,17 @@ function job(name: string): FailurePlace {
   return { source: 'api', route: `job:${name}` }
 }
 
+/** A channel with no bank behind it: every call refused as a bank away (a test's server with the фф on). */
+function unconfiguredChannel(): PaymentChannelAdapter {
+  const away = (method: string) => () => Promise.reject(new VposError('unreachable', method))
+  return {
+    channel: 'ameriabank',
+    start: away('InitPayment'),
+    check: away('GetPaymentDetails'),
+    refund: away('RefundPayment'),
+  }
+}
+
 function decodedPath(url: string): string {
   const path = url.split('?', 1)[0] ?? ''
   try {
@@ -434,6 +460,11 @@ export interface ServerOptions {
    * API does not have — the same 404, before any session.
    */
   readonly ff?: ReadonlySet<FfName>
+  /**
+   * The channel of payment by card (MOL-277), used only while the фф `payments` is on. Absent, Ameriabank's by
+   * `VPOS_CONFIG`; a test names its own.
+   */
+  readonly paymentChannel?: PaymentChannelAdapter
 }
 
 /**
@@ -546,6 +577,22 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
   const sweepFailed = (error: unknown): void => {
     failures.report(error, job('released-items'), 'released items sweep failed')
   }
+
+  // Payment by card (MOL-277): the channel exists only while the фф is on; a server a test turns it on in with no
+  // bank configured has one that refuses, as a bank away does.
+  const paymentChannel: PaymentChannelAdapter | null = !ff.has('payments')
+    ? null
+    : (options.paymentChannel ??
+      (VPOS_CONFIG === null
+        ? unconfiguredChannel()
+        : ameriabankChannel({
+            client: vposClient(VPOS_CONFIG),
+            stand: VPOS_CONFIG.stand,
+            appBaseUrl: VPOS_CONFIG.appBaseUrl,
+            strange: (error) => {
+              failures.report(error, job('payment-bank'), 'bank said what the journal leaves')
+            },
+          })))
 
   // The auth scopes set `no-store` on what their routes answer, but a path no route matches
   // and a URL Fastify cannot decode are answered before any scope is entered (adversarial А4).
@@ -1315,6 +1362,41 @@ export function buildServer(options: ServerOptions = {}): FastifyInstance {
         setting: (owner) => analyticsOf(events, owner),
         choose: (owner, body) => chooseAnalytics(events, owner, body),
       })
+      if (paymentChannel !== null) {
+        const payments = createPaymentsRepository(db)
+        const rates = createRateRepository(db)
+        const mayAsk = paymentAskLimiter()
+        const failedAt = (route: string) => (error: unknown) => {
+          failures.report(error, { source: 'api', route }, 'bank did not answer a payment')
+        }
+        paymentRoutes(guarded, {
+          offer: (actorId) => offerPayments({ payments, rates }, actorId, new Date()),
+          start: (actorId, body) =>
+            startPayment(
+              { payments, rates, channel: paymentChannel, failed: failedAt('POST /payments') },
+              {
+                actorId,
+                lang: body.lang,
+                now: new Date(),
+                ...(body.tariff === 'tip'
+                  ? { tariff: 'tip', tipCents: BigInt(body.tipCents) }
+                  : { tariff: body.tariff }),
+              },
+            ),
+          status: (actorId, id) =>
+            confirmPayment(
+              {
+                payments,
+                channel: paymentChannel,
+                mayAsk,
+                failed: failedAt('GET /payments/:paymentId'),
+              },
+              actorId,
+              id,
+              new Date(),
+            ),
+        })
+      }
       consentRoutes(guarded, {
         consent: (owner) => consentOf(actors, { id: owner }),
         accept: (owner, body) => acceptConsent(actors, { id: owner }, body),

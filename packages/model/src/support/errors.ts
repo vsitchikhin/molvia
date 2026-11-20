@@ -147,6 +147,21 @@ export const ERROR = {
    */
   ITEMS_DAY_LIMITED: 'error.items_day_limited',
   /**
+   * A payment past `PAYMENTS_DAY_MAX` started in a rolling day (MOL-277, Р-12): nothing is written; the screen says
+   * to try tomorrow.
+   */
+  PAYMENTS_DAY_LIMITED: 'error.payments_day_limited',
+  /**
+   * A payment asked for with no price to make (MOL-277, Р-1): the CBA has published no rate fresh for today, and no
+   * price is made of another's. The screen says so before the tap; the server answers only a page left open.
+   */
+  PAYMENT_UNPRICED: 'error.payment_unpriced',
+  /**
+   * The bank did not register the payment (MOL-277, Р-10): away, or refusing. Nothing was charged; the screen
+   * says to try again later.
+   */
+  PAYMENT_CHANNEL_UNAVAILABLE: 'error.payment_channel_unavailable',
+  /**
    * A message to the developer past `FEEDBACK_DAY_LIMIT` in a rolling day (MOL-147). The sheet keeps
    * the text and says to send it tomorrow.
    */
