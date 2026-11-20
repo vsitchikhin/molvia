@@ -1637,14 +1637,26 @@ describe('a Georgian receipt the model read (MOL-408)', () => {
     return [text.tin, text.till, text.receiptNo]
   }
 
-  it('keys a Georgian receipt by «ქვითარი» and the till’s «Fsmd» where no tax number is printed (MOL-422)', () => {
+  it('keys a Georgian receipt by «ქვითარი» and the till’s «Fsmd» (MOL-422)', () => {
     expect(key(...nikora)).toEqual([null, 'DY00135692', '1287592'])
-    expect(key('ს/კ: 405123456', 'ქვითარი: 1287592')).toEqual(['405123456', null, '1287592'])
+    expect(key('ს/კ: 405123456', ...nikora)).toEqual(['405123456', 'DY00135692', '1287592'])
     expect(key('Fsmd:DY00135692')).toEqual([null, 'DY00135692', null])
   })
 
-  it('takes no number but seven digits after «ქვითარი», nor «ჩეკი», nor the 2008 till’s «ქვთ» (В-3 «а»)', () => {
-    for (const row of ['ქვითარი 128759', 'ქვითარი 12875920', 'ჩეკი № 1287592', 'ქვთ N:1287592']) {
+  it('keys no Georgian number without its till: «ქვითარი» is the till’s own count, «ს/კ» the chain’s (adversarial А1)', () => {
+    // must not: two tills of one chain print the same «ქვითარი» under the same «ს/კ»
+    expect(key('ს/კ: 405123456', 'ქვითარი: 1287592')).toEqual(['405123456', null, null])
+    expect(key('ქვითარი 1287592')).toEqual([null, null, null])
+  })
+
+  it('takes «ქვითარი» of one to ten digits, a till’s count however far it went (owner’s В-4 «а», adversarial А2)', () => {
+    for (const number of ['1', '382114', '1287592', '10625770', '1234567890']) {
+      expect(key('Fsmd: DY00135692', `ქვითარი N:${number}`)[2], number).toBe(number)
+    }
+  })
+
+  it('takes no number of eleven digits after «ქვითარი», nor «ჩეკი», nor the 2008 till’s «ქვთ» (В-3 «а»)', () => {
+    for (const row of ['ქვითარი 12345678901', 'ჩეკი № 1287592', 'ქვთ N:1287592']) {
       expect(key('Fsmd: DY00135692', row)[2], row).toBeNull()
     }
   })
