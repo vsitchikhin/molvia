@@ -25,6 +25,12 @@ Rules: `.claude/rules/payments.md`. A test beside its source, or mirroring it un
 
 - `backend/src/usecases/reconcile-payments.ts` — The reconciliation of payments by card (MOL-277): every minute each page still open asked of the bank from its first minute to 25 — then the last answer not «paid» abandons it — and once a day the bank's list of the two days before against the journal, an order the bank took money for settled by its own id, what still disagrees told to the owner by the order and the two states.
 
+## backend · the owner's command
+
+- `backend/src/refund.ts` — `make refund ORDER= [AMOUNT=] [YES=1]` (MOL-277, Р-9): a dry run without `--yes` — the payment by its order, what is left and what would go back — and with it the bank first, the journal after; nothing of the person printed.
+- `backend/src/refund-cli.ts` — Entry of `dist/refund.js` in the API image: the journal and Ameriabank's channel by the bank's configuration, read only for a real refund.
+- `bin/refund.sh` — Script behind `make refund`: the order, the sum and `--yes` to the command of this copy.
+
 ## backend · db
 
 - `backend/src/db/payments-repository.ts` — Repository of the journal: a payment written with its order number, the channel's name of it given once, «paid» set once with the access it extends under the person's lock — after our «abandoned» too — and where the payment's days end, declined or abandoned, refunds adding up with the whole one taking back the days not lived and moving the later payments' ends, and the payments three years past their last movement and their days deleted. MOL-277: a payment written under the day's quota, the person's access ends, what the reconciliation reads, and a tap of «У меня только карта РФ» counted by the day (`rf_card_days`). Tests: `backend/tests/payments.integration.test.ts`.

@@ -39,6 +39,7 @@ const entries = {
     failures: 'src/failures-cli.ts',
     merge: 'src/merge-cli.ts',
     notify: 'src/notify-cli.ts',
+    refund: 'src/refund-cli.ts',
     'repack-receipts': 'src/repack-receipts-cli.ts',
     'rename-receipt-items': 'src/rename-receipt-items-cli.ts',
     'receipt-misses': 'src/receipt-misses-cli.ts',

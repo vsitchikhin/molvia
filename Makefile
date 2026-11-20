@@ -17,7 +17,7 @@ NEED_SCAFFOLD = @test -f package.json || { echo "no scaffold yet (package.json i
 # The heavy checks of every copy on this machine take turns, the push's among them (MOL-139).
 ONE_AT_A_TIME = ./bin/one-at-a-time.sh "make $@"
 
-.PHONY: help setup hooks up down reup ps logs psql migrate forget notify seed repack rename-items gates receipt-reasons receipt-miss receipt-miss-forget failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
+.PHONY: help setup hooks up down reup ps logs psql migrate forget notify refund seed repack rename-items gates receipt-reasons receipt-miss receipt-miss-forget failures merge unmerge apart merge-night merge-candidates db-reset dev format lint typecheck test e2e check prod-build watcher certs icons ports
 
 help: ## Show this help
 	@grep -hE '^[a-zA-Z0-9_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -92,6 +92,13 @@ forget: ## Erase a person by Telegram id: make forget TG=<id> [YES=1] (dry run w
 notify: ## Write to people about a leak: make notify FILE=<text> [COUNTRY=AM,GE] [OWNER=1] [YES=1] | STATUS=1 | CANCEL=1
 	$(NEED_SCAFFOLD)
 	$(if $(filter command line,$(origin FILE)),,unset FILE;) $(if $(filter command line,$(origin COUNTRY)),,unset COUNTRY;) ./bin/notify.sh "$${FILE:-}" "--country=$${COUNTRY:-}" $(if $(and $(filter command line,$(origin OWNER)),$(filter 1,$(OWNER))),--owner) $(if $(and $(filter command line,$(origin STATUS)),$(filter 1,$(STATUS))),--status) $(if $(and $(filter command line,$(origin CANCEL)),$(filter 1,$(CANCEL))),--cancel) $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
+
+# Money given back by the owner (MOL-277, Р-9): the order's number and the sum reach the script through the
+# environment, never pasted into the recipe, and count only when typed on this command line — as for `forget`. It asks
+# the bank only for YES=1 typed here; without AMOUNT, all that is left of the payment.
+refund: ## Give a card payment back: make refund ORDER=<number> [AMOUNT=<drams>] [YES=1] (dry run without YES=1)
+	$(NEED_SCAFFOLD)
+	$(if $(filter command line,$(origin ORDER)),,unset ORDER;) $(if $(filter command line,$(origin AMOUNT)),,unset AMOUNT;) ./bin/refund.sh "$${ORDER:-}" "$${AMOUNT:-}" $(if $(and $(filter command line,$(origin YES)),$(filter 1,$(YES))),--yes)
 
 # No value from a person reaches the recipe, so unlike `forget` it needs no wrapper script. It
 # writes only for YES=1 typed on this command line: `$(if $(YES),…)` read YES=0 as yes, and took a
