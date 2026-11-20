@@ -6,9 +6,10 @@ import {
   anchorCentsOf,
   extendedUntil,
   paymentPrice,
+  refundSum,
   refundedUntil,
 } from '#model/entities/payment'
-import { DomainError } from '#model/support/errors'
+import { DomainError, ERROR } from '#model/support/errors'
 import { parseRate } from '#model/values/rates'
 import type { ExchangeRate } from '#model/values/rates'
 
@@ -69,16 +70,15 @@ describe('paymentPrice — dollars into drams, up to 10 ֏ (MOL-271)', () => {
   })
 })
 
-describe('anchorCentsOf — the dollar a payment names', () => {
-  it('is the tariff’s own, whatever tip is named beside it', () => {
-    expect(anchorCentsOf('both')).toBe(250n)
-    expect(anchorCentsOf('data', 500n)).toBe(100n)
+describe('anchorCentsOf — the dollar an order names', () => {
+  it('is the tariff’s own', () => {
+    expect(anchorCentsOf({ tariff: 'both' })).toBe(250n)
+    expect(anchorCentsOf({ tariff: 'data' })).toBe(100n)
   })
 
   it('takes a tip only of the three amounts', () => {
-    expect(anchorCentsOf('tip', 300n)).toBe(300n)
-    expect(anchorCentsOf('tip', 200n)).toBeNull()
-    expect(anchorCentsOf('tip')).toBeNull()
+    expect(anchorCentsOf({ tariff: 'tip', tipCents: 300n })).toBe(300n)
+    expect(anchorCentsOf({ tariff: 'tip', tipCents: 200n })).toBeNull()
   })
 })
 
@@ -108,20 +108,56 @@ describe('extendedUntil — thirty days from the end, or from now (MOL-271)', ()
   })
 })
 
-describe('refundedUntil — a whole refund takes the thirty days back (owner’s В-2 «а»)', () => {
-  it('takes thirty days off, keeping a later payment’s days', () => {
-    expect(refundedUntil(days(now, 60), now)).toEqual(days(now, 30))
+describe('refundSum — refunds add up, never past the amount (MOL-281 §1)', () => {
+  const paid = { state: 'paid' as const, amountMinor: 77_000n, refundedMinor: 7_000n }
+
+  it('gives back all that is left when no sum is named, or the sum named up to it', () => {
+    expect(refundSum(paid)).toBe(70_000n)
+    expect(refundSum(paid, 70_000n)).toBe(70_000n)
+    expect(refundSum(paid, 1n)).toBe(1n)
+  })
+
+  it('refuses past what is left, nothing, and a payment not paid — a conflict', () => {
+    for (const [payment, minor] of [
+      [paid, 70_001n],
+      [paid, 0n],
+      [paid, -1n],
+      [{ ...paid, state: 'created' as const, refundedMinor: 0n }, 1_000n],
+      [{ ...paid, state: 'refunded' as const, refundedMinor: 77_000n }, undefined],
+    ] as const) {
+      expect(() => refundSum(payment, minor)).toThrow(
+        expect.objectContaining({ code: ERROR.CONFLICT }),
+      )
+    }
+  })
+})
+
+describe('refundedUntil — a whole refund takes back the days not lived (owner’s В-2 «а»)', () => {
+  it('takes the thirty days back when none is lived yet, keeping a later payment’s days', () => {
+    // Paid now to day 30, another payment after it to day 60.
+    expect(refundedUntil(days(now, 60), days(now, 30), now)).toEqual(days(now, 30))
+  })
+
+  it('takes back only what is left of the payment’s own days', () => {
+    // Paid ten days ago to day 20: ten of its days lived, twenty taken back.
+    expect(refundedUntil(days(now, 50), days(now, 20), now)).toEqual(days(now, 30))
+  })
+
+  it('takes nothing of a payment whose days are lived — a later one’s and a grant’s stay (А1)', () => {
+    expect(refundedUntil(days(now, 25), days(now, -15), now)).toEqual(days(now, 25))
+    expect(refundedUntil(days(now, 25), now, now)).toEqual(days(now, 25))
   })
 
   it('never goes earlier than now', () => {
-    expect(refundedUntil(days(now, 20), now)).toEqual(now)
-    expect(refundedUntil(days(now, 30), now)).toEqual(now)
+    expect(refundedUntil(days(now, 20), days(now, 30), now)).toEqual(now)
+    expect(refundedUntil(days(now, 30), days(now, 30), now)).toEqual(now)
   })
 
-  it('leaves an access already over, or never open, as it is', () => {
-    expect(refundedUntil(null, now)).toBeNull()
+  it('leaves an access already over, never open, or a payment that extended nothing as it is', () => {
+    expect(refundedUntil(null, days(now, 30), now)).toBeNull()
     const past = days(now, -3)
-    expect(refundedUntil(past, now)).toEqual(past)
-    expect(refundedUntil(now, now)).toEqual(now)
+    expect(refundedUntil(past, days(now, 30), now)).toEqual(past)
+    expect(refundedUntil(now, days(now, 30), now)).toEqual(now)
+    expect(refundedUntil(days(now, 10), null, now)).toEqual(days(now, 10))
   })
 })

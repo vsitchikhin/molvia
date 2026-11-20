@@ -49,10 +49,18 @@ export const PAYMENT_TARIFFS: Readonly<
 /** A tip's amounts in cents (MOL-277, owner's В-4 «а»): it extends nothing. */
 export const TIP_CENTS: readonly bigint[] = Object.freeze([100n, 300n, 500n])
 
-/** The anchor in cents a payment of `tariff` names: the tariff's, or a tip's own — one of `TIP_CENTS` or none. */
-export function anchorCentsOf(tariff: PaymentTariff, tipCents?: bigint): bigint | null {
-  if (tariff !== 'tip') return PAYMENT_TARIFFS[tariff].cents
-  return tipCents !== undefined && TIP_CENTS.includes(tipCents) ? tipCents : null
+/**
+ * What a person asks to pay for: a tariff, or a tip with its amount — a tip without one, or an amount beside
+ * a tariff, is no order the type lets be written (MOL-283, review №5).
+ */
+export type PaymentOrder =
+  | { readonly tariff: Exclude<PaymentTariff, 'tip'> }
+  | { readonly tariff: 'tip'; readonly tipCents: bigint }
+
+/** The anchor in cents an order names: the tariff's, or a tip's own — one of `TIP_CENTS` or none. */
+export function anchorCentsOf(order: PaymentOrder): bigint | null {
+  if (order.tariff !== 'tip') return PAYMENT_TARIFFS[order.tariff].cents
+  return TIP_CENTS.includes(order.tipCents) ? order.tipCents : null
 }
 
 /** The access a tariff extends; a tip extends none. */
@@ -65,7 +73,7 @@ export const PAYMENT_TERM_DAYS = 30
 const TERM_MS = PAYMENT_TERM_DAYS * 24 * 60 * 60 * 1000
 
 /**
- * A payment row lives this long after its last movement (MOL-283, Р-4): Ameriabank's terms §3.9 keep card
+ * A payment row lives this long after its last movement (MOL-283, Р-5): Ameriabank's terms §3.9 keep card
  * records three years; past them nothing is kept without a reason — a living person's payment included.
  */
 export const PAYMENT_KEEP_YEARS = 3
@@ -96,11 +104,35 @@ export function extendedUntil(until: Date | null, now: Date): Date {
 }
 
 /**
- * Where a whole refund leaves an access (MOL-277, owner's В-2 «а»): the thirty days the payment gave taken
- * back, never earlier than `now` — a later payment's days stay. An access already over is left as it is.
+ * What a refund of `minor` gives back — all that is left when no sum is named — or a conflict: refunds add up,
+ * never past the amount, only of a payment paid, never of nothing (MOL-281 §1). The one rule for the use case,
+ * before the bank is asked, and the journal, under the payment's lock.
  */
-export function refundedUntil(until: Date | null, now: Date): Date | null {
-  if (until === null || until <= now) return until
-  const back = new Date(until.getTime() - TERM_MS)
+export function refundSum(
+  payment: {
+    readonly state: PaymentState
+    readonly amountMinor: bigint
+    readonly refundedMinor: bigint
+  },
+  minor?: bigint,
+): bigint {
+  const left = payment.amountMinor - payment.refundedMinor
+  const sum = minor ?? left
+  if (payment.state !== 'paid' || sum <= 0n || sum > left) {
+    throw new DomainError(ERROR.CONFLICT, `refund ${String(sum)} of ${payment.state}`)
+  }
+  return sum
+}
+
+/**
+ * Where a whole refund leaves an access (MOL-277, owner's В-2 «а»): the days the payment gave and the person has
+ * not lived yet taken back, never earlier than `now`. Its days are the thirty before `paidUntil`, the end its
+ * extension reached: those already lived stay, and so do a later payment's and a grant's (MOL-283, adversarial
+ * А1). An access already over, or a payment that extended nothing, is left as it is.
+ */
+export function refundedUntil(until: Date | null, paidUntil: Date | null, now: Date): Date | null {
+  if (until === null || paidUntil === null || until <= now) return until
+  const unlived = Math.min(TERM_MS, Math.max(0, paidUntil.getTime() - now.getTime()))
+  const back = new Date(until.getTime() - unlived)
   return back > now ? back : now
 }
