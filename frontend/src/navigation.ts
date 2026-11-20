@@ -220,8 +220,8 @@ export function lazyScreen<T>(load: () => Promise<T>): () => Promise<T> {
  * module that came and threw: an engine says so in its own words, probed on Chromium and WebKit (MOL-337,
  * adversarial А1), Firefox by its source. A throw of the module is its own error — `TypeError … is not a
  * function`, a `SyntaxError`. Nothing is preloaded beside a screen's `import()` (`vite.config.ts`, adversarial
- * А14), so Vite's own words of a preload are not among them. **The price, named:** an engine that words it otherwise has its chunk counted as our defect — heard by
- * the owner, and the screen not reloaded.
+ * А14), so Vite's own words of a preload are not among them. **The price, named:** an engine that words it
+ * otherwise has its chunk counted as our defect — heard by the owner, and the screen not reloaded.
  */
 const CHUNK_NOT_LOADED = [
   /^Failed to fetch dynamically imported module/,
@@ -277,8 +277,8 @@ export async function loadScreens(router: Router): Promise<void> {
  * The loads of the screens not loaded yet, each by the router's own `loadRouteLocation`, which keeps the screen
  * it loaded in its record as a move does (MOL-337): a move to it then waits for nothing — a dynamic `import()`
  * settles a task later even for a module loaded already, and a screen mounted that much after the tap let
- * another move to it in first, the record's «Записали N покупок» lost to the re-read's (`ReceiptView`), and its
- * first request go after the connection did. The function reads the location's `matched` alone.
+ * another move to it in first, the record's «Записали N покупок» lost to the re-read's (`ReceiptView`), and
+ * its first request go after the connection did. The function reads the location's `matched` alone.
  */
 function screenLoads(router: Router): (() => Promise<unknown>)[] {
   return router
