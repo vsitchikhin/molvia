@@ -178,28 +178,46 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
 
 - **In `backend/src/statements/`, one file a bank's format, and a refusal is an answer, never a throw** (MOL-430): a
   parser is the input's adapter — the domain gets lines, the phone parses nothing (Д-3 «а») — and it gives back its
-  statements or what it refused (`TbankRefusal`): the format not known, a record that does not read (its number), a
-  status not known (as printed), a currency Molvia keeps no account in, more than `STATEMENT_LINES_MAX` lines. The
-  upload (MOL-433) makes the answer of it; a `DomainError` carries no word of what was refused to the phone, and the
-  owner's В-4 «а» wants the status named.
+  statements or what it refused, one shape for every parser (`refusal.ts`: `StatementRead`, `StatementRefusal`, review
+  №5): the format not known, a record that does not read (the line of the file it begins on, as an editor counts —
+  a field over two lines and a blank line count, adversarial А7), a status not known (as printed), a currency Molvia
+  keeps no account in, more than `STATEMENT_LINES_MAX` lines. The upload (MOL-433) makes the answer of it; a
+  `DomainError` carries no word of what was refused to the phone, and the owner's В-4 «а» wants the status named.
 - **Columns by their names, never their places; a header no layout knows is refused, never guessed** — T-Bank's
   format changed twice in five years, silently (b-russia.md, 1.4). Names are compared without case, «ё», hyphens and
-  spaces; a column not read may come and go; a header repeated inside the file — exports glued together — is no line.
-  **A CSV is read by `csv.ts`** for every bank: UTF-8 where it is valid, its byte order mark dropped, else
-  Windows-1251; quotes by RFC 4180; a quote never closed refuses the file.
+  spaces; a column not read may come and go. **Exports glued together** repeat their header, each part beginning with
+  it — a byte order mark of its own too — and **a record a part repeats of an earlier part, cell for cell, is read
+  once** (adversarial А4): two exports sharing their edge day gave each line of it twice, both ticked new; two like
+  records of one part stay two operations. **A CSV is read by `csv.ts`** for every bank: UTF-8 where it is valid, its
+  byte order mark dropped, else Windows-1251; quotes by RFC 4180; a quote never closed refuses the file.
 - **Wrong is worse than unread** — a sum with more digits than its currency has, signs of the two sums that disagree,
-  a day no calendar has refuse the file; a line of zero is left out. **An operation in a currency Molvia has not got
-  is the money that left the account**, `debited` none (research §6): the sum is right, the currency it was spent in
-  lost. «Списано» only where the two currencies differ.
+  one sum zero beside the other not, a day no calendar has or before the rates' epoch refuse the file, decided once
+  the whole record has read (review №4); a line of zero is left out, and so is a declined one whose sums disagree —
+  it moved nothing. **An operation in a currency Molvia has not got is the money that left the account**, `debited`
+  none (research §6): the sum is right, the currency it was spent in lost. «Списано» only where the two currencies
+  differ. A bank's text is cut as the schema counts it — UTF-16, never a pair of surrogates in two (review №2).
 - **T-Bank's CSV** (MOL-430, owner's В-1 «а» — no XLSX: the same rows, and a zip of a stranger's unpacked by JSZip
   with no ceiling): the layout of 2026 and the one before it; **its Moscow time is a day on the phone's calendar**
   (`ZONE_HEADER`, MOL-121) — a dinner in Yerevan at 00:30 is 23:30 in Moscow the day before; `SHIFTED_FORMS` keeps
-  its ± 1 for a person who flew. «Учёт в аналитике: Нет» is an own transfer — the bank's word that the money stayed
-  the person's; the kind else by the bank's category, its words and the MCC, padded to four digits. The payee is
-  «Описание»; **«Сообщение» — a person's words to a person — is never read**, nor «Ваша категория». A file of several
-  accounts is a statement each, by «Имя счёта». «В обработке» the format does not mark: every line is posted, the price
-  of section 7 of the research. **Unknown status refuses the file** (owner's В-4 «а»): a hold or a cancellation, the
-  parser cannot tell. The rows of the owner's real export are checked against the 137 lines of his PDF (В-3 «а»).
+  its ± 1 for a person who flew; **the old layout's «Дата платежа», printed bare, moves with its operation** (adversarial
+  А6: a night's line was posted the day before it was made). Each zone's clock is made once a file (`daysIn`,
+  `midnightsIn`) — never kept in the model's module, where every spelling of a zone a request names would stay for
+  good (review №1, adversarial А3: +240 MB for 20 000 spellings).
+- **The kind: a line with no MCC is an own transfer where the bank says so** — «Учёт в аналитике: Нет» in the layout
+  of 2026, its words in the one before, which has no such column. **A line with an MCC is never one**: «Нет» is the
+  person's to set on any line (adversarial А2: a purchase in a supermarket taken out of the bank's analytics was «не
+  трата», silently). **«Внутренний перевод» is no own word**: T-Bank names so a transfer to any of its contracts,
+  another person's too (А1: the owner's PDF holds such transfers to contracts not his) — a transfer, «перевод — трата ли
+  это?», a tap rather than a spending lost. The rest by the bank's category, its words and the MCC, padded to four
+  digits. The payee is «Описание»; **«Сообщение» — a person's words to a person — is never read**, nor «Ваша
+  категория». **A file of several accounts is a statement each, by «Имя счёта» and the account's currency**
+  (adversarial А5: a product's accounts in two currencies may share a name). «В обработке» the format does not mark:
+  every line is posted, the price of section 7 of the research. **Unknown status refuses the file** (owner's В-4 «а»):
+  a hold or a cancellation, the parser cannot tell.
+- **The price, named: T-Bank's layouts, statuses and kinds' words are those of open parsers** (b-russia.md, 1.2),
+  **not checked on the owner's own export yet** — В-3 «а» checks it against the 137 lines of his PDF once he exports
+  it; until then a header spelt otherwise is refused, a status otherwise refuses the file, and a category or a word
+  otherwise gives another kind.
 
 ## The prices, named
 

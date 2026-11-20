@@ -403,7 +403,7 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **A bank's file is parsed by its columns' names, and what the parser does not know refuses the file** (MOL-430,
   `backend/src/statements/`): a header, a status, a sum wider than its currency — named in the answer, never guessed;
   T-Bank's Moscow time is a day on the phone's calendar, «Сообщение» is never read, «Учёт в аналитике: Нет» is an own
-  transfer.
+  transfer only on a line with no MCC, and «Внутренний перевод» is a transfer — a tap, never a spending lost.
 
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 
