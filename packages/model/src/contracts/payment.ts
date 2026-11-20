@@ -75,6 +75,10 @@ export interface TariffOffer {
   readonly tariff: PaidTariff
   readonly cents: number
   readonly amount: Money
+  /**
+   * Both columns, a term the tariff leaves as it is said as it stands — none once over (review №3). The screen reads
+   * a tariff's own column; of `both` it reads neither and says «each from its own end» (`pay.meta.both`).
+   */
   readonly after: PaidAccessView
 }
 
