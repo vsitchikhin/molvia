@@ -331,7 +331,7 @@ export default defineComponent({
       phase,
       other,
       speakOther: () => {
-        choose(other.value)
+        void choose(other.value)
       },
       offered,
       seam,

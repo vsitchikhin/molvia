@@ -92,6 +92,7 @@ import AppField from '@/components/AppField.vue'
 import BottomSheet from '@/components/BottomSheet.vue'
 import { OWN_ICONS } from '@/components/spending'
 import { useFieldRefusal } from '@/composables/useFieldRefusal'
+import { BOTH_LANGUAGES } from '@/i18n/bothLanguages'
 import { newId } from '@/ids'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 
@@ -169,8 +170,9 @@ export default defineComponent({
       const identity = nameIdentity(typed)
       // A preset in every language the app speaks: one's own named as a preset in the other would stand
       // beside it as its twin after a switch of the language (MOL-398, adversarial А3).
+      // Not by `t`: the app holds the device's dictionary alone (MOL-337, adversarial А9).
       const presets = SPENDING_PRESETS.flatMap((preset) =>
-        LOCALES.map((locale) => t(`spending.category.${preset}`, {}, { locale })),
+        LOCALES.map((locale) => BOTH_LANGUAGES[locale].presets[preset]),
       )
       const own = props.categories.flatMap((category) =>
         category.preset === null &&

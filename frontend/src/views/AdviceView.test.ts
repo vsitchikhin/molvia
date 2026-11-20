@@ -29,6 +29,8 @@ import { useActorStore } from '@/stores/actor'
 import { useReceiptQueueStore } from '@/stores/receiptQueue'
 import { useTripStore } from '@/stores/trip'
 import AdviceView from '@/views/AdviceView.vue'
+// A tap here leads to another screen, loaded when first opened (MOL-337): imported up front, it is there.
+import '@molvia/frontend/testing/screens'
 
 const advice = vi.fn<() => Promise<AdviceResponse>>()
 const adviceSearch = vi.fn<(query: string) => Promise<AdviceSearchResponse>>()

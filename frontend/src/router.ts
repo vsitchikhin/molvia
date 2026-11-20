@@ -1,27 +1,8 @@
 import { START_LOCATION, createRouter, createWebHistory } from 'vue-router'
 import type { NavigationGuard, RouteRecordRaw, Router, RouterScrollBehavior } from 'vue-router'
 import type { FfName } from '@molvia/model'
-import SettingsView from '@/views/SettingsView.vue'
-import PrivacyView from '@/views/PrivacyView.vue'
-import TermsView from '@/views/TermsView.vue'
 import AdviceView from '@/views/AdviceView.vue'
-import ItemSearchView from '@/views/ItemSearchView.vue'
-import FinishedTripView from '@/views/FinishedTripView.vue'
-import PurchasesView from '@/views/PurchasesView.vue'
-import ReceiptView from '@/views/ReceiptView.vue'
-import TripView from '@/views/TripView.vue'
-import ExchangeView from '@/views/ExchangeView.vue'
-import IncomesView from '@/views/IncomesView.vue'
-import DevicesView from '@/views/DevicesView.vue'
-import BotView from '@/views/BotView.vue'
-import VerdictsView from '@/views/VerdictsView.vue'
-import MoneySpendingsView from '@/views/MoneySpendingsView.vue'
-import MoneyBudgetView from '@/views/MoneyBudgetView.vue'
-import MoneyView from '@/views/MoneyView.vue'
-import AccountView from '@/views/AccountView.vue'
-import AccountsView from '@/views/AccountsView.vue'
-import MoneyCategoriesView from '@/views/MoneyCategoriesView.vue'
-import MoneyChartsView from '@/views/MoneyChartsView.vue'
+import { lazyScreen } from '@/navigation'
 import { sameScreen, watchBrowserAnimatedBack } from '@/transitions'
 import { atNextFf, ffOn } from '@/stores/ff'
 import { sheetOpen } from '@/composables/useSheetHistory'
@@ -88,13 +69,17 @@ declare module 'vue-router' {
   }
 }
 
-// Not lazy: nine small screens, and a chunk per route would turn the first tap on a tab into
-// a network request exactly where the connection drops.
+// Every screen but home is a chunk of its own, loaded when first opened (MOL-337): a cold start at
+// the shelf parses home and nothing else. MOL-17 kept them all in one bundle so that the first tap on
+// a tab would never go to the network where the connection drops — that still holds: every screen is
+// fetched after the first paint (`warmScreens`) and lies in the precache, and one that failed to load
+// all the same is opened by a full load of its address (`reloadOnStaleChunk`). Home stays in the bundle:
+// it is where the app opens and where «back» leads.
 export const routes = [
   {
     path: '/settings',
     name: 'settings',
-    component: SettingsView,
+    component: lazyScreen(() => import('@/views/SettingsView.vue')),
     meta: { titleKey: 'settings.title', tab: 'settings' },
   },
   // Moved to «Деньги» (MOL-81): a bookmark or the history of an installed app still arrives.
@@ -103,13 +88,13 @@ export const routes = [
   {
     path: '/settings/devices',
     name: 'devices',
-    component: DevicesView,
+    component: lazyScreen(() => import('@/views/DevicesView.vue')),
     meta: { titleKey: 'devices.title', parent: 'settings' },
   },
   {
     path: '/settings/bot',
     name: 'bot',
-    component: BotView,
+    component: lazyScreen(() => import('@/views/BotView.vue')),
     meta: { titleKey: 'bot.title', parent: 'settings' },
   },
   {
@@ -124,7 +109,7 @@ export const routes = [
   {
     path: '/purchases',
     name: 'purchases',
-    component: PurchasesView,
+    component: lazyScreen(() => import('@/views/PurchasesView.vue')),
     meta: { titleKey: 'purchases.title', tab: 'purchases' },
   },
   // The record typed by hand, the screen that was «Поход» with a trip going on. Before the
@@ -132,13 +117,13 @@ export const routes = [
   {
     path: '/purchases/manual',
     name: 'purchase-manual',
-    component: TripView,
+    component: lazyScreen(() => import('@/views/TripView.vue')),
     meta: { titleKey: 'trip.title', parent: 'purchases' },
   },
   {
     path: '/purchases/manual/add',
     name: 'item-search',
-    component: ItemSearchView,
+    component: lazyScreen(() => import('@/views/ItemSearchView.vue')),
     meta: { titleKey: 'item.search_title', parent: 'purchase-manual' },
   },
   // A receipt before it is recorded (MOL-127). Before the records by id: a static segment outranks
@@ -146,13 +131,13 @@ export const routes = [
   {
     path: '/purchases/receipts/:receiptId',
     name: 'purchase-receipt',
-    component: ReceiptView,
+    component: lazyScreen(() => import('@/views/ReceiptView.vue')),
     meta: { titleKey: 'receipt.review.title_loading', parent: 'purchases' },
   },
   {
     path: '/purchases/:tripId',
     name: 'purchase',
-    component: FinishedTripView,
+    component: lazyScreen(() => import('@/views/FinishedTripView.vue')),
     // «Запись», as the record still being typed: the screen is named by its place, and the chevron of
     // its search reads the route's name — «Записанные покупки» there stood for words the screen it led
     // to never said (MOL-208, Е-13, owner's В-1 «а»).
@@ -165,7 +150,7 @@ export const routes = [
   {
     path: '/purchases/:tripId/add',
     name: 'finished-search',
-    component: ItemSearchView,
+    component: lazyScreen(() => import('@/views/ItemSearchView.vue')),
     meta: { titleKey: 'item.search_title', parent: 'purchase' },
   },
   { path: '/trip', redirect: { name: 'purchases' } },
@@ -182,40 +167,40 @@ export const routes = [
   {
     path: '/verdicts',
     name: 'verdicts',
-    component: VerdictsView,
+    component: lazyScreen(() => import('@/views/VerdictsView.vue')),
     meta: { titleKey: 'verdict.title', tab: 'verdicts' },
   },
   // The month is in the address (`?month=2026-09`) and changes by `replace` (MOL-82).
   {
     path: '/money',
     name: 'money',
-    component: MoneyView,
+    component: lazyScreen(() => import('@/views/MoneyView.vue')),
     meta: { titleKey: 'spending.title', tab: 'money' },
   },
   // «Траты» (MOL-159): the journal of the month «Деньги» has open, the month in the same address.
   {
     path: '/money/spendings',
     name: 'money-spendings',
-    component: MoneySpendingsView,
+    component: lazyScreen(() => import('@/views/MoneySpendingsView.vue')),
     meta: { titleKey: 'spending.list.title', parent: 'money' },
   },
   // «Бюджет» (MOL-117): the plans of the month «Деньги» has open, the month in the same address.
   {
     path: '/money/budget',
     name: 'money-budget',
-    component: MoneyBudgetView,
+    component: lazyScreen(() => import('@/views/MoneyBudgetView.vue')),
     meta: { titleKey: 'budget.title', parent: 'money' },
   },
   {
     path: '/money/exchange',
     name: 'exchange',
-    component: ExchangeView,
+    component: lazyScreen(() => import('@/views/ExchangeView.vue')),
     meta: { titleKey: 'exchange.title', parent: 'money' },
   },
   {
     path: '/money/incomes',
     name: 'incomes',
-    component: IncomesView,
+    component: lazyScreen(() => import('@/views/IncomesView.vue')),
     meta: { titleKey: 'income.title', parent: 'money' },
   },
   // «Графики» (MOL-74, MOL-158): «Месяц · Год» (`?mode=year`), the month (`?month=`) and the
@@ -224,7 +209,7 @@ export const routes = [
   {
     path: '/money/charts',
     name: 'money-charts',
-    component: MoneyChartsView,
+    component: lazyScreen(() => import('@/views/MoneyChartsView.vue')),
     meta: { titleKey: 'spending.charts.title', parent: 'money' },
     beforeEnter: (to) => {
       if (to.query.period === undefined) return true
@@ -235,27 +220,27 @@ export const routes = [
   {
     path: '/money/categories',
     name: 'money-categories',
-    component: MoneyCategoriesView,
+    component: lazyScreen(() => import('@/views/MoneyCategoriesView.vue')),
     meta: { titleKey: 'spending.categories.title', parent: 'money' },
   },
   // «Счета» and one account (MOL-123): where the money lies, counted by the server.
   {
     path: '/money/accounts',
     name: 'money-accounts',
-    component: AccountsView,
+    component: lazyScreen(() => import('@/views/AccountsView.vue')),
     meta: { titleKey: 'accounts.title', parent: 'money' },
   },
   {
     path: '/money/accounts/:accountId',
     name: 'money-account',
-    component: AccountView,
+    component: lazyScreen(() => import('@/views/AccountView.vue')),
     meta: { titleKey: 'accounts.title', parent: 'money-accounts' },
   },
   // Under the settings, and open without a session: it is read before deciding to sign in (MOL-58).
   {
     path: '/privacy',
     name: 'privacy',
-    component: PrivacyView,
+    component: lazyScreen(() => import('@/views/PrivacyView.vue')),
     meta: { titleKey: 'privacy.title', parent: 'settings', public: true },
   },
   // Beside it, and open without a session for the same reason: it is read before saying yes to it
@@ -263,7 +248,7 @@ export const routes = [
   {
     path: '/terms',
     name: 'terms',
-    component: TermsView,
+    component: lazyScreen(() => import('@/views/TermsView.vue')),
     meta: { titleKey: 'terms.title', parent: 'settings', public: true },
   },
   // Every piece of the kit in every state, and the sheet in a real history — for the eye in both

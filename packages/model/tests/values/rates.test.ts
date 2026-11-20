@@ -9,6 +9,7 @@ import {
   RATE_BASE,
   RATE_SCALE,
   dayIn,
+  daysIn,
   decimalFromRate,
   earliestDay,
   exchangeRateSchema,
@@ -21,6 +22,7 @@ import {
   isTimeZone,
   latestDay,
   midnightIn,
+  midnightsIn,
   parseRate,
   pickOfficialRate,
   publishes,
@@ -806,6 +808,17 @@ describe('dayIn and midnightIn (MOL-121, adversarial round 4)', () => {
     expect(midnightIn('2026-03-09', 'America/New_York').toISOString()).toBe(
       '2026-03-09T04:00:00.000Z',
     )
+  })
+
+  it('answers through a clock held for one zone as through the single calls (MOL-430)', () => {
+    const days = daysIn('America/New_York')
+    const midnights = midnightsIn('America/New_York')
+    for (const day of ['2026-03-08', '2026-03-09', '2026-11-01', '2026-11-02']) {
+      expect(midnights(day)).toEqual(midnightIn(day, 'America/New_York'))
+      expect(days(midnights(day))).toBe(day)
+    }
+    expect(daysIn()(new Date('2026-08-31T20:30:00Z'))).toBe('2026-09-01')
+    expect(midnightsIn()('2026-09-11')).toEqual(midnightIn('2026-09-11'))
   })
 
   it('knows a zone by its name only', () => {

@@ -1,7 +1,15 @@
-import { useRoute, useRouter } from 'vue-router'
-import type { LocationQuery, RouteLocationNormalizedLoaded, RouteParams, Router } from 'vue-router'
+import { loadRouteLocation, useRoute, useRouter } from 'vue-router'
+import type {
+  LocationQuery,
+  RouteLocationNormalized,
+  RouteLocationNormalizedLoaded,
+  RouteParams,
+  Router,
+} from 'vue-router'
 import type { RouteName, Tab } from '@/router'
+import { ScreenNotLoaded, reportFailure } from '@/failures'
 import { useLoginStore } from '@/stores/login'
+import { read, writeOwn } from '@/stores/storage'
 
 /**
  * How a tap on a tab is written into the history.
@@ -165,27 +173,185 @@ export async function settleColdStart(router: Router, door = () => false): Promi
   const parent = parentName(route)
   if (!parent || router.options.history.state.back) return
 
-  // A public screen behind the door leads back to it, and the door stands at home (MOL-216, В-1 «а»):
-  // with «Настройки» underneath, a stranger who read the privacy page signed in onto the settings.
-  if (route.meta.public && door()) {
-    await router.replace({ name: HOME })
-    await router.push(route.fullPath)
-    return
-  }
+  // The address a parent's code that did not come is to load in its place (`reloadOnStaleChunk`).
+  settling = route.fullPath
+  try {
+    // A public screen behind the door leads back to it, and the door stands at home (MOL-216, В-1 «а»):
+    // with «Настройки» underneath, a stranger who read the privacy page signed in onto the settings.
+    if (route.meta.public && door()) {
+      await router.replace({ name: HOME })
+      await router.push(route.fullPath)
+      return
+    }
 
-  const ancestors: string[] = []
-  let cursor = router.resolve(route.fullPath)
-  let ancestor = parentOf(router, cursor)
-  while (ancestor) {
-    ancestors.unshift(ancestor.fullPath)
-    cursor = ancestor
-    ancestor = parentOf(router, cursor)
+    const ancestors: string[] = []
+    let cursor = router.resolve(route.fullPath)
+    let ancestor = parentOf(router, cursor)
+    while (ancestor) {
+      ancestors.unshift(ancestor.fullPath)
+      cursor = ancestor
+      ancestor = parentOf(router, cursor)
+    }
+    const root = ancestors.shift()
+    if (!root) return
+    await router.replace(root)
+    for (const path of ancestors) await router.push(path)
+    await router.push(route.fullPath)
+  } finally {
+    settling = null
   }
-  const root = ancestors.shift()
-  if (!root) return
-  await router.replace(root)
-  for (const path of ancestors) await router.push(path)
-  await router.push(route.fullPath)
+}
+
+/**
+ * A screen's code, loaded when the screen is first opened (MOL-337). A failure to load it is told apart
+ * from any other failure of a move: it is the connection's or a release's, never a defect of the phone,
+ * and `reloadOnStaleChunk` opens the screen by a full load. A module that came and threw as it ran is our
+ * defect, and goes on as it was thrown (adversarial А1).
+ */
+export function lazyScreen<T>(load: () => Promise<T>): () => Promise<T> {
+  return () =>
+    load().catch((cause: unknown) => {
+      throw chunkNotLoaded(cause) ? new ScreenNotLoaded('screen not loaded', { cause }) : cause
+    })
+}
+
+/**
+ * Whether a failed `import()` is a chunk that did not come — cut, missing, answered with a page — rather than a
+ * module that came and threw: an engine says so in its own words, probed on Chromium and WebKit (MOL-337,
+ * adversarial А1), Firefox by its source. A throw of the module is its own error — `TypeError … is not a
+ * function`, a `SyntaxError`. Nothing is preloaded beside a screen's `import()` (`vite.config.ts`, adversarial
+ * А14), so Vite's own words of a preload are not among them. **The price, named:** an engine that words it
+ * otherwise has its chunk counted as our defect — heard by the owner, and the screen not reloaded.
+ */
+const CHUNK_NOT_LOADED = [
+  /^Failed to fetch dynamically imported module/,
+  /^Importing a module script failed/,
+  /is not a valid JavaScript MIME type/,
+  /^error loading dynamically imported module/,
+]
+
+function chunkNotLoaded(error: unknown): boolean {
+  return error instanceof Error && CHUNK_NOT_LOADED.some((words) => words.test(error.message))
+}
+
+/**
+ * Every screen's code, loaded one at a time once the first screen is drawn (MOL-337, owner's В-1 «а»), so
+ * that no tap waits for the network — the reason MOL-17 kept them in one bundle. The precache holds them
+ * all, but not for the page that installed the worker, which nothing claims (`pwaUpdate.ts`), nor for an
+ * old page after a release that took its chunks off the server: such a page keeps its screens in memory
+ * once this has run. A chunk that did not come is left to the move that needs the screen, a module that threw is
+ * reported; a pause before each screen lets the page draw what it is doing meanwhile.
+ */
+export async function warmScreens(
+  router: Router,
+  pause: () => Promise<void> = () =>
+    new Promise((done) => {
+      setTimeout(done, 0)
+    }),
+  report: (error: unknown) => void = (error) => {
+    reportFailure(error, 'screen')
+  },
+): Promise<void> {
+  for (const load of screenLoads(router)) {
+    await pause()
+    try {
+      await load()
+    } catch (error) {
+      // A chunk that did not come is the weather, and the move that opens the screen asks again; a module that
+      // came and threw is our defect, heard at the launch that loaded it, as in the bundle (adversarial А12).
+      if (!(error instanceof ScreenNotLoaded)) report(error)
+    }
+  }
+}
+
+/**
+ * Every screen's code at once, waited for before the first paint — on the dev server alone (MOL-337), which
+ * has no precache: there a screen not yet loaded is out of reach with the connection gone, and a spec that
+ * goes offline and taps a tab found it so. Loaded first, the dev server's start is what the one bundle was.
+ */
+export async function loadScreens(router: Router): Promise<void> {
+  await Promise.allSettled(screenLoads(router).map((load) => load()))
+}
+
+/**
+ * The loads of the screens not loaded yet, each by the router's own `loadRouteLocation`, which keeps the screen
+ * it loaded in its record as a move does (MOL-337): a move to it then waits for nothing — a dynamic `import()`
+ * settles a task later even for a module loaded already, and a screen mounted that much after the tap let
+ * another move to it in first, the record's «Записали N покупок» lost to the re-read's (`ReceiptView`), and
+ * its first request go after the connection did. The function reads the location's `matched` alone.
+ */
+function screenLoads(router: Router): (() => Promise<unknown>)[] {
+  return router
+    .getRoutes()
+    .filter(({ components }) =>
+      Object.values(components ?? {}).some(
+        (component) => typeof component === 'function' && !('displayName' in component),
+      ),
+    )
+    .map(
+      (record) => () =>
+        loadRouteLocation({ matched: [record] } as unknown as RouteLocationNormalized),
+    )
+}
+
+/** When this tab last opened a screen by a full load, so that a failure does not load in a loop. */
+export const SCREEN_RELOAD_KEY = 'molvia.screen-reload'
+/** How long after a full load of a screen another one is not tried. */
+export const SCREEN_RELOAD_GAP_MS = 30 * 1000
+
+export interface ScreenReloadEnvironment {
+  online(): boolean
+  assign(href: string): void
+  now(): number
+  /** Any other failure of a move: the phone's defect, for the owner to hear. */
+  report(error: unknown): void
+}
+
+const BROWSER: ScreenReloadEnvironment = {
+  online: () => navigator.onLine,
+  assign: (href) => {
+    window.location.assign(href)
+  },
+  now: () => Date.now(),
+  report: (error) => {
+    reportFailure(error, 'screen')
+  },
+}
+
+/**
+ * The address a cold start is laying its parents under (`settleColdStart`): a parent whose code did not come
+ * is no reason to lose the screen opened, so the full load goes there (MOL-337, adversarial А4).
+ */
+let settling: string | null = null
+
+/**
+ * A screen whose code did not come is opened by a full load of its address (MOL-337, owner's В-2 «а»):
+ * the page asked for a chunk a release took off the server, and the load brings the new version and its
+ * chunks. The person tapped, so nothing is reloaded under them that they did not ask for. Without a
+ * connection the move is cancelled and the page stays — the strip says it is offline; and once a tab has
+ * loaded a screen so, it does not again for `SCREEN_RELOAD_GAP_MS`, so a chunk missing from the new
+ * version too cannot load in a loop.
+ */
+export function reloadOnStaleChunk(
+  router: Router,
+  environment: ScreenReloadEnvironment = BROWSER,
+): void {
+  router.onError((error, to) => {
+    // A guard that threw, a screen's module that threw as it ran: `RouterLink` swallows the move's refusal,
+    // and nothing else would tell the owner (adversarial А1).
+    if (!(error instanceof ScreenNotLoaded)) {
+      environment.report(error)
+      return
+    }
+    if (!environment.online()) return
+    const at = environment.now()
+    const last = Number(read(SCREEN_RELOAD_KEY, true))
+    // A mark ahead of the clock is a clock set back since, and guards nothing (adversarial А13).
+    if (Number.isFinite(last) && last > 0 && last <= at && at - last < SCREEN_RELOAD_GAP_MS) return
+    // A mark the tab cannot keep guards nothing: no load at all rather than one in a loop (adversarial А6).
+    if (!writeOwn(SCREEN_RELOAD_KEY, String(at))) return
+    environment.assign(router.resolve(settling ?? to.fullPath).href)
+  })
 }
 
 function prefersReducedMotion(): boolean {

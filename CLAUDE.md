@@ -400,6 +400,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   answers `too_heavy` and weighs none; the matching skips what a failed search went through (А20), and past
   `STATEMENT_STEPS_MAX` steps stops with `too_heavy` too (А22) — 1.3 s at worst; a refund weighs the sellers of its
   sum alone, counted in the pairs (А23), and names weigh by their words, eight at most (А24).
+- **A bank's file is parsed by its columns' names, and what the parser does not know refuses the file** (MOL-430,
+  `backend/src/statements/`): a header, a status, a sum wider than its currency — named in the answer, never guessed;
+  T-Bank's Moscow time is a day on the phone's calendar, «Сообщение» is never read, an own transfer
+  is a line with no MCC the bank's words call one, with «Учёт в аналитике: Нет» beside them — «Нет» alone is the
+  person's switch, and «Внутренний перевод» is a transfer: a tap, never a spending lost.
 
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 
@@ -709,6 +714,12 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`),
   **or by «Обновить»** (MOL-132): never reloaded without the tap; the strip is the top row over the
   tab bar, and an error while a version waits offers it first.
+- **Every screen but home is a chunk, all loaded once the first is drawn; one dictionary at the start**
+  (MOL-337): `lazyScreen` in `router.ts`, `warmScreens` after the paint — a first visit and an old page after a
+  release are under no precache, the dev server loads them before it — a screen whose code did not come opened
+  by a full load, once in 30 s, a module that threw as it ran never — it is our defect; a
+  language spoken once its dictionary is here; modules run in the source's order (`strictExecutionOrder`); words
+  read back in either language are `BOTH_LANGUAGES`, never a dictionary, which would pull its whole chunk in.
 - **The bars are opaque `--surface`; the docked strip's margins and column are `AppScreen`'s, and
   «Вернуть» is its `#undo`, 8 over the strip** (MOL-179): never in `#docked`, never a wrapper's
   padding in a screen; a sheet's «Вернуть» stays in its footer.

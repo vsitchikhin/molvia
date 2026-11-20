@@ -13,6 +13,8 @@ import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
 import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import MoneyBudgetViewScreen from './MoneyBudgetView.vue'
+// A tap here leads to another screen, loaded when first opened (MOL-337): imported up front, it is there.
+import '@molvia/frontend/testing/screens'
 
 const moneyBudget = vi.fn<(month: string) => Promise<MoneyBudgetView>>()
 const setBudgetPlan = vi.fn<(body: BudgetPlanBody) => Promise<MoneyBudgetView>>()
