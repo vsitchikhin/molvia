@@ -536,12 +536,16 @@ that are easiest to break; the file holds every rule of the area and the reason 
 ### Payments: the journal, tariffs, access paid for — `.claude/rules/payments.md`
 
 - **One journal for every channel** (MOL-283): `payments`, a channel is a `PaymentChannelAdapter`; the price is fixed
-  at creation — the dollar anchor at the official rate fresh for the day, rounded up to 10 ֏ — and none without a rate.
+  at creation — the dollar anchor at the CBA's rate fresh for today in Yerevan, rounded up to 10 ֏ — and none without
+  it, never another provider's.
 - **«Paid» is set once, the access with it**: the person's row locked, `update … where state = 'created'`, thirty days
-  from the end of a running term or from now in the same transaction; any later word moves nothing.
-- **A whole refund takes the thirty days back, never earlier than now; refunds add up, the bank asked first.**
+  from the end of a running term or from now in the same transaction; any later word moves nothing — but the bank's
+  «paid» over our «abandoned».
+- **A whole refund takes back the payment's days not lived yet, never earlier than now; refunds add up, the bank asked
+  first.**
 - **Erasure lets the person go and keeps the payment** (`set null`, Ameriabank's three years); every payment goes three
-  years after its last movement; the holder's name, email and card are never kept.
+  years after its last movement, one no bank ever saw goes with the person; the holder's name, email and card are never
+  kept.
 
 ### Feedback: «Написать разработчику» — `.claude/rules/feedback.md`
 
