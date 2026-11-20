@@ -361,7 +361,7 @@ export async function aLife(
     threadId: message.id,
     inReplyTo: reply?.id,
   })
-  // A payment (MOL-283): erasure lets the person go and keeps the row for the bank's three years.
+  // A payment the bank named (MOL-283): erasure lets the person go and keeps the row for the bank's three years.
   await db.insert(payments).values({
     id: randomUUID(),
     actorId,
@@ -369,10 +369,11 @@ export async function aLife(
     anchorMinor: 100n,
     anchorCurrency: 'USD',
     rateScaled: 383_120_000n,
-    rateDay: '2026-09-18',
+    rateAsOf: new Date('2026-09-18T00:00:00+04:00'),
     amountMinor: 39_000n,
     currency: 'AMD',
     channel: 'ameriabank',
+    channelRef: randomUUID(),
   })
   return { ownItem, exchangeId, incomeId, spendingId, accountId, receiptId, transferId }
 }

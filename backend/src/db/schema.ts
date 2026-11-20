@@ -3437,9 +3437,9 @@ export const payments = pgTable(
     tariff: text('tariff').$type<PaymentTariff>().notNull(),
     anchorMinor: bigint('anchor_minor', { mode: 'bigint' }).notNull(),
     anchorCurrency: char('anchor_currency', { length: 3 }).$type<Currency>().notNull(),
-    // drams per dollar at six digits, the official rate of `rate_day`
+    // drams per dollar at six digits, the CBA's rate the price was made at, and the moment it is of
     rateScaled: bigint('rate_scaled', { mode: 'bigint' }).notNull(),
-    rateDay: date('rate_day', { mode: 'string' }).notNull(),
+    rateAsOf: timestamp('rate_as_of', { withTimezone: true }).notNull(),
     amountMinor: bigint('amount_minor', { mode: 'bigint' }).notNull(),
     currency: char('currency', { length: 3 }).$type<Currency>().notNull(),
     channel: text('channel').$type<PaymentChannel>().notNull(),
@@ -3455,6 +3455,9 @@ export const payments = pgTable(
       .notNull()
       .default(sql`clock_timestamp()`),
     paidAt: timestamp('paid_at', { withTimezone: true }),
+    // where the payment's days of each access it extended end — a whole refund takes back the unlived ones
+    sharedUntil: timestamp('shared_until', { withTimezone: true }),
+    receiptsModelUntil: timestamp('receipts_model_until', { withTimezone: true }),
     // declined, abandoned or refunded whole
     closedAt: timestamp('closed_at', { withTimezone: true }),
     // the last movement: created, paid, closed or a refund — three years from it the row goes
@@ -3466,7 +3469,6 @@ export const payments = pgTable(
     uniqueIndex('payments_order_no_key').on(table.orderNo),
     uniqueIndex('payments_channel_ref_key').on(table.channel, table.channelRef),
     index('payments_actor_idx').on(table.actorId),
-    index('payments_created_idx').on(table.state, table.createdAt),
     index('payments_moved_idx').on(table.movedAt),
     check('payments_tariff_known', oneOf(table.tariff, paymentTariffSchema.options)),
     check('payments_state_known', oneOf(table.state, paymentStateSchema.options)),

@@ -123,7 +123,8 @@ export interface ErasureReport {
   readonly memoryReleased: number
   /**
    * Payments this person made (MOL-283): they stay, with `actor_id` nulled — Ameriabank's terms §3.9 keep card
-   * records three years, and the journal's own timer deletes a payment three years after its last movement.
+   * records three years, and the journal's own timer deletes a payment three years after its last movement. One
+   * the channel never named reached no bank and has no card record to keep: it goes, uncounted (adversarial А6).
    */
   readonly paymentsReleased: number
   /**
@@ -523,6 +524,9 @@ export function createErasureRepository(db: Db): ErasureRepository {
                 and ${groupGoes(actorId)}
               order by i.id`)
             leavingItems = going.map((row) => row.id)
+            await tx.execute(
+              sql`delete from payments where actor_id = ${actorId} and channel_ref is null`,
+            )
             const [counts] = await tx.execute<{
               own: number
               codes: number

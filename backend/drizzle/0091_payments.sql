@@ -1,6 +1,7 @@
--- MOL-283. Журнал платежей — общий для всех каналов (Америабанк — MOL-277): тариф, якорь в долларах, курс дня, драмы,
--- номер заказа целым числом, состояние и номера канала. Стирание отвязывает платёж от человека (set null) — договор
--- банка, п. 3.9, держит записи три года. Только добавление: откат образа таблицу не читает.
+-- MOL-283. Журнал платежей — общий для всех каналов (Америабанк — MOL-277): тариф, якорь в долларах, курс ЦБ РА
+-- и его момент, драмы, номер заказа целым числом, состояние, номера канала и где кончились дни платежа. Стирание
+-- отвязывает платёж от человека (set null) — договор банка, п. 3.9, держит записи три года; платёж, не дошедший до
+-- банка, уходит с человеком. Только добавление: откат образа таблицу не читает.
 CREATE TABLE "payments" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"order_no" bigint GENERATED ALWAYS AS IDENTITY (sequence name "payments_order_no_seq" INCREMENT BY 1 MINVALUE 1 MAXVALUE 9223372036854775807 START WITH 1 CACHE 1),
@@ -9,7 +10,7 @@ CREATE TABLE "payments" (
 	"anchor_minor" bigint NOT NULL,
 	"anchor_currency" char(3) NOT NULL,
 	"rate_scaled" bigint NOT NULL,
-	"rate_day" date NOT NULL,
+	"rate_as_of" timestamp with time zone NOT NULL,
 	"amount_minor" bigint NOT NULL,
 	"currency" char(3) NOT NULL,
 	"channel" text NOT NULL,
@@ -20,6 +21,8 @@ CREATE TABLE "payments" (
 	"approval_code" text,
 	"created_at" timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
 	"paid_at" timestamp with time zone,
+	"shared_until" timestamp with time zone,
+	"receipts_model_until" timestamp with time zone,
 	"closed_at" timestamp with time zone,
 	"moved_at" timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
 	CONSTRAINT "payments_tariff_known" CHECK ("payments"."tariff" in ('data', 'receipts', 'both', 'tip')),
@@ -39,5 +42,4 @@ ALTER TABLE "payments" ADD CONSTRAINT "payments_actor_id_actors_id_fk" FOREIGN K
 CREATE UNIQUE INDEX "payments_order_no_key" ON "payments" USING btree ("order_no");--> statement-breakpoint
 CREATE UNIQUE INDEX "payments_channel_ref_key" ON "payments" USING btree ("channel","channel_ref");--> statement-breakpoint
 CREATE INDEX "payments_actor_idx" ON "payments" USING btree ("actor_id");--> statement-breakpoint
-CREATE INDEX "payments_created_idx" ON "payments" USING btree ("state","created_at");--> statement-breakpoint
 CREATE INDEX "payments_moved_idx" ON "payments" USING btree ("moved_at");

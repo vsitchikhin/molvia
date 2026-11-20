@@ -251,6 +251,32 @@ describe('стирание владельца по Telegram-id (MOL-58)', () => 
     expect(after).toEqual({ ...before, actorId: null })
   })
 
+  it('платёж, не дошедший до банка, уходит с человеком (MOL-283, адверсариал А6)', async () => {
+    const tg = telegramId()
+    const anna = await insertActor(db, { telegramUserId: tg })
+    await aLife(db, anna, tg, { itemId: await insertSeedItem(db), placeId: await insertPlace(db) })
+    const named = onlyRow(await db.select().from(payments).where(eq(payments.actorId, anna)))
+    await db.insert(payments).values({
+      id: randomUUID(),
+      actorId: anna,
+      tariff: 'receipts',
+      anchorMinor: 200n,
+      anchorCurrency: 'USD',
+      rateScaled: 383_120_000n,
+      rateAsOf: new Date('2026-09-18T00:00:00+04:00'),
+      amountMinor: 77_000n,
+      currency: 'AMD',
+      channel: 'ameriabank',
+    })
+
+    const report = await erasure.erase(tg, { dryRun: false })
+
+    expect(report.paymentsReleased).toBe(1)
+    expect(
+      sorted((await db.select({ id: payments.id }).from(payments)).map((row) => row.id)),
+    ).toEqual([named?.id])
+  })
+
   it('места остаются все — и то, где бывал только он (решение Q4)', async () => {
     const tg = telegramId()
     const anna = await insertActor(db, { telegramUserId: tg })

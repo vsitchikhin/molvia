@@ -1,5 +1,5 @@
 {
-  "id": "2a8a08e4-11e4-4857-9305-b6bcfb1e500e",
+  "id": "60f2ed92-a206-48c5-94aa-fbc859484bf7",
   "prevId": "9badc4aa-e26e-4c34-bc5e-813c78f586c1",
   "version": "7",
   "dialect": "postgresql",
@@ -4646,9 +4646,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "rate_day": {
-          "name": "rate_day",
-          "type": "date",
+        "rate_as_of": {
+          "name": "rate_as_of",
+          "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true
         },
@@ -4715,6 +4715,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "shared_until": {
+          "name": "shared_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "receipts_model_until": {
+          "name": "receipts_model_until",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
         "closed_at": {
           "name": "closed_at",
           "type": "timestamp with time zone",
@@ -4771,27 +4783,6 @@
           "columns": [
             {
               "expression": "actor_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "payments_created_idx": {
-          "name": "payments_created_idx",
-          "columns": [
-            {
-              "expression": "state",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            },
-            {
-              "expression": "created_at",
               "isExpression": false,
               "asc": true,
               "nulls": "last"

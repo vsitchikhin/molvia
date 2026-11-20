@@ -70,7 +70,8 @@ export const EXPORT_FORMAT = 'molvia-export'
 // model read in the person's month, and a receipt's `sentMonth`, `counted` and `retakenAt`, the month it counts in, how
 // it was counted and when «Переснять» gave that back (MOL-275). 37: a receipt's `rounding`, a pharmacy's rounding the
 // lines make the total less, either sign (MOL-421). 38: `payments`, the person's payments — the tariff, the dollar
-// anchor, the rate of its day, the drams charged and refunded, the channel's numbers and the moments (MOL-283).
+// anchor, the CBA's rate and its moment, the drams charged and refunded, the channel's numbers, where its days of
+// access end and the moments (MOL-283).
 export const EXPORT_VERSION = 38
 
 const day = z.iso.date()
@@ -563,7 +564,7 @@ const paymentSchema = z.strictObject({
   tariff: z.string(),
   anchor: signedMoneyCodec,
   rate: rateNumber,
-  rateDay: day,
+  rateAsOf: isoDate,
   amount: signedMoneyCodec,
   refunded: signedMoneyCodec,
   channel: z.string(),
@@ -573,6 +574,8 @@ const paymentSchema = z.strictObject({
   approvalCode: z.string().nullable(),
   createdAt: isoDate,
   paidAt: isoDate.nullable(),
+  sharedUntil: isoDate.nullable(),
+  receiptsModelUntil: isoDate.nullable(),
   closedAt: isoDate.nullable(),
   movedAt: isoDate,
 })
