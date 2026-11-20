@@ -1,4 +1,4 @@
-import { and, eq, gt, inArray, sql } from 'drizzle-orm'
+import { and, eq, gt, inArray, lte, sql } from 'drizzle-orm'
 import {
   PAYMENT_KEEP_YEARS,
   accessOf,
@@ -289,9 +289,11 @@ export function createPaymentsRepository(db: Db): PaymentsRepository {
       // journal is what the access was paid by (adversarial Д1). A refunded one's ends are gone with its days.
       const last = sql`greatest(${payments.movedAt}, case when ${payments.state} = 'paid'
         then greatest(${payments.sharedUntil}, ${payments.receiptsModelUntil}) end)`
+      const kept = sql`${at(now)} - make_interval(years => ${PAYMENT_KEEP_YEARS})`
+      // `moved_at` first, though `last` is never below it: the index leaves the young rows out (review №12).
       const gone = await db
         .delete(payments)
-        .where(sql`${last} <= ${at(now)} - make_interval(years => ${PAYMENT_KEEP_YEARS})`)
+        .where(and(lte(payments.movedAt, kept), sql`${last} <= ${kept}`))
         .returning({ id: payments.id })
       return gone.length
     },
