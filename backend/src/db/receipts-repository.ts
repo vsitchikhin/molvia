@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, inArray, sql } from 'drizzle-orm'
-import type { SQL } from 'drizzle-orm'
+import type { Column, SQL } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import type { AnyPgColumn } from 'drizzle-orm/pg-core'
 import {
   DomainError,
@@ -130,6 +131,8 @@ export interface ReceiptHead {
   readonly printedOn: string | null
   readonly printedTime: string | null
   readonly receiptNo: string | null
+  /** The till's serial, the seller of the key where no tax number is printed (MOL-422); a model's reading only. */
+  readonly till?: string | null
   readonly totalMinor: bigint | null
   /**
    * The total as the reading found it in one place, vouched for or not (MOL-244): for «Прочитали не всё»
@@ -643,15 +646,10 @@ export interface ReceiptRepository {
   /** Where these sellers' receipts were recorded, in a country, by anyone, the purchases still there. */
   placesOfTins(actorId: string, tins: readonly string[], country: string): Promise<TinPlace[]>
   /**
-   * The person's receipt of this tax number and number, recorded as purchases still there (Т-11):
+   * The person's other receipt of the same paper as this one, recorded as purchases still there (Т-11):
    * `recordedTwinOf`, the one rule a trip's «Вернуть» reads as well (MOL-254).
    */
-  recordedTwin(
-    actorId: string,
-    tin: string,
-    receiptNo: string,
-    except: string,
-  ): Promise<RecordedTwin | null>
+  recordedTwin(actorId: string, receiptId: string): Promise<RecordedTwin | null>
   /**
    * «Удалить чек»: a mark. A receipt recorded as purchases still there is refused (409): the trip is
    * dated, named «из чека» and guarded against a second record by this row (MOL-126) — it goes with
@@ -896,18 +894,43 @@ function sentColumn(row: { via: ReceiptVia | null; qrMissed: boolean | null }) {
   return row.qrMissed === true ? 'sentPasteMissed' : 'sentPaste'
 }
 
+/** One side of the key against a second record: a row's columns, or a receipt's values. */
+interface KeySide {
+  readonly tin: Column | SQL | string | null
+  readonly till: Column | SQL | string | null
+  readonly receiptNo: Column | SQL | string | null
+}
+
 /**
- * The one rule of a second record of a receipt (Т-11): the person's receipt of this tax number and
- * number, recorded, its trip not marked removed — for «Записать», the review, the bot and a trip's
- * «Вернуть» alike (MOL-254). A trip only marked removed holds no new shot: it may never come back.
+ * Two receipts of one paper (Т-11): the same number of the same till where either names its till — Georgia's «Fsmd»,
+ * whose number is the till's own count (MOL-422, adversarial А1) — else of the same tax number. Either side columns or
+ * values; `coalesce` gives a value the column's type. A null is SQL's own and matches nothing, so a receipt with no
+ * number, or with no seller, is held by its id alone; a Georgian number read without its till is none (`keyOf`).
+ */
+function sameReceiptKey(row: KeySide, key: KeySide): SQL {
+  return sql`(${row.receiptNo} = ${key.receiptNo} and (${row.till} = ${key.till}
+    or (coalesce(${row.till}, ${key.till}) is null and ${row.tin} = ${key.tin})))`
+}
+
+/** The key's columns of a table under an alias of raw SQL. */
+const keyColumnsOf = (table: 'twin' | 'r'): KeySide => ({
+  tin: sql.raw(`${table}.tin`),
+  till: sql.raw(`${table}.till`),
+  receiptNo: sql.raw(`${table}.receipt_no`),
+})
+
+/**
+ * The one rule of a second record of a receipt (Т-11): the person's other receipt of the same paper as this one
+ * (`sameReceiptKey`), recorded, its trip not marked removed — for «Записать», the review, the bot and a trip's
+ * «Вернуть» alike (MOL-254). Read off the receipt's own row, so no caller spells the key. A trip only marked removed
+ * holds no new shot: it may never come back.
  */
 export async function recordedTwinOf(
   db: Conn,
   actorId: string,
-  tin: string,
-  receiptNo: string,
-  except: string,
+  receiptId: string,
 ): Promise<RecordedTwin | null> {
+  const own = alias(receipts, 'own')
   const [twin] = await db
     .select({
       receiptId: receipts.id,
@@ -916,12 +939,14 @@ export async function recordedTwinOf(
     })
     .from(receipts)
     .innerJoin(trips, and(eq(trips.id, receipts.tripId), sql`${trips.deletedAt} is null`))
+    .innerJoin(
+      own,
+      and(eq(own.id, receiptId), eq(own.actorId, actorId), sameReceiptKey(receipts, own)),
+    )
     .where(
       and(
         eq(receipts.actorId, actorId),
-        eq(receipts.tin, tin),
-        eq(receipts.receiptNo, receiptNo),
-        sql`${receipts.id} <> ${except}`,
+        sql`${receipts.id} <> ${receiptId}`,
         eq(receipts.status, 'recorded'),
       ),
     )
@@ -967,10 +992,10 @@ async function takeCount(
 
 /**
  * A receipt the model read to the review counts among its person's (MOL-275): once, and never where a receipt of
- * theirs of the same tax number and number counted before and was not given back by «Переснять» — a removed one still
- * in the table too; a receipt with neither is its own. A trial receipt while nothing is paid and one is left, else a
- * place alone — a reading in flight past the trial too — and the receipt keeps which (`counted`), so «Переснять» gives
- * back what it took (В-4 «а»).
+ * theirs of the same paper (`sameReceiptKey`: the number with the till's serial or the tax number — MOL-422) counted
+ * before and was not given back by «Переснять» — a removed one still in the table too; a receipt with no key is its
+ * own. A trial receipt while nothing is paid and one is left, else a place alone — a reading in flight past the trial
+ * too — and the receipt keeps which (`counted`), so «Переснять» gives back what it took (В-4 «а»).
  */
 async function countModelReceipt(tx: Conn, id: string): Promise<void> {
   const [receipt] = await tx.execute<{ actorId: string; month: string }>(sql`
@@ -980,7 +1005,7 @@ async function countModelReceipt(tx: Conn, id: string): Promise<void> {
         select 1 from ${receipts} twin
         where twin.actor_id = r.actor_id and twin.id <> r.id
           and twin.counted is not null and twin.retaken_at is null
-          and twin.tin = r.tin and twin.receipt_no = r.receipt_no)`)
+          and ${sameReceiptKey(keyColumnsOf('twin'), keyColumnsOf('r'))})`)
   if (receipt === undefined) return
   const person = await personOf(tx, receipt.actorId, receipt.month)
   if (person === null) return
@@ -1510,8 +1535,8 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
       }))
     },
 
-    async recordedTwin(actorId, tin, receiptNo, except) {
-      return recordedTwinOf(db, actorId, tin, receiptNo, except)
+    async recordedTwin(actorId, receiptId) {
+      return recordedTwinOf(db, actorId, receiptId)
     },
 
     async remove(actorId, id, { retake = false } = {}) {
@@ -1528,6 +1553,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
             counted: receipts.counted,
             sentMonth: receipts.sentMonth,
             tin: receipts.tin,
+            till: receipts.till,
             receiptNo: receipts.receiptNo,
           })
           .from(receipts)
@@ -1559,7 +1585,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                     sql`${receipts.counted} is null`,
                     sql`${receipts.status} in ('parsed', 'recorded')`,
                     readByModelSql(sql`${receipts.readerVersion}`),
-                    sql`${receipts.tin} = ${held.tin} and ${receipts.receiptNo} = ${held.receiptNo}`,
+                    sameReceiptKey(receipts, held),
                   ),
                 )
                 .orderBy(asc(receipts.createdAt), asc(receipts.id))
@@ -1857,6 +1883,7 @@ export function createReceiptRepository(db: Conn): ReceiptRepository {
                   printedOn: head.printedOn,
                   printedTime: head.printedTime,
                   receiptNo: head.receiptNo,
+                  till: head.till ?? null,
                   totalMinor: head.totalMinor,
                   readTotalMinor: head.readTotalMinor,
                   cashbackMinor: head.cashbackMinor ?? null,

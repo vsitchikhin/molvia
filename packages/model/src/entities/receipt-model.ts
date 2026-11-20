@@ -280,19 +280,14 @@ const clockOf = (time: string | null): string | null => {
 }
 
 /**
- * Every number of the card's digits the rows the model copied print after a word of the card (MOL-408: Armenia's
- * eight, Georgia's tax number nine or eleven). The model copies the rows with their labels and never says which
- * number is which (review №10, adversarial А6): asked for the tax number, it gave «Ереван Сити»'s till registration
- * «ԳՀ» printed under it, and the shop's tax number as the fiscal one — the key of every receipt of that till, and the
- * next one «recorded before».
+ * Every value the rows the model copied print after a word of the card — a number of the card's digits (MOL-408:
+ * Armenia's eight, Georgia's tax number nine or eleven), or the till's serial (MOL-422). The model copies the rows with
+ * their labels and never says which number is which (review №10, adversarial А6): asked for the tax number, it gave
+ * «Ереван Сити»'s till registration «ԳՀ» printed under it, and the shop's tax number as the fiscal one — the key of
+ * every receipt of that till, and the next one «recorded before».
  */
-function labelled(
-  answer: ModelReceipt,
-  word: string,
-  between: string,
-  digits: readonly number[],
-): string[] {
-  const pattern = new RegExp(`(?:${word})${between}(?<!\\d)(${digitCounts(digits)})(?!\\d)`, 'giu')
+function labelled(answer: ModelReceipt, word: string, between: string, value: string): string[] {
+  const pattern = new RegExp(`(?:${word})${between}(?<!\\d)(${value})(?!\\d)`, 'giu')
   return answer.id_rows.flatMap((row) => [...row.matchAll(pattern)].map((found) => found[1] ?? ''))
 }
 
@@ -308,26 +303,42 @@ const timesPrinted = (answer: ModelReceipt, number: string): number =>
     .length
 
 /**
+ * The till's serial after its word, where the card names one (MOL-422, owner's В-1 «б»): Georgia's «Fsmd: DY00185692».
+ * A constant of the till, as the tax number is, so no guard of А6; two serials are two tills, and none. Bounded by
+ * digits as every number of the key is (review №9): its form is its length, so a letter after it — «FM» with its «:»
+ * lost — is no other serial; read in any case and kept in capitals, or one till would be two keys.
+ */
+const tillOf = (reading: PhotoReading, answer: ModelReceipt): string | null =>
+  reading.till === null
+    ? null
+    : oneOf(
+        labelled(answer, reading.till.word, '[\\s:]*', reading.till.serial).map((serial) =>
+          serial.toUpperCase(),
+        ),
+      )
+
+/**
  * The seller's tax number and the receipt's number, the key against a second record (Т-11), in Tesseract's
  * form and by its words — or one paper read by the two readers is two keys and recorded twice (adversarial
  * А5, А6): the card's digits after its word — Armenia's eight after «ՀՎՀՀ», Georgia's nine or eleven after «ს/კ»
- * (MOL-408) — and the fiscal number, the card's digits after «Ֆիսկալ», leading zeros kept. **Never «ԿՀ»**: a
- * till's own count, repeated by the shop's other tills. **Never a number the rows
- * print under another label too** — the shop's tax number, the till's registration: the same on every
- * receipt of the till, and every one after the first «recorded before» (adversarial А6, round 4). The tax
- * number keeps no such guard: it is the same on every receipt anyway, and the bench's one number under two
- * labels was the tax number under «ՀՎՀՀ» and «ՀԴՄ» both, right. Two fiscal numbers are a pair (MOL-293);
- * three are none.
+ * (MOL-408), Georgia's till's serial (`tillOf`, MOL-422) — and the fiscal number, the card's digits after its word,
+ * «Ֆիսկալ», Georgia's «ქვითარი», leading zeros kept. **Never «ԿՀ»**: a till's own count, repeated by the shop's other
+ * tills; Georgia's number is one such, and keys only with its till — over the paper's head, never a reading's
+ * (`keyNumberOf`). **Never a number the rows print under another label too** —
+ * the shop's tax number, the till's registration: the same on every receipt of the till, and every one after the
+ * first «recorded before» (adversarial А6, round 4). The tax number keeps no such guard: it is the same on every
+ * receipt anyway, and the bench's one number under two labels was the tax number under «ՀՎՀՀ» and «ՀԴՄ» both,
+ * right. Two fiscal numbers are a pair (MOL-293); three are none.
  */
 function keyOf(
   reading: PhotoReading,
   answer: ModelReceipt,
-): { tin: string | null; number: string | null } {
+): { tin: string | null; till: string | null; number: string | null } {
   const fiscals = labelled(
     answer,
     reading.words.fiscal,
     '\\S*(?:\\s+\\S*)?\\s*',
-    reading.fiscalDigits,
+    digitCounts(reading.fiscalDigits),
   )
   const distinct = [...new Set(fiscals)].sort()
   // each under its own label alone: one printed under another too is a constant of the till (А6, round 4)
@@ -335,12 +346,25 @@ function keyOf(
     (fiscal) => timesPrinted(answer, fiscal) === fiscals.filter((one) => one === fiscal).length,
   )
   return {
-    tin: oneOf(labelled(answer, reading.words.tin, '\\S{0,2}\\s*', reading.tinDigits)),
+    tin: oneOf(labelled(answer, reading.words.tin, '\\S{0,2}\\s*', digitCounts(reading.tinDigits))),
+    till: tillOf(reading, answer),
     // a prepayment slip printed over «Ереван Сити»'s receipt has a fiscal number of its own, and the model
     // copies the two in either order: the pair is the paper's key, as either alone would be (MOL-293, В-3 «а»)
     number: !own || distinct.length === 0 || distinct.length > 2 ? null : distinct.join('+'),
   }
 }
+
+/**
+ * The receipt's number as the key, judged over the paper's head — both readings of it joined (MOL-405) — never a
+ * reading's: where the card names a till, the number is that till's own count (MOL-422, adversarial А1: ge-02's till
+ * 1713 in its shift 6205 printed «ქვითარი 1687592», some 272 a shift) and «ს/კ» the chain's, the same on all its
+ * tills, so a number with no till keys nothing. Judged a reading at a time, one that copied only «Fsmd» and one that
+ * copied only «ქვითარი» left a paper keyless (adversarial Б1).
+ */
+export const keyNumberOf = (
+  reading: PhotoReading,
+  head: { readonly till?: string | null; readonly receiptNo: string | null },
+): string | null => (reading.till !== null && (head.till ?? null) === null ? null : head.receiptNo)
 
 /**
  * A line as the model wrote it. Its figures are printed by the model's nature — it copies, the arithmetic
@@ -1180,7 +1204,7 @@ export function receiptTextOfModel(
         : discounted
           ? 'card'
           : 'class'
-  const { tin, number } = keyOf(reading, answer)
+  const { tin, till, number } = keyOf(reading, answer)
   // a pharmacy's lines and total as printed (MOL-421): what they are judged by, here and by the check
   const totalThousandths = total === null ? undefined : printedTotals.get(total)
   const milli = pharmacySum({ cashbackHundredths: cashback, serviceHundredths: service, lines })
@@ -1204,6 +1228,7 @@ export function receiptTextOfModel(
     date: printedDayOf(answer.date, reading),
     time: clockOf(answer.time),
     receiptNo: number,
+    till,
     totalHundredths: total ?? slip,
     readTotalHundredths: read ?? slip,
     balanced:

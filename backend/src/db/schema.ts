@@ -2905,6 +2905,10 @@ export const receipts = pgTable(
     printedOn: date('printed_on'),
     printedTime: text('printed_time'),
     receiptNo: text('receipt_no'),
+    // The till's serial where the receipt prints no tax number — Georgia's «Fsmd» (MOL-422, owner's В-1 «б»): the
+    // seller of the key against a second record beside `receipt_no`, never the seller's place or the shop's memory,
+    // which `tin` alone opens (MOL-438). Only a model's reading names it.
+    till: text('till'),
     // In the receipt's own currency: the total two sources vouch for — the lines that met it, or two
     // places printed (MOL-244) — the review's and the trip's.
     totalMinor: bigint('total_minor', { mode: 'bigint' }),

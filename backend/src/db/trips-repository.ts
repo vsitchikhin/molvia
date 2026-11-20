@@ -292,12 +292,12 @@ function ownerLock(tx: Conn, actorId: string) {
  */
 async function refuseRecordedAgain(tx: Conn, actorId: string, tripId: string) {
   const [own] = await tx
-    .select({ id: receipts.id, tin: receipts.tin, receiptNo: receipts.receiptNo })
+    .select({ id: receipts.id })
     .from(receipts)
     .where(and(eq(receipts.tripId, tripId), eq(receipts.status, 'recorded')))
     .limit(1)
-  if (own?.tin == null || own.receiptNo === null) return
-  if ((await recordedTwinOf(tx, actorId, own.tin, own.receiptNo, own.id)) !== null) {
+  if (own === undefined) return
+  if ((await recordedTwinOf(tx, actorId, own.id)) !== null) {
     throw new DomainError(ERROR.RECEIPT_RECORDED_BEFORE)
   }
 }

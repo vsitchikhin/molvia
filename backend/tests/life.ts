@@ -168,6 +168,8 @@ export async function aLife(
       printedOn: '2026-09-30',
       printedTime: '15:03',
       receiptNo: '21410811',
+      // the till's serial (MOL-422): a field of the copy, filled in some row
+      till: 'DY00135692',
       totalMinor: 74_000n,
       // the card's 1 % sent to the card, a bonus spent on it (MOL-289)
       cashbackMinor: 740n,

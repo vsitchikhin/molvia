@@ -98,19 +98,12 @@ describe('claimReceiptNotices (MOL-129)', () => {
     const twin = repository([receipt], [], true)
     const { notices } = await claimReceiptNotices(twin, AT, vi.fn())
     expect(notices[0]?.duplicate).toBe(true)
-    expect(twin.recordedTwin).toHaveBeenCalledWith('a1', '01234567', '417', receipt.receipt.id)
+    // the key is read off the receipt's own row (MOL-422): the use case names the receipt, never its key
+    expect(twin.recordedTwin).toHaveBeenCalledWith('a1', receipt.receipt.id)
   })
 
-  it('asks nothing about a twin without a number to know it by', async () => {
-    const twin = repository(
-      [
-        untold({
-          header: { tin: '01234567', date: null, time: null, receiptNo: null, shop: null },
-        }),
-      ],
-      [],
-      true,
-    )
+  it('asks nothing about a twin of a receipt recorded already', async () => {
+    const twin = repository([untold({ tripId: '5d1f6a2e-3c4b-4f8a-9e7d-2b1a0c9d8e7f' })], [], true)
     const { notices } = await claimReceiptNotices(twin, AT, vi.fn())
     expect(notices[0]?.duplicate).toBe(false)
     expect(twin.recordedTwin).not.toHaveBeenCalled()
