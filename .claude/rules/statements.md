@@ -187,13 +187,18 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   format changed twice in five years, silently (b-russia.md, 1.4). Names are compared without case, «ё», hyphens and
   spaces; a column not read may come and go. **Exports glued together** repeat their header, each part beginning with
   it — a byte order mark of its own too — and **an operation a part repeats of an earlier part is read once, the
-  later export's** (adversarial А4: two exports sharing their edge day gave each line of it twice, both ticked new).
+  later part's** (adversarial А4: two exports sharing their edge day gave each line of it twice, both ticked new).
   It is known by what the bank printed of it and never sets later — the account, the moment to the second, the
   operation's sum and currency, the payee, the MCC — **never cell for cell** (Б1: between two exports a bonus is added,
   a hold posts at another rate, the person changes a category). Like records are counted by part: the n-th of a part
   is the n-th of the parts before, one more than any of them held another operation (review №10). **The price,
-  named:** two operations of one second alike in all of these, in different parts and not in one, are one. **A CSV is read by `csv.ts`** for every bank: UTF-8 where it is valid, its
-  byte order mark dropped, else Windows-1251; quotes by RFC 4180; a quote never closed refuses the file.
+  named:** two operations of one second alike in all of these, in different parts and not in one, are one; the later
+  part is the one further down the file, never known to be the fresher export — glued out of order, the older one's
+  version stays (review №13, adversarial В2); and a hold the bank changed or dropped between the two exports stays a
+  line of its own (В1) — the glue mends no hold, as two uploads of those exports would not (research §7). Dropping
+  what a later part leaves out was weighed and refused: a file glued the other way would lose a spending.
+  **A CSV is read by `csv.ts`** for every bank: UTF-8 where it is valid, its byte order mark dropped, else
+  Windows-1251; quotes by RFC 4180; a quote never closed refuses the file.
 - **Wrong is worse than unread** — a sum with more digits than its currency has, signs of the two sums that disagree,
   one sum zero beside the other not, a day no calendar has or before the rates' epoch refuse the file, decided once
   the whole record has read (review №4); a line of zero is left out, and so is a declined one whose sums disagree —

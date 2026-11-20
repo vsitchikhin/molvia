@@ -333,6 +333,21 @@ describe('readTbankCsv — the layout of 2026', () => {
     ).toEqual([null, 96_240n])
   })
 
+  it('keeps the part further down the file, never knowing which export is fresher (named price, В2)', () => {
+    const usd = { amount: '-10,00', currency: 'USD', payee: 'STEAMGAMES', mcc: '5816' }
+    const read = readTbankCsv(
+      utf8File(
+        HEADER_2026,
+        row2026({ ...usd, debited: '-962,40' }),
+        HEADER_2026,
+        row2026({ ...usd, debited: '-950,00' }),
+      ),
+    )
+    expect(accountsOf(read)[0]?.statement.lines.map(({ debited }) => debited?.minor)).toEqual([
+      95_000n,
+    ])
+  })
+
   it('reads a like record a later export holds more of than any before as another (review №10)', () => {
     const read = readTbankCsv(utf8File(HEADER_2026, row2026(), HEADER_2026, row2026(), row2026()))
     expect(accountsOf(read)[0]?.statement.lines).toHaveLength(2)

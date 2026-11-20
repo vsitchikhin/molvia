@@ -295,8 +295,12 @@ const OPERATION: readonly Column[] = ['account', 'date', 'amount', 'currency', '
  * by the account, the moment to the second, the operation's sum and currency, the payee and the MCC, never by
  * every cell: between two exports the bank adds a bonus, a hold posts at another rate, the person changes a
  * category or «Учёт в аналитике» (Б1). The n-th like record of a part is the n-th of the parts before, the later
- * export's in its place; one more than any part before held is another operation (review №10). **The price,
- * named:** two operations of one second alike in all of these, in different parts and not in one, are one.
+ * part's in its place; one more than any part before held is another operation (review №10). **The prices,
+ * named:** two operations of one second alike in all of these, in different parts and not in one, are one; the
+ * later part is the one further down the file, never known to be the fresher export — glued out of order, the
+ * older one's version stays (review №13, adversarial В2); and a hold the bank changed or dropped between the two
+ * exports stays a line of its own — the glue mends no hold, as two uploads of those exports would not (research §7,
+ * В1). Dropping what a later part leaves out would lose a spending of a file glued the other way.
  */
 function recordsOf(
   records: readonly CsvRecord[],
