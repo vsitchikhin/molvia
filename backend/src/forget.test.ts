@@ -32,6 +32,7 @@ const REPORT: ErasureReport = {
   itemsReleased: 1,
   barcodesReleased: 2,
   memoryReleased: 0,
+  paymentsReleased: 0,
   counted: true,
 }
 

@@ -3,7 +3,7 @@ import { createApp, defineComponent, h, nextTick, ref } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR, ISSUE, PHONE_FAILURES_KEPT } from '@molvia/model'
 import type { ClientErrors } from '@molvia/model'
-import { FAILURES_KEY, failureReports, pageBuild, phoneDefect } from './failures'
+import { FAILURES_KEY, ScreenNotLoaded, failureReports, pageBuild, phoneDefect } from './failures'
 import type { FailureEnvironment } from './failures'
 
 const ORIGIN = 'https://molvia.net'
@@ -255,6 +255,12 @@ describe('сбой ли это телефона (Р-4, В-3)', () => {
       true,
     ],
     ['исключение в коде', new TypeError('x'), true],
+    // Код экрана не пришёл: связь или выкатка, убравшая чанк старой страницы (MOL-337).
+    [
+      'код экрана не пришёл',
+      new ScreenNotLoaded('screen not loaded', { cause: new TypeError('Failed to fetch') }),
+      false,
+    ],
   ])('%s', (_name, error, defect) => {
     expect(phoneDefect(error)).toBe(defect)
   })

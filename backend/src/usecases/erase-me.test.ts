@@ -10,6 +10,7 @@ const report = (leavingItems: readonly string[]): ErasureReport => ({
   itemsReleased: 0,
   barcodesReleased: 0,
   memoryReleased: 0,
+  paymentsReleased: 0,
   counted: true,
 })
 

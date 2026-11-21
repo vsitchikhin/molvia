@@ -332,11 +332,8 @@ export async function receiptOfOwner(
     { incomeCurrency: actor.incomeCurrency, spendCurrency: currency },
     day,
   )
-  const number = receipt.header?.receiptNo ?? null
   const twin =
-    tin === null || number === null || receipt.tripId !== null
-      ? null
-      : await repositories.receipts.recordedTwin(actor.id, tin, number, receipt.id)
+    receipt.tripId !== null ? null : await repositories.receipts.recordedTwin(actor.id, receipt.id)
 
   // a total proves the receipt's sum, never whose figure is right: it points at a price only where the price is all the
   // sum there is — the one line of the receipt, one piece with no discount, nothing sent to the card. Beside another

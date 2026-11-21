@@ -400,6 +400,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   answers `too_heavy` and weighs none; the matching skips what a failed search went through (А20), and past
   `STATEMENT_STEPS_MAX` steps stops with `too_heavy` too (А22) — 1.3 s at worst; a refund weighs the sellers of its
   sum alone, counted in the pairs (А23), and names weigh by their words, eight at most (А24).
+- **A bank's file is parsed by its columns' names, and what the parser does not know refuses the file** (MOL-430,
+  `backend/src/statements/`): a header, a status, a sum wider than its currency — named in the answer, never guessed;
+  T-Bank's Moscow time is a day on the phone's calendar, «Сообщение» is never read, an own transfer
+  is a line with no MCC the bank's words call one, with «Учёт в аналитике: Нет» beside them — «Нет» alone is the
+  person's switch, and «Внутренний перевод» is a transfer: a tap, never a spending lost.
 
 ### Trips and the queue on the device — `.claude/rules/trips.md`
 
@@ -532,6 +537,20 @@ that are easiest to break; the file holds every rule of the area and the reason 
   onnxruntime's telemetry is off (`ORT_DISABLE_TELEMETRY`, MOL-105).
 - **Logs live fourteen days and carry no address and no query**; a failure is logged by its kind
   through `describeFailure`, never by its message.
+
+### Payments: the journal, tariffs, access paid for — `.claude/rules/payments.md`
+
+- **One journal for every channel** (MOL-283): `payments`, a channel is a `PaymentChannelAdapter`; the price is fixed
+  at creation — the dollar anchor at the CBA's rate fresh for today in Yerevan, rounded up to 10 ֏ — and none without
+  it, never another provider's.
+- **«Paid» is set once, the access with it**: the person's row locked, `update … where state = 'created'`, thirty days
+  from the end of a running term or from now in the same transaction; any later word moves nothing — but the bank's
+  «paid» over our «abandoned».
+- **A whole refund takes back the payment's days not lived yet, never earlier than now; refunds add up, the bank asked
+  first.**
+- **Erasure lets the person go and keeps the payment** (`set null`, Ameriabank's three years); every payment goes three
+  years after its last movement — a paid one after its days too — one unnamed and unpaid goes with the person; the
+  holder's name, email and card are never kept.
 
 ### Feedback: «Написать разработчику» — `.claude/rules/feedback.md`
 
@@ -695,6 +714,12 @@ that are easiest to break; the file holds every rule of the area and the reason 
 - **An installed app takes a new version only when hidden and holding no typing** (`pwaUpdate.ts`),
   **or by «Обновить»** (MOL-132): never reloaded without the tap; the strip is the top row over the
   tab bar, and an error while a version waits offers it first.
+- **Every screen but home is a chunk, all loaded once the first is drawn; one dictionary at the start**
+  (MOL-337): `lazyScreen` in `router.ts`, `warmScreens` after the paint — a first visit and an old page after a
+  release are under no precache, the dev server loads them before it — a screen whose code did not come opened
+  by a full load, once in 30 s, a module that threw as it ran never — it is our defect; a
+  language spoken once its dictionary is here; modules run in the source's order (`strictExecutionOrder`); words
+  read back in either language are `BOTH_LANGUAGES`, never a dictionary, which would pull its whole chunk in.
 - **The bars are opaque `--surface`; the docked strip's margins and column are `AppScreen`'s, and
   «Вернуть» is its `#undo`, 8 over the strip** (MOL-179): never in `#docked`, never a wrapper's
   padding in a screen; a sheet's «Вернуть» stays in its footer.
@@ -748,9 +773,11 @@ that are easiest to break; the file holds every rule of the area and the reason 
   did not read fails `unreadable`, the model away waited for a day, asked hourly at most, a person's receipts of the
   country resting together through an outage, the round going on past them — the camera there only for whom `/actors/me`
   says `receiptsByModel` (a header: grant, share, cap), the digits of the tax and fiscal numbers the card's, every item
-  a Georgian line finds «проверьте»; no tax number printed, no shop memory (MOL-438). A pharmacy's three decimals are
-  read where most amounts of its lines print three, or else where a total is printed with three, its lines judged as
-  printed by the reading and the check alike, then half up to the tetri; lines that meet the total as printed are whole,
+  a Georgian line finds «проверьте»; no tax number printed, no shop memory (MOL-438); a paper keyed by «ქვითარი»,
+  the till's own count, with the till's «Fsmd» alone, never the chain's «ს/კ», over the paper's two readings joined
+  (`receipts.till`, `keyNumberOf`, MOL-422). A pharmacy's three decimals are read where most amounts of its lines
+  print three, or else where a total is printed with three, its lines judged as printed by the reading and the check
+  alike, then half up to the tetri; lines that meet the total as printed are whole,
   the tetri they round apart a row of its own, «Округление» (`rounding_minor`, А1 «а»), named of sums read right on a
   receipt not whole too and recorded with the lines typed against the total as read; its total under «ლარი» alone is a
   place of the total where none has the word (`bareTotal`, MOL-421). **A line off its sum by no more than its price's

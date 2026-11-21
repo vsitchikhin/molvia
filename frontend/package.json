@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./testing/root-font-size": "./testing/root-font-size.ts"
+    "./testing/root-font-size": "./testing/root-font-size.ts",
+    "./testing/screens": "./testing/screens.ts"
   },
   "scripts": {
     "dev": "vite",

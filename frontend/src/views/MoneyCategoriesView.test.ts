@@ -4,6 +4,7 @@ import { createPinia, setActivePinia } from 'pinia'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defineComponent, h } from 'vue'
+import type { Plugin } from 'vue'
 import { ApiError } from '@molvia/client'
 import { ERROR } from '@molvia/model'
 import type {
@@ -14,7 +15,7 @@ import type {
 } from '@molvia/model'
 import ListRow from '@/components/ListRow.vue'
 import { provideAnnouncer } from '@/composables/useAnnouncer'
-import { createAppI18n } from '@/i18n'
+import { createAppI18n, i18n as appI18n, loadDictionary } from '@/i18n'
 import en from '@/i18n/en.json'
 import { routes } from '@/router'
 import { useActorStore } from '@/stores/actor'
@@ -70,7 +71,7 @@ const LIST: SpendingCategoryView[] = [
 ]
 
 const views: VueWrapper[] = []
-async function render(): Promise<VueWrapper> {
+async function render(i18n: Plugin = createAppI18n('en')): Promise<VueWrapper> {
   const pinia = createPinia()
   setActivePinia(pinia)
   const actor = useActorStore()
@@ -80,7 +81,7 @@ async function render(): Promise<VueWrapper> {
   await router.push('/money/categories')
   const view = mount(MoneyCategoriesView, {
     attachTo: document.body,
-    global: { plugins: [pinia, router, createAppI18n('en')] },
+    global: { plugins: [pinia, router, i18n] },
   })
   views.push(view)
   await flushPromises()
@@ -189,6 +190,19 @@ describe('MoneyCategoriesView: «Добавить категорию» in the st
   it('a ready-made name in the other language is taken too: after a switch the two would be twins (MOL-398, А3)', async () => {
     spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
     const view = await render()
+    await addThroughSheet(view, 'Продукты')
+    expect(document.querySelector('dialog[open]')?.textContent).toContain(
+      en.spending.new_category.bad_taken,
+    )
+    expect(addSpendingCategory).not.toHaveBeenCalled()
+  })
+
+  // MOL-337, adversarial А9: the app holds the phone's dictionary alone, and the other language's names were keys.
+  it('so too where the app holds the phone’s dictionary alone, as it does since each is a chunk of its own', async () => {
+    await loadDictionary('en-GB')
+    appI18n.global.locale.value = 'en-GB'
+    spendingCategories.mockResolvedValue({ categories: LIST, frequent: [] })
+    const view = await render(appI18n)
     await addThroughSheet(view, 'Продукты')
     expect(document.querySelector('dialog[open]')?.textContent).toContain(
       en.spending.new_category.bad_taken,

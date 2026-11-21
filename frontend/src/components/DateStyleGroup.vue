@@ -45,7 +45,7 @@ export default defineComponent({
     }))
     function pick(value: string): void {
       const chosen = STYLES.find((known) => known === value)
-      if (chosen) chooseStyle(chosen)
+      if (chosen) void chooseStyle(chosen)
     }
     return { t, style, styles, pick }
   },

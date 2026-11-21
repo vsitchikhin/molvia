@@ -31,6 +31,7 @@ test('сбой собранного приложения: сборка — им�
   expect(report?.build).toMatch(/^index-[\w-]+$/)
   expect(report?.screen).toBe('privacy')
   expect(
-    report?.frames?.some((frame) => /\(\/assets\/index-[\w-]+\.js:\d+:\d+\)$/.test(frame)),
+    // A path of the site, in whichever chunk the failure stood (MOL-337).
+    report?.frames?.some((frame) => /\(\/assets\/[\w-]+\.js:\d+:\d+\)$/.test(frame)),
   ).toBe(true)
 })

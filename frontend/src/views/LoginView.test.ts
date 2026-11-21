@@ -8,7 +8,7 @@ import { ApiError } from '@molvia/client'
 import { actorCodec, ERROR } from '@molvia/model'
 import type { ActorView, LoginPoll, LoginStarted } from '@molvia/model'
 import { LOCALE_KEY } from '@/composables/useLocale'
-import { createAppI18n, i18n } from '@/i18n'
+import { createAppI18n, i18n, loadDictionary } from '@/i18n'
 import en from '@/i18n/en.json'
 import ru from '@/i18n/ru.json'
 import { routes } from '@/router'
@@ -16,6 +16,8 @@ import { pwaUpdateKey, type UpdatePhase } from '@/pwaUpdate'
 import { useActorStore } from '@/stores/actor'
 import { useLoginStore } from '@/stores/login'
 import LoginView from './LoginView.vue'
+// A tap here leads to another screen, loaded when first opened (MOL-337): imported up front, it is there.
+import '@molvia/frontend/testing/screens'
 
 const startLogin = vi.fn<() => Promise<LoginStarted>>()
 const pollLogin = vi.fn<(id: string) => Promise<LoginPoll>>()
@@ -88,7 +90,9 @@ function button(view: VueWrapper, name: string) {
   return found
 }
 
-beforeEach(() => {
+beforeEach(async () => {
+  // Both dictionaries here before a tap on the other language (MOL-337): it is spoken within one flush.
+  await Promise.all([loadDictionary('ru'), loadDictionary('en')])
   vi.restoreAllMocks()
   startLogin.mockReset()
   pollLogin.mockReset()
@@ -245,6 +249,8 @@ describe('другой язык на первом экране (MOL-398, В-2 «
     expect(other.attributes('lang')).toBe('ru')
 
     await other.trigger('click')
+    // Spoken once its dictionary is here (MOL-337).
+    await flushPromises()
     expect(localStorage.getItem(LOCALE_KEY)).toBe('ru')
     expect(i18n.global.locale.value).toBe('ru')
   })

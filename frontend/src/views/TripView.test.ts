@@ -33,6 +33,8 @@ import { useSpendingQueueStore } from '@/stores/spendingQueue'
 import { useTripQueueStore } from '@/stores/tripQueue'
 import ItemDetailsSheet from '@/components/ItemDetailsSheet.vue'
 import TripNotices from '@/components/TripNotices.vue'
+// A tap here leads to another screen, loaded when first opened (MOL-337): imported up front, it is there.
+import '@molvia/frontend/testing/screens'
 
 const currentTrip = vi.fn<() => Promise<TripViewModel | null>>()
 const recentPlaces = vi.fn<() => Promise<{ id: string; kind: 'store'; name: string }[]>>()

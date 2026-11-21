@@ -194,6 +194,11 @@ export interface ReceiptText {
   readonly time: string | null
   readonly receiptNo: string | null
   /**
+   * The till's serial, the seller of the key beside `receiptNo` where no tax number is printed (MOL-422): Georgia's
+   * «Fsmd». Only a model's reading names it.
+   */
+  readonly till?: string | null
+  /**
    * The total two sources vouch for — the lines that met it, or two places printed (MOL-244) — else null:
    * what the review shows and the trip's money may take.
    */

@@ -41,6 +41,8 @@ import { rememberJournal, useAccountsStore } from '@/stores/accounts'
 import { useActorStore } from '@/stores/actor'
 import AccountView from '@/views/AccountView.vue'
 import AccountsView from '@/views/AccountsView.vue'
+// A tap here leads to another screen, loaded when first opened (MOL-337): imported up front, it is there.
+import '@molvia/frontend/testing/screens'
 
 const moneyAccounts = vi.fn<() => Promise<MoneyAccountsResponse>>()
 const accountJournal = vi.fn<(id: string) => Promise<AccountJournalResponse>>()

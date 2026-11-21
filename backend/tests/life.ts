@@ -20,6 +20,7 @@ import {
   moneyAccounts,
   moneyMonthRates,
   budgetPlans,
+  payments,
   ratingReminders,
   receiptLineImages,
   receiptLines,
@@ -168,6 +169,8 @@ export async function aLife(
       printedOn: '2026-09-30',
       printedTime: '15:03',
       receiptNo: '21410811',
+      // the till's serial (MOL-422): a field of the copy, filled in some row
+      till: 'DY00135692',
       totalMinor: 74_000n,
       // the card's 1 % sent to the card, a bonus spent on it (MOL-289)
       cashbackMinor: 740n,
@@ -359,6 +362,20 @@ export async function aLife(
     apiBuild: 'dev',
     threadId: message.id,
     inReplyTo: reply?.id,
+  })
+  // A payment the bank named (MOL-283): erasure lets the person go and keeps the row for the bank's three years.
+  await db.insert(payments).values({
+    id: randomUUID(),
+    actorId,
+    tariff: 'data',
+    anchorMinor: 100n,
+    anchorCurrency: 'USD',
+    rateScaled: 383_120_000n,
+    rateAsOf: new Date('2026-09-18T00:00:00+04:00'),
+    amountMinor: 39_000n,
+    currency: 'AMD',
+    channel: 'ameriabank',
+    channelRef: randomUUID(),
   })
   return { ownItem, exchangeId, incomeId, spendingId, accountId, receiptId, transferId }
 }

@@ -4,6 +4,7 @@ paths:
   - 'packages/model/src/support/{payee-name,printed-time}.ts'
   - 'packages/model/tests/entities/statement-*'
   - 'packages/model/tests/support/{payee-name,printed-time}.test.ts'
+  - 'backend/src/statements/**'
 ---
 
 # Spendings from a bank's statement: the line, its key, «не траты», the duplicates rule (MOL-429)
@@ -173,13 +174,73 @@ measurement on the owner's samples; the owner's decisions are in `.scratch/tasks
   `recorded` (the record and the doubt, or none), `not_spending` (the reason and the record that settled it); the holds
   apart (`unposted`). MOL-433 and MOL-435 read one shape and repeat no rule.
 
+## The parsers of a bank's file (MOL-430…432)
+
+- **In `backend/src/statements/`, one file a bank's format, and a refusal is an answer, never a throw** (MOL-430): a
+  parser is the input's adapter — the domain gets lines, the phone parses nothing (Д-3 «а») — and it gives back its
+  statements or what it refused, one shape for every parser (`refusal.ts`: `StatementRead`, `StatementRefusal`, review
+  №5): the format not known, a record that does not read (the line of the file it begins on, as an editor counts —
+  a field over two lines and a blank line count, adversarial А7), a status not known (as printed), a currency Molvia
+  keeps no account in, more than `STATEMENT_LINES_MAX` lines. The upload (MOL-433) makes the answer of it; a
+  `DomainError` carries no word of what was refused to the phone, and the owner's В-4 «а» wants the status named.
+- **Columns by their names, never their places; a header no layout knows is refused, never guessed** — T-Bank's
+  format changed twice in five years, silently (b-russia.md, 1.4). Names are compared without case, «ё», hyphens and
+  spaces; a column not read may come and go. **Exports glued together** repeat their header, each part beginning with
+  it — a byte order mark of its own too — and **an operation a part repeats of an earlier part is read once, the
+  later part's** (adversarial А4: two exports sharing their edge day gave each line of it twice, both ticked new).
+  It is known by what the bank printed of it and never sets later — the account, the moment to the second, the
+  operation's sum and currency, the payee, the MCC — **never cell for cell** (Б1: between two exports a bonus is added,
+  a hold posts at another rate, the person changes a category). Like records are counted by part: the n-th of a part
+  is the n-th of the parts before, one more than any of them held another operation (review №10). **The price,
+  named:** two operations of one second alike in all of these, in different parts and not in one, are one; the later
+  part is the one further down the file, never known to be the fresher export — glued out of order, the older one's
+  version stays (review №13, adversarial В2); and a hold the bank changed or dropped between the two exports stays a
+  line of its own (В1) — the glue mends no hold, as two uploads of those exports would not (research §7). Dropping
+  what a later part leaves out was weighed and refused: a file glued the other way would lose a spending.
+  **A CSV is read by `csv.ts`** for every bank: UTF-8 where it is valid, its byte order mark dropped, else
+  Windows-1251; quotes by RFC 4180; a quote never closed refuses the file.
+- **Wrong is worse than unread** — a sum with more digits than its currency has, signs of the two sums that disagree,
+  one sum zero beside the other not, a day no calendar has or before the rates' epoch refuse the file, decided once
+  the whole record has read (review №4); a line of zero is left out, and so is a declined one whose sums disagree —
+  it moved nothing. **An operation in a currency Molvia has not got is the money that left the account**, `debited`
+  none (research §6): the sum is right, the currency it was spent in lost. «Списано» only where the two currencies
+  differ. A bank's text is cut as the schema counts it — UTF-16, never a pair of surrogates in two (`cutText` of `csv.ts`,
+  review №2).
+- **T-Bank's CSV** (MOL-430, owner's В-1 «а» — no XLSX: the same rows, and a zip of a stranger's unpacked by JSZip
+  with no ceiling): the layout of 2026 and the one before it; **its Moscow time is a day on the phone's calendar**
+  (`ZONE_HEADER`, MOL-121) — a dinner in Yerevan at 00:30 is 23:30 in Moscow the day before; `SHIFTED_FORMS` keeps
+  its ± 1 for a person who flew; **the old layout's «Дата платежа», printed bare, moves with its operation** (adversarial
+  А6: a night's line was posted the day before it was made). Each zone's clock is made once a file (`daysIn`,
+  `midnightsIn`) — never kept in the model's module, where every spelling of a zone a request names would stay for
+  good (review №1, adversarial А3: +240 MB for 20 000 spellings).
+- **The kind: an own transfer is a line with no MCC the bank's words call one** — «Между своими счетами», «Перевод
+  себе», a deposit's — **and, in the layout of 2026, «Учёт в аналитике: Нет» beside them**; the layout before it has no
+  such column. **«Нет» alone is no sign**: the person switches it off on any line (adversarial А2: a purchase in a
+  supermarket taken out of the bank's analytics was «не трата», silently; Б2: so was a transfer to somebody by phone
+  number). **«Внутренний перевод» is no own word**: T-Bank names so a transfer to any of its contracts,
+  another person's too (А1: the owner's PDF holds such transfers to contracts not his) — a transfer, «перевод — трата ли
+  это?», a tap rather than a spending lost. **A fee is the bank's category, or its words on a line with no MCC**: a
+  line with one is a card's (adversarial Г1: «Комиссионный магазин», a second-hand shop, was a fee with the hint
+  «Прочее»). The rest by the bank's category, its words and the MCC, padded to four digits. The payee is «Описание»; **«Сообщение» — a person's words to a person — is never read**, nor «Ваша
+  категория». **A file of several accounts is a statement each, by «Имя счёта» and the account's currency**
+  (adversarial А5: a product's accounts in two currencies may share a name). «В обработке» the format does not mark:
+  every line is posted, the price of section 7 of the research. **Unknown status refuses the file** (owner's В-4 «а»):
+  a hold or a cancellation, the parser cannot tell.
+- **The price, named: T-Bank's layouts, statuses and kinds' words are those of open parsers** (b-russia.md, 1.2),
+  **not checked on the owner's own export yet** — В-3 «а» checks it against the 137 lines of his PDF once he exports
+  it; until then a header spelt otherwise is refused, a status otherwise refuses the file, and a category or a word
+  otherwise gives another kind.
+
 ## The prices, named
 
 - **The bench's truth is the rule's own feature**: MOL-428's pairs were gathered by «the same sum, the day ± 3» — false
   «recorded» answers are not measured. A doubt is shown, not ticked, so an error costs a tap, never a lost spending.
 - **A file that prints no account's number, uploaded «без счёта»** keys two cards of one bank alike, and a like line of
-  the second is the first's own (А14): a named price — every format the parsers read prints one (Ameria's CSV
-  «Account No.»), and a parser that reads it puts it in `accountNumber`.
+  the second is the first's own (А14): a named price — a parser that reads a number puts it in `accountNumber`
+  (Ameria's CSV «Account No.»). **T-Bank's CSV prints none** (MOL-430): only a card's mask a line, which differs
+  between one account's cards and is empty on a transfer — so its key reads the account chosen in Molvia, and two of
+  its accounts uploaded «без счёта» share one space of keys. Nor does it print a period: «убрать трату?» of a hold with
+  no posting is never ticked for it (Ж1).
 - **The unmeasured constants** — 7, 30, 60 days, a fifth, a half, T-Bank's day, and a file with no posting day
   meeting a screenshot one to four days later as a doubt — are measured by the parsers' tasks on the owner's files;
   a change is a test of its boundary moved. Whether Ameria's CSV «Date» is the operation's day is MOL-432's: if it is

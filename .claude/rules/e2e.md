@@ -162,8 +162,11 @@ The detail behind the end-to-end lines of `CLAUDE.md`.
   window of the app, where it does wait (Е1). Beside it `client-errors-built.spec.ts` (MOL-144) and
   `outdated-built.spec.ts` (MOL-231): the line of a browser below the floor is put in by the build,
   and a start that stayed silent is proved where a worker could have registered. `phone` ignores
-  them; all three run under the page's policy (below). The build is a web server of the run, so every `make e2e`
-  pays for it — some twenty seconds. The spec comes in by `page.goto('/privacy')`, **the one spec
+  them; all three run under the page's policy (below). **`pwa-offline` holds `offline-built.spec.ts`**
+  (MOL-337): every kind of screen opened with no connection from the precache, and a page with no worker
+  opening the tabs offline once the screens are loaded; **after `pwa`**, as `csp-built`'s projects: its pages
+  are opened by `goto`, which hides them and lets a version `pwa-update.spec` put out in. The build is a web
+  server of the run, so every `make e2e` pays for it — some twenty seconds. The spec comes in by `page.goto('/privacy')`, **the one spec
   not through `open()`**: the development seam is not in a build, and that page is open without a
   session. A new version is a byte appended to the built `sw.js`, put back after the spec; `preview`
   keeps plain http even in a copy with certificates (`PWA_PLAIN_HTTP`), since the loopback is a
