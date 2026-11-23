@@ -22,10 +22,10 @@
     "d3-shape": "^3.2.1",
     "pinia": "^4.1.0",
     "reka-ui": "^2.11.0",
-    "vue": "^3.5.45",
+    "vue": "^3.5.46",
     "vue-i18n": "^11.4.20",
     "vue-router": "^5.5.1",
-    "zxing-wasm": "^3.1.6"
+    "zxing-wasm": "^3.1.7"
   },
   "devDependencies": {
     "@iconify-json/mdi": "^1.2.3",
